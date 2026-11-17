@@ -37,7 +37,7 @@ const publisher = person(['core.production.edit', 'core.production.publish'])
 async function publish(h: House) {
   await inContext(async () => (await import('../../../core/server/vocabularies/service')).ensureVocabularies())
   const category = (await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.production-category' AND slug = 'play'"))[0]!.id
-  expect((await req('PATCH', `/api/core/productions/${h.productionId}`, { summary: 'A play to book for.', categoryTermId: category, advisoriesConfirmedNone: true }, publisher)).status).toBe(200)
+  expect((await req('PATCH', `/api/core/productions/${h.productionId}`, { summary: 'A play to book for.', categoryTermId: category, effectsConfirmedNone: true, advisoriesConfirmedNone: true }, publisher)).status).toBe(200)
   expect((await req('POST', `/api/core/productions/${h.productionId}/publish`, {}, publisher)).status).toBe(200)
 }
 

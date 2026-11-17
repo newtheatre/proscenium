@@ -6,7 +6,7 @@ import { sql, type SQL } from 'drizzle-orm'
 import { all, createUnit, first, newId, nowMs, refuse, usePoint, useContext } from '#kit'
 import type { UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
-import { terms } from '../db/domain'
+import { terms, termGroups } from '../db/domain'
 
 export interface VocabularyDecl {
   id: string
@@ -15,7 +15,9 @@ export interface VocabularyDecl {
   ordering?: 'manual' | 'alphabetical'
   locked?: boolean
   termClass?: 'public' | 'internal'
-  terms: { slug: string, label: string, description?: string, icon?: string }[]
+  /** Headings, in order. A grouped vocabulary keeps its terms under them, and each term names its heading. */
+  groups?: string[]
+  terms: { slug: string, label: string, description?: string, icon?: string, group?: string }[]
 }
 
 export interface Vocabulary {
@@ -26,6 +28,14 @@ export interface Vocabulary {
   ordering: 'manual' | 'alphabetical'
   locked: boolean
   termClass: 'public' | 'internal'
+  grouped: boolean
+}
+
+export interface TermGroup {
+  id: string
+  vocabularyKey: string
+  label: string
+  sort: number
 }
 
 export interface Term {
@@ -39,6 +49,7 @@ export interface Term {
   seeded: boolean
   retired: boolean
   mergedIntoId: string | null
+  groupId: string | null
 }
 
 interface TermRow {
@@ -52,6 +63,7 @@ interface TermRow {
   seeded: number
   retired_at: number | null
   merged_into_id: string | null
+  group_id: string | null
 }
 
 interface VocabularyRow {
@@ -62,6 +74,7 @@ interface VocabularyRow {
   ordering: 'manual' | 'alphabetical'
   locked: number
   term_class: 'public' | 'internal'
+  grouped: number
 }
 
 const toTerm = (r: TermRow): Term => ({
@@ -75,6 +88,7 @@ const toTerm = (r: TermRow): Term => ({
   seeded: !!r.seeded,
   retired: r.retired_at !== null,
   mergedIntoId: r.merged_into_id,
+  groupId: r.group_id,
 })
 
 const toVocabulary = (r: VocabularyRow): Vocabulary => ({
@@ -85,6 +99,7 @@ const toVocabulary = (r: VocabularyRow): Vocabulary => ({
   ordering: r.ordering,
   locked: !!r.locked,
   termClass: r.term_class,
+  grouped: !!r.grouped,
 })
 
 const NOT_FOUND = () => refuse('core.vocabulary.not-found', 'There is no such vocabulary.', { status: 404 })
@@ -108,12 +123,15 @@ export async function ensureVocabularies(moduleId?: string): Promise<number> {
   const existing = new Set((await all<{ key: string }>('SELECT key FROM core_vocabularies')).map(r => r.key))
   const missing = declared.filter(d => !existing.has(d.decl.id))
   if (!moduleId) context.cache.vocabulariesEnsured = true
-  if (!missing.length) return 0
+  const adopted = await adoptHeadings(declared)
+  if (!missing.length) return adopted
   const unit = createUnit()
   for (const { module, decl } of missing) {
-    unit.add(sql`INSERT INTO core_vocabularies (key, owner, label, description, ordering, locked, term_class)
-      VALUES (${decl.id}, ${module}, ${decl.label}, ${decl.description ?? null}, ${decl.ordering ?? 'manual'}, ${decl.locked ? 1 : 0}, ${decl.termClass ?? 'public'})`)
-    unit.insertSet(terms, decl.terms.map((t, sort) => ({ vocabularyKey: decl.id, slug: t.slug, label: t.label, description: t.description ?? null, icon: t.icon ?? null, sort, seeded: true })))
+    unit.add(sql`INSERT INTO core_vocabularies (key, owner, label, description, ordering, locked, term_class, grouped)
+      VALUES (${decl.id}, ${module}, ${decl.label}, ${decl.description ?? null}, ${decl.ordering ?? 'manual'}, ${decl.locked ? 1 : 0}, ${decl.termClass ?? 'public'}, ${decl.groups ? 1 : 0})`)
+    const groupIds = new Map((decl.groups ?? []).map(label => [label, newId('tgr')]))
+    if (groupIds.size) unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort })))
+    unit.insertSet(terms, decl.terms.map((t, sort) => ({ vocabularyKey: decl.id, slug: t.slug, label: t.label, description: t.description ?? null, icon: t.icon ?? null, sort, seeded: true, groupId: t.group ? groupIds.get(t.group) ?? null : null })))
   }
   try {
     await unit.commit()
@@ -123,7 +141,59 @@ export async function ensureVocabularies(moduleId?: string): Promise<number> {
     if (/UNIQUE|PRIMARY KEY/i.test(String((error as Error)?.message))) return 0
     throw error
   }
-  return missing.length
+  return missing.length + adopted
+}
+
+/** Adds the declared terms an existing vocabulary lacks, by slug, leaving any whose label a live term already has. Set-wise, so the batch stays small. */
+async function topUpTerms(unit: UnitView, decl: VocabularyDecl, groupIds: Map<string, string>): Promise<void> {
+  const existing = await all<{ slug: string, label: string, retired_at: number | null }>('SELECT slug, label, retired_at FROM core_terms WHERE vocabulary_key = ?', decl.id)
+  const have = new Set(existing.map(r => r.slug))
+  const labels = new Set(existing.filter(r => r.retired_at === null).map(r => r.label.toLowerCase()))
+  const assign = decl.terms.filter(t => t.group && have.has(t.slug)).map(t => [t.slug, groupIds.get(t.group!) ?? null])
+  if (assign.length) {
+    unit.add(sql`UPDATE core_terms SET group_id = (SELECT json_extract(value, '$[1]') FROM json_each(${JSON.stringify(assign)}) WHERE json_extract(value, '$[0]') = core_terms.slug)
+      WHERE vocabulary_key = ${decl.id} AND group_id IS NULL AND slug IN (SELECT json_extract(value, '$[0]') FROM json_each(${JSON.stringify(assign)}))`)
+  }
+  let sort = (await first<{ n: number }>('SELECT coalesce(max(sort), -1) + 1 AS n FROM core_terms WHERE vocabulary_key = ?', decl.id))!.n
+  const fresh = decl.terms.filter(t => !have.has(t.slug) && !labels.has(t.label.toLowerCase()))
+  if (fresh.length) {
+    unit.insertSet(terms, fresh.map(t => ({ vocabularyKey: decl.id, slug: t.slug, label: t.label, description: t.description ?? null, icon: t.icon ?? null, sort: sort++, seeded: true, groupId: t.group ? groupIds.get(t.group) ?? null : null })))
+  }
+}
+
+/**
+ * A site made before headings existed keeps its vocabulary and its terms. The first time a grouped
+ * declaration meets an ungrouped vocabulary of the same key it gains the headings, the declared
+ * terms it lacks go under them, and a term the theatre added itself goes under "Other", so every
+ * live term has a heading. The staging effects, which the migration moved out of the advisory
+ * vocabulary, are topped up with the declared terms they lack.
+ */
+async function adoptHeadings(declared: { module: string, decl: VocabularyDecl }[]): Promise<number> {
+  const ungrouped = await all<{ key: string }>('SELECT key FROM core_vocabularies WHERE grouped = 0')
+  const todo = declared.filter(d => d.decl.groups && ungrouped.some(u => u.key === d.decl.id))
+  if (!todo.length) return 0
+  const unit = createUnit()
+  for (const { decl } of todo) {
+    const labels = [...decl.groups!]
+    const known = new Set(decl.terms.map(t => t.slug))
+    const own = await first('SELECT 1 FROM core_terms WHERE vocabulary_key = ? AND group_id IS NULL AND slug NOT IN (SELECT value FROM json_each(?))', decl.id, JSON.stringify([...known]))
+    if (own) labels.push('Other')
+    const groupIds = new Map(labels.map(label => [label, newId('tgr')]))
+    unit.add(sql`UPDATE core_vocabularies SET grouped = 1 WHERE key = ${decl.id}`)
+    unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort })))
+    await topUpTerms(unit, decl, groupIds)
+    if (own) unit.add(sql`UPDATE core_terms SET group_id = ${groupIds.get('Other')!} WHERE vocabulary_key = ${decl.id} AND group_id IS NULL`)
+  }
+  const effects = declared.find(d => d.decl.id === 'core.staging-effect')
+  if (effects && await first("SELECT 1 FROM core_vocabularies WHERE key = 'core.staging-effect'")) await topUpTerms(unit, effects.decl, new Map())
+  try {
+    await unit.commit()
+  }
+  catch (error) {
+    if (/UNIQUE|PRIMARY KEY/i.test(String((error as Error)?.message))) return 0
+    throw error
+  }
+  return todo.length
 }
 
 export async function getVocabulary(key: string): Promise<Vocabulary | null> {
@@ -148,6 +218,13 @@ export async function listTerms(vocabularyKey: string, options: { includeRetired
   const order = vocabulary.ordering === 'alphabetical' ? 'lower(label), sort' : 'sort, lower(label)'
   const rows = await all<TermRow>(`SELECT * FROM core_terms WHERE vocabulary_key = ? ${options.includeRetired ? '' : 'AND retired_at IS NULL'} ORDER BY ${order}`, vocabularyKey)
   return rows.map(toTerm)
+}
+
+/** The headings of a grouped vocabulary, in order. Empty for one that is not grouped. */
+export async function listTermGroups(vocabularyKey: string): Promise<TermGroup[]> {
+  await ensureVocabularies()
+  const rows = await all<{ id: string, vocabulary_key: string, label: string, sort: number }>('SELECT id, vocabulary_key, label, sort FROM core_term_groups WHERE vocabulary_key = ? ORDER BY sort, lower(label)', vocabularyKey)
+  return rows.map(r => ({ id: r.id, vocabularyKey: r.vocabulary_key, label: r.label, sort: r.sort }))
 }
 
 /** One term, following merged_into_id. Works for a retired term, so old records keep a label. */

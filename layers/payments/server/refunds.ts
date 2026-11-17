@@ -99,11 +99,17 @@ export async function approveRefund(unit: UnitView, refundId: string, approver: 
   if (await integrated(attempt)) unit.enqueue('payments.send-refund', { refundId: refund.id })
 }
 
-/** Declines a requested refund with a reason from the theatre's list. No counter moves. */
-export function declineRefund(unit: UnitView, refundId: string, by: string, reasonTermId: string): void {
+/**
+ * Declines a requested refund with a reason from the theatre's list. No counter moves. The owner hears
+ * it as payments.refund.failed, so whatever it held against the refund is let go.
+ */
+export async function declineRefund(unit: UnitView, refundId: string, by: string, reasonTermId: string): Promise<void> {
+  const refund = await getRefund(refundId)
+  const part = refund ? await partOf(refund.part_id) : null
   unit.add(sql`UPDATE payments_refunds SET state = 'declined', approved_by = ${by}, decline_reason_term_id = ${reasonTermId}, updated_at = ${nowMs()}
     WHERE id = ${refundId} AND state = 'requested' AND ${assertTerm(reasonTermId, 'payments.refund-decline-reason')}`)
     .expect(1, { code: 'payments.refund.cannot-decline', reason: 'This refund is not waiting for approval, or that reason is not on the list.' })
+  if (part) unit.announce('payments.refund.failed', { refundId, partId: part.id, owner: ownerOf(part) }, { record: ['payments.refund', refundId] })
 }
 
 /** The refund's posting: the money out of its clearing account, and what the owner's sale credited back. */

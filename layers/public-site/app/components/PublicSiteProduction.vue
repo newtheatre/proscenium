@@ -30,7 +30,10 @@ interface Production {
   season: { name: string } | null
   companyName: string | null
   ageGuidance: string | null
-  advisories: Note[]
+  ageRestricted: boolean
+  effects: { termId: string, label: string, description: string | null, icon: string | null, detail: string | null }[]
+  effectsConfirmedNone: boolean
+  advisories: { termId: string, label: string, heading: string | null, level: 'mentioned' | 'discussed' | 'depicted' | null, detail: string | null }[]
   advisoriesConfirmedNone: boolean
   contentNote: string | null
   runningMinutes: number | null
@@ -185,6 +188,32 @@ useHead(() => {
             />
           </header>
 
+          <section
+            v-if="production.effects.length"
+            aria-labelledby="effects-heading"
+            class="space-y-2"
+          >
+            <h2
+              id="effects-heading"
+              class="text-lg font-semibold text-highlighted"
+            >
+              {{ t('public-site.production.effects') }}
+            </h2>
+            <ul class="space-y-1">
+              <li
+                v-for="e in production.effects"
+                :key="e.termId"
+                class="flex items-start gap-2"
+              >
+                <UIcon
+                  :name="e.icon ?? 'i-lucide-triangle-alert'"
+                  class="mt-1 size-4 shrink-0 text-muted"
+                />
+                <span><span class="font-medium">{{ e.label }}</span><span v-if="e.detail">: {{ e.detail }}</span></span>
+              </li>
+            </ul>
+          </section>
+
           <UCollapsible
             v-if="production.advisories.length || production.contentNote"
             class="rounded-lg border border-default"
@@ -199,12 +228,22 @@ useHead(() => {
             />
             <template #content>
               <div class="space-y-2 px-4 pb-4">
-                <ul class="space-y-1">
+                <ul class="space-y-2">
                   <li
                     v-for="a in production.advisories"
                     :key="a.termId"
                   >
-                    <span class="font-medium">{{ a.label }}</span><span v-if="a.detail">: {{ a.detail }}</span>
+                    <details v-if="a.detail">
+                      <summary class="cursor-pointer">
+                        <span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span>
+                      </summary>
+                      <p class="mt-1 text-sm text-muted">
+                        {{ a.detail }}
+                      </p>
+                    </details>
+                    <template v-else>
+                      <span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span>
+                    </template>
                   </li>
                 </ul>
                 <MarkdownText
@@ -216,11 +255,25 @@ useHead(() => {
             </template>
           </UCollapsible>
           <p
-            v-else-if="production.advisoriesConfirmedNone"
+            v-if="!production.effects.length && production.effectsConfirmedNone && !production.advisories.length && production.advisoriesConfirmedNone"
             class="text-sm text-muted"
           >
             {{ t('public-site.production.no-advisories') }}
           </p>
+          <template v-else>
+            <p
+              v-if="!production.effects.length && production.effectsConfirmedNone"
+              class="text-sm text-muted"
+            >
+              {{ t('public-site.production.no-effects') }}
+            </p>
+            <p
+              v-if="!production.advisories.length && production.advisoriesConfirmedNone"
+              class="text-sm text-muted"
+            >
+              {{ t('public-site.production.no-warnings') }}
+            </p>
+          </template>
 
           <section
             v-if="dates.length"

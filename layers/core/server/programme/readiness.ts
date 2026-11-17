@@ -16,7 +16,10 @@ export const summaryCheck = line(10, 'A summary', 'details', async id => // not-
   !!await first('SELECT 1 FROM core_productions WHERE id = ? AND summary IS NOT NULL', id))
 export const categoryCheck = line(20, 'A category', 'details', async id => // not-policy: the line's place in the list
   !!await first('SELECT 1 FROM core_productions WHERE id = ? AND category_term_id IS NOT NULL', id))
-export const advisoriesCheck = line(30, 'Advisories listed, or none confirmed', 'advisories', async id => // not-policy: the line's place in the list
+export const effectsCheck = line(25, 'Staging effects listed, or none confirmed', 'advisories', async id => // not-policy: the line's place in the list
+  !!await first(`SELECT 1 FROM core_productions p WHERE p.id = ?
+    AND (p.effects_confirmed_none = 1 OR EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id))`, id))
+export const advisoriesCheck = line(30, 'Content warnings listed, or none confirmed', 'advisories', async id => // not-policy: the line's place in the list
   !!await first(`SELECT 1 FROM core_productions p WHERE p.id = ?
     AND (p.advisories_confirmed_none = 1 OR EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id))`, id))
 export const posterCheck = line(40, 'A poster', 'media', async id => // not-policy: the line's place in the list

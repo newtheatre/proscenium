@@ -10,6 +10,8 @@ import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAd
 import { BROWSER_COOKIE, readCookie, setShortCookie } from './web'
 import { startSession } from './sessions'
 import { useEnrolmentLink } from './recovery'
+import { checkClaimable } from './claim'
+import { managedDomainProvider } from './providers'
 
 export interface TokenRow {
   id: string
@@ -25,7 +27,7 @@ export interface TokenRow {
   used_at: number | null
 }
 
-export type RequestOutcome = { sent: true } | { provider: 'google', to: string }
+export type RequestOutcome = { sent: true } | { provider: string, to: string }
 
 /** Is this address's domain one whose people sign in only through the provider? */
 export async function isManaged(address: string): Promise<boolean> {
@@ -42,7 +44,8 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
   const address = normaliseAddress(input.address)
   if (await isManaged(address)) {
     const query = new URLSearchParams({ login_hint: address, ...(input.next ? { next: input.next } : {}) })
-    return { provider: 'google', to: `/api/core/sign-in/google?${query}` }
+    const provider = managedDomainProvider()
+    return { provider: provider.id, to: `/api/core/sign-in/${provider.id}?${query}` }
   }
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
@@ -74,7 +77,8 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
 async function tokenByHash(hash: string): Promise<TokenRow | null> {
   // A staff-issued enrolment link lands on the same page and opens a recovery session (ID-08).
   // An invitation's link signs in exactly as a sign-in link does, and so claims the account.
-  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'enrol_passkey\', \'invite\')', hash)
+  // A claim link from a guest's confirmation email does the same, while the account is unclaimed.
+  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'enrol_passkey\', \'invite\', \'claim\')', hash)
 }
 
 export interface SignedIn { accountId: string, next: string | null, offerPasskey: boolean, created: boolean }
@@ -104,6 +108,7 @@ export async function useLink(unit: UnitView, event: H3Event, token: string): Pr
   if (!row) refuse('core.sign-in.link-unknown', 'This link is not valid.', { status: 410, remedy: 'Ask for a new email.' })
   if (row.used_at) refuse('core.sign-in.link-used', 'This link has been used.', { status: 410, remedy: 'Ask for a new email if you need to sign in again.' })
   if (row.expires_at <= nowMs()) refuse('core.sign-in.link-expired', 'This link has expired.', { status: 410, remedy: 'Ask for a new email.' })
+  if (row.purpose === 'claim') await checkClaimable(row)
   unit.add({ sql: 'UPDATE core_account_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL', params: [nowMs(), row.id] })
     .expect(1, { code: 'core.sign-in.link-used', reason: 'This link has been used.', remedy: 'Ask for a new email if you need to sign in again.' })
   if (row.purpose === 'enrol_passkey') return { ...(await useEnrolmentLink(unit, event, row)), offerPasskey: true, created: false }
