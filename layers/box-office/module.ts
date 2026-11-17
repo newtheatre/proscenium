@@ -45,7 +45,8 @@ export default defineModule({
     'performance.manage': ability({ on: 'core.performance' }),
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
-    'order.view': ability({ on: 'box-office.order', owner: 'grants' }),
+    // Seeing orders includes finding them by the buyer's name or address.
+    'order.view': ability({ on: 'box-office.order', owner: 'grants', implies: ['core.account.find'] }),
     'order.sell': ability({ on: 'core.performance', implies: ['order.view'] }),
     'order.take-payment': ability({ on: 'box-office.order', implies: ['order.view'] }),
     'order.release': ability({ on: 'box-office.order', implies: ['order.view'] }),
@@ -92,6 +93,7 @@ export default defineModule({
     'payments.desk-basket': [{ id: 'box-office' }],
     'core.navigation': [
       { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
+      { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
