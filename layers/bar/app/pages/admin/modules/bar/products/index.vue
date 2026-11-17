@@ -5,8 +5,8 @@
 interface VariantPrice { listId: string, amountMinor: number | null }
 interface Variant { id: string, name: string, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, name: string, ageRestricted: boolean, active: boolean, variants: Variant[] }
-interface Category { id: string, name: string, colour: string | null, parentId: string | null, active: boolean, products: Product[] }
-interface List { id: string, standard: boolean }
+interface Category { id: string, name: string, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
+interface List { id: string, name: string, standard: boolean, percentOff: number | null, active: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -40,7 +40,8 @@ function line(p: Product): string {
 }
 
 // A category: new, or renamed, recoloured or retired.
-const category = ref<{ id: string | null, name: string, colour: string, parentId: string } | null>(null)
+const category = ref<{ id: string | null, name: string, colour: string, parentId: string, ageRestricted: boolean, usualPreset: string } | null>(null)
+const presetItems = ref<{ value: string, label: string }[]>([])
 // A sub-category sits under a top-level category in use; one with sub-categories of its own stays top-level.
 const parentItems = computed(() => {
   const all = data.value?.categories ?? []
@@ -50,15 +51,19 @@ const parentItems = computed(() => {
   return [{ value: 'none', label: t('bar.screens.products.parent-none') }, ...tops.map(c => ({ value: c.id, label: c.name }))]
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function editCategory(c?: Category) {
+async function editCategory(c?: Category) {
   refusal.value = null
-  category.value = c ? { id: c.id, name: c.name, colour: c.colour ?? 'none', parentId: c.parentId ?? 'none' } : { id: null, name: '', colour: 'none', parentId: 'none' }
+  const { presets } = await $api<{ presets: { id: string, builtIn: boolean, name: string | null }[] }>('/api/bar/presets')
+  presetItems.value = [{ value: 'none', label: t('bar.screens.products.preset-none') }, ...presets.map(p => ({ value: p.id, label: p.builtIn ? t(`bar.presets.${p.id.slice('builtin:'.length)}.name`) : p.name! }))]
+  category.value = c
+    ? { id: c.id, name: c.name, colour: c.colour ?? 'none', parentId: c.parentId ?? 'none', ageRestricted: c.ageRestricted, usualPreset: c.usualPreset ?? 'none' }
+    : { id: null, name: '', colour: 'none', parentId: 'none', ageRestricted: false, usualPreset: 'none' }
 }
 async function saveCategory() {
   const c = category.value!
   refusal.value = null
   try {
-    const body = { name: c.name, colour: c.colour === 'none' ? null : c.colour, parentId: c.parentId === 'none' ? null : c.parentId }
+    const body = { name: c.name, colour: c.colour === 'none' ? null : c.colour, parentId: c.parentId === 'none' ? null : c.parentId, ageRestricted: c.ageRestricted, usualPreset: c.usualPreset === 'none' ? null : c.usualPreset }
     if (c.id) await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body })
     else await $api('/api/bar/categories', { method: 'POST', body })
     toast.add({ title: t('bar.screens.products.category-saved'), color: 'success' })
@@ -79,23 +84,13 @@ async function setCategoryActive(c: Category, active: boolean) {
   }
 }
 
-// A new product: its category, name, whether it needs an age check, and its first size's Standard price.
-const product = ref<{ categoryId: string, name: string, ageRestricted: boolean, variantName: string, amountMinor: number | null } | null>(null)
+// A new product: the two-step window, opened on a category's usual preset when it has one.
+const adding = ref(false)
+const addingTo = ref<string | undefined>()
 const categoryItems = computed(() => (data.value?.categories ?? []).filter(c => c.active).map(c => ({ value: c.id, label: c.name })))
 function newProduct(c?: Category) {
-  refusal.value = null
-  product.value = { categoryId: c?.id ?? categoryItems.value[0]?.value ?? '', name: '', ageRestricted: false, variantName: '', amountMinor: null }
-}
-async function saveProduct() {
-  refusal.value = null
-  try {
-    const made = await $api<{ productId: string }>('/api/bar/products', { method: 'POST', body: { ...product.value, variantName: product.value!.variantName || undefined } })
-    product.value = null
-    await navigateTo(`/admin/modules/bar/products/${made.productId}`)
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-  }
+  addingTo.value = c?.id
+  adding.value = true
 }
 
 async function move(p: Product, direction: 'up' | 'down') {
@@ -265,6 +260,21 @@ async function move(p: Product, direction: 'up' | 'down') {
               :items="parentItems"
             />
           </UFormField>
+          <UCheckbox
+            v-model="category.ageRestricted"
+            :label="t('bar.screens.products.category-age')"
+            :description="t('bar.screens.products.category-age-help')"
+          />
+          <UFormField
+            :label="t('bar.screens.products.usual-preset')"
+            :help="t('bar.screens.products.usual-preset-help')"
+            name="usualPreset"
+          >
+            <USelect
+              v-model="category.usualPreset"
+              :items="presetItems"
+            />
+          </UFormField>
         </UForm>
       </template>
       <template #footer>
@@ -276,67 +286,13 @@ async function move(p: Product, direction: 'up' | 'down') {
       </template>
     </UModal>
 
-    <UModal
-      :open="!!product"
-      :title="t('bar.screens.products.new-product')"
-      @update:open="v => { if (!v) product = null }"
-    >
-      <template #body>
-        <UForm
-          v-if="product"
-          id="bar-product"
-          :state="product"
-          class="space-y-4"
-          novalidate
-          @submit="saveProduct"
-        >
-          <RefusalNotice :refusal="refusal" />
-          <UFormField
-            :label="t('bar.screens.products.category')"
-            name="categoryId"
-            required
-          >
-            <USelect
-              v-model="product.categoryId"
-              :items="categoryItems"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('bar.screens.products.name')"
-            :help="t('bar.screens.products.name-help')"
-            name="name"
-            required
-          >
-            <UInput v-model="product.name" />
-          </UFormField>
-          <UFormField
-            :label="t('bar.screens.products.first-size')"
-            :help="t('bar.screens.products.first-size-help')"
-            name="variantName"
-          >
-            <UInput v-model="product.variantName" />
-          </UFormField>
-          <UFormField
-            :label="t('bar.screens.products.standard-price')"
-            :help="t('bar.screens.products.standard-price-help')"
-            name="amountMinor"
-          >
-            <FieldMoney v-model="product.amountMinor" />
-          </UFormField>
-          <UCheckbox
-            v-model="product.ageRestricted"
-            :label="t('bar.screens.products.age-check')"
-            :description="t('bar.screens.products.age-check-help')"
-          />
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="bar-product"
-          :label="t('bar.screens.products.create')"
-        />
-      </template>
-    </UModal>
+    <BarAddProduct
+      v-if="data"
+      v-model:open="adding"
+      :category-id="addingTo"
+      :categories="data.categories"
+      :lists="data.lists"
+      @added="id => navigateTo(`/admin/modules/bar/products/${id}`)"
+    />
   </PageFrame>
 </template>

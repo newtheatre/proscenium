@@ -145,7 +145,7 @@ export interface ChoiceGroup { id: string, name: string, source: 'options' | 'mi
 async function optionsOf(groupId: string, source: string): Promise<ChoiceOption[]> {
   if (source === 'mixers') {
     const rows = await all<{ id: string, product: string, age_restricted: number }>(
-      `SELECT v.id, p.name AS product, p.age_restricted FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
+      `SELECT v.id, p.name AS product, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
         WHERE v.mixer_measure = 1 AND v.active = 1 AND p.active = 1 AND c.active = 1 ORDER BY c.position, p.position, lower(p.name), v.id`)
     return rows.map(r => ({ key: r.id, label: r.product, deltaMinor: 0, ageRestricted: !!r.age_restricted, optionId: null, mixerVariantId: r.id }))
   }
