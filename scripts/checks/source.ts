@@ -191,7 +191,10 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
   }
   for (const m of modules) {
     for (const file of moduleFiles(m)) {
-      for (const [, name] of readFileSync(file, 'utf8').matchAll(/(?:can|requireAbility)\([^,]+,\s*['"]([^'"]+)['"]/g)) required.add(name!)
+      const text = readFileSync(file, 'utf8')
+      for (const [, name] of text.matchAll(/(?:can|requireAbility)\([^,]+,\s*['"]([^'"]+)['"]/g)) required.add(name!)
+      // A requirement source's guards: the kit checks them on every check and holder() call.
+      for (const [, name] of text.matchAll(/\b(?:checkAbility|holderAbility):\s*['"]([^'"]+)['"]/g)) required.add(name!)
     }
   }
   for (const [key] of registry.abilities as Map<string, any>) if (!required.has(key)) problems.push(`abilities.${key}: is declared but nothing requires it`)

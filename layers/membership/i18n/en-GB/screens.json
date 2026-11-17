@@ -64,6 +64,8 @@
   "membership.screens.scheme.grace-help": "How long a membership still counts after its end date.",
   "membership.screens.scheme.holder-may-end": "Holders may end their own membership",
   "membership.screens.scheme.holder-may-end-help": "Turn this off where another body, such as a students' union, owns the membership.",
+  "membership.screens.scheme.accepts-reference": "Member price without signing in",
+  "membership.screens.scheme.accepts-reference-help": "A buyer may type a current holder's member number at the checkout to get the member price. Anybody who knows a number can type it, so these tickets are always checked again at the door.",
   "membership.screens.scheme.details": "Details",
   "membership.screens.scheme.save": "Save details",
   "membership.screens.scheme.saved": "Scheme saved",
