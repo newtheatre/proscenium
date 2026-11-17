@@ -17,6 +17,8 @@ const current = computed(() => (data.value?.awards ?? []).filter(a => a.state ==
 const revoked = computed(() => (data.value?.awards ?? []).filter(a => a.state === 'revoked'))
 const describe = (a: Row) => [a.typeName, day(a.awardedOn), a.awardedFor, a.linked ? null : t('awards.screens.awards.not-linked')].filter(Boolean).join(' · ')
 const issuing = ref(false)
+const importing = ref(false)
+const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x.state === 'active'))
 </script>
 
 <template>
@@ -26,6 +28,15 @@ const issuing = ref(false)
         v-model="q"
         v-model:open="searching"
         :label="t('awards.screens.awards.search')"
+      />
+      <UButton
+        v-if="data?.canIssue && activeTypes.length"
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-file-up"
+        :label="t('awards.screens.import.action')"
+        :ui="{ label: 'max-sm:sr-only' }"
+        @click="importing = true"
       />
       <UButton
         v-if="data?.canIssue"
@@ -92,9 +103,15 @@ const issuing = ref(false)
     </DataBoundary>
     <AwardsIssueDialog
       v-model:open="issuing"
-      :types="(types.data.value?.types ?? []).filter(x => x.state === 'active')"
+      :types="activeTypes"
       :type-id="typeId === 'all' ? undefined : typeId"
       @issued="(id: string) => navigateTo(`/console/awards/${id}`)"
+    />
+    <AwardsImportDialog
+      v-model:open="importing"
+      :types="activeTypes"
+      :type-id="typeId === 'all' ? undefined : typeId"
+      @imported="refresh()"
     />
   </PageFrame>
 </template>

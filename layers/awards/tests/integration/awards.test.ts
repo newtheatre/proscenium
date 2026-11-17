@@ -66,8 +66,8 @@ describe('issuing an award', () => {
     const made = await req('POST', `/api/awards/types/${type}/awards`, { awardedOn: '2026-11-17', recipientName: 'Alan Turing', address: 'alan@example.org' })
     expect(made.body.accountId, JSON.stringify(made.body)).toBeTruthy()
     const past = await issue(type, { recipientName: 'Peggy Ashcroft', awardedOn: '1998-06-01' })
-    const listed = (await req('GET', `/api/awards/awards?typeId=${type}`)).body.awards
-    expect(listed.map((a: any) => [a.recipientName, a.linked])).toEqual(expect.arrayContaining([['Alan Turing', true], ['Peggy Ashcroft', false]]))
+    const listed = (await req('GET', `/api/awards/awards?type=${type}`)).body.awards
+    expect(listed.map((a: any) => [a.recipientName, a.linked])).toEqual([['Alan Turing', true], ['Peggy Ashcroft', false]])
     expect((await req('GET', `/api/awards/awards/${past}`)).body.award.accountId).toBeNull()
   })
 

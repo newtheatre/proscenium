@@ -5,7 +5,7 @@
 // is. Awards requires no other module. This file grows with the build; it declares only what the
 // code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, job, setting } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'awards.settings.manage'
@@ -97,6 +97,19 @@ export default defineModule({
     // The fellow's price: a ticket type Box office keeps for anyone holding a current award that
     // carries a ticket price, one ticket each, checked when bought. The theatre prices it per band.
     'box-office.ticket-type': [{ id: 'fellow', name: 'Fellow', kind: 'standard', requirementRefs: ['awards:benefit'], sort: 12 }],
+  },
+
+  jobs: {
+    // A share of an awards import, on the bulk lane so a large file never holds up the prompt one.
+    'awards.import-awards': job({
+      payload: z.object({
+        importId: z.string(),
+        typeId: z.string(),
+        importedBy: z.string().nullable(),
+        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
+      }),
+      lane: 'bulk',
+    }),
   },
 
   events: {
