@@ -7,14 +7,14 @@ import type { z } from 'zod'
 import { spaceInput, venuePatch } from '../../../../server/places/input'
 
 interface Option { id: string, label: string, icon: string | null, retired: boolean }
-interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, managed: boolean, findingIt: string | null, archived: boolean }
+interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, doorsBeforeMinutes: number | null, runPresetId: string | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, managed: boolean, findingIt: string | null, archived: boolean }
 interface Place { id: string, name: string, addressLines: string | null, locality: string | null, postcode: string | null, country: string | null }
 interface Venue extends Place { description: string | null, accessInfo: string | null, gettingHere: string | null, archived: boolean, spaces: Space[], access: { spaceId: string | null, termId: string, note: string | null }[] }
 
 const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/venues/${String(route.params.id)}`)
-const { data, status, error, refresh } = await useAPI<{ venue: Venue, kinds: Option[], features: Option[] }>(base, { key: `core:venue:${String(route.params.id)}` })
+const { data, status, error, refresh } = await useAPI<{ venue: Venue, kinds: Option[], features: Option[], presets: { id: string, name: string }[], usualPreset: string | null, doorsBeforeMinutes: number }>(base, { key: `core:venue:${String(route.params.id)}` })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -60,14 +60,18 @@ async function setArchived(archived: boolean) {
 }
 
 // Spaces
+// A space with no usual run preset starts from the theatre's, shown first as what "none" means.
+const theatrePresetName = computed(() => data.value?.presets.find(p => p.id === data.value?.usualPreset)?.name)
+const USUAL = '__usual'
+const presetItems = computed(() => [{ value: USUAL, label: theatrePresetName.value ? `The theatre's usual (${theatrePresetName.value})` : 'None' }, ...(data.value?.presets ?? []).map(p => ({ value: p.id, label: p.name }))])
 const spaceOpen = ref(false)
 const spaceId = ref<string | null>(null)
-const space = reactive({ name: '', kindTermId: '', defaultCapacity: null as number | null, performable: true, exclusive: true, description: '', accessInfo: '', managed: true, findingIt: '' })
+const space = reactive({ name: '', kindTermId: '', defaultCapacity: null as number | null, doorsBeforeMinutes: null as number | null, runPresetId: null as string | null, performable: true, exclusive: true, description: '', accessInfo: '', managed: true, findingIt: '' })
 function openSpace(s?: Space) {
   spaceId.value = s?.id ?? null
   Object.assign(space, s
-    ? { name: s.name, kindTermId: s.kindTermId, defaultCapacity: s.defaultCapacity, performable: s.performable, exclusive: s.exclusive, description: s.description ?? '', accessInfo: s.accessInfo ?? '', managed: s.managed, findingIt: s.findingIt ?? '' }
-    : { name: '', kindTermId: liveKinds.value[0]?.value ?? '', defaultCapacity: null, performable: true, exclusive: true, description: '', accessInfo: '', managed: true, findingIt: '' })
+    ? { name: s.name, kindTermId: s.kindTermId, defaultCapacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId, performable: s.performable, exclusive: s.exclusive, description: s.description ?? '', accessInfo: s.accessInfo ?? '', managed: s.managed, findingIt: s.findingIt ?? '' }
+    : { name: '', kindTermId: liveKinds.value[0]?.value ?? '', defaultCapacity: null, doorsBeforeMinutes: null, runPresetId: null, performable: true, exclusive: true, description: '', accessInfo: '', managed: true, findingIt: '' })
   refusal.value = null
   spaceOpen.value = true
 }
@@ -396,6 +400,33 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             name="performable"
             label="Performances can happen here"
           />
+          <div
+            v-if="space.performable"
+            class="grid gap-4 sm:grid-cols-2"
+          >
+            <UFormField
+              name="doorsBeforeMinutes"
+              label="Doors open before"
+            >
+              <MinutesInput
+                v-model="space.doorsBeforeMinutes"
+                :placeholder="data?.doorsBeforeMinutes"
+                :max="180"
+                label="Doors open before"
+              />
+            </UFormField>
+            <UFormField
+              name="runPresetId"
+              label="Usual run preset"
+              help="What Add a run starts from here."
+            >
+              <USelect
+                :model-value="space.runPresetId ?? USUAL"
+                :items="presetItems"
+                @update:model-value="space.runPresetId = $event === USUAL ? null : String($event)"
+              />
+            </UFormField>
+          </div>
           <UCheckbox
             v-model="space.exclusive"
             name="exclusive"

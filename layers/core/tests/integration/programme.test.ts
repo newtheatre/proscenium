@@ -20,6 +20,9 @@ import { productionBySlug } from '../../server/services'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'GET /api/core/seasons': listSeasons,
   'POST /api/core/seasons': createSeason,
@@ -59,7 +62,7 @@ async function term(vocabulary: string, slug: string): Promise<string> {
   return (await rows<{ id: string }>('SELECT id FROM core_terms WHERE vocabulary_key = ? AND slug = ?', vocabulary, slug))[0]!.id
 }
 async function ready(id: string) {
-  await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play about a play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true })
+  await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play about a play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING })
 }
 
 beforeEach(() => {
@@ -110,14 +113,14 @@ describe('productions', () => {
     expect((await req('POST', `/api/core/productions/${id}/publish`, {}, lead)).status).toBe(403)
   })
 
-  it('publish only with a summary, a category and an answer on staging effects and content warnings', async () => {
+  it('publish only with a summary, a category, an answer on staging effects and content warnings, and a booking link when nothing sells tickets', async () => {
     const id = await production()
     const refused = await req('POST', `/api/core/productions/${id}/publish`)
     expect(refused.status).toBe(422)
-    expect(refused.body.reason).toBe('To publish, the production needs a summary, a category, its staging effects, or confirmation that it has none, its content warnings, or confirmation that it has none.')
-    expect((await read(id)).needs).toEqual(['a summary', 'a category', 'its staging effects, or confirmation that it has none', 'its content warnings, or confirmation that it has none'])
+    expect(refused.body.reason).toBe('To publish, the production needs a summary, a category, its staging effects, or confirmation that it has none, its content warnings, or confirmation that it has none, a booking link, as nothing here sells tickets.')
+    expect((await read(id)).needs).toEqual(['a summary', 'a category', 'its staging effects, or confirmation that it has none', 'its content warnings, or confirmation that it has none', 'a booking link, as nothing here sells tickets'])
 
-    await req('PATCH', `/api/core/productions/${id}`, { summary: 'Short.', categoryTermId: await term('core.production-category', 'comedy') })
+    await req('PATCH', `/api/core/productions/${id}`, { summary: 'Short.', categoryTermId: await term('core.production-category', 'comedy'), externalBookingUrl: BOOKING })
     const strobe = await term('core.advisory', (await rows<{ slug: string }>("SELECT slug FROM core_terms WHERE vocabulary_key = 'core.advisory' LIMIT 1"))[0]!.slug)
     expect((await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [{ termId: strobe, level: 'discussed', detail: 'In act two' }] })).status).toBe(200)
     // Content warnings alone are half the answer: the effects still need listing or confirming as none.
@@ -132,6 +135,8 @@ describe('productions', () => {
     expect((await req('PUT', `/api/core/productions/${id}/effects`, { effects: [] })).status).toBe(200)
     expect((await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: false })).body.code).toBe('core.production.effects-needed')
     expect((await req('PATCH', `/api/core/productions/${id}`, { summary: null })).body.code).toBe('core.production.needed-to-publish')
+    // With nothing here selling tickets, it cannot be left without its booking link either.
+    expect((await req('PATCH', `/api/core/productions/${id}`, { externalBookingUrl: null })).body.code).toBe('core.production.booking-link-needed')
   })
 
   it('announce changes to public fields of a published production, by name only', async () => {

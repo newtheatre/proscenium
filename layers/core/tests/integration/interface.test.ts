@@ -195,7 +195,7 @@ describe("core's settings", () => {
   it('put Programme and People on Core\'s page in Admin, which console staff open from the cog', async () => {
     const programmer = person(['core.programme.configure', 'core.identity-settings.manage'])
     const tabs = (await (await call(handle, 'GET', '/api/core/modules/core/tabs', { actor: programmer })).json()) as { tabs: { to: string, page: string | null }[] }
-    expect(tabs.tabs.map(t => `${t.to} ${t.page}`)).toEqual(['/admin/modules/core core.programme', '/admin/modules/core/people core.people'])
+    expect(tabs.tabs.map(t => `${t.to} ${t.page}`)).toEqual(['/admin/modules/core core.programme', '/admin/modules/core/people core.people', '/admin/modules/core/run-presets null'])
     // Someone who may change only the programme's settings has no business in Admin.
     expect((await decide('/admin/modules/core', person(['core.programme.configure']))).decision).toBe('not-found')
   })
