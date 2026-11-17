@@ -11,6 +11,7 @@ import orderPhotos from '../../server/api/core/productions/[id]/media/order.put'
 import removeMedia from '../../server/api/core/productions/[id]/media/[fileId]/index.delete'
 import restoreMedia from '../../server/api/core/productions/[id]/media/[fileId]/restore.post'
 import serveFile from '../../server/routes/files/[id].get'
+import recordChecks from '../../server/api/core/record-checks.get'
 import { runJob } from '#kit/jobs'
 import { resetRateLimits } from '#kit/ratelimit'
 import { env, inContext, person, sent, server } from '../../../../tests/integration/helpers'
@@ -25,6 +26,7 @@ const handle = server({
   'DELETE /api/core/productions/:id/media/:fileId': removeMedia,
   'POST /api/core/productions/:id/media/:fileId/restore': restoreMedia,
   'GET /files/:id': serveFile,
+  'GET /api/core/record-checks': recordChecks,
 })
 const editor = person(['core.production.create', 'core.production.edit'])
 const viewer = person(['core.production.view'])
@@ -150,5 +152,21 @@ describe('a production\'s photos', () => {
     expect((await media(id)).waiting).toMatchObject([{ id: body.id, state: 'rejected', rejectedReason: 'type-not-accepted' }])
     await send('DELETE', `/api/core/productions/${id}/media/${body.id}`, { actor: editor })
     expect((await media(id)).waiting).toEqual([])
+  })
+})
+
+describe('the production page\'s "Ready to publish?" checklist', () => {
+  it('names what is missing in order, each linked to its tab, and ticks the poster once one is in use', async () => {
+    const id = await production()
+    const checks = async () => (await json(send('GET', `/api/core/record-checks?record=core.production&id=${id}`, { actor: viewer }))).body.checks
+    const before = await checks()
+    expect(before.map((c: { sentence: string, done: boolean }) => [c.sentence, c.done])).toEqual([
+      ['A summary', false], ['A category', false], ['Advisories listed, or none confirmed', false], ['A poster', false], ['A scheduled performance', false],
+    ])
+    expect(before[3].link).toBe(`/console/programme/productions/${id}?tab=media`)
+    await use(id, await ready(id, 'poster'))
+    expect((await checks())[3]).toMatchObject({ sentence: 'A poster', done: true })
+    // Someone who may not see productions gets no lines.
+    expect((await json(send('GET', `/api/core/record-checks?record=core.production&id=${id}`, { actor: person([]) }))).body.checks).toEqual([])
   })
 })

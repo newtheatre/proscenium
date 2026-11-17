@@ -193,15 +193,21 @@ const { te } = useT()
           role="tabpanel"
           :aria-label="items.find(i => i.value === current)?.label"
         >
-          <component
-            :is="contributedNow.component"
-            v-if="contributedNow"
-            :record-id="recordId"
-          />
-          <slot
-            v-else
-            :name="`tab-${current}`"
-          />
+          <!-- A tab of its own boundary: one whose content waits for data keeps the last tab in view
+               until it is ready, and never unsettles the page around it. -->
+          <Suspense>
+            <div :key="current">
+              <component
+                :is="contributedNow.component"
+                v-if="contributedNow"
+                :record-id="recordId"
+              />
+              <slot
+                v-else
+                :name="`tab-${current}`"
+              />
+            </div>
+          </Suspense>
         </div>
       </div>
     </div>
