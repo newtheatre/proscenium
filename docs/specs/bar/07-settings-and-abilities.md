@@ -4,7 +4,11 @@ Twenty settings, twenty-five abilities, seven record types, one fact, one secret
 
 ## How to read this part
 
-Written in the Foundations registry formats, in the column layout the Box office specification uses. Settings are site-wide. Where a value varies by outlet it is a field on the outlet, and the table says so. All settings are changed by `bar.settings.manage`. Defaults are proposals for a small theatre.
+Written in the Foundations registry formats, in the column layout the Box office specification uses. A setting has no scope of its own: where it is shown is declared per group in the manifest's `settingGroups`, and every setting has exactly one home. Where a value varies by outlet it is a field on the outlet, and the table says so. Defaults are proposals for a small theatre.
+
+The bar declares nine groups, the first segment of each short key: `age-check`, `sales`, `openings`, `tabs`, `stock`, `stocktake`, `till`, `desk` and `retention`. Each is `{ place: 'console', change: 'bar.settings.manage' }` and names no page, so all twenty settings are drawn on the bar's own generated page, `/console/bar/settings` (screen S16), one section per group with one "Changed by people who can manage bar settings" line. No group is `advanced` and none has a bespoke `screen`: the two retention periods are a licensing and privacy choice a bar manager makes, not an engineering limit, so they stay on the bar's page. The bar declares no `settingPages` of its own beyond that default.
+
+Two settings are declared `onChange: 'confirm'`, and only those ask for anything extra when saved: `bar.age-check.description`, whose confirmation says what will be kept about a person and for how long, and `bar.stock.enabled`, whose confirmation says that switching it off stops stock movements. Every other setting saves with no prompt. The five `duration` settings use the kit's `DurationInput`, where a month is 30 days and a year is 365; they are stored as whole seconds as before, and the written defaults below are unchanged.
 
 ## Settings
 
@@ -13,7 +17,7 @@ Written in the Foundations registry formats, in the column layout the Box office
 | `bar.age-check.enabled` | boolean | true |  | staff | No | Prompt on restricted products and keep the register |
 | `bar.age-check.minimum-age` | integer (years) | 18 | 16 to 25 | public | Yes | The legal age, quoted on a public price list |
 | `bar.age-check.challenge-age` | integer (years) | 25 | 18 to 30 | public | Yes | The age in the prompt: "look under 25". Must be at least the minimum age |
-| `bar.age-check.description` | boolean | false |  | staff | No | Offer an optional short description of the person on a refusal. Off unless a licence condition asks for it |
+| `bar.age-check.description` | boolean | false |  | staff | No | Offer an optional short description of the person on a refusal. Off by default. A theatre switches it on when its licence conditions ask for it; the Nottingham New Theatre expects to. Switching it on shows what is kept and for how long |
 | `bar.age-check.review-every` | duration | 7d | 1d to 90d | staff | No | How long the register may go unsigned before the console home says so |
 | `bar.sales.max-discount-percent` | integer (percent) | 100 | 0 to 100 | staff | No | Largest discount on a line; 0 switches discounts off |
 | `bar.sales.reference-prefix` | text | B | 1 to 3 letters | staff | No | Starts a bar sale's reference, so it is not mistaken for a booking reference |

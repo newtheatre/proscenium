@@ -24,6 +24,7 @@ export default defineNuxtConfig({
   alias: kitAliases(root),
   // Screens that moved to Site administration (R-33): old bookmarks still arrive.
   routeRules: {
+    '/console/system/settings': { redirect: { to: '/admin/settings', statusCode: 301 } },
     '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
     '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
     '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },

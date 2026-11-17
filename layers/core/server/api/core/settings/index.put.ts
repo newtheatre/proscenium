@@ -10,6 +10,8 @@ export default defineRoute({
   input: z.object({
     changes: z.array(z.object({ key: z.string(), value: z.unknown().optional(), reset: z.boolean().optional() })).min(1).max(100), // not-policy: one section of a page
     reason: z.string().max(500).optional(), // not-policy: a sane length for a reason
+    /** The person has seen what will change and confirmed it, for a setting declared onChange: 'confirm'. */
+    confirm: z.boolean().optional(),
   }),
 }, async (_event, { input, actor, unit }) => {
   const context = useContext()
@@ -22,7 +24,7 @@ export default defineRoute({
     context.ability = entry.change
     if (entry.managed) refuse('core.setting.managed', 'This setting is kept up to date by the system and cannot be changed here.', { status: 409 })
     if (!change.reset && change.value === undefined) refuse('core.input.invalid', 'Give a value, or reset: true.', { status: 422, fields: { [change.key]: 'required' } })
-    saved[change.key] = await changeSetting(unit, change.key, change.value ?? null, { reason: input.reason, reset: change.reset })
+    saved[change.key] = await changeSetting(unit, change.key, change.value ?? null, { reason: input.reason, reset: change.reset, confirm: input.confirm })
   }
   return { saved }
 })

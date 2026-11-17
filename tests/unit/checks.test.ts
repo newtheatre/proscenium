@@ -87,3 +87,31 @@ describe('the account scope check', () => {
     expect(problems('export function exactAccount(column: string, accountId: string) {')).toEqual([])
   })
 })
+
+describe('counts of changed rows', () => {
+  it('allows a test against nought and refuses an exact count', async () => {
+    const { exactChangeCounts } = await import('../../scripts/checks/source')
+    expect(exactChangeCounts([
+      'if (claim.meta.changes !== 1) return',
+      'if (!(claim.meta.changes > 0)) return',
+      'const queued = jobs.filter(j => (results[j.index]?.meta?.changes ?? 0) > 0)',
+      'if (result.meta.changes === 2) ok()',
+      'if (1 === result.meta.changes) ok()',
+      'return { reset: reset.meta.changes ?? 0 }',
+      "'SELECT CASE WHEN changes() = 1 THEN 1 END'",
+      'if (res.changes >= 3) more()',
+    ].join('\n'))).toEqual([1, 4, 5, 8])
+  })
+})
+
+describe('changes() in SQL', () => {
+  it('is found in SQL text and sql templates, and not in a comment', async () => {
+    const { changesInSql } = await import('../../scripts/checks/source')
+    expect(changesInSql([
+      "unit.add({ sql: 'INSERT INTO scans (id, ok) VALUES (?, CASE WHEN changes() > 0 THEN 1 ELSE 0 END)', params })",
+      'const ok = sql`SELECT changes ( ) AS n`',
+      '// never read changes() here',
+      'if (result.meta.changes > 0) done()',
+    ].join('\n'))).toEqual([1, 2])
+  })
+})

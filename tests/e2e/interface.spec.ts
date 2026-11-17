@@ -17,7 +17,7 @@ const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.string
 test.beforeAll(async ({ playwright }) => {
   const siteOwner = { ...person('Rate Owner', [grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(siteOwner) })
-  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
+  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }] } })
   await api.dispose()
 })
 
@@ -102,10 +102,12 @@ for (const scheme of ['light', 'dark'] as const) {
     test('sidebar: groups in the fixed order, everyday before set-up, a group nobody may open is absent', async ({ page }) => {
       await visit(page, '/console')
       const nav = page.getByRole('navigation', { name: 'Console' })
+      expect(await nav.innerText()).toContain('Gallery')
+      expect(await nav.innerText()).not.toContain('System') // core's own screens are not theirs to open
+      expect(await nav.innerText()).not.toContain('Everyday') // no headings that split a section
+      await nav.getByRole('button', { name: 'Gallery' }).click() // a group is a collapsible section
       const text = await nav.innerText()
-      expect(text.indexOf('Gallery')).toBeGreaterThan(-1)
-      expect(text).not.toContain('System') // core's own screens are not theirs to open
-      expect(text.indexOf('Everyday')).toBeLessThan(text.indexOf('Set up'))
+      expect(text.indexOf('Sample list')).toBeLessThan(text.indexOf('Sample steps')) // everyday before set-up
       expect(text).not.toContain('Administration') // the entry they cannot open is not greyed, it is absent
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
       await noViolations(page)
@@ -252,12 +254,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('button', { name: 'Set up my theatre' })).toHaveCount(0)
     })
 
-    test('core\'s own settings page shows wording for every setting, never a catalogue key', async ({ browser }) => {
+    test('the site\'s settings page shows wording for every setting, never a catalogue key, and the old console address redirects', async ({ browser }) => {
       const owner = { ...person('Olive Owner', ['core.settings.manage', 'core.identity-settings.manage', 'core.organisation.edit', 'core.branding.edit', 'core.sender.manage', 'core.template.edit'].map(grant)), assurance: 'strong', reassertedAt: Date.now() }
       const context = await browser.newContext(as(owner))
       const page = await context.newPage()
       await visit(page, '/console/system/settings')
-      await expect(page.getByRole('heading', { level: 1, name: 'Core settings' })).toBeVisible()
+      await expect(page).toHaveURL(/\/admin\/settings$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Site settings' })).toBeVisible()
       await expect(page.getByText('Short name', { exact: true }).first()).toBeVisible()
       // A part of the catalogue that is not loaded shows as its key, such as core.settings.x.label.
       expect((await page.locator('main').innerText()).match(/\b[a-z][a-z0-9-]*\.[a-z0-9.-]+\.(label|help)\b/g) ?? []).toEqual([])

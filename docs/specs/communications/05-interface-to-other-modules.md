@@ -209,13 +209,15 @@ All under `/api/communications/`, written with `defineRoute`.
 | Route | Access | Limit class | Purpose |
 | --- | --- | --- | --- |
 | POST /signup | Public, Turnstile | public-form | Request a subscription. Always answers the same |
-| POST /confirm | Public, by token | public-form | Confirm a pending subscription |
-| GET /manage/\<token> | Public, by token | public-form | The lists for that subscription's subject and side. Names nothing but the lists |
-| POST /manage/\<token> | Public, by token | public-form | Leave a list, rejoin, or stop all |
-| POST /unsubscribe/\<token> | Public, by token | public-form | The one-click target for mail clients. Later, with mailings |
+| POST /confirm | Public, by a random token (T1) | public-form | Confirm a pending subscription |
+| GET /manage/\<token> | Public, by a signed token (T2) | public-form | The name of the one list. Changes nothing |
+| POST /manage/\<token> | Public, by a signed token (T2) | public-form | Leave that list, or stop all on that side. Harmless to repeat |
+| POST /manage/\<token>/preferences-link | Public, by a signed token (T2) | public-form | Email a preferences link to the subscription's address. Always answers the same |
+| GET and POST /preferences/\<token> | Public, by a random token (T1) | public-form | The lists for that subscription's subject and side; join, leave or rejoin. Names nothing but the lists |
+| POST /unsubscribe/\<token> | Public, by a signed token (T2) | public-form | The one-click target for mail clients. Later, with mailings |
 | Everything else | By ability | default, write or export | The console and account screens in part 5 |
 
-Pages: `/mailing/confirm/<token>` and `/mailing/manage/<token>`, in the public shell. A token page is marked `noindex` and sets no cookie.
+Pages: /mailing/confirm/\<token>, /mailing/manage/\<token> and /mailing/preferences/\<token>, in the public shell. Every route declares its token parameter so that it stays out of logs. A token page is marked noindex, sets no cookie, sends no-referrer and no-store, and gives one answer for a wrong, used or expired link. Links are built with the kit's `siteUrl(path)` from the setting `core.site.origin`.
 
 ## Jobs and tasks
 

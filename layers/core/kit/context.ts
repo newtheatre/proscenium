@@ -63,6 +63,8 @@ export interface KitContext {
   module?: string
   /** The caller's network address, set by a route; keys the presented-value rate limit. */
   address?: string
+  /** Link tokens in the request's address (path parameters the route declares as tokens). */
+  tokens?: readonly string[]
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {

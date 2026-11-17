@@ -158,19 +158,15 @@ const label = computed(() => props.count ? t('core.list.filters-on', { count: pr
             </div>
             <div class="grid grid-cols-2 gap-2">
               <UFormField :label="t('core.list.from')">
-                <UInput
+                <FieldDate
                   v-model="rangeOf(name).from"
-                  type="date"
-                  class="w-full"
-                  @change="setRange(name)"
+                  @update:model-value="setRange(name)"
                 />
               </UFormField>
               <UFormField :label="t('core.list.to')">
-                <UInput
+                <FieldDate
                   v-model="rangeOf(name).to"
-                  type="date"
-                  class="w-full"
-                  @change="setRange(name)"
+                  @update:model-value="setRange(name)"
                 />
               </UFormField>
             </div>
