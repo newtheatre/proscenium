@@ -104,6 +104,27 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 })
 
+test('the Till takes part of the total one way and the rest another', async ({ page }) => {
+  await visit(page, '/console/payments/till')
+  await page.getByLabel('Programmes sold').fill('2')
+  await page.getByLabel('Programmes sold').blur()
+  await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
+  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await page.getByLabel(/^Amount to take this way/).fill('7')
+  await page.getByLabel(/^Amount to take this way/).blur()
+  await expect(page.getByText('Enter an amount above nothing and no more than £6.00.')).toBeVisible()
+  await page.getByLabel(/^Amount to take this way/).fill('2.50')
+  await page.getByLabel(/^Amount to take this way/).blur()
+  await page.getByRole('button', { name: 'Cash taken: £2.50' }).click()
+  await expect(page.getByText('£2.50 taken. Still to pay: £3.50', { exact: true })).toBeVisible()
+  await expect(page.getByText('Paid so far: £2.50')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
+  await noViolations(page)
+  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await page.getByRole('button', { name: 'Cash taken: £3.50' }).click()
+  await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
+})
+
 test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {
   await visit(page, '/console/payments/sessions')
   // Other browser tests open tills of the same name, so this looks for one and for its state.
