@@ -37,7 +37,7 @@ test.beforeAll(async ({ playwright }) => {
 
   const api = await playwright.request.newContext({ ...base, ...as(manager) })
   const production = await post(api, '/api/core/productions', { title, kind: 'own' })
-  await post(api, `/api/core/productions/${production.id}`, { summary: 'A show to book for.', categoryTermId: categories.terms[0].id, advisoriesConfirmedNone: true }, 'patch')
+  await post(api, `/api/core/productions/${production.id}`, { summary: 'A show to book for.', categoryTermId: categories.terms[0].id, effectsConfirmedNone: true, advisoriesConfirmedNone: true }, 'patch')
   const venue = await post(api, '/api/core/venues', { name: `Booking Theatre ${stamp}` })
   const performance = await post(api, `/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 2 * 86_400_000, capacity: 100 })
   await post(api, `/api/core/performances/${performance.id}/schedule`, {})

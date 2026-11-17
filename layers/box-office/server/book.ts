@@ -65,8 +65,8 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
       soldOut: b.free <= 0,
       types: b.prices.flatMap((p) => {
         const type = types.get(p.ticketTypeId)
-        // Complimentary tickets are given, never bought.
-        if (!type || type.kind === 'complimentary' || judged.get(type.id) === null) return []
+        // Complimentary tickets are given, never bought; a desk-only type is sold at the box office.
+        if (!type || type.kind === 'complimentary' || type.channel === 'desk' || judged.get(type.id) === null) return []
         return [{ ticketTypeId: type.id, name: type.name, kind: type.kind, proofNote: type.proofNote, needsPaidTicket: type.needsPaidTicket || type.kind === 'companion', amountMinor: p.amountMinor, sort: type.sort, ...judged.get(type.id) }]
       }).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(({ sort: _, ...type }) => type),
     })).filter(b => b.types.length),

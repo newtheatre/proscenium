@@ -10,6 +10,6 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({ reasonTermId: idSchema('trm') }).strict(),
 }, async (_event, { input, record, actor, unit }) => {
-  declineRefund(unit.view(), record!.id, actor.accountId!, input.reasonTermId)
+  await declineRefund(unit.view(), record!.id, actor.accountId!, input.reasonTermId)
   return { declined: true }
 })

@@ -1,5 +1,8 @@
-// Add a passkey to my account. The first one comes with a set of recovery codes, shown once; the
-// page asks for one to be typed back before it can be left (ID-03).
+// Add a passkey to my account (ID-03). The first one comes with a set of recovery codes, shown once,
+// which the page asks to have typed back, but only for somebody who needs them: a person whose roles
+// reach the console, or one with no other way in. Everybody else's way back in is their inbox, so a
+// theatre-goer is not made to keep codes they will never use. Anyone may still make a set on the
+// Signing in page.
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { requireFresh, sessionOf } from '../../../identity/guards'
@@ -7,6 +10,7 @@ import { addPasskey, newRecoveryCodes, passkeyCount, verifyRegistration } from '
 import { deviceLabel } from '../../../identity/web'
 import { reassert } from '../../../identity/sessions'
 import { credentialNotice } from '../../../identity/notices'
+import { hasOtherWayIn, holdsPrivileged } from '../../../identity/me'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -19,7 +23,8 @@ export default defineRoute({
   if (credential.accountId !== session.accountId) refuse('core.passkey.challenge-stale', 'That took too long, or the page was used twice.', { status: 410, remedy: 'Try again.' })
   const first = (await passkeyCount(session.accountId)) === 0
   const id = addPasskey(unit, session.accountId, credential, input.label || deviceLabel(event))
-  const recoveryCodes = first ? await newRecoveryCodes(unit, session.accountId) : undefined
+  const needsCodes = first && ((await holdsPrivileged(session.accountId)) || !(await hasOtherWayIn(session.accountId)))
+  const recoveryCodes = needsCodes ? await newRecoveryCodes(unit, session.accountId) : undefined
   // Proving a new passkey is a strong proof, so this session is strong from now on.
   reassert(unit, session.id, 'passkey', true)
   unit.audit({ action: 'create', record: ['core.account', session.accountId], detail: { passkeyId: id } })

@@ -1,4 +1,5 @@
-// Exchange tickets on an order for another performance, band or ticket type (BO-54). With
+// Exchange tickets on an order for another performance, band or ticket type (BO-54), each line
+// with its own band and ticket type, so a family's adults and children stay that. With
 // `preview`, says what it would cost or give back and changes nothing. Refunding a cheaper
 // exchange's difference needs box-office.order.refund as well.
 import { z } from 'zod'
@@ -11,10 +12,12 @@ export default defineRoute({
   record: event => ['box-office.order', getRouterParam(event, 'id')],
   rateLimit: 'write',
   input: z.object({
-    lineIds: z.array(z.string().min(1).max(64)).min(1).max(50), // not-policy: more lines than any order holds
     performanceId: z.string().min(1).max(64), // not-policy: shape bound
-    bandId: z.string().min(1).max(64), // not-policy: shape bound
-    ticketTypeId: z.string().min(1).max(64), // not-policy: shape bound
+    lines: z.array(z.object({
+      lineId: z.string().min(1).max(64), // not-policy: shape bound
+      bandId: z.string().min(1).max(64), // not-policy: shape bound
+      ticketTypeId: z.string().min(1).max(64), // not-policy: shape bound
+    }).strict()).min(1).max(50), // not-policy: more lines than any order holds
     preview: z.boolean().optional(),
   }).strict(),
 }, async (_event, { input, record, actor, unit }) => {

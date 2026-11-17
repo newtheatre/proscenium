@@ -49,7 +49,7 @@ async function answer(intentId: string, amountMinor: number, state: 'succeeded' 
 }
 
 async function mail(typeKey: string, orderId: string): Promise<Record<string, string>> {
-  const [row] = await rows<{ payload: string, sealed_variables: string | null }>('SELECT payload, sealed_variables FROM core_notifications WHERE type_key = ? AND subject_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', typeKey, orderId)
+  const [row] = await rows<{ payload: string, sealed_variables: string | null }>('SELECT payload, sealed_variables FROM core_notifications WHERE type_key IN (?, ? || \'-guest\') AND subject_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', typeKey, typeKey, orderId)
   expect(row, `no ${typeKey} message`).toBeTruthy()
   const sealed = row!.sealed_variables ? JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!) : {}
   return { ...JSON.parse(row!.payload), ...sealed }

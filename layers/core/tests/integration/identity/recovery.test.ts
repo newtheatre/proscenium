@@ -38,6 +38,23 @@ async function withPasskey() {
   return { browser, device, accountId, mine: mine!, codes }
 }
 
+describe('seeing my recovery codes again (ID-14)', () => {
+  it('shows the set in order, used ones marked, only after confirming it is you', async () => {
+    const { browser, device, accountId, mine, codes } = await withPasskey()
+    await new Browser().post('/api/core/sign-in/recovery', { address: mine, code: codes[2] })
+    await goStale(accountId)
+    expect((await browser.post('/api/core/me/recovery-codes/show')).body.code).toBe('core.access.not-fresh')
+    await reassert(browser, device)
+    const shown = await browser.post('/api/core/me/recovery-codes/show')
+    expect(shown.status).toBe(200)
+    expect(shown.body.codes.map((c: { code: string }) => c.code)).toEqual(codes)
+    expect(shown.body.codes.map((c: { used: boolean }) => c.used)).toEqual(codes.map((_, i) => i === 2))
+    // Kept sealed, never in the clear.
+    const [row] = await rows<{ code_sealed: string }>('SELECT code_sealed FROM core_recovery_codes WHERE account_id = ? LIMIT 1', accountId)
+    expect(codes).not.toContain(row!.code_sealed)
+  })
+})
+
 describe('recovering a lost passkey (ID-08)', () => {
   it('a recovery code works once, and its session can only enrol a passkey', async () => {
     const { accountId, mine, codes } = await withPasskey()
@@ -94,7 +111,7 @@ describe('recovering a lost passkey (ID-08)', () => {
     const person = new Browser()
     const landed = await person.post('/api/core/sign-in/link', { token: fragment(second.body.link) })
     expect(landed.status).toBe(200)
-    expect(landed.body).toEqual({ next: '/account/passkey', offerPasskey: true })
+    expect(landed.body).toEqual({ next: '/account/passkey', offerPasskey: true, welcome: false })
     expect((await person.get('/api/core/me')).body.account.id).toBe(lockedOut)
     expect((await person.get('/api/core/me/sessions')).status).toBe(401)
     expect((await new Browser().post('/api/core/sign-in/link', { token: fragment(second.body.link) })).status).toBe(410)

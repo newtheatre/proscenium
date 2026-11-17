@@ -3,13 +3,16 @@
      a module keeps (Companion, Complimentary, Member) shows which module, and only its name, order
      and whether it is sold can be changed; its rules are the module's. The order is set by dragging a
      row's handle, or from the keyboard with the arrow keys on the handle or Move up and Move down. A type a person made may ask
-     for requirements, such as a membership, chosen from what the switched-on modules provide. -->
+     for requirements, such as a membership, chosen from what the switched-on modules provide. Any
+     type can be sold everywhere, only at the box office (an industry rate, a price on the door) or
+     only online. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { unrefElement } from '@vueuse/core'
 import { insertNodeAt, removeNode, useSortable } from '@vueuse/integrations/useSortable'
 
 type Kind = 'standard' | 'concession' | 'companion' | 'complimentary'
+type Channel = 'all' | 'desk' | 'online'
 interface TicketType {
   id: string
   name: string
@@ -20,6 +23,7 @@ interface TicketType {
   proofNote: string | null
   needsPaidTicket: boolean
   active: boolean
+  channel: Channel
   sort: number
   managedBy: string | null
   available: boolean
@@ -35,18 +39,19 @@ const toast = useToast()
 const { data, status, error, refresh } = await useAPI<Listing>('/api/box-office/ticket-types', { key: 'box-office:ticket-types' })
 
 const kinds = computed(() => (['standard', 'concession'] as const).map(value => ({ value, label: t(`box-office.ticket-types.kind.${value}`) })))
+const channels = computed(() => (['all', 'desk', 'online'] as const).map(value => ({ value, label: t(`box-office.ticket-types.channel.${value}`) })))
 const options = computed(() => data.value?.requirementOptions ?? [])
 const labelOf = (ref: string) => data.value?.requirementLabels[ref] ?? ref
 // `box-office.companion` is kept by box-office: the module's own name for it.
 const moduleName = (managedBy: string) => t(`${managedBy.slice(0, managedBy.lastIndexOf('.'))}.module.name`)
 
-interface FormState { name: string, kind: 'standard' | 'concession', proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
-const blank = (): FormState => ({ name: '', kind: 'standard', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
+interface FormState { name: string, kind: 'standard' | 'concession', channel: Channel, proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
+const blank = (): FormState => ({ name: '', kind: 'standard', channel: 'all', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
 const form = ref<FormState>(blank())
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 function body(f: FormState, managed: boolean) {
-  const common = { name: f.name.trim(), proofNote: f.proofNote.trim() || null }
+  const common = { name: f.name.trim(), channel: f.channel, proofNote: f.proofNote.trim() || null }
   if (managed) return common
   return { ...common, kind: f.kind, requirementRefs: f.requirementRefs, ...(f.requirementRefs.length ? { maxPerHolder: f.maxPerHolder } : {}) }
 }
@@ -72,7 +77,7 @@ const editOpen = computed({ get: () => !!editing.value, set: (v) => { if (!v) ed
 
 function startEdit(type: TicketType) {
   editRefusal.value = null
-  editForm.value = { name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active }
+  editForm.value = { name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', channel: type.channel, proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active }
   editing.value = type
 }
 
@@ -193,6 +198,7 @@ function actions(type: TicketType): DropdownMenuItem[] {
 function describe(type: TicketType): string {
   const parts: string[] = [t(`box-office.ticket-types.kind.${type.kind}`)]
   if (type.requirementRefs.length) parts.push(t('box-office.ticket-types.for', { who: type.requirementRefs.map(labelOf).join(t('box-office.ticket-types.or')) }))
+  if (type.channel !== 'all') parts.push(t(`box-office.ticket-types.channel.note.${type.channel}`))
   if (type.proofNote) parts.push(type.proofNote)
   if (type.managedBy) parts.push(t('box-office.ticket-types.kept-by', { module: moduleName(type.managedBy) }))
   if (!type.available) parts.push(t('box-office.ticket-types.module-off'))
@@ -289,6 +295,12 @@ function describe(type: TicketType): string {
               :items="kinds"
             />
           </UFormField>
+          <UFormField :label="t('box-office.ticket-types.channel.label')">
+            <USelect
+              v-model="form.channel"
+              :items="channels"
+            />
+          </UFormField>
           <UFormField
             :label="t('box-office.ticket-types.add.proof')"
             :help="t('box-office.ticket-types.add.proof-help')"
@@ -357,6 +369,12 @@ function describe(type: TicketType): string {
             <USelect
               v-model="editForm.kind"
               :items="kinds"
+            />
+          </UFormField>
+          <UFormField :label="t('box-office.ticket-types.channel.label')">
+            <USelect
+              v-model="editForm.channel"
+              :items="channels"
             />
           </UFormField>
           <UFormField

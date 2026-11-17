@@ -18,6 +18,7 @@ export async function queueNotice(unit: UnitView, type: NoticeType, addresses: s
 /** What was added, in the words of the core.credential-added message. */
 export const CREDENTIAL = {
   'passkey': 'a passkey',
+  'authenticator': 'an authenticator app',
   'recovery-codes': 'a new set of recovery codes',
   'recovery-used': 'a recovery code, used to sign in',
   'enrolment-link': 'a link from the theatre for adding a passkey',

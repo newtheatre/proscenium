@@ -41,7 +41,7 @@ export default defineModule({
     // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in
     // screen, not an entry; "Signing in" is where passkeys are kept.
     'core.navigation': [
-      { id: 'core.account-details', menu: 'account', group: 'account', to: '/account/details', icon: 'i-lucide-user-round', ability: 'signed-in', order: 10 },
+      { id: 'core.account-details', menu: 'account', group: 'account', to: '/account/details', match: '/account/welcome', icon: 'i-lucide-user-round', ability: 'signed-in', order: 10 },
       { id: 'core.account-email', menu: 'account', group: 'account', to: '/account/email', icon: 'i-lucide-mail', ability: 'signed-in', order: 20, attention: 'core.unconfirmed-addresses' },
       { id: 'core.account-sign-in', menu: 'account', group: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
       { id: 'core.account-data', menu: 'account', group: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },

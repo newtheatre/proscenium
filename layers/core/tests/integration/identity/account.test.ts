@@ -79,12 +79,46 @@ describe('the passkey offer (ID-03)', () => {
     const to = address()
     const first = await emailSignIn(browser, to)
     expect((await browser.post('/api/core/sign-in/link', { token: tokenOf(first.message!) })).body.offerPasskey).toBe(true)
-    const codes = await addPasskey(browser, new Authenticator())
+    // A theatre-goer who can always sign in by email is not handed recovery codes.
+    expect(await addPasskey(browser, new Authenticator())).toBeUndefined()
+    const codes = (await browser.post('/api/core/me/recovery-codes')).body.recoveryCodes as string[]
     expect(codes).toHaveLength(10)
     expect((await browser.post('/api/core/me/recovery-codes/check', { code: codes![3]!.toUpperCase() })).body).toEqual({ matches: true })
     expect((await browser.post('/api/core/me/recovery-codes/check', { code: 'aaaaa-bbbbb' })).body).toEqual({ matches: false })
     const again = await emailSignIn(new Browser(), to)
     expect((await new Browser().post('/api/core/sign-in/link', { token: tokenOf(again.message!) })).body.offerPasskey).toBe(false)
+  })
+
+  it('is not offered again while "Not now" lasts, except to somebody whose roles reach the console', async () => {
+    const browser = new Browser()
+    const to = address()
+    const accountId = await signInByEmail(browser, to)
+    const later = async () => {
+      const fresh = new Browser()
+      fresh.cookies.set('proscenium-passkey-later', '1')
+      const { message } = await emailSignIn(fresh, to)
+      return (await fresh.post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.offerPasskey
+    }
+    expect(await later()).toBe(false)
+    await grantDirectly(accountId, ['core.role.manage'])
+    expect(await later()).toBe(true)
+  })
+
+  it('asks for a name on sign-in until the account has one', async () => {
+    const to = address()
+    const browser = new Browser()
+    await signInByEmail(browser, to)
+    expect((await browser.patch('/api/core/me', { name: 'Alex Rivers' })).status).toBe(200)
+    const again = new Browser()
+    const { message } = await emailSignIn(again, to)
+    expect((await again.post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.welcome).toBe(false)
+  })
+
+  it('gives recovery codes with the first passkey only to somebody who needs them', async () => {
+    const browser = new Browser()
+    const accountId = await signInByEmail(browser)
+    await grantDirectly(accountId, ['core.role.manage'])
+    expect(await addPasskey(browser, new Authenticator())).toHaveLength(10)
   })
 
   it('tells staff with a privileged ability that the console needs a passkey', async () => {
@@ -134,7 +168,8 @@ describe('my passkeys and recovery codes (ID-14)', () => {
   it('making new recovery codes ends the old set', async () => {
     const browser = new Browser()
     await signInByEmail(browser)
-    const old = await addPasskey(browser, new Authenticator())
+    await addPasskey(browser, new Authenticator())
+    const old = (await browser.post('/api/core/me/recovery-codes')).body.recoveryCodes
     const fresh = (await browser.post('/api/core/me/recovery-codes')).body.recoveryCodes
     expect(fresh).toHaveLength(10)
     expect((await browser.post('/api/core/me/recovery-codes/check', { code: old![0] })).body.matches).toBe(false)

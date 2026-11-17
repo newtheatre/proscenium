@@ -15,6 +15,7 @@ export default defineRoute({
     requirementRefs: z.array(z.string().min(3).max(120)).max(10).optional(), // not-policy: a short list of alternatives
     maxPerHolder: z.number().int().min(1).max(50).optional(), // not-policy: the order cap's own ceiling
     recheckAtEntry: z.boolean().optional(),
+    channel: z.enum(['all', 'desk', 'online']).optional(),
     sort: z.number().int().min(0).max(999).optional(), // not-policy: an order, not a quantity
   }).strict(),
 }, async (_event, { input, unit }) => ({ ticketTypeId: await createTicketType(unit.view(), input) }))
