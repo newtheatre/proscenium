@@ -53,7 +53,8 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
     WHERE state IN ('held', 'confirmed') AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
     .expect(lines.length, options.from === 'basket' ? RAN_OUT : GONE)
 
-  const doorCodes = await issueTickets(unit, lines)
+  // Paid at the desk with the buyer standing there: admitted in the same batch, by whoever sold it.
+  const doorCodes = await issueTickets(unit, lines, options.from === 'awaiting_payment' && order.admit_on_payment && order.sold_by ? { by: order.sold_by, at } : undefined)
   const performanceIds = [...new Set(lines.map(l => l.performance_id))]
   unit.announce('box-office.order.confirmed', { orderId: order.id, performanceIds }, { record: ['box-office.order', order.id] })
   // An anonymous desk sale has nobody to write to: the seller hands over the tickets.

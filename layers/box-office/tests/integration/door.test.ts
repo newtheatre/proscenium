@@ -103,3 +103,29 @@ describe('scanning at the door', () => {
     expect(await count('SELECT count(*) AS n FROM box_office_tickets WHERE performance_id = ? AND admitted_at IS NOT NULL', h.performanceId)).toBe(0)
   })
 })
+
+describe('the door list', () => {
+  it('lists who is still to arrive, and moves them once every ticket is used', async () => {
+    const h = await freeHouse(4)
+    const codes = await tickets(h, 2)
+    const waiting = await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)
+    expect(waiting.status).toBe(200)
+    expect(waiting.body.rows).toHaveLength(1)
+    expect(waiting.body.rows[0]).toMatchObject({ tickets: 2, admitted: 0 })
+    await scan(h, codes[0]!)
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)).body.rows[0].admitted).toBe(1)
+    await scan(h, codes[1]!)
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)).body.rows).toHaveLength(0)
+    const everyone = await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all`, undefined, steward)
+    expect(everyone.body.rows[0]).toMatchObject({ tickets: 2, admitted: 2 })
+  })
+
+  it('finds a booking by its reference', async () => {
+    const h = await freeHouse(4)
+    await tickets(h, 1)
+    const all = await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all`, undefined, steward)
+    const reference = all.body.rows[0].reference as string
+    const found = await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all&q=${reference}`, undefined, steward)
+    expect(found.body.rows.map((r: { reference: string }) => r.reference)).toEqual([reference])
+  })
+})

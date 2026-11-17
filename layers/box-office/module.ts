@@ -21,17 +21,20 @@ export default defineModule({
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
     'baskets.pay-within': setting.duration({ default: '15m', min: '5m', max: '60m', change, audience: 'public' }),
+    'orders.desk-seat-cap': setting.integer({ default: 30, min: 1, max: 500, change, audience: 'staff' }),
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
+    // How long after curtain the desk may still sell, for latecomers.
+    'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
-    'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public' }),
+    'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
     'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
-    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true }),
+    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Kept from each ticket when staff refund less the fee.
-    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true }),
-    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff' }),
+    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
@@ -42,11 +45,16 @@ export default defineModule({
     'performance.manage': ability({ on: 'core.performance' }),
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
-    'order.release': ability({ on: 'box-office.order' }),
+    // Seeing orders includes finding them by the buyer's name or address.
+    'order.view': ability({ on: 'box-office.order', owner: 'grants', implies: ['core.account.find'] }),
+    'order.sell': ability({ on: 'core.performance', implies: ['order.view'] }),
+    'order.take-payment': ability({ on: 'box-office.order', implies: ['order.view'] }),
+    'order.release': ability({ on: 'box-office.order', implies: ['order.view'] }),
     // Cancelling does not imply refunding: staff with only the first cancel with no refund.
-    'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses' }),
-    'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses' }),
-    'ticket.admit': ability({ on: 'core.performance' }),
+    'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
+    'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
+    // The door finds a booking by the buyer's name as well as by its reference.
+    'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -82,6 +90,14 @@ export default defineModule({
   contributes: {
     // Box office owns its part of a payment: it makes the sale real when the money arrives.
     'payments.settlement': [{ id: 'box-office' }],
+    // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
+    'payments.desk-basket': [{ id: 'box-office' }],
+    'core.navigation': [
+      { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
+      { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
+      { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
+      { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
+    ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
       { id: 'deferred-ticket-income', name: 'Deferred ticket income', kind: 'liability' },
