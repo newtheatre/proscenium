@@ -143,6 +143,35 @@ describe('a reservation at the desk', () => {
     expect(await tickets(r.orderId)).toHaveLength(4)
     expect(await deferred(h)).toBe(-3600)
   })
+
+  it('is split so one of a group pays for their own tickets, and the rest stay reserved', async () => {
+    const h = await house(5)
+    const r = await reserved(h, 3)
+    const lines = (await rows<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' ORDER BY id", r.orderId)).map(l => l.id)
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: [lines[0]] }, onlooker)).status).toBe(403)
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: lines }, seller)).body.code).toBe('box-office.desk.split-all')
+
+    const split = await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: [lines[0], lines[1]] }, seller)
+    expect(split.status, JSON.stringify(split.body)).toBe(200)
+    expect(split.body).toMatchObject({ totalMinor: 2400, remainingMinor: 1200 })
+    expect(split.body.reference).not.toBe(r.reference)
+    const original = await order(r.orderId)
+    expect(original).toMatchObject({ state: 'reserved', total_minor: 1200 })
+    expect(await order(split.body.orderId)).toMatchObject({ state: 'reserved', total_minor: 2400, split_from_id: r.orderId, account_id: original.account_id })
+    // The seats moved with their claims: none was let go or taken again.
+    expect(await claimed(h)).toBe(3)
+    expect(await count("SELECT count(*) AS n FROM box_office_claims c JOIN box_office_holds k ON k.id = c.hold_id WHERE k.order_id = ? AND c.state = 'confirmed'", split.body.orderId)).toBe(2)
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: [lines[0]] }, seller)).body.code).toBe('box-office.order.lines-changed')
+
+    // The part split off is paid at the till; the rest is still reserved, under the same reference.
+    const sale = await till({ orderId: split.body.orderId, expectedTotalMinor: 2400 })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    expect(await tickets(split.body.orderId)).toHaveLength(2)
+    expect(await tickets(r.orderId)).toEqual([])
+    expect(await order(r.orderId)).toMatchObject({ state: 'reserved', total_minor: 1200 })
+    expect(await deferred(h)).toBe(-2400)
+  })
 })
 
 describe('selling at the desk', () => {
