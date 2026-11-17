@@ -129,7 +129,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'membership.schemes', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/schemes', match: '/console/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
-      { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5 },
+      { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5, count: 'membership.applications-waiting' },
       { id: 'membership.lists', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/lists', match: '/console/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],
@@ -198,6 +198,11 @@ export default defineModule({
       { id: 'membership.first-scheme', required: true, to: '/console/membership/schemes', order: 40 },
       { id: 'membership.verification-list', required: false, to: '/console/membership/lists', order: 41 },
     ],
+    // Applications waiting on staff: beside the Applications entry, and as a card on the console home.
+    'core.count': [{ id: 'membership.applications-waiting', file: 'applications-waiting' }],
+    'core.home-card': [{ id: 'membership.applications', home: 'console', ability: 'membership.membership.view', component: 'MembershipApplicationsCard', urgency: 'today', count: 'membership.applications-waiting' }],
+    // A person's memberships, on their page in the console.
+    'core.record-tab': [{ id: 'membership.account', record: 'core.account', ability: 'membership.membership.view', component: 'MembershipAccountTab', order: 30 }],
     'core.health-check': [
       { id: 'membership.applications-waiting', file: 'applications-waiting' },
       { id: 'membership.open-schemes', file: 'open-schemes' },

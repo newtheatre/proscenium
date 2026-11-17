@@ -365,5 +365,15 @@
   "membership.screens.import.submit": "Import",
   "membership.screens.import.queued.one": "{count} member is being imported",
   "membership.screens.import.queued.other": "{count} members are being imported",
-  "membership.screens.import.queued-help": "They appear in the members list over the next few minutes."
+  "membership.screens.import.queued-help": "They appear in the members list over the next few minutes.",
+
+  "membership.record-tabs.account.label": "Membership",
+  "membership.screens.account-tab.number": "Member number {number}",
+  "membership.screens.account-tab.none": "No memberships",
+  "membership.screens.account-tab.pending": "Application open",
+  "membership.screens.account-tab.dates": "{from} to {to}",
+  "membership.screens.account-tab.from": "From {from}",
+  "membership.screens.home-card.applications.one": "{count} membership application is waiting for a check",
+  "membership.screens.home-card.applications.other": "{count} membership applications are waiting for a check",
+  "membership.screens.home-card.applications-action": "Check applications"
 }
