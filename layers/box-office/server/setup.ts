@@ -1,6 +1,7 @@
 // Setting a performance up for sale (Box office specification, part 3, "A performance on sale";
 // story BO-01). Box office owns the sales record and the pools that divide the house into bands;
 // the core owns the performance and its capacity. Every guard is on the statement that it guards.
+import { sql } from 'drizzle-orm'
 import { all, can, first, newId, nowMs, refuse, type Actor, type UnitView } from '#kit'
 import { capacityOf, getPerformance } from '#modules/core'
 import { methodsFor } from '#modules/payments'
@@ -54,6 +55,33 @@ export function createBand(unit: UnitView, productionId: string, input: BandInpu
   }).expect(1, { code: 'box-office.band.name-taken', reason: 'This production already has a band with that name.' })
   unit.audit({ action: 'create', record: ['core.production', productionId], detail: { bandId: id } })
   return id
+}
+
+/** Renames a band, or changes its kind. Its prices, seats and sales stay with it. */
+export function updateBand(unit: UnitView, productionId: string, bandId: string, input: { name?: string, kind?: BandInput['kind'] }): void {
+  unit.add({
+    sql: `UPDATE box_office_bands SET name = coalesce(?, name), kind = coalesce(?, kind), updated_at = ? WHERE id = ? AND production_id = ?
+      AND NOT EXISTS (SELECT 1 FROM box_office_bands o WHERE o.production_id = ? AND o.name = ? AND o.id <> ?)`,
+    params: [input.name ?? null, input.kind ?? null, nowMs(), bandId, productionId, productionId, input.name ?? null, bandId],
+  }).expect(1, { code: 'box-office.band.name-taken', reason: 'This production already has a band with that name, or the band is not this production\'s.' })
+  unit.audit({ action: 'update', record: ['core.production', productionId], detail: { bandId } })
+}
+
+/**
+ * Removes a band nothing has been priced, held or sold in, with its seat counts. A band that has
+ * been priced or sold stays, so what was charged can still be read: set its seats to none instead.
+ */
+export function deleteBand(unit: UnitView, productionId: string, bandId: string): void {
+  const unused = sql`NOT EXISTS (SELECT 1 FROM box_office_prices WHERE band_id = ${bandId})
+    AND NOT EXISTS (SELECT 1 FROM box_office_order_lines WHERE band_id = ${bandId})
+    AND NOT EXISTS (SELECT 1 FROM box_office_comp_requests WHERE band_id = ${bandId})
+    AND NOT EXISTS (SELECT 1 FROM box_office_exchanges WHERE band_id = ${bandId})
+    AND NOT EXISTS (SELECT 1 FROM box_office_bands WHERE displaces_band_id = ${bandId})
+    AND NOT EXISTS (SELECT 1 FROM box_office_claims c JOIN box_office_pools p ON p.id = c.pool_id WHERE p.band_id = ${bandId})`
+  unit.add(sql`DELETE FROM box_office_pools WHERE band_id = ${bandId} AND EXISTS (SELECT 1 FROM box_office_bands WHERE id = ${bandId} AND production_id = ${productionId}) AND ${unused}`)
+  unit.add(sql`DELETE FROM box_office_bands WHERE id = ${bandId} AND production_id = ${productionId} AND ${unused}`)
+    .expect(1, { code: 'box-office.band.in-use', reason: 'This band has prices or tickets, so it cannot be removed.', remedy: 'Set its seats to 0 so nothing more is sold in it.' })
+  unit.audit({ action: 'delete', record: ['core.production', productionId], detail: { bandId } })
 }
 
 export async function listBands(productionId: string): Promise<{ id: string, name: string, kind: string, sort: number }[]> {

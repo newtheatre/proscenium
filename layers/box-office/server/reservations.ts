@@ -176,7 +176,8 @@ export interface OrderView {
   /** What is still to pay: the whole total of a reservation, nothing once paid. */
   amountDueMinor: number
   releaseAt: number | null
-  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number }[]
+  /** band names the part of the house when the production has more than one, such as a wheelchair space. */
+  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, band: string | null, amountMinor: number }[]
   /**
    * Whether the buyer may cancel paid tickets here, and on what terms: the fee kept from each ticket
    * and the last moment to do it. Null when they may not, and the box office changes the booking.
@@ -222,7 +223,7 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
     totalMinor: order.total_minor,
     amountDueMinor: order.state === 'reserved' || order.state === 'awaiting_payment' ? order.total_minor : 0,
     releaseAt: order.release_at,
-    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
+    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
     buyerCancel: await buyerCancelTerms(order, lines),
     accountUnclaimed: order.account_id ? await isUnclaimed(order.account_id) : false,
   }
@@ -248,7 +249,7 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
       totalMinor: done.totalMinor,
       amountDueMinor: 0,
       releaseAt: null,
-      lines: done.state === 'cancelled' ? [] : kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
+      lines: done.state === 'cancelled' ? [] : kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
       buyerCancel: done.state === 'cancelled' ? null : await buyerCancelTerms(order, kept),
     }
   }
@@ -297,7 +298,7 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
     totalMinor,
     amountDueMinor: totalMinor,
     releaseAt: kept.length ? order.release_at : null,
-    lines: kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
+    lines: kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
     buyerCancel: null,
   }
 }
