@@ -2,7 +2,7 @@
 // reference to a performance or a venue is by id only: no table here reads the core's. The shift
 // window is stored on the shift, so "is this person on shift?" is one indexed read, and the CHECK on
 // places_taken is what stops a place being taken twice.
-import { integer, text, check, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { integer, text, check, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
 
@@ -39,6 +39,42 @@ export const duties = defineTable('front_of_house_duties', {
     check('front_of_house_duties_description', sql`${t.description} IS NULL OR length(${t.description}) <= 500`),
     check('front_of_house_duties_call', sql`${t.callBeforeMinutes} BETWEEN 0 AND 480`),
     check('front_of_house_duties_stay', sql`${t.stayAfterMinutes} BETWEEN 0 AND 480`),
+  ],
+})
+
+/** A named set of duties and place counts, applied to a performance to make its shifts. */
+export const rotaTemplates = defineTable('front_of_house_rota_templates', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  // Offered first for performances in this venue.
+  venueId: col.internal(text('venue_id')),
+  isDefault: col.internal(integer('is_default', { mode: 'boolean' }).notNull().default(false)),
+  archivedAt: col.timestamp('archived_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'rtp',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_rota_templates_name').on(t.name).where(sql`archived_at IS NULL`),
+    // At most one default per venue, and one with no venue.
+    uniqueIndex('front_of_house_rota_templates_default').on(sql`coalesce(${t.venueId}, '')`).where(sql`is_default = 1 AND archived_at IS NULL`),
+    check('front_of_house_rota_templates_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+})
+
+/** One duty in a rota template. */
+export const rotaTemplateLines = defineTable('front_of_house_rota_template_lines', {
+  templateId: col.ref('front_of_house_rota_templates'),
+  dutyId: col.ref('front_of_house_duties'),
+  places: col.internal(integer('places').notNull()),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.templateId, t.dutyId] }),
+    check('front_of_house_rota_template_lines_places', sql`${t.places} BETWEEN 1 AND 50`),
   ],
 })
 
@@ -114,4 +150,4 @@ export const assignments = defineTable('front_of_house_assignments', {
   ],
 })
 
-export const tables = { duties, shifts, assignments }
+export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments }

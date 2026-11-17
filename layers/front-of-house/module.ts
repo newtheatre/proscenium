@@ -49,15 +49,61 @@ export default defineModule({
   events: {
     announces: {
       'front-of-house.shift.published': event({ version: 1, payload: shift, internal: false }),
+      'front-of-house.shift.cancelled': event({ version: 1, payload: shift, internal: false }),
       // About a person, so internal (Foundations).
       'front-of-house.assignment.confirmed': event({ version: 1, payload: assignment, internal: true }),
+      // Released, withdrawn, declined or removed; the state is on the record.
+      'front-of-house.assignment.released': event({ version: 1, payload: assignment, internal: true }),
     },
     listens: {
       'core.performance.rescheduled': 'move-shifts',
+      'core.performance.cancelled': 'cancel-shifts',
+      'core.performance.moved': 'follow-move',
     },
   },
 
   contributes: {
     'core.record-resolver': [{ id: 'front-of-house.shift', file: 'shift' }, { id: 'front-of-house.assignment', file: 'assignment' }],
+    // Messages to people on the rota about their own shifts, so none can be switched off.
+    'core.notification-type': [{
+      id: 'front-of-house.shift-changed',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your shift has a new time: {{ show }}',
+          body: 'Your {{ duty }} shift for **{{ show }}** has moved. Please now arrive by **{{ when }}**.\n\nIf you can no longer do it, you can give it up without the usual notice.',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-moved',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, where: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your shift has moved: {{ show }}',
+          body: 'The performance of **{{ show }}** you are on as {{ duty }} has moved to **{{ where }}**. Please arrive there by {{ when }}.\n\nIf you can no longer do it, you can give it up without the usual notice.',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-cancelled',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Shift cancelled: {{ show }}',
+          body: 'Your shift for **{{ show }}** on {{ when }} has been cancelled, so you are no longer needed. Thank you for signing up.',
+        },
+      },
+    }],
   },
 })
