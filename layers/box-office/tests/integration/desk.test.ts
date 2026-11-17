@@ -5,6 +5,7 @@
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
+import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
@@ -181,6 +182,25 @@ describe('selling at the desk', () => {
     expect(owner!.address).toBe('desk.buyer@example.org')
     expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE \'box-office.order-confirmed%\'', made!.id)).toBe(1)
+  })
+
+  it('finds a buyer by name in the till\'s box and sends the tickets to them', async () => {
+    const h = await house(3)
+    const { accountId } = await commit(unit => findOrCreateAccount(unit.view(), { address: 'picked.buyer@example.org', name: 'Pickering Buyer', origin: 'guest' }))
+    const found = await req('GET', '/api/box-office/desk/buyers?q=Pickering', undefined, seller)
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.people).toEqual([expect.objectContaining({ id: accountId, label: 'Pickering Buyer', claimed: false })])
+    expect(JSON.stringify(found.body)).not.toContain('picked.buyer@example.org')
+    expect((await req('GET', '/api/box-office/desk/buyers?q=Pickering', undefined, onlooker)).status).toBe(403)
+    const desk = await req('GET', '/api/box-office/desk/performances', undefined, seller)
+    expect(desk.body.emailDomains).toContain('gmail.com')
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], accountId }
+    const sale = await till(input)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(made!.account_id).toBe(accountId)
+    expect((await till({ ...input, email: 'both@example.org' })).status).toBe(422)
+    expect((await till({ ...input, accountId: 'acc_nobody' })).body.code).toBe('box-office.desk.no-address')
   })
 
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {

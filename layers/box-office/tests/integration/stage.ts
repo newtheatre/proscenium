@@ -40,6 +40,8 @@ import doorTonight from '../../server/api/box-office/door/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
+import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
+import deskBuyersGet from '../../server/api/box-office/desk/buyers.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
@@ -102,6 +104,8 @@ export const handle = server({
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/desk/performances': deskPerformancesGet,
+  'GET /api/box-office/desk/buyers': deskBuyersGet,
   'POST /api/box-office/orders/:id/exchange': exchangePost,
   'GET /api/box-office/reports/sales': reportsSalesGet,
   'GET /api/box-office/reports/sales.csv': reportsSalesCsv,
