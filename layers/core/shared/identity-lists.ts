@@ -3,16 +3,40 @@
 // (Identity Doc part 4, "Finding rows by a person's name or email").
 import { defineList } from './list'
 
-/** Accounts, searched by name and the name the person goes by. */
+/**
+ * Accounts: the console's People list (Identity Doc part 5, "Accounts"), searched by name and the
+ * name the person goes by. Unclaimed and anonymised accounts are hidden unless looked for, through
+ * the state filter or a view. Labels are the English fallback; the page shows translated ones.
+ */
 export const accountsList = defineList('core.accounts', {
-  filters: {},
+  filters: {
+    state: {
+      kind: 'choices',
+      label: 'State',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'unclaimed', label: 'Not yet signed in' },
+        { value: 'disabled', label: 'Disabled' },
+        { value: 'anonymised', label: 'Erased' },
+      ],
+    },
+  },
   sorts: {
     name: { label: 'Name', type: 'text' },
   },
   columns: {
-    name: { label: 'Name', sort: 'name', always: true },
-    preferredName: { label: 'Known as' },
+    name: { label: 'Name', sort: 'name', always: true, card: true },
+    preferredName: { label: 'Known as', hidden: true },
+    state: { label: 'State', card: true },
+    since: { label: 'Since' },
   },
+  views: {
+    people: { label: 'People', filters: { state: 'active,disabled' } },
+    unclaimed: { label: 'Not yet signed in', filters: { state: 'unclaimed' } },
+    anonymised: { label: 'Erased', filters: { state: 'anonymised' } },
+    all: { label: 'All' },
+  },
+  defaultView: 'people',
   defaultSort: { key: 'name', order: 'asc' },
 })
 

@@ -1,0 +1,23 @@
+{
+  "core.navigation.people.label": "Accounts",
+
+  "core.people.column.name": "Name",
+  "core.people.column.preferredName": "Known as",
+  "core.people.column.state": "State",
+  "core.people.column.since": "Since",
+
+  "core.people.state.active": "Active",
+  "core.people.state.unclaimed": "Not yet signed in",
+  "core.people.state.disabled": "Disabled",
+  "core.people.state.anonymised": "Erased",
+
+  "core.people.view.people": "People",
+  "core.people.view.unclaimed": "Not yet signed in",
+  "core.people.view.anonymised": "Erased",
+  "core.people.view.all": "All",
+
+  "core.people.unnamed": "Unnamed person",
+  "core.people.erased": "Erased account",
+  "core.people.empty.title": "Nobody here yet",
+  "core.people.empty.description": "People appear here once they sign in, book or are added by a member of staff."
+}
