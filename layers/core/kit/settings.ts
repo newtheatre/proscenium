@@ -121,7 +121,7 @@ export function defineSettings<const M extends string, const S extends Record<st
 export interface SettingRule {
   id: string
   /** Given every setting of the module by short key; true when the values may stand together. */
-  check: (values: Record<string, any>) => boolean
+  check: (values: Record<string, any>) => boolean | Promise<boolean>
 }
 
 /** Rules across two or more settings, checked on every save. The message is `<module>.settings.rules.<id>`. */

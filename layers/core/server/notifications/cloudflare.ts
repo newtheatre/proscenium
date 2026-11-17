@@ -1,5 +1,6 @@
 // The Cloudflare API, for setting up the sending domain by itself (C-52). Only core calls it, with
-// the optional secret CORE_CLOUDFLARE_TOKEN (Email Sending edit and Zone read). The token is never
+// the optional credential CORE_CLOUDFLARE_TOKEN (Email Sending edit and Zone read), saved on Admin >
+// Email sending or set as a Worker secret of the same name. The token is never
 // shown, logged or returned: errors carry Cloudflare's numeric codes only. Tests swap the transport
 // with setCloudflareFetch(), as they swap the mail binding with setMailer().
 //
@@ -8,7 +9,7 @@
 //   GET  /zones?name=<zone>                              find the zone that holds the site's host
 //   GET  /zones/{zone_id}/email/sending/subdomains       list sending subdomains
 //   POST /zones/{zone_id}/email/sending/subdomains       create one, or re-enable an existing one
-import { useContext } from '#kit/context'
+import { credential } from '#kit/secrets'
 
 const API = 'https://api.cloudflare.com/client/v4'
 
@@ -28,12 +29,12 @@ export class CloudflareError extends Error {
   }
 }
 
-export function cloudflareToken(): string | null {
-  return (useContext().env as { CORE_CLOUDFLARE_TOKEN?: string }).CORE_CLOUDFLARE_TOKEN || null
+export async function cloudflareToken(): Promise<string | null> {
+  return await credential('CORE_CLOUDFLARE_TOKEN')
 }
 
 async function api<T>(path: string, init: { method?: string, body?: unknown } = {}): Promise<T> {
-  const token = cloudflareToken()
+  const token = await cloudflareToken()
   if (!token) throw new CloudflareError(0, [])
   const response = await transport(`${API}${path}`, {
     method: init.method ?? 'GET',

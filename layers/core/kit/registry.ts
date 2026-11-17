@@ -192,6 +192,12 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       }
     }
     placeSettings(r, entry, fail)
+    for (const [name, decl] of Object.entries(m.credentials ?? {})) {
+      if (!decl.manage) continue
+      // Saving a key asks for a fresh sign-in, which a privileged ability brings.
+      if (!r.abilities.has(decl.manage)) fail(entry, `credentials.${name}.manage`, `"${decl.manage}" is not a declared ability`)
+      else if (r.abilities.get(decl.manage)!.decl.risk !== 'privileged') fail(entry, `credentials.${name}.manage`, `"${decl.manage}" is not privileged, and a key is managed only under a privileged ability`)
+    }
     for (const [key, setting] of Object.entries(m.settings ?? {})) {
       if (!r.abilities.has(setting.change)) fail(entry, `settings.${key}.change`, `"${setting.change}" is not a declared ability`)
       if (setting.kind === 'reference' && !r.records.has(setting.record!)) fail(entry, `settings.${key}.record`, `"${setting.record}" is not a record type`)

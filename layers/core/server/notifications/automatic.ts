@@ -15,6 +15,6 @@ export async function automaticPlan(event: H3Event): Promise<{ host: string, pro
   let unavailable: Unavailable | null = null
   if (base.endsWith('.workers.dev')) unavailable = 'workers-dev'
   else if (!base.includes('.') || /^[\d.]+$/.test(base) || base.endsWith('.localhost')) unavailable = 'local'
-  else if (!cloudflareToken()) unavailable = 'no-token'
+  else if (!(await cloudflareToken())) unavailable = 'no-token'
   return { host, proposed: unavailable === 'workers-dev' || unavailable === 'local' ? null : `${label}.${base}`, unavailable }
 }
