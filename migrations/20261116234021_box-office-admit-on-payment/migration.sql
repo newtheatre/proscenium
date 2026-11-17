@@ -1,1 +1,0 @@
-ALTER TABLE `box_office_orders` ADD `admit_on_payment` integer DEFAULT false NOT NULL;

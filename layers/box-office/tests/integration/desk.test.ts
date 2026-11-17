@@ -4,7 +4,7 @@
 // issues the tickets, admits them and posts the sale in one batch and failure leaves the
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
@@ -180,5 +180,30 @@ describe('selling at the desk', () => {
     expect(full.body.code).toMatch(/^box-office\.capacity\./)
     expect(await claimed(h)).toBe(0)
     expect(await count("SELECT count(*) AS n FROM box_office_orders o JOIN box_office_order_lines l ON l.order_id = o.id WHERE l.performance_id = ? AND o.state = 'awaiting_payment'", h.performanceId)).toBe(0)
+  })
+})
+
+describe('prices and pauses at the desk', () => {
+  it('prices a change of type as of when the order was reserved, and an added ticket as of now', async () => {
+    const h = await house(5)
+    const r = await reserved(h, 2)
+    const lines = (await rows<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' ORDER BY id", r.orderId)).map(l => l.id)
+    advanceClock(60_000)
+    // The concession goes up after the booking was made.
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.concessionId, amountMinor: 1000 }] })).status).toBe(200)
+    const changed = await req('POST', `/api/box-office/orders/${r.orderId}/amend`, { retype: [{ lineId: lines[0], ticketTypeId: h.concessionId }], add: [{ bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }] }, seller)
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200)
+    // Full price kept, the swap at the old concession price, the new ticket at today's.
+    expect(changed.body.totalMinor).toBe(1200 + 800 + 1000)
+  })
+
+  it('sells nothing new for a paused performance, but still takes payment for a reservation', async () => {
+    const h = await house(4)
+    const r = await reserved(h, 1)
+    expect((await req('POST', `/api/box-office/performances/${h.performanceId}/sales/pause`, {})).status).toBe(200)
+    expect((await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] })).body).toMatchObject({ code: 'box-office.sales.paused' })
+    const sale = await till({ orderId: r.orderId, expectedTotalMinor: r.totalMinor })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
   })
 })
