@@ -9,19 +9,19 @@ const change = 'core.identity-settings.manage'
 // sit in Site administration (Sign-in at /admin/sign-in), not on the console's settings page.
 
 export const identitySettings = defineSettings('core', {
-  'sign-in.email-link': setting.boolean({ default: true, change, audience: 'public' }),
+  'sign-in.email-link': setting.boolean({ default: true, change, audience: 'public', onChange: 'confirm' }),
   'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, audience: 'public', quotable: true }),
   'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change }),
   'sign-in.open-sign-up': setting.boolean({ default: true, change, audience: 'public' }),
   'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
   'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
-  'sign-in.google': setting.boolean({ default: false, change, audience: 'public' }),
+  'sign-in.google': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is
   // not a secret, so it is a setting the theatre types in beside the switch.
   'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change }),
-  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change }),
-  'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public' }),
-  'sign-in.provider-is-strong': setting.boolean({ default: false, change }),
+  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm' }),
+  'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm' }),
+  'sign-in.provider-is-strong': setting.boolean({ default: false, change, onChange: 'confirm' }),
 
   'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change }),
@@ -30,19 +30,19 @@ export const identitySettings = defineSettings('core', {
   'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change }),
 
   'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
-  'grants.allow-no-expiry': setting.boolean({ default: true, change }),
+  'grants.allow-no-expiry': setting.boolean({ default: true, change, onChange: 'confirm' }),
   'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change }),
 
   'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
-  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change }),
+  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change, onChange: 'confirm' }),
 
-  'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change }),
+  'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change, onChange: 'confirm' }),
 
   'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, audience: 'public', quotable: true }),
   'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   // Erasure and the download are not offered until the theatre says who to contact about personal data.
-  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true }),
+  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
 
   'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
@@ -51,7 +51,14 @@ export const identitySettings = defineSettings('core', {
   'access-scheme.companions-need-verified': setting.boolean({ default: false, change }),
   'access-scheme.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   'access-scheme.review-after': setting.duration({ default: '1095d', min: '365d', max: '3650d', change }),
-  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change }),
+  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change, onChange: 'confirm' }),
+  // The account sweeps (part 3, "Retention"). They are built in a later release; their settings are
+  // declared now so the advanced page shows them. A retention period asks again before it is saved,
+  // and arming the sweeps asks why, and only an Owner may (core.retention.arm).
+  'retention.unclaimed-after': setting.duration({ default: '1095d', min: '90d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+  'retention.dormant-after': setting.duration({ default: '730d', min: '180d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+  'retention.run-cap': setting.integer({ default: 50, min: 1, max: 500, unit: 'core.units.accounts', change }),
+  'retention.armed': setting.boolean({ default: false, change: 'core.retention.arm', onChange: 'reason' }),
 })
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
@@ -98,6 +105,8 @@ export const identityAbilities = defineAbilities('core', {
   'grant.read': ability({ risk: 'normal', implies: ['account.search'], audit: false, grantAt: ['site'] }),
   'grant.manage': ability({ on: 'core.grant', risk: 'privileged', owner: 'refuses', implies: ['grant.read'], grantAt: ['site', 'module', 'record'] }),
   'identity-settings.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
+  // Arming or disarming the account sweeps: an Owner's alone (part 6).
+  'retention.arm': ability({ risk: 'privileged', grantAt: ['site'] }),
   // Read one member's emergency contacts, with a reason. Strong but never asked again, so an
   // emergency is not slowed; an Owner does not hold it by being an Owner (OWNER_DOES_NOT_READ).
   'emergency-contact.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', grantAt: ['site'] }),
