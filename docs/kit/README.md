@@ -233,6 +233,15 @@ names a `menu` (account, members, console or live) and may set `hideEmpty` besid
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
 
+An ability's `implies` names the module's own abilities by short name (`order.view`) and another
+module's by full id (`core.account.find`). Another module's ability may come with one only when it
+declares `impliable: true`, is of risk normal, and is owned by core or by a module the implying
+module lists under `requires`; one it only `uses` is not enough. The registry refuses anything else
+when it reads the manifests. An impliable ability may be neither privileged nor on a record type,
+because it comes with its implier at every reach: whoever holds the implying ability through a
+site-wide, module or record grant, or through a fact, holds the impliable one too, with no record,
+and the audit names the implying grant or fact.
+
 ## Requirements
 
 A module that can judge a condition contributes a source to `core.requirement` under its own id,

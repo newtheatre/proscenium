@@ -20,8 +20,9 @@ watch(() => [props.status, props.data] as const, ([status, data]) => {
 const hasData = computed(() => props.data !== null && props.data !== undefined)
 const failedFirst = computed(() => props.status === 'error' && !hasData.value)
 const failedRefresh = computed(() => props.status === 'error' && hasData.value)
+const dates = useDates()
 const reason = computed(() => toRefusal(props.error).reason)
-const lastGoodText = computed(() => lastGood.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
+const lastGoodText = computed(() => lastGood.value ? dates.time(lastGood.value) : '')
 </script>
 
 <template>
