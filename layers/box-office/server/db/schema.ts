@@ -461,6 +461,10 @@ export const exchanges = defineTable('box_office_exchanges', {
   ticketTypeId: col.ref('box_office_ticket_types'),
   // The price of each new ticket, and what is to pay on top of the old ones.
   priceMinor: col.minor('price_minor').notNull(),
+  // A JSON array of each line's new seats, ticket type and price ({ lineId, bandId, ticketTypeId,
+  // priceMinor }); band, ticket type and price above are then the first line's. Null on an exchange
+  // made before lines could differ, which gives every line those three.
+  moves: col.internal(text('moves')),
   differenceMinor: col.minor('difference_minor').notNull(),
   holdId: col.ref('box_office_holds'),
   intentId: col.ref('payments_intents', { nullable: true }),

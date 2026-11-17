@@ -1,7 +1,9 @@
 <!-- The "Confirm it is you" dialogue (ID-28; identity spec part 6: a dialogue, not a page). With a
      passkey, the browser's passkey prompt opens at once and the action carries on when it is used.
      A basic sign-in on an account with no passkey gets a six-digit code by email instead, typed
-     here. A strong sign-in is never confirmed by email. -->
+     here. A strong sign-in is never confirmed by email. An account with an authenticator app may
+     type its code instead of using the passkey; after an email sign-in, where the theatre allows, that
+     code also makes the sign-in strong. -->
 <script setup lang="ts">
 import type { Refusal } from '../utils/identity'
 import type { ConfirmReason } from '../composables/useConfirmItsYou'
@@ -11,7 +13,12 @@ const emit = defineEmits<{ close: [confirmed: boolean] }>()
 const { t } = useT()
 const settle = (confirmed: boolean) => emit('close', confirmed)
 
-const ways = ref<('passkey' | 'code')[] | null>(null)
+const ways = ref<('passkey' | 'authenticator' | 'code')[] | null>(null)
+// Whether the app's code would make this sign-in strong, so it is offered when a strong one is needed.
+const authenticatorStrong = ref(false)
+const appDigits = ref<number[]>([])
+const appCode = computed(() => appDigits.value.join(''))
+const useApp = computed(() => !!ways.value?.includes('authenticator') && (!strongNeeded.value || authenticatorStrong.value))
 const address = ref<string | null>(null)
 const refusal = ref<Refusal | null>(null)
 const busy = ref(false)
@@ -49,9 +56,19 @@ async function checkCode() {
   refusal.value = answer.refusal
 }
 
+async function checkApp() {
+  busy.value = true
+  refusal.value = null
+  const answer = await callIdentity('/api/core/me/reassert/authenticator', { code: appCode.value })
+  busy.value = false
+  if (answer.ok) return settle(true)
+  appDigits.value = []
+  refusal.value = answer.refusal
+}
+
 // As it opens: find how this sign-in may confirm, and start the quickest way at once.
 onMounted(async () => {
-  const answer = await callIdentity<{ ways: ('passkey' | 'code')[], address: string | null }>('/api/core/me/reassert')
+  const answer = await callIdentity<{ ways: ('passkey' | 'authenticator' | 'code')[], address: string | null, authenticatorStrong: boolean }>('/api/core/me/reassert')
   if (!answer.ok) {
     refusal.value = answer.refusal
     ways.value = []
@@ -59,8 +76,9 @@ onMounted(async () => {
   }
   ways.value = answer.data.ways
   address.value = answer.data.address
+  authenticatorStrong.value = answer.data.authenticatorStrong
   if (ways.value.includes('passkey')) await usePasskey()
-  else if (ways.value.includes('code') && !strongNeeded.value) await sendCode()
+  else if (ways.value.includes('code') && !strongNeeded.value && !useApp.value) await sendCode()
 })
 </script>
 
@@ -68,7 +86,7 @@ onMounted(async () => {
   <UModal
     :title="t('core.confirm-its-you.title')"
     :close="{ onClick: () => settle(false) }"
-    :description="strongNeeded ? t('core.confirm-its-you.strong') : t('core.confirm-its-you.description')"
+    :description="strongNeeded ? (useApp ? t('core.confirm-its-you.strong-or-app') : t('core.confirm-its-you.strong')) : t('core.confirm-its-you.description')"
   >
     <template #body>
       <div class="space-y-4">
@@ -77,14 +95,42 @@ onMounted(async () => {
           v-if="ways === null"
           class="h-10 w-full"
         />
-        <template v-else-if="ways.includes('passkey')">
+        <template v-else-if="ways.includes('passkey') || useApp">
           <UButton
+            v-if="ways.includes('passkey')"
             block
             icon="i-lucide-key-round"
             :loading="busy"
             :label="t('core.confirm-its-you.passkey')"
             @click="usePasskey"
           />
+          <template v-if="useApp">
+            <USeparator
+              v-if="ways.includes('passkey')"
+              :label="t('core.confirm-its-you.or')"
+            />
+            <form
+              class="space-y-3"
+              @submit.prevent="checkApp"
+            >
+              <UFormField :label="t('core.confirm-its-you.app-code')">
+                <UPinInput
+                  v-model="appDigits"
+                  otp
+                  type="number"
+                  :length="CODE_LENGTH"
+                />
+              </UFormField>
+              <UButton
+                type="submit"
+                block
+                color="neutral"
+                variant="outline"
+                :loading="busy"
+                :label="t('core.confirm-its-you.confirm')"
+              />
+            </form>
+          </template>
         </template>
         <template v-else-if="ways.includes('code') && !strongNeeded">
           <form

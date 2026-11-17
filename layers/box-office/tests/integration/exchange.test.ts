@@ -20,6 +20,8 @@ const balance = async (key: string, performanceId: string) => (await rows<{ tota
 const claimed = async (h: House) => (await rows<{ claimed: number }>('SELECT claimed FROM box_office_pools WHERE performance_id = ?', h.performanceId))[0]!.claimed
 const lineIds = async (orderId: string) => (await rows<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' ORDER BY id", orderId)).map(r => r.id)
 const DEFERRED = 'box-office.deferred-ticket-income'
+/** Every line to the same seats and ticket type. */
+const each = (lines: string[], performanceId: string, bandId: string, ticketTypeId: string) => ({ performanceId, lines: lines.map(lineId => ({ lineId, bandId, ticketTypeId })) })
 let card: string
 let cash: string
 let reason: string
@@ -80,10 +82,10 @@ describe('exchanging tickets', () => {
     const from = await house(5)
     const to = await house(5)
     const o = await paid(from, 2)
-    const target = { performanceId: to.performanceId, bandId: to.bandId, ticketTypeId: to.fullId }
-    expect((await exchange(o.orderId, { lineIds: o.lines, ...target, preview: true }, exchanger)).body).toMatchObject({ oldMinor: 2400, newMinor: 2400, differenceMinor: 0 })
+    const target = each(o.lines, to.performanceId, to.bandId, to.fullId)
+    expect((await exchange(o.orderId, { ...target, preview: true }, exchanger)).body).toMatchObject({ oldMinor: 2400, newMinor: 2400, differenceMinor: 0 })
 
-    const done = await exchange(o.orderId, { lineIds: o.lines, ...target }, exchanger)
+    const done = await exchange(o.orderId, target, exchanger)
     expect(done.status, JSON.stringify(done.body)).toBe(200)
     expect(done.body).toMatchObject({ totalMinor: 2400, refund: null })
     expect(await claimed(from)).toBe(0)
@@ -100,7 +102,7 @@ describe('exchanging tickets', () => {
   it('refunds a cheaper exchange\'s difference, which needs the refund ability too', async () => {
     const h = await house(5)
     const o = await paid(h, 2)
-    const cheaper = { lineIds: o.lines, performanceId: h.performanceId, bandId: h.bandId, ticketTypeId: h.concessionId }
+    const cheaper = each(o.lines, h.performanceId, h.bandId, h.concessionId)
     expect((await exchange(o.orderId, cheaper, exchanger)).status).toBe(403)
     const done = await exchange(o.orderId, cheaper)
     expect(done.status, JSON.stringify(done.body)).toBe(200)
@@ -111,18 +113,18 @@ describe('exchanging tickets', () => {
     expect(await balance(DEFERRED, h.performanceId)).toBe(-1600)
 
     // Back again would cost more: refused here, and nothing changes.
-    const back = await exchange(o.orderId, { lineIds: await lineIds(o.orderId), performanceId: h.performanceId, bandId: h.bandId, ticketTypeId: h.fullId })
+    const back = await exchange(o.orderId, each(await lineIds(o.orderId), h.performanceId, h.bandId, h.fullId))
     expect(back.body).toMatchObject({ code: 'box-office.exchange.costs-more' })
   })
 
   it('takes the difference on a dearer exchange at the till and makes the exchange when it is paid', async () => {
     const h = await house(5)
     const o = await paid(h, 2)
-    const cheaper = await exchange(o.orderId, { lineIds: o.lines, performanceId: h.performanceId, bandId: h.bandId, ticketTypeId: h.concessionId })
+    const cheaper = await exchange(o.orderId, each(o.lines, h.performanceId, h.bandId, h.concessionId))
     expect(cheaper.body.refund).toMatchObject({ amountMinor: 800 })
     await deliver()
     const concession = await lineIds(o.orderId)
-    const dearer = { orderId: o.orderId, lineIds: concession, performanceId: h.performanceId, bandId: h.bandId, ticketTypeId: h.fullId }
+    const dearer = { orderId: o.orderId, ...each(concession, h.performanceId, h.bandId, h.fullId) }
 
     const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input: { exchange: { ...dearer, expectedDifferenceMinor: 800 } } }] }, manager)
     expect(summary.status, JSON.stringify(summary.body)).toBe(200)
@@ -160,12 +162,54 @@ describe('exchanging tickets', () => {
     expect(await balance(DEFERRED, h.performanceId)).toBe(-800)
   })
 
+  it('keeps each ticket\'s own type, so a mixed booking moves as it is and only the changed line costs more', async () => {
+    const from = await house(5)
+    const to = await house(5)
+    const o = await paid(from, 2)
+    // One full price and one concession, moved together to another performance.
+    const mixed = { performanceId: to.performanceId, lines: [{ lineId: o.lines[0]!, bandId: to.bandId, ticketTypeId: to.fullId }, { lineId: o.lines[1]!, bandId: to.bandId, ticketTypeId: to.concessionId }] }
+    expect((await exchange(o.orderId, { ...mixed, preview: true })).body).toMatchObject({ oldMinor: 2400, newMinor: 2000, differenceMinor: -400 })
+    const done = await exchange(o.orderId, mixed)
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body.refund).toMatchObject({ amountMinor: 400 })
+    const moved = await rows<{ ticket_type_id: string, amount_minor: number, replaces_line_id: string }>("SELECT ticket_type_id, amount_minor, replaces_line_id FROM box_office_order_lines WHERE order_id = ? AND state = 'live'", o.orderId)
+    expect(moved.find(l => l.replaces_line_id === o.lines[0])).toMatchObject({ ticket_type_id: to.fullId, amount_minor: 1200 })
+    expect(moved.find(l => l.replaces_line_id === o.lines[1])).toMatchObject({ ticket_type_id: to.concessionId, amount_minor: 800 })
+    expect(await claimed(to)).toBe(2)
+    await deliver()
+
+    // At the till, only the concession going back to full price is paid for; the full ticket stays as it is.
+    const lines = await rows<{ id: string, ticket_type_id: string }>("SELECT id, ticket_type_id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' ORDER BY id", o.orderId)
+    const back = { orderId: o.orderId, performanceId: to.performanceId, lines: lines.map(l => ({ lineId: l.id, bandId: to.bandId, ticketTypeId: to.fullId })) }
+    const sale = await till({ exchange: { ...back, expectedDifferenceMinor: 400 } })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(JSON.parse((await rows<{ moves: string }>('SELECT moves FROM box_office_exchanges WHERE order_id = ?', o.orderId))[0]!.moves)).toHaveLength(2)
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const after = await rows<{ ticket_type_id: string, amount_minor: number }>("SELECT ticket_type_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND state = 'live'", o.orderId)
+    expect(after.map(l => [l.ticket_type_id, l.amount_minor])).toEqual([[to.fullId, 1200], [to.fullId, 1200]])
+    expect(await claimed(to)).toBe(2)
+  })
+
+  it('makes a till exchange kept before each line had its own type, giving every line the same', async () => {
+    const h = await house(5)
+    const o = await paid(h, 1)
+    await exchange(o.orderId, each(o.lines, h.performanceId, h.bandId, h.concessionId))
+    await deliver()
+    const concession = await lineIds(o.orderId)
+    const sale = await till({ exchange: { orderId: o.orderId, ...each(concession, h.performanceId, h.bandId, h.fullId), expectedDifferenceMinor: 400 } })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    // As an exchange made by the earlier code would be: no moves, every line taking band, type and price.
+    await env.DB.prepare('UPDATE box_office_exchanges SET moves = NULL WHERE order_id = ?').bind(o.orderId).run()
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    expect(await rows("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' AND ticket_type_id = ? AND amount_minor = 1200", o.orderId, h.fullId)).toHaveLength(1)
+  })
+
   it('leaves the buyer with what they had when the new performance has just filled', async () => {
     const from = await house(5)
     const full = await house(1)
     const o = await paid(from, 1)
     await paid(full, 1)
-    const refused = await exchange(o.orderId, { lineIds: o.lines, performanceId: full.performanceId, bandId: full.bandId, ticketTypeId: full.fullId })
+    const refused = await exchange(o.orderId, each(o.lines, full.performanceId, full.bandId, full.fullId))
     expect(refused.body.code).toMatch(/^box-office\.capacity\./)
     expect(await lineIds(o.orderId)).toEqual(o.lines)
     expect((await scan(from, o.codes[0]!)).body.result).toBe('admitted')
