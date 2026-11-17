@@ -35,6 +35,7 @@ const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ labe
         :aria-label="area"
       />
       <template #right>
+        <InboxBell side="members" />
         <AccountMenu />
       </template>
     </UHeader>

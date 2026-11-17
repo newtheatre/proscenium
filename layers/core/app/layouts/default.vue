@@ -47,6 +47,7 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
         :aria-label="t('core.public.navigation')"
       />
       <template #right>
+        <InboxBell side="audience" />
         <AccountMenu />
       </template>
       <template #body>
