@@ -3,7 +3,7 @@
 // posted. It names no module that provides a member price: that is a requirement reference checked
 // through the kit. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'box-office.settings.manage'
@@ -40,6 +40,7 @@ export default defineModule({
     'performance.manage': ability({ on: 'core.performance' }),
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
+    'order.release': ability({ on: 'box-office.order' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -61,6 +62,13 @@ export default defineModule({
       'box-office.order.expired': event({ version: 1, payload: z.object({ orderId: z.string() }), internal: true }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
     },
+  },
+
+  tasks: {
+    // Expires baskets whose hold has lapsed and that no purchase has cleaned up on its way past.
+    'box-office.sweep-holds': task({ every: '5m' }),
+    // Releases reservations nobody has paid for, at the time the theatre set before the start.
+    'box-office.release-reservations': task({ every: '5m' }),
   },
 
   contributes: {
@@ -97,6 +105,18 @@ export default defineModule({
         'en-GB': {
           subject: 'Reserved: {{ show }}, {{ when }}',
           body: 'Your tickets are reserved. Nothing has been paid yet: you pay at the box office when you arrive.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nTo pay on arrival: **{{ amountDue }}**\n\nBooking reference: **{{ reference }}**\n\nDesk code: **{{ deskCode }}**\n\nShow the reference or the desk code at the box office. They are not tickets and will not let you in at the door.\n\nIf you cannot come, or need fewer tickets, please let them go so somebody else can have them:\n\n[Change or cancel my reservation]({{ link }})\\n\\nThis link works until the reservation is paid for. Once you have paid, your tickets come with a new one.',
+        },
+      },
+    }, {
+      id: 'box-office.reservation-released',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your reservation has been released: {{ show }}, {{ when }}',
+          body: 'Your reservation **{{ reference }}** for **{{ show }}**, {{ when }}, was not paid for in time, so the seats have gone back on sale. Nothing was charged.\n\nIf you still want to come, ask the box office: there may be tickets left.',
         },
       },
     }, {
