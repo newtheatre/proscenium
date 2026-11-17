@@ -103,10 +103,21 @@ export default defineRequirementSource({
 
   async describe(refs) {
     const out: Record<string, { label: string, presentable?: { label: string, shape: string } }> = {}
+    const presentableOf = async (scheme: Scheme) => {
+      const list = await schemeList(scheme)
+      return list?.keyKind === 'reference'
+        ? { label: `${scheme.name}? Enter your ${list.referenceLabel ?? 'reference'}`, shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
+        : { label: `${scheme.name}? Enter your member number`, shape: 'member-number' }
+    }
     for (const ref of refs) {
       const id = schemeIdOf(ref)
       if (id === ANY) {
-        out[ref] = { label: 'Members' }
+        // Any membership: a reference is taken where some scheme takes one. With one such scheme its
+        // own words (V13); with several, words that fit them all.
+        const taking = (await listSchemes(['open', 'closed'])).filter(s => s.acceptsReference)
+        out[ref] = taking.length === 1
+          ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
+          : taking.length ? { label: 'Members', presentable: { label: 'A member? Enter your membership reference', shape: 'reference' } } : { label: 'Members' }
         continue
       }
       const scheme = await getScheme(id)
@@ -115,12 +126,7 @@ export default defineRequirementSource({
         continue
       }
       // V13: the label names the scheme, never a bare noun. A list's own label where it has one.
-      const list = scheme.acceptsReference ? await schemeList(scheme) : null
-      out[ref] = !scheme.acceptsReference
-        ? { label: scheme.name }
-        : list?.keyKind === 'reference'
-          ? { label: scheme.name, presentable: { label: `${scheme.name}? Enter your ${list.referenceLabel ?? 'reference'}`, shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' } }
-          : { label: scheme.name, presentable: { label: `${scheme.name}? Enter your member number`, shape: 'member-number' } }
+      out[ref] = scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }
     }
     return out
   },

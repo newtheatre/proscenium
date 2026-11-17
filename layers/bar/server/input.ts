@@ -8,17 +8,20 @@ const id = z.string().min(1).max(64) // not-policy: an id's length
 // A named colour token from the theme, never a hex value.
 export const COLOURS = ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'neutral'] as const
 
-export const categoryInput = z.object({ name, colour: z.enum(COLOURS).nullable().optional(), parentId: id.nullable().optional() }).strict()
+// A usual preset is a built-in key ('builtin:wine') or one of the theatre's preset ids.
+const presetRef = z.string().min(1).max(64) // not-policy: an id's length
+export const categoryInput = z.object({ name, colour: z.enum(COLOURS).nullable().optional(), parentId: id.nullable().optional(), ageRestricted: z.boolean().optional(), usualPreset: presetRef.nullable().optional() }).strict()
 export const categoryPatch = categoryInput.partial().extend({ active: z.boolean().optional() }).strict()
 
 export const productInput = z.object({
   categoryId: id,
   name,
-  ageRestricted: z.boolean().optional(),
+  // null: as the category.
+  ageRestricted: z.boolean().nullable().optional(),
   variantName: z.string().trim().max(80).optional(), // not-policy: a name's bound
   amountMinor: amount.nullable().optional(),
 }).strict()
-export const productPatch = z.object({ categoryId: id, name, ageRestricted: z.boolean(), active: z.boolean() }).partial().strict()
+export const productPatch = z.object({ categoryId: id, name, ageRestricted: z.boolean().nullable(), active: z.boolean() }).partial().strict()
 
 export const variantInput = z.object({ name, barcode: z.string().trim().min(1).max(64).nullable().optional(), amountMinor: amount.nullable().optional() }).strict() // not-policy: a barcode's bound
 export const variantPatch = z.object({ name, barcode: z.string().trim().min(1).max(64).nullable(), active: z.boolean() }).partial().strict() // not-policy: a barcode's bound
