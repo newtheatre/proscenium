@@ -336,7 +336,7 @@ settingGroups: {
 A group not named is on the module's own page in its `place` (`console` by default:
 `/console/<module>/settings`; `admin`: `/admin/modules/<module>`). Core has no page of its own, so
 each of its groups names a home; the table is `layers/core/module/settings.ts`. A single setting may
-carry `screen` where only part of its group is bespoke. Page ids are `<module>.<page>`, plus
+carry `screen` where only part of its group is bespoke. A setting or group names a screen only once that screen shows and saves it: no setting may be reachable only through the API. Page ids are `<module>.<page>`, plus
 `core.advanced` and each module's `<module>.settings` and `<module>.admin`. A page's name is
 `<module>.settings-pages.<page>`. The conformance run fails for a screen that is not a page. In
 code, `useRegistry().settingPages` and `.settingHomes` say where everything is.

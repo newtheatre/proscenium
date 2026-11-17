@@ -30,8 +30,10 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'recovery': on('sign-in'),
   'access': on('sign-in'),
   'privacy': on('privacy'),
-  // Sending domain, verified domain, sending label and email footer: the Email screen manages them.
-  'notifications': { screen: '/admin/email' },
+  // The Email screen shows and saves the sending and verified domains, which say so themselves. The
+  // footer and sending label stay here until that screen draws them too (Foundations, 17 November):
+  // no setting may be reachable only through the API.
+  'notifications': on('theatre'),
   'units': advanced,
   'jobs': advanced,
   'external': advanced,
