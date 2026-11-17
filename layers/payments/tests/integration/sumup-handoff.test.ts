@@ -135,6 +135,6 @@ describe('Providers and readers', () => {
     const byId = Object.fromEntries(listed.providers.map((p: any) => [p.id, p]))
     expect(byId.sumup.pairsReaders).toBe(true)
     expect(byId['sumup-handoff'].pairsReaders).toBe(false)
-    expect(byId.cash).toMatchObject({ pairsReaders: false, missingSecrets: [] })
+    expect(byId.cash).toMatchObject({ pairsReaders: false })
   })
 })

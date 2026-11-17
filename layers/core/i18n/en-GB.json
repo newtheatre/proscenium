@@ -510,5 +510,13 @@
   "core.live.offline-title": "This device is offline",
   "core.live.offline-description": "What is on screen stays readable, but changes cannot be sent until the connection returns.",
   "core.live.empty.title": "Nothing to open tonight",
-  "core.live.empty.description": "Screens for working a performance appear here when you are on shift or hold a role that uses them."
+  "core.live.empty.description": "Screens for working a performance appear here when you are on shift or hold a role that uses them.",
+  "core.credentials.saved": "Saved",
+  "core.credentials.saved-ending": "Saved, ending {hint}",
+  "core.credentials.saved-for-module": "Using the value saved for the whole site",
+  "core.credentials.worker-secret": "Using the Worker secret set in Cloudflare",
+  "core.credentials.not-set": "Not set",
+  "core.credentials.replace": "Leave blank to keep it, or type a new value",
+  "core.credentials.enter": "Paste the value",
+  "core.credentials.remove": "Remove"
 }

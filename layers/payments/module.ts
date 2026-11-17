@@ -3,7 +3,7 @@
 // through the point payments.settlement, so it never imports Box office, a bar or anything else that
 // sells. Cash and attested card ship with it, so a desk works on day one with no account anywhere.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, secret, setting, task } from '#kit'
+import { ability, call, code, credentialDecl, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'payments.settings.manage'
@@ -99,17 +99,19 @@ export default defineModule({
     'payments.send-refund': job({ payload: z.object({ refundId: z.string() }), retries: 8 }),
   },
 
-  // Provider keys are Worker secrets in the first release (Matt's question 3). Stripe's are needed
-  // only once a Stripe account is added, and SumUp's once a SumUp account is.
-  secrets: {
-    PAYMENTS_STRIPE_SECRET_KEY: secret({ needed: 'when-used' }),
-    PAYMENTS_STRIPE_WEBHOOK_SECRET: secret({ needed: 'when-used' }),
-    PAYMENTS_STRIPE_PUBLISHABLE_KEY: secret({ needed: 'when-used' }),
+  // Provider keys are credentials (Matt, 17 November: keys are managed in the app, not in Cloudflare),
+  // typed into each provider account on the Providers screen. A Worker secret of the same name is
+  // used where none is saved. Stripe's are needed only once a Stripe account is added, SumUp's once a
+  // SumUp account is.
+  credentials: {
+    PAYMENTS_STRIPE_SECRET_KEY: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_STRIPE_WEBHOOK_SECRET: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_STRIPE_PUBLISHABLE_KEY: credentialDecl({ needed: 'when-used' }),
     // SumUp's API key (the Cloud API only), and the affiliate app id and key that both the Cloud API's
     // reader checkout and the hand-off to the SumUp app carry.
-    PAYMENTS_SUMUP_API_KEY: secret({ needed: 'when-used' }),
-    PAYMENTS_SUMUP_AFFILIATE_KEY: secret({ needed: 'when-used' }),
-    PAYMENTS_SUMUP_APP_ID: secret({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_API_KEY: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_AFFILIATE_KEY: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_APP_ID: credentialDecl({ needed: 'when-used' }),
   },
 
   // The return address of a hand-off to the SumUp app is signed for its attempt. A key checks for a
