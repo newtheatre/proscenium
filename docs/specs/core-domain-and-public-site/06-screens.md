@@ -8,7 +8,7 @@ The inventory lists every screen this workstream adds, the shell it sits in, and
 
 ## Which shell each screen sits in
 
-On 16 November 2026 Matt added a fourth shell, Site administration at `/admin`, for screens about the installation itself, and the console's System group went (integration ruling R-33). The console keeps the theatre's day-to-day work. The tables further down group screens by subject; this table says which shell each is in. The interface specification owns the shell, its menu and the exact addresses, and it confirmed this split and these addresses the same day.
+On 16 November 2026 Matt added a fourth shell, Admin at `/admin`, for screens about the installation itself, and the console's System group went (integration ruling R-33). The console keeps the theatre's day-to-day work. The tables further down group screens by subject; this table says which shell each is in. The interface specification owns the shell, its menu and the exact addresses, and it confirmed this split and these addresses the same day.
 
 | Screen | Shell | Address |
 | --- | --- | --- |
@@ -17,15 +17,15 @@ On 16 November 2026 Matt added a fourth shell, Site administration at `/admin`, 
 | Files | Console | unchanged |
 | Message types, Template editor | Console | unchanged |
 | Delivery log | Console | unchanged |
-| Branding | Site administration | `/admin/branding` |
-| Theatre (the generated settings page that holds the site, organisation and locale groups) | Site administration | `/admin/theatre` |
-| Vocabularies | Site administration | `/admin/vocabularies` |
-| Senders, with the sending-domain setup and the email outcomes step | Site administration | `/admin/email` |
-| Delivery health, with the suppression list | Site administration | `/admin/email/health` |
-| Webhooks, Webhook editor, Webhook delivery log | Site administration | `/admin/webhooks` |
-| Site readiness | Site administration | `/admin/site-readiness` |
+| Branding | Admin | `/admin/branding` |
+| Theatre (the generated settings page that holds the site, organisation and locale groups) | Admin | `/admin/theatre` |
+| Vocabularies | Admin | `/admin/vocabularies` |
+| Senders, with the sending-domain setup and the email outcomes step | Admin | `/admin/email` |
+| Delivery health, with the suppression list | Admin | `/admin/email/health` |
+| Webhooks, Webhook editor, Webhook delivery log | Admin | `/admin/webhooks` |
+| Site readiness | Admin | `/admin/site-readiness` |
 
-Each Site administration entry declares `menu: 'admin'` and one of the interface specification's groups:
+Each Admin entry declares `menu: 'admin'` and one of the interface specification's groups:
 
 | Group | Core's entries, in order |
 | --- | --- |
@@ -37,11 +37,11 @@ The shell has six groups in a fixed order: Theatre, Modules, Access, Email, Conn
 
 Core declares all six groups of the shell (`theatre`, `email`, `connections`, `modules`, `access`, `upkeep`), because `core.navigation-group` now carries a `menu` field, `console` by default or `admin`. Core also declares the console's Communications group, so that Message types, Template editor and Delivery log have a home while the Communications module is off.
 
-Core contributes cards to the Site administration Overview through `core.home-card` with `menu: 'admin'`, one for each thing on its screens that needs someone: the sending domain is not verified, the email outcomes step is not done, a webhook is paused, Site readiness has items outstanding. Each shows only to a holder of the screen's ability and links to the screen. They repeat what the health checks already report and add no new check.
+Core contributes cards to the Admin Overview through `core.home-card` with `menu: 'admin'`, one for each thing on its screens that needs someone: the sending domain is not verified, the email outcomes step is not done, a webhook is paused, Site readiness has items outstanding. Each shows only to a holder of the screen's ability and links to the screen. They repeat what the health checks already report and add no new check.
 
-Why the line falls there. A screen is in Site administration when it changes how the installation is set up and is touched rarely: who the theatre is, how it looks, where its mail comes from, what its lists contain, where its events are sent. A screen stays in the console when someone uses it in the course of running shows. That is why the wording of messages and the delivery log stay in the console, beside the people who answer "did my email arrive", while the sender and its health move.
+Why the line falls there. A screen is in Admin when it changes how the installation is set up and is touched rarely: who the theatre is, how it looks, where its mail comes from, what its lists contain, where its events are sent. A screen stays in the console when someone uses it in the course of running shows. That is why the wording of messages and the delivery log stay in the console, beside the people who answer "did my email arrive", while the sender and its health move.
 
-Moving a screen changes no ability. A person sees Site administration when they hold at least one ability with a screen in it, and sees only those screens. The setup steps "Your look", "Your year", "Your sender" and "Email outcomes" link to their screens at the new addresses.
+Moving a screen changes no ability. A person sees Admin when they hold at least one ability with a screen in it, and sees only those screens. The setup steps "Your look", "Your year", "Your sender" and "Email outcomes" link to their screens at the new addresses.
 
 ## Public shell
 
@@ -90,7 +90,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Venue | `core.venue.manage` | Address, public text, access text, photos, and its spaces. Each space has its capacity and kind, a switch for whether the theatre runs it (on by default), and a short note on finding it. There is no such switch on the venue |
 | Closures | `core.closure.manage` | A list and a small calendar. Add a closure for the theatre, a venue or a space. Public holidays shown, greyed, from the feed. |
 
-## Site and brand (Site administration, except Files)
+## Site and brand (Admin, except Files)
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
@@ -114,7 +114,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 
 **Finding rows by a person.** By a foundations ruling of 16 November 2026, no core list queries the accounts table itself. Identity's part 4 gives two services, both exported from core's services. `searchAccounts` is the person picker, for choosing a person not yet on the screen (adding a credit, say), under `core.account.search`, which every preset with console work already holds. `findAccounts(text, list)` narrows a list already on the screen by its account holder and shows no name, under `core.account.find`. It answers an SQL subquery of account ids, which the list passes to the kit's `inAccountScope`, so no list of ids is ever bound, and it writes one audit `read` entry for each call, which never holds the text typed. `core.account.find` is impliable, and three core abilities imply it, one for each list that filters by person: `core.delivery.read` (the delivery log, by recipient), `core.file.manage` (Files, by an owner that is an account) and `core.production.view` (a production's credits, by the linked account). The public archive's search across credited names is a different thing: it reads the public text of published credits and touches no account.
 
-## Site administration: webhooks
+## Admin: webhooks
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
