@@ -32,6 +32,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const { dateTime } = useDates()
 const { money } = await useMoney()
 const route = useRoute()
@@ -44,12 +45,16 @@ const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type 
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const base = computed(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/sales`)
-async function act(run: () => Promise<unknown>, done: string): Promise<boolean> {
+// Does the act, then says so, with an Undo that does its reverse where there is one.
+async function act(run: () => Promise<unknown>, done: string, undo?: () => Promise<unknown>): Promise<boolean> {
   refusal.value = null
   try {
     await run()
-    toast.add({ title: done, color: 'success' })
     await refresh()
+    offer(done, undo && (async () => {
+      await undo()
+      await refresh()
+    }))
     return true
   }
   catch (e) {
@@ -82,11 +87,18 @@ watch(data, (d) => {
 
 async function saveCapacity(confirmOverVenue = false) {
   const pools = Object.entries(capacity.value).map(([bandId, n]) => ({ bandId, capacity: n ?? 0 }))
+  const before = (data.value?.pools ?? []).map(p => ({ bandId: p.bandId, capacity: p.capacity }))
   refusal.value = null
   try {
     await $api(base.value, { method: 'PUT', body: { pools, confirmOverVenue } })
-    toast.add({ title: t('box-office.setup.capacity.saved'), color: 'success' })
     await refresh()
+    // Putting the old numbers back was allowed before, so it needs no second confirming.
+    offer(t('box-office.setup.capacity.saved'), before.length
+      ? async () => {
+        await $api(base.value, { method: 'PUT', body: { pools: before, confirmOverVenue: true } })
+        await refresh()
+      }
+      : undefined)
   }
   catch (e) {
     const r = toRefusal(e)
@@ -95,7 +107,9 @@ async function saveCapacity(confirmOverVenue = false) {
   }
 }
 async function saveWindow() {
-  await act(() => $api(base.value, { method: 'PUT', body: windowForm.value }), t('box-office.setup.window.saved'))
+  const s = data.value?.sales
+  const before = { onSaleAt: s?.onSaleAt ?? null, offSaleAt: s?.offSaleAt ?? null, maxPerOrder: s?.maxPerOrder ?? null, holdMinutes: s?.holdMinutes ?? null }
+  await act(() => $api(base.value, { method: 'PUT', body: windowForm.value }), t('box-office.setup.window.saved'), () => $api(base.value, { method: 'PUT', body: before }))
 }
 function layer(bandId: string, typeId: string): PriceLayer {
   return data.value?.priceLayers.find(l => l.bandId === bandId && l.ticketTypeId === typeId) ?? { bandId, ticketTypeId: typeId, production: null, own: null }
@@ -121,6 +135,7 @@ function priceHelp(bandId: string, typeId: string): string | undefined {
   return l.production === null ? t('box-office.setup.prices.own-none') : t('box-office.setup.prices.own', { amount: money(l.production) })
 }
 
+const pricesUrl = (d: Setup) => `/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`
 async function savePrices() {
   const d = data.value!
   const performanceId = scope.value === 'this' ? d.performance.id : null
@@ -132,8 +147,19 @@ async function savePrices() {
     return
   }
   const later = when.value === 'later' && from.value !== null
-  const saved = await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: rows, ...(later ? { from: from.value } : {}) } }),
-    later ? t('box-office.setup.prices.scheduled', { when: dateTime(from.value!) }) : t('box-office.setup.prices.saved'))
+  const at = from.value
+  // Undo puts back what each box showed: the production's price, this performance's own, or
+  // following the production again; a change set for later is cancelled instead.
+  const before = rows.map((p) => {
+    const l = layer(p.bandId, p.ticketTypeId)
+    if (!p.performanceId) return { ...p, amountMinor: l.production }
+    return l.own ? { ...p, amountMinor: l.own.amountMinor } : { ...p, amountMinor: null, inherit: true }
+  })
+  const undo = later
+    ? () => Promise.all(rows.map(p => $api(`${pricesUrl(d)}/cancel-scheduled`, { method: 'POST', body: { bandId: p.bandId, ticketTypeId: p.ticketTypeId, performanceId: p.performanceId, from: at } })))
+    : () => $api(pricesUrl(d), { method: 'POST', body: { prices: before } })
+  const saved = await act(() => $api(pricesUrl(d), { method: 'POST', body: { prices: rows, ...(later ? { from: at } : {}) } }),
+    later ? t('box-office.setup.prices.scheduled', { when: dateTime(at!) }) : t('box-office.setup.prices.saved'), undo)
   if (saved && later) {
     when.value = 'now'
     from.value = null
@@ -149,11 +175,16 @@ function becomes(s: ScheduledPrice): string {
 }
 async function cancelScheduled(s: ScheduledPrice) {
   const d = data.value!
-  await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices/cancel-scheduled`, { method: 'POST', body: { bandId: s.bandId, ticketTypeId: s.ticketTypeId, performanceId: s.performanceId, from: s.from } }), t('box-office.setup.prices.coming.cancelled'))
+  // Undo sets the same change for the same moment again.
+  const again = { bandId: s.bandId, ticketTypeId: s.ticketTypeId, performanceId: s.performanceId, amountMinor: s.inherits ? null : s.amountMinor, ...(s.inherits ? { inherit: true } : {}) }
+  await act(() => $api(`${pricesUrl(d)}/cancel-scheduled`, { method: 'POST', body: { bandId: s.bandId, ticketTypeId: s.ticketTypeId, performanceId: s.performanceId, from: s.from } }), t('box-office.setup.prices.coming.cancelled'),
+    () => $api(pricesUrl(d), { method: 'POST', body: { prices: [again], from: s.from } }))
 }
 async function inherit(bandId: string, typeId: string) {
   const d = data.value!
-  await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: [{ bandId, ticketTypeId: typeId, performanceId: d.performance.id, amountMinor: null, inherit: true }] } }), t('box-office.setup.prices.reverted'))
+  const own = layer(bandId, typeId).own
+  await act(() => $api(pricesUrl(d), { method: 'POST', body: { prices: [{ bandId, ticketTypeId: typeId, performanceId: d.performance.id, amountMinor: null, inherit: true }] } }), t('box-office.setup.prices.reverted'),
+    own ? () => $api(pricesUrl(d), { method: 'POST', body: { prices: [{ bandId, ticketTypeId: typeId, performanceId: d.performance.id, amountMinor: own.amountMinor }] } }) : undefined)
 }
 
 // Copying another performance's set-up (BO-02).
@@ -186,13 +217,15 @@ async function addBand() {
   if (await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`, { method: 'POST', body: { name: band.value.name.trim(), kind: band.value.kind, sort: d.bands.length } }), t('box-office.setup.bands.added'))) band.value = { name: '', kind: 'standard' }
 }
 
+// Opening and pausing undo each other. Opening for the first time has no Undo: a draft cannot be
+// put back, only paused.
+const opening = () => $api(`${base.value}/open`, { method: 'POST', body: {} })
+const pausing = () => $api(`${base.value}/pause`, { method: 'POST', body: {} })
 async function open() {
-  await act(() => $api(`${base.value}/open`, { method: 'POST', body: {} }), t('box-office.setup.opened'))
+  await act(opening, t('box-office.setup.opened'), data.value?.sales?.state === 'paused' ? pausing : undefined)
 }
 async function pause() {
-  const d = data.value!
-  if (!await confirm({ verb: t('box-office.setup.pause.verb'), thing: t('box-office.setup.thing', { title: d.performance.title }), consequence: t('box-office.setup.pause.consequence') })) return
-  await act(() => $api(`${base.value}/pause`, { method: 'POST', body: {} }), t('box-office.setup.paused'))
+  await act(pausing, t('box-office.setup.paused'), opening)
 }
 
 const TONES = { draft: 'neutral', on_sale: 'success', paused: 'warning', closed: 'neutral' } as const

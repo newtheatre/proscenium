@@ -20,6 +20,7 @@ const typeName = `Desk price ${stamp}`
 let reference = ''
 let swapping = ''
 let group = ''
+let amending = ''
 const premiumName = `Premium ${stamp}`
 let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
@@ -73,6 +74,9 @@ test.beforeAll(async ({ playwright }) => {
   // And three for a group who will pay separately.
   const third = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 3 }] })
   group = (await post(buyer, `/api/box-office/baskets/${third.orderId}/reserve`, { expectedTotalMinor: 3600, email: 'desk.group@example.org', name: 'Desk Group' }, { 'x-basket-token': third.token })).reference
+  // And two for a couple who turn up wanting something different.
+  const fourth = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 2 }] })
+  amending = (await post(buyer, `/api/box-office/baskets/${fourth.orderId}/reserve`, { expectedTotalMinor: 2400, email: 'desk.couple@example.org', name: 'Desk Couple' }, { 'x-basket-token': fourth.token })).reference
   await buyer.dispose()
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
@@ -200,6 +204,28 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
   await context.close()
 })
 
+test('the till in live mode collects a reservation, changed to who came, and takes payment', async ({ page }) => {
+  await page.setViewportSize({ width: 820, height: 1180 }) // a tablet held upright, as at a desk
+  await visit(page, '/live/till')
+  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
+  await page.getByLabel(/^Booking reference or desk code/).fill(amending)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await expect(page.getByText('To pay: £24.00')).toBeVisible()
+  // One of them wants the dearer seat, and the other could not come.
+  await page.getByRole('combobox', { name: 'Kind of ticket for line 1' }).click()
+  await page.getByRole('option', { name: new RegExp(premiumName) }).click()
+  await expect(page.getByText('To pay: £27.00')).toBeVisible()
+  await page.getByRole('button', { name: `Remove ${typeName}` }).click()
+  await expect(page.getByText('To pay: £15.00')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Take payment of £15.00' })).toBeEnabled()
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Take payment of £15.00' }).click()
+  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await page.getByRole('button', { name: 'Cash taken' }).click()
+  await expect(page.getByText('Nothing to pay.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+})
+
 test.describe('the box office console', () => {
   test.use(as(office))
 
@@ -255,6 +281,24 @@ test.describe('the box office console', () => {
 
     await visit(page, '/admin/modules/box-office/ticket-types')
     await expect(page.getByText(typeName)).toBeVisible()
+    await noViolations(page)
+  })
+
+  test('a retired ticket type folds away under Retired, and Undo brings it back', async ({ page }) => {
+    const spare = `Spare ${stamp}`
+    expect((await page.request.post('/api/box-office/ticket-types', { data: { name: spare }, headers: key() })).ok()).toBe(true)
+    await visit(page, '/admin/modules/box-office/ticket-types')
+    await page.getByRole('button', { name: `Actions for ${spare}` }).click()
+    await page.getByRole('menuitem', { name: 'Retire' }).click()
+    await expect(page.getByRole('button', { name: /^Retired \(\d+\)$/ })).toBeVisible()
+    await expect(page.getByText(spare, { exact: true })).toBeHidden()
+    await page.locator('button', { hasText: 'Undo' }).click()
+    await expect(page.getByText(spare, { exact: true })).toBeVisible()
+    // The search finds a type by name.
+    await page.getByRole('button', { name: 'Search ticket types' }).click()
+    await page.getByRole('searchbox', { name: 'Search ticket types' }).fill(spare)
+    await expect(page.getByText(typeName, { exact: true })).toBeHidden()
+    await expect(page.getByText(spare, { exact: true })).toBeVisible()
     await noViolations(page)
   })
 })

@@ -34,6 +34,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const { day, dateTime } = useDates()
 const { money } = await useMoney()
 const route = useRoute()
@@ -49,12 +50,19 @@ const exchangeable = computed(() => (data.value?.lines ?? []).filter(l => l.kind
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const at = (action: string): string => `/api/box-office/orders/${encodeURIComponent(id.value)}/${action}`
 
-async function act(run: () => Promise<unknown>, done: string) {
+// Does the act, then says so, with an Undo that does its reverse where there is one.
+async function act(run: () => Promise<unknown>, done: string, undo?: () => Promise<unknown>) {
   refusal.value = null
   try {
     await run()
-    toast.add({ title: done, color: 'success' })
     await refresh()
+    if (undo) {
+      offer(done, async () => {
+        await undo()
+        await refresh()
+      })
+    }
+    else toast.add({ title: done, color: 'success' })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -65,8 +73,9 @@ async function release() {
   if (!await confirm({ verb: t('box-office.order.release.verb'), thing: t('box-office.order.thing', { reference: o.reference }), consequence: t('box-office.order.release.consequence'), button: t('box-office.order.release.button') })) return
   await act(() => $api(at('release'), { method: 'POST', body: {} }), t('box-office.order.release.done'))
 }
+const keeping = (value: boolean) => $api(at('keep'), { method: 'POST', body: { keep: value } })
 async function keep(value: boolean) {
-  await act(() => $api(at('keep'), { method: 'POST', body: { keep: value } }), t(value ? 'box-office.order.keep.done' : 'box-office.order.keep.undone'))
+  await act(() => keeping(value), t(value ? 'box-office.order.keep.done' : 'box-office.order.keep.undone'), () => keeping(!value))
 }
 
 const actions = computed<DropdownMenuItem[][]>(() => {
