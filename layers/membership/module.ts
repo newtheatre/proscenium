@@ -177,6 +177,11 @@ export default defineModule({
       { id: 'membership.membership', file: 'membership' },
       { id: 'membership.verification-list', file: 'verification-list' },
     ],
+    // Setting up membership (MEM-45): the first scheme is required; a list only for a scheme that checks one.
+    'core.setup-step': [
+      { id: 'membership.first-scheme', required: true, to: '/console/membership/schemes', order: 40 },
+      { id: 'membership.verification-list', required: false, to: '/console/membership/lists', order: 41 },
+    ],
     'core.health-check': [
       { id: 'membership.applications-waiting', file: 'applications-waiting' },
       { id: 'membership.open-schemes', file: 'open-schemes' },
@@ -187,6 +192,8 @@ export default defineModule({
     // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.
     // Ends live memberships in the erasure batch (X4); claimed list entries are let go and emptied.
     'core.erasure-handler': [{ id: 'membership', file: 'membership' }],
+    // X2, X3: a duplicate open application is superseded before the memberships move.
+    'core.merge-handler': [{ id: 'membership', file: 'membership' }],
     'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
     // The member price: a ticket type Box office keeps for anyone with a current membership of any
     // scheme, checked when bought and again at the door. The theatre prices it per band.
