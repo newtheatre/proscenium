@@ -5,7 +5,8 @@
 interface Line { accountId: string, code: string, name: string, currency: string, balanceMinor: number, paidOutMinor: number, lastPayoutAt: number | null }
 
 const { t } = useT()
-const { money, day } = await useMoney()
+const { money } = await useMoney()
+const { day } = useDates()
 const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/api/finance/reconcile', { key: 'finance:reconcile' })
 </script>
 

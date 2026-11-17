@@ -36,6 +36,20 @@ Notes:
 - Rate limits on the public routes are declared per route in the platform's own registry, not here.
 - Presets: `student-society` and `amateur-company` take the defaults. `small-venue` sets `forms.review.blind-by-default` to false, since a venue with paid staff seldom runs a panel.
 
+### Where the settings are shown
+
+This follows the settings format Matt agreed on 16 November 2026 (integration ruling R-37; foundations, Settings registry, "Where a setting is shown: groups and pages"). A setting has no scope of its own. The manifest declares setting groups, and every setting has exactly one home.
+
+| Group | Place and page | Settings |
+| --- | --- | --- |
+| Respondents | Console, `/console/forms/settings` | `forms.public.*`, `forms.drafts.*` |
+| Uploads | Console, `/console/forms/settings` | `forms.uploads.*` |
+| Building and review | Console, `/console/forms/settings` | `forms.builder.free-patterns`, `forms.review.blind-by-default` |
+| Keeping answers | Console, `/console/forms/settings` | `forms.retention.*`, `forms.exports.keep-for` |
+| Limits | Marked advanced, drawn on `/admin/advanced` | `forms.limits.*`, `forms.actions.retries` |
+
+No setting is managed on a bespoke screen. The duration settings use the kit's DurationInput, where a month is 30 days and a year 365, and are stored as before. Extra confirmation applies only where a setting declares it: `forms.public.special-without-sign-in` declares `onChange: 'confirm'`, because turning it on lets special-category answers be given without an account, and no other forms setting asks.
+
 ### Rules across settings
 
 | Rule | Check |
@@ -53,7 +67,7 @@ The columns are the foundations format. An ability that acts on `forms.form` can
 | `forms.form.edit` | `forms.form` | normal | grants |  | Edit the draft version, preview, run test mode | The form's creator, as owner |
 | `forms.form.publish` | `forms.form` | normal | ignored | `form.edit` | Publish, pause, close and archive; attach to `forms.link` | `administrator` |
 | `forms.form.share` | `forms.form` | normal | grants |  | Grant and remove the per-form abilities on a form | The form's creator, as owner |
-| `forms.response.read` | `forms.response` | normal | grants |  | See responses and results, except restricted answers. The submitter always sees their own | Granted per form |
+| `forms.response.read` | `forms.response` | normal | grants | `core.account.find` | See responses and results, except restricted answers. The submitter always sees their own | Granted per form |
 | `forms.response.manage` | `forms.response` | normal | refuses | `response.read` | Move responses along transitions marked for managers, message submitters, answer on someone's behalf, withdraw | Granted per form |
 | `forms.response.decide` | `forms.response` | normal | refuses | `response.read` | Perform a transition to an approved or declined stage | Granted per form |
 | `forms.response.export` | `forms.form` | privileged | ignored | `response.read` | Build and download an export | Granted per form |

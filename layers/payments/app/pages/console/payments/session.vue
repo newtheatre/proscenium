@@ -9,7 +9,8 @@ interface Waiting { id: string, method: string, amountMinor: number, currency: s
 const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
-const { currency, money, toMinor, when, time } = await useMoney()
+const { money } = await useMoney()
+const { dateTime: when, time } = useDates()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ session: Session | null, waiting: Waiting[] }>('/api/payments/session', { key: 'payments:session' })
@@ -21,7 +22,7 @@ const handoff = computed(() => {
   return result === 'succeeded' ? 'succeeded' : result === 'failed' ? 'failed' : 'unknown'
 })
 
-const opening = reactive({ pointLabel: '', float: undefined as number | undefined, key: crypto.randomUUID() })
+const opening = reactive({ pointLabel: '', floatMinor: null as number | null, key: crypto.randomUUID() })
 const busy = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
@@ -29,7 +30,7 @@ async function open() {
   busy.value = true
   refusal.value = null
   try {
-    const floatMinor = opening.float === undefined ? undefined : toMinor(opening.float)
+    const floatMinor = opening.floatMinor ?? undefined
     await $api('/api/payments/sessions', { method: 'POST', body: { pointLabel: opening.pointLabel, floatMinor }, headers: { 'idempotency-key': opening.key } })
     opening.key = crypto.randomUUID()
     toast.add({ title: t('payments.screens.session.opened'), color: 'success' })
@@ -113,12 +114,9 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
               :help="t('payments.screens.session.float-help')"
               :error="refusal?.fields?.floatMinor ? refusal.reason : undefined"
             >
-              <UInputNumber
-                v-model="opening.float"
-                :min="0"
-                :step="0.01"
-                :format-options="{ style: 'currency', currency }"
-                class="w-full sm:w-56"
+              <FieldMoney
+                v-model="opening.floatMinor"
+                class="sm:w-56"
               />
             </UFormField>
             <UButton

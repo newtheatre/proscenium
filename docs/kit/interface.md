@@ -156,6 +156,24 @@ the server for actions and sources when it is first opened, not on every page.
   sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
   says so and offers up to three of the viewer's quick actions.
 
+## Dates, times and money
+
+One language and one time zone, set once: `UApp` takes its `locale` from `core.locale.language`
+(`useUiLocale()`), so Nuxt UI's date and time controls read day first on a 24-hour clock for `en-GB`.
+
+- **Text**: `useDates()` gives `day`, `dayLong`, `dayNamed`, `dateTime`, `time` and `range`. An instant
+  (milliseconds) is shown in the theatre's time zone, whatever the viewer's; a calendar date
+  (`2027-09-01`) is never shifted. Do not call `Intl.DateTimeFormat` in a screen.
+- **Fields**: `FieldDate` (takes and gives `2027-09-01`), `FieldDateRange` (`{ start, end }`),
+  `FieldDateTime` (an instant in milliseconds, entered in the theatre's time zone, which the field
+  names when the viewer is somewhere else) and `FieldMoney` (the currency's minor unit, typed in its
+  major unit). The date fields take `min`, `max` and `unavailable`, a function given a day. Do not use
+  `type="date"` or `type="datetime-local"`: a native picker ignores the locale and works in the
+  viewer's zone.
+- `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
+- A date control is typed part by part, so a browser test focuses its first part and types the digits
+  (`tests/e2e/date-fields.spec.ts` covers the kit fields; a module need not test them again).
+
 ## Choice fields in forms
 
 PageForm's `radio` takes `options: [{ value, label }]` (values may be numbers) and shows one group
@@ -234,6 +252,42 @@ gets the same declaration made for it: each filter is a `choice`, each `sortable
 - **Server:** `decodeList(query, list, { can, today })` (alias `parse`) validates strictly and answers a typed
   `ListQuery` (folded search words, validated filters, dropped filters, view, sort, page, size) or a
   `ListRefusal` naming the key. Routes call the kit's `readList`, not this.
+
+### The server part: defineListSource and readList
+
+The route's side of a list is a source in the module's `server/lists/<name>.ts`, the default export of
+`defineListSource(list, { table, filters, sorts, search })`. It binds every key of the declaration, and a
+missing or extra binding does not compile:
+
+- **filters:** `{ column: 'key' }` compares the filter's value with a column (a `choices` value with
+  `IN`, a `dates` value as a range in the theatre's days, a timestamp column by the instants that
+  bound them), or `{ where: value => sql`...` }` writes the condition, a subquery for a child filter.
+  A `grouped` filter always writes its own.
+- **sorts:** `{ columns: [...], index: 'name' }` names an index on the table that begins with those
+  columns, or `{ columns, bounded: n }` says the list's own filters hold the scan to n rows.
+- **search:** every column of the list and every extra in the declaration's `search`, bound to a
+  text column, to `{ column, ability }` when only some viewers may see it, or to `false` for a field
+  that is not text. An encrypted, special or erase-`clear` column is refused. The searched columns
+  make the table's search index: `bun run db:generate` writes it into the next migration and the
+  check compares.
+
+A data route reads its address with `readList(event, source)` (or `readListQuery(query, source)` in
+an export job). It refuses an unknown key with `core.list.unknown` and a page past 10,000 rows with
+`core.list.too-deep`, and answers the validated filters, `dropped`, the search `words`,
+`ignoredWords` and `searchTooShort` (words under three letters are not searched), the sort, view,
+page, `limit` and `offset`, and:
+
+```ts
+const read = await readList(event, source)
+const rows = await useDb().select(...).from(table).where(read.where()).orderBy(...read.orderBy()).limit(read.limit).offset(read.offset)
+const [{ n }] = await useDb().select({ n: count() }).from(table).where(read.where())
+return read.answer(rows, n)
+```
+
+`orderBy()` ends with the id. `read.answer(rows, total)` adds `dropped`, `ignoredWords`,
+`searchTooShort` and, when there was a search, `matched`: for each row whose words were found only in a
+field not shown by default, its id mapped to that field ("Matches Note: …"). It reads rows that carry
+`id` and their values under the list's field keys; `read.matched(rows)` gives the same by position.
 
 ### Adding to another module's list or record page (R-35)
 

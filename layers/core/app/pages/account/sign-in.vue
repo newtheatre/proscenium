@@ -14,7 +14,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ passkeys: Passkey[], recoveryCodesLeft: number }>('/api/core/me/passkeys', { key: 'core:my-passkeys' })
 
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
 // New codes, shown once until the person types one back.

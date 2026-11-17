@@ -38,7 +38,7 @@ if (!data.value?.enabled) throw createError({ statusCode: 404, statusMessage: 'P
 
 const name = computed(() => data.value?.name ?? '')
 const application = computed(() => data.value?.application ?? null)
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 
 const refusal = ref<RefusalView | null>(null)
 const APPLY = '/account/access/apply'

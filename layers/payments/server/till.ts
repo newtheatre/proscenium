@@ -17,7 +17,7 @@ export async function panelsFor(actor: Actor): Promise<{ id: string, module: str
   for (const c of await usePoint<DeskBasket>('payments.desk-basket')) {
     if ((await can(actor, c.value.ability as any)).allowed) out.push(c)
   }
-  return out
+  return out.sort((a, b) => (a.value.order ?? 0) - (b.value.order ?? 0))
 }
 
 async function chosen(actor: Actor, panels: PanelInput[]) {

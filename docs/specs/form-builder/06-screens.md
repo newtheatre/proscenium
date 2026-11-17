@@ -142,7 +142,7 @@ Follows the platform's list conventions: filters live in the address, every view
 
 - One row per response, with reference, submitter, submitted time, stage and a column per question. Retired questions are grouped at the right and marked.
 - Restricted answers show as "restricted". Uploaded files show as a count that opens the response.
-- Filters by stage, date, version, and any choice, number or date question.
+- Filters by stage, date, version, and any choice, number or date question. Finding responses by a respondent's name or email goes through identity's `findAccounts(text)` service and the kit's account scope; forms never searches accounts itself, the lookup is guarded by `core.account.find`, which `forms.response.read` implies so that no preset role needs it by hand, and each lookup leaves one audit entry that does not hold the text typed. A response keyed to an address is matched on its own stored address.
 - Export to CSV of the current view. An export that would include personal answers names the retention period in its confirmation, and is audited.
 
 ## Screens inside other modules

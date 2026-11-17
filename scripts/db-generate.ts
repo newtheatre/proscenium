@@ -11,6 +11,7 @@ import { bundleSchema, drizzleKit } from './lib/drizzle.ts'
 import { JOURNALS } from './lib/write.ts'
 import { ROOT, KIT } from './lib/paths.ts'
 import { jiti } from './lib/load.ts'
+import { findListSources, indexChanges, journalIndexes, wantedIndexes } from './lib/lists.ts'
 
 /** The unit of work's guard: a passing expectation is ignored, a failing one aborts the batch. */
 export const GUARD_TRIGGER = "CREATE TRIGGER `core_guard_check` BEFORE INSERT ON `core_guard` BEGIN SELECT CASE WHEN NEW.ok = 1 THEN RAISE(IGNORE) ELSE RAISE(ABORT, 'guard:' || coalesce(NEW.code, '')) END; END;"
@@ -34,11 +35,25 @@ try {
   const run = drizzleKit(['generate', '--dialect', 'sqlite', '--schema', schema, '--out', JOURNALS[owner], '--name', values.name])
   process.stdout.write(run.output)
   if (run.status !== 0) process.exit(run.status)
-  const created = readdirSync(out).filter(name => !before.has(name))
+  // Search indexes (Foundations part 4, "Lists", S1): Drizzle Kit cannot write a virtual table or a
+  // trigger, so the generator adds them from the list sources' search fields.
+  const wanted = await wantedIndexes(await findListSources(modules), owner)
+  const changes = indexChanges(wanted, await journalIndexes(owner))
+  let created = readdirSync(out).filter(name => !before.has(name))
+  if (!created.length && changes.length) {
+    const custom = drizzleKit(['generate', '--custom', '--dialect', 'sqlite', '--schema', schema, '--out', JOURNALS[owner], '--name', values.name])
+    if (custom.status !== 0) {
+      process.stdout.write(custom.output)
+      process.exit(custom.status)
+    }
+    created = readdirSync(out).filter(name => !before.has(name))
+  }
   const { appendOnlyTriggers } = await jiti.import<any>(join(KIT, 'db.ts'))
+  const { searchIndexStatements, dropSearchIndexStatements, searchIndexMarker } = await jiti.import<any>(join(KIT, 'search.ts'))
   for (const folder of created) {
     const file = join(out, folder, 'migration.sql')
     let sql = readFileSync(file, 'utf8')
+    if (sql.split('\n').every(line => !line.trim() || line.trim().startsWith('--'))) sql = '' // a custom migration's placeholder comment
     const extra: string[] = []
     for (const [name, { meta, module }] of registry.tables as Map<string, any>) {
       if (modules.find((m: any) => m.manifest.id === module)?.found.owner !== owner) continue
@@ -53,11 +68,20 @@ try {
       }
       if (name === 'core_guard' && /CREATE TABLE `core_guard`/.test(sql)) extra.push(GUARD_TRIGGER)
     }
+    // A searched table that Drizzle Kit rebuilds loses its triggers and its rows' rowids, so its
+    // index is made again in the same migration.
+    const remake = new Map(changes.map(c => [c.table, c.columns]))
+    for (const [table, columns] of wanted) if (new RegExp(`\`__new_${table}\``).test(sql)) remake.set(table, columns)
+    for (const [table, columns] of remake) {
+      const statements: string[] = columns ? searchIndexStatements(table, columns) : dropSearchIndexStatements(table)
+      statements[0] = `${searchIndexMarker(table, columns)}\n${statements[0]}`
+      extra.push(...statements)
+    }
     if (extra.length) {
-      sql = `${sql.trimEnd()}\n--> statement-breakpoint\n${extra.join('\n--> statement-breakpoint\n')}\n`
+      sql = sql.trim() ? `${sql.trimEnd()}\n--> statement-breakpoint\n${extra.join('\n--> statement-breakpoint\n')}\n` : `${extra.join('\n--> statement-breakpoint\n')}\n`
       writeFileSync(file, sql)
     }
-    console.log(`Wrote ${JOURNALS[owner]}/${folder}/migration.sql${extra.length ? ` with ${extra.length} trigger statement${extra.length === 1 ? '' : 's'}` : ''}.`)
+    console.log(`Wrote ${JOURNALS[owner]}/${folder}/migration.sql${extra.length ? ` with ${extra.length} added statement${extra.length === 1 ? '' : 's'}` : ''}.`)
   }
 }
 catch (error) {

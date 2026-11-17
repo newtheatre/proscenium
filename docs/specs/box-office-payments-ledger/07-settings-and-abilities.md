@@ -2,17 +2,26 @@
 
 ## How to read this part
 
-Written in the Foundations registry formats. Every operational number in parts 3 and 5 is a setting here; none is a constant in code. Defaults are proposals for a small theatre and are meant to be argued with. Settings are site-wide; where a value varies by performance it is a column on the performance's sales record whose default is the setting, and the table says so.
+Written in the Foundations registry formats. Every operational number in parts 3 and 5 is a setting here; none is a constant in code. Defaults are proposals for a small theatre and are meant to be argued with. A setting holds one value for the whole theatre; where a value varies by performance it is a column on the performance's sales record whose default is the setting, and the table says so.
 
 "Changed by" names the ability. Three abilities cover all settings: `box-office.settings.manage`, `payments.settings.manage` and `finance.settings.manage`, shortened below to BO, PAY and FIN.
+
+**Where each setting is found** (integration ruling R-37; Foundations, Settings registry). No setting carries a scope. Each module's manifest declares its groups in `settingGroups`, a group being the first segment of the short key (`sales`, `baskets`, `checkout`, `reservations`, `cancellations` and so on), and every setting has exactly one home:
+
+- Box office, Payments and Finance each keep their own generated page in the console, beside the work it governs: `/console/box-office/settings`, `/console/payments/settings` and `/console/finance/settings`. Every group in the tables below is on its module's page, in the console, unless named in the next two lines.
+- `box-office.retention` stays on Box office's page, as its last section. How long orders, baskets and waiting-list entries are kept is the theatre's data-protection decision, taken by the people who run the box office, not an engineering limit.
+- `payments.retention` is marked `advanced`, so it is drawn on the Advanced page in Site administration under the heading Payments. How long webhook receipts are kept is an engineering limit.
+- None of these modules manages a setting on a screen of its own, so none declares `screen`. Provider accounts, readers, ledger accounts and periods are records, not settings.
+
+No setting here asks for an extra confirmation or a reason on saving. Every duration is entered with the kit's `DurationInput` and stored as whole seconds, as before; the limits in the tables are what that control offers. A duration is shown in the largest unit that divides it exactly, so no label or help line below names a unit.
 
 ## Settings: box office
 
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `box-office.checkout.payment-timing` | choice | `pay-now` when an online provider is connected, otherwise `reserve` | pay-now, reserve, buyer-chooses | BO | public | No | Whether an online order is paid at checkout or reserved and paid at the desk. Per performance: `payment_timing` |
+| `box-office.checkout.payment-timing` | choice | `pay-now`; while no online payment method is connected the value in force is `reserve` | pay-now, reserve, buyer-chooses | BO | public | No | Whether an online order is paid at checkout or reserved and paid at the desk. Per performance: `payment_timing` |
 | `box-office.baskets.hold-for` | duration | 10m | 2m to 60m | BO | public | Yes | How long seats are held in a basket. Per performance: `hold_minutes` |
-| `box-office.baskets.extend-by` | duration | 5m | 0m to 30m | BO | public | No | The one extension a buyer may take by button in the hold's last minute; 0m removes the button |
+| `box-office.baskets.extend-by` | duration | 5m | 0m to 30m | BO | public | No | The one extension a buyer may take by button as the hold is about to end; zero removes the button |
 | `box-office.baskets.pay-within` | duration | 15m | 5m to 60m | BO | public | No | How long a hold lasts once payment starts |
 | `box-office.orders.seat-cap` | integer (seats) | 8 | 1 to 50 | BO | public | Yes | Most tickets in one online order. Per performance: `max_per_order` |
 | `box-office.orders.desk-seat-cap` | integer (seats) | 30 | 1 to 500 | BO | staff | No | Most tickets in one desk order, for group bookings |
@@ -44,7 +53,7 @@ Written in the Foundations registry formats. Every operational number in parts 3
 | `box-office.tickets.reminder-before` | duration | unset | 1h to 14d | BO | staff | No | Send a reminder for paid tickets this long before; unset sends none |
 | `box-office.checkout.ask-phone` | choice | optional | hidden, optional, required | BO | public | No | The phone field at checkout |
 | `box-office.checkout.ask-access` | boolean | true |  | BO | public | No | Offer the access-needs field |
-| `box-office.retention.orders` | duration | 2555d | 365d to 3650d | BO | staff | No | How long after the performance an order keeps its access note, its link and desk code hashes and its tickets' attendee names. The rows stay for the ledger. The buyer's contact details are on their account and follow Identity's retention |
+| `box-office.retention.orders` | duration | 2555d | 365d to 3650d | BO | staff | No | How long after the performance an order keeps its access note, its link and desk code hashes and its tickets' stored codes and attendee names. The rows stay for the ledger. The buyer's contact details are on their account and follow Identity's retention |
 | `box-office.retention.baskets` | duration | 30d | 1d to 365d | BO | staff | No | How long an expired basket that never became an order is kept before it is deleted |
 | `box-office.retention.waiting-list` | duration | 30d | 0d to 365d | BO | staff | No | How long after the performance waiting-list entries are kept |
 | `box-office.retention.comp-requests` | duration | 365d | 30d to 3650d | BO | staff | No | How long a complimentary request is kept before its link to the recipient's account is removed |
@@ -113,7 +122,7 @@ A grant on a production covers its performances and so their orders: a visiting 
 
 | Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders |
 | --- | --- | --- | --- | --- | --- | --- |
-| `box-office.order.view` | `box-office.order` | normal | grants |  | See an order and its tickets | `box-office-staff`; fact `front-of-house.on-shift` |
+| `box-office.order.view` | `box-office.order` | normal | grants | `core.account.find` (Identity's, for search by name or email) | See an order and its tickets | `box-office-staff`; fact `front-of-house.on-shift` |
 | `box-office.order.view-access-note` | `box-office.order` | privileged | grants | `order.view` | Read access needs: the order's copy, the access list for a performance, and a check of the access scheme on a customer's behalf. Declared with audit 'read', and the ability of the purpose box-office.booking | `box-office-manager`, `front-of-house-manager` |
 | `box-office.order.sell` | `core.performance` | normal |  | `order.view` | Sell at the desk and by phone | `box-office-staff` |
 | `box-office.order.reserve` | `core.performance` | normal |  | `order.view` | Reserve for a customer at the desk or by phone | `box-office-staff` |
@@ -122,7 +131,7 @@ A grant on a production covers its performances and so their orders: a visiting 
 | `box-office.order.cancel` | `box-office.order` | privileged | refuses | `order.view` | Cancel lines of a paid order. Does not imply a refund | `box-office-manager` |
 | `box-office.order.refund` | `box-office.order` | privileged | refuses | `order.view` | Ask Payments to refund an order's part, with or after a cancellation. Approval is still Payments' | `box-office-manager` |
 | `box-office.order.exchange` | `box-office.order` | normal | refuses | `order.view` | Exchange tickets for a buyer | `box-office-staff` |
-| `box-office.order.resend` | `box-office.order` | normal | grants | `order.view` | Resend or reissue tickets | `box-office-staff` |
+| `box-office.order.resend` | `box-office.order` | normal | grants | `order.view` | Show, resend or reissue tickets. Showing or resending reads the ticket's stored code and is an audited read | `box-office-staff` |
 | `box-office.order.export` | `core.production` | privileged |  | `order.view` | Export a list of orders | `box-office-manager` |
 | `box-office.ticket.admit` | `core.performance` | normal |  |  | Scan and admit; undo a mis-scan with a reason; see the door list | Fact `front-of-house.on-shift`; `box-office-staff` |
 | `box-office.ticket-type.override-requirement` | `core.performance` | privileged |  |  | Sell a ticket type to someone who does not meet its requirement, or admit one at the door with "Admit anyway". Needs a reason, is audited, and never applies to one's own ticket | `box-office-manager`, `front-of-house-manager` |

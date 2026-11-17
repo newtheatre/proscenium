@@ -42,7 +42,7 @@ const { data, status, error, refresh } = await useAPI<Opened>(base, { key: `core
 const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
 const app = computed(() => data.value?.application ?? null)
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 
 const STATUS = {
   'submitted': { tone: 'info', key: 'core.access.review.status.submitted' },
