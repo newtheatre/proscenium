@@ -8,6 +8,7 @@ import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import { members } from '../../../../tests/fixtures/modules/seats/server/contributions/core.requirement/seats'
+import attendance from '../../server/contributions/front-of-house.report-section/attendance'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const steward = person(['box-office.ticket.admit'])
@@ -232,5 +233,25 @@ describe('checking a requirement again at entry', () => {
     expect(await rows("SELECT unchecked FROM box_office_scans WHERE performance_id = ? AND result = 'admitted'", off.h.performanceId)).toEqual([{ unchecked: 1 }])
     // A second scan says Already in without asking again.
     expect((await scan(off.h, off.code, undefined, checker)).body.result).toBe('already_admitted')
+  })
+
+  it('lists each ticket admitted without the check on the night report, by booking and type', async () => {
+    const nobody = person([])
+    const off = await memberTicket({ account: nobody.accountId! })
+    await setModule('seats', false)
+    expect((await scan(off.h, off.code, undefined, checker)).body).toMatchObject({ result: 'admitted', unchecked: true })
+    // Scanned again, it is still listed once.
+    await scan(off.h, off.code, undefined, checker)
+    const [{ reference }] = await rows<{ reference: string }>('SELECT o.reference FROM box_office_orders o JOIN box_office_order_lines l ON l.order_id = o.id WHERE l.performance_id = ? LIMIT 1', off.h.performanceId)
+    const lines = await inContext(() => attendance.compile(off.h.performanceId))
+    expect(lines.slice(0, 5)).toEqual([
+      { label: 'box-office.report.tickets', value: 1 },
+      { label: 'box-office.report.admitted', value: 1 },
+      { label: 'box-office.report.not-in', value: 0 },
+      { label: 'box-office.report.complimentary', value: 0 },
+      { label: 'box-office.report.unchecked', value: 1 },
+    ])
+    expect(lines[5]).toMatchObject({ label: expect.stringMatching(new RegExp(`^${reference} · Member `)), value: expect.stringMatching(/^\d{2}:\d{2}$/) })
+    expect(lines.slice(6)).toEqual([{ label: 'box-office.report.overridden', value: 0 }])
   })
 })

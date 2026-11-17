@@ -497,5 +497,12 @@
   "box-office.setup.copy.verb": "Copy the set-up of",
   "box-office.setup.copy.consequence": "This performance's capacities and limits are replaced. Prices that differ are set here; other performances keep theirs.",
   "box-office.setup.copy.done": "Set-up copied",
-  "box-office.setup.copy.done-detail": "{pools} bands with capacity, {prices} prices set, {bands} bands added."
+  "box-office.setup.copy.done-detail": "{pools} bands with capacity, {prices} prices set, {bands} bands added.",
+  "box-office.report.attendance": "Tickets and admissions",
+  "box-office.report.tickets": "Tickets",
+  "box-office.report.admitted": "Admitted",
+  "box-office.report.not-in": "Not in",
+  "box-office.report.complimentary": "Complimentary tickets",
+  "box-office.report.unchecked": "Admitted without the check (follow up)",
+  "box-office.report.overridden": "Admitted anyway"
 }
