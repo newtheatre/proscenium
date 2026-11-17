@@ -199,7 +199,6 @@
   "payments.screens.till.part-too-much": "Enter an amount above nothing and no more than {amount}.",
   "payments.screens.till.part-paid": "{amount} taken. Still to pay: {due}",
   "payments.screens.till.paid-so-far": "Paid so far: {amount}",
-  "payments.screens.till.no-cancel": "Part of this sale is paid, so it cannot be cancelled here. Take the rest another way.",
   "payments.screens.till.declined": "The payment did not go through",
   "payments.screens.till.declined-help": "Nothing was taken. Choose a way to pay and try again.",
   "payments.screens.till.waiting": "Waiting for the answer",
@@ -220,5 +219,12 @@
   "payments.screens.till.change": "Give {amount} change.",
   "payments.screens.till.unfulfilled": "The money was taken but the sale could not be completed",
   "payments.screens.till.unfulfilled-help": "It is refunded in full automatically. Needs attention shows it until the refund goes through.",
-  "payments.screens.till.cancelled": "Sale cancelled"
+  "payments.screens.till.cancelled": "Sale cancelled",
+  "payments.screens.till.give-back-button": "Give back what was taken",
+  "payments.screens.till.give-back-verb": "Give back",
+  "payments.screens.till.give-back-consequence": "The sale ends and what was prepared for it is released. Hand back the cash, and refund on any card machine or in the SumUp app, before you confirm. A card payment the site took goes back to the card by itself.",
+  "payments.screens.till.given-back": "Sale ended and payment given back",
+  "payments.screens.till.given-back-by-hand": "{amount} handed back.",
+  "payments.screens.till.given-back-to-card": "{amount} is going back to the card.",
+  "payments.screens.till.given-back-unconfirmed": "Confirm the cash on Refunds once it is handed back."
 }
