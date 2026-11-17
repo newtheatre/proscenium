@@ -6,7 +6,7 @@ import { kitAliases } from './aliases'
 import { MODE_COOKIE_AGE, MODE_KEY } from './shared/appearance'
 
 /** The layout of each shell that has one of its own, by the prefix of its addresses. */
-const SHELL_LAYOUTS = { '/console': 'console', '/members': 'members', '/admin': 'admin' }
+const SHELL_LAYOUTS = { '/console': 'console', '/members': 'members', '/admin': 'admin', '/live': 'live' }
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const publicComponentsFile = fileURLToPath(new URL('../../.generated/public-components.json', import.meta.url))
