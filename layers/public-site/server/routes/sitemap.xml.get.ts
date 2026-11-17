@@ -1,5 +1,5 @@
 // The sitemap search engines read (public site; C-47): the theatre's own pages from
-// site/content/pages, what's on and the archive, and every public production, venue and season.
+// site/content/pages (less those kept from search engines), what's on and the archive, and every public production, venue and season.
 // Past shows leave it while they are not public; with the public site off it is not found.
 import { defineEventHandler, getHeader, getRequestURL, setResponseHeaders, setResponseStatus } from 'h3'
 import { queryCollection } from '@nuxt/content/server'
@@ -19,9 +19,9 @@ export default defineEventHandler(async (event) => {
     }
     const pastVisible = await useSetting('public-site.archive.public') as boolean
     // The collection's types are generated for the app only, so the server names it loosely.
-    const pages = await queryCollection(event, 'pages' as never).select('path' as never).all() as { path?: unknown }[]
+    const pages = await queryCollection(event, 'pages' as never).select('path' as never, 'placeholder' as never, 'noindex' as never).all() as { path?: unknown, placeholder?: unknown, noindex?: unknown }[]
     const paths = [...new Set([
-      ...pages.map(p => p.path).filter((p): p is string => typeof p === 'string' && p.startsWith('/')),
+      ...pages.filter(p => p.placeholder !== true && p.noindex !== true).map(p => p.path).filter((p): p is string => typeof p === 'string' && p.startsWith('/')),
       '/whats-on',
       ...(pastVisible ? ['/shows'] : []),
       ...await publicProgrammePaths({ pastVisible }),

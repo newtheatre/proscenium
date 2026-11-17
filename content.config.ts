@@ -8,7 +8,9 @@ const link = z.object({ label: z.string(), to: z.string() })
 
 export default defineContentConfig({
   collections: {
-    pages: defineCollection({ type: 'page', source: { include: '**/*.md', cwd: site('pages') } }),
+    // placeholder: the page still holds starter text, so it is listed on the site-readiness screen and
+    // kept from search engines (C-42). noindex: keep it from search engines anyway.
+    pages: defineCollection({ type: 'page', source: { include: '**/*.md', cwd: site('pages') }, schema: z.object({ placeholder: z.boolean().default(false), noindex: z.boolean().default(false) }) }),
     // The public menu (C-40): one file, site/content/navigation.yml.
     navigation: defineCollection({ type: 'data', source: { include: 'navigation.yml', cwd: site('') }, schema: z.object({ header: z.array(link).default([]), footer: z.array(link).default([]) }) }),
     ...theatre,

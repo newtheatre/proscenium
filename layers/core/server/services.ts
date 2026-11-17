@@ -16,6 +16,8 @@ export { publicProduction, currentProductions, whatsOnFilters } from './programm
 export { pastProductions } from './programme/archive'
 export { publicVenue, publicSeason } from './programme/public-places'
 export { publicProgrammePaths } from './programme/sitemap'
+export { coreReadiness } from './programme/site-readiness'
+export type { CoreReadiness, ReadinessItem } from './programme/site-readiness'
 export type { PublicVenue, PublicSpace, PublicFeature, PublicSeason, SeasonProduction } from './programme/public-places'
 export type { Archive, ArchiveEntry, ArchiveYear, ArchiveOptions } from './programme/archive'
 export type { PublicProduction, PublicPerformance, PublicListing, PublicProductionOptions, WhatsOnOptions, WhatsOnFilters } from './programme/public'
