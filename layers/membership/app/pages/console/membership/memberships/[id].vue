@@ -224,6 +224,7 @@ async function saveDates() {
           id="membership-end"
           :state="{ note }"
           class="space-y-4"
+          novalidate
           @submit="end"
         >
           <RefusalNotice :refusal="refusal" />
@@ -264,6 +265,7 @@ async function saveDates() {
           id="membership-waive"
           :state="{ waiveNote }"
           class="space-y-4"
+          novalidate
           @submit="waive"
         >
           <RefusalNotice :refusal="feeRefusal" />
@@ -303,6 +305,7 @@ async function saveDates() {
           id="membership-refund"
           :state="{ refundMinor }"
           class="space-y-4"
+          novalidate
           @submit="refund"
         >
           <RefusalNotice :refusal="feeRefusal" />
@@ -343,6 +346,7 @@ async function saveDates() {
           id="membership-dates"
           :state="dates"
           class="space-y-4"
+          novalidate
           @submit="saveDates"
         >
           <RefusalNotice :refusal="datesRefusal" />

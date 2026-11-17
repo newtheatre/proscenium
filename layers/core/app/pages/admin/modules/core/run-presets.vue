@@ -122,6 +122,7 @@ const actions = (p: Preset) => [[
           id="run-preset-form"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

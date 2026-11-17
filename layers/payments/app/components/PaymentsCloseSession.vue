@@ -40,6 +40,7 @@ async function close() {
   <UForm
     class="space-y-4"
     :state="{ countedMinor, note }"
+    novalidate
     @submit="close"
   >
     <RefusalNotice :refusal="refusal" />

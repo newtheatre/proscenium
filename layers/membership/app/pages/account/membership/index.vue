@@ -277,6 +277,7 @@ async function withdraw(a: Mine['applications'][number]) {
           id="membership-renew"
           :state="renewChoice"
           class="space-y-4"
+          novalidate
           @submit="renew"
         >
           <RefusalNotice :refusal="renewRefusal" />

@@ -223,6 +223,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
           id="fh-problem"
           :state="problem"
           class="space-y-4"
+          novalidate
           @submit="saveProblem"
         >
           <RefusalNotice :refusal="refusal" />

@@ -31,6 +31,19 @@ export function interfaceProblems(name: string, source: string): { line: number,
     if (/new Intl\.DateTimeFormat\(|\.toLocale(Date|Time)String\(/.test(text) && !DATE_TEXT.includes(name)) problems.push({ line, problem: 'formats a date by hand; use useDates(), so every screen agrees on language and time zone' })
   })
   // A whole tag, since its attributes sit on lines of their own.
+  // The browser's own checks show a bubble of their own, in the browser's words, away from the field.
+  // A form leaves checking to its schema, which puts the message beside the field, as the server says it.
+  for (const match of source.matchAll(/<(UForm|form)\b((?:[^>"]|"[^"]*")*)>/g)) {
+    const [, tag, attrs] = match
+    if (tag === 'form' && !RAW_FORM.includes(name)) continue // already refused as a raw form
+    if (/(^|\s)nested(\s|=|$)/.test(attrs!) || /(^|\s)novalidate(\s|=|$)/.test(attrs!)) continue
+    problems.push({ line: source.slice(0, match.index).split('\n').length, problem: `a ${tag} without novalidate; the browser would check it with a bubble of its own. Add novalidate and check with a schema (:schema), so the message shows beside its field` })
+  }
+  for (const match of source.matchAll(/<(U[A-Z]\w*|input|textarea|select)\b((?:[^>"]|"[^"]*")*)>/g)) {
+    const [, tag, attrs] = match
+    if (tag === 'UFormField' || !/(^|\s)required(\s|=|\/|$)/.test(attrs!)) continue
+    problems.push({ line: source.slice(0, match.index).split('\n').length, problem: `a native required on ${tag}; say it in the form's schema, so the message shows beside the field (UFormField's own required only draws the mark)` })
+  }
   if (!ICON_BUTTON.includes(name)) {
     for (const match of source.matchAll(/<UButton\b((?:[^>"]|"[^"]*")*?)\/>/g)) {
       const attrs = match[1]!

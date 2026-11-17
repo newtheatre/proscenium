@@ -359,6 +359,7 @@ async function admit(row: Row, count: number) {
         <UForm
           class="space-y-4"
           :state="{ reasonId }"
+          novalidate
           @submit="admitAnyway"
         >
           <UFormField
@@ -402,6 +403,7 @@ async function admit(row: Row, count: number) {
           <UForm
             class="flex items-end gap-2"
             :state="{ query }"
+            novalidate
             @submit="submitQuery"
           >
             <UFormField

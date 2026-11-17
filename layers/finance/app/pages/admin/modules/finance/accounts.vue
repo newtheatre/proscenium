@@ -124,6 +124,7 @@ async function save() {
           id="ledger-account"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

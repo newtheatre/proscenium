@@ -164,6 +164,7 @@ const context = computed(() => data.value?.performance ? [data.value.performance
               v-if="d.state === 'draft' && d.can.write"
               :state="note"
               class="space-y-3"
+              novalidate
               @submit="addNote"
             >
               <UFormField

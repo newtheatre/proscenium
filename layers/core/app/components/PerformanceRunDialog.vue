@@ -5,7 +5,7 @@
 // behind one line, as on Add performance. Every performance the run would make is listed before
 // anything is saved: those that are past, clash or fall in a closure are left out, and any other can
 // be unticked. A long run is made by a job; the production's performances section follows it.
-import { noOverrides, rowSlots, slotRows, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides, type SlotRow } from '../utils/show-defaults'
+import { noOverrides, overrideErrors, rowSlots, slotRows, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides, type SlotRow } from '../utils/show-defaults'
 
 interface Planned { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: 'past' | 'clash' | 'closed' | null, reason: string | null }
 interface Space { value: string, label: string, venueId: string, runPresetId: string | null }
@@ -168,7 +168,9 @@ async function savePreset() {
       <UForm
         id="performance-run"
         :state="form"
+        :validate="() => overrideErrors(overrides, shown, defaults.sellsHere)"
         class="space-y-4"
+        novalidate
         @submit="planned ? add() : preview()"
       >
         <RefusalNotice :refusal="refusal" />
@@ -311,6 +313,7 @@ async function savePreset() {
         id="run-preset-save"
         :state="{ name: presetName }"
         class="space-y-4"
+        novalidate
         @submit="savePreset"
       >
         <RefusalNotice :refusal="saveRefusal" />

@@ -51,6 +51,7 @@ async function cancel() {
         id="box-office-cancel"
         class="space-y-4"
         :state="form"
+        novalidate
         @submit="cancel"
       >
         <RefusalNotice :refusal="refusal" />

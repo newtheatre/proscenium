@@ -224,6 +224,7 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
           id="bar-sign"
           :state="signing"
           class="space-y-4"
+          novalidate
           @submit="sign"
         >
           <RefusalNotice :refusal="refusal" />

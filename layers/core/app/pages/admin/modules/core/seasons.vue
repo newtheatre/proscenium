@@ -181,6 +181,7 @@ const actions = (s: Season) => [[
           id="season-form"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

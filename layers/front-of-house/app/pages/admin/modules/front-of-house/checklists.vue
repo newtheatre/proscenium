@@ -148,6 +148,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
         <UForm
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="save"
         >
           <UFormField

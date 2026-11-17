@@ -95,6 +95,7 @@ async function create() {
           id="membership-new-scheme"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="create"
         >
           <RefusalNotice :refusal="refusal" />

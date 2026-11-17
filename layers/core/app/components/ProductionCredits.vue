@@ -236,6 +236,7 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
           id="credit-form"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

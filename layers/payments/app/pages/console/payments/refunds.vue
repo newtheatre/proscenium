@@ -131,6 +131,7 @@ const rowActions = (r: Row): DropdownMenuItem[] => {
           id="decline-refund"
           class="space-y-4"
           :state="{ reason }"
+          novalidate
           @submit="decline"
         >
           <RefusalNotice :refusal="declineRefusal" />

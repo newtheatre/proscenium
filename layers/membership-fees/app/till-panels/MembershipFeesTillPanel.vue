@@ -83,6 +83,7 @@ const what = (fee: WaitingFee) => fee.lengthName ? `${fee.schemeName}, ${fee.len
       <UForm
         class="flex items-end gap-2"
         :state="{ query }"
+        novalidate
         @submit="search()"
       >
         <UFormField
