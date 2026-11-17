@@ -27,7 +27,7 @@ const toast = useToast()
 const UNAVAILABLE = {
   'workers-dev': 'This site is on workers.dev, which cannot send email from its own address. Add a custom domain to the Worker and open the site there to set email up automatically.',
   'local': 'This site has no public domain yet, so email cannot be set up automatically here.',
-  'no-token': 'To set this up automatically, set the CORE_CLOUDFLARE_TOKEN secret on the Worker with Email Sending edit and Zone read. You can also onboard a domain in the Cloudflare dashboard and enter it below.',
+  'no-token': 'To set this up automatically, save a Cloudflare API token with Email Sending edit and Zone read under Keys, below. You can also onboard a domain in the Cloudflare dashboard and enter it in the email settings.',
 } as const
 
 async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}) {
@@ -147,6 +147,11 @@ async function setUp() {
             />
           </template>
         </PageSection>
+
+        <KeysCard
+          :names="['CORE_CLOUDFLARE_TOKEN']"
+          @saved="refresh()"
+        />
       </template>
     </DataBoundary>
     <SettingsSections

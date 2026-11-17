@@ -119,10 +119,15 @@ export default defineModule({
     ...domain.tasks,
   },
 
+  // CORE_ENCRYPTION_KEY and CORE_SESSION_KEY protect everything else, so they stay Worker secrets.
   secrets: {
     CORE_ENCRYPTION_KEY: secret({ needed: 'when-used' }),
-    CORE_TURNSTILE_SECRET_KEY: secret({ needed: 'optional' }),
     ...identity.identitySecrets,
-    ...domain.secrets,
+  },
+
+  // Keys an administrator types into the app, on the page each belongs to (KeysCard).
+  credentials: {
+    ...identity.identityCredentials,
+    ...domain.credentials,
   },
 })

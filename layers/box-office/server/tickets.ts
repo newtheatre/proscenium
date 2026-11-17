@@ -2,6 +2,7 @@
 // door"). A ticket is issued when its order is confirmed, one per ticket line, with a fresh random
 // code. The buyer gets the code inside a signed door code, `tkt.<key id>.<code>.<signature>`, which
 // a device can check with no connection; the database keeps only the hash of the code part.
+import { sql } from 'drizzle-orm'
 import { newId, type UnitView } from '#kit'
 import { signing } from '#kit/signing'
 import { scans, tickets } from './db/schema'
@@ -50,6 +51,9 @@ export async function issueTickets(unit: UnitView, lines: readonly { id: string,
     orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, keyId: m.keyId, state: 'valid', admittedAt: admit ? admit.at : null, admittedScanId: m.scanId,
   })))
   unit.expect(made.length, { code: 'box-office.ticket.not-issued', reason: 'The tickets could not be issued.' })
+  // What a line met to be sold goes onto its ticket, so the door can check it again.
+  unit.add(sql`UPDATE box_office_tickets SET requirement_ref = l.requirement_ref, requirement_account_id = l.requirement_account_id, requirement_evidence_id = l.requirement_evidence_id
+    FROM box_office_order_lines l WHERE l.id = box_office_tickets.order_line_id AND l.requirement_ref IS NOT NULL AND box_office_tickets.id IN (SELECT value FROM json_each(${JSON.stringify(ids)}))`)
   if (admit) {
     unit.insertSet(scans, made.map((m, i) => ({
       id: m.scanId!, ticketId: ids[i]!, performanceId: m.line.performance_id, result: 'admitted', scannedBy: admit.by, deviceLabel: 'Desk', scannedAt: admit.at, receivedAt: admit.at,

@@ -35,13 +35,10 @@ beforeAll(async () => {
 })
 
 describe('complimentary tickets', () => {
-  it('refuses to issue before there is a complimentary ticket type, then issues zero-price tickets on approval', async () => {
+  it('issues zero-price tickets on approval, on the Complimentary type Box office keeps', async () => {
     const asked = await ask()
     expect(asked.status).toBe(200)
     const id = asked.body.requestId as string
-    expect((await decide(id, 'approve')).body).toMatchObject({ code: 'box-office.comp.no-type' })
-
-    await req('POST', '/api/box-office/ticket-types', { name: 'Complimentary', kind: 'complimentary' })
     const approved = await decide(id, 'approve')
     expect(approved.status).toBe(200)
     expect(approved.body.state).toBe('issued')

@@ -468,7 +468,13 @@ test.describe('the access scheme screens', () => {
     await page.getByRole('checkbox', { name: 'I use a wheelchair' }).click()
     await expect(page.getByRole('radio', { name: 'Stay in my wheelchair' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toBeVisible()
-    await expect(page.getByRole('radio', { name: 'No' })).toBeVisible()
+    // The needs question heads the form; a divider and "More about your visit" lead the rest.
+    await expect(page.getByRole('heading', { level: 2, name: 'Which of these make a visit harder for you?' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'More about your visit' })).toBeVisible()
+    // A companion is a tick box that asks how many only once ticked.
+    await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toHaveCount(0)
+    await page.getByRole('checkbox', { name: 'I require a companion/carer' }).click()
+    await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toBeVisible()
     await noViolations(page)
     if (process.env.PROSCENIUM_SHOTS) await page.screenshot({ path: `${process.env.PROSCENIUM_SHOTS}/form.png`, fullPage: true })
     await context.close()

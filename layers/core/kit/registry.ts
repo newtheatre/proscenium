@@ -46,7 +46,7 @@ export interface Registry {
   tables: Map<string, { module: string, table: any, meta: TableMeta }>
   prefixes: Map<string, string>
   events: Map<string, { module: string, decl: EventDecl }>
-  listeners: Map<string, { module: string, listener: string }[]>
+  listeners: Map<string, { module: string, listener: string, deliverable?: true }[]>
   jobs: Map<string, { module: string, decl: JobDecl }>
   tasks: Map<string, { module: string, decl: TaskDecl }>
   calls: Map<string, { module: string, decl: CallDecl }>
@@ -147,7 +147,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         for (const [name, announced] of r.events) {
           if (announced.decl.internal) continue
           const list = r.listeners.get(name) ?? []
-          list.push({ module: m.id, listener })
+          list.push({ module: m.id, listener, deliverable: true })
           r.listeners.set(name, list)
         }
         continue
@@ -192,6 +192,12 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       }
     }
     placeSettings(r, entry, fail)
+    for (const [name, decl] of Object.entries(m.credentials ?? {})) {
+      if (!decl.manage) continue
+      // Saving a key asks for a fresh sign-in, which a privileged ability brings.
+      if (!r.abilities.has(decl.manage)) fail(entry, `credentials.${name}.manage`, `"${decl.manage}" is not a declared ability`)
+      else if (r.abilities.get(decl.manage)!.decl.risk !== 'privileged') fail(entry, `credentials.${name}.manage`, `"${decl.manage}" is not privileged, and a key is managed only under a privileged ability`)
+    }
     for (const [key, setting] of Object.entries(m.settings ?? {})) {
       if (!r.abilities.has(setting.change)) fail(entry, `settings.${key}.change`, `"${setting.change}" is not a declared ability`)
       if (setting.kind === 'reference' && !r.records.has(setting.record!)) fail(entry, `settings.${key}.record`, `"${setting.record}" is not a record type`)

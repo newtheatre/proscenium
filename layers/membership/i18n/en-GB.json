@@ -61,5 +61,7 @@
   "membership.abilities.settings.manage.label": "Change membership settings",
   "membership.notices.renewal-open.title": "You can renew {scheme}",
   "membership.notices.renewal-open.description": "Renew now and the new membership starts the day after this one ends.",
-  "membership.notices.renewal-open.action": "Renew"
+  "membership.notices.renewal-open.action": "Renew",
+
+  "membership.records.membership": "Members"
 }

@@ -1,8 +1,10 @@
 // The access scheme's application form (ID-38, ID-42). The person ticks what makes a visit harder,
-// each with an optional short note when the scheme allows notes; says whether they use a wheelchair
-// and, if so, whether they stay in it or move to a seat; how many companions they need; and anything
-// else. The person's own form and a reviewer applying on somebody's behalf both build it from here,
-// on PageForm's 'ticks', 'checkbox' and 'radio' kinds.
+// each with an optional short note when the scheme allows notes; then, under "More about your visit",
+// says whether they use a wheelchair and, if so, whether they stay in it or move to a seat; whether
+// they need a companion or carer and, if so, one or two; and anything else. The needs question heads
+// the form and a divider follows it (Matt, 2026-11-17). The person's own form and a reviewer
+// applying on somebody's behalf both build it from here, on PageForm's 'ticks', 'checkbox', 'radio'
+// and 'select' kinds.
 //
 // The API speaks in terms ({ term, note? }). The wheelchair answer is one of two terms, and the
 // companion and "anything else" terms are set by the server from those questions, so none of those
@@ -45,6 +47,7 @@ export function useAccessApplicationForm(
     needs: z.array(z.object({ value: z.string(), note: z.string().max(NOTE_LIMIT).optional() })),
     wheelchair: z.boolean().optional(),
     preference: z.enum(['stays', 'transfers']).optional(),
+    companion: z.boolean().optional(),
     companions: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     other: z.string().max(OTHER_LIMIT).optional(),
   }).superRefine((v, ctx) => {
@@ -57,6 +60,7 @@ export function useAccessApplicationForm(
       name: 'needs',
       label: t('core.access.form.needs'),
       kind: 'ticks',
+      heading: true,
       help: t('core.access.form.needs-help'),
       options: ticks.value.map(n => ({ value: n.id, label: n.label, ...(n.description ? { description: n.description } : {}) })),
       ...(toValue(allowNote) ? { notes: { max: NOTE_LIMIT, label: t('core.access.form.note') } } : {}),
@@ -66,6 +70,7 @@ export function useAccessApplicationForm(
         name: 'wheelchair',
         label: t('core.access.form.wheelchair'),
         kind: 'checkbox',
+        section: t('core.access.form.more'),
       } satisfies FormField]
       : []),
     ...(askPreference.value
@@ -82,11 +87,19 @@ export function useAccessApplicationForm(
       } satisfies FormField]
       : []),
     {
-      name: 'companions',
-      label: t('core.access.form.companions'),
-      kind: 'radio',
+      name: 'companion',
+      label: t('core.access.form.companion'),
+      kind: 'checkbox',
       help: t('core.access.form.companions-help'),
-      options: [0, 1, 2].map(n => ({ value: n, label: t(`core.access.form.companions-${n}`) })),
+      // Without the wheelchair question, this one opens the second part.
+      ...(askChair.value ? {} : { section: t('core.access.form.more') }),
+    },
+    {
+      name: 'companions',
+      label: t('core.access.form.companions-how-many'),
+      kind: 'select',
+      options: [1, 2].map(n => ({ value: n, label: t(`core.access.form.companions-${n}`) })),
+      showIf: (values: Record<string, any>) => !!values.companion,
     },
     {
       name: 'other',
@@ -108,7 +121,8 @@ export function useAccessApplicationForm(
       needs: sent.filter(n => offered.has(n.term)).map(n => n.note ? { value: n.term, note: n.note } : { value: n.term }),
       wheelchair: !!preference,
       preference,
-      companions: from?.companions ?? 0,
+      companion: !!from?.companions,
+      companions: from?.companions || 1,
       other: from?.other ?? '',
     }
   }
@@ -127,7 +141,7 @@ export function useAccessApplicationForm(
         ...ticked.map(n => n.note?.trim() ? { term: n.value, note: n.note.trim() } : { term: n.value }),
         ...(chairTerm ? [{ term: chairTerm }] : []),
       ],
-      companions: values.companions,
+      companions: values.companion ? values.companions : 0,
       ...(other ? { other } : {}),
     }
   }

@@ -41,7 +41,7 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
       requiredBy: [...registry.modules.values()].filter(o => o.manifest.requires?.includes(id)).map(o => o.manifest.id),
       alsoOn: on.has(id) ? [] : await requiredOff(id),
       secrets: Object.entries(m.secrets ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: isSet(env, name) })),
-      credentials: Object.entries(m.credentials ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: stored.has(`${id} ${name}`) })),
+      credentials: Object.entries(m.credentials ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: stored.has(`${id} ${name}`) || isSet(env, name) })),
       missingSecrets: missingSecrets(id),
       screens,
       // The module's own console group's icon, else its first screen's.

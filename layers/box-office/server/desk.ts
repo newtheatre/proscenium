@@ -11,6 +11,8 @@ import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSettin
 import { getPerformance, getProduction, listPerformances } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
+import { entitle } from './entitlement'
+import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference } from './codes'
 import { cancellations, orderLines } from './db/schema'
@@ -69,7 +71,7 @@ async function deskSale(input: SaleInput, at: number) {
   const quantity = input.lines.reduce((sum, l) => sum + l.quantity, 0)
   const cap = await useSetting('box-office.orders.desk-seat-cap') as number
   if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one desk order.`, { status: 422 })
-  return pricedLines(input.performanceId, input.lines, at)
+  return pricedLines(input.performanceId, input.lines, at, { channel: 'desk', account: null })
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
@@ -116,7 +118,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   }
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
-  const { pool, lines, currency } = await deskSale(input.sale, at)
+  const { pool, lines, currency, guard } = await deskSale(input.sale, at)
   const totalMinor = lines.reduce((sum, l) => sum + l.amountMinor, 0)
   if (totalMinor <= 0) refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })
   const orderId = newId('ord')
@@ -128,6 +130,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
     VALUES (${orderId}, ${newReference()}, 'desk', 'basket', 0, ${currency}, ${totalMinor}, ${expiresAt}, 0, ${at}, ${at})`)
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${orderId}, ${actor.accountId ?? null}, ${at}, ${at})`)
   const claimed = (await claimSeats(unit, { holdId, requests: input.sale.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
+  guard(unit)
   unit.insertSet(orderLines, lines.map((l, i) => ({
     orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
   })))
@@ -234,7 +237,14 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
     unit.add(sql`UPDATE box_office_order_lines SET ticket_type_id = ${change.ticketTypeId}, list_minor = ${amountMinor}, discount_minor = 0, amount_minor = ${amountMinor}, updated_at = ${at}
       WHERE id = ${l.id} AND order_id = ${order.id} AND state = 'live'`).expect(1, CHANGED)
   }
-  const added = add.length ? await pricedLines(performanceId, add, at) : null
+  // A change to a type with requirements is a desk sale of it: the seller must be able to check by hand.
+  const sellable = await sellableTypes()
+  if (retype.some(r => sellable.get(r.ticketTypeId)?.kind === 'complimentary' || !sellable.has(r.ticketTypeId)))
+    refuse('box-office.price.none', 'That kind of ticket is not sold for this part of the house.', { status: 422 })
+  const retyped = retype.length ? await entitle(performanceId, retype.map(r => ({ ticketTypeId: r.ticketTypeId })), sellable, { channel: 'desk', account: null }) : null
+  retyped?.guard(unit)
+  const added = add.length ? await pricedLines(performanceId, add, at, { channel: 'desk', account: null }) : null
+  added?.guard(unit)
   const after = [...kept, ...(added?.lines ?? []).map(l => ({ typeId: l.ticketTypeId, amountMinor: l.amountMinor }))]
   if (!after.length) refuse('box-office.desk.nothing-left', 'That would leave nothing on the reservation.', { status: 422, remedy: 'Release the reservation instead.' })
   const cap = await useSetting('box-office.orders.desk-seat-cap') as number

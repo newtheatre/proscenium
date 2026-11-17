@@ -85,6 +85,11 @@ const describe = (l: List) => [
           :description="describe(l)"
         />
       </RecordList>
+      <KeysCard
+        class="mt-6"
+        :names="['MEMBERSHIP_LIST_KEY']"
+        @saved="refresh()"
+      />
     </DataBoundary>
 
     <UModal

@@ -83,6 +83,11 @@ contributes: {
   page beyond; a stale save shows both versions and asks which to keep; leaving with changes asks once.
 - **PageSettings**: the generated page for a module's settings, one section at a time with a stated
   summary, a Reset to default, who may change each, and a tag where a content page quotes it.
+- **KeysCard**: the keys a page manages, by name, as one section: where each comes from now
+  (saved, the Worker secret, or not set); a set key's field shows dots between its prefix and last
+  four characters (`sk_live_••••4242`) until Replace opens it; Remove; and Save
+  keys, which asks the person to confirm it is them. **PageSettings** draws its default slot beneath
+  the settings, so a settings page puts its KeysCard there. See the kit's "Secrets and keys".
 - **PageSteps**: a guided flow with Back, a summary that names the act, and progress kept on the device.
 - **PageFrame**, **DataBoundary**, **EmptyState**, **PageFailed**, **RefusalPanel**, **StatusBadge**:
   one title per page, load and fail states, refusals shown from the standard body.
@@ -293,6 +298,12 @@ PageForm's `radio` takes `options: [{ value, label }]` (values may be numbers) a
 with the field's label as its legend. `ticks` takes `options` and, if short notes are allowed,
 `notes: { max, label }`; its value is an array of `{ value, note? }` for the ticked options, in the
 order of the options, and a note box opens under a tick only when `notes` is given.
+
+A `checkbox` shows its `help` under its own label. A field with `showIf` is a follow-up and is set in
+under the question it follows. A long form can be divided into parts: `heading: true` on a `radio` or
+`ticks` field draws its question at heading size (an `h2` in its legend), as the head of the first
+part, and `section: '<heading>'` on a field draws a divider and that heading (an `h2`) above it. The
+access scheme's application form does both.
 
 ## Admin (R-33)
 

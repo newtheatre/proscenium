@@ -332,7 +332,7 @@ describe('the registry', () => {
       'lost-property.item.tidied': event({ version: 1, payload: z.object({ itemId: z.string() }), internal: true }),
     } } })
     const registry = buildRegistry([core, lost])
-    expect(registry.listeners.get('lost-property.item.found')).toEqual([{ module: 'core', listener: 'deliver-webhooks' }])
+    expect(registry.listeners.get('lost-property.item.found')).toEqual([{ module: 'core', listener: 'deliver-webhooks', deliverable: true }])
     expect(registry.listeners.get('lost-property.item.tidied')).toBeUndefined()
   })
   it('lets only core listen on deliverable', () => {

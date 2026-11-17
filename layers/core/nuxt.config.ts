@@ -13,8 +13,9 @@ const publicComponentsFile = fileURLToPath(new URL('../../.generated/public-comp
 const generatedTypes = fileURLToPath(new URL('../../.generated/types/registry.d.ts', import.meta.url))
 
 export default defineNuxtConfig({
-  // Loads Cloudflare Turnstile for TurnstileCheck. The site key is public and set at run time with
-  // NUXT_PUBLIC_TURNSTILE_SITE_KEY, beside CORE_TURNSTILE_SECRET_KEY; the kit verifies the token itself.
+  // Loads Cloudflare Turnstile for TurnstileCheck. The site key is public: the setting
+  // core.sign-in.turnstile-site-key on Admin > Sign-in, or NUXT_PUBLIC_TURNSTILE_SITE_KEY where that
+  // is unset. Its secret key is a credential saved on the same page; the kit verifies the token itself.
   modules: ['@nuxtjs/turnstile'],
   app: { head: { htmlAttrs: { lang: 'en-GB' } } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],

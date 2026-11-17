@@ -2,7 +2,7 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, setting, task, credentialDecl } from '#kit'
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
 
@@ -65,6 +65,12 @@ export const settings = defineSettings('core', {
   'delivery.inbox-retention': setting.duration({ replaces: 'core.notifications.inbox-retention', default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in', onChange: 'confirm' }),
   // C-52: the label put before the site's host when the sending domain is set up automatically.
   'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender, onChange: 'confirm' }),
+
+  // Webhooks (group 6; C-49 to C-51). Each retry waits four times as long as the one before.
+  'webhooks.max-attempts': setting.integer({ default: 8, min: 1, max: 15, change: 'core.webhook.manage' }),
+  'webhooks.pause-after': setting.integer({ default: 20, min: 5, max: 100, change: 'core.webhook.manage' }),
+  'webhooks.log-retention': setting.duration({ default: '30d', min: '1d', max: '365d', change: 'core.webhook.manage', onChange: 'confirm' }),
+  'webhooks.timeout': setting.duration({ default: '10s', min: '1s', max: '30s', change: 'core.webhook.manage' }),
 })
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // not-policy: the calendar; 29 February is not every year's end
@@ -97,6 +103,7 @@ export const records = defineRecords('core', {
   venue: record({ table: 'core_venues' }),
   space: record({ table: 'core_spaces', parent: 'core.venue' }),
   closure: record({ table: 'core_closures' }),
+  webhook: record({ table: 'core_webhooks' }),
 })
 
 export const abilities = defineAbilities('core', {
@@ -123,6 +130,8 @@ export const abilities = defineAbilities('core', {
   'venue.manage': ability({ on: 'core.venue', grantAt: ['site', 'record'] }),
   // Closures for the theatre, a venue or a space. Site-wide only: a closure cannot scope a grant.
   'closure.manage': ability(),
+  // Webhooks send the theatre's events to an outside address, and their log shows what went where.
+  'webhook.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
 })
 
 const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]*$/)
@@ -270,6 +279,19 @@ export const contributes = {
   // A person told their credit is linked (question 5). Optional, so they can switch it off.
   'core.notification-topic': [{ id: 'core.credits', side: 'members' as const, order: 50 }],
   'core.notification-type': [{
+    id: 'core.webhook.paused',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    link: '/admin/webhooks',
+    variables: { webhook: 'text' as const, failures: 'text' as const, link: 'url' as const },
+    wording: {
+      'en-GB': {
+        subject: 'The webhook {{ webhook }} has been paused',
+        body: 'The webhook {{ webhook }} failed {{ failures }} times in a row, so {{ theatre }} has stopped sending to it. Nothing more is sent until someone resumes it.\n\n[Open the webhook]({{ link }})',
+      },
+    },
+  }, {
     id: 'core.credit.added',
     category: 'optional' as const,
     side: 'members' as const,
@@ -343,10 +365,14 @@ export const announces = {
   'core.delivery.bounced': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),
   'core.delivery.complained': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),
   'core.address.suppressed': event({ version: 1, payload: z.object({ reason: z.enum(['hard_bounce', 'complaint', 'manual']) }), internal: true }),
+  // Never sent to webhooks itself, so a failing webhook cannot feed its own failures.
+  'core.webhook.paused': event({ version: 1, payload: z.object({ webhookId: z.string(), failures: z.number().int() }), internal: true }),
   'core.term.merged': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code(), intoId: z.string() }), internal: true }),
 }
 
 export const listens = {
+  // Every event not marked internal: core's webhook sender, the one listener of its kind.
+  'deliverable': 'queue-webhooks',
   'core.setting.changed': 'recompute-on-change',
   'core.module.enabled': 'seed-vocabularies',
 }
@@ -356,12 +382,14 @@ export const jobs = {
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
   'core.send-notifications': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }) }),
   'core.create-run': job({ payload: z.object({ runId: z.string() }) }),
+  'core.send-webhook': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }), lane: 'bulk' }),
   'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
 }
 
-// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard.
-export const secrets = {
-  CORE_CLOUDFLARE_TOKEN: secret({ needed: 'optional' }),
+// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard. Typed
+// on Admin > Email sending (Matt, 17 November), or set as a Worker secret of the same name.
+export const credentials = {
+  CORE_CLOUDFLARE_TOKEN: credentialDecl({ needed: 'optional', manage: 'core.sender.manage' }),
 }
 
 export const calls = {
