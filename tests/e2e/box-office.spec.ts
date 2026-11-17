@@ -9,7 +9,7 @@ const person = (accountId: string, name: string, abilities: string[]) => ({ kind
 const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage'])
 const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
-const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit'])
+const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const key = () => ({ 'idempotency-key': crypto.randomUUID() })
 // Names are unique to a run, so a retry in a fresh worker can set the stage again.
@@ -127,6 +127,12 @@ test.describe('the box office console', () => {
     await page.getByRole('link', { name: reference, exact: true }).first().click()
     await expect(page.getByRole('heading', { level: 1, name: `Order ${reference}` })).toBeVisible()
     await noViolations(page)
+    // The exchange dialogue opens from the order's actions, and shows its options without violations.
+    await page.getByRole('button', { name: /More actions/ }).click()
+    await page.getByRole('menuitem', { name: 'Exchange tickets' }).click()
+    await expect(page.getByRole('dialog', { name: 'Exchange tickets' })).toBeVisible()
+    await noViolations(page)
+    await page.keyboard.press('Escape')
 
     await visit(page, '/console/box-office/performances')
     await expect(page.getByRole('heading', { level: 1, name: 'Performances' })).toBeVisible()
