@@ -155,6 +155,9 @@ describe('selling at the desk', () => {
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
     const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
     expect(made).toMatchObject({ channel: 'desk', state: 'awaiting_payment', account_id: null, total_minor: 2400, sold_by: seller.accountId })
+    // Each line records the price row it was sold at.
+    const price = (await rows<{ id: string }>('SELECT id FROM box_office_prices WHERE band_id = ? AND ticket_type_id = ?', h.bandId, h.fullId))[0]!.id
+    expect(await rows('SELECT price_id FROM box_office_order_lines WHERE order_id = ?', made!.id)).toEqual([{ price_id: price }, { price_id: price }])
     expect(await claimed(h)).toBe(2)
     // The seats are the desk's while it takes the money: one is left for anybody else.
     expect((await buy(h, 2)).ok).toBe(false)
