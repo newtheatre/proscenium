@@ -101,7 +101,8 @@ async function payCash(page: Page, amount: string) {
   await expect(page.getByText(`Still to pay: ${amount}`)).toBeVisible()
   await page.getByRole('radio', { name: 'Cash' }).first().check()
   await page.getByRole('button', { name: 'Cash taken' }).click()
-  await expect(page.getByText(`Paid: ${amount}`, { exact: true }).first()).toBeVisible()
+  // The till says so once.
+  await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 }
 
@@ -112,12 +113,17 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Sell' }).first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
   const quantity = page.getByLabel(`Stalls, ${typeName}, £12.00`)
+  // How many are left is the field's help, which it names as its description.
+  const help = page.locator(`[id="${(await quantity.getAttribute('aria-describedby'))!.split(' ').at(-1)}"]`)
+  const before = Number((await help.textContent())!.match(/(\d+) left/)![1])
   await quantity.fill('2')
   await quantity.blur()
   await page.getByRole('checkbox', { name: 'Admit now' }).check()
   await expect(page.getByRole('button', { name: 'Take payment of £24.00' })).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£24.00')
+  // The panel shows what is left after the sale without a reload.
+  await expect(help).toHaveText(`${before - 2} left`)
 })
 
 test('Sell finds a reservation by its reference and takes payment for it', async ({ page }) => {
@@ -201,6 +207,10 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
   await expect(page.getByRole('button', { name: 'Take payment of £6.00' })).toBeEnabled()
   await expect(page.getByRole('tab', { name: /^Gallery programmes/ })).toContainText('1')
   await noViolations(page)
+  // On a phone the till fits the screen: nothing scrolls sideways, however long a performance's name.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('tab', { name: 'Tickets', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
   await context.close()
 })
 
