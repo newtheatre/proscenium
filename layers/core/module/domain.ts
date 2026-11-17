@@ -256,6 +256,9 @@ export const contributes = {
   'core.file-slot': [
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
+    // A production's poster and its photos (C-23, C-24), managed on its own page.
+    { id: 'core.production-poster', owner: 'core.production', ability: 'core.production.edit', accepts: ['png', 'jpeg', 'webp'], limit: 'core.files.image-limit', access: 'public', textClass: 'public', clean: true },
+    { id: 'core.production-photos', owner: 'core.production', ability: 'core.production.edit', many: true, accepts: ['png', 'jpeg', 'webp'], limit: 'core.files.image-limit', access: 'public', textClass: 'public', clean: true },
   ],
   'core.erasure-handler': [{ id: 'core.files', file: 'files' }, { id: 'core.credits', file: 'credits' }],
   // A person told their credit is linked (question 5). Optional, so they can switch it off.

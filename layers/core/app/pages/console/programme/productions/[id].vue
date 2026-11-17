@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One production (C-02, C-03, C-09): its details, performances, credits, advisories and web address, with publish,
-// withdraw, cancel (and bring back) and delete. Publishing names what is still missing. Media arrive
-// with their slice.
+// withdraw, cancel (and bring back) and delete, and its poster and photos (C-23, C-24), managed here.
+// Publishing names what is still missing.
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -196,6 +196,8 @@ async function remove() {
           icon="i-lucide-info"
           :title="`To publish, this production needs ${data!.needs.join(', ')}.`"
         />
+
+        <ProductionMedia :production-id="production.id" />
 
         <PageSection title="Details">
           <UForm
