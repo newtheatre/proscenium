@@ -27,6 +27,8 @@ interface SettingView {
   onChange: 'reason' | 'confirm' | null
   changeLabelKey: string
   canChange: boolean
+  /** The latest change, for "Changed by <name>, <date>". */
+  lastChange?: { at: number, by: string | null } | null
   min?: number | string
   max?: number | string
   maxLength?: number
@@ -38,53 +40,40 @@ interface SettingView {
 
 const { $api } = useNuxtApp()
 const props = defineProps<{
-  /** The page of settings to draw, by id (`core.sign-in`, `core.advanced`). The older module and scope props are going. */
-  page?: string
-  /** The module whose settings these are (its own page in the console). Leave out for the site page. */
-  module?: string
-  /** 'site' draws every setting declared with scope 'site', whichever module declares it (Site administration). */
-  scope?: 'module' | 'site'
+  /** The page of settings to draw, by id (`core.sign-in`, `core.advanced`, `gallery.settings`). */
+  page: string
   title: string
   trail?: { label: string, to: string }[]
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
-  /** Only settings whose key starts with one of these, for a page of one subject (Sign-in). */
-  only?: string[]
 }>()
 
 const { t } = useT()
 const toast = useToast()
 const { confirm } = useConfirm()
-const { language } = useDates()
+const { language, day: when } = useDates()
 const { data: publicSettings } = usePublicSettings()
 const currency = computed(() => (publicSettings.value?.['core.locale.currency']?.value as string | undefined) ?? 'GBP')
-const site = props.scope === 'site' || !!props.page
-const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', {
-  query: props.page ? { page: props.page } : site ? { scope: 'site' } : { module: props.module, scope: 'module' },
-  key: props.page ? `core:settings:page:${props.page}` : site ? 'core:settings:site' : `core:settings:${props.module}`,
+const { data, status, error, refresh } = await useAPI<{ page: { id: string, module: string } | null, settings: SettingView[] }>('/api/core/settings', {
+  query: { page: props.page },
+  key: `core:settings:page:${props.page}`,
 })
-
-// A module whose console page leaves some settings to Site administration says so, when the viewer may open them.
-const { data: alsoSite } = site || !props.module
-  ? { data: ref(false) }
-  : await useAsyncData(`core:settings:also-site:${props.module}`, async () => {
-      try {
-        const found = await $api<{ settings: unknown[] }>('/api/core/settings', { query: { module: props.module, scope: 'site' } })
-        return found.settings.length > 0
-      }
-      catch { return false }
-    }, { default: () => false })
+const advanced = props.page === 'core.advanced'
+const history = ref<SettingView | null>(null)
+const changedLine = (s: SettingView) => s.lastChange?.by ? t('core.settings-history.line', { who: s.lastChange.by, when: when(s.lastChange.at) }) : t('core.settings-history.line-system', { when: s.lastChange ? when(s.lastChange.at) : '' })
 
 const draft = reactive<Record<string, any>>({})
 const resets = reactive<Record<string, boolean>>({})
 const problems = reactive<Record<string, string>>({})
 const saving = ref<string | null>(null)
 
-// The settings this page draws: all of them, or those of its subject.
-const shown = computed(() => (data.value?.settings ?? []).filter(s => !props.only || props.only.some(prefix => s.key.startsWith(prefix))))
+// "Changed" leaves only the settings that differ from their default, so a page of forty reads as a short list.
+const onlyChanged = ref(false)
+const all = computed(() => data.value?.settings ?? [])
+const shown = computed(() => onlyChanged.value ? all.value.filter(s => s.overridden || resets[s.key]) : all.value)
 
 function load() {
-  for (const s of shown.value) {
+  for (const s of all.value) {
     draft[s.key] = s.sensitive ? '' : toControl(s)
     resets[s.key] = false
   }
@@ -92,7 +81,7 @@ function load() {
 watch(data, load, { immediate: true })
 
 const sections = computed(() => {
-  // Sections are a module's own groups; on the site page the same group of two modules stays apart.
+  // Sections are a module's own groups; where a page draws two modules' settings the same group stays apart.
   const groups = new Map<string, SettingView[]>()
   for (const s of shown.value) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
   return [...groups].map(([id, settings]) => ({ id, module: settings[0]!.module, group: settings[0]!.group, settings }))
@@ -155,10 +144,19 @@ function timeOf(value: unknown) {
   catch { return undefined }
 }
 
-// On the site page a section's heading also names its module, so "Sending" of two modules differ.
+// On the Advanced page a section's heading also names its module, so "Sending" of two modules differ.
 const sectionTitle = (section: { module: string, group: string }) => {
   const name = t(`${section.module}.settings-sections.${section.group}`)
-  return site ? `${t(`${section.module}.module.name`)}: ${name}` : name
+  return advanced ? `${t(`${section.module}.module.name`)}: ${name}` : name
+}
+// One line for a section when every setting in it is changed by the same people; otherwise each says its own.
+const sharedAbility = (settings: SettingView[]) => {
+  const first = settings[0]?.changeLabelKey
+  return first && settings.every(s => s.changeLabelKey === first && s.canChange) ? first : null
+}
+const resettable = (settings: SettingView[]) => settings.filter(s => s.canChange && s.overridden && !resets[s.key])
+function resetSection(settings: SettingView[]) {
+  for (const s of resettable(settings)) resetToDefault(s)
 }
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
 const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
@@ -204,11 +202,18 @@ onMounted(() => {
   >
     <SettingsSearch />
     <UAlert
-      v-if="alsoSite"
-      class="mb-6"
-      icon="i-lucide-info"
-      :title="t('core.settings-page.also-in-admin')"
-      :actions="[{ label: t('core.settings-page.open-admin'), to: '/admin/settings', color: 'neutral', variant: 'outline' }]"
+      v-if="advanced"
+      class="my-6"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      :title="t('core.settings-page.advanced-warning-title')"
+      :description="t('core.settings-page.advanced-warning')"
+    />
+    <USwitch
+      v-model="onlyChanged"
+      class="my-4"
+      :label="t('core.settings-page.changed-only')"
     />
     <DataBoundary
       :data="data"
@@ -216,12 +221,23 @@ onMounted(() => {
       :error="error"
       @retry="refresh()"
     >
+      <EmptyState
+        v-if="onlyChanged && !sections.length"
+        :title="t('core.settings-page.nothing-changed')"
+        icon="i-lucide-undo-2"
+      />
       <form
         v-for="section in sections"
         :key="section.id"
         @submit.prevent="save(section.id, section.settings)"
       >
         <PageSection :title="sectionTitle(section)">
+          <p
+            v-if="sharedAbility(section.settings)"
+            class="mb-4 text-sm text-muted"
+          >
+            {{ t('core.settings-page.who', { ability: t(sharedAbility(section.settings)!) }) }}
+          </p>
           <div class="divide-y divide-default">
             <div
               v-for="s in section.settings"
@@ -369,7 +385,16 @@ onMounted(() => {
                 <span v-if="!s.canChange">
                   {{ s.managed ? t('core.settings-page.managed') : t('core.settings-page.read-only', { ability: t(s.changeLabelKey) }) }}
                 </span>
-                <span v-else>{{ t('core.settings-page.who', { ability: t(s.changeLabelKey) }) }}</span>
+                <span v-else-if="!sharedAbility(section.settings)">{{ t('core.settings-page.who', { ability: t(s.changeLabelKey) }) }}</span>
+                <UButton
+                  v-if="s.lastChange && !s.sensitive"
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  :label="changedLine(s)"
+                  :aria-label="`${changedLine(s)}. ${t('core.settings-history.open-named', { setting: t(s.labelKey) })}`"
+                  @click="history = s"
+                />
               </div>
             </div>
           </div>
@@ -381,6 +406,14 @@ onMounted(() => {
               {{ changesIn(section.settings).length ? t('core.settings-page.changes', { count: changesIn(section.settings).length }) : t('core.settings-page.no-changes') }}
             </p>
             <UButton
+              v-if="resettable(section.settings).length"
+              color="neutral"
+              variant="outline"
+              :label="t('core.settings-page.reset-section')"
+              :aria-label="t('core.settings-page.reset-section-named', { section: sectionTitle(section) })"
+              @click="resetSection(section.settings)"
+            />
+            <UButton
               type="submit"
               :label="t('core.settings-page.save', { section: sectionTitle(section) })"
               :loading="saving === section.id"
@@ -390,5 +423,20 @@ onMounted(() => {
         </PageSection>
       </form>
     </DataBoundary>
+    <USlideover
+      :open="!!history"
+      :title="history ? t('core.settings-history.drawer-title', { setting: t(history.labelKey) }) : ''"
+      :description="t('core.settings-history.drawer-description')"
+      @update:open="!$event && (history = null)"
+    >
+      <template #body>
+        <SettingChanges
+          v-if="history"
+          :query="{ key: history.key }"
+          :kind="history.kind"
+          @reverted="refresh()"
+        />
+      </template>
+    </USlideover>
   </PageFrame>
 </template>

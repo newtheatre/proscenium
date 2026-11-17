@@ -79,6 +79,7 @@
   "core.settings.rules.year-end": "The year end is a month and a day that falls in every year, written as MM-DD, such as 07-31.",
   "core.abilities.vocabulary.manage.label": "Edit vocabularies",
   "core.navigation.vocabularies.label": "Vocabularies",
+  "core.navigation.settings-history.label": "Settings history",
   "core.settings.delivery.max-attempts.label": "Tries before giving up",
   "core.settings.delivery.max-attempts.help": "How many times an email is tried before it is marked as failed.",
   "core.settings.delivery.first-retry.label": "Wait before the first retry",

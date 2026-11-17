@@ -17,7 +17,7 @@ async function visit(page: Page, url: string) {
 const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 
 test.describe('a site owner with no console', () => {
-  test.use(as(siteOwner('Sol Site')))
+  test.use(as(siteOwner('Sol Site', ['core.audit.view'])))
 
   test('has the strip, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
@@ -26,6 +26,7 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
     await expect(page.getByText('Nothing needs attention')).toBeVisible()
+    await page.getByRole('navigation', { name: 'Site administration' }).getByRole('button', { name: 'Upkeep' }).click()
     await expect(page.getByRole('navigation', { name: 'Site administration' })).toContainText('Advanced')
     await noViolations(page)
   })
@@ -36,6 +37,17 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
     await page.getByRole('searchbox').first().fill('rate')
     await expect(page.getByRole('link').filter({ hasText: /limit/i }).first()).toBeVisible()
+    await noViolations(page)
+  })
+
+  test('Advanced opens with a warning, and Changed leaves only what differs from its default', async ({ page }) => {
+    await visit(page, '/admin/advanced')
+    await expect(page.getByText('These are engineering limits')).toBeVisible()
+    const shown = await page.getByRole('heading', { level: 2 }).count()
+    expect(shown).toBeGreaterThan(1)
+    await page.getByRole('switch', { name: 'Show only settings I have changed' }).click()
+    await expect(page.getByText('Nothing on this page differs from its default')).toBeVisible()
+    await expect(page.locator('form')).toHaveCount(0)
     await noViolations(page)
   })
 
@@ -73,6 +85,30 @@ test.describe('a site owner with no console', () => {
     await page.locator('form').filter({ has: period }).getByRole('button', { name: /^Save/ }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Save the change' }).click()
     await expect(page.getByText(/period between 1 minute and 1 day/)).toBeVisible()
+  })
+
+  test('a changed setting shows who changed it, its history opens and Revert puts it back, and Settings history lists the change', async ({ page }) => {
+    await visit(page, '/admin/advanced')
+    const size = page.getByRole('combobox', { name: 'Rows on a page of a list' })
+    await expect(size).toBeVisible()
+    await size.click()
+    await page.getByRole('option', { name: '50' }).click()
+    const section = page.locator('form').filter({ has: size })
+    await section.getByRole('button', { name: /^Save/ }).click()
+    await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible()
+    await expect(section.getByRole('button', { name: /^Changed by the system, / })).toBeVisible()
+    await section.getByRole('button', { name: /^Changed by the system, .*Show the history of Rows on a page of a list/ }).click()
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toContainText('From 25 to 50.')
+    await noViolations(page)
+    await drawer.getByRole('button', { name: /^Revert Rows on a page of a list/ }).click()
+    await expect(page.getByText('Rows on a page of a list reverted', { exact: true })).toBeVisible()
+    await expect(drawer).toContainText('From 50 to 25.')
+    await page.keyboard.press('Escape')
+    await visit(page, '/admin/settings-history')
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings history' })).toBeVisible()
+    await expect(page.getByText('From 50 to 25.').first()).toBeVisible()
+    await noViolations(page)
   })
 
   test('is not offered the console', async ({ page }) => {

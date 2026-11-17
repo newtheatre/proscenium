@@ -28,7 +28,7 @@ export function matchSettings(index: readonly SettingRef[], term: string, t: (ke
     const label = t(ref.labelKey)
     const help = t(ref.helpKey)
     const inLabel = label.toLowerCase()
-    const both = `${inLabel} ${help.toLowerCase()}`
+    const both = `${inLabel} ${help.toLowerCase()} ${ref.key.toLowerCase()}`
     if (!wanted.every(w => both.includes(w))) continue
     hits.push({ ...ref, label, help, to: `${ref.to}?setting=${encodeURIComponent(ref.key)}`, rank: wanted.every(w => inLabel.includes(w)) ? 0 : 1 })
   }
