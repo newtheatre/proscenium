@@ -11,8 +11,6 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import { unrefElement } from '@vueuse/core'
 import { insertNodeAt, removeNode, useSortable } from '@vueuse/integrations/useSortable'
 
-definePageMeta({ layout: 'console' })
-
 type Kind = 'standard' | 'concession' | 'companion' | 'complimentary'
 type Channel = 'all' | 'desk' | 'online'
 interface TicketType {

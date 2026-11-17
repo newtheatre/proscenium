@@ -5,8 +5,7 @@
 <script setup lang="ts">
 const { t } = useT()
 const route = useRoute()
-const { nameOf } = useModuleWords()
-// In the console, a cog opens the settings of the module the page belongs to, for whoever may change them.
+// In the console, a cog opens the settings that belong to the page, for whoever may change them.
 const settings = inject(CONSOLE_SETTINGS, undefined)
 </script>
 
@@ -15,8 +14,8 @@ const settings = inject(CONSOLE_SETTINGS, undefined)
     <IconButton
       v-if="settings"
       icon="i-lucide-settings"
-      :label="t('core.modules.window.title', { module: nameOf(settings) })"
-      :to="{ query: { ...route.query, settings } }"
+      :label="t('core.modules.window.title', { module: t(settings.name) })"
+      :to="{ query: { ...route.query, settings: settings.scope } }"
     />
     <UDashboardSearchButton
       :label="t('core.palette.open')"

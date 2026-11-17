@@ -70,14 +70,29 @@ contributes: {
   Someone who may open the tab but not Admin is sent by the guard to the console's settings window
   for that address (`decision: 'redirect'`). Redirect a moved screen's old console address in the
   layer's `nuxt.config.ts` `routeRules`.
-- **The console's cog.** The console layout works out the module of the current page from its
-  navigation entry; when the viewer may change any of that module's settings, `ShellTools` shows a
-  cog that adds `?settings=<module>` to the address, and `ModuleSettingsWindow` (in the console
-  layout) draws the module's tabs, less About, in a window as wide as the settings cards:
-  `?screen=<address in Admin>` names the open one, and `NuxtPage` draws that address's page with
-  `EmbeddedScreens window` round it. While the window is open, the console layout keeps a link to
-  a module's address in Admin, or a screen changing its own query, inside the window. Settings
-  search sends console staff to `/console?settings=<module>` and administrators to the page in Admin.
+- **The console's cog.** The cog on a console page opens the settings window for that page: the
+  tabs from modules' pages in Admin (pages of settings and set-up screens, less About) that belong
+  there, as far as the viewer may open them. `ShellTools` shows the cog when there are any, adding
+  `?settings=<entry id>`; `GET /api/core/settings-window?for=<entry id>` lists the tabs and the
+  window's name. Which tabs belong where is one rule, `settingsIn`:
+  - A tab that names nowhere belongs on every console page of its own module, so a module whose
+    console pages sit in one group needs nothing.
+  - `settingsIn: [...]` lists console entry ids (`core.productions`) or console group ids
+    (`membership`) instead. Declare it on the tab's navigation entry, on a declared page of
+    settings (`settingPages.<page>.settingsIn`), or once for a whole module in its manifest (a
+    module with no console pages of its own, such as membership fees, names the group it serves).
+    The entry wins over the page, and the page over the module.
+  - The window is named after the module when it holds only the page's module's tabs and that
+    module's console pages sit in one group (Payments settings); otherwise after the page's group
+    (Programme settings, Membership settings). Another module's own Settings tab is named after
+    that module.
+  `?settings=<module>` (an Admin address opened from the console, or settings search) is every tab of
+  that module. `ModuleSettingsWindow` (in the console layout) draws the tabs in a window as wide as
+  the settings cards: `?screen=<address in Admin>` names the open one, and `NuxtPage` draws that
+  address's page with `EmbeddedScreens window` round it. While the window is open, the console
+  layout keeps a link to a module's address in Admin, or a screen changing its own query, inside
+  the window. Settings search sends console staff to `/console?settings=<module>` and
+  administrators to the page in Admin.
 - `GET /api/core/settings?page=<id>` gives one page's settings and `?screen=<address>` the ones a
   bespoke screen manages; each item names its `page` or `screen`. The older `?module=x` and
   `?scope=site` answer for one release, `scope` now meaning where the setting's page is.
@@ -121,7 +136,15 @@ row of figures on a record's summary and on a screen's totals.
 hand-built bordered list, no native date or time input, and no date formatted by hand.
 
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
-can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
+can be reversed. `useUndo().offer(message, undo)` is the success toast with an Undo button for ten
+seconds: `undo` does the reverse act (move a record back to the state it was in, patch the old
+values back, delete what was just added, add again what was just deleted), then the toast says
+Undone, or why it could not be. Use it in place of a plain success toast wherever the reverse act
+exists; Seasons is the worked example. Browser `alert`, `confirm` and `prompt` are a lint error.
+
+A short list that needs a search only now and then takes `SearchToggle` beside its primary action:
+an icon that opens into a search box. Archived or finished records go below the others under a
+`CollapsibleDivider` (label and count, closed until opened), so the list shows what is current.
 
 ## Calling the API, layouts and moving between pages
 

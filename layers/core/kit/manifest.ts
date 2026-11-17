@@ -76,7 +76,15 @@ export interface SettingGroupDecl { place?: SettingPlace, page?: string, advance
  * is the navigation group it sits in. `to` defaults to /admin/<page> or /console/<page>/settings for
  * core, and /admin/modules/<module>/<page> or /console/<module>/settings/<page> for another module.
  */
-export interface SettingPageDecl { place: SettingPlace, group: string, order?: number, icon?: string, to?: string }
+export interface SettingPageDecl {
+  place: SettingPlace
+  group: string
+  order?: number
+  icon?: string
+  to?: string
+  /** For a page in Admin's Modules: the console entries or groups whose settings window shows it (see the manifest's settingsIn). */
+  settingsIn?: readonly string[]
+}
 
 export interface ModuleManifest {
   id: string
@@ -91,6 +99,12 @@ export interface ModuleManifest {
   settingRules?: { module: string, rules: SettingRule[] }
   settingGroups?: Record<string, SettingGroupDecl>
   settingPages?: Record<string, SettingPageDecl>
+  /**
+   * Where the console's settings window shows this module's tabs from its page in Admin: console
+   * navigation entry ids (core.productions) or console group ids (membership). Left out, the window
+   * on any of the module's own console pages shows them. A tab's own settingsIn wins over this.
+   */
+  settingsIn?: readonly string[]
   abilities?: Record<string, AbilityDecl>
   facts?: Record<string, FactDecl>
   records?: Record<string, RecordDecl>
@@ -138,7 +152,7 @@ const SIGNING_MIN = 86_400 // not-policy: a signing key lives at least a day, in
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
 const kebab = new RegExp(`^${KEBAB}$`)
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9a-z.-]+)?$/
-const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
+const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'settingsIn', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export function snake(id: string): string {
@@ -174,6 +188,7 @@ export function validateManifest(m: ModuleManifest): void {
   }
   if (m.settingRules && m.settingRules.module !== id) throw new DeclarationError('settingRules', `use defineSettingRules('${id}', [...])`)
   validateSettingPlaces(m)
+  if (m.settingsIn !== undefined && !validPlaces(m.settingsIn)) throw new DeclarationError('settingsIn', 'is a list of console entry or group ids, such as core.productions or membership')
   for (const key of Object.keys(m.abilities ?? {})) if (!own('', `${KEBAB}\\.${KEBAB}`).test(key)) throw new DeclarationError(`abilities.${key}`, `is <module>.<record>.<verb>: use defineAbilities('${id}', {...})`)
   for (const key of Object.keys(m.facts ?? {})) if (!own('', KEBAB).test(key)) throw new DeclarationError(`facts.${key}`, `is <module>.<name>: use defineFacts('${id}', {...})`)
   for (const key of Object.keys(m.records ?? {})) if (!own('', KEBAB).test(key)) throw new DeclarationError(`records.${key}`, `is <module>.<noun>: use defineRecords('${id}', {...})`)
@@ -300,6 +315,8 @@ function checkPayload(field: string, schema: z.ZodObject<any>) {
 const PLACES = ['console', 'admin']
 const ADDRESS = /^\/(admin|console)(\/[a-z0-9-]+)+$/
 
+const validPlaces = (list: unknown) => Array.isArray(list) && list.length > 0 && list.every(x => typeof x === 'string' && /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/.test(x))
+
 /** settingGroups and settingPages: their shapes, and that every group names at most one home. */
 function validateSettingPlaces(m: ModuleManifest): void {
   const pages = m.settingPages ?? {}
@@ -310,6 +327,7 @@ function validateSettingPlaces(m: ModuleManifest): void {
     if (typeof decl.group !== 'string' || !kebab.test(decl.group)) throw new DeclarationError(f('group'), 'names the navigation group the page sits in')
     if (decl.to !== undefined && !(typeof decl.to === 'string' && ADDRESS.test(decl.to) && decl.to.startsWith(`/${decl.place}/`))) throw new DeclarationError(f('to'), `is an address under /${decl.place}`)
     if (decl.order !== undefined && !Number.isInteger(decl.order)) throw new DeclarationError(f('order'), 'is a whole number')
+    if (decl.settingsIn !== undefined && !validPlaces(decl.settingsIn)) throw new DeclarationError(f('settingsIn'), 'is a list of console entry or group ids, such as core.productions or membership')
   }
   for (const [group, decl] of Object.entries(m.settingGroups ?? {})) {
     const f = (name: string) => `settingGroups.${group}.${name}`

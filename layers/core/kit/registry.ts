@@ -67,6 +67,8 @@ export interface SettingPage {
   to: string
   /** The translation key of the page's name. */
   label: string
+  /** The console entries or groups whose settings window shows the page, when declared. */
+  settingsIn?: readonly string[]
 }
 export type SettingHome = { page: string, screen?: undefined } | { screen: string, page?: undefined }
 
@@ -335,7 +337,7 @@ function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntr
     const to = decl.to ?? (id === 'core'
       ? (decl.place === 'admin' ? `/admin/${page}` : `/console/${page}/settings`)
       : (decl.place === 'admin' ? `/admin/modules/${id}/${page}` : `/console/${id}/settings/${page}`))
-    addPage(`${id}.${page}`, { module: id, place: decl.place, group: decl.group, order: decl.order ?? 100, icon: decl.icon ?? SETTINGS_ICON, to, label: `${id}.settings-pages.${page}` }, `settingPages.${page}`) // not-policy: sort position
+    addPage(`${id}.${page}`, { module: id, place: decl.place, group: decl.group, order: decl.order ?? 100, icon: decl.icon ?? SETTINGS_ICON, to, label: `${id}.settings-pages.${page}`, ...(decl.settingsIn ? { settingsIn: decl.settingsIn } : {}) }, `settingPages.${page}`) // not-policy: sort position
   }
   for (const [key, setting] of Object.entries(m.settings ?? {})) {
     const group = key.slice(id.length + 1).split('.')[0]!

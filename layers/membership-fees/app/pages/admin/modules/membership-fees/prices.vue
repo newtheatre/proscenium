@@ -3,8 +3,6 @@
      the one before from then; a price is never edited, so nobody's charge changes after they were
      quoted. A price may be for every length or one, and for joining, renewing or both. -->
 <script setup lang="ts">
-definePageMeta({ layout: 'console' })
-
 interface Price { id: string, lengthOptionId: string | null, amountMinor: number, currency: string, appliesTo: string, fromDate: string }
 interface Scheme { id: string, name: string, state: string, requiresPayment: boolean, lengths: { id: string | null, name: string | null, join: number | null, renew: number | null }[], history: Price[] }
 
