@@ -31,6 +31,11 @@ export default defineModule({
     'shifts.late-after': setting.duration({ default: '30m', min: '5m', max: '2h', change, audience: 'staff' }),
     // Off by default: the board warns instead.
     'checklists.block-house-open': setting.boolean({ default: false, change, audience: 'staff' }),
+    // What volunteer hours are counted from: the shift's times, or check-in to check-out.
+    'hours.count-from': setting.choice({ default: 'scheduled', options: ['scheduled', 'checked'], change, audience: 'staff' }),
+    // After the performance ends, when an unsigned report is chased.
+    'night-report.sign-off-by': setting.duration({ default: '12h', min: '1h', max: '7d', change, audience: 'staff' }),
+    'night-report.auto-distribute': setting.boolean({ default: true, change, audience: 'staff' }),
     // When an incident nobody has opened is flagged.
     'incidents.review-within': setting.duration({ default: '72h', min: '1h', max: '30d', change, audience: 'staff' }),
     // At or above this, managers are told at once; below, in the daily digest.
@@ -58,6 +63,10 @@ export default defineModule({
     'duty.manage': ability(),
     'emergency-card.view': ability(),
     // The reporter sees their own reports in limited form: the service limits what, not the ability.
+    'night-report.write': ability({ on: 'core.performance', implies: ['shift.view'] }),
+    'night-report.sign-off': ability({ on: 'core.performance', implies: ['night-report.write'] }),
+    'night-report.view': ability({ on: 'core.performance' }),
+    'hours.view': ability({ audit: 'read' }),
     'incident.report': ability({ on: 'front-of-house.incident', owner: 'grants' }),
     'incident.view': ability({ on: 'front-of-house.incident', risk: 'privileged', audit: 'read' }),
     'incident.manage': ability({ on: 'front-of-house.incident', risk: 'privileged', implies: ['incident.view'] }),
@@ -84,6 +93,8 @@ export default defineModule({
       // Never offered to webhooks: who was involved is not for outside systems.
       'front-of-house.incident.reported': event({ version: 1, payload: z.object({ incidentId: z.string(), severity: z.enum(['minor', 'moderate', 'serious']) }), internal: true }),
       'front-of-house.incident.closed': event({ version: 1, payload: z.object({ incidentId: z.string() }), internal: true }),
+      // Nothing financial waits on it.
+      'front-of-house.night-report.signed-off': event({ version: 1, payload: z.object({ performanceId: z.string() }), internal: false }),
       'front-of-house.checklist-run.completed': event({ version: 1, payload: z.object({ runId: z.string(), checklistId: z.string(), performanceId: z.string() }), internal: false }),
     },
     listens: {
@@ -98,6 +109,9 @@ export default defineModule({
     'front-of-house.remind-shifts': task({ every: '15m' }),
     // Reminds action owners and sends the incident digest.
     'front-of-house.chase-actions': task({ dailyAt: '09:00' }),
+    // Completes shifts past their window and opens tonight's draft reports.
+    'front-of-house.close-shifts': task({ every: '15m' }),
+    'front-of-house.chase-night-reports': task({ dailyAt: '10:00' }),
   },
 
   // Other modules' parts of the board and the night report. Front of house calls none of them.
@@ -136,7 +150,10 @@ export default defineModule({
         { slug: 'other', label: 'Other' },
       ],
     }],
-    'core.notification-topic': [{ id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 }],
+    'core.notification-topic': [
+      { id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 },
+      { id: 'front-of-house.night-reports', side: 'members' as const, order: 61 },
+    ],
     // Messages to people on the rota about their own shifts, so none can be switched off.
     'core.notification-type': [{
       id: 'front-of-house.shift-changed',
@@ -285,6 +302,36 @@ export default defineModule({
         'en-GB': {
           subject: 'Due tomorrow: {{ what }}',
           body: 'The action "{{ what }}" from {{ incident }} is due tomorrow ({{ due }}). Mark it done when it is, or drop it with a reason.',
+        },
+      },
+    }, {
+      // Headline numbers and a link: never incident detail (question 9).
+      id: 'front-of-house.night-report-ready',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      topic: 'front-of-house.night-reports',
+      link: '/console/front-of-house/night-reports/{{ performance }}',
+      variables: { show: 'text' as const, worked: 'text' as const, incidents: 'text' as const, performance: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Night report: {{ show }}',
+          body: 'The night report for **{{ show }}** has been signed off. People on shift: {{ worked }}. Incidents: {{ incidents }}.',
+        },
+      },
+    }, {
+      id: 'front-of-house.night-report-unsigned',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      link: '/console/front-of-house/night-reports/{{ performance }}',
+      variables: { show: 'text' as const, performance: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Night report not signed off: {{ show }}',
+          body: 'The night report for **{{ show }}** is still a draft. Please check who worked and sign it off.',
         },
       },
     }, {
