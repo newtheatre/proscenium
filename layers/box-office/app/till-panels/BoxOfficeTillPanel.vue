@@ -44,6 +44,9 @@ const performances = computed(() => data.value?.performances ?? [])
 const mode = ref<'sell' | 'collect'>('sell')
 const modes = computed(() => [{ label: t('box-office.screens.panel.sell'), value: 'sell' }, { label: t('box-office.screens.panel.collect'), value: 'collect' }])
 const admit = ref(false)
+// The buyer's address, if they want the tickets emailed. Optional; the till shows nothing back about them.
+const email = ref('')
+const emailToSend = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()) ? email.value.trim() : undefined)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 // Selling: how many of each kind of ticket for one performance.
@@ -72,13 +75,13 @@ function say() {
   }
   if (mode.value === 'sell') {
     const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map(r => ({ bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity: quantities.value[keyOf(r)]! }))
-    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value } : null)
+    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...(emailToSend.value ? { email: emailToSend.value } : {}) } : null)
   }
   else {
     emit('update:modelValue', order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, order, exchange], say, { deep: true })
+watch([mode, admit, quantities, order, exchange, emailToSend], say, { deep: true })
 onMounted(() => {
   if (exchange.value) say()
 })
@@ -88,6 +91,8 @@ watch(() => props.modelValue, (now) => {
   if (now !== null && now !== undefined) return
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
+  // The next buyer never sees the last one's address.
+  email.value = ''
   if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
 })
 
@@ -322,6 +327,19 @@ function clear() {
       </div>
     </template>
 
+    <UFormField
+      v-if="mode === 'sell' && !exchange"
+      :label="t('box-office.screens.panel.email')"
+      :help="t('box-office.screens.panel.email-help')"
+      name="email"
+    >
+      <UInput
+        v-model="email"
+        type="email"
+        autocomplete="off"
+        :disabled="locked"
+      />
+    </UFormField>
     <UCheckbox
       v-model="admit"
       :label="t('box-office.screens.panel.admit')"
