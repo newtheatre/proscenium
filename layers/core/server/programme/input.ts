@@ -25,7 +25,9 @@ const productionFields = z.object({
   categoryTermId: z.string().min(1).nullable(),
   seasonId: z.string().min(1).nullable(),
   companyName: text(200), // not-policy: a company name's bound
-  ageGuidance: text(40), // not-policy: the table's bound on age guidance
+  ageMin: z.number().int().min(0).max(21).nullable(), // not-policy: the table's bounds on a minimum age
+  ageRestricted: z.boolean(),
+  effectsConfirmedNone: z.boolean(),
   advisoriesConfirmedNone: z.boolean(),
   contentNote: text(4000), // not-policy: public text's bound
   runningMinutes: z.number().int().positive().max(24 * 60).nullable(), // not-policy: a day
@@ -39,7 +41,11 @@ export const productionInput = productionFields.partial().required({ title: true
 export const productionPatch = productionFields.partial()
 
 export const advisoriesInput = z.object({
-  advisories: z.array(z.object({ termId: z.string().min(1), detail: text(300).default(null) })).max(50), // not-policy: the table's bound on a detail; a list's ceiling
+  advisories: z.array(z.object({ termId: z.string().min(1), level: z.enum(['mentioned', 'discussed', 'depicted']), detail: text(300).default(null) })).max(100), // not-policy: the table's bound on a detail; a list's ceiling
+})
+
+export const effectsInput = z.object({
+  effects: z.array(z.object({ termId: z.string().min(1), detail: text(300).default(null) })).max(50), // not-policy: the table's bound on a detail; a list's ceiling
 })
 
 // A time is UTC milliseconds, or a local date and time in the theatre's time zone, as the console's

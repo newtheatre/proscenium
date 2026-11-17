@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
 import { assertTerm } from '../vocabularies/service'
+import { orderWarnings, type WarningLevel } from './guidance'
 import { changeImpact, firstRefusal, syncProductionDates } from './performances'
 
 // ---------------------------------------------------------------------------------------------
@@ -115,7 +116,9 @@ export interface ProductionInput {
   categoryTermId?: string | null
   seasonId?: string | null
   companyName?: string | null
-  ageGuidance?: string | null
+  ageMin?: number | null
+  ageRestricted?: boolean
+  effectsConfirmedNone?: boolean
   advisoriesConfirmedNone?: boolean
   contentNote?: string | null
   runningMinutes?: number | null
@@ -136,7 +139,9 @@ export interface Production {
   categoryTermId: string | null
   seasonId: string | null
   companyName: string | null
-  ageGuidance: string | null
+  ageMin: number | null
+  ageRestricted: boolean
+  effectsConfirmedNone: boolean
   advisoriesConfirmedNone: boolean
   contentNote: string | null
   runningMinutes: number | null
@@ -151,7 +156,11 @@ export interface Production {
   lastEndsAt: number | null
 }
 
-export interface Advisory { termId: string, detail: string | null }
+export type { WarningLevel }
+/** A content warning: the term, how much of it the show holds, and a short detail. */
+export interface Advisory { termId: string, level: WarningLevel, detail: string | null }
+/** A staging effect: the term and a short detail, no level. */
+export interface Effect { termId: string, detail: string | null }
 
 interface ProductionRow {
   id: string
@@ -164,7 +173,9 @@ interface ProductionRow {
   category_term_id: string | null
   season_id: string | null
   company_name: string | null
-  age_guidance: string | null
+  age_min: number | null
+  age_restricted: number
+  effects_confirmed_none: number
   advisories_confirmed_none: number
   content_note: string | null
   running_minutes: number | null
@@ -181,8 +192,8 @@ interface ProductionRow {
 
 const toProduction = (r: ProductionRow): Production => ({
   id: r.id, slug: r.slug, title: r.title, subtitle: r.subtitle, summary: r.summary, description: r.description, kind: r.kind,
-  categoryTermId: r.category_term_id, seasonId: r.season_id, companyName: r.company_name, ageGuidance: r.age_guidance,
-  advisoriesConfirmedNone: !!r.advisories_confirmed_none, contentNote: r.content_note, runningMinutes: r.running_minutes,
+  categoryTermId: r.category_term_id, seasonId: r.season_id, companyName: r.company_name, ageMin: r.age_min,
+  ageRestricted: !!r.age_restricted, effectsConfirmedNone: !!r.effects_confirmed_none, advisoriesConfirmedNone: !!r.advisories_confirmed_none, contentNote: r.content_note, runningMinutes: r.running_minutes,
   intervalCount: r.interval_count, externalBookingUrl: r.external_booking_url, creditsPublic: !!r.credits_public, listed: !!r.listed,
   state: r.state, cancelReasonTermId: r.cancel_reason_term_id, publishedAt: r.published_at, firstStartsAt: r.first_starts_at, lastEndsAt: r.last_ends_at,
 })
@@ -190,10 +201,15 @@ const toProduction = (r: ProductionRow): Production => ({
 // Field name, column, and whether the public sees it (a change to one on a published production is announced).
 const FIELDS: [keyof ProductionInput, keyof ProductionRow, boolean][] = [
   ['title', 'title', true], ['subtitle', 'subtitle', true], ['summary', 'summary', true], ['description', 'description', true], ['kind', 'kind', false],
-  ['categoryTermId', 'category_term_id', true], ['seasonId', 'season_id', true], ['companyName', 'company_name', true], ['ageGuidance', 'age_guidance', true],
-  ['advisoriesConfirmedNone', 'advisories_confirmed_none', true], ['contentNote', 'content_note', true], ['runningMinutes', 'running_minutes', true],
+  ['categoryTermId', 'category_term_id', true], ['seasonId', 'season_id', true], ['companyName', 'company_name', true], ['ageMin', 'age_min', true], ['ageRestricted', 'age_restricted', true],
+  ['effectsConfirmedNone', 'effects_confirmed_none', true], ['advisoriesConfirmedNone', 'advisories_confirmed_none', true], ['contentNote', 'content_note', true], ['runningMinutes', 'running_minutes', true],
   ['intervalCount', 'interval_count', true], ['externalBookingUrl', 'external_booking_url', true], ['creditsPublic', 'credits_public', true], ['listed', 'listed', true],
 ]
+
+const AGE_REFUSED = { code: 'core.production.age-needed', reason: 'A restriction needs a minimum age.', fields: { ageMin: 'Set the age, or make it a recommendation.' } }
+function refuseRestrictionWithoutAge(restricted: boolean | undefined, ageMin: number | null) {
+  if (restricted && ageMin === null) refuse(AGE_REFUSED.code, AGE_REFUSED.reason, { status: 422, fields: AGE_REFUSED.fields })
+}
 
 const CATEGORY_REFUSED = { code: 'core.production.category-unknown', reason: 'Choose a category from the list.' }
 const SEASON_REFUSED = { code: 'core.production.season-unknown', reason: 'There is no such season.' }
@@ -204,11 +220,17 @@ async function productionRow(id: string): Promise<ProductionRow> {
   return row
 }
 
-export async function getProduction(id: string): Promise<Production & { advisories: Advisory[] }> {
+export async function getProduction(id: string): Promise<Production & { advisories: (Advisory & { levelAssumed: boolean })[], effects: Effect[] }> {
   const production = toProduction(await productionRow(id))
-  const advisories = (await all<{ term_id: string, detail: string | null }>('SELECT term_id, detail FROM core_production_advisories WHERE production_id = ? ORDER BY sort', id))
-    .map(a => ({ termId: a.term_id, detail: a.detail }))
-  return { ...production, advisories }
+  // In their derived order: depicted, discussed, mentioned, then by heading and term.
+  const rows = await all<{ term_id: string, level: WarningLevel, level_assumed: number, detail: string | null, heading_sort: number | null, term_sort: number }>(
+    `SELECT a.term_id, a.level, a.level_assumed, a.detail, g.sort AS heading_sort, t.sort AS term_sort
+      FROM core_production_advisories a JOIN core_terms t ON t.id = a.term_id LEFT JOIN core_term_groups g ON g.id = t.group_id WHERE a.production_id = ?`, id)
+  const advisories = orderWarnings(rows.map(r => ({ ...r, headingSort: r.heading_sort ?? Number.MAX_SAFE_INTEGER, termSort: r.term_sort, level: r.level })))
+    .map(a => ({ termId: a.term_id, level: a.level, levelAssumed: !!a.level_assumed, detail: a.detail }))
+  const effects = (await all<{ term_id: string, detail: string | null }>('SELECT e.term_id, e.detail FROM core_production_effects e JOIN core_terms t ON t.id = e.term_id WHERE e.production_id = ? ORDER BY t.sort', id))
+    .map(e => ({ termId: e.term_id, detail: e.detail }))
+  return { ...production, advisories, effects }
 }
 
 export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next', order?: 'asc' | 'desc' }
@@ -252,12 +274,13 @@ export async function createProduction(unit: UnitView, input: ProductionInput, a
   const slug = input.slug ?? await freeSlug(slugFrom(input.title, 'production'), s => productionSlugTaken(s))
   if (input.slug && await productionSlugTaken(input.slug)) refuse('core.production.slug-taken', 'A production has, or once had, that web address.', { status: 409, fields: { slug: 'Choose a different web address.' } })
   if (input.seasonId && !await first('SELECT 1 FROM core_seasons WHERE id = ?', input.seasonId)) refuse(SEASON_REFUSED.code, SEASON_REFUSED.reason, { status: 422 })
+  refuseRestrictionWithoutAge(input.ageRestricted, input.ageMin ?? null)
   const creditsPublic = input.creditsPublic ?? await useSetting('core.programme.credits-public') as boolean
   const at = nowMs()
-  unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_guidance,
-      advisories_confirmed_none, content_note, running_minutes, interval_count, external_booking_url, credits_public, state, listed, created_by, created_at)
+  unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_min, age_restricted,
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, external_booking_url, credits_public, state, listed, created_by, created_at)
     SELECT ${id}, ${slug}, ${input.title}, ${input.subtitle ?? null}, ${input.summary ?? null}, ${input.description ?? null}, ${input.kind}, ${input.categoryTermId ?? null},
-      ${input.seasonId ?? null}, ${input.companyName ?? null}, ${input.ageGuidance ?? null}, ${input.advisoriesConfirmedNone ? 1 : 0}, ${input.contentNote ?? null},
+      ${input.seasonId ?? null}, ${input.companyName ?? null}, ${input.ageMin ?? null}, ${input.ageRestricted ? 1 : 0}, ${input.effectsConfirmedNone ? 1 : 0}, ${input.advisoriesConfirmedNone ? 1 : 0}, ${input.contentNote ?? null},
       ${input.runningMinutes ?? null}, ${input.intervalCount ?? 0}, ${input.externalBookingUrl ?? null}, ${creditsPublic ? 1 : 0}, 'draft', ${input.listed === false ? 0 : 1}, ${actorId}, ${at}
     WHERE ${input.categoryTermId ? assertTerm(input.categoryTermId, 'core.production-category') : sql`1`}`).expect(1, CATEGORY_REFUSED)
   unit.audit({ action: 'create', record: ['core.production', id] })
@@ -278,13 +301,16 @@ export async function updateProduction(unit: UnitView, id: string, input: Partia
   if (slugChanged && await productionSlugTaken(input.slug!, id)) refuse('core.production.slug-taken', 'A production has, or once had, that web address.', { status: 409, fields: { slug: 'Choose a different web address.' } })
   if (input.seasonId && input.seasonId !== row.season_id && !await first('SELECT 1 FROM core_seasons WHERE id = ?', input.seasonId)) refuse(SEASON_REFUSED.code, SEASON_REFUSED.reason, { status: 422 })
 
+  refuseRestrictionWithoutAge(input.ageRestricted ?? !!row.age_restricted, input.ageMin === undefined ? row.age_min : input.ageMin)
   const sets = changed.map(([key, column]) => sql`${sql.raw(column)} = ${value(input[key])}`)
   if (slugChanged) sets.push(sql`slug = ${input.slug!}`)
   // A published production keeps what publishing needed.
   if (row.state === 'published' && (input.summary === null || input.categoryTermId === null))
     refuse('core.production.needed-to-publish', 'A published production needs a summary and a category.', { status: 422, remedy: 'Withdraw it first to remove them.' })
   if (row.state === 'published' && input.advisoriesConfirmedNone === false && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id))
-    refuse('core.production.advisories-needed', 'A published production lists its advisories or confirms it has none.', { status: 422 })
+    refuse('core.production.advisories-needed', 'A published production lists its content warnings or confirms it has none.', { status: 422 })
+  if (row.state === 'published' && input.effectsConfirmedNone === false && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id))
+    refuse('core.production.effects-needed', 'A published production lists its staging effects or confirms it has none.', { status: 422 })
   const categoryGuard = input.categoryTermId && input.categoryTermId !== row.category_term_id ? assertTerm(input.categoryTermId, 'core.production-category') : sql`1`
   if (slugChanged && row.published_at !== null)
     unit.add(sql`INSERT INTO core_production_slugs (slug, production_id, retired_at) VALUES (${row.slug}, ${id}, ${nowMs()})`)
@@ -295,25 +321,53 @@ export async function updateProduction(unit: UnitView, id: string, input: Partia
   return fields
 }
 
+const LEVELS_OK = new Set(['mentioned', 'discussed', 'depicted'])
+
 /**
- * Replaces a production's advisories with the list given, in order. Listing any clears "confirmed
- * as none"; an empty list leaves the confirmation as it is, so silence is never taken for none.
+ * Replaces a production's content warnings with the list given. Every one needs a level. Listing
+ * any clears "confirmed as none"; an empty list leaves the confirmation as it is, so silence is
+ * never taken for none. Their order is derived, so the list's own order means nothing.
  */
 export async function setAdvisories(unit: UnitView, id: string, advisories: Advisory[]): Promise<void> {
   const row = await productionRow(id)
-  if (new Set(advisories.map(a => a.termId)).size !== advisories.length) refuse('core.production.advisory-repeated', 'Each advisory can be listed once.', { status: 422 })
-  // A published production keeps an answer: it cannot be left with neither advisories nor "none".
+  if (new Set(advisories.map(a => a.termId)).size !== advisories.length) refuse('core.production.advisory-repeated', 'Each content warning can be listed once.', { status: 422 })
+  if (advisories.some(a => !LEVELS_OK.has(a.level))) refuse('core.production.advisory-level-needed', 'Every content warning needs a level: mentioned, discussed or depicted.', { status: 422 })
+  // A published production keeps an answer: it cannot be left with neither warnings nor "none".
   if (row.state === 'published' && !advisories.length && !row.advisories_confirmed_none)
-    refuse('core.production.advisories-needed', 'A published production lists its advisories or confirms it has none.', { status: 422 })
+    refuse('core.production.advisories-needed', 'A published production lists its content warnings or confirms it has none.', { status: 422 })
+  const before = new Map((await all<{ term_id: string, level: WarningLevel }>('SELECT term_id, level FROM core_production_advisories WHERE production_id = ?', id)).map(r => [r.term_id, r.level]))
   unit.add(sql`DELETE FROM core_production_advisories WHERE production_id = ${id}`)
-  advisories.forEach((a, sort) => {
-    unit.add(sql`INSERT INTO core_production_advisories (production_id, term_id, detail, sort)
-      SELECT ${id}, ${a.termId}, ${a.detail}, ${sort} WHERE ${assertTerm(a.termId, 'core.advisory')}`)
-      .expect(1, { code: 'core.production.advisory-unknown', reason: 'Choose advisories from the list.' })
-  })
+  for (const a of advisories) {
+    unit.add(sql`INSERT INTO core_production_advisories (production_id, term_id, level, level_assumed, detail)
+      SELECT ${id}, ${a.termId}, ${a.level}, 0, ${a.detail} WHERE ${assertTerm(a.termId, 'core.advisory')}`)
+      .expect(1, { code: 'core.production.advisory-unknown', reason: 'Choose content warnings from the list.' })
+  }
   if (advisories.length && row.advisories_confirmed_none) unit.add(sql`UPDATE core_productions SET advisories_confirmed_none = 0 WHERE id = ${id}`)
   unit.audit({ action: 'update', record: ['core.production', id], detail: { advisories: advisories.length } })
-  if (row.state === 'published') unit.announce('core.production.updated', { productionId: id, fields: ['advisories'] }, { record: ['core.production', id] })
+  // What the change added (a term, or a graver level), by id and level, never a person: a module holding bookings decides who is told.
+  const added = advisories.filter(a => !before.has(a.termId) || (LEVEL_RANK[a.level]! > LEVEL_RANK[before.get(a.termId)!]!)).map(a => ({ termId: a.termId, level: a.level }))
+  if (row.state === 'published') unit.announce('core.production.updated', { productionId: id, fields: ['advisories'], ...(added.length ? { guidanceAdded: { effectTermIds: [], warnings: added } } : {}) }, { record: ['core.production', id] })
+}
+
+const LEVEL_RANK: Record<string, number> = { mentioned: 0, discussed: 1, depicted: 2 }
+
+/** Replaces a production's staging effects. Same answer rules as content warnings, with no level. */
+export async function setEffects(unit: UnitView, id: string, effects: Effect[]): Promise<void> {
+  const row = await productionRow(id)
+  if (new Set(effects.map(e => e.termId)).size !== effects.length) refuse('core.production.effect-repeated', 'Each staging effect can be listed once.', { status: 422 })
+  if (row.state === 'published' && !effects.length && !row.effects_confirmed_none)
+    refuse('core.production.effects-needed', 'A published production lists its staging effects or confirms it has none.', { status: 422 })
+  const before = new Set((await all<{ term_id: string }>('SELECT term_id FROM core_production_effects WHERE production_id = ?', id)).map(r => r.term_id))
+  unit.add(sql`DELETE FROM core_production_effects WHERE production_id = ${id}`)
+  for (const e of effects) {
+    unit.add(sql`INSERT INTO core_production_effects (production_id, term_id, detail)
+      SELECT ${id}, ${e.termId}, ${e.detail} WHERE ${assertTerm(e.termId, 'core.staging-effect')}`)
+      .expect(1, { code: 'core.production.effect-unknown', reason: 'Choose staging effects from the list.' })
+  }
+  if (effects.length && row.effects_confirmed_none) unit.add(sql`UPDATE core_productions SET effects_confirmed_none = 0 WHERE id = ${id}`)
+  unit.audit({ action: 'update', record: ['core.production', id], detail: { effects: effects.length } })
+  const added = effects.filter(e => !before.has(e.termId)).map(e => e.termId)
+  if (row.state === 'published') unit.announce('core.production.updated', { productionId: id, fields: ['effects'], ...(added.length ? { guidanceAdded: { effectTermIds: added, warnings: [] } } : {}) }, { record: ['core.production', id] })
 }
 
 /** What publishing still needs, in the words the person sees. Empty when it can be published. */
@@ -322,7 +376,8 @@ export async function publishingNeeds(id: string): Promise<string[]> {
   const needs: string[] = []
   if (!row.summary) needs.push('a summary')
   if (!row.category_term_id) needs.push('a category')
-  if (!row.advisories_confirmed_none && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id)) needs.push('its advisories, or confirmation that it has none')
+  if (!row.effects_confirmed_none && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id)) needs.push('its staging effects, or confirmation that it has none')
+  if (!row.advisories_confirmed_none && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id)) needs.push('its content warnings, or confirmation that it has none')
   return needs
 }
 
@@ -335,6 +390,7 @@ export async function publishProduction(unit: UnitView, id: string): Promise<voi
   if (needs.length) refuse('core.production.not-ready', `To publish, the production needs ${needs.join(', ')}.`, { status: 422 })
   unit.add(sql`UPDATE core_productions SET state = 'published', published_at = coalesce(published_at, ${nowMs()})
     WHERE id = ${id} AND state = ${row.state} AND summary IS NOT NULL AND category_term_id IS NOT NULL
+      AND (effects_confirmed_none = 1 OR EXISTS (SELECT 1 FROM core_production_effects WHERE production_id = ${id}))
       AND (advisories_confirmed_none = 1 OR EXISTS (SELECT 1 FROM core_production_advisories WHERE production_id = ${id}))`)
     .expect(1, { code: 'core.production.changed', reason: 'Someone else changed this production just now.', remedy: 'Refresh and try again.' })
   unit.audit({ action: 'state', record: ['core.production', id], detail: { from: row.state, to: 'published' } })
