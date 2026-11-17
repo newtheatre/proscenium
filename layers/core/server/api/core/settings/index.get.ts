@@ -83,6 +83,7 @@ export default defineRoute({
       min: entry.kind === 'rate' ? RATE_COUNT.min : entry.min,
       max: entry.kind === 'rate' ? RATE_COUNT.max : entry.max,
       maxLength: entry.maxLength,
+      multiline: entry.multiline === true,
       /** A choice's values; where they come from a catalogue the screen labels them itself. */
       options: entry.kind === 'choice' || entry.of === 'choice' ? optionsOf(entry) : undefined,
       catalogue: entry.catalogue ?? null,

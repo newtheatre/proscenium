@@ -424,13 +424,16 @@ test.describe('confirming it is you', () => {
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(sender) })
     const page = await context.newPage()
     await visit(page, '/admin/email')
-    const section = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Email and notices' }) })
+    const section = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Email settings' }) })
     await expect(section.getByRole('textbox', { name: 'Sending domain' })).toBeVisible()
     await expect(section.getByRole('textbox', { name: 'Sending label' })).toBeVisible()
     // The verified domain is the status at the top, so it is not drawn again.
     await expect(page.getByText('Verified sending domain')).toHaveCount(0)
-    await section.getByRole('textbox', { name: 'Email footer' }).fill(`Registered charity ${Date.now()}`)
-    await section.getByRole('button', { name: 'Save Email and notices settings' }).click()
+    const footer = `Registered charity ${Date.now()}`
+    await section.getByRole('textbox', { name: 'Email footer' }).fill(footer)
+    // The preview beneath the field shows the footer as the email will, before it is saved.
+    await expect(section.getByRole('figure').getByText(footer)).toBeVisible()
+    await section.getByRole('button', { name: 'Save Email settings' }).click()
     await expect(section.getByRole('button', { name: /^Changed by .*Email footer/ })).toBeVisible()
     await expect(section.getByRole('button', { name: 'Reset Email footer to its default' })).toBeVisible()
     await noViolations(page)
