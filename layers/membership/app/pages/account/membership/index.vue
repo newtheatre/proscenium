@@ -3,7 +3,7 @@
      step, as is one that checks a list (a student ID, or a verified address); other schemes say how to
      join until applications are built. -->
 <script setup lang="ts">
-interface Mine { applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Mine { applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string }[], asksFor: string | null }
 
 const { t } = useT()
@@ -48,6 +48,32 @@ async function endMine(m: Mine['memberships'][number]) {
     toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })
   }
 }
+// Renewing: the same scheme's lengths and, where it checks a reference again, the reference.
+const renewing = ref<Mine['memberships'][number] | null>(null)
+const renewChoice = reactive({ lengthOptionId: undefined as string | undefined, reference: '' })
+const renewScheme = computed(() => (offered.data.value?.schemes ?? []).find(s => s.id === renewing.value?.schemeId))
+const renewRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+function openRenew(m: Mine['memberships'][number]) {
+  renewing.value = m
+  Object.assign(renewChoice, { lengthOptionId: undefined, reference: '' })
+  renewRefusal.value = null
+}
+async function renew() {
+  renewRefusal.value = null
+  try {
+    const done = await $api<{ pending: boolean }>(`/api/membership/mine/${renewing.value!.id}/renew` as string, {
+      method: 'POST',
+      headers: { 'idempotency-key': crypto.randomUUID() },
+      body: { lengthOptionId: renewChoice.lengthOptionId ?? null, reference: renewChoice.reference.trim() || undefined },
+    })
+    toast.add({ title: t(done.pending ? 'membership.screens.mine.renew-pending' : 'membership.screens.mine.renewed', { scheme: renewing.value!.schemeName }), color: 'success' })
+    renewing.value = null
+    await mine.refresh()
+  }
+  catch (e) {
+    renewRefusal.value = toRefusal(e)
+  }
+}
 async function withdraw(a: Mine['applications'][number]) {
   if (!(await confirm({ verb: t('membership.screens.mine.verb-withdraw'), thing: a.schemeName, consequence: t('membership.screens.mine.confirm-withdraw'), button: t('membership.screens.mine.withdraw') }))) return
   try {
@@ -85,13 +111,19 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="m in mine.data.value.memberships"
               :key="m.id"
               :name="m.schemeName"
-              :description="m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end')"
+              :description="[m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end'), m.renewed ? t('membership.screens.mine.already-renewed') : m.renewal && !m.renewal.open && m.status !== 'lapsed' ? t('membership.screens.mine.renewal-opens', { date: day(m.renewal.opensOn) }) : ''].filter(Boolean).join(' · ')"
               :muted="m.status === 'lapsed'"
             >
               <div class="flex items-center gap-2">
                 <StatusBadge
                   :tone="TONE[m.status]"
                   :label="t(`membership.screens.derived.${m.status}`)"
+                />
+                <UButton
+                  v-if="m.renewal?.open"
+                  size="sm"
+                  :label="t('membership.screens.mine.renew')"
+                  @click="openRenew(m)"
                 />
                 <UButton
                   v-if="m.mayEnd && m.status !== 'lapsed'"
@@ -179,5 +211,51 @@ async function withdraw(a: Mine['applications'][number]) {
         </PageSection>
       </div>
     </DataBoundary>
+    <UModal
+      :open="!!renewing"
+      :title="renewing ? t('membership.screens.mine.renew-title', { scheme: renewing.schemeName }) : ''"
+      @update:open="v => { if (!v) renewing = null }"
+    >
+      <template #body>
+        <UForm
+          id="membership-renew"
+          :state="renewChoice"
+          class="space-y-4"
+          @submit="renew"
+        >
+          <RefusalNotice :refusal="renewRefusal" />
+          <UFormField
+            v-if="(renewScheme?.options.length ?? 0) > 1"
+            :label="t('membership.screens.mine.choose-length')"
+          >
+            <USelect
+              v-model="renewChoice.lengthOptionId"
+              :items="renewScheme!.options.map(o => ({ value: o.id, label: o.name }))"
+            />
+          </UFormField>
+          <UFormField
+            v-if="renewScheme?.asksFor"
+            :label="renewScheme.asksFor"
+          >
+            <UInput
+              v-model="renewChoice.reference"
+              autocomplete="off"
+              maxlength="254"
+            />
+          </UFormField>
+          <p class="text-sm text-muted">
+            {{ t('membership.screens.mine.renew-help') }}
+          </p>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-renew"
+          loading-auto
+          :label="t('membership.screens.mine.renew')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

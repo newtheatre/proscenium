@@ -29,6 +29,7 @@ import applicationsGet from '../../server/api/membership/applications/index.get'
 import decidePost from '../../server/api/membership/applications/[id]/decide.post'
 import withdrawPost from '../../server/api/membership/mine/[id]/withdraw.post'
 import mineEnd from '../../server/api/membership/mine/[id]/end.post'
+import mineRenew from '../../server/api/membership/mine/[id]/renew.post'
 import membersGet from '../../server/api/membership/members.get'
 import membershipGet from '../../server/api/membership/memberships/[id].get'
 import membershipEnd from '../../server/api/membership/memberships/[id]/end.post'
@@ -60,6 +61,7 @@ export const handle = server({
   'POST /api/membership/applications/:id/decide': decidePost,
   'POST /api/membership/mine/:id/withdraw': withdrawPost,
   'POST /api/membership/mine/:id/end': mineEnd,
+  'POST /api/membership/mine/:id/renew': mineRenew,
   'GET /api/membership/members': membersGet,
   'GET /api/membership/memberships/:id': membershipGet,
   'POST /api/membership/memberships/:id/end': membershipEnd,
