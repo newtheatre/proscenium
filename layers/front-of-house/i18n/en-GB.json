@@ -6,6 +6,7 @@
 
   "front-of-house.settings-sections.shifts": "Shifts",
   "front-of-house.settings-sections.reminders": "Reminders",
+  "front-of-house.settings-sections.checklists": "Checklists",
 
   "front-of-house.settings.shifts.window-before.label": "Shifts start to count before the call time",
   "front-of-house.settings.shifts.window-before.help": "How long before their call time people on a shift can use what the shift lets them do, such as scanning tickets. Changing this does not move shifts that already exist.",
@@ -25,6 +26,11 @@
   "front-of-house.settings.reminders.second.label": "Second reminder before the call time",
   "front-of-house.settings.reminders.second.help": "When the second reminder of a shift is sent. Set it to 0 to send no second reminder. Someone who signs up late gets only one reminder.",
 
+  "front-of-house.settings.shifts.late-after.label": "Flag someone as not arrived after the call time",
+  "front-of-house.settings.shifts.late-after.help": "How long after their call time someone who has not checked in is flagged on the board, as a prompt to whoever is leading the night.",
+  "front-of-house.settings.checklists.block-house-open.label": "Keep the house closed until checklists are done",
+  "front-of-house.settings.checklists.block-house-open.help": "When on, house open cannot be recorded while a checklist for before the show is unfinished. When off, the board warns instead.",
+
   "front-of-house.facts.on-shift.label": "On shift for the performance",
   "front-of-house.facts.leading-shift.label": "Leading the shift for the performance",
   "front-of-house.facts.rostered.label": "Has a shift coming up",
@@ -32,6 +38,10 @@
   "front-of-house.abilities.shift.sign-up.label": "Sign up for shifts",
   "front-of-house.abilities.shift.view.label": "See the rota for a performance",
   "front-of-house.abilities.shift.manage.label": "Manage the rota",
+  "front-of-house.abilities.assignment.check-in.label": "Lead the night: mark people arrived, record timings and extend tonight",
+  "front-of-house.abilities.checklist.complete.label": "Work through checklists on the night",
+  "front-of-house.abilities.checklist.manage.label": "Manage checklists and emergency cards",
+  "front-of-house.abilities.emergency-card.view.label": "Open the emergency card",
   "front-of-house.abilities.duty.manage.label": "Manage duties",
   "front-of-house.abilities.settings.manage.label": "Change front of house settings"
 }

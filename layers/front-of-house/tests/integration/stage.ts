@@ -39,6 +39,21 @@ import keepPost from '../../server/api/front-of-house/assignments/[id]/keep.post
 import coverPost from '../../server/api/front-of-house/assignments/[id]/cover.post'
 import openShiftsGet from '../../server/api/front-of-house/open-shifts.get'
 import myShiftsGet from '../../server/api/front-of-house/me/shifts.get'
+import checkInPost from '../../server/api/front-of-house/assignments/[id]/check-in.post'
+import timingsPost from '../../server/api/front-of-house/performances/[id]/timings.post'
+import extendPost from '../../server/api/front-of-house/performances/[id]/extend.post'
+import tonightGet from '../../server/api/front-of-house/performances/[id]/tonight.get'
+import runGet from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/index.get'
+import runOpen from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/open.post'
+import itemPut from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/items/[itemId].put'
+import runComplete from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/complete.post'
+import runReopen from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/reopen.post'
+import checklistsGet from '../../server/api/front-of-house/checklists/index.get'
+import checklistsPost from '../../server/api/front-of-house/checklists/index.post'
+import checklistPut from '../../server/api/front-of-house/checklists/[id]/index.put'
+import checklistArchive from '../../server/api/front-of-house/checklists/[id]/archive.post'
+import cardsGet from '../../server/api/front-of-house/emergency-cards/index.get'
+import cardPut from '../../server/api/front-of-house/emergency-cards/[venueId].put'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -78,11 +93,26 @@ export const handle = server({
   'POST /api/front-of-house/assignments/:id/cover': coverPost,
   'GET /api/front-of-house/open-shifts': openShiftsGet,
   'GET /api/front-of-house/me/shifts': myShiftsGet,
+  'POST /api/front-of-house/assignments/:id/check-in': checkInPost,
+  'POST /api/front-of-house/performances/:id/timings': timingsPost,
+  'POST /api/front-of-house/performances/:id/extend': extendPost,
+  'GET /api/front-of-house/performances/:id/tonight': tonightGet,
+  'GET /api/front-of-house/performances/:id/checklists/:checklistId': runGet,
+  'POST /api/front-of-house/performances/:id/checklists/:checklistId/open': runOpen,
+  'PUT /api/front-of-house/performances/:id/checklists/:checklistId/items/:itemId': itemPut,
+  'POST /api/front-of-house/performances/:id/checklists/:checklistId/complete': runComplete,
+  'POST /api/front-of-house/performances/:id/checklists/:checklistId/reopen': runReopen,
+  'GET /api/front-of-house/checklists': checklistsGet,
+  'POST /api/front-of-house/checklists': checklistsPost,
+  'PUT /api/front-of-house/checklists/:id': checklistPut,
+  'POST /api/front-of-house/checklists/:id/archive': checklistArchive,
+  'GET /api/front-of-house/emergency-cards': cardsGet,
+  'PUT /api/front-of-house/emergency-cards/:venueId': cardPut,
 })
 
 export type Person = ReturnType<typeof person>
 
-export const manager = person(['core.production.create', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'front-of-house.duty.manage', 'front-of-house.shift.manage'])
+export const manager = person(['core.production.create', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'front-of-house.duty.manage', 'front-of-house.shift.manage', 'front-of-house.checklist.manage'])
 export const volunteer = (): Person => person(['front-of-house.shift.sign-up'])
 
 export const NOV_16 = Date.UTC(2026, 10, 16, 12)
@@ -91,7 +121,7 @@ let keys = 0
 let dutyCount = 0
 
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: Person = manager): Promise<{ status: number, body: T }> {
-  const headers = method === 'POST' ? { 'idempotency-key': `foh${++keys}-${newId('req')}` } : undefined
+  const headers = method !== 'GET' ? { 'idempotency-key': `foh${++keys}-${newId('req')}` } : undefined
   const response = await call(handle, method, path, { actor, body, headers })
   return { status: response.status, body: await response.json() as T }
 }

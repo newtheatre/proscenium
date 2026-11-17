@@ -150,4 +150,145 @@ export const assignments = defineTable('front_of_house_assignments', {
   ],
 })
 
-export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments }
+export const TIMING_KINDS = ['house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear'] as const
+
+/** A recorded moment of the night: house open, curtain up and the rest. One of each per performance. */
+export const timings = defineTable('front_of_house_timings', {
+  id: col.id(),
+  performanceId: col.internal(text('performance_id').notNull()),
+  kind: col.internal(text('kind', { enum: TIMING_KINDS }).notNull()),
+  at: col.timestamp('at').notNull(),
+  recordedBy: col.account('recorded_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'tmg',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_timings_kind').on(t.performanceId, t.kind),
+    check('front_of_house_timings_kind_check', sql`${t.kind} IN (${list(TIMING_KINDS)})`),
+  ],
+})
+
+/** A checklist for a moment of the night: before the house opens, after it clears. */
+export const checklists = defineTable('front_of_house_checklists', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  moment: col.internal(text('moment', { enum: ['pre-show', 'post-show', 'other'] }).notNull()),
+  // Null applies everywhere.
+  venueId: col.internal(text('venue_id')),
+  // Whose list it usually is: a hint for the board, not a restriction.
+  dutyId: col.ref('front_of_house_duties', { nullable: true }),
+  sortOrder: col.internal(integer('sort_order').notNull().default(0)),
+  archivedAt: col.timestamp('archived_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ckl',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    check('front_of_house_checklists_name', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('front_of_house_checklists_moment', sql`${t.moment} IN ('pre-show', 'post-show', 'other')`),
+  ],
+})
+
+/** One item of a checklist. Archived, never deleted, once a run has used it. */
+export const checklistItems = defineTable('front_of_house_checklist_items', {
+  id: col.id(),
+  checklistId: col.ref('front_of_house_checklists'),
+  label: col.internal(text('label').notNull()),
+  help: col.internal(text('help')),
+  kind: col.internal(text('kind', { enum: ['tick', 'reading'] }).notNull().default('tick')),
+  unit: col.internal(text('unit')),
+  required: col.internal(integer('required', { mode: 'boolean' }).notNull().default(true)),
+  sortOrder: col.internal(integer('sort_order').notNull().default(0)),
+  archivedAt: col.timestamp('archived_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'cki',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('front_of_house_checklist_items_list').on(t.checklistId, t.sortOrder),
+    check('front_of_house_checklist_items_label', sql`length(${t.label}) BETWEEN 1 AND 160`),
+    check('front_of_house_checklist_items_help', sql`${t.help} IS NULL OR length(${t.help}) <= 500`),
+    check('front_of_house_checklist_items_kind', sql`${t.kind} IN ('tick', 'reading')`),
+    check('front_of_house_checklist_items_unit', sql`${t.unit} IS NULL OR (${t.kind} = 'reading' AND length(${t.unit}) <= 20)`),
+  ],
+})
+
+/** One use of a checklist on one night. */
+export const checklistRuns = defineTable('front_of_house_checklist_runs', {
+  id: col.id(),
+  checklistId: col.ref('front_of_house_checklists'),
+  performanceId: col.internal(text('performance_id')),
+  venueId: col.internal(text('venue_id')),
+  localDate: col.localDate('local_date').notNull(),
+  state: col.internal(text('state', { enum: ['open', 'complete', 'complete_with_exceptions'] }).notNull().default('open')),
+  completedBy: col.account('completed_by', { role: 'actor', nullable: true }),
+  completedAt: col.timestamp('completed_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ckr',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_checklist_runs_performance').on(t.checklistId, t.performanceId).where(sql`performance_id IS NOT NULL`),
+    uniqueIndex('front_of_house_checklist_runs_day').on(t.checklistId, sql`coalesce(${t.venueId}, '')`, t.localDate).where(sql`performance_id IS NULL`),
+    check('front_of_house_checklist_runs_state', sql`${t.state} IN ('open', 'complete', 'complete_with_exceptions')`),
+  ],
+})
+
+/** The outcome of one item in one run. The label is copied, so a later rewording leaves the record alone. */
+export const checklistEntries = defineTable('front_of_house_checklist_entries', {
+  id: col.id(),
+  runId: col.ref('front_of_house_checklist_runs'),
+  itemId: col.ref('front_of_house_checklist_items'),
+  label: col.internal(text('label').notNull()),
+  outcome: col.internal(text('outcome', { enum: ['done', 'exception', 'not_applicable'] }).notNull()),
+  reading: col.internal(integer('reading')),
+  reasonCode: col.ref('core_terms', { nullable: true }),
+  // About the thing, not a person: anything about a person belongs in an incident.
+  reasonNote: col.internal(text('reason_note')),
+  doneBy: col.account('done_by', { role: 'actor' }),
+  // The device's time when the entry was queued offline.
+  doneAt: col.timestamp('done_at').notNull(),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'cke',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_checklist_entries_item').on(t.runId, t.itemId),
+    check('front_of_house_checklist_entries_outcome', sql`${t.outcome} IN ('done', 'exception', 'not_applicable')`),
+    check('front_of_house_checklist_entries_reason', sql`${t.outcome} <> 'exception' OR ${t.reasonCode} IS NOT NULL`),
+    check('front_of_house_checklist_entries_note', sql`${t.reasonNote} IS NULL OR length(${t.reasonNote}) <= 200`),
+  ],
+})
+
+/** A venue's evacuation and emergency instructions, kept on the device. */
+export const emergencyCards = defineTable('front_of_house_emergency_cards', {
+  id: col.id(),
+  venueId: col.internal(text('venue_id').notNull()),
+  // Markdown: routes, assembly point, who to call. Role titles and switchboard numbers, not private numbers.
+  body: col.internal(text('body').notNull()),
+  reviewedOn: col.localDate('reviewed_on').notNull(),
+  reviewedBy: col.account('reviewed_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'emg',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_emergency_cards_venue').on(t.venueId),
+    check('front_of_house_emergency_cards_body', sql`length(${t.body}) BETWEEN 1 AND 8000`),
+  ],
+})
+
+export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards }

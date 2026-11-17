@@ -3,7 +3,7 @@
 // module's services: figures from Box office and Payments arrive through its own points. This file
 // grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'front-of-house.settings.manage'
@@ -27,18 +27,28 @@ export default defineModule({
     // 0 turns a reminder off.
     'reminders.first': setting.duration({ default: '48h', min: '0m', max: '14d', change, audience: 'staff' }),
     'reminders.second': setting.duration({ default: '3h', min: '0m', max: '48h', change, audience: 'staff' }),
+    // After the call time, when the board flags someone as not arrived.
+    'shifts.late-after': setting.duration({ default: '30m', min: '5m', max: '2h', change, audience: 'staff' }),
+    // Off by default: the board warns instead.
+    'checklists.block-house-open': setting.boolean({ default: false, change, audience: 'staff' }),
   }),
 
   records: defineRecords('front-of-house', {
-    shift: { table: 'front_of_house_shifts', parent: 'core.performance' },
-    assignment: { table: 'front_of_house_assignments', parent: 'front-of-house.shift', owner: 'account_id' },
+    'shift': { table: 'front_of_house_shifts', parent: 'core.performance' },
+    'assignment': { table: 'front_of_house_assignments', parent: 'front-of-house.shift', owner: 'account_id' },
+    'checklist-run': { table: 'front_of_house_checklist_runs', parent: 'core.performance' },
   }),
 
   abilities: defineAbilities('front-of-house', {
     'shift.sign-up': ability(),
     'shift.view': ability({ on: 'core.performance' }),
-    'shift.manage': ability({ on: 'core.performance', implies: ['shift.view'] }),
+    'shift.manage': ability({ on: 'core.performance', implies: ['shift.view', 'assignment.check-in'] }),
+    // Mark others arrived, record timings, extend tonight.
+    'assignment.check-in': ability({ on: 'core.performance', implies: ['shift.view'] }),
+    'checklist.complete': ability({ on: 'core.performance' }),
+    'checklist.manage': ability(),
     'duty.manage': ability(),
+    'emergency-card.view': ability(),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -59,6 +69,7 @@ export default defineModule({
       'front-of-house.assignment.confirmed': event({ version: 1, payload: assignment, internal: true }),
       // Released, withdrawn, declined or removed; the state is on the record.
       'front-of-house.assignment.released': event({ version: 1, payload: assignment, internal: true }),
+      'front-of-house.checklist-run.completed': event({ version: 1, payload: z.object({ runId: z.string(), checklistId: z.string(), performanceId: z.string() }), internal: false }),
     },
     listens: {
       'core.performance.rescheduled': 'move-shifts',
@@ -72,8 +83,29 @@ export default defineModule({
     'front-of-house.remind-shifts': task({ every: '15m' }),
   },
 
+  // Other modules' parts of the board and the night report. Front of house calls none of them.
+  points: {
+    'front-of-house.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
+    'front-of-house.report-section': point({ kind: 'code', contract: 'report-section' }),
+  },
+
   contributes: {
-    'core.record-resolver': [{ id: 'front-of-house.shift', file: 'shift' }, { id: 'front-of-house.assignment', file: 'assignment' }],
+    'core.record-resolver': [
+      { id: 'front-of-house.shift', file: 'shift' },
+      { id: 'front-of-house.assignment', file: 'assignment' },
+      { id: 'front-of-house.checklist-run', file: 'checklist-run' },
+    ],
+    'core.vocabulary': [{
+      id: 'front-of-house.exception-reason',
+      label: 'Reasons a checklist item could not be done',
+      terms: [
+        { slug: 'broken', label: 'Broken' },
+        { slug: 'missing', label: 'Missing' },
+        { slug: 'not-safe', label: 'Not safe' },
+        { slug: 'no-time', label: 'No time' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }],
     'core.notification-topic': [{ id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 }],
     // Messages to people on the rota about their own shifts, so none can be switched off.
     'core.notification-type': [{
