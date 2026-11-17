@@ -1,9 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "374aff49-9a75-401d-ad06-1f2e360761f7",
+  "id": "fb6ed0e5-3e6b-4b4b-b546-d6e8fa0bb8b5",
   "prevIds": [
-    "eee29aaf-c609-4b6d-9d4b-91fd9958b09a"
+    "c064beca-8ec3-47a7-8918-c4d448cfa716",
+    "efe53ead-5807-4117-a31b-5da52c95dbdf"
   ],
   "ddl": [
     {
@@ -103,6 +104,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_email_events_set_aside",
+      "entityType": "tables"
+    },
+    {
       "name": "core_email_suppressions",
       "entityType": "tables"
     },
@@ -195,6 +200,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_performance_runs",
+      "entityType": "tables"
+    },
+    {
       "name": "core_performances",
       "entityType": "tables"
     },
@@ -204,6 +213,10 @@
     },
     {
       "name": "core_production_advisories",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_production_credits",
       "entityType": "tables"
     },
     {
@@ -2246,6 +2259,16 @@
     },
     {
       "table": "core_account_merges",
+      "name": "undo_started_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_account_merges",
       "name": "undone_at",
       "type": "integer",
       "notNull": false,
@@ -2258,6 +2281,16 @@
       "table": "core_account_merges",
       "name": "undone_by",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_account_merges",
+      "name": "closed_at",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -3109,6 +3142,46 @@
       "name": "closed_by",
       "type": "text",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "queue_message_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "event_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "reason",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "set_aside_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -5025,6 +5098,156 @@
       "entityType": "columns"
     },
     {
+      "table": "core_performance_runs",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "space_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "scheduled",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "capacity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "interval_count",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "items",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "total",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "done",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'running'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "stop_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_performances",
       "name": "id",
       "type": "text",
@@ -5196,6 +5419,16 @@
     },
     {
       "table": "core_performances",
+      "name": "run_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -5296,6 +5529,86 @@
     },
     {
       "table": "core_production_advisories",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "credited_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "role",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "section_term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "visibility",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'public'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
       "name": "sort",
       "type": "integer",
       "notNull": true,
@@ -6326,6 +6639,26 @@
     },
     {
       "table": "core_spaces",
+      "name": "managed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "finding_it",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
       "name": "state",
       "type": "text",
       "notNull": true,
@@ -6551,16 +6884,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_venues",
-      "name": "managed",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
       "generated": null,
       "entityType": "columns"
     },
@@ -8789,6 +9112,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_accounts",
+      "name": "core_accounts_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_audit",
       "name": "core_audit_record",
       "columns": [
@@ -8910,6 +9247,20 @@
         },
         {
           "value": "not_before",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_at",
+      "columns": [
+        {
+          "value": "set_aside_at",
           "isExpression": false
         }
       ],
@@ -9319,6 +9670,24 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_performance_runs",
+      "name": "core_performance_runs_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_performances",
       "name": "core_performances_starts",
       "columns": [
@@ -9401,6 +9770,24 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_performances",
+      "name": "core_performances_run",
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"core_performances\".\"run_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_place_access",
       "name": "core_place_access_term",
       "columns": [
@@ -9418,6 +9805,42 @@
         }
       ],
       "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_order",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "section_term_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -10748,6 +11171,21 @@
       "entityType": "fks"
     },
     {
+      "table": "core_performance_runs",
+      "name": "fk_core_performance_runs_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_performances",
       "name": "fk_core_performances_production_id_core_productions_id_fk",
       "columns": [
@@ -10789,6 +11227,21 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performances",
+      "name": "fk_core_performances_run_id_core_performance_runs_id_fk",
+      "columns": [
+        "run_id"
+      ],
+      "tableTo": "core_performance_runs",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -10876,6 +11329,36 @@
       "name": "fk_core_production_advisories_term_id_core_terms_id_fk",
       "columns": [
         "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_section_term_id_core_terms_id_fk",
+      "columns": [
+        "section_term_id"
       ],
       "tableTo": "core_terms",
       "columnsTo": [
@@ -11611,6 +12094,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_pk",
+      "columns": [
+        "queue_message_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "core_email_suppressions_pk",
       "columns": [
@@ -11755,6 +12247,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_performance_runs",
+      "name": "core_performance_runs_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_performances",
       "name": "core_performances_pk",
       "columns": [
@@ -11766,6 +12267,15 @@
     {
       "table": "core_place_access",
       "name": "core_place_access_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_pk",
       "columns": [
         "id"
       ],
@@ -12364,6 +12874,18 @@
       "entityType": "checks"
     },
     {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_type",
+      "value": "\"event_type\" IS NULL OR \"event_type\" IN ('delivered', 'deferred', 'bounced', 'failed', 'rejected', 'complained')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_reason",
+      "value": "\"reason\" IN ('unreadable', 'unmatched')",
+      "entityType": "checks"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "core_email_suppressions_reason",
       "value": "\"reason\" IN ('hard_bounce', 'complaint', 'manual')",
@@ -12448,6 +12970,24 @@
       "entityType": "checks"
     },
     {
+      "table": "core_performance_runs",
+      "name": "core_performance_runs_state",
+      "value": "\"state\" IN ('running', 'stopped', 'done', 'removing', 'removed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "core_performance_runs_done",
+      "value": "\"done\" BETWEEN 0 AND \"total\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "core_performance_runs_stop",
+      "value": "\"stop_reason\" IS NULL OR length(\"stop_reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
       "table": "core_performances",
       "name": "core_performances_state",
       "value": "\"state\" IN ('draft', 'scheduled', 'cancelled', 'completed')",
@@ -12517,6 +13057,24 @@
       "table": "core_production_advisories",
       "name": "core_production_advisories_detail",
       "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_visibility",
+      "value": "\"visibility\" IN ('public', 'members', 'hidden')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_name",
+      "value": "length(\"credited_name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_role",
+      "value": "length(\"role\") BETWEEN 1 AND 120",
       "entityType": "checks"
     },
     {
