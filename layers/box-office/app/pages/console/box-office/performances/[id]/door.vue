@@ -1,6 +1,6 @@
 <!-- The door list for one performance (BO-40): who is coming, found by name or booking reference,
      with how many of their tickets are used. Those still to arrive are the default view. Each row
-     opens the order. -->
+     opens the order. A buyer with no ticket to scan is admitted from their row, one or all. -->
 <script setup lang="ts">
 import { doorList } from '../../../../../../shared/lists'
 
@@ -19,6 +19,28 @@ const list = computed(() => ({
   columns: Object.fromEntries(Object.entries(doorList.columns).map(([key, c]) => [key, { ...c, label: t(`box-office.door.column.${key}`) }])),
   views: Object.fromEntries(Object.entries(doorList.views).map(([key, v]) => [key, { ...v, label: t(`box-office.door.view.${key}`) }])),
 }))
+const listRoute = computed(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/door`)
+const { $api } = useNuxtApp()
+const toast = useToast()
+const { toRefusal } = useRefusal()
+const admitting = ref<string | null>(null)
+
+async function admit(row: Row, count: number) {
+  admitting.value = row.id
+  try {
+    const { admitted } = await $api<{ admitted: number }>(`${listRoute.value}/admit`, { method: 'POST', body: { orderId: row.id, count } })
+    toast.add({ title: t('box-office.door.admitted-now', { count: admitted }), color: admitted ? 'success' : 'neutral' })
+    await refreshNuxtData(`core:list:${listRoute.value}`)
+  }
+  catch (error) {
+    const refusal = toRefusal(error)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+  finally {
+    admitting.value = null
+  }
+}
+
 const trail = computed(() => [
   { label: t('box-office.navigation.performances.label'), to: '/console/box-office/performances' },
   { label: t('box-office.door.set-up'), to: `/console/box-office/performances/${encodeURIComponent(id.value)}` },
@@ -29,7 +51,7 @@ const trail = computed(() => [
   <PageList
     :title="t('box-office.door.title')"
     :trail="trail"
-    :route="`/api/box-office/performances/${encodeURIComponent(id)}/door`"
+    :route="listRoute"
     :list="list"
     :row-label="(row: Row) => t('box-office.orders.row', { reference: row.reference })"
     :row-to="(row: Row) => `/console/box-office/orders/${encodeURIComponent(row.id)}`"
@@ -42,10 +64,31 @@ const trail = computed(() => [
       <span class="font-mono">{{ row.reference }}</span>
     </template>
     <template #cell-admitted="{ row }">
-      <StatusBadge
-        :tone="row.admitted === row.tickets ? 'success' : row.admitted ? 'warning' : 'neutral'"
-        :label="t('box-office.door.admitted', { admitted: row.admitted, tickets: row.tickets })"
-      />
+      <span class="inline-flex flex-wrap items-center gap-2">
+        <StatusBadge
+          :tone="row.admitted === row.tickets ? 'success' : row.admitted ? 'warning' : 'neutral'"
+          :label="t('box-office.door.admitted', { admitted: row.admitted, tickets: row.tickets })"
+        />
+        <template v-if="row.admitted < row.tickets">
+          <UButton
+            size="xs"
+            variant="outline"
+            :loading="admitting === row.id"
+            :label="t('box-office.door.admit-one')"
+            :aria-label="t('box-office.door.admit-one-of', { reference: row.reference })"
+            @click="admit(row, 1)"
+          />
+          <UButton
+            v-if="row.tickets - row.admitted > 1"
+            size="xs"
+            variant="outline"
+            :loading="admitting === row.id"
+            :label="t('box-office.door.admit-all', { count: row.tickets - row.admitted })"
+            :aria-label="t('box-office.door.admit-all-of', { count: row.tickets - row.admitted, reference: row.reference })"
+            @click="admit(row, row.tickets - row.admitted)"
+          />
+        </template>
+      </span>
     </template>
   </PageList>
 </template>

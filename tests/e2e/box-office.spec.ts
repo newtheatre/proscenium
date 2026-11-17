@@ -120,7 +120,7 @@ test('Sell finds a reservation by its reference and takes payment for it', async
 test.describe('the box office console', () => {
   test.use(as(office))
 
-  test('Orders, Performances, a set-up, its door list and Ticket types open with no accessibility violations', async ({ page }) => {
+  test('Orders, Performances, a set-up, its door list (admitting by name) and Ticket types open with no accessibility violations', async ({ page }) => {
     await visit(page, '/console/box-office/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Orders' })).toBeVisible()
     await page.getByRole('searchbox').first().fill(reference)
@@ -140,6 +140,10 @@ test.describe('the box office console', () => {
     await visit(page, `/console/box-office/performances/${performanceId}/door`)
     await expect(page.getByRole('heading', { level: 1, name: 'Door list' })).toBeVisible()
     await noViolations(page)
+    // The reservation was paid for at the desk: its buyer is admitted from the list by name.
+    await page.getByRole('button', { name: `Admit one ticket for ${reference}` }).click()
+    await expect(page.getByText('1 admitted').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: `Admit one ticket for ${reference}` })).toHaveCount(0)
 
     await visit(page, '/console/box-office/ticket-types')
     await expect(page.getByText(typeName)).toBeVisible()

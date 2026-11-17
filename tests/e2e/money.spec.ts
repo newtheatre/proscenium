@@ -14,6 +14,7 @@ const treasurer = {
     'payments.session.open', 'payments.session.view', 'payments.session.close-any', 'payments.attempt.reconcile',
     'payments.attempt.attest', 'payments.refund.approve', 'payments.provider.manage', 'gallery.sample.view',
     'finance.ledger.view', 'finance.ledger.export', 'finance.account.manage', 'finance.period.close', 'finance.period.reopen', 'finance.posting.correct',
+    'payments.settings.manage', 'finance.settings.manage',
   ].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
@@ -53,6 +54,8 @@ const SCREENS = [
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
   ['/console/finance/export', 'Export'],
+  ['/console/payments/settings', 'Payments'],
+  ['/console/finance/settings', 'Finance'],
 ] as const
 
 for (const [path, title] of SCREENS) {
