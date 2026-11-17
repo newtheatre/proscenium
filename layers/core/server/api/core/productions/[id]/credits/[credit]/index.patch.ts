@@ -12,6 +12,6 @@ export default defineRoute({
   input: creditPatch,
 }, async (event, { input, unit, record }) => {
   const id = getRouterParam(event, 'credit')!
-  await updateCredit(unit, record!.id, id, input, relyingParty(event).origin)
+  await updateCredit(unit, record!.id, id, input, (await relyingParty(event)).origin)
   return { id }
 })

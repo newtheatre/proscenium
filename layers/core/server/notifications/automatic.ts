@@ -9,7 +9,7 @@ import { cloudflareToken } from './cloudflare'
 export type Unavailable = 'no-token' | 'workers-dev' | 'local'
 
 export async function automaticPlan(event: H3Event): Promise<{ host: string, proposed: string | null, unavailable: Unavailable | null }> {
-  const host = relyingParty(event).id.toLowerCase()
+  const host = (await relyingParty(event)).id.toLowerCase()
   const label = await useSetting('core.notifications.sending-label') as string
   const base = host.replace(/^www\./, '')
   let unavailable: Unavailable | null = null
