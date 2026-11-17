@@ -1,9 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "4814a539-5dca-4223-9da4-e69e75c72353",
+  "id": "572697f2-9dc5-4b5e-8535-bacca2bea27b",
   "prevIds": [
-    "c064beca-8ec3-47a7-8918-c4d448cfa716"
+    "c064beca-8ec3-47a7-8918-c4d448cfa716",
+    "efe53ead-5807-4117-a31b-5da52c95dbdf"
   ],
   "ddl": [
     {
@@ -2248,6 +2249,16 @@
     },
     {
       "table": "core_account_merges",
+      "name": "undo_started_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_account_merges",
       "name": "undone_at",
       "type": "integer",
       "notNull": false,
@@ -2260,6 +2271,16 @@
       "table": "core_account_merges",
       "name": "undone_by",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_account_merges",
+      "name": "closed_at",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
