@@ -6,6 +6,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
+import { listTerms } from '#modules/core'
 import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import { members } from '../../../../tests/fixtures/modules/seats/server/contributions/core.requirement/seats'
 import attendance from '../../server/contributions/front-of-house.report-section/attendance'
@@ -253,5 +254,40 @@ describe('checking a requirement again at entry', () => {
     ])
     expect(lines[5]).toMatchObject({ label: expect.stringMatching(new RegExp(`^${reference} · Member `)), value: expect.stringMatching(/^\d{2}:\d{2}$/) })
     expect(lines.slice(6)).toEqual([{ label: 'box-office.report.overridden', value: 0 }])
+  })
+
+  it('lets a holder of the override admit anyway, with a reason from the list, audited, never on their own booking', async () => {
+    const supervisor = person(['box-office.ticket.admit', 'seats.members.look-up', 'box-office.ticket-type.override-requirement'])
+    const reason = (await inContext(() => listTerms('box-office.override-reason'))).find(t => t.slug === 'membership-shown')!.id
+    const lapsed = person([])
+    const { h, code } = await memberTicket({ account: lapsed.accountId! })
+    const override = (actor: ReturnType<typeof person>, body: Record<string, unknown>) => req('POST', `/api/box-office/performances/${h.performanceId}/door/override`, body, actor)
+
+    // The plain steward is offered nothing; the supervisor is offered Admit anyway.
+    expect((await scan(h, code, undefined, checker)).body.overridable).toBeUndefined()
+    const out = await scan(h, code, undefined, supervisor)
+    expect(out.body).toMatchObject({ result: 'requirement_not_met', overridable: true })
+
+    expect((await override(checker, { ticketId: out.body.ticketId, reasonTermId: reason })).status).toBe(403)
+    expect((await override(supervisor, { ticketId: out.body.ticketId, reasonTermId: 'term_nope' })).body.code).toBe('box-office.door.override-bad-reason')
+    const done = await override(supervisor, { ticketId: out.body.ticketId, reasonTermId: reason })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toMatchObject({ result: 'admitted', booking: { admitted: 1 } })
+    expect(await admittedIn(h)).toBe(1)
+    expect(await rows("SELECT reason_term_id FROM box_office_scans WHERE performance_id = ? AND result = 'admitted_by_override'", h.performanceId)).toEqual([{ reason_term_id: reason }])
+    expect(await count("SELECT count(*) AS n FROM core_audit WHERE ability = 'box-office.ticket-type.override-requirement' AND record_id = ?", h.performanceId)).toBe(1)
+    expect((await override(supervisor, { ticketId: out.body.ticketId, reasonTermId: reason })).body.code).toBe('box-office.door.override-in')
+    // The night report lists it with the reason chosen.
+    const report = await inContext(() => attendance.compile(h.performanceId))
+    expect(report.slice(-2)).toEqual([{ label: 'box-office.report.overridden', value: 1 }, { label: expect.stringMatching(/ · Member /), value: expect.stringMatching(/^\d{2}:\d{2} · Membership shown in person$/) }])
+
+    // On the supervisor's own booking, nothing is offered and the route refuses.
+    const own = await memberTicket({ account: supervisor.accountId! })
+    await rows('UPDATE box_office_orders SET account_id = ? WHERE id IN (SELECT l.order_id FROM box_office_order_lines l WHERE l.performance_id = ?)', supervisor.accountId!, own.h.performanceId)
+    const mine = await scan(own.h, own.code, undefined, supervisor)
+    expect(mine.body).toMatchObject({ result: 'requirement_not_met' })
+    expect(mine.body.overridable).toBeUndefined()
+    const refused = await req('POST', `/api/box-office/performances/${own.h.performanceId}/door/override`, { ticketId: mine.body.ticketId, reasonTermId: reason }, supervisor)
+    expect(refused.body.code).toBe('box-office.door.override-own')
   })
 })

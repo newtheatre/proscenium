@@ -175,6 +175,9 @@ export interface PublicListing {
   subtitle: string | null
   summary: string | null
   category: PublicTerm | null
+  /** The age in words, and whether the show uses staging effects: the compact form of its guidance, for cards. */
+  age: string | null
+  hasEffects: boolean
   /** The next scheduled performance to start, or the one running now. */
   nextStartsAt: number
   /** The last scheduled performance's end. */
@@ -236,8 +239,9 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
   const where = conditions.map(([c]) => c)
   const params = [now, ...conditions.flatMap(([, p]) => p)]
   const limit = options.limit ? ` LIMIT ${Math.max(1, Math.floor(options.limit))}` : ''
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, next_starts_at: number, last_ends_at: number, venues: string }>(
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, next_starts_at: number, last_ends_at: number, venues: string, age_min: number | null, age_restricted: number, has_effects: number }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
+        p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
         min(f.starts_at) AS next_starts_at, max(f.ends_at) AS last_ends_at,
         json_group_array(DISTINCT v.name) AS venues
        ${UPCOMING}${where.map(w => ` AND ${w}`).join('')}
@@ -253,6 +257,8 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
     subtitle: r.subtitle,
     summary: r.summary,
     category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
+    age: ageWording(r.age_min, !!r.age_restricted),
+    hasEffects: !!r.has_effects,
     nextStartsAt: r.next_starts_at,
     lastEndsAt: r.last_ends_at,
     venues: (JSON.parse(r.venues) as string[]).sort(),

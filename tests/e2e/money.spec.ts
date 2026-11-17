@@ -88,32 +88,33 @@ for (const [path, title] of [['/console/payments/sessions', 'Payments settings']
   })
 }
 
-test('the till is a live screen: a tile on Tonight and a link in the Money group', async ({ page }) => {
+test('the till is a live screen: a tile on Tonight and a button on Till sessions, not a menu entry', async ({ page }) => {
   await visit(page, '/console/payments/sessions')
-  await expect(page.getByRole('link', { name: 'Open the till' }).first()).toHaveAttribute('href', '/live/till')
+  await expect(page.getByRole('link', { name: 'Open the till' })).toHaveAttribute('href', '/live/till')
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Open the till' })).toHaveCount(0)
   await visit(page, '/live')
   await page.getByRole('link', { name: 'Till' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
   await noViolations(page)
 })
 
-test('the till opens a session by itself, shown as Your session above Till sessions with the cash expected', async ({ page }) => {
+test('coming to the till opens no session: it waits for the first sale', async ({ page }) => {
+  const looker = { ...treasurer, accountId: 'acc_tilllooker', name: 'Lou Looker', grants: ['payments.session.open', 'gallery.sample.view'].map(grant) }
+  await page.context().setExtraHTTPHeaders(as(looker).extraHTTPHeaders)
   await visit(page, '/live/till')
-  await expect(page.getByText(/^Your session since/)).toBeVisible()
+  await expect(page.getByText('Your session opens with the first sale, at')).toBeVisible()
+  await expect(page.getByLabel('Place: Unknown')).toBeVisible()
+  await noViolations(page)
   await visit(page, '/console/payments/sessions')
   await expect(page.getByRole('heading', { name: 'Your session' })).toBeVisible()
-  await expect(page.getByText('Cash expected now')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Close and count' })).toBeEnabled()
+  await expect(page.getByText('You have no session open. The till opens one with your first sale.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'My session' })).toHaveCount(0)
-  await noViolations(page)
 })
 
 test('the Till sells from a panel and takes cash for the total', async ({ page, playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
   const key = () => ({ 'idempotency-key': crypto.randomUUID() })
   expect((await api.post('/api/payments/providers', { data: { provider: 'cash', label: 'Cash drawer', channels: ['desk'], mode: 'live' }, headers: key() })).ok()).toBe(true)
-  const opened = await api.post('/api/payments/sessions', { data: { pointLabel: 'Foyer desk' }, headers: key() })
-  expect([200, 409]).toContain(opened.status())
   await api.dispose()
 
   await visit(page, '/live/till')
@@ -131,6 +132,13 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+  // The sale opened the session, shown as Your session above Till sessions with the cash expected.
+  await expect(page.getByText(/^Your session since/)).toBeVisible()
+  await visit(page, '/console/payments/sessions')
+  await expect(page.getByRole('heading', { name: 'Your session' })).toBeVisible()
+  await expect(page.getByText('Cash expected now')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Close and count' })).toBeEnabled()
+  await noViolations(page)
 })
 
 /** Types an amount into a currency number field, leaves it, and waits for it to show the amount. */
@@ -248,6 +256,10 @@ test('without cash, a seller\'s session has no float and closes in one step from
   // A seller who may not see everyone's sessions sees only their own on Sessions.
   const seller = { ...treasurer, accountId: 'acc_nocashseller', name: 'Nora No-Cash', grants: ['payments.session.open', 'gallery.sample.view'].map(grant) }
   await page.context().setExtraHTTPHeaders(as(seller).extraHTTPHeaders)
+  // The first sale would open it; this seller has no way to take payment, so it is opened directly.
+  const own = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(seller) })
+  expect((await own.post('/api/payments/till/session', { data: {} })).ok()).toBe(true)
+  await own.dispose()
   await visit(page, '/live/till')
   await expect(page.getByText(/^Your session since/)).toBeVisible()
   await visit(page, '/console/payments/sessions')
@@ -258,5 +270,5 @@ test('without cash, a seller\'s session has no float and closes in one step from
   await noViolations(page)
   await page.getByRole('button', { name: 'Close session' }).click()
   await expect(page.getByText('Session closed', { exact: true })).toBeVisible()
-  await expect(page.getByText('You have no session open. The till opens one when you go to it.')).toBeVisible()
+  await expect(page.getByText('You have no session open. The till opens one with your first sale.')).toBeVisible()
 })

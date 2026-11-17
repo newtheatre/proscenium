@@ -7,7 +7,7 @@ export const DASHBOARD_SHELL: InjectionKey<boolean> = Symbol('core:dashboard-she
  * Provided by the console: the module whose settings the cog at the end of the navbar opens, or
  * nothing when the page belongs to no module or the viewer may change none of its settings.
  */
-export const CONSOLE_SETTINGS: InjectionKey<Ref<string | undefined>> = Symbol('core:console-settings')
+export const CONSOLE_SETTINGS: InjectionKey<Ref<{ scope: string, name: string } | undefined>> = Symbol('core:console-settings')
 
 /**
  * Provided round a screen drawn inside another frame: a tab of a module's page in Admin, or the

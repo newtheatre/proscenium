@@ -45,6 +45,8 @@ export interface NavigationEntry {
   /** A count of things that need the person (an address to confirm): above zero, the entry is marked. */
   attention?: string
   match?: string
+  /** A tab of a module's page in Admin: the console entries or groups whose settings window shows it. */
+  settingsIn?: string[]
 }
 
 export interface NavigationGroupDecl {

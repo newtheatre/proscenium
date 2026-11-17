@@ -200,3 +200,21 @@ describe('beforeYouCome', () => {
     expect((await inContext(() => beforeYouCome(id)))!.empty).toBe(true)
   })
 })
+
+describe('the guidance health check', () => {
+  it('names productions with an assumed level or no answer on effects, and clears when put right', async () => {
+    const check = (await import('../../server/contributions/core.health-check/guidance')).default
+    const id = await production({ title: 'Old Show' })
+    await rows("UPDATE core_productions SET state = 'published', published_at = 1, summary = 's' WHERE id = ?", id)
+    const violence = await term('core.advisory', 'violence')
+    await rows("INSERT INTO core_production_advisories (production_id, term_id, level, level_assumed) VALUES (?, ?, 'depicted', 1)", id, violence)
+    const before = await inContext(() => check.check())
+    expect(before.state).toBe('warning')
+    expect(before.sentence).toContain('content warnings with no level yet')
+    expect(before.sentence).toContain('not said whether it uses staging effects')
+    expect(before.remedy).toContain('Old Show')
+    await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [{ termId: violence, level: 'discussed' }] })
+    await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: true })
+    expect(await inContext(() => check.check())).toMatchObject({ state: 'ok' })
+  })
+})
