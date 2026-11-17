@@ -259,8 +259,8 @@ for (const scheme of ['light', 'dark'] as const) {
       const context = await browser.newContext(as(owner))
       const page = await context.newPage()
       await visit(page, '/console/system/settings')
-      await expect(page).toHaveURL(/\/admin\/settings$/)
-      await expect(page.getByRole('heading', { level: 1, name: 'Site settings' })).toBeVisible()
+      await expect(page).toHaveURL(/\/admin\/theatre$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Theatre' })).toBeVisible()
       await expect(page.getByText('Short name', { exact: true }).first()).toBeVisible()
       // A part of the catalogue that is not loaded shows as its key, such as core.settings.x.label.
       expect((await page.locator('main').innerText()).match(/\b[a-z][a-z0-9-]*\.[a-z0-9.-]+\.(label|help)\b/g) ?? []).toEqual([])

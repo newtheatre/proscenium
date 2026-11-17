@@ -39,6 +39,17 @@ test.describe('a site owner with no console', () => {
     await noViolations(page)
   })
 
+  test('Advanced opens with a warning, and Changed leaves only what differs from its default', async ({ page }) => {
+    await visit(page, '/admin/advanced')
+    await expect(page.getByText('These are engineering limits')).toBeVisible()
+    const shown = await page.getByRole('heading', { level: 2 }).count()
+    expect(shown).toBeGreaterThan(1)
+    await page.getByRole('switch', { name: 'Show only settings I have changed' }).click()
+    await expect(page.getByText('Nothing on this page differs from its default')).toBeVisible()
+    await expect(page.locator('form')).toHaveCount(0)
+    await noViolations(page)
+  })
+
   test('edits a rate limit as a number of times in a period', async ({ page }) => {
     await visit(page, '/admin/advanced')
     await expect(page.getByText('[object Object]')).toHaveCount(0)
@@ -90,8 +101,8 @@ test.describe('staff who also run the console', () => {
   test('the palette names the shell of each screen', async ({ page }) => {
     await visit(page, '/admin')
     await page.keyboard.press('Control+k')
-    await page.keyboard.type('Site settings')
-    await expect(page.getByRole('dialog').getByRole('option', { name: /Site settings/ }).first()).toBeVisible()
+    await page.keyboard.type('Theatre')
+    await expect(page.getByRole('dialog').getByRole('option', { name: /Theatre/ }).first()).toBeVisible()
     await expect(page.getByRole('dialog')).toContainText('Site administration')
   })
 })
@@ -114,8 +125,8 @@ test.describe('on a phone, in dark mode', () => {
     await visit(page, '/admin')
     await page.getByRole('button', { name: 'Open or close the menu' }).first().click()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
-    await page.getByRole('link', { name: 'Site settings' }).click()
-    await expect(page).toHaveURL(/\/admin\/settings/)
+    await visit(page, '/admin/theatre')
+    await expect(page.getByRole('heading', { level: 1, name: 'Theatre' })).toBeVisible()
     await noViolations(page)
   })
 })
