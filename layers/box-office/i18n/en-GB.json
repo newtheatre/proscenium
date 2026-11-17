@@ -1,7 +1,6 @@
 {
   "box-office.module.name": "Box office",
   "box-office.module.description": "Selling tickets: what is on sale and for how much, seats held and sold, reservations paid for at the desk, orders, tickets and the door.",
-  "box-office.navigation.groups.box-office.label": "Box office",
 
   "box-office.settings-sections.cancellations": "Cancellations",
   "box-office.settings-sections.baskets": "Baskets",

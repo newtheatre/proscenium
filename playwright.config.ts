@@ -11,7 +11,7 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:8788' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'rm -rf .wrangler/e2e && bunx wrangler dev --cwd .output --port 8788 --persist-to ../.wrangler/e2e --var PROSCENIUM_AUTO_MIGRATE:1',
+    command: 'rm -rf .wrangler/e2e && bunx wrangler dev --cwd .output --port 8788 --persist-to ../.wrangler/e2e --var PROSCENIUM_AUTO_MIGRATE:1 --var CORE_ENCRYPTION_KEY:browser-tests-only-not-a-secret',
     url: 'http://localhost:8788/api/core/health',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
