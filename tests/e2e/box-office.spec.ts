@@ -9,7 +9,7 @@ const person = (accountId: string, name: string, abilities: string[]) => ({ kind
 const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage'])
 const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
-const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit'])
+const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.report.export'])
 const producer = person('acc_compproducer', 'Pat Producer', ['box-office.comp.request'])
 const approver = person('acc_compapprover', 'Alex Approver', ['box-office.comp.request', 'box-office.comp.approve'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
@@ -122,7 +122,7 @@ test('Sell finds a reservation by its reference and takes payment for it', async
 test.describe('the box office console', () => {
   test.use(as(office))
 
-  test('Orders, Performances, a set-up, its door list (admitting by name) and Ticket types open with no accessibility violations', async ({ page }) => {
+  test('Orders, Performances, a set-up, its door list (admitting by name), the sales report and Ticket types open with no accessibility violations', async ({ page }) => {
     await visit(page, '/console/box-office/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Orders' })).toBeVisible()
     await page.getByRole('searchbox').first().fill(reference)
@@ -146,6 +146,11 @@ test.describe('the box office console', () => {
     await page.getByRole('button', { name: `Admit one ticket for ${reference}` }).click()
     await expect(page.getByText('1 admitted').first()).toBeVisible()
     await expect(page.getByRole('button', { name: `Admit one ticket for ${reference}` })).toHaveCount(0)
+
+    await visit(page, '/console/box-office/reports/sales')
+    await expect(page.getByRole('heading', { level: 1, name: 'Sales report' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Download as CSV' })).toBeVisible()
+    await noViolations(page)
 
     await visit(page, '/console/box-office/ticket-types')
     await expect(page.getByText(typeName)).toBeVisible()
