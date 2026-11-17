@@ -294,12 +294,11 @@ export interface DeskPerformance {
 }
 
 /**
- * A buyer the seller picked by name (identity spec part 5: a person not yet on the screen is chosen
- * with the person picker, under core.account.search). The account they live on now, if it has an
- * address to send the tickets to; the till still shows nothing about them.
+ * A buyer the seller picked in the till's buyer box: the account they live on now, if it has an
+ * address to send the tickets to. Selling already asked for box-office.order.sell, which is what
+ * the box's search needs; the till still shows nothing about them.
  */
 async function pickedBuyer(picked: string): Promise<string> {
-  await requireAbility(useContext().actor, 'core.account.search')
   const accountId = await canonicalAccount(picked)
   if (!await addressFor(accountId, 'audience')) refuse('box-office.desk.no-address', 'There is no email address for this person, so the tickets cannot be sent.', { status: 422, remedy: 'Type their email address instead.' })
   return accountId

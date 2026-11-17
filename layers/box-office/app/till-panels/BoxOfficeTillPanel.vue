@@ -40,7 +40,7 @@ function dropExchange() {
   void router.replace({ query })
 }
 
-const { data } = await useAPI<{ performances: Performance[], searchPeople: boolean }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [], searchPeople: false }) })
+const { data } = await useAPI<{ performances: Performance[], emailDomains: string[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [], emailDomains: [] }) })
 const performances = computed(() => data.value?.performances ?? [])
 
 const mode = ref<'sell' | 'collect'>('sell')
@@ -333,12 +333,12 @@ function clear() {
     <UFormField
       v-if="mode === 'sell' && !exchange"
       :label="t('box-office.screens.panel.email')"
-      :help="data?.searchPeople ? t('box-office.screens.panel.buyer.help-search') : t('box-office.screens.panel.email-help')"
+      :help="t('box-office.screens.panel.email-help')"
       name="buyer"
     >
       <BoxOfficeBuyerPicker
         v-model="buyer"
-        :search-people="data?.searchPeople ?? false"
+        :domains="data?.emailDomains ?? []"
         :disabled="locked"
       />
     </UFormField>
