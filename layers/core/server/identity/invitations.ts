@@ -25,7 +25,7 @@ export async function createInvitation(unit: UnitView, event: H3Event, actor: Ac
           VALUES (?, 'invite', ?, ?, ?, ?, 0, ?, ?)`,
     params: [tokenId, await digest('link', token), to.accountId, to.address, actor.accountId ?? null, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  const link = `${relyingParty(event).origin}/sign-in/link#${token}`
+  const link = `${(await relyingParty(event)).origin}/sign-in/link#${token}`
   await notify(unit, 'core.invitation', { to: to.accountId, variables: { link, role: to.role }, dedupeKey: tokenId })
   return { tokenId, link }
 }

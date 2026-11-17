@@ -29,6 +29,10 @@ async function visit(page: Page, url: string) {
 }
 
 async function noViolations(page: Page) {
+  // A dialogue fading in is half transparent, and its contrast is judged on the half (seen in CI).
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
