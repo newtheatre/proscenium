@@ -106,7 +106,8 @@ describe('readList', async () => {
     const show = await performance()
     const one = await sale(show, 'Single Buyer')
     const group = newId('sl')
-    await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, created_at) VALUES (?, ?, 4, ?, ?, ?)').bind(group, show, newId('acc'), 'Group Buyer', Date.now()).run()
+    // A millisecond after the single sale, so the two never tie on time and fall back to the id.
+    await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, created_at) VALUES (?, ?, 4, ?, ?, ?)').bind(group, show, newId('acc'), 'Group Buyer', Date.now() + 1).run()
     expect((await page({ sizes: 'group' }, seller(), show)).found.map(r => r.id)).toEqual([group])
     expect((await page({ sizes: 'single,group' }, seller(), show)).total).toBe(2)
     const dropped = await page({ buyer: newId('acc') }, nobody(), show)
