@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "276f4491-3291-48d7-8412-691c20a08d48",
+  "id": "efe53ead-5807-4117-a31b-5da52c95dbdf",
   "prevIds": [
-    "4a76b5ab-82c9-4809-a416-7c49f9223df7"
+    "7bc90789-9e71-40b5-9417-3dcc69e5d7e0"
   ],
   "ddl": [
     {
@@ -212,6 +212,10 @@
     },
     {
       "name": "core_production_advisories",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_production_credits",
       "entityType": "tables"
     },
     {
@@ -986,6 +990,66 @@
       "table": "box_office_orders",
       "name": "intent_id",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "basket_token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "confirm_token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "confirm_expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "confirm_email",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "confirm_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "link_token_expires_at",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -5463,6 +5527,86 @@
       "entityType": "columns"
     },
     {
+      "table": "core_production_credits",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "credited_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "role",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "section_term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "visibility",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'public'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_production_slugs",
       "name": "slug",
       "type": "text",
@@ -6484,6 +6628,26 @@
     },
     {
       "table": "core_spaces",
+      "name": "managed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "finding_it",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
       "name": "state",
       "type": "text",
       "notNull": true,
@@ -6709,16 +6873,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_venues",
-      "name": "managed",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
       "generated": null,
       "entityType": "columns"
     },
@@ -8554,6 +8708,34 @@
     },
     {
       "table": "box_office_orders",
+      "name": "box_office_orders_basket_token",
+      "columns": [
+        {
+          "value": "basket_token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "basket_token_hash IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_confirm_token",
+      "columns": [
+        {
+          "value": "confirm_token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "confirm_token_hash IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
       "name": "box_office_orders_link",
       "columns": [
         {
@@ -9598,6 +9780,42 @@
         }
       ],
       "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_order",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "section_term_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -11097,6 +11315,36 @@
       "entityType": "fks"
     },
     {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_section_term_id_core_terms_id_fk",
+      "columns": [
+        "section_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_production_slugs",
       "name": "fk_core_production_slugs_production_id_core_productions_id_fk",
       "columns": [
@@ -12001,6 +12249,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_production_credits",
+      "name": "core_production_credits_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_production_slugs",
       "name": "core_production_slugs_pk",
       "columns": [
@@ -12775,6 +13032,24 @@
       "table": "core_production_advisories",
       "name": "core_production_advisories_detail",
       "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_visibility",
+      "value": "\"visibility\" IN ('public', 'members', 'hidden')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_name",
+      "value": "length(\"credited_name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_role",
+      "value": "length(\"role\") BETWEEN 1 AND 120",
       "entityType": "checks"
     },
     {
