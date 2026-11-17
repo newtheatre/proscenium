@@ -311,6 +311,29 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
   return problems
 }
 
+/**
+ * sealSpecial writes a special or encrypted column and nothing else (Foundations part 4, T5): a
+ * link token is never sealed, it is hashed with linkTokens. Refuses sealSpecial in a module that has
+ * no such column, and a call whose argument names a token or a link.
+ */
+export function checkSealSpecial(modules: Loaded[], registry: any): string[] {
+  const problems: string[] = []
+  for (const m of modules) {
+    const sealsColumns = [...(registry.tables as Map<string, any>).values()].some(t => t.module === m.manifest.id && Object.values(t.meta.columns as Record<string, any>).some(c => c.meta.encrypted))
+    for (const file of moduleFiles(m).filter(f => f.endsWith('.ts') && !rel(f).startsWith('layers/core/kit/'))) {
+      lines(file).forEach((line, i) => {
+        if (!/\b(sealSpecial|sealColumn)\(/.test(line)) return
+        const at = `${rel(file)}:${i + 1}`
+        if (!sealsColumns) problems.push(`${at}: sealSpecial and sealColumn write a special or encrypted column, and this module has none`)
+        for (const [, , argument] of line.matchAll(/\b(sealSpecial|sealColumn)\(([^)]*)\)/g)) {
+          if (/token|link/i.test(argument!)) problems.push(`${at}: seals a link token; a token is never sealed or stored, keep linkTokens.hash(token) instead`)
+        }
+      })
+    }
+  }
+  return problems
+}
+
 // A statement's count of changed rows includes rows its triggers and a search index wrote, so an
 // INSERT into a searched table can count 3 (Foundations part 3, "Counting changed rows"). A count
 // may be tested against nought; a unit that needs an exact count uses the kit's guard.

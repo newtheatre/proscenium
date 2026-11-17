@@ -6,6 +6,7 @@ interface Input { amountMinor: number, deferredMinor?: number, performanceId?: s
 
 export default {
   label: 'tickets.desk.label',
+  panel: 'TicketsTillPanel',
   ability: 'tickets.orders.sell',
   order: 1,
   async prepare(unit: UnitView, context: DeskContext) {

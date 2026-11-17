@@ -33,6 +33,9 @@ export async function open(sealed: string): Promise<string> {
 
 export const sealSpecial = (value: string | null) => value === null ? Promise.resolve(null) : seal(value)
 export const openSpecial = (value: string | null) => value === null ? Promise.resolve(null) : open(value)
+/** The same pair, for a column declared encrypted: true that is not special (a ticket's code kept to show again). */
+export const sealColumn = sealSpecial
+export const openColumn = openSpecial
 
 /** Reads a secret or a stored credential the calling module declared. Null when it is not set. */
 export async function credential(name: string): Promise<string | null> {
