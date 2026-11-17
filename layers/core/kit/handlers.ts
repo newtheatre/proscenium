@@ -50,6 +50,8 @@ export interface ModuleHandlers {
   tasks?: Record<string, TaskHandler>
   facts?: Record<string, FactResolver>
   calls?: Record<string, CallHandler>
+  /** List sources (server/lists/<name>.ts), keyed <module>.<file>. */
+  lists?: Record<string, unknown>
   /** Code contributions: point name, then file name, to the module's export. */
   contributions?: Record<string, Record<string, unknown>>
 }

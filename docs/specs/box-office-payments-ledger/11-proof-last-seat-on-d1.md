@@ -71,7 +71,7 @@ The runner and the raw output are with the proof files: `run-deployed.mjs` and `
 - **A refused purchase is an error, not an empty result.** D1 reports `CHECK constraint failed` or `UNIQUE constraint failed` and the service maps those to "sold out" and "seat taken". This avoids the trap Proscenium recorded, where a guarded insert that matches no rows does not raise and the batch must be made to fail explicitly ([decision 0035](https://github.com/newtheatre/proscenium/blob/main/docs/decisions/0035-a-multi-row-claim-asserts-its-own-completeness.md)).
 - **Triggers, partial unique indexes and table CHECKs all work in D1**, and a constraint that fails inside a trigger-fired update aborts the whole batch.
 - **Lazy expiry works.** Releasing expired holds as the first statement of every purchase means a missed sweep never blocks a sale. The scheduled sweep becomes housekeeping, not correctness.
-- **Foundations reached the same result independently** on 16 November: a CHECK sold the last seat once under 20 concurrent purchases on local D1, and a conditional update with an expected row count aborts the whole batch when the count is wrong.
+- **Foundations reached the same result independently** on 16 November: a CHECK sold the last seat once under 20 concurrent purchases on local D1. The kit build later found that D1's count of changed rows includes rows written by triggers and search indexes, so no exact count is relied on anywhere and a condition that could match nothing is followed by the kit's guard (Foundations part 3). This proof never used a count: every refusal in it is a constraint error that aborts the batch, so its conclusion stands unchanged.
 
 ## Limitations
 

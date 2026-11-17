@@ -19,6 +19,8 @@ export interface RouteInfo {
   rateLimit?: string
   input: boolean
   idempotent: boolean
+  /** Path parameters the route declares as link tokens. */
+  tokens: string[]
 }
 
 function walk(dir: string): string[] {
@@ -46,7 +48,7 @@ export function parseRoute(file: string, apiRoot: string): RouteInfo {
   const method = /\.(get|post|put|patch|delete|head)\.ts$/.exec(relative)?.[1]
   const info: RouteInfo = {
     file: file.slice(ROOT.length + 1), module: relative.split('/')[0], method, path: `/api/${relative.replace(/(\.(get|post|put|patch|delete|head))?\.ts$/, '').replace(/\/index$/, '')}`,
-    usesDefineRoute: false, abilityIsLiteral: true, public: false, input: false, idempotent: false,
+    usesDefineRoute: false, abilityIsLiteral: true, public: false, input: false, idempotent: false, tokens: [],
   }
   for (const statement of source.statements) {
     if (!ts.isExportAssignment(statement) || statement.isExportEquals) continue
@@ -67,6 +69,7 @@ export function parseRoute(file: string, apiRoot: string): RouteInfo {
       if (name === 'rateLimit' && value && ts.isStringLiteralLike(value)) info.rateLimit = value.text
       if (name === 'input') info.input = true
       if (name === 'idempotent') info.idempotent = !!value && value.kind === ts.SyntaxKind.TrueKeyword
+      if (name === 'tokens' && value && ts.isArrayLiteralExpression(value)) info.tokens = value.elements.map(e => ts.isStringLiteralLike(e) ? e.text : e.getText(source))
     }
   }
   return info
@@ -91,6 +94,7 @@ export function checkRoutes(registry: any, modules: Loaded[], options: { fatalOn
     if (route.ability && route.ability !== 'signed-in' && !registry.abilities.has(route.ability)) problems.push(`${at}: ability: "${route.ability}" is not declared by any module`)
     if (route.owner && route.module !== route.owner) problems.push(`${at}: lies outside its module's prefix: put it under server/api/${route.owner}/`)
     if (!route.owner && !(route.module && registry.modules.has(route.module) && registry.modules.get(route.module).owner === 'site')) problems.push(`${at}: a theatre's route lives under /api/<one of your x- modules>/`)
+    for (const token of route.tokens) if (!route.path.includes(`[${token}]`)) problems.push(`${at}: tokens: "${token}" is not a parameter of the route's path`)
     const changes = route.method !== 'get' && route.method !== 'head'
     if (changes && !route.input) problems.push(`${at}: input: a route that changes something validates its input with a Zod schema`)
   }
