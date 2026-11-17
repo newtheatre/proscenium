@@ -38,6 +38,7 @@ export default defineModule({
     'product': { table: 'bar_products' },
     'price-list': { table: 'bar_price_lists' },
     'category': { table: 'bar_categories' },
+    'product-preset': { table: 'bar_product_presets' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
     'age-check': { table: 'bar_age_checks', owner: 'by' },

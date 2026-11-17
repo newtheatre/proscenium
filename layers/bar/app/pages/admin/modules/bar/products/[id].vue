@@ -4,7 +4,7 @@
 <script setup lang="ts">
 interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
 interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
-interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, active: boolean, groupIds: string[], variants: Variant[] }
+interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, active: boolean, groupIds: string[], variants: Variant[] }
 interface List { id: string, name: string, standard: boolean, percentOff: number | null }
 
 const { t } = useT()
@@ -26,18 +26,24 @@ const isMixer = computed(() => !!data.value?.product.variants.some(v => v.mixerM
 const groupNames = computed(() => (data.value?.product.groupIds ?? []).map(g => data.value!.groups.find(x => x.id === g)?.name).filter(Boolean).join(', '))
 
 // The product's own fields, the choices it asks at the till, and whether it can be a mixer.
-const editing = ref<{ name: string, categoryId: string, ageRestricted: boolean, groupIds: string[], mixer: boolean } | null>(null)
+const editing = ref<{ name: string, categoryId: string, age: 'category' | 'yes' | 'no', groupIds: string[], mixer: boolean } | null>(null)
+const ageItems = computed(() => [
+  { value: 'category', label: t('bar.screens.add-product.age-as-category-plain') },
+  { value: 'yes', label: t('bar.screens.product.age-yes') },
+  { value: 'no', label: t('bar.screens.product.age-no') },
+])
 function edit() {
   const p = data.value!.product
   refusal.value = null
-  editing.value = { name: p.name, categoryId: p.categoryId, ageRestricted: p.ageRestricted, groupIds: [...p.groupIds], mixer: isMixer.value }
+  editing.value = { name: p.name, categoryId: p.categoryId, age: p.ageFromCategory ? 'category' : p.ageRestricted ? 'yes' : 'no', groupIds: [...p.groupIds], mixer: isMixer.value }
 }
 async function patch(body: Record<string, unknown>) {
   await $api(`/api/bar/products/${id.value}` as string, { method: 'PATCH', body })
   await refresh()
 }
 async function save() {
-  const { groupIds, mixer, ...fields } = editing.value!
+  const { groupIds, mixer, age, ...rest } = editing.value!
+  const fields = { ...rest, ageRestricted: age === 'category' ? null : age === 'yes' }
   refusal.value = null
   try {
     if (groupIds.join() !== data.value!.product.groupIds.join()) await $api(`/api/bar/products/${id.value}/choices` as string, { method: 'POST', body: { groupIds } })
@@ -210,7 +216,7 @@ function planned(v: Variant, l: List): string | null {
           <FactStrip
             :facts="[
               { label: t('bar.screens.products.category'), value: data.categories.find(c => c.id === data!.product.categoryId)?.name ?? '' },
-              { label: t('bar.screens.product.age-check'), value: data.product.ageRestricted ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no') },
+              { label: t('bar.screens.product.age-check'), value: (data.product.ageRestricted ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no')) + (data.product.ageFromCategory ? ` ${t('bar.screens.product.from-category')}` : '') },
               { label: t('bar.screens.product.choices'), value: groupNames || t('bar.screens.product.no-choices') },
               { label: t('bar.screens.product.mixer'), value: isMixer ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no') },
             ]"
@@ -303,11 +309,16 @@ function planned(v: Variant, l: List): string | null {
               :items="categoryItems"
             />
           </UFormField>
-          <UCheckbox
-            v-model="editing.ageRestricted"
-            :label="t('bar.screens.products.age-check')"
-            :description="t('bar.screens.products.age-check-help')"
-          />
+          <UFormField
+            :label="t('bar.screens.product.age-check')"
+            :help="t('bar.screens.products.age-check-help')"
+            name="age"
+          >
+            <USelect
+              v-model="editing.age"
+              :items="ageItems"
+            />
+          </UFormField>
           <UFormField
             :label="t('bar.screens.product.choices')"
             :help="t('bar.screens.product.choices-help')"

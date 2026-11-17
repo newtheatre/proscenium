@@ -47,6 +47,11 @@ export const categories = defineTable('bar_categories', {
   colour: col.internal(text('colour')),
   // The category this one sits under. One level only: a parent never has a parent itself.
   parentId: col.ref('bar_categories', { nullable: true }),
+  // Products in it need the age check unless a product says otherwise (Wine, Beer, Spirits: yes).
+  ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  // The preset Add a product opens on for this category: a built-in key such as 'builtin:wine', or a
+  // bar_product_presets id. Not a reference, because built-ins live in code.
+  usualPreset: col.internal(text('usual_preset')),
   // A Finance account of the bar's own; null posts to bar.income.
   incomeAccountId: col.internal(text('income_account_id')),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
@@ -64,8 +69,9 @@ export const products = defineTable('bar_products', {
   id: col.id(),
   categoryId: col.ref('bar_categories'),
   name: col.public(text('name').notNull()),
-  // Selling it asks the age check.
+  // Selling it asks the age check. Ignored while ageFromCategory is set, when the category's answer applies.
   ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  ageFromCategory: col.internal(integer('age_from_category', { mode: 'boolean' }).notNull().default(false)),
   position: col.internal(integer('position').notNull()),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),
@@ -155,6 +161,30 @@ export const choiceOptions = defineTable('bar_choice_options', {
     uniqueIndex('bar_choice_options_name').on(t.groupId, sql`lower(${t.name})`),
     check('bar_choice_options_delta', sql`${t.deltaMinor} >= 0`),
   ],
+})
+
+/**
+ * The theatre's own product preset, saved from Add a product: what a kind of product usually has, never
+ * its name, prices or stock. `sizes` is JSON, [{ "name": "Pint", "measure": "568 ml" }, ...];
+ * `group_ids` is JSON, the choices it attaches in order. Built-in presets live in code.
+ */
+export const productPresets = defineTable('bar_product_presets', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  sizes: col.internal(text('sizes').notNull()),
+  groupIds: col.internal(text('group_ids').notNull()),
+  // null: as the category.
+  ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' })),
+  mixer: col.internal(integer('mixer', { mode: 'boolean' }).notNull().default(false)),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bpps',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('bar_product_presets_name').on(sql`lower(${t.name})`).where(sql`active = 1`)],
 })
 
 /** A group attached to a product, in the order the till asks them. */
@@ -504,4 +534,4 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks }
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks }
