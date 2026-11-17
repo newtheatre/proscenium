@@ -15,10 +15,10 @@ export default defineModule({
   stability: 'experimental',
 
   settings: defineSettings('finance', {
-    'periods.length': setting.choice({ default: 'month', options: ['month', 'quarter'], change, audience: 'staff' }),
+    'periods.length': setting.choice({ default: 'month', options: ['month', 'quarter'], change, audience: 'staff', onChange: 'confirm' }),
     // A month and a day. Days stop at 28 so that every period starts on the same day of the month.
-    'year.starts': setting.custom({ schema: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$/), default: '08-01', change, audience: 'staff' }),
-    'tax.registered': setting.boolean({ default: false, change, audience: 'staff' }),
+    'year.starts': setting.custom({ schema: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$/), default: '08-01', change, audience: 'staff', onChange: 'confirm' }),
+    'tax.registered': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
   }),
   // Tax on sales is not supported in the first release.
   settingRules: defineSettingRules('finance', [{ id: 'tax-not-yet', check: s => s['tax.registered'] !== true }]),

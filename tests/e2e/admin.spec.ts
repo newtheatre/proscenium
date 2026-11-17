@@ -26,13 +26,13 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
     await expect(page.getByText('Nothing needs attention')).toBeVisible()
-    await expect(page.getByRole('navigation', { name: 'Site administration' })).toContainText('Site settings')
+    await expect(page.getByRole('navigation', { name: 'Site administration' })).toContainText('Advanced')
     await noViolations(page)
   })
 
-  test('the site settings page lists settings of the site, and settings search lands on it', async ({ page }) => {
-    await visit(page, '/admin/settings')
-    await expect(page.getByRole('heading', { level: 1, name: 'Site settings' })).toBeVisible()
+  test('the Advanced page lists the engineering limits, and settings search lands on it', async ({ page }) => {
+    await visit(page, '/admin/advanced')
+    await expect(page.getByRole('heading', { level: 1, name: 'Advanced' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
     await page.getByRole('searchbox').first().fill('rate')
     await expect(page.getByRole('link').filter({ hasText: /limit/i }).first()).toBeVisible()
@@ -40,7 +40,7 @@ test.describe('a site owner with no console', () => {
   })
 
   test('edits a rate limit as a number of times in a period', async ({ page }) => {
-    await visit(page, '/admin/settings')
+    await visit(page, '/admin/advanced')
     await expect(page.getByText('[object Object]')).toHaveCount(0)
     const count = page.getByRole('spinbutton', { name: 'Rate limit: exports: how many times' })
     // The period is a number and a unit, not text such as "1h".
@@ -63,7 +63,7 @@ test.describe('a site owner with no console', () => {
     await section.getByRole('button', { name: /^Save/ }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Save the change' }).click()
     await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible() // not the toaster's own live-region copy
-    await visit(page, '/admin/settings')
+    await visit(page, '/admin/advanced')
     await expect(page.getByRole('spinbutton', { name: 'Rate limit: exports: how many times' })).toHaveValue('12')
     await expect(period).toHaveValue('2')
     await expect(unit).toContainText('hours')
@@ -96,8 +96,8 @@ test.describe('staff who also run the console', () => {
   test('the palette names the shell of each screen', async ({ page }) => {
     await visit(page, '/admin')
     await page.keyboard.press('Control+k')
-    await page.keyboard.type('Site settings')
-    await expect(page.getByRole('dialog').getByRole('option', { name: /Site settings/ }).first()).toBeVisible()
+    await page.keyboard.type('Advanced')
+    await expect(page.getByRole('dialog').getByRole('option', { name: /Advanced/ }).first()).toBeVisible()
     await expect(page.getByRole('dialog')).toContainText('Site administration')
   })
 })
@@ -120,8 +120,8 @@ test.describe('on a phone, in dark mode', () => {
     await visit(page, '/admin')
     await page.getByRole('button', { name: 'Open or close the menu' }).first().click()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
-    await page.getByRole('link', { name: 'Site settings' }).click()
-    await expect(page).toHaveURL(/\/admin\/settings/)
+    await page.getByRole('link', { name: 'Advanced' }).click()
+    await expect(page).toHaveURL(/\/admin\/advanced/)
     await noViolations(page)
   })
 })
