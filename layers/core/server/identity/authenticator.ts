@@ -35,7 +35,7 @@ export function base32(bytes: Uint8Array): string {
 }
 
 export function fromBase32(text: string): Uint8Array<ArrayBuffer> {
-  const clean = text.toUpperCase().replace(/[^A-Z2-7]/g, '')
+  const clean = text.toUpperCase().replace(/[^A-Z2-7]/g, '') // not-policy: the base32 alphabet
   const out: number[] = []
   let bits = 0
   let value = 0
@@ -62,7 +62,7 @@ export async function codeAt(secret: Uint8Array<ArrayBuffer>, step: number): Pro
   const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counter))
   const offset = mac[mac.length - 1]! & 15 // not-policy: RFC 4226 dynamic truncation
   const binary = ((mac[offset]! & 127) << 24) | (mac[offset + 1]! << 16) | (mac[offset + 2]! << 8) | mac[offset + 3]! // not-policy: RFC 4226 dynamic truncation
-  return String(binary % 10 ** DIGITS).padStart(DIGITS, '0')
+  return String(binary % 10 ** DIGITS).padStart(DIGITS, '0') // not-policy: decimal digits
 }
 
 export const stepAt = (ms: number) => Math.floor(ms / 1000 / STEP_SECONDS) // not-policy: milliseconds to steps

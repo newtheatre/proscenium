@@ -434,6 +434,6 @@ export const accessShares = defineTable('core_access_shares', {
 }, { realm: 'audience', onErasure: 'delete-row', extra: t => [primaryKey({ columns: [t.accountId, t.purpose] })] })
 
 export const identityTables = {
-  accounts, accountEmails, passkeys, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
+  accounts, accountEmails, passkeys, authenticators, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
   roles, roleAbilities, factAbilities, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
 }
