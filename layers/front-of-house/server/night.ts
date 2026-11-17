@@ -85,7 +85,7 @@ export async function extendTonight(unit: UnitView, performanceId: string): Prom
 // ---------------------------------------------------------------------------------------------
 // The board (FH-19, FH-20)
 
-export interface FigureAnswer { value: string | number | null, state: 'ok' | 'attention' | 'unavailable', to?: string }
+export interface FigureAnswer { value: string | number | null, state: 'ok' | 'attention' | 'unavailable', to?: string, unit?: string }
 
 export async function readFigure(figure: TonightFigure, performanceId: string): Promise<FigureAnswer> {
   let timer: ReturnType<typeof setTimeout> | undefined

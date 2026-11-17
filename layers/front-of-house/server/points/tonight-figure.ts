@@ -13,5 +13,5 @@ export interface TonightFigure {
    * Reads the figure for one performance. Reads only. An answer that takes too long or throws is
    * shown as unavailable, never as an error on the board.
    */
-  read: (performanceId: string) => Promise<{ value: string | number | null, state: 'ok' | 'attention' | 'unavailable', to?: string }>
+  read: (performanceId: string) => Promise<{ value: string | number | null, state: 'ok' | 'attention' | 'unavailable', to?: string, /** As a report line's: an ISO currency code makes the value money in minor units. */ unit?: string }>
 }

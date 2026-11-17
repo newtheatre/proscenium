@@ -131,6 +131,26 @@ async function setAsideOthers(unit: UnitView, row: FileRow, at: number) {
   })
 }
 
+/**
+ * Puts a removed file back in use while its restore period lasts (C-24), in the caller's unit. In a
+ * slot that holds one file the file it holds now is set aside in the same unit, so the owner is
+ * never without one.
+ */
+export async function restoreFile(unit: UnitView, fileId: string, target: { ownerType: string, ownerId: string, slots: string[] }): Promise<FileRow> {
+  const row = await first<FileRow & { purge_after: number | null }>("SELECT * FROM core_files WHERE id = ? AND state = 'deleted'", fileId)
+  if (!row || row.owner_type !== target.ownerType || row.owner_id !== target.ownerId || !target.slots.includes(row.slot) || row.attached_at === null) {
+    refuse('core.files.not-found', 'There is no such removed file for this place.', { status: 404 })
+  }
+  const at = nowMs()
+  if (row.purge_after !== null && row.purge_after <= at) refuse('core.files.gone', 'This file was removed too long ago to be put back.', { status: 410 })
+  const slot = await fileSlot(row.slot)
+  if (slot && !slot.many) await setAsideOthers(unit, row, at)
+  unit.add({ sql: "UPDATE core_files SET state = 'ready', deleted_at = NULL, purge_after = NULL, attached_at = ? WHERE id = ? AND state = 'deleted'", params: [at, row.id] }).expect(1)
+  unit.audit({ action: 'update', record: ['core.file', row.id], detail: { restored: true } })
+  unit.announce('core.file.ready', { fileId: row.id, slot: row.slot }, { record: ['core.file', row.id] })
+  return row
+}
+
 /** Removes a file from use. Its bytes stay until core.files.deleted-retention has passed. */
 export async function detachFile(unit: UnitView, fileId: string): Promise<void> {
   const keep = await useSetting('core.files.deleted-retention') as number

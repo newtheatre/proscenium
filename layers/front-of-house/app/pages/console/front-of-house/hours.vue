@@ -51,11 +51,12 @@ const columns = computed(() => [
         :label="t('front-of-house.hours.export')"
       />
     </template>
-    <template #toolbar>
-      <UFormField :label="t('front-of-house.hours.range')">
-        <FieldDateRange v-model="range" />
-      </UFormField>
-    </template>
+    <UFormField
+      :label="t('front-of-house.hours.range')"
+      class="mb-6"
+    >
+      <FieldDateRange v-model="range" />
+    </UFormField>
     <DataBoundary
       :data="data"
       :status="status"
