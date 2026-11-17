@@ -81,8 +81,10 @@ export interface CredentialStatus {
   name: string
   /** Saved for this scope, saved for the whole module, a Worker secret, or not set. */
   source: 'saved' | 'saved-for-module' | 'worker-secret' | null
-  /** The last four characters of a saved value. */
+  /** The last four characters of a long value. */
   hint: string | null
+  /** A long value's provider prefix (`sk_live_`, `whsec_`), so a screen can tell live from test. */
+  start: string | null
   setAt: number | null
   setBy: string | null
 }
@@ -92,15 +94,37 @@ export async function credentialStatus(names: readonly string[], scope = ''): Pr
   for (const name of names) {
     const manifest = ownerOf(name)
     const [row] = manifest.credentials?.[name] ? await storedRows(manifest.id, name, scope) : []
-    if (row) out.push({ name, source: row.scope === scope ? 'saved' : 'saved-for-module', hint: row.hint, setAt: row.set_at, setBy: row.set_by })
-    else out.push({ name, source: workerSecret(name) ? 'worker-secret' : null, hint: null, setAt: null, setBy: null })
+    if (row) out.push({ name, source: row.scope === scope ? 'saved' : 'saved-for-module', ...splitHint(row.hint), setAt: row.set_at, setBy: row.set_by })
+    else {
+      // A Worker secret is read here on the server, so it is shown the same way as a saved value.
+      const value = manifest.credentials?.[name] ? workerSecret(name) : null
+      out.push({ name, source: workerSecret(name) ? 'worker-secret' : null, ...splitHint(value ? hintOf(value) : null), setAt: null, setBy: null })
+    }
   }
   return out
 }
 
 // A hint shows the last four characters, and only of a value long enough that four give little away.
+// A longer one also shows its provider's prefix, such as sk_live_ or whsec_, which says what kind of
+// key it is and nothing of the secret part (Matt, 17 November: make a saved key obvious at a glance).
+// Both are kept in the hint column as <start>…<end>; a hint saved before has the end alone.
 const HINT_CHARS = 4 // not-policy: the hint's length (Foundations, core_credentials)
 const HINT_FROM = 16 // not-policy: shortest value that shows a hint
+const START_FROM = 24 // not-policy: shortest value that also shows its prefix
+const PREFIX = /^[A-Za-z]{2,6}[_-](?:(?:live|test)[_-])?/ // not-policy: a provider's key prefix, such as sk_live_ or whsec_
+const SPLIT = '…'
+
+function hintOf(value: string): string | null {
+  if (value.length < HINT_FROM) return null
+  const prefix = value.length >= START_FROM ? value.match(PREFIX)?.[0] ?? '' : ''
+  return `${prefix}${SPLIT}${value.slice(-HINT_CHARS)}`
+}
+
+function splitHint(stored: string | null): { hint: string | null, start: string | null } {
+  if (!stored) return { hint: null, start: null }
+  const at = stored.lastIndexOf(SPLIT)
+  return at < 0 ? { hint: stored, start: null } : { hint: stored.slice(at + 1) || null, start: stored.slice(0, at) || null }
+}
 
 /** A declared credential and the module that owns it, or null for a name that is not one. */
 export function credentialEntry(name: string): { module: string, decl: CredentialDecl } | null {
@@ -126,7 +150,7 @@ export async function setCredential(unit: UnitView, name: string, value: string,
   const manifest = credentialOf(name)
   const scope = options.scope ?? ''
   const at = nowMs()
-  const hint = value.length >= HINT_FROM ? value.slice(-HINT_CHARS) : null
+  const hint = hintOf(value)
   unit.add({
     sql: `INSERT INTO core_credentials (module_id, name, scope, ciphertext, key_version, set_at, set_by, hint) VALUES (?, ?, ?, ?, 1, ?, ?, ?)
       ON CONFLICT (module_id, name, scope) DO UPDATE SET ciphertext = excluded.ciphertext, key_version = excluded.key_version, set_at = excluded.set_at, set_by = excluded.set_by, hint = excluded.hint, last_used_at = NULL`,

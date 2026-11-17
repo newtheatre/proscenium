@@ -35,13 +35,25 @@ describe('GET /api/core/credentials', () => {
   })
 })
 
+describe('what a set key shows', () => {
+  it('shows a long key\'s prefix and last four, a shorter one\'s last four, a short one nothing, and a Worker secret the same way', async () => {
+    secrets.CORE_GOOGLE_CLIENT_SECRET = 'GOCSPX-from-cloudflare-abcd1234'
+    await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: '0x4AAAAAAAshort9999' } } })
+    const { keys } = await (await call(handle, 'GET', `/api/core/credentials?names=${NAMES.join(',')}`, { actor: signIn })).json() as { keys: { name: string, hint: string | null, start: string | null }[] }
+    expect(keys.map(k => [k.name, k.start, k.hint])).toEqual([['CORE_TURNSTILE_SECRET_KEY', null, '9999'], ['CORE_GOOGLE_CLIENT_SECRET', 'GOCSPX-', '1234']])
+    await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: 'short' } } })
+    const after = await (await call(handle, 'GET', '/api/core/credentials?names=CORE_TURNSTILE_SECRET_KEY', { actor: signIn })).json() as { keys: { hint: string | null, start: string | null }[] }
+    expect(after.keys[0]).toMatchObject({ hint: null, start: null })
+  })
+})
+
 describe('POST /api/core/credentials', () => {
   it('saves a key encrypted, never sends it back, audits it by name, and the readers use it', async () => {
     const res = await call(handle, 'POST', '/api/core/credentials', { actor: sender, body: { keys: { CORE_CLOUDFLARE_TOKEN: 'cf_token_abcdefghijklmnop_7777' } } })
     expect(res.status).toBe(200)
     const text = await res.text()
     expect(text).not.toContain('abcdefghijklmnop')
-    expect(JSON.parse(text).keys).toEqual([{ name: 'CORE_CLOUDFLARE_TOKEN', source: 'saved', hint: '7777' }])
+    expect(JSON.parse(text).keys).toEqual([{ name: 'CORE_CLOUDFLARE_TOKEN', source: 'saved', hint: '7777', start: 'cf_' }])
     const [row] = await rows<{ ciphertext: string }>("SELECT ciphertext FROM core_credentials WHERE module_id = 'core' AND name = 'CORE_CLOUDFLARE_TOKEN'")
     expect(row!.ciphertext).not.toContain('abcdefghijklmnop')
     expect(await inContext(() => cloudflareToken())).toBe('cf_token_abcdefghijklmnop_7777')

@@ -27,6 +27,7 @@ export default defineRoute({
       module: entry.module,
       source: status!.source,
       hint: status!.hint,
+      start: status!.start,
       setAt: status!.setAt,
       labelKey: `${entry.module}.credentials.${short}.label`,
       helpKey: `${entry.module}.credentials.${short}.help`,

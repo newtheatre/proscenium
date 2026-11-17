@@ -1,8 +1,9 @@
 <!-- The shared keys form (Matt, 17 November: every configurable key is managed in the app). A page
      drops it in with the names of the credentials that belong to it, and it does the rest: loads
      where each value comes from now, takes new values, saves them together, and removes a saved one
-     after asking. A key is never shown again once saved: each field says "Saved, ending 4242", "Using
-     the Worker secret set in Cloudflare" or "Not set", and a blank field keeps what is there. Saving
+     after asking. A key is never shown again once saved: a set key's field is filled with dots between its
+     prefix and last four characters (sk_live_••••4242) and says where it comes from (saved here, the
+     Worker secret in Cloudflare), and Replace opens it to type a new one. Saving
      asks the person to confirm it is them. A credential declared confirm: true (replacing it breaks
      what the old value made) asks before it is replaced or removed. Keys the viewer may not manage
      are left out, and with none left the card is not drawn. -->
