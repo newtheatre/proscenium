@@ -55,6 +55,7 @@
   "membership.abilities.membership.add.label": "Add a member directly",
   "membership.abilities.membership.update.label": "Correct a membership's dates",
   "membership.abilities.membership.export.label": "Export the members list",
+  "membership.abilities.membership.import.label": "Import members into a scheme from a file",
   "membership.abilities.card.check.label": "Check whether somebody else holds a membership, at the desk or the door",
   "membership.abilities.verification-list.check.label": "See the name behind a ticket bought with a membership reference",
   "membership.abilities.verification-list.manage.label": "Load, add to and remove from verification lists, such as a students' union's list of student IDs",

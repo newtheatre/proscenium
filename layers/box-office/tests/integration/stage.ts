@@ -33,6 +33,8 @@ import amendPost from '../../server/api/box-office/orders/[id]/amend.post'
 import performancesGet from '../../server/api/box-office/performances/index.get'
 import doorGet from '../../server/api/box-office/performances/[id]/door.get'
 import doorAdmit from '../../server/api/box-office/performances/[id]/door/admit.post'
+import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.post'
+import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
 import doorTonight from '../../server/api/box-office/door/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
@@ -89,6 +91,8 @@ export const handle = server({
   'GET /api/box-office/performances': performancesGet,
   'GET /api/box-office/performances/:id/door': doorGet,
   'POST /api/box-office/performances/:id/door/admit': doorAdmit,
+  'POST /api/box-office/performances/:id/sales/copy': copyPost,
+  'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
   'GET /api/box-office/door/tonight': doorTonight,
   'GET /api/box-office/orders/:id': orderGet,
