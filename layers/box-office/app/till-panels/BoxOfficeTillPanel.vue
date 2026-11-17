@@ -12,7 +12,8 @@ const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { money, when } = await useMoney()
+const { money } = await useMoney()
+const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 
 const { data } = await useAPI<{ performances: Performance[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
@@ -26,7 +27,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // Selling: how many of each kind of ticket for one performance.
 const performanceId = ref<string | undefined>(performances.value[0]?.performanceId)
 const performance = computed(() => performances.value.find(p => p.performanceId === performanceId.value))
-const choices = computed(() => performances.value.map(p => ({ value: p.performanceId, label: `${p.title}, ${when(p.startsAt)}` })))
+const choices = computed(() => performances.value.map(p => ({ value: p.performanceId, label: `${p.title}, ${dateTime(p.startsAt)}` })))
 const quantities = ref<Record<string, number>>({})
 const keyOf = (row: { bandId: string, ticketTypeId: string }) => `${row.bandId} ${row.ticketTypeId}`
 watch(performanceId, () => { quantities.value = {} })
@@ -125,7 +126,6 @@ function clear() {
             v-model="performanceId"
             :items="choices"
             :disabled="locked"
-            class="w-full"
           />
         </UFormField>
         <p
@@ -153,9 +153,10 @@ function clear() {
     </template>
 
     <template v-else>
-      <form
+      <UForm
         class="flex items-end gap-2"
-        @submit.prevent="find()"
+        :state="{ query }"
+        @submit="find()"
       >
         <UFormField
           :label="t('box-office.screens.panel.find-label')"
@@ -166,7 +167,6 @@ function clear() {
             v-model="query"
             :disabled="locked"
             autocomplete="off"
-            class="w-full"
           />
         </UFormField>
         <UButton
@@ -176,7 +176,7 @@ function clear() {
           :loading="busy"
           :disabled="locked || !query.trim()"
         />
-      </form>
+      </UForm>
       <p
         v-if="searched && !order"
         class="text-sm text-muted"
@@ -214,13 +214,11 @@ function clear() {
             <span class="flex items-center gap-2">
               <span v-if="line.admittedAt">{{ t('box-office.screens.panel.admitted') }}</span>
               <span>{{ money(line.amountMinor, order.currency) }}</span>
-              <UButton
+              <IconButton
                 v-if="order.state === 'reserved' && order.lines.length > 1"
                 icon="i-lucide-x"
-                color="neutral"
-                variant="ghost"
                 size="xs"
-                :aria-label="t('box-office.screens.panel.remove', { type: line.ticketType })"
+                :label="t('box-office.screens.panel.remove', { type: line.ticketType })"
                 :disabled="locked || busy"
                 @click="amend({ remove: [line.id] })"
               />
@@ -239,7 +237,6 @@ function clear() {
               v-model="adding"
               :items="addChoices"
               :disabled="locked || busy"
-              class="w-full"
             />
           </UFormField>
           <UButton
