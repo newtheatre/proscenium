@@ -39,6 +39,8 @@ async function applied(name: string) {
 
 beforeAll(async () => {
   await ready()
+  // Payments takes no cash until a theatre turns it on.
+  await commit(unit => changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }))
   for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
 })
 

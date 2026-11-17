@@ -7,6 +7,7 @@ export default {
   label: 'membership-fees.desk.label',
   ability: 'membership-fees.payment.take',
   order: 20, // not-policy: after Box office's panel
+  icon: 'i-lucide-id-card',
   panel: 'MembershipFeesTillPanel',
   prepare: deskPrepare,
   attach: deskAttach,
