@@ -11,7 +11,7 @@ import { hashOf, newReference, randomToken } from './codes'
 import { pricesFor } from './prices'
 import { poolsOf, salesOf } from './setup'
 import { entitle, type Buyer, type Requirement } from './entitlement'
-import { sellableTypes } from './ticket-types'
+import { sellableTypes, soldOn } from './ticket-types'
 
 export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number }
 export interface BasketInput { performanceId: string, lines: BasketLineInput[] }
@@ -53,6 +53,9 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
     const type = types.get(line.ticketTypeId)
     if (!pool.has(line.bandId) || !type || type.kind === 'complimentary' || !price.has(`${line.bandId} ${line.ticketTypeId}`))
       refuse('box-office.price.none', 'One of these tickets is not on sale for this performance.', { status: 422, remedy: 'Reload to see what is on sale.' })
+    // A desk-only type is never sold online, nor an online-only one at the desk.
+    if (!soldOn(type.channel, buyer.channel))
+      refuse('box-office.ticket-type.wrong-channel', buyer.channel === 'online' ? 'One of these tickets is sold only at the box office.' : 'One of these tickets is sold only online.', { status: 422, remedy: 'Reload to see what is on sale.' })
   }
   if (asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
     refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })

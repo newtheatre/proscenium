@@ -295,7 +295,8 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
   const until = (await useSetting('box-office.sales.desk-until-after') as number) * 1000 // not-policy: seconds to milliseconds
   const sold = new Map((await all<{ performance_id: string, state: string }>("SELECT performance_id, state FROM box_office_performance_sales WHERE state <> 'draft'")).map(r => [r.performance_id, r.state]))
   const coming = (await listPerformances({ state: 'scheduled', from: at - until, to: at + AHEAD })).filter(p => sold.has(p.id) && p.startsAt + until > at).slice(0, MOST)
-  const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
+  // An online-only type is not offered at the desk.
+  const names = new Map((await all<{ id: string, name: string }>("SELECT id, name FROM box_office_ticket_types WHERE channel <> 'online'")).map(t => [t.id, t.name]))
   return Promise.all(coming.map(async (performance) => {
     const [production, available] = await Promise.all([getProduction(performance.productionId), availability(performance.id)])
     return {
@@ -304,7 +305,7 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       startsAt: performance.startsAt,
       state: sold.get(performance.id)!,
       currency: available.currency,
-      rows: available.bands.flatMap(b => b.prices.map(x => ({ bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free }))),
+      rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map(x => ({ bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free }))),
     }
   }))
 }
