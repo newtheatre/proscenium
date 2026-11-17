@@ -59,7 +59,7 @@ export function compsWhere(where: SQL): Promise<CompRow[]> {
 }
 
 /** Adds a request to the unit and says its id. */
-export async function requestComps(unit: UnitView, input: CompRequestInput): Promise<{ requestId: string }> {
+export async function requestComps(unit: UnitView, input: CompRequestInput): Promise<{ requestId: string, issued: boolean }> {
   const actor = useContext().actor
   if (!actor.accountId) refuse('box-office.comp.signed-out', 'Sign in to ask for complimentary tickets.', { status: 401 })
   const performance = await getPerformance(input.performanceId)
@@ -78,7 +78,12 @@ export async function requestComps(unit: UnitView, input: CompRequestInput): Pro
   unit.add(sql`INSERT INTO box_office_comp_requests (id, performance_id, band_id, quantity, for_account_id, reason_term_id, requested_by, state, created_at, updated_at)
     VALUES (${requestId}, ${input.performanceId}, ${input.bandId}, ${input.quantity}, ${accountId}, ${input.reasonTermId}, ${actor.accountId}, 'requested', ${at}, ${at})`)
   unit.announce('box-office.comp-request.requested', { requestId }, { record: ['box-office.comp-request', requestId] })
-  return { requestId }
+  // With no approval needed, the tickets are issued in the same batch, decided by nobody.
+  if (!await useSetting('box-office.comps.needs-approval')) {
+    await issueComps(unit, { id: requestId, performance_id: input.performanceId, band_id: input.bandId, quantity: input.quantity, for_account_id: accountId }, null)
+    return { requestId, issued: true }
+  }
+  return { requestId, issued: false }
 }
 
 /**
@@ -87,10 +92,16 @@ export async function requestComps(unit: UnitView, input: CompRequestInput): Pro
  * at once cannot pass the cap between them.
  */
 export async function approveComps(unit: UnitView, requestId: string): Promise<Confirmed> {
-  const actor = useContext().actor
   const request = await compById(requestId)
   if (!request) refuse('box-office.comp.not-found', 'There is no such request.', { status: 404 })
   if (request.state !== 'requested') refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  return issueComps(unit, request, useContext().actor.accountId ?? null)
+}
+
+/** Approves a request still asked for, in the unit, and issues its tickets. */
+async function issueComps(unit: UnitView, request: Pick<CompRow, 'id' | 'performance_id' | 'band_id' | 'quantity' | 'for_account_id'>, decidedBy: string | null): Promise<Confirmed> {
+  const actor = useContext().actor
+  const requestId = request.id
   // Box office keeps its own Complimentary type; it is made here if this site has not listed its types yet.
   await ensureManagedTicketTypes()
   const type = await managedType('box-office.complimentary')
@@ -102,7 +113,7 @@ export async function approveComps(unit: UnitView, requestId: string): Promise<C
   // Nothing is charged: the currency is the performance's, for the order's money columns.
   const currency = (await pricesFor(request.performance_id, at))[0]?.currency ?? 'GBP'
   const over = { code: 'box-office.comp.over-cap', reason: `Approving these would take this performance past its ${cap ?? 0} complimentary tickets.`, remedy: 'Decline it, or raise the limit in the box office settings.' }
-  unit.add(sql`UPDATE box_office_comp_requests SET state = 'approved', decided_by = ${actor.accountId ?? null}, decided_at = ${at}, updated_at = ${at}
+  unit.add(sql`UPDATE box_office_comp_requests SET state = 'approved', decided_by = ${decidedBy}, decided_at = ${at}, updated_at = ${at}
     WHERE id = ${requestId} AND state = 'requested'
       AND (${cap} IS NULL OR quantity + (SELECT coalesce(sum(quantity), 0) FROM box_office_comp_requests
         WHERE performance_id = ${request.performance_id} AND state IN ('approved', 'issued') AND id <> ${requestId}) <= ${cap})`).expect(1, cap === null ? CHANGED : over)

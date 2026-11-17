@@ -10,7 +10,7 @@ definePageMeta({ layout: 'console' })
 type State = 'requested' | 'approved' | 'declined' | 'issued' | 'withdrawn'
 interface Request { id: string, state: State, quantity: number, show: string, startsAt: number, band: string, forName: string | null, reason: string, requestedBy: string | null, orderId: string | null }
 interface Offer { id: string, title: string, label: string | null, startsAt: number, bands: { id: string, name: string }[] }
-interface Comps { mine: Request[], waiting: Request[], performances: Offer[] }
+interface Comps { mine: Request[], waiting: Request[], performances: Offer[], needsApproval: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -29,6 +29,15 @@ const TONES = { requested: 'info', approved: 'info', issued: 'success', declined
 const blank = () => ({ performanceId: '', bandId: '', quantity: 1, name: '', email: '', reasonTermId: '' })
 const form = ref(blank())
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const asking = ref(false)
+// With box-office.comps.needs-approval off, asking issues the tickets at once.
+const direct = computed(() => data.value?.needsApproval === false)
+const askWords = (key: string) => t(`box-office.comps.ask.${key}${direct.value ? '-direct' : ''}`)
+function startAsking() {
+  form.value = blank()
+  refusal.value = null
+  asking.value = true
+}
 const busy = ref<string | null>(null)
 
 const performanceItems = computed(() => (data.value?.performances ?? []).map(p => ({ value: p.id, label: `${p.title}, ${dateTime(p.startsAt)}` })))
@@ -49,9 +58,15 @@ const showFinished = ref(false)
 async function ask() {
   refusal.value = null
   try {
-    const { requestId } = await $api<{ requestId: string }>('/api/box-office/comps', { method: 'POST', body: { ...form.value, name: form.value.name.trim() || undefined, email: form.value.email.trim() } })
+    const { requestId, issued } = await $api<{ requestId: string, issued: boolean }>('/api/box-office/comps', { method: 'POST', body: { ...form.value, name: form.value.name.trim() || undefined, email: form.value.email.trim() } })
+    asking.value = false
     form.value = blank()
     await refresh()
+    // Tickets issued at once have been sent: there is nothing to undo.
+    if (issued) {
+      toast.add({ title: t('box-office.comps.issued'), color: 'success' })
+      return
+    }
     // Undo withdraws the request, while nobody has decided it yet.
     offer(t('box-office.comps.asked'), async () => {
       await $api(`/api/box-office/comps/${encodeURIComponent(requestId)}/withdraw`, { method: 'POST', body: {} })
@@ -85,8 +100,18 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
 <template>
   <PageFrame
     :title="t('box-office.navigation.comps.label')"
-    :description="t('box-office.comps.description')"
+    :description="direct ? t('box-office.comps.description-direct') : t('box-office.comps.description')"
   >
+    <template
+      v-if="data?.performances.length"
+      #primary
+    >
+      <UButton
+        icon="i-lucide-gift"
+        :label="askWords('title')"
+        @click="startAsking"
+      />
+    </template>
     <DataBoundary
       :data="data"
       :status="status"
@@ -125,91 +150,6 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 </span>
               </RecordListItem>
             </RecordList>
-          </PageSection>
-
-          <PageSection
-            v-if="d.performances.length"
-            :title="t('box-office.comps.ask.title')"
-            :description="t('box-office.comps.ask.description')"
-          >
-            <UForm
-              ref="askForm"
-              class="space-y-4"
-              :schema="compsInput"
-              :state="form"
-              novalidate
-              @submit="ask"
-            >
-              <RefusalNotice :refusal="refusal" />
-              <UFormField
-                name="performanceId"
-                :label="t('box-office.comps.ask.performance')"
-                required
-              >
-                <USelect
-                  v-model="form.performanceId"
-                  :items="performanceItems"
-                />
-              </UFormField>
-              <UFormField
-                name="bandId"
-                :label="t('box-office.comps.ask.band')"
-                required
-              >
-                <USelect
-                  v-model="form.bandId"
-                  :items="bandItems"
-                  :disabled="!form.performanceId"
-                />
-              </UFormField>
-              <UFormField
-                name="quantity"
-                :label="t('box-office.comps.ask.quantity')"
-                required
-              >
-                <UInputNumber
-                  v-model="form.quantity"
-                  :min="1"
-                />
-              </UFormField>
-              <UFormField
-                name="name"
-                :label="t('box-office.comps.ask.name')"
-              >
-                <UInput
-                  v-model="form.name"
-                  maxlength="120"
-                  autocomplete="off"
-                />
-              </UFormField>
-              <UFormField
-                name="email"
-                :label="t('box-office.comps.ask.email')"
-                :help="t('box-office.comps.ask.email-help')"
-                required
-              >
-                <UInput
-                  v-model="form.email"
-                  type="email"
-                  maxlength="254"
-                  autocomplete="off"
-                />
-              </UFormField>
-              <UFormField
-                name="reasonTermId"
-                :label="t('box-office.comps.ask.reason')"
-                required
-              >
-                <USelect
-                  v-model="form.reasonTermId"
-                  :items="reasonItems"
-                />
-              </UFormField>
-              <UButton
-                type="submit"
-                :label="t('box-office.comps.ask.button')"
-              />
-            </UForm>
           </PageSection>
 
           <PageSection :title="t('box-office.comps.mine')">
@@ -275,5 +215,95 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
         </div>
       </template>
     </DataBoundary>
+    <UModal
+      v-model:open="asking"
+      :title="askWords('title')"
+      :description="askWords('description')"
+    >
+      <template #body>
+        <UForm
+          id="comps-ask-form"
+          ref="askForm"
+          class="space-y-4"
+          :schema="compsInput"
+          :state="form"
+          novalidate
+          @submit="ask"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <UFormField
+            name="performanceId"
+            :label="t('box-office.comps.ask.performance')"
+            required
+          >
+            <USelect
+              v-model="form.performanceId"
+              :items="performanceItems"
+            />
+          </UFormField>
+          <UFormField
+            name="bandId"
+            :label="t('box-office.comps.ask.band')"
+            required
+          >
+            <USelect
+              v-model="form.bandId"
+              :items="bandItems"
+              :disabled="!form.performanceId"
+            />
+          </UFormField>
+          <UFormField
+            name="quantity"
+            :label="t('box-office.comps.ask.quantity')"
+            required
+          >
+            <UInputNumber
+              v-model="form.quantity"
+              :min="1"
+            />
+          </UFormField>
+          <UFormField
+            name="name"
+            :label="t('box-office.comps.ask.name')"
+          >
+            <UInput
+              v-model="form.name"
+              maxlength="120"
+              autocomplete="off"
+            />
+          </UFormField>
+          <UFormField
+            name="email"
+            :label="t('box-office.comps.ask.email')"
+            :help="askWords('email-help')"
+            required
+          >
+            <UInput
+              v-model="form.email"
+              type="email"
+              maxlength="254"
+              autocomplete="off"
+            />
+          </UFormField>
+          <UFormField
+            name="reasonTermId"
+            :label="t('box-office.comps.ask.reason')"
+            required
+          >
+            <USelect
+              v-model="form.reasonTermId"
+              :items="reasonItems"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="comps-ask-form"
+          :label="askWords('button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

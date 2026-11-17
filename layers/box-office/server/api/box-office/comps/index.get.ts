@@ -2,7 +2,7 @@
 // this person has made, the requests waiting that they may decide, and the performances they may
 // ask for, each with its bands. Anyone signed in may open it; what it holds depends on their grants.
 import { sql } from 'drizzle-orm'
-import { can, defineRoute, inAccountScope, nowMs } from '#kit'
+import { can, defineRoute, inAccountScope, nowMs, useSetting } from '#kit'
 import { accountLabel, getPerformance, getProduction, getTerm, listPerformances } from '#modules/core'
 import { compsWhere, type CompRow } from '../../../comps'
 import { poolsOf } from '../../../setup'
@@ -41,5 +41,5 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     const bands = (await poolsOf(p.id)).map(b => ({ id: b.bandId, name: b.bandName }))
     if (bands.length) performances.push({ id: p.id, title: await titleOf(p.productionId), label: p.label, startsAt: p.startsAt, bands })
   }
-  return { mine, waiting: open, performances }
+  return { mine, waiting: open, performances, needsApproval: await useSetting('box-office.comps.needs-approval') as boolean }
 })

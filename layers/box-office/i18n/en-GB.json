@@ -66,6 +66,8 @@
   "box-office.settings-sections.comps": "Complimentary tickets",
   "box-office.settings.comps.per-request.label": "Most complimentary tickets in one request",
   "box-office.settings.comps.per-request.help": "Anyone asking for more makes a second request.",
+  "box-office.settings.comps.needs-approval.label": "Complimentary tickets need approval",
+  "box-office.settings.comps.needs-approval.help": "Off, anyone who may ask for complimentary tickets issues them straight away, with no approver.",
   "box-office.settings.comps.per-performance.label": "Most complimentary tickets for one performance",
   "box-office.settings.comps.per-performance.help": "Approvals stop once a performance reaches this many. Nothing means no limit.",
   "box-office.abilities.comp.request.label": "Ask for complimentary tickets",
