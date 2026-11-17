@@ -5,6 +5,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
+import { env } from 'cloudflare:test'
 import { inContext, person, rows, server, call, setModule } from '../../../../tests/integration/helpers'
 import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post'
@@ -173,7 +174,8 @@ describe('a member price', () => {
     expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.' })
     const mine = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, await member())
     expect(mine.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ most: 1 })
-    expect(mine.body.bands[0].types.find((t: { unmet?: string }) => t.unmet)).toBeUndefined()
+    // Only the Wheelchair space, which every show offers, is out of a member's reach here.
+    expect(mine.body.bands[0].types.filter((t: { unmet?: string }) => t.unmet).map((t: { name: string }) => t.name)).toEqual(['Wheelchair space'])
   })
 
   it('is withheld while Membership is off', async () => {
@@ -193,6 +195,84 @@ describe('a companion ticket', () => {
     const buyer = person([])
     expect(await buy(h, h.fullId, 1, buyer, [{ ticketTypeId: companion.id, quantity: 1 }])).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
     expect((await buy(h, h.fullId, 1, buyer)).ok).toBe(true)
+  })
+})
+
+describe('a wheelchair space', () => {
+  /** Someone signed in who has applied to the access scheme saying they stay in their wheelchair. */
+  async function wheelchairUser(holder?: ReturnType<typeof person>, decided = false) {
+    if (!holder) {
+      holder = person([])
+      await rows('INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, \'Wheelchair User\', \'self\', ?, ?)', holder.accountId, NOV_16, NOV_16)
+    }
+    const [stays] = await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.access-need' AND slug = 'wheelchair-stays'")
+    const scheme = await import('../../../core/server/identity/access-scheme')
+    await inContext(async () => {
+      const unit = createUnit()
+      await scheme.apply(unit.view(), holder!, holder!.accountId!, { needs: [{ term: stays!.id }], companions: 0 })
+      await unit.commit()
+    }, holder)
+    if (decided) {
+      const reviewer = person(['core.access-scheme.review'])
+      await inContext(async () => {
+        const unit = createUnit()
+        await scheme.decide(unit.view(), reviewer, holder!.accountId!, { action: 'accept' })
+        await unit.commit()
+      }, reviewer)
+    }
+    return holder
+  }
+  const evidence = async (orderId: string) => (await rows<{ requirement_evidence_id: string | null }>('SELECT requirement_evidence_id FROM box_office_order_lines WHERE order_id = ?', orderId)).map(r => r.requirement_evidence_id)
+
+  it('is kept by Box office and costs the lowest price open to everyone, with no price of its own', async () => {
+    const h = await house(20)
+    const wheelchair = await managed('box-office.wheelchair')
+    expect(wheelchair).toMatchObject({ name: 'Wheelchair space', requirementRefs: ['core.access-scheme:wheelchair'] })
+    const holder = await wheelchairUser(undefined, true)
+    const bought = await buy(h, wheelchair.id, 1, holder)
+    expect(bought.ok, JSON.stringify(bought)).toBe(true)
+    const [line] = await rows<{ amount_minor: number }>('SELECT amount_minor FROM box_office_order_lines WHERE order_id = ?', (bought as { orderId: string }).orderId)
+    expect(line!.amount_minor).toBe(800)
+    expect(await evidence((bought as { orderId: string }).orderId)).toEqual([null])
+  })
+
+  it('is booked on an application not yet decided, and the order says so for staff', async () => {
+    const h = await house(20)
+    const wheelchair = await managed('box-office.wheelchair')
+    const holder = await wheelchairUser()
+    const bought = await buy(h, wheelchair.id, 1, holder)
+    expect(bought.ok, JSON.stringify(bought)).toBe(true)
+    const orderId = (bought as { orderId: string }).orderId
+    expect(await evidence(orderId)).toEqual(['pending'])
+    await env.DB.prepare("UPDATE box_office_orders SET state = 'reserved', account_id = ? WHERE id = ?").bind(holder.accountId, orderId).run()
+    const order = await req('GET', `/api/box-office/orders/${orderId}`, undefined, person(['box-office.order.view']))
+    expect(order.status, JSON.stringify(order.body)).toBe(200)
+    expect(order.body.lines[0]).toMatchObject({ ticketType: 'Wheelchair space', requirementPending: true })
+  })
+
+  it('costs a member who uses a wheelchair the member price, when that is lower', async () => {
+    const h = await house(20)
+    const wheelchair = await managed('box-office.wheelchair')
+    const memberType = await managed('membership.member')
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: memberType.id, amountMinor: 500 }] })).status).toBe(200)
+    const bought = await buy(h, wheelchair.id, 1, await wheelchairUser(await member(), true))
+    expect(bought.ok, JSON.stringify(bought)).toBe(true)
+    const [line] = await rows<{ amount_minor: number, ticket_type_id: string }>('SELECT amount_minor, ticket_type_id FROM box_office_order_lines WHERE order_id = ?', (bought as { orderId: string }).orderId)
+    expect(line).toEqual({ amount_minor: 500, ticket_type_id: wheelchair.id })
+  })
+
+  it('is refused to someone not on the access scheme, and not sold at all while the scheme is off', async () => {
+    const h = await house(20)
+    const wheelchair = await managed('box-office.wheelchair')
+    expect(await buy(h, wheelchair.id, 1, person([]))).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    const holder = await wheelchairUser(undefined, true)
+    await env.DB.prepare("INSERT INTO core_settings (key, value, updated_at) VALUES ('core.access-scheme.enabled', 'false', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
+    try {
+      expect(await buy(h, wheelchair.id, 1, holder)).toMatchObject({ ok: false, code: 'box-office.price.none' })
+    }
+    finally {
+      await env.DB.prepare("DELETE FROM core_settings WHERE key = 'core.access-scheme.enabled'").run()
+    }
   })
 })
 

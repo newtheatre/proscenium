@@ -158,6 +158,10 @@ export default defineModule({
     'box-office.ticket-type': [
       { id: 'companion', name: 'Companion', kind: 'companion', requirementRefs: ['core.access-scheme:companions'], needsPaidTicket: true, recheckAtEntry: false, sort: 90 },
       { id: 'complimentary', name: 'Complimentary', kind: 'complimentary', sort: 99 },
+      // A wheelchair space for someone on the access scheme who stays in their wheelchair (Matt,
+      // 2026-11-17). It has no price of its own: it costs the lowest price the buyer can have in its
+      // band (prices.ts), and an application not yet decided is enough, with the booking flagged.
+      { id: 'wheelchair', name: 'Wheelchair space', kind: 'standard', requirementRefs: ['core.access-scheme:wheelchair'], recheckAtEntry: false, sort: 80 },
     ],
     // Box office owns its part of a payment: it makes the sale real when the money arrives.
     'payments.settlement': [{ id: 'box-office' }],

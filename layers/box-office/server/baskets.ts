@@ -3,12 +3,12 @@
 // nothing. The hold starts then and editing never moves its end. A basket has no account yet: it is
 // opened again with the token handed back here, which is stored only as its hash and stays the
 // browser's own through checkout.
-import { all, first, newId, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, refuse, requirements, useContext, useSetting, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { orderLines } from './db/schema'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
-import { pricesFor } from './prices'
+import { pricesFor, type Price } from './prices'
 import { poolsOf, salesOf } from './setup'
 import { entitle, type Buyer, type Requirement } from './entitlement'
 import { sellableTypes, soldOn } from './ticket-types'
@@ -59,13 +59,41 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
   }
   if (asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
     refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
+  const lowered = await lowestFor(performanceId, asked, prices, types, buyer)
   const each = asked.flatMap(l => Array.from({ length: l.quantity }, () => {
-    const p = price.get(`${l.bandId} ${l.ticketTypeId}`)!
+    const p = lowered.get(`${l.bandId} ${l.ticketTypeId}`) ?? price.get(`${l.bandId} ${l.ticketTypeId}`)!
     return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor }
   }))
   const entitled = await entitle(performanceId, each, types, buyer)
   const lines = each.map((l, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
   return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
+}
+
+/**
+ * A Wheelchair space costs the lowest price the buyer can have in its band: its own price is the
+ * lowest open to everyone, and a signed-in buyer who qualifies for a cheaper type, such as Member,
+ * pays that instead. Only the cheaper types are asked about, cheapest first.
+ */
+async function lowestFor(performanceId: string, asked: BasketLineInput[], prices: Price[], types: Awaited<ReturnType<typeof sellableTypes>>, buyer: { channel: 'online' | 'desk', account: string | null }): Promise<Map<string, Price>> {
+  const out = new Map<string, Price>()
+  if (buyer.channel !== 'online' || !buyer.account) return out
+  for (const line of asked) {
+    const own = prices.find(p => p.bandId === line.bandId && p.ticketTypeId === line.ticketTypeId)
+    if (!own?.derived) continue
+    const cheaper = prices.filter((p) => {
+      const type = types.get(p.ticketTypeId)
+      return p.bandId === line.bandId && !p.derived && p.amountMinor < own.amountMinor && type && type.requirementRefs.length
+        && type.kind !== 'companion' && type.kind !== 'complimentary' && !type.needsPaidTicket && soldOn(type.channel, 'online')
+    }).sort((a, b) => a.amountMinor - b.amountMinor)
+    for (const p of cheaper) {
+      const answers = await requirements.check({ accounts: [buyer.account], refs: types.get(p.ticketTypeId)!.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
+      if (answers.some(a => a.verdict === 'met' && !a.unavailable)) {
+        out.set(`${line.bandId} ${line.ticketTypeId}`, p)
+        break
+      }
+    }
+  }
+  return out
 }
 
 /** Adds an online basket to the unit: every ticket asked for is held together, or nothing is. */
@@ -104,7 +132,7 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   guard(unit)
   const lineIds = unit.insertSet(orderLines, lines.map((l, i) => ({
     orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
-    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null,
+    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null,
   })))
   unit.expect(lines.length)
   return { orderId, reference, token, expiresAt, currency, totalMinor, lines: lines.map((l, i) => ({ id: lineIds[i]!, bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: l.amountMinor })) }
