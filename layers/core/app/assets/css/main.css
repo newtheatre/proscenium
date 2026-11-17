@@ -74,6 +74,18 @@
 .live-shell :where(input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='range'])) {
   min-height: var(--proscenium-target-live);
 }
+/* A button or tab stretched to the live target draws its words and icon at the size Nuxt UI gives
+   an xl button, so a small one does not look lost inside its own larger box. */
+.live-shell :is(button, a)[data-slot='base']:not([role='checkbox'], [role='switch'], [role='radio']),
+.live-shell [role='tab'][data-slot='trigger'] {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  gap: 0.5rem;
+}
+.live-shell :is(button, a)[data-slot='base'] > :is([data-slot='leadingIcon'], [data-slot='trailingIcon']) {
+  width: 1.5rem;
+  height: 1.5rem;
+}
 
 /* The eight calendar colours (UI-35), apart from the brand and the status colours so no brand can
    make them unreadable. Each sets a fill, its text (over 7:1 on the fill) and an edge that keeps 3:1
