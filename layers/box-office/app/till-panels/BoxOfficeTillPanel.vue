@@ -6,7 +6,7 @@
 interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
-interface PendingExchange { orderId: string, reference: string, lineIds: string[], performanceId: string, bandId: string, ticketTypeId: string, expectedDifferenceMinor: number }
+interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
 interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, lines: OrderLine[] }
 
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
@@ -25,7 +25,7 @@ function readExchange(value: unknown): PendingExchange | null {
   if (typeof value !== 'string') return null
   try {
     const parsed = JSON.parse(value) as PendingExchange
-    return parsed && typeof parsed.orderId === 'string' && Array.isArray(parsed.lineIds) && Number.isInteger(parsed.expectedDifferenceMinor) ? parsed : null
+    return parsed && typeof parsed.orderId === 'string' && Array.isArray(parsed.lines) && Number.isInteger(parsed.expectedDifferenceMinor) ? parsed : null
   }
   catch {
     return null
@@ -143,7 +143,7 @@ function clear() {
       {{ t('box-office.screens.panel.exchange.title', { reference: exchange.reference }) }}
     </h3>
     <p class="text-sm">
-      {{ t('box-office.screens.panel.exchange.description', { count: exchange.lineIds.length }) }}
+      {{ t('box-office.screens.panel.exchange.description', { count: exchange.lines.length }) }}
     </p>
     <p class="font-medium">
       {{ t('box-office.screens.panel.due', { amount: money(exchange.expectedDifferenceMinor) }) }}
