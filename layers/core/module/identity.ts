@@ -29,29 +29,29 @@ export const identitySettings = defineSettings('core', {
   'recovery.enrolment-link-lifetime': setting.duration({ default: '24h', min: '1h', max: '7d', change, scope: 'site' }),
   'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change, scope: 'site' }),
 
-  'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
-  'grants.allow-no-expiry': setting.boolean({ default: true, change }),
-  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change }),
+  'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change, scope: 'site' }),
+  'grants.allow-no-expiry': setting.boolean({ default: true, change, scope: 'site' }),
+  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change, scope: 'site' }),
 
-  'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
-  'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
-  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change }),
+  'members-area.enabled': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
+  'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, scope: 'site', audience: 'public', quotable: true }),
+  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change, scope: 'site' }),
 
-  'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change }),
+  'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change, scope: 'site' }),
 
-  'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, audience: 'public', quotable: true }),
-  'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
+  'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, scope: 'site', audience: 'public', quotable: true }),
+  'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, scope: 'site', audience: 'public', quotable: true }),
   // Erasure and the download are not offered until the theatre says who to contact about personal data.
-  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true }),
-  'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
+  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, scope: 'site', audience: 'public', quotable: true }),
+  'privacy.contact': setting.text({ unset: true, maxLength: 120, change, scope: 'site', audience: 'public', quotable: true }),
 
-  'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
-  'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, audience: 'public', quotable: true }),
-  'access-scheme.allow-note': setting.boolean({ default: true, change }),
-  'access-scheme.companions-need-verified': setting.boolean({ default: false, change }),
-  'access-scheme.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
-  'access-scheme.review-after': setting.duration({ default: '1095d', min: '365d', max: '3650d', change }),
-  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change }),
+  'access-scheme.enabled': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
+  'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, scope: 'site', audience: 'public', quotable: true }),
+  'access-scheme.allow-note': setting.boolean({ default: true, change, scope: 'site' }),
+  'access-scheme.companions-need-verified': setting.boolean({ default: false, change, scope: 'site' }),
+  'access-scheme.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change, scope: 'site', audience: 'public', quotable: true }),
+  'access-scheme.review-after': setting.duration({ default: '1095d', min: '365d', max: '3650d', change, scope: 'site' }),
+  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change, scope: 'site' }),
 })
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
@@ -374,6 +374,22 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Your sign-in at {{ theatre }} has changed',
         body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+      },
+    },
+  }, {
+    // Two accounts were joined into one (part 4, Merge, "Tell both"), to every verified address of
+    // both, read before the merge moved them. It names nobody, so it says nothing to an address
+    // about another person's account.
+    id: 'core.merge-notice',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: {},
+    wording: {
+      'en-GB': {
+        subject: 'Your accounts at {{ theatre }} have been joined',
+        body: 'Two accounts at {{ theatre }} that belong to you, including the one for this address, have been joined into one, so your bookings and history are now in one place. You sign in as before, with any of your addresses.\n\nIf you did not expect this, contact the theatre soon: for a while it can be undone.',
       },
     },
   }, {

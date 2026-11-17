@@ -328,11 +328,21 @@ export function exactChangeCounts(source: string): number[] {
   return found
 }
 
+/** Lines (1-based) whose SQL reads SQLite's changes(). */
+export function changesInSql(source: string): number[] {
+  return source.split('\n').flatMap((line, i) => /\bchanges\s*\(\s*\)/.test(line) && !/^\s*(\/\/|\*)/.test(line) ? [i + 1] : [])
+}
+
 export function checkChangeCounts(modules: Loaded[]): string[] {
   const problems: string[] = []
   for (const m of modules) {
     for (const file of moduleFiles(m).filter(f => f.endsWith('.ts'))) {
-      for (const line of exactChangeCounts(readFileSync(file, 'utf8'))) problems.push(`${rel(file)}:${line}: compares a count of changed rows with a number other than 0; triggers and search indexes add to the count, so test it against 0 or use the unit of work's guard`)
+      const source = readFileSync(file, 'utf8')
+      for (const line of exactChangeCounts(source)) problems.push(`${rel(file)}:${line}: compares a count of changed rows with a number other than 0; triggers and search indexes add to the count, so test it against 0 or use the unit of work's guard`)
+      // A search index flushes what it holds when the next write opens, so changes() read by a later
+      // statement can be stale (Foundations part 3, "the claim stamp"). Only the kit's guard reads it.
+      if (rel(file).startsWith('layers/core/kit/')) continue
+      for (const line of changesInSql(source)) problems.push(`${rel(file)}:${line}: reads changes() in SQL, which a search index can leave stale; stamp the row in the conditional write and read the stamp back`)
     }
   }
   return problems
