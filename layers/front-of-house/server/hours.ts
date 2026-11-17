@@ -2,11 +2,19 @@
 // Read under hours.view, which is audited on read. Front of house never reads the accounts table:
 // names come from the core's accountLabel. A merge moves assignments to the survivor, so each person
 // is one row.
-import { all } from '#kit'
+import { all, theatreTimeZone } from '#kit'
+import { instantOfLocal, previousDate } from '#kit/clock'
 import { accountScopeSql } from '#kit/accounts'
 import { accountLabel } from '#modules/core'
 
 export interface HoursFilter { from: number, to: number, accountId?: string, dutyId?: string }
+/** The range a query names, in milliseconds: given directly, or as the theatre's days, both ends included. */
+export async function hoursRange(q: { from?: number, to?: number, fromDay?: string, toDay?: string, accountId?: string, dutyId?: string }): Promise<HoursFilter> {
+  if (q.from !== undefined && q.to !== undefined) return { from: q.from, to: q.to, accountId: q.accountId, dutyId: q.dutyId }
+  const zone = await theatreTimeZone()
+  return { from: instantOfLocal(q.fromDay!, '00:00', zone), to: instantOfLocal(previousDate(q.toDay!, -1), '00:00', zone), accountId: q.accountId, dutyId: q.dutyId }
+}
+
 export interface HoursRow { accountId: string, name: string, shiftsWorked: number, minutes: number, noShows: number }
 
 /** Minutes worked, grouped by person, for shifts whose call time falls in [from, to). */

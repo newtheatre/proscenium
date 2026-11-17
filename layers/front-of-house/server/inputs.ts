@@ -49,10 +49,14 @@ export const personInput = z.object({
   details: z.string().trim().max(2000).nullish(), // not-policy: shape bound
 }).strict()
 
-// Calls at or after `from` and before `to`, in UTC milliseconds.
+// Calls at or after `from` and before `to`, in UTC milliseconds; or from the start of `fromDay` to
+// the end of `toDay`, the theatre's own days (YYYY-MM-DD), as the screen's date range gives them.
+const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: the shape of a YYYY-MM-DD date
 export const hoursQuery = z.object({
-  from: z.coerce.number().int().nonnegative(),
-  to: z.coerce.number().int().positive(),
+  from: z.coerce.number().int().nonnegative().optional(),
+  to: z.coerce.number().int().positive().optional(),
+  fromDay: DAY.optional(),
+  toDay: DAY.optional(),
   accountId: z.string().min(1).max(40).optional(), // not-policy: shape bound
   dutyId: z.string().min(1).max(40).optional(), // not-policy: shape bound
-})
+}).refine(q => (q.from !== undefined && q.to !== undefined) || (q.fromDay !== undefined && q.toDay !== undefined), { message: 'Give from and to, or fromDay and toDay.' })
