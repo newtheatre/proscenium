@@ -109,14 +109,49 @@ export async function writeActive(unit: UnitView, input: ActiveInput): Promise<{
           VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?)`,
     params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.origin, input.startsOn, endsOn, at, input.addedBy ?? null, input.note ?? null, at, at],
   }).expect(1)
-  // A3: the number is one more than the highest, read and written in one statement; the unique
-  // index settles a race. A person who has ever held a membership keeps theirs.
-  unit.add({
-    sql: `INSERT INTO membership_members (id, account_id, number, first_joined_on, created_at) SELECT ?1, ?2, coalesce(max(number), 0) + 1, ?3, ?4 FROM membership_members WHERE NOT EXISTS (SELECT 1 FROM membership_members WHERE account_id IN (${accountScopeSql('?2')}))`,
-    params: [newId('mbr'), input.accountId, input.startsOn, at],
-  })
+  writeNumber(unit, input.accountId, input.startsOn, at)
   unit.announce('membership.membership.started', { membershipId: id, schemeId: input.scheme.id, accountId: input.accountId }, { record: ['membership.membership', id] })
   return { membershipId: id, startsOn: input.startsOn, endsOn }
+}
+
+/**
+ * A3: the number is one more than the highest, read and written in one statement; the unique index
+ * settles a race. A person who has ever held a membership keeps theirs.
+ */
+export function writeNumber(unit: UnitView, accountId: string, startsOn: string, at: number): void {
+  unit.add({
+    sql: `INSERT INTO membership_members (id, account_id, number, first_joined_on, created_at) SELECT ?1, ?2, coalesce(max(number), 0) + 1, ?3, ?4 FROM membership_members WHERE NOT EXISTS (SELECT 1 FROM membership_members WHERE account_id IN (${accountScopeSql('?2')}))`,
+    params: [newId('mbr'), accountId, startsOn, at],
+  })
+}
+
+/** An application waiting on staff to check it (V2, V3): pending, with verification outstanding. */
+export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null }): string {
+  const at = nowMs()
+  const id = newId('mshp')
+  unit.add({
+    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, needs_verification, needs_approval, needs_payment, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', 'applied', 1, 0, 0, ?, ?)`,
+    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, at, at],
+  }).expect(1)
+  return id
+}
+
+/**
+ * Activates a pending application whose last requirement has just been met (A1): its dates are set
+ * now, from the day it activates. The check constraint refuses it while anything is outstanding.
+ */
+export function activatePending(unit: UnitView, input: { id: string, scheme: Scheme, accountId: string, count: number, startsOn: string, endsOn?: string | null }): { startsOn: string, endsOn: string | null } {
+  const at = nowMs()
+  const endsOn = input.endsOn !== undefined ? input.endsOn : endsOnFor(input.scheme, input.startsOn, input.count)
+  unit.add({
+    // D9: an end date from a list entry leaves the membership without a length option.
+    sql: `UPDATE membership_memberships SET state = 'active', starts_on = ?, ends_on = ?, verified_at = coalesce(verified_at, ?), activated_at = ?, expires_at = NULL, updated_at = ?${input.endsOn !== undefined ? ', length_option_id = NULL' : ''} WHERE id = ? AND state = 'pending'`,
+    params: [input.startsOn, endsOn, at, at, at, input.id],
+  }).expect(1, { code: 'membership.application.changed', reason: 'This application has already been dealt with.', remedy: 'Reload the page.' })
+  writeNumber(unit, input.accountId, input.startsOn, at)
+  unit.announce('membership.membership.started', { membershipId: input.id, schemeId: input.scheme.id, accountId: input.accountId }, { record: ['membership.membership', input.id] })
+  return { startsOn: input.startsOn, endsOn }
 }
 
 /** The person's member number, shown with the theatre's prefix. Null before their first membership. */

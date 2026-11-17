@@ -56,6 +56,8 @@ export default defineModule({
     // Privileged: a scheme decides who gets the members' area.
     'scheme.manage': ability({ on: 'membership.scheme', risk: 'privileged', implies: ['scheme.view'] }),
     'membership.view': ability({ on: 'membership.membership', owner: 'grants', audit: 'read', implies: ['core.account.find'] }),
+    // Passing or declining an application waiting on a check (V3). Nobody checks their own.
+    'membership.verify': ability({ on: 'membership.membership', owner: 'refuses', implies: ['membership.view'] }),
     'membership.add': ability({ on: 'membership.scheme', implies: ['membership.view'] }),
     // Asking whether somebody else holds a membership: a seller checking a customer's member price,
     // a steward at the door. The requirement source's checkAbility.
@@ -89,6 +91,7 @@ export default defineModule({
   contributes: {
     'core.navigation': [
       { id: 'membership.schemes', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/schemes', match: '/console/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
+      { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5 },
       { id: 'membership.lists', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/lists', match: '/console/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],

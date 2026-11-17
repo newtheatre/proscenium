@@ -124,3 +124,14 @@ test('the Till takes part of the total one way and the rest another', async ({ p
   await page.getByRole('button', { name: 'Cash taken: £3.50' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
 })
+
+test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {
+  await visit(page, '/console/payments/sessions')
+  // Other browser tests open tills of the same name, so this looks for one and for its state.
+  await expect(page.getByRole('cell', { name: 'Box office desk' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Open', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('searchbox')).toBeVisible()
+  await visit(page, '/console/payments/sessions?view=counting')
+  await expect(page.getByRole('cell', { name: 'Open', exact: true })).toHaveCount(0)
+  await noViolations(page)
+})

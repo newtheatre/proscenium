@@ -1,8 +1,9 @@
-// Publishes a draft shift, so members can see it and sign up (FH-07, the part the gate needs).
+// Publishes a draft shift, so members can see it and sign up (FH-07).
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
-import { getShift, publishShift } from '../../../../shifts'
+import { getShift } from '../../../../shifts'
+import { publishShifts } from '../../../../rota'
 
 export default defineRoute({
   ability: 'front-of-house.shift.manage',
@@ -13,6 +14,6 @@ export default defineRoute({
 }, async (_event, { record, unit }) => {
   const shift = await getShift(record!.id!)
   if (!shift) refuse('core.not-found', 'There is no such shift.', { status: 404 })
-  publishShift(unit.view(), shift)
+  publishShifts(unit.view(), [shift])
   return { shiftId: shift.id }
 })
