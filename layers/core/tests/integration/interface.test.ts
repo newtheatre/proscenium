@@ -69,6 +69,15 @@ describe('the guard for addresses under a shell (UI-07, UI-08)', () => {
     expect((await decide('/console', reader())).decision).toBe('allow')
   })
 
+  it('opens a screen for someone who holds its ability but must confirm it is you, so a reload is not refused', async () => {
+    // Site settings are privileged: a strong sign-in, confirmed recently. The API asks for that when
+    // the screen loads or saves, where the browser can confirm in place; a server render cannot.
+    const stale = person(['core.settings.manage'], { reassertedAt: 1 })
+    const basic = person(['core.settings.manage'], { assurance: 'basic' })
+    expect((await decide('/admin/theatre', stale)).decision).toBe('allow')
+    expect((await decide('/admin/theatre', basic)).decision).toBe('allow')
+  })
+
   it('lets any signed-in person open their account', async () => {
     expect((await decide('/account/gallery', audience())).decision).toBe('allow')
   })
