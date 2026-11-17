@@ -124,3 +124,18 @@ test('the Till takes part of the total one way and the rest another', async ({ p
   await page.getByRole('button', { name: 'Cash taken: £3.50' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
 })
+
+test('the Till picks a sale up again when the SumUp app sends the seller back', async ({ page, playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
+  const made = await api.post('/api/payments/till/sale', { data: { panels: [{ basket: 'gallery', input: { count: 1 } }] }, headers: { 'idempotency-key': crypto.randomUUID() } })
+  expect(made.ok()).toBe(true)
+  const { intentId } = await made.json() as { intentId: string }
+
+  await visit(page, `/console/payments/till?attempt=att_none&intent=${intentId}&result=failed`)
+  await expect(page.getByText('Still to pay: £3.00')).toBeVisible()
+  await expect(page.getByText('The payment did not go through')).toBeVisible()
+  await expect(page).toHaveURL(/\/console\/payments\/till$/)
+  await noViolations(page)
+  expect((await api.post(`/api/payments/intents/${intentId}/cancel`, { data: {} })).ok()).toBe(true)
+  await api.dispose()
+})

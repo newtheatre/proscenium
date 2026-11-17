@@ -15,6 +15,8 @@ const emit = defineEmits<{ settled: [{ intentId: string, amountMinor: number }] 
 
 const { t } = useT()
 const { $api } = useNuxtApp()
+const route = useRoute()
+const router = useRouter()
 const { currency, money, toMinor } = await useMoney()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
@@ -164,7 +166,8 @@ async function pay(succeeded = true) {
     else {
       const started = await $api<{ next: Next, state: string, settled: boolean, unfulfilled: boolean }>(`/api/payments/intents/${sale.value.intentId}/start` as string, {
         method: 'POST',
-        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, amountMinor: partMinor.value },
+        // The SumUp app sends the seller back to this screen, which picks the sale up again (resume).
+        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, amountMinor: partMinor.value, returnTo: route.path },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -199,6 +202,37 @@ function partTaken(amountMinor: number) {
   part.value = undefined
 }
 const paidInPart = computed(() => (payment.value?.paidMinor ?? 0) > 0)
+
+// Back from a hand-off to another app, such as SumUp's: the page has loaded afresh, so the sale is
+// picked up again from its payment, and what the app said is shown. The address is then cleaned so a
+// reload does not repeat it.
+async function resume(intentId: string, said: string) {
+  try {
+    const now = await $api<Status>(`/api/payments/intents/${intentId}` as string)
+    sale.value = { intentId, amountMinor: now.amountMinor, key: crypto.randomUUID() }
+    payment.value = now
+    if (now.state === 'open' && !offered.value) offered.value = await $api<{ methods: Offer[] }>('/api/payments/till/methods')
+    if (now.state === 'succeeded') return done()
+    if (now.state === 'unfulfilled') return undone()
+    if (now.state !== 'open') return ended()
+    if (now.waiting) {
+      result.value = { kind: 'waiting' }
+      poll()
+    }
+    else if (said === 'succeeded') toast.add({ title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
+    else if (said === 'failed') result.value = { kind: 'declined' }
+    else toast.add({ title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+onMounted(() => {
+  const { intent, result: said, attempt, ...rest } = route.query
+  if (typeof intent !== 'string' || typeof said !== 'string' || !attempt) return
+  void router.replace({ query: rest })
+  if (open.value) void resume(intent, said)
+})
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
 
