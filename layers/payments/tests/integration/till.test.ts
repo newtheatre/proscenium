@@ -7,6 +7,7 @@ import { addAttempt, recordAnswer } from '../../server/answers'
 import sessionGet from '../../server/api/payments/session.get'
 import sessionsPost from '../../server/api/payments/sessions.post'
 import sessionsGet from '../../server/api/payments/sessions.get'
+import recentGet from '../../server/api/payments/sessions/recent.get'
 import countPost from '../../server/api/payments/sessions/[id]/count.post'
 import closePost from '../../server/api/payments/sessions/[id]/close.post'
 import summaryPost from '../../server/api/payments/till/summary.post'
@@ -27,6 +28,7 @@ const handle = server({
   'GET /api/payments/session': sessionGet,
   'POST /api/payments/sessions': sessionsPost,
   'GET /api/payments/sessions': sessionsGet,
+  'GET /api/payments/sessions/recent': recentGet,
   'POST /api/payments/sessions/:id/count': countPost,
   'POST /api/payments/sessions/:id/close': closePost,
   'POST /api/payments/till/summary': summaryPost,
@@ -208,6 +210,23 @@ describe('cashing up (PAY-03)', () => {
     const countersigned = await post(`/api/payments/sessions/${sessionId}/close`, manager, { countedMinor: 3000, varianceNote: 'Short: a note was missing' })
     expect(countersigned.body).toMatchObject({ varianceMinor: -1000, session: { state: 'closed', closedBy: manager.accountId } })
     const list = await get('/api/payments/sessions', manager)
-    expect(list.body.sessions.find((s: { id: string }) => s.id === sessionId)).toMatchObject({ expectedCashMinor: 4000, countedCashMinor: 3000 })
+    expect(list.body.rows.find((s: { id: string }) => s.id === sessionId)).toMatchObject({ expectedCashMinor: 4000, countedCashMinor: 3000, canClose: false })
+    expect((await get('/api/payments/sessions/recent', manager)).body.sessions.at(-1)).toMatchObject({ id: sessionId, countedCashMinor: 3000 })
+  })
+
+  it('lists sessions newest first, filters by state, and offers closing only to someone allowed', async () => {
+    const me = seller()
+    const { sessionId } = await sellForCash(me, 0, 1500)
+    await post(`/api/payments/sessions/${sessionId}/count`, me)
+    const counting = await get('/api/payments/sessions?state=counting', manager)
+    expect(counting.body.rows.map((s: { id: string }) => s.id)).toContain(sessionId)
+    expect(counting.body.rows.every((s: { state: string }) => s.state === 'counting')).toBe(true)
+    expect(counting.body.rows.find((s: { id: string }) => s.id === sessionId).canClose).toBe(true)
+    const viewer = person(['payments.session.view'])
+    expect((await get('/api/payments/sessions?state=counting', viewer)).body.rows.find((s: { id: string }) => s.id === sessionId).canClose).toBe(false)
+    const all = await get('/api/payments/sessions', manager)
+    const opened = all.body.rows.map((s: { openedAt: number }) => s.openedAt)
+    expect(opened).toEqual([...opened].sort((a: number, b: number) => b - a))
+    expect(all.body.total).toBeGreaterThanOrEqual(opened.length)
   })
 })
