@@ -12,6 +12,7 @@
   "awards.abilities.award.issue.label": "Issue an award the committee has decided",
   "awards.abilities.award.update.label": "Correct an award's wording, date and where it is listed",
   "awards.abilities.award.revoke.label": "Revoke an award",
+  "awards.abilities.award.check.label": "Check whether somebody else holds an award, at the desk or the door",
   "awards.abilities.settings.manage.label": "Change awards settings",
 
   "awards.navigation.types.label": "Award types",
@@ -127,6 +128,10 @@
   "awards.screens.mine.listed": "Where it is listed",
   "awards.screens.mine.listed-help": "Your choice stands over the theatre's.",
   "awards.screens.mine.listed-toast": "Listing changed",
+  "awards.screens.mine.show-card": "Show card",
+  "awards.screens.mine.card-code": "Your card's code",
+  "awards.screens.mine.card-help": "Show this at the box office or the door.",
+  "awards.screens.mine.card-no-code": "Show this at the box office or the door. No code is available at the moment.",
 
   "awards.screens.account-tab.none": "No awards"
 }

@@ -38,6 +38,9 @@ export default defineModule({
     'award.update': ability({ on: 'awards.award', owner: 'refuses', implies: ['award.view'] }),
     // Taking an award back, with a reason. Nobody revokes their own.
     'award.revoke': ability({ on: 'awards.award', risk: 'privileged', owner: 'refuses', implies: ['award.view'] }),
+    // Asking whether somebody else holds an award: a seller checking a fellow's ticket price, a
+    // steward at the door. The requirement source's checkAbility.
+    'award.check': ability({ on: 'awards.award', audit: 'read' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -82,6 +85,12 @@ export default defineModule({
     'core.count': [{ id: 'awards.mine', file: 'mine' }],
     // An erased person's awards leave the roll in the erasure's own batch.
     'core.erasure-handler': [{ id: 'awards', file: 'awards' }],
+    'core.requirement': [{ id: 'awards', file: 'awards' }],
+    // The holder's card, read by the door and the desk.
+    'box-office.door-code': [{ id: 'awards.card', file: 'card' }],
+    // The fellow's price: a ticket type Box office keeps for anyone holding a current award that
+    // carries a ticket price, one ticket each, checked when bought. The theatre prices it per band.
+    'box-office.ticket-type': [{ id: 'fellow', name: 'Fellow', kind: 'standard', requirementRefs: ['awards:benefit'], sort: 12 }],
   },
 
   events: {
