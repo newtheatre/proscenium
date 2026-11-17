@@ -6,7 +6,7 @@
 import { all, nowMs, useSetting } from '#kit'
 import type { BookingAction, BookingAnswer, PriceSummary } from '#modules/core'
 import { pricesFor } from '../../prices'
-import { sellableTypes } from '../../ticket-types'
+import { sellableTypes, soldOn } from '../../ticket-types'
 
 interface Sale { performance_id: string, state: string, on_sale_at: number | null, off_sale_at: number | null }
 
@@ -60,7 +60,8 @@ const DATES_PER_PRODUCTION = 10 // not-policy: a bound on one read, not a rule o
  * What each production is sold at, from its dates to come that are or will be on sale. "From" is
  * the lowest price open to anyone; each type that needs something (a membership, a concession)
  * and comes in lower is given by its own name. Free tickets and tickets that ride on a paid one are
- * not prices anyone books at, so they are left out.
+ * not prices anyone books at, and a type sold only at the desk is not on offer to a reader of the
+ * listing, so they are left out.
  */
 async function prices(productionIds: string[]): Promise<Record<string, PriceSummary>> {
   if (!productionIds.length) return {}
@@ -80,7 +81,7 @@ async function prices(productionIds: string[]): Promise<Record<string, PriceSumm
   for (const { productionId, prices: rows } of priced) {
     for (const price of rows) {
       const type = types.get(price.ticketTypeId)
-      if (!type || type.kind === 'complimentary' || type.needsPaidTicket) continue
+      if (!type || type.kind === 'complimentary' || type.needsPaidTicket || !soldOn(type.channel, 'online')) continue
       const entry = lowest.get(productionId) ?? { currency: price.currency, byType: new Map<string, number>() }
       if (entry.currency !== price.currency) continue
       const was = entry.byType.get(type.id)
