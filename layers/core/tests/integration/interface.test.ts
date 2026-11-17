@@ -76,6 +76,11 @@ describe('the guard for addresses under a shell (UI-07, UI-08)', () => {
     const basic = person(['core.settings.manage'], { assurance: 'basic' })
     expect((await decide('/admin/theatre', stale)).decision).toBe('allow')
     expect((await decide('/admin/theatre', basic)).decision).toBe('allow')
+    // And its fields are editable: confirming is asked when saving, not when loading.
+    const loaded = (await (await call(handle, 'GET', '/api/core/settings?page=core.theatre', { actor: stale })).json()) as { settings: { key: string, managed: boolean, canChange: boolean, changeAbility: string }[] }
+    const held = loaded.settings.filter(s => !s.managed && s.changeAbility === 'core.settings.manage')
+    expect(held.length).toBeGreaterThan(0)
+    expect(held.every(s => s.canChange)).toBe(true)
   })
 
   it('lets any signed-in person open their account', async () => {
