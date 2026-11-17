@@ -99,6 +99,24 @@ test('what\'s on lists the production and opens its page', async ({ page }) => {
   await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible()
 })
 
+test('what\'s on narrows by month and venue, and says when nothing matches', async ({ page }) => {
+  await visit(page, '/whats-on?month=2031-03')
+  await expect(page.getByRole('link', { name: new RegExp(title) })).toHaveAttribute('href', `/whats-on/${slug}`)
+  await visit(page, '/whats-on?month=2031-03&venue=no-such-venue-here')
+  await expect(page.getByRole('heading', { name: 'Nothing on matches' })).toBeVisible()
+  await noViolations(page)
+  await page.getByRole('link', { name: 'Clear the filters' }).click()
+  await expect(page).toHaveURL(/\/whats-on$/)
+  await expect(page.getByRole('link', { name: new RegExp(title) })).toHaveCount(1)
+})
+
+test('the home page lists what is on through ::whats-on', async ({ page }) => {
+  await visit(page, '/')
+  await expect(page.getByRole('heading', { name: 'What\'s on', level: 2 })).toBeVisible()
+  await expect(page.locator('a[href^="/whats-on/"]').first()).toBeAttached()
+  await noViolations(page)
+})
+
 test('what\'s on works with scripts off', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false })
   const page = await context.newPage()
