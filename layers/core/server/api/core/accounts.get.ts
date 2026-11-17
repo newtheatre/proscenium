@@ -12,7 +12,7 @@ const PAGE = 20 // not-policy: a picker shows a short list
 export default defineRoute({
   ability: 'core.account.search',
   rateLimit: 'default',
-  input: z.object({ q: z.string().trim().min(2).max(120) }), // not-policy: a search needs two characters
+  input: z.object({ q: z.string().trim().min(3).max(120) }), // not-policy: the search index needs three letters
 }, async (_event, { input }) => {
   const { words } = searchWords(input.q)
   const rows = await all<{ id: string, name: string | null, preferred_name: string | null, origin: string, created_at: number, first_signed_in_at: number | null, disabled_at: number | null }>(
