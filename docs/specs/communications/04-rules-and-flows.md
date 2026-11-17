@@ -172,16 +172,16 @@ flowchart LR
 
 Steps 3 and 4 repeat until every tranche is handed over.
 
-1. **Prepare.** The job resolves the audience page by page and inserts recipient rows, numbering tranches of `communications.sending.tranche-size`. For a mailing: subscribed rows of the list (or the automatic source minus opt-outs), intersected with each include source, minus each exclude source. For a notice: the one source. A recipient is an account or an address, as its subscription or source gave it.
+1. **Prepare.** The job resolves the audience page by page and inserts recipient rows, numbering tranches of `communications.engine.tranche-size`. For a mailing: subscribed rows of the list (or the automatic source minus opt-outs), intersected with each include source, minus each exclude source. For a notice: the one source. A recipient is an account or an address, as its subscription or source gave it.
 2. **Exclude at snapshot.** Each candidate is marked excluded, with its reason, if the topic is off for them or core says the account is unreachable. An address recipient is excluded as duplicate when it equals any verified address of an account recipient, checked with identity's `verifiedAddressesOf`, server side and never shown.
 3. **Hand over.** A tranche job takes one tranche. In one unit of work it re-checks subscription state, passes the whole tranche to core as one set, and marks the rows handed. Both writes are set-wise, from one JSON parameter read with `json_each`, as Foundations requires of every fan-out; nothing loops over recipients. Each recipient carries the dedupe key `communications.campaign:<campaign>:<recipient>`. A tranche is never larger than `core.units.set-rows-limit`. A repeated job does nothing twice: the key and the row state both guard it.
 4. **Throttle (mailings, later).** Tranches are queued with a delay so no more than `communications.sending.per-minute` are handed to core each minute. Core's own job sends each delivery, on the lane the type declares.
-5. **Finish.** The sweep task moves the campaign to sent when nothing is pending, and copies final counts from core's `deliveryCounts` once every delivery has reached an end state or `communications.sending.results-after` has passed.
+5. **Finish.** The sweep task moves the campaign to sent when nothing is pending, and copies final counts from core's `deliveryCounts` once every delivery has reached an end state or `communications.engine.results-after` has passed.
 
 What core does with each notification is core's: the address for the side, the suppression check, the retry, the bounce. A recipient handed over but skipped by core shows in the results under core's reason.
 
 - **Paused (later) means no new tranche starts.** A tranche in flight finishes.
-- **A stuck campaign is found.** The sweep re-queues a tranche whose job died, and the health check reports a campaign in preparing or sending for longer than `communications.sending.stuck-after`.
+- **A stuck campaign is found.** The sweep re-queues a tranche whose job died, and the health check reports a campaign in preparing or sending for longer than `communications.engine.stuck-after`.
 - **The module switched off stops everything.** Scheduled campaigns stay scheduled and do not start. Core already skips deliveries whose type's module is off.
 
 ## Notices

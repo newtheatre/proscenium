@@ -2,7 +2,7 @@
 
 ## Settings
 
-All are site-wide, as Foundations rules. All are changed by holders of `front-of-house.settings.manage`, have audience staff, and are not quotable, so those three columns are given once here and left out of the table.
+Placement follows Foundations' settings format: the manifest declares a group for each first segment of the keys below (shifts, reminders, hours, checklists, incidents, night-report, retention, emergency), and every setting has exactly one home. All eight groups take the default, place console on the module's own generated page at /console/front-of-house/settings, one section per group; none names a bespoke screen and none is marked advanced. The retention group stays on this page rather than on the Advanced page because its periods are a welfare and insurance decision made by people running the theatre, not an engineering limit. No setting is declared with onChange confirm or reason, so none asks for extra confirmation on saving. Every duration is entered with the kit's DurationInput (a month is 30 days and a year is 365 days) and stored as whole seconds. All are changed by holders of `front-of-house.settings.manage`, have audience staff, and are not quotable, so those three columns are given once here and left out of the table.
 
 | Key | Kind | Default | Limits | Purpose |
 | --- | --- | --- | --- | --- |
@@ -49,7 +49,7 @@ Night reports and the incident's own row (number, kind, severity, dates) have no
 | `front-of-house.night-report.write` | `core.performance` | normal | ignored | shift.view | Add notes and addenda | Fact `front-of-house.leading-shift` |
 | `front-of-house.night-report.sign-off` | `core.performance` | normal | ignored | night-report.write | Sign off the night | Fact `front-of-house.leading-shift`; `front-of-house-manager` |
 | `front-of-house.night-report.view` | `core.performance` | normal | ignored |  | Read night reports | `front-of-house-manager`; `committee-member`; `production-lead` and fact `core.production-team`, for their own production |
-| `front-of-house.hours.view` | site | normal | ignored |  | See and export everyone's hours. `audit: 'read'` | `front-of-house-manager` |
+| `front-of-house.hours.view` | site | normal | ignored | core.account.find | See and export everyone's hours. `audit: 'read'` | `front-of-house-manager` |
 | `front-of-house.settings.manage` | site | privileged | ignored |  | Change the settings above | `administrator` |
 
 Notes:

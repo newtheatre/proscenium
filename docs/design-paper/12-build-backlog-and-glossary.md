@@ -11,14 +11,14 @@ As of 16 November 2026, after all of your answers. This tab is the index that jo
 | 3. Core domain | C-01 to C-58 | 58 | 0 | 44 | 14 | [Core domain](https://claude.ai/artifact/Qt8cFSyEekr7tfpiMCqe2E), tab 7 |
 | 4. Box office, payments, finance | BO, PAY, FIN, R | 71 | 17 | 46 | 5, plus 3 for allocated seating | [Box office](https://claude.ai/artifact/MUbXSQbs4vQKMyvxZL44Po), tab 7 |
 | 5. Form builder | FB-101 to FB-512 | 43 | 0 | 31 | 12 | [Form builder](https://claude.ai/artifact/6E5k2VS2PnhdciVNMeap5s), tab 7 |
-| 6. Interface | UI-01 to UI-40 | 40 | 0 | 26 | 14 | [Interface](https://claude.ai/artifact/KwZ3oXcFJSMNj98kNc9ywW), tab 7 |
+| 6. Interface | UI-01 to UI-41 | 41 | 0 | 27 | 14 | [Interface](https://claude.ai/artifact/KwZ3oXcFJSMNj98kNc9ywW), tab 7 |
 | 7. Front of house | FH-01 to FH-47 | 47 | 4 | 31 | 12 | [Front of house](https://claude.ai/artifact/6F8QhPq1EFKUabiJTB1dxA) |
 | 8. Spaces | SP-01 to SP-48 | 48 | 4 | 32 | 12 | [Spaces](https://claude.ai/artifact/XEW9gcTLL4gMfgWeXaFrks) |
 | 9. Bar | BAR | 48 | 8 | 31 | 9 | [Bar](https://claude.ai/artifact/QBYi2Dci21MVDj2CTuqvQK) |
 | 10. Training | TR | 34 | 0 | 24 | 10 | [Training](https://claude.ai/artifact/Sit2qCdVGgB6BvGhDdREga) |
 | 11. Membership | MEM-01 to MEM-58 | 58 | 9 | 40 | 9 | [Membership](https://claude.ai/artifact/2drDXf3PoCgPgXJXREBF5T) |
 | 12. Communications | COM-01 to COM-39 | 39 | 6 | 15 | 18 | [Communications](https://claude.ai/artifact/377kofYbMZFHNDxMCaddYQ) |
-| **All** |  | **568** | **68** | **373** | **127** |  |
+| **All** |  | **569** | **68** | **374** | **127** |  |
 
 A gate story is one that must be finished and proved before the work that rests on it starts. The form builder's first release belongs to roadmap phase 4, so phases 1 to 3 hold 195 stories from the first round, 37 gate and 158 others.
 
@@ -172,7 +172,7 @@ Matt's answers changed several specifications, so these figures replace the ones
 | Membership | 58 (card, scheme lengths, reference without an account) | 49 | 9 |
 | Communications | 38 (no mailings in the first release) | 21 | 17 |
 
-With Identity 45 (ID-38 to ID-45 added for the access scheme on 16 November), Core 58 (C-52, automatic sending-domain setup, and C-53 to C-58, the content warnings later slice, both added at Matt's request on 16 November), Box office 71 (BO-24 and BO-45 from the consistency review; BO-65 and BO-66 later, for age and staging effects), Interface 40 (UI-37 and UI-38 for lists, UI-39 for layered warnings, UI-40 for the trail), Front of house 47 (FH-47 later), Communications 39 (COM-39 later), Spaces 48 and Training 34, the total is 568 stories.
+With Identity 45 (ID-38 to ID-45 added for the access scheme on 16 November), Core 58 (C-52, automatic sending-domain setup, and C-53 to C-58, the content warnings later slice, both added at Matt's request on 16 November), Box office 71 (BO-24 and BO-45 from the consistency review; BO-65 and BO-66 later, for age and staging effects), Interface 41 (UI-37 and UI-38 for lists, UI-39 for layered warnings, UI-40 for the trail, UI-41 for settings history and revert), Front of house 47 (FH-47 later), Communications 39 (COM-39 later), Spaces 48 and Training 34, the total is 569 stories.
 
 Decided changes to the order of work: the ten bar stories join phase 3 after BO-30 to BO-36; FB-501, FB-502, FB-503 (record mode) and FB-506 (outcome actions) come forward with Membership as their first host, in that build order; anything that cited FB-506 for "creates a production" now cites FB-512, and custom fields on a production, person or venue cite FB-511. Phase 2 keeps two notification proofs (a tranche of 50 in one D1 batch, and Cloudflare's bounce and complaint events reaching a Worker with the message id); the 10,000-recipient proof waits for mailings.
 
