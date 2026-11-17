@@ -1,0 +1,26 @@
+// Exchange tickets on an order for another performance, band or ticket type (BO-54). With
+// `preview`, says what it would cost or give back and changes nothing. Refunding a cheaper
+// exchange's difference needs box-office.order.refund as well.
+import { z } from 'zod'
+import { getRouterParam } from 'h3'
+import { defineRoute, requireAbility } from '#kit'
+import { exchangeLines, exchangeQuote } from '../../../../exchange'
+
+export default defineRoute({
+  ability: 'box-office.order.exchange',
+  record: event => ['box-office.order', getRouterParam(event, 'id')],
+  rateLimit: 'write',
+  input: z.object({
+    lineIds: z.array(z.string().min(1).max(64)).min(1).max(50), // not-policy: more lines than any order holds
+    performanceId: z.string().min(1).max(64), // not-policy: shape bound
+    bandId: z.string().min(1).max(64), // not-policy: shape bound
+    ticketTypeId: z.string().min(1).max(64), // not-policy: shape bound
+    preview: z.boolean().optional(),
+  }).strict(),
+}, async (_event, { input, record, actor, unit }) => {
+  const { preview, ...change } = input
+  const quote = await exchangeQuote(record!.id!, change)
+  if (preview) return quote
+  if (quote.differenceMinor < 0) await requireAbility(actor, 'box-office.order.refund', ['box-office.order', record!.id!])
+  return exchangeLines(unit.view(), record!.id!, { ...change, by: actor.accountId! })
+})

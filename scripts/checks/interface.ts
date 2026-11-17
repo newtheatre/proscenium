@@ -7,7 +7,7 @@ import type { Loaded } from '../lib/load.ts'
 import { walk } from './source.ts'
 
 /** The kit's own components may use what they wrap. */
-const RAW_FORM = ['PageSettings.vue', 'PageList.vue', 'ConfirmItsYouDialog.vue']
+const RAW_FORM = ['SettingsSections.vue', 'PageList.vue', 'ConfirmItsYouDialog.vue']
 const HAND_LIST = ['RecordList.vue']
 const DATE_TEXT = ['useDates.ts']
 const ICON_BUTTON = ['IconButton.vue']

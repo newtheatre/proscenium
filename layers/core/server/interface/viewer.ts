@@ -9,7 +9,7 @@ import { allowedEntries, declaredEntries, holds, mayOpen } from './navigation'
 import { abilityList, entryLabelKey } from '../../shared/navigation'
 import { isMember } from '../identity/standings'
 
-export type Side = 'audience' | 'members' | 'console' | 'admin'
+export type Side = 'audience' | 'members' | 'console' | 'admin' | 'live'
 
 export interface ViewerDescription {
   signedIn: boolean
@@ -46,13 +46,25 @@ export async function holdsAdmin(actor: Actor): Promise<boolean> {
   return false
 }
 
+/**
+ * Live mode: holding the ability of at least one live entry (a tile on the Tonight hub). Like site
+ * administration it has no ability of its own; the modules that bring live screens decide who works
+ * tonight through their entries' abilities, which may be held through a fact such as being on shift.
+ */
+export async function holdsLive(actor: Actor): Promise<boolean> {
+  for (const entry of await declaredEntries()) {
+    if (entry.menu === 'live' && abilityList(entry.ability).length && holds(await mayOpen(actor, entry))) return true
+  }
+  return false
+}
+
 export async function isEntitled(actor: Actor, shell: ShellName): Promise<boolean> {
   if (!isSignedIn(actor)) return false
   if (shell === 'account') return true
   if (shell === 'members') return isMember(actor)
   if (shell === 'console') return holdsConsole(actor)
   if (shell === 'admin') return holdsAdmin(actor)
-  return false // live mode is entered from the Tonight hub, which the front-of-house module brings
+  return holdsLive(actor)
 }
 
 /** Identity's describeViewer (part 4, "Services"): the name, the sides open and the entries the viewer may open. */
@@ -62,6 +74,7 @@ export async function describeViewer(actor: Actor): Promise<ViewerDescription> {
   if (await isMember(actor)) sides.push('members')
   if (await holdsConsole(actor)) sides.push('console')
   if (await holdsAdmin(actor)) sides.push('admin')
+  if (await holdsLive(actor)) sides.push('live')
   const navigation: ViewerDescription['navigation'] = []
   for (const shell of ['account', 'members'] as const) {
     if (shell === 'members' && !sides.includes('members')) continue

@@ -23,7 +23,7 @@ const admin = () => person(['core.sender.manage'])
 async function setSettings(values: Record<string, unknown>) {
   await inContext(async () => {
     const unit = createUnit()
-    for (const [key, value] of Object.entries(values)) await changeSetting(unit, key, value, value === null ? { reset: true } : {})
+    for (const [key, value] of Object.entries(values)) await changeSetting(unit, key, value, { reset: value === null, confirm: true })
     await unit.commit()
   })
   sent.length = 0

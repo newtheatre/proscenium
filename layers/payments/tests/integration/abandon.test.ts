@@ -4,10 +4,11 @@
 // cancelled. Money taken towards a sale that then expires goes back the same way.
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, nowMs, setClock } from '#kit'
-import { attest, cancelIntent, createIntent, recordAnswer } from '../../server/services'
+import { attest, cancelIntent, createIntent, openSession, recordAnswer } from '../../server/services'
 import { addAttempt } from '../../server/answers'
 import { expireIntent } from '../../server/tasks/expire-intents'
 import cancelRoute from '../../server/api/payments/intents/[id]/cancel.post'
+import giveBackRoute from '../../server/api/payments/intents/[id]/give-back.post'
 import { world } from '../../../../tests/fixtures/modules/cardco/server/contributions/payments.provider/cardco'
 import { call, deliver, env, inContext, person, rows, sent, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -16,7 +17,7 @@ const MINUTE = 60_000
 let card: string
 let cash: string
 
-const handle = server({ 'POST /api/payments/intents/:id/cancel': cancelRoute })
+const handle = server({ 'POST /api/payments/intents/:id/cancel': cancelRoute, 'POST /api/payments/intents/:id/give-back': giveBackRoute })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
   return inContext(async () => {
@@ -109,5 +110,73 @@ describe('a sale left after part was paid', () => {
     expect(await state('payments_intents', intentId)).toBe('expired')
     const [refund] = await rows<{ amount_minor: number, state: string }>('SELECT amount_minor, state FROM payments_refunds WHERE attempt_id = ?', attemptId)
     expect(refund).toEqual({ amount_minor: 800, state: 'approved' })
+  })
+})
+
+describe('giving back what was taken for a sale paid in part (BO-35)', () => {
+  const seller = person(['payments.attempt.attest', 'payments.session.open'])
+  let sessionId: string
+
+  beforeAll(async () => {
+    sessionId = await commit(unit => openSession(unit.view(), { accountId: seller.accountId!, pointLabel: 'Foyer', floatMinor: 0 }))
+  })
+
+  async function partPaid(amount: number, cashMinor: number, cardMinor = 0) {
+    const orderId = newId('tko')
+    const { intentId } = await commit(async (unit) => {
+      const view = unit.view()
+      view.add({ sql: "INSERT INTO tickets_orders (id, amount_minor, state) VALUES (?, ?, 'held')", params: [orderId, amount] })
+      return createIntent(view, { parts: [{ owner: { module: 'tickets', record: orderId }, amountMinor: amount }], channel: 'desk', sessionId, expiresAt: nowMs() + 15 * MINUTE })
+    })
+    if (cashMinor) await inContext(() => attest({ intentId, providerAccountId: cash, method: 'cash', amountMinor: cashMinor }), seller)
+    let cardAttempt: string | undefined
+    if (cardMinor) {
+      cardAttempt = await commit(async unit => addAttempt(unit.view(), { intentId, providerAccountId: card, method: 'card_online', amountMinor: cardMinor }).id)
+      await inContext(() => recordAnswer(cardAttempt!, { state: 'succeeded', providerRef: `cc_${cardAttempt}` }, { kind: 'poll' }))
+    }
+    return { orderId, intentId, cardAttempt }
+  }
+  const giveBack = (intentId: string, actor = seller) => call(handle, 'POST', `/api/payments/intents/${intentId}/give-back`, { actor, body: {} })
+
+  it('ends the sale, releases it, hands the cash back from the seller\'s session and sends the card back', async () => {
+    const held = await balance('payments.unfulfilled')
+    const { orderId, intentId, cardAttempt } = await partPaid(3000, 1000, 1200)
+    const res = await giveBack(intentId)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ givenBack: true, handedBack: [{ method: 'cash', amountMinor: 1000 }], sent: [{ method: 'card_online', amountMinor: 1200 }], unconfirmed: 0 })
+    expect(await state('payments_intents', intentId)).toBe('unfulfilled')
+    expect(await state('tickets_orders', orderId)).toBe('released')
+    const cashRefund = (await rows<{ state: string, session_id: string | null }>("SELECT r.state, r.session_id FROM payments_refunds r JOIN payments_attempts a ON a.id = r.attempt_id WHERE a.intent_id = ? AND a.method = 'cash'", intentId))[0]
+    expect(cashRefund).toEqual({ state: 'succeeded', session_id: sessionId })
+    // The card's money waits in payments.unfulfilled until the provider sends it back.
+    expect(await balance('payments.unfulfilled') - held).toBe(-1200)
+    await deliver()
+    expect((await rows<{ state: string }>('SELECT state FROM payments_refunds WHERE attempt_id = ?', cardAttempt!))[0]!.state).toBe('succeeded')
+    expect(await balance('payments.unfulfilled') - held).toBe(0)
+    // Nothing was sold, so no income moved.
+    expect(await rows("SELECT p.id FROM finance_postings p WHERE p.kind = 'sale' AND p.source_id = ?", intentId)).toEqual([])
+  })
+
+  it('refuses when nothing was taken, and once the sale has ended', async () => {
+    const { intentId } = await partPaid(1000, 0)
+    expect(await (await giveBack(intentId)).json()).toMatchObject({ code: 'payments.giveback.nothing-taken' })
+    const paid = await partPaid(1000, 400)
+    expect((await giveBack(paid.intentId)).status).toBe(200)
+    expect(await (await giveBack(paid.intentId)).json()).toMatchObject({ code: 'payments.intent.not-open' })
+  })
+
+  it('lets someone else give back only with refund approval, within the self-approve limit', async () => {
+    const { intentId } = await partPaid(2000, 600)
+    const other = await giveBack(intentId, person(['payments.attempt.attest']))
+    expect(other.status).toBe(403)
+    expect(await other.json()).toMatchObject({ code: 'payments.giveback.not-yours' })
+    const approver = person(['payments.attempt.attest', 'payments.refund.approve'])
+    expect(await (await giveBack(intentId, approver)).json()).toMatchObject({ code: 'payments.giveback.over-limit' })
+    await commit(unit => changeSetting(unit.view(), 'payments.refunds.self-approve-up-to', 1000, { reason: 'test', confirm: true }))
+    const res = await giveBack(intentId, approver)
+    expect(res.status).toBe(200)
+    // The approver has no till session of their own, so the cash waits on Refunds to be confirmed.
+    expect(await res.json()).toMatchObject({ handedBack: [], unconfirmed: 1 })
+    expect(await state('payments_intents', intentId)).toBe('unfulfilled')
   })
 })

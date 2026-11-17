@@ -75,7 +75,7 @@ describe('the Order page', () => {
     const seen = await req('GET', `/api/box-office/orders/${reservation.orderId}`, undefined, viewer)
     expect(seen.body.state).toBe('reserved')
     expect(seen.body.lines.filter((l: { kind: string }) => l.kind === 'ticket')).toHaveLength(2)
-    expect(seen.body.can).toEqual({ release: false, cancel: false, refund: false })
+    expect(seen.body.can).toEqual({ release: false, cancel: false, refund: false, exchange: false })
     const asReleaser = await req('GET', `/api/box-office/orders/${reservation.orderId}`, undefined, releaser)
     expect(asReleaser.body.can.release).toBe(true)
   })

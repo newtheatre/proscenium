@@ -22,14 +22,14 @@ async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>
   })
 }
 
-async function handedOff(amount: number) {
+async function handedOff(amount: number, screen?: string) {
   const orderId = newId('tko')
   const { intentId, partIds } = await commit(async (unit) => {
     const view = unit.view()
     view.add({ sql: "INSERT INTO tickets_orders (id, amount_minor, state) VALUES (?, ?, 'held')", params: [orderId, amount] })
     return createIntent(view, { parts: [{ owner: { module: 'tickets', record: orderId }, amountMinor: amount }], channel: 'desk', expiresAt: nowMs() + 30 * MINUTE })
   })
-  const out = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_reader', origin: 'https://theatre.example' }))
+  const out = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_reader', origin: 'https://theatre.example', returnTo: screen }))
   const url = new URL((out.next as { url: string }).url)
   const back = new URL(url.searchParams.get('callback')!)
   return { orderId, intentId, partId: partIds[0]!, out, url, back }
@@ -73,15 +73,34 @@ describe('the hand-off', () => {
   })
 
   it('settles on the app\'s success, keeping SumUp\'s transaction code, and sends the seller back', async () => {
-    const { out, back, orderId } = await handedOff(2000)
+    const { out, back, orderId, intentId } = await handedOff(2000)
     const res = await returnTo(back, { 'smp-status': 'success', 'smp-tx-code': 'TEENSK4W2K', 'foreign-tx-id': out.attemptId })
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe(`/console/payments/session?attempt=${out.attemptId}&result=succeeded`)
+    expect(res.headers.get('location')).toBe(`/console/payments/session?attempt=${out.attemptId}&intent=${intentId}&result=succeeded`)
     expect(await state('tickets_orders', orderId)).toBe('paid')
     expect((await rows('SELECT provider_ref FROM payments_attempts WHERE id = ?', out.attemptId))[0]).toEqual({ provider_ref: 'TEENSK4W2K' })
     // The same return again changes nothing.
     expect((await returnTo(back, { 'smp-status': 'failed' })).status).toBe(302)
     expect(await state('payments_attempts', out.attemptId)).toBe('succeeded')
+  })
+
+  it('sends the seller back to the screen that started the sale, signed into the address', async () => {
+    const { out, back, intentId } = await handedOff(1100, '/console/box-office/sell')
+    expect(back.pathname).toMatch(new RegExp(`^/api/payments/handoff/${out.attemptId}/[^/.]+\\.[^/.]+\\.[^/.]+$`))
+    const res = await returnTo(back, { 'smp-status': 'success' })
+    expect(res.headers.get('location')).toBe(`/console/box-office/sell?attempt=${out.attemptId}&intent=${intentId}&result=succeeded`)
+  })
+
+  it('refuses a return screen that was changed, or one that is not a console path', async () => {
+    const { out, back } = await handedOff(1200, '/console/payments/till')
+    const [keyId, signature] = back.pathname.split('/').pop()!.split('.')
+    const elsewhere = btoa('/console/finance/ledger').replace(/=+$/, '')
+    expect((await call(handle, 'GET', `/api/payments/handoff/${out.attemptId}/${keyId}.${signature}.${elsewhere}?smp-status=success`)).status).toBe(403)
+    expect((await call(handle, 'GET', `/api/payments/handoff/${out.attemptId}/${keyId}.${signature}?smp-status=success`)).status).toBe(403)
+    expect(await state('payments_attempts', out.attemptId)).toBe('pending')
+    // A screen that is not a plain console path is not signed in at all; the seller goes to their session.
+    const offsite = await handedOff(1300, 'https://elsewhere.example/console')
+    expect(offsite.back.pathname).toMatch(new RegExp(`^/api/payments/handoff/${offsite.out.attemptId}/[^/.]+\\.[^/.]+$`))
   })
 
   it('fails the attempt on anything but success', async () => {

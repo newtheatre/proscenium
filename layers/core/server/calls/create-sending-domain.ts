@@ -15,9 +15,9 @@ export default defineCall({
     if (outcome.result !== 'succeeded') return
     const domain = domainOf(attempt.reference)
     if (await useSetting('core.notifications.sending-domain') !== domain)
-      await changeSetting(unit, 'core.notifications.sending-domain', domain)
+      await changeSetting(unit, 'core.notifications.sending-domain', domain, { confirm: true })
     if (await useSetting('core.notifications.verified-domain') !== domain && await useSetting('core.notifications.verified-domain') !== null)
-      await changeSetting(unit, 'core.notifications.verified-domain', null, { reset: true })
+      await changeSetting(unit, 'core.notifications.verified-domain', null, { reset: true, confirm: true })
     unit.enqueue('core.verify-sending-domain', { domain, tries: 1 }, { delay: FIRST_VERIFY_WAIT })
   },
   async reconcile(attempt) {
