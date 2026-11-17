@@ -91,9 +91,10 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
           :title="t('payments.screens.session.open-title')"
           :description="t('payments.screens.session.open-help')"
         >
-          <form
+          <UForm
             class="space-y-4"
-            @submit.prevent="open"
+            :state="opening"
+            @submit="open"
           >
             <RefusalNotice :refusal="refusal" />
             <UFormField
@@ -105,7 +106,6 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
               <UInput
                 v-model="opening.pointLabel"
                 maxlength="60"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -125,7 +125,7 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
               :disabled="!opening.pointLabel.trim()"
               :label="t('payments.screens.session.open-button')"
             />
-          </form>
+          </UForm>
         </PageSection>
 
         <div
@@ -139,28 +139,13 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
                 :label="t(`payments.screens.session.states.${loaded.session.state}`)"
               />
             </template>
-            <dl class="grid gap-4 sm:grid-cols-3">
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('payments.screens.session.opened-at') }}
-                </dt>
-                <dd>{{ when(loaded.session.openedAt) }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('payments.screens.session.float') }}
-                </dt>
-                <dd>{{ money(loaded.session.floatMinor, loaded.session.currency) }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('payments.screens.session.expected') }}
-                </dt>
-                <dd class="font-medium">
-                  {{ money(loaded.session.expectedCashMinor, loaded.session.currency) }}
-                </dd>
-              </div>
-            </dl>
+            <FactStrip
+              :facts="[
+                { label: t('payments.screens.session.opened-at'), value: when(loaded.session.openedAt), strong: false },
+                { label: t('payments.screens.session.float'), value: money(loaded.session.floatMinor, loaded.session.currency), strong: false },
+                { label: t('payments.screens.session.expected'), value: money(loaded.session.expectedCashMinor, loaded.session.currency) },
+              ]"
+            />
           </PageSection>
 
           <PageSection
@@ -168,20 +153,13 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
             :title="t('payments.screens.session.waiting-title')"
             :description="t('payments.screens.session.waiting-help')"
           >
-            <ul class="divide-y divide-default rounded-lg border border-default">
-              <li
+            <RecordList :label="t('payments.screens.session.waiting-title')">
+              <RecordListItem
                 v-for="w in loaded.waiting"
                 :key="w.id"
-                class="flex flex-wrap items-center gap-3 px-3 py-2"
+                :name="`${money(w.amountMinor, w.currency)} · ${methodLabel(w.method)} · ${w.provider}`"
+                :description="w.unknownAt ? t('payments.screens.session.unknown-at', { started: time(w.startedAt), at: time(w.unknownAt) }) : t('payments.screens.session.unknown-now', { started: time(w.startedAt) })"
               >
-                <div class="min-w-0 flex-1">
-                  <p class="font-medium">
-                    {{ money(w.amountMinor, w.currency) }} · {{ methodLabel(w.method) }} · {{ w.provider }}
-                  </p>
-                  <p class="text-sm text-muted">
-                    {{ w.unknownAt ? t('payments.screens.session.unknown-at', { started: time(w.startedAt), at: time(w.unknownAt) }) : t('payments.screens.session.unknown-now', { started: time(w.startedAt) }) }}
-                  </p>
-                </div>
                 <UButton
                   v-if="!w.unknownAt"
                   :label="t('payments.navigation.attention.label')"
@@ -190,8 +168,8 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
                   variant="outline"
                   size="sm"
                 />
-              </li>
-            </ul>
+              </RecordListItem>
+            </RecordList>
           </PageSection>
 
           <PageSection

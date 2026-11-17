@@ -3,8 +3,6 @@
      one is opened, and opening one is recorded. The two ways to bring somebody in start here: email
      them a link to apply, or fill the form in with them now. -->
 <script setup lang="ts">
-definePageMeta({ layout: 'console' })
-
 interface Row { accountId: string, name: string | null, change: boolean, submittedVia: 'self' | 'staff', waitingFor: number, overdue: boolean }
 
 const { t } = useT()
@@ -119,10 +117,11 @@ const filters = [{
       :description="mode === 'apply' ? t('core.access.apply-for.description') : t('core.access.invite.description')"
     >
       <template #body>
-        <form
+        <UForm
           id="access-person"
           class="space-y-4"
-          @submit.prevent="go"
+          :state="person"
+          @submit="go"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -132,7 +131,6 @@ const filters = [{
             <UInput
               v-model="person.name"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -144,10 +142,9 @@ const filters = [{
               v-model="person.address"
               type="email"
               maxlength="254"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

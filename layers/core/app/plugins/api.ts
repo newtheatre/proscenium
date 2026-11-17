@@ -7,14 +7,27 @@
 // once. A screen therefore needs nothing of its own to get this. The dialogue's own requests are
 // left alone, so a refusal there cannot open a second dialogue. On the server it is the request's
 // own fetch, which carries the visitor's cookies to the API.
+import type { FetchOptions, ResponseType } from 'ofetch'
 import { CONFIRM_REASONS, type ConfirmReason } from '../composables/useConfirmItsYou'
 
 const OWN = '/api/core/me/reassert'
 
 type Fetch = typeof globalThis.$fetch
 
+/**
+ * `$api` as screens see it: a path and options in, the answer out, with the answer's type named by
+ * the caller (`$api<Order>(...)`). It is deliberately not Nitro's typed fetch, which matches the
+ * path against every route of the site: with a few hundred routes that comparison passes the
+ * compiler's depth limit, and which call fails first moves each time a route is added.
+ */
+export interface Api {
+  <T = unknown>(request: string, options?: FetchOptions<ResponseType>): Promise<T>
+  raw: Fetch['raw']
+  create: Fetch['create']
+}
+
 export default defineNuxtPlugin(() => {
-  if (import.meta.server) return { provide: { api: useRequestFetch() as Fetch } }
+  if (import.meta.server) return { provide: { api: useRequestFetch() as unknown as Api } }
 
   const { confirmItsYou } = useConfirmItsYou()
   const base = globalThis.$fetch
@@ -32,7 +45,7 @@ export default defineNuxtPlugin(() => {
       if (!(await confirmItsYou(code as ConfirmReason))) throw error
       return send(request, options)
     }
-  }) as unknown as Fetch
+  }) as unknown as Api
   // `raw` and `create` are the plain fetch's: only a call to `$api` itself confirms and retries.
   Object.assign(api, { raw: base.raw, create: base.create })
   return { provide: { api } }

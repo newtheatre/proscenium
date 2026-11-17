@@ -15,5 +15,5 @@ export default defineRoute({
 }, async (event, { input }) => {
   // Noted for the message sent when the payment settles, which a job may do with no request.
   await fromRequest(event)
-  return startPayment({ orderId: getRouterParam(event, 'id')!, token: getHeader(event, 'x-basket-token') ?? '', providerAccountId: input.providerAccountId, origin: relyingParty(event).origin })
+  return startPayment({ orderId: getRouterParam(event, 'id')!, token: getHeader(event, 'x-basket-token') ?? '', providerAccountId: input.providerAccountId, origin: (await relyingParty(event)).origin })
 })

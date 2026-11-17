@@ -192,7 +192,6 @@ async function recordPayout() {
                   <UAlert
                     v-if="providerOf(a)?.missingSecrets.length"
                     color="error"
-                    variant="subtle"
                     icon="i-lucide-key-round"
                     :title="t('payments.screens.providers.missing', { secrets: providerOf(a)!.missingSecrets.join(', ') })"
                     :description="t('payments.screens.providers.missing-help')"
@@ -279,20 +278,13 @@ async function recordPayout() {
             :title="t('payments.screens.providers.available-title')"
             :description="t('payments.screens.providers.available-help')"
           >
-            <ul class="divide-y divide-default rounded-lg border border-default">
-              <li
+            <RecordList :label="t('payments.screens.providers.available-title')">
+              <RecordListItem
                 v-for="p in loaded.providers"
                 :key="p.id"
-                class="flex flex-wrap items-center gap-3 px-3 py-2"
+                :name="providerName(p.id)"
+                :description="t(`payments.screens.providers.about.${p.id}`)"
               >
-                <div class="min-w-0 flex-1">
-                  <p class="font-medium">
-                    {{ providerName(p.id) }}
-                  </p>
-                  <p class="text-sm text-muted">
-                    {{ t(`payments.screens.providers.about.${p.id}`) }}
-                  </p>
-                </div>
                 <StatusBadge
                   v-if="p.missingSecrets.length"
                   tone="warning"
@@ -303,8 +295,8 @@ async function recordPayout() {
                   tone="success"
                   :label="t('payments.screens.providers.ready')"
                 />
-              </li>
-            </ul>
+              </RecordListItem>
+            </RecordList>
           </PageSection>
         </div>
       </template>
@@ -315,10 +307,11 @@ async function recordPayout() {
       :title="t('payments.screens.providers.add')"
     >
       <template #body>
-        <form
+        <UForm
           id="add-provider"
           class="space-y-4"
-          @submit.prevent="add"
+          :state="form"
+          @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -328,7 +321,6 @@ async function recordPayout() {
             <USelect
               v-model="form.provider"
               :items="(data?.providers ?? []).map(p => ({ value: p.id, label: providerName(p.id) }))"
-              class="w-full"
             />
           </UFormField>
           <p
@@ -345,7 +337,6 @@ async function recordPayout() {
             <UInput
               v-model="form.label"
               maxlength="80"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -375,10 +366,9 @@ async function recordPayout() {
             <UInput
               v-model="form.externalRef"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -397,10 +387,11 @@ async function recordPayout() {
       :description="t('payments.screens.payouts.help')"
     >
       <template #body>
-        <form
+        <UForm
           id="record-payout"
           class="space-y-4"
-          @submit.prevent="recordPayout"
+          :state="payout"
+          @submit="recordPayout"
         >
           <RefusalNotice :refusal="payoutRefusal" />
           <UFormField
@@ -410,7 +401,6 @@ async function recordPayout() {
             <USelect
               v-model="payout.providerAccountId"
               :items="(data?.accounts ?? []).filter(a => a.mode === 'live').map(a => ({ value: a.id, label: a.label }))"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -443,11 +433,10 @@ async function recordPayout() {
               <UInput
                 v-model="payout.reference"
                 maxlength="120"
-                class="w-full"
               />
             </UFormField>
           </div>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

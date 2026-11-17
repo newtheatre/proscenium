@@ -115,38 +115,20 @@ async function reopen() {
             v-if="!reopening"
             :refusal="refusal"
           />
-          <dl class="grid gap-4 sm:grid-cols-3">
-            <div>
-              <dt class="text-sm text-muted">
-                {{ t('finance.screens.period.dates') }}
-              </dt>
-              <dd>{{ t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }) }}</dd>
-            </div>
-            <div>
-              <dt class="text-sm text-muted">
-                {{ t('finance.screens.period.debits') }}
-              </dt>
-              <dd class="tabular-nums">
-                {{ money(loaded.period.debitsMinor) }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm text-muted">
-                {{ t('finance.screens.period.credits') }}
-              </dt>
-              <dd class="tabular-nums">
-                {{ money(loaded.period.creditsMinor) }}
-              </dd>
-            </div>
-          </dl>
-          <UButton
-            :to="{ path: '/console/finance/ledger', query: { periodId: loaded.period.id } }"
-            :label="t('finance.screens.period.postings')"
-            icon="i-lucide-book-open"
-            color="neutral"
-            variant="link"
-            class="px-0"
+          <FactStrip
+            :facts="[
+              { label: t('finance.screens.period.dates'), value: t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }), strong: false },
+              { label: t('finance.screens.period.debits'), value: money(loaded.period.debitsMinor) },
+              { label: t('finance.screens.period.credits'), value: money(loaded.period.creditsMinor) },
+            ]"
           />
+          <ULink
+            :to="{ path: '/console/finance/ledger', query: { periodId: loaded.period.id } }"
+            class="inline-flex items-center gap-1.5"
+          >
+            <UIcon name="i-lucide-book-open" />
+            {{ t('finance.screens.period.postings') }}
+          </ULink>
 
           <PageSection
             v-if="!loaded.period.closed"
@@ -176,11 +158,13 @@ async function reopen() {
                   name="i-lucide-circle-alert"
                   class="mt-0.5 shrink-0 text-warning"
                 />
-                <NuxtLink
+                <ULink
                   v-if="b.to"
                   :to="b.to"
                   class="underline"
-                >{{ b.sentence }}</NuxtLink>
+                >
+                  {{ b.sentence }}
+                </ULink>
                 <span v-else>{{ b.sentence }}</span>
               </li>
             </ul>
@@ -195,10 +179,11 @@ async function reopen() {
       :description="t('finance.screens.period.reopen-help')"
     >
       <template #body>
-        <form
+        <UForm
           id="reopen-period"
+          :state="{ reason }"
           class="space-y-4"
-          @submit.prevent="reopen"
+          @submit="reopen"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -208,10 +193,9 @@ async function reopen() {
             <USelect
               v-model="reason"
               :items="reasons?.reasons.map(r => ({ value: r.id, label: r.label })) ?? []"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
