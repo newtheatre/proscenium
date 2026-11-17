@@ -66,7 +66,7 @@ for (const [path, title] of SCREENS) {
   })
 }
 
-for (const [path, title] of [['/console/payments/session', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
+for (const [path, title] of [['/console/payments/sessions', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
   test(`${title} open from the cog on ${path} and have no violations`, async ({ page }) => {
     await visit(page, path)
     await page.getByRole('link', { name: title }).click()
