@@ -5,7 +5,7 @@
 interface VariantPrice { listId: string, amountMinor: number | null }
 interface Variant { id: string, name: string, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, name: string, ageRestricted: boolean, active: boolean, variants: Variant[] }
-interface Category { id: string, name: string, colour: string | null, active: boolean, products: Product[] }
+interface Category { id: string, name: string, colour: string | null, parentId: string | null, active: boolean, products: Product[] }
 interface List { id: string, standard: boolean }
 
 const { t } = useT()
@@ -19,6 +19,16 @@ const standard = computed(() => data.value?.lists.find(l => l.standard)?.id)
 const COLOURS = ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'neutral'] as const
 const colourItems = computed(() => [{ value: 'none', label: t('bar.screens.products.colour-none') }, ...COLOURS.map(c => ({ value: c, label: t(`bar.screens.colours.${c}`) }))])
 
+// Each top-level category followed by its sub-categories, which are titled with the parent's name.
+const ordered = computed(() => {
+  const all = data.value?.categories ?? []
+  const nameOf = (id: string) => all.find(c => c.id === id)?.name ?? ''
+  return all.filter(c => !c.parentId || !all.some(p => p.id === c.parentId)).flatMap(top => [
+    { ...top, title: top.name },
+    ...all.filter(c => c.parentId === top.id).map(c => ({ ...c, title: t('bar.screens.products.sub-title', { parent: nameOf(top.id), name: c.name }) })),
+  ])
+})
+
 // One line of a product: each size on sale with its Standard price.
 function line(p: Product): string {
   const sizes = p.variants.filter(v => v.active).map((v) => {
@@ -30,17 +40,25 @@ function line(p: Product): string {
 }
 
 // A category: new, or renamed, recoloured or retired.
-const category = ref<{ id: string | null, name: string, colour: string } | null>(null)
+const category = ref<{ id: string | null, name: string, colour: string, parentId: string } | null>(null)
+// A sub-category sits under a top-level category in use; one with sub-categories of its own stays top-level.
+const parentItems = computed(() => {
+  const all = data.value?.categories ?? []
+  const self = category.value?.id
+  const hasChildren = !!self && all.some(c => c.parentId === self)
+  const tops = hasChildren ? [] : all.filter(c => c.active && !c.parentId && c.id !== self)
+  return [{ value: 'none', label: t('bar.screens.products.parent-none') }, ...tops.map(c => ({ value: c.id, label: c.name }))]
+})
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function editCategory(c?: Category) {
   refusal.value = null
-  category.value = c ? { id: c.id, name: c.name, colour: c.colour ?? 'none' } : { id: null, name: '', colour: 'none' }
+  category.value = c ? { id: c.id, name: c.name, colour: c.colour ?? 'none', parentId: c.parentId ?? 'none' } : { id: null, name: '', colour: 'none', parentId: 'none' }
 }
 async function saveCategory() {
   const c = category.value!
   refusal.value = null
   try {
-    const body = { name: c.name, colour: c.colour === 'none' ? null : c.colour }
+    const body = { name: c.name, colour: c.colour === 'none' ? null : c.colour, parentId: c.parentId === 'none' ? null : c.parentId }
     if (c.id) await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body })
     else await $api('/api/bar/categories', { method: 'POST', body })
     toast.add({ title: t('bar.screens.products.category-saved'), color: 'success' })
@@ -126,9 +144,9 @@ async function move(p: Product, direction: 'up' | 'down') {
           </template>
         </EmptyState>
         <PageSection
-          v-for="c in data.categories"
+          v-for="c in ordered"
           :key="c.id"
-          :title="c.name"
+          :title="c.title"
           :description="c.active ? undefined : t('bar.screens.products.category-retired')"
         >
           <template #actions>
@@ -235,6 +253,16 @@ async function move(p: Product, direction: 'up' | 'down') {
             <USelect
               v-model="category.colour"
               :items="colourItems"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('bar.screens.products.parent')"
+            :help="t('bar.screens.products.parent-help')"
+            name="parentId"
+          >
+            <USelect
+              v-model="category.parentId"
+              :items="parentItems"
             />
           </UFormField>
         </UForm>
