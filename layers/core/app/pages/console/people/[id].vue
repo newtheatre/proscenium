@@ -318,7 +318,6 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
           <UInput
             :model-value="link?.link"
             readonly
-            class="w-full"
             :aria-label="t('core.person.recover.link')"
           />
         </template>
