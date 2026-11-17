@@ -10,6 +10,7 @@ import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post'
 import ticketTypePatch from '../../server/api/box-office/ticket-types/[id].patch'
 import ticketTypeDelete from '../../server/api/box-office/ticket-types/[id].delete'
+import ticketTypeOrder from '../../server/api/box-office/ticket-types/order.put'
 import bookGet from '../../server/api/box-office/book/performances/[id].get'
 import { createBasket } from '../../server/baskets'
 import { scheme as memberScheme, req as membershipReq } from '../../../membership/tests/integration/stage'
@@ -20,6 +21,7 @@ const handle = server({
   'POST /api/box-office/ticket-types': ticketTypesPost,
   'PATCH /api/box-office/ticket-types/:id': ticketTypePatch,
   'DELETE /api/box-office/ticket-types/:id': ticketTypeDelete,
+  'PUT /api/box-office/ticket-types/order': ticketTypeOrder,
   'GET /api/box-office/book/performances/:id': bookGet,
 })
 let keys = 0
@@ -109,6 +111,20 @@ describe('ticket types a person makes', () => {
     expect((await api('PATCH', `/api/box-office/ticket-types/${id}`, { requirementRefs: ['nothing:here'] })).body).toMatchObject({ code: 'box-office.ticket-type.unknown-requirement' })
     expect((await api('DELETE', `/api/box-office/ticket-types/${id}`, {})).status).toBe(200)
     expect((await list()).some(t => t.id === id)).toBe(false)
+  })
+
+  it('are put in the order dragged, a new one goes last, and an order from a stale screen is refused', async () => {
+    const made = await api('POST', '/api/box-office/ticket-types', { name: 'Last in' })
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    const before = await list()
+    expect(before.at(-1)!.id).toBe(made.body.ticketTypeId)
+    const reversed = before.map(t => t.id).reverse()
+    expect((await api('PUT', '/api/box-office/ticket-types/order', { ticketTypeIds: reversed })).status).toBe(200)
+    expect((await list()).map(t => t.id)).toEqual(reversed)
+    expect((await api('PUT', '/api/box-office/ticket-types/order', { ticketTypeIds: reversed.slice(1) })).body).toMatchObject({ code: 'box-office.ticket-type.order-stale' })
+    expect((await api('PUT', '/api/box-office/ticket-types/order', { ticketTypeIds: [reversed[0], ...reversed.slice(0, -1)] })).body).toMatchObject({ code: 'box-office.ticket-type.order-stale' })
+    expect((await api('PUT', '/api/box-office/ticket-types/order', { ticketTypeIds: reversed }, person([]))).status).toBe(403)
+    expect((await list()).map(t => t.id)).toEqual(reversed)
   })
 
   it('refuses a name another type has, whatever its capitals', async () => {

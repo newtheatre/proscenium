@@ -76,7 +76,7 @@ describe('the hand-off', () => {
     const { out, back, orderId, intentId } = await handedOff(2000)
     const res = await returnTo(back, { 'smp-status': 'success', 'smp-tx-code': 'TEENSK4W2K', 'foreign-tx-id': out.attemptId })
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe(`/console/payments/session?attempt=${out.attemptId}&intent=${intentId}&result=succeeded`)
+    expect(res.headers.get('location')).toBe(`/console/payments/sessions?attempt=${out.attemptId}&intent=${intentId}&result=succeeded`)
     expect(await state('tickets_orders', orderId)).toBe('paid')
     expect((await rows('SELECT provider_ref FROM payments_attempts WHERE id = ?', out.attemptId))[0]).toEqual({ provider_ref: 'TEENSK4W2K' })
     // The same return again changes nothing.
