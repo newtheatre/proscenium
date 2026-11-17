@@ -146,3 +146,26 @@ test.describe('the account menu on a phone', () => {
     await visitor.close()
   })
 })
+
+test.describe('a page whose scripts are missing', () => {
+  test('a missing build file is never cached, so a reload after a deploy starts the page', async ({ request }) => {
+    const response = await request.get('/_nuxt/no-such-file.js')
+    expect(response.status()).toBe(404)
+    expect(response.headers()['cache-control']).toBe('no-store')
+  })
+})
+
+test.describe('the site menu on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('the menu button opens the site links, signed out and signed in', async ({ browser }) => {
+    for (const headers of [{}, as(staff).extraHTTPHeaders]) {
+      const context = await browser.newContext({ baseURL: BASE, viewport: { width: 390, height: 844 }, hasTouch: true, extraHTTPHeaders: headers })
+      const page = await context.newPage()
+      await visit(page, '/')
+      await page.getByRole('button', { name: 'Open menu' }).tap()
+      await expect(page.getByRole('dialog').getByRole('link', { name: "What's on" })).toBeVisible()
+      await context.close()
+    }
+  })
+})
