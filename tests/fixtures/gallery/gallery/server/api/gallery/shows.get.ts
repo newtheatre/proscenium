@@ -29,5 +29,5 @@ export default defineRoute({ ability: 'gallery.sample.view', rateLimit: 'default
   const matched = Object.fromEntries(found.filter(s => words.length && !words.every(w => s.title.toLowerCase().includes(w))).map(s => [s.id, 'venue']))
   const key = q.sort.key === 'title' ? 'title' : q.sort.key === 'opens' ? 'opens' : 'changed'
   found = [...found].sort((a, b) => (a[key] > b[key] ? 1 : -1) * (q.sort.order === 'desc' ? -1 : 1))
-  return { rows: found.slice((q.page - 1) * q.size, q.page * q.size), total: found.length, dropped: read.value.dropped, ignoredWords, searchTooShort, matched }
+  return { rows: found.slice((q.page - 1) * q.size, q.page * q.size), total: found.length, dropped: read.value.dropped, ignoredWords, searchTooShort, matched, hidden: { cancelled: 2 } }
 })

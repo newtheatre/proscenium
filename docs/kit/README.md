@@ -353,6 +353,31 @@ cannot be saved. A quotable public setting can be quoted in content as
 `:setting{name="box-office.fees.booking"}`. `onChange: 'reason'` makes a change need a written
 reason and `onChange: 'confirm'` a second confirmation; the `change` ability still decides who may.
 
+### Pages of settings
+
+Where settings are shown is declared per group (the first part of a short key), never per setting;
+`scope` is refused. Every setting has exactly one home, a generated page or a bespoke screen:
+
+```ts
+settingPages: { desk: { place: 'admin', group: 'modules', order: 20 } },   // makes the page and its entry
+settingGroups: {
+  'items': { page: 'desk' },                // a page of the module's own
+  'retention': { advanced: true },          // the shared Advanced page, under Upkeep
+  'sending': { screen: '/admin/email' },    // a bespoke screen manages it; no generated page draws it
+},
+```
+
+A group not named is on the module's own page in its `place` (`console` by default:
+`/console/<module>/settings`; `admin`: `/admin/modules/<module>`). Core has no page of its own, so
+each of its groups names a home; the table is `layers/core/module/settings.ts`. A single setting may
+carry `screen` where only part of its group is bespoke. A setting or group names a screen only once that screen shows and saves it: no setting may be reachable only through the API. Page ids are `<module>.<page>`, plus
+`core.advanced` and each module's `<module>.settings` and `<module>.admin`. A page's name is
+`<module>.settings-pages.<page>`. The conformance run fails for a screen that is not a page. In
+code, `useRegistry().settingPages` and `.settingHomes` say where everything is.
+
+A renamed setting carries `replaces: '<old full key>'`: the old key's stored value is carried over,
+`useSetting` still answers to the old key, and the old row goes when the setting is next changed.
+
 The core's locale settings are `core.site.name` and `core.locale.time-zone` (both unset until
 setup), `core.locale.currency` (GBP), `core.locale.language` (en-GB) and `core.locale.day-start`
 (04:00). Until the time zone is set, scheduled tasks run on UTC and `today()` and `localDate()`
