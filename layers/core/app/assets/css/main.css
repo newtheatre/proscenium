@@ -55,8 +55,6 @@
   }
 }
 
-/* Site administration: the strip above each page's panel takes 2.25rem off the panel's full height. */
-.admin-shell .admin-main > div { height: calc(100svh - 2.25rem); }
 /* A module's page holds two panels side by side (ModuleFrame), each the height of the one it replaces. */
 .admin-shell .admin-main > .module-frame > div { height: 100%; }
 

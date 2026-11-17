@@ -344,9 +344,10 @@ access scheme's application form does both.
 The fourth shell, at `/admin` (menu value `admin`). It holds install-level screens; the console keeps
 day-to-day work and each module's own settings. Someone enters it by holding the ability of at least
 one admin entry (the viewer then has the side `admin` and the account menu shows "Admin");
-anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the console's frame with a
-strip above the page header that says where you are at every width (and carries the drawer toggle
-below 1024 pixels), a "Back to console" (or "Back to the site") row where the theatre's mark is,
+anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the console's frame with an
+"Admin" mark at the start of every page's navbar that says where you are at every width (PageFrame
+draws it when the layout provides `ADMIN_SHELL`; there is no second bar, and below 1024 pixels the
+navbar's own menu button opens the drawer), a "Back to console" (or "Back to the site") row where the theatre's mark is,
 neutral buttons (the `admin-shell` class on `body` swaps the brand colour out), and a browser title
 that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
 

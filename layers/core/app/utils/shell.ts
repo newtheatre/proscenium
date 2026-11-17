@@ -3,6 +3,9 @@ import type { InjectionKey, Ref } from 'vue'
 /** Provided by a layout built on Nuxt UI's dashboard, so a page type knows to own its panel. */
 export const DASHBOARD_SHELL: InjectionKey<boolean> = Symbol('core:dashboard-shell')
 
+/** Provided by the Admin layout, so a page's navbar starts with the Admin mark (R-33). */
+export const ADMIN_SHELL: InjectionKey<boolean> = Symbol('core:admin-shell')
+
 /**
  * Provided by the console: the module whose settings the cog at the end of the navbar opens, or
  * nothing when the page belongs to no module or the viewer may change none of its settings.
