@@ -1,12 +1,13 @@
 <!-- The public shell (UI-01): the theatre's header and footer around a page rendered on the server.
      To restyle it, put a file at site/app/layouts/default.vue: it wins, with no other edit. Its
-     links are the theatre's own, from site/content/navigation.yml; its name, logos and colours are
-     the brand's (C-35). -->
+     links are What's on and Past shows, then the theatre's own, from site/content/navigation.yml;
+     its name, logos and colours are the brand's (C-35). -->
 <script setup lang="ts">
 const { t } = useT()
 const { data: brand } = await useBrand()
 const { data: navigation } = await useAsyncData('core:navigation', () => queryCollection('navigation').first())
 const route = useRoute()
+const { data: settings } = await usePublicSettings()
 
 // The brand's tokens go into the page's head with the page, so no stylesheet request holds up the
 // first paint and a saved brand shows on the next page load.
@@ -17,6 +18,8 @@ useHead(() => ({
 const name = computed(() => brand.value?.name ?? t('core.public.default-name'))
 const links = computed(() => [
   { label: t('core.public.whats-on'), to: '/whats-on' },
+  // The archive of past shows, unless the theatre keeps it private (public-site.archive.public).
+  ...(settings.value?.['public-site.archive.public']?.value === true ? [{ label: t('core.public.past-shows'), to: '/shows' }] : []),
   ...(navigation.value?.header ?? []),
 ].map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined, active: route.path === l.to || route.path.startsWith(`${l.to}/`) })))
 const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined })))
@@ -44,6 +47,7 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
         :aria-label="t('core.public.navigation')"
       />
       <template #right>
+        <InboxBell side="audience" />
         <AccountMenu />
       </template>
       <template #body>

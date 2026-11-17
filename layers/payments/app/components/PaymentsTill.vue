@@ -36,6 +36,9 @@ const toast = useToast()
 
 const { data: session, refresh: refreshSession } = await useAPI<YourSession>('/api/payments/session', { key: 'payments:session' })
 const open = computed(() => session.value?.session?.state === 'open')
+// The till is usable by someone with a session open or who may open one: the session itself waits
+// for the first sale, so coming to the till by mistake leaves nothing behind.
+const usable = computed(() => open.value || !!session.value?.mayOpen)
 const { time } = useDates()
 
 // The place this device last sold at, where its next session opens.
@@ -44,32 +47,22 @@ function deviceSpace(): string | null {
   try { return localStorage.getItem(SPACE_KEY) || null }
   catch { return null }
 }
-const opening = ref(false)
-const openingRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-/** Opens the seller's session if none is open. True once one is. */
+const nextPlace = ref<string | null>(null)
+onMounted(() => { nextPlace.value = deviceSpace() })
+/** Opens the seller's session if none is open, at this device's place. True once one is. */
 async function ensureSession(): Promise<boolean> {
   if (open.value) return true
-  opening.value = true
-  openingRefusal.value = null
-  try {
-    await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace() } })
-    await refreshSession()
-  }
-  catch (e) {
-    openingRefusal.value = toRefusal(e)
-  }
-  finally {
-    opening.value = false
-  }
+  await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace() } })
+  await refreshSession()
   return open.value
 }
-onMounted(() => { if (session.value?.mayOpen && !open.value) void ensureSession() })
 
 async function move(spaceId: string | null) {
-  const current = session.value?.session
-  if (!current) return
   try { localStorage.setItem(SPACE_KEY, spaceId ?? '') }
   catch { /* storage refused: the next session opens at the default */ }
+  nextPlace.value = spaceId
+  const current = session.value?.session
+  if (!current || current.state !== 'open') return
   try {
     await $api(`/api/payments/sessions/${current.id}` as string, { method: 'PATCH', body: { spaceId } })
     await refreshSession()
@@ -78,8 +71,8 @@ async function move(spaceId: string | null) {
     refusal.value = toRefusal(e)
   }
 }
-const { data: loaded, status, error, refresh } = await useAPI<{ panels: Panel[] }>('/api/payments/till/panels', { key: 'payments:till-panels', immediate: open.value })
-watch(open, (now) => { if (now && !loaded.value) refresh() })
+const { data: loaded, status, error, refresh } = await useAPI<{ panels: Panel[] }>('/api/payments/till/panels', { key: 'payments:till-panels', immediate: usable.value })
+watch(usable, (now) => { if (now && !loaded.value) refresh() })
 
 // A panel component no layer supplies is left out rather than breaking the till.
 const panels = computed(() => (loaded.value?.panels ?? []).flatMap((p) => {
@@ -129,6 +122,10 @@ const summaryOf = (id: string) => summary.value?.panels.find(p => p.basket === i
 // In live mode each panel is a tab once there are two; its badge counts the lines it adds to the sale.
 const tabbed = computed(() => props.live && panels.value.length > 1)
 const tab = ref<string | undefined>(undefined)
+// The first tab is shown until the seller picks another, so the till never opens on an empty panel.
+watch(panels, (now) => {
+  if (!now.some(p => p.id === tab.value)) tab.value = now[0]?.id
+}, { immediate: true })
 const tabs = computed(() => panels.value.map((p) => {
   const lines = summaryOf(p.id)?.lines.length ?? 0
   return { value: p.id, label: t(p.tab), icon: p.icon ?? undefined, badge: lines ? String(lines) : undefined, slot: 'panel' as const }
@@ -148,7 +145,9 @@ async function takePayment() {
   taking.value = true
   refusal.value = null
   try {
-    // A session that closed itself while the till sat quiet is opened again, and the sale made in it.
+    // The first sale opens the session. One that closed itself while the till sat quiet is opened
+    // again, and the sale made in it.
+    if (!open.value && !await ensureSession()) return
     const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value }, headers: { 'idempotency-key': saleKey.value } })
     let made: Awaited<ReturnType<typeof sell>>
     try {
@@ -294,6 +293,7 @@ async function resume(intentId: string, said: string) {
       result.value = { kind: 'waiting' }
       poll()
     }
+    else if (said === 'reload') toast.add({ title: t('payments.screens.till.picked-up', { amount: money(now.amountMinor - now.paidMinor) }), description: t('payments.screens.till.picked-up-help'), color: 'warning' })
     else if (said === 'succeeded') toast.add({ title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
     else if (said === 'failed') result.value = { kind: 'declined' }
     else toast.add({ title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
@@ -304,9 +304,15 @@ async function resume(intentId: string, said: string) {
 }
 onMounted(() => {
   const { intent, result: said, attempt, ...rest } = route.query
-  if (typeof intent !== 'string' || typeof said !== 'string' || !attempt) return
-  void router.replace({ query: rest })
-  if (session.value?.session) void resume(intent, said)
+  if (typeof intent === 'string' && typeof said === 'string' && attempt) {
+    void router.replace({ query: rest })
+    if (session.value?.session) void resume(intent, said)
+    return
+  }
+  // A sale left open, such as by reloading the page while taking it, is picked up again so it can be
+  // taken or cancelled; otherwise what it holds, such as a reservation, stays waiting for it.
+  const left = session.value?.unfinished
+  if (left) void resume(left.intentId, 'reload')
 })
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
@@ -398,22 +404,11 @@ function ended() {
 <template>
   <div>
     <EmptyState
-      v-if="!open"
-      :title="opening ? t('payments.screens.till.opening') : t('payments.screens.till.no-session')"
-      :description="opening ? undefined : t('payments.screens.till.no-session-help')"
+      v-if="!usable"
+      :title="t('payments.screens.till.no-session')"
+      :description="t('payments.screens.till.no-session-help')"
       icon="i-lucide-calculator"
-    >
-      <template
-        v-if="!opening"
-        #actions
-      >
-        <RefusalNotice :refusal="openingRefusal" />
-        <UButton
-          :label="t('payments.screens.till.open-session')"
-          @click="ensureSession"
-        />
-      </template>
-    </EmptyState>
+    />
 
     <DataBoundary
       v-else
@@ -424,23 +419,30 @@ function ended() {
       @retry="refresh()"
     >
       <template #default>
-        <!-- Which session sales go into, and where it is; moving it is remembered on this device. -->
+        <!-- Which session sales go into, or that one opens with the first sale, and where; the place
+             is remembered on this device. -->
         <div
-          v-if="session?.session"
-          class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted"
+          class="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-muted"
+          :class="live ? 'text-base' : 'text-sm'"
         >
-          <span>{{ t('payments.screens.till.session-since', { time: time(session.session.openedAt) }) }}</span>
-          <PaymentsSessionPlace
-            :model-value="session.session.spaceId"
-            :disabled="!!sale"
-            @update:model-value="move"
-          />
-          <ULink
+          <span v-if="open && session?.session">{{ t('payments.screens.till.session-since', { time: time(session.session.openedAt) }) }}</span>
+          <span v-else>{{ t('payments.screens.till.session-opens') }}</span>
+          <div class="w-64 max-w-full">
+            <PaymentsSessionPlace
+              :model-value="open && session?.session ? session.session.spaceId : nextPlace"
+              :disabled="!!sale"
+              @update:model-value="move"
+            />
+          </div>
+          <UButton
             to="/console/payments/sessions"
-            class="underline"
-          >
-            {{ t('payments.screens.till.your-session') }}
-          </ULink>
+            color="neutral"
+            variant="ghost"
+            :size="live ? 'xl' : 'md'"
+            trailing-icon="i-lucide-arrow-right"
+            class="ms-auto"
+            :label="t('payments.screens.till.your-session')"
+          />
         </div>
         <EmptyState
           v-if="!panels.length"
@@ -491,194 +493,195 @@ function ended() {
           </div>
 
           <aside
-            class="space-y-4 rounded-lg border border-default p-4"
             :class="live ? 'md:sticky md:top-16 md:self-start' : 'lg:sticky lg:top-4 lg:self-start'"
             :aria-label="t('payments.screens.till.total-label')"
           >
-            <ul
-              v-if="summary?.panels.length"
-              class="space-y-1"
-            >
-              <template
-                v-for="s in summary.panels"
-                :key="s.basket"
+            <PageSection :title="t('payments.screens.till.basket')">
+              <ul
+                v-if="summary?.panels.length"
+                class="space-y-1"
               >
-                <li
-                  v-for="(line, i) in s.lines"
-                  :key="`${s.basket}-${i}`"
-                  class="flex justify-between gap-3 text-sm"
+                <template
+                  v-for="s in summary.panels"
+                  :key="s.basket"
                 >
-                  <span>{{ line.label }}</span>
-                  <span>{{ money(line.amountMinor) }}</span>
-                </li>
-              </template>
-            </ul>
-            <p
-              v-else
-              class="text-sm text-muted"
-            >
-              {{ t('payments.screens.till.nothing-yet') }}
-            </p>
-            <p
-              class="flex justify-between text-lg font-semibold"
-              aria-live="polite"
-            >
-              <span>{{ t('payments.screens.till.total') }}</span>
-              <span>{{ money(summary?.amountMinor ?? 0) }}</span>
-            </p>
-
-            <RefusalNotice :refusal="refusal" />
-
-            <UButton
-              v-if="!sale"
-              block
-              size="lg"
-              icon="i-lucide-banknote"
-              :loading="taking"
-              :disabled="summing || !summary || summary.amountMinor <= 0"
-              :label="t('payments.screens.till.take', { amount: money(summary?.amountMinor ?? 0) })"
-              @click="takePayment"
-            />
-
-            <div
-              v-else
-              class="space-y-4"
-            >
-              <p class="font-medium">
-                {{ t('payments.screens.till.due', { amount: money(due) }) }}
-              </p>
+                  <li
+                    v-for="(line, i) in s.lines"
+                    :key="`${s.basket}-${i}`"
+                    class="flex justify-between gap-3 text-sm"
+                  >
+                    <span>{{ line.label }}</span>
+                    <span>{{ money(line.amountMinor) }}</span>
+                  </li>
+                </template>
+              </ul>
               <p
-                v-if="paidInPart"
+                v-else
                 class="text-sm text-muted"
               >
-                {{ t('payments.screens.till.paid-so-far', { amount: money(payment?.paidMinor ?? 0) }) }}
+                {{ t('payments.screens.till.nothing-yet') }}
+              </p>
+              <p
+                class="flex justify-between text-lg font-semibold"
+                aria-live="polite"
+              >
+                <span>{{ t('payments.screens.till.total') }}</span>
+                <span>{{ money(summary?.amountMinor ?? 0) }}</span>
               </p>
 
-              <UAlert
-                v-if="result?.kind === 'declined'"
-                color="warning"
-                icon="i-lucide-circle-x"
-                :title="t('payments.screens.till.declined')"
-                :description="t('payments.screens.till.declined-help')"
-              />
-              <UAlert
-                v-else-if="waiting"
-                color="info"
-                icon="i-lucide-loader"
-                :title="t('payments.screens.till.waiting')"
-                :description="t('payments.screens.till.waiting-help')"
-              >
-                <template #actions>
-                  <UButton
-                    v-if="result?.kind === 'handoff'"
-                    :to="result.url"
-                    external
-                    size="sm"
-                    :label="t('payments.screens.test.open')"
-                  />
-                  <UButton
-                    size="sm"
-                    color="neutral"
-                    variant="outline"
-                    :label="t('payments.screens.test.check')"
-                    @click="check()"
-                  />
-                </template>
-              </UAlert>
+              <RefusalNotice :refusal="refusal" />
 
-              <template v-if="!waiting">
+              <UButton
+                v-if="!sale"
+                block
+                size="lg"
+                icon="i-lucide-banknote"
+                :loading="taking"
+                :disabled="summing || !summary || summary.amountMinor <= 0"
+                :label="t('payments.screens.till.take', { amount: money(summary?.amountMinor ?? 0) })"
+                @click="takePayment"
+              />
+
+              <div
+                v-else
+                class="space-y-4"
+              >
+                <p class="font-medium">
+                  {{ t('payments.screens.till.due', { amount: money(due) }) }}
+                </p>
                 <p
-                  v-if="!methods.length"
+                  v-if="paidInPart"
                   class="text-sm text-muted"
                 >
-                  {{ t('payments.screens.till.no-methods') }}
+                  {{ t('payments.screens.till.paid-so-far', { amount: money(payment?.paidMinor ?? 0) }) }}
                 </p>
-                <URadioGroup
-                  v-else
-                  v-model="choice"
-                  :size="live ? 'xl' : undefined"
-                  :variant="live ? 'card' : undefined"
-                  :legend="t('payments.screens.till.how')"
-                  :items="methods.map(m => ({ value: key(m), label: methodLabel(m), description: m.mode === 'test' ? t('payments.screens.providers.test-mode') : undefined }))"
+
+                <UAlert
+                  v-if="result?.kind === 'declined'"
+                  color="warning"
+                  icon="i-lucide-circle-x"
+                  :title="t('payments.screens.till.declined')"
+                  :description="t('payments.screens.till.declined-help')"
                 />
+                <UAlert
+                  v-else-if="waiting"
+                  color="info"
+                  icon="i-lucide-loader"
+                  :title="t('payments.screens.till.waiting')"
+                  :description="t('payments.screens.till.waiting-help')"
+                >
+                  <template #actions>
+                    <UButton
+                      v-if="result?.kind === 'handoff'"
+                      :to="result.url"
+                      external
+                      size="sm"
+                      :label="t('payments.screens.test.open')"
+                    />
+                    <UButton
+                      size="sm"
+                      color="neutral"
+                      variant="outline"
+                      :label="t('payments.screens.test.check')"
+                      @click="check()"
+                    />
+                  </template>
+                </UAlert>
 
-                <UFormField
-                  v-if="chosen"
-                  :label="t('payments.screens.till.part')"
-                  :hint="t('payments.screens.optional')"
-                  :help="t('payments.screens.till.part-help', { amount: money(due) })"
-                  :error="partTooMuch ? t('payments.screens.till.part-too-much', { amount: money(due) }) : undefined"
-                >
-                  <UInputNumber
-                    v-model="part"
-                    :min="0"
-                    :step="0.01"
-                    :format-options="{ style: 'currency', currency }"
+                <template v-if="!waiting">
+                  <p
+                    v-if="!methods.length"
+                    class="text-sm text-muted"
+                  >
+                    {{ t('payments.screens.till.no-methods') }}
+                  </p>
+                  <URadioGroup
+                    v-else
+                    v-model="choice"
+                    :size="live ? 'xl' : undefined"
+                    :variant="live ? 'card' : undefined"
+                    :legend="t('payments.screens.till.how')"
+                    :items="methods.map(m => ({ value: key(m), label: methodLabel(m), description: m.mode === 'test' ? t('payments.screens.providers.test-mode') : undefined }))"
                   />
-                </UFormField>
-                <UFormField
-                  v-if="chosen?.method === 'cash'"
-                  :label="t('payments.screens.till.tendered')"
-                  :hint="t('payments.screens.optional')"
-                  :help="t('payments.screens.till.tendered-help')"
-                >
-                  <UInputNumber
-                    v-model="tendered"
-                    :min="0"
-                    :step="0.01"
-                    :format-options="{ style: 'currency', currency }"
-                  />
-                </UFormField>
-                <UFormField
-                  v-if="chosen?.method === 'card_reader'"
-                  :label="t('payments.screens.test.reader')"
-                  required
-                >
-                  <USelect
-                    v-model="readerId"
-                    :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
-                  />
-                </UFormField>
 
-                <div
-                  v-if="chosen"
-                  class="flex flex-wrap gap-2"
-                >
-                  <UButton
-                    :loading="taking"
-                    :disabled="partTooMuch || (chosen.method === 'card_reader' && !readerId)"
-                    :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
-                    @click="pay()"
-                  />
-                  <UButton
-                    v-if="chosen.method.endsWith('_attested')"
-                    color="neutral"
-                    variant="outline"
-                    :disabled="taking"
-                    :label="t('payments.screens.till.machine-declined')"
-                    @click="pay(false)"
-                  />
-                </div>
-              </template>
+                  <UFormField
+                    v-if="chosen"
+                    :label="t('payments.screens.till.part')"
+                    :hint="t('payments.screens.optional')"
+                    :help="t('payments.screens.till.part-help', { amount: money(due) })"
+                    :error="partTooMuch ? t('payments.screens.till.part-too-much', { amount: money(due) }) : undefined"
+                  >
+                    <UInputNumber
+                      v-model="part"
+                      :min="0"
+                      :step="0.01"
+                      :format-options="{ style: 'currency', currency }"
+                    />
+                  </UFormField>
+                  <UFormField
+                    v-if="chosen?.method === 'cash'"
+                    :label="t('payments.screens.till.tendered')"
+                    :hint="t('payments.screens.optional')"
+                    :help="t('payments.screens.till.tendered-help')"
+                  >
+                    <UInputNumber
+                      v-model="tendered"
+                      :min="0"
+                      :step="0.01"
+                      :format-options="{ style: 'currency', currency }"
+                    />
+                  </UFormField>
+                  <UFormField
+                    v-if="chosen?.method === 'card_reader'"
+                    :label="t('payments.screens.test.reader')"
+                    required
+                  >
+                    <USelect
+                      v-model="readerId"
+                      :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
+                    />
+                  </UFormField>
 
-              <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is given back. -->
-              <UButton
-                v-if="paidInPart"
-                color="neutral"
-                variant="ghost"
-                :disabled="taking || waiting"
-                :label="t('payments.screens.till.give-back-button')"
-                @click="giveBack"
-              />
-              <UButton
-                v-else
-                color="neutral"
-                variant="ghost"
-                :disabled="taking"
-                :label="t('payments.screens.till.cancel-button')"
-                @click="cancel"
-              />
-            </div>
+                  <div
+                    v-if="chosen"
+                    class="flex flex-wrap gap-2"
+                  >
+                    <UButton
+                      :loading="taking"
+                      :disabled="partTooMuch || (chosen.method === 'card_reader' && !readerId)"
+                      :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
+                      @click="pay()"
+                    />
+                    <UButton
+                      v-if="chosen.method.endsWith('_attested')"
+                      color="neutral"
+                      variant="outline"
+                      :disabled="taking"
+                      :label="t('payments.screens.till.machine-declined')"
+                      @click="pay(false)"
+                    />
+                  </div>
+                </template>
+
+                <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is given back. -->
+                <UButton
+                  v-if="paidInPart"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="taking || waiting"
+                  :label="t('payments.screens.till.give-back-button')"
+                  @click="giveBack"
+                />
+                <UButton
+                  v-else
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="taking"
+                  :label="t('payments.screens.till.cancel-button')"
+                  @click="cancel"
+                />
+              </div>
+            </PageSection>
           </aside>
         </div>
       </template>

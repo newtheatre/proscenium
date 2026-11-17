@@ -8,6 +8,7 @@ import type { Actor, UnitView } from '#kit'
 import { assertTerm } from '../vocabularies/service'
 import { orderWarnings, type WarningLevel } from './guidance'
 import { changeImpact, firstRefusal, syncProductionDates } from './performances'
+import { sellsHere } from './booking'
 
 // ---------------------------------------------------------------------------------------------
 // Slugs
@@ -123,6 +124,9 @@ export interface ProductionInput {
   contentNote?: string | null
   runningMinutes?: number | null
   intervalCount?: number
+  intervalMinutes?: number | null
+  doorsBeforeMinutes?: number | null
+  capacity?: number | null
   externalBookingUrl?: string | null
   creditsPublic?: boolean
   listed?: boolean
@@ -146,6 +150,9 @@ export interface Production {
   contentNote: string | null
   runningMinutes: number | null
   intervalCount: number
+  intervalMinutes: number | null
+  doorsBeforeMinutes: number | null
+  capacity: number | null
   externalBookingUrl: string | null
   creditsPublic: boolean
   listed: boolean
@@ -180,6 +187,9 @@ interface ProductionRow {
   content_note: string | null
   running_minutes: number | null
   interval_count: number
+  interval_minutes: number | null
+  doors_before_minutes: number | null
+  capacity: number | null
   external_booking_url: string | null
   credits_public: number
   listed: number
@@ -194,7 +204,7 @@ const toProduction = (r: ProductionRow): Production => ({
   id: r.id, slug: r.slug, title: r.title, subtitle: r.subtitle, summary: r.summary, description: r.description, kind: r.kind,
   categoryTermId: r.category_term_id, seasonId: r.season_id, companyName: r.company_name, ageMin: r.age_min,
   ageRestricted: !!r.age_restricted, effectsConfirmedNone: !!r.effects_confirmed_none, advisoriesConfirmedNone: !!r.advisories_confirmed_none, contentNote: r.content_note, runningMinutes: r.running_minutes,
-  intervalCount: r.interval_count, externalBookingUrl: r.external_booking_url, creditsPublic: !!r.credits_public, listed: !!r.listed,
+  intervalCount: r.interval_count, intervalMinutes: r.interval_minutes, doorsBeforeMinutes: r.doors_before_minutes, capacity: r.capacity, externalBookingUrl: r.external_booking_url, creditsPublic: !!r.credits_public, listed: !!r.listed,
   state: r.state, cancelReasonTermId: r.cancel_reason_term_id, publishedAt: r.published_at, firstStartsAt: r.first_starts_at, lastEndsAt: r.last_ends_at,
 })
 
@@ -203,7 +213,7 @@ const FIELDS: [keyof ProductionInput, keyof ProductionRow, boolean][] = [
   ['title', 'title', true], ['subtitle', 'subtitle', true], ['summary', 'summary', true], ['description', 'description', true], ['kind', 'kind', false],
   ['categoryTermId', 'category_term_id', true], ['seasonId', 'season_id', true], ['companyName', 'company_name', true], ['ageMin', 'age_min', true], ['ageRestricted', 'age_restricted', true],
   ['effectsConfirmedNone', 'effects_confirmed_none', true], ['advisoriesConfirmedNone', 'advisories_confirmed_none', true], ['contentNote', 'content_note', true], ['runningMinutes', 'running_minutes', true],
-  ['intervalCount', 'interval_count', true], ['externalBookingUrl', 'external_booking_url', true], ['creditsPublic', 'credits_public', true], ['listed', 'listed', true],
+  ['intervalCount', 'interval_count', true], ['intervalMinutes', 'interval_minutes', true], ['doorsBeforeMinutes', 'doors_before_minutes', true], ['capacity', 'capacity', false], ['externalBookingUrl', 'external_booking_url', true], ['creditsPublic', 'credits_public', true], ['listed', 'listed', true],
 ]
 
 const AGE_REFUSED = { code: 'core.production.age-needed', reason: 'A restriction needs a minimum age.', fields: { ageMin: 'Set the age, or make it a recommendation.' } }
@@ -278,10 +288,10 @@ export async function createProduction(unit: UnitView, input: ProductionInput, a
   const creditsPublic = input.creditsPublic ?? await useSetting('core.programme.credits-public') as boolean
   const at = nowMs()
   unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_min, age_restricted,
-      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, external_booking_url, credits_public, state, listed, created_by, created_at)
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, state, listed, created_by, created_at)
     SELECT ${id}, ${slug}, ${input.title}, ${input.subtitle ?? null}, ${input.summary ?? null}, ${input.description ?? null}, ${input.kind}, ${input.categoryTermId ?? null},
       ${input.seasonId ?? null}, ${input.companyName ?? null}, ${input.ageMin ?? null}, ${input.ageRestricted ? 1 : 0}, ${input.effectsConfirmedNone ? 1 : 0}, ${input.advisoriesConfirmedNone ? 1 : 0}, ${input.contentNote ?? null},
-      ${input.runningMinutes ?? null}, ${input.intervalCount ?? 0}, ${input.externalBookingUrl ?? null}, ${creditsPublic ? 1 : 0}, 'draft', ${input.listed === false ? 0 : 1}, ${actorId}, ${at}
+      ${input.runningMinutes ?? null}, ${input.intervalCount ?? await useSetting('core.programme.intervals') as number}, ${input.intervalMinutes ?? null}, ${input.doorsBeforeMinutes ?? null}, ${input.capacity ?? null}, ${input.externalBookingUrl ?? null}, ${creditsPublic ? 1 : 0}, 'draft', ${input.listed === false ? 0 : 1}, ${actorId}, ${at}
     WHERE ${input.categoryTermId ? assertTerm(input.categoryTermId, 'core.production-category') : sql`1`}`).expect(1, CATEGORY_REFUSED)
   unit.audit({ action: 'create', record: ['core.production', id] })
   return id
@@ -307,6 +317,8 @@ export async function updateProduction(unit: UnitView, id: string, input: Partia
   // A published production keeps what publishing needed.
   if (row.state === 'published' && (input.summary === null || input.categoryTermId === null))
     refuse('core.production.needed-to-publish', 'A published production needs a summary and a category.', { status: 422, remedy: 'Withdraw it first to remove them.' })
+  if (row.state === 'published' && input.externalBookingUrl === null && !await sellsHere())
+    refuse('core.production.booking-link-needed', 'A published production needs a booking link while nothing here sells tickets.', { status: 422, fields: { externalBookingUrl: 'Give the link where people book.' } })
   if (row.state === 'published' && input.advisoriesConfirmedNone === false && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id))
     refuse('core.production.advisories-needed', 'A published production lists its content warnings or confirms it has none.', { status: 422 })
   if (row.state === 'published' && input.effectsConfirmedNone === false && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id))
@@ -359,6 +371,7 @@ export async function setEffects(unit: UnitView, id: string, effects: Effect[]):
     refuse('core.production.effects-needed', 'A published production lists its staging effects or confirms it has none.', { status: 422 })
   const before = new Set((await all<{ term_id: string }>('SELECT term_id FROM core_production_effects WHERE production_id = ?', id)).map(r => r.term_id))
   unit.add(sql`DELETE FROM core_production_effects WHERE production_id = ${id}`)
+  unit.add(sql`DELETE FROM core_performance_effect_exceptions WHERE performance_id IN (SELECT id FROM core_performances WHERE production_id = ${id}) AND term_id NOT IN (SELECT value FROM json_each(${JSON.stringify(effects.map(e => e.termId))}))`)
   for (const e of effects) {
     unit.add(sql`INSERT INTO core_production_effects (production_id, term_id, detail)
       SELECT ${id}, ${e.termId}, ${e.detail} WHERE ${assertTerm(e.termId, 'core.staging-effect')}`)
@@ -378,6 +391,8 @@ export async function publishingNeeds(id: string): Promise<string[]> {
   if (!row.category_term_id) needs.push('a category')
   if (!row.effects_confirmed_none && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id)) needs.push('its staging effects, or confirmation that it has none')
   if (!row.advisories_confirmed_none && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id)) needs.push('its content warnings, or confirmation that it has none')
+  // With no booking module switched on, the public can only book through the production's own link.
+  if (!row.external_booking_url && !await sellsHere()) needs.push('a booking link, as nothing here sells tickets')
   return needs
 }
 

@@ -110,7 +110,7 @@ test('the desk finds a reservation by scanning its box office code with the came
     await visit(page, '/console/box-office/sell')
     await page.getByRole('tab', { name: 'Collect a reservation' }).click()
     // Find and the icon-only scan button share the code box's row, lined up with it.
-    const box = (await page.getByLabel(/^Booking reference or desk code/).boundingBox())!
+    const box = (await page.getByLabel(/^Booking reference, desk code or name/).boundingBox())!
     const scanButton = page.getByRole('button', { name: 'Scan with camera' })
     for (const button of [page.getByRole('button', { name: 'Find' }), scanButton]) {
       const at = (await button.boundingBox())!
@@ -122,7 +122,7 @@ test('the desk finds a reservation by scanning its box office code with the came
     await page.screenshot({ path: 'test-results/desk-find-row.png' })
     await scanButton.click()
     await expect(page.getByRole('heading', { name: `Booking ${reference}` })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByLabel(/^Booking reference or desk code/)).toHaveValue(deskCode)
+    await expect(page.getByLabel(/^Booking reference, desk code or name/)).toHaveValue(deskCode)
   }
   finally {
     await browser.close()
@@ -165,19 +165,19 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     // Pausing stops the camera; a reservation's code typed in is sent to pay.
     await page.getByRole('button', { name: 'Pause camera' }).click()
     await expect(page.getByText('Camera paused')).toBeVisible()
-    await page.getByRole('button', { name: 'Type a code' }).click()
-    await page.getByRole('dialog').getByLabel('Or type the code').fill(deskCode)
-    await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').fill(deskCode)
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').press('Enter')
     const unpaid = page.getByRole('status').filter({ hasText: 'Not paid' })
     await expect(unpaid).toBeVisible()
     await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the box office or the bar to pay.`)
     await expect(page.getByRole('dialog')).toBeHidden()
 
     // A member whose membership has lapsed is sent to the box office with the members list's own words.
-    await page.route('**/scan', route => route.fulfill({ json: { result: 'requirement_not_met', scanId: 'scan_x', requirement: { reason: 'Membership not current.', ticketType: 'Member' } } }))
-    await page.getByRole('button', { name: 'Type a code' }).click()
-    await page.getByRole('dialog').getByLabel('Or type the code').fill('t.k.lapsed.member')
-    await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
+    await page.route('**/scan', route => route.fulfill({ json: { result: 'requirement_not_met', scanId: 'scan_x', ticketId: 'tkt_x', overridable: true, requirement: { reason: 'Membership not current.', ticketType: 'Member' } } }))
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').fill('t.k.lapsed.member')
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').press('Enter')
     const lapsed = page.getByRole('status').filter({ hasText: 'Does not qualify' })
     await expect(lapsed).toContainText('Member: Membership not current. Send them to the box office to change the ticket.')
     // The dialogue fades as it closes; checked mid-fade, its title fails contrast.
@@ -185,6 +185,24 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.unroute('**/scan')
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
+
+    // A holder of the override may admit them anyway, with a reason from the list.
+    let sent: Record<string, unknown> | null = null
+    await page.route('**/door/override', async (route) => {
+      sent = route.request().postDataJSON()
+      await route.fulfill({ json: { result: 'admitted', scanId: 'scan_y', ticketId: 'tkt_x' } })
+    })
+    await page.getByRole('button', { name: 'Admit anyway' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Member: Membership not current. Admit them only if you have checked for yourself.')
+    await expect(dialog.getByRole('button', { name: 'Admit anyway' })).toBeDisabled()
+    await dialog.getByRole('combobox').click()
+    await page.getByRole('option', { name: 'Membership shown in person' }).click()
+    await dialog.getByRole('button', { name: 'Admit anyway' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Admitted anyway' })).toContainText('Member · Membership shown in person')
+    expect(sent).toMatchObject({ ticketId: 'tkt_x' })
+    await expect(page.getByRole('button', { name: 'Admit anyway' })).toHaveCount(0)
+    await page.unroute('**/door/override')
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.getByRole('button', { name: 'Resume camera' }).click()

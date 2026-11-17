@@ -11,7 +11,10 @@ import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post
 import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import bandsPost from '../../server/api/box-office/productions/[id]/bands/index.post'
 import bandsGet from '../../server/api/box-office/productions/[id]/bands/index.get'
+import bandPatch from '../../server/api/box-office/productions/[id]/bands/[bandId].patch'
+import bandDelete from '../../server/api/box-office/productions/[id]/bands/[bandId].delete'
 import pricesPost from '../../server/api/box-office/productions/[id]/prices.post'
+import pricesCancelScheduled from '../../server/api/box-office/productions/[id]/prices/cancel-scheduled.post'
 import salesPut from '../../server/api/box-office/performances/[id]/sales/index.put'
 import salesGet from '../../server/api/box-office/performances/[id]/sales/index.get'
 import openPost from '../../server/api/box-office/performances/[id]/sales/open.post'
@@ -30,9 +33,11 @@ import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
 import cancelPost from '../../server/api/box-office/orders/[id]/cancel.post'
 import amendPost from '../../server/api/box-office/orders/[id]/amend.post'
+import splitPost from '../../server/api/box-office/orders/[id]/split.post'
 import performancesGet from '../../server/api/box-office/performances/index.get'
 import doorGet from '../../server/api/box-office/performances/[id]/door.get'
 import doorAdmit from '../../server/api/box-office/performances/[id]/door/admit.post'
+import doorOverride from '../../server/api/box-office/performances/[id]/door/override.post'
 import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.post'
 import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
@@ -40,7 +45,11 @@ import doorTonight from '../../server/api/box-office/door/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
+import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
+import deskBuyersGet from '../../server/api/box-office/desk/buyers.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
+import sessionGet from '../../../payments/server/api/payments/session.get'
+import intentCancelPost from '../../../payments/server/api/payments/intents/[id]/cancel.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
 import exchangePost from '../../server/api/box-office/orders/[id]/exchange.post'
@@ -57,6 +66,8 @@ import compDecline from '../../server/api/box-office/comps/[id]/decline.post'
 import compWithdraw from '../../server/api/box-office/comps/[id]/withdraw.post'
 import bookGet from '../../server/api/box-office/book/performances/[id].get'
 import publishProduction from '../../../core/server/api/core/productions/[id]/publish.post'
+import setProductionEffects from '../../../core/server/api/core/productions/[id]/effects.put'
+import setProductionAdvisories from '../../../core/server/api/core/productions/[id]/advisories.put'
 import editProduction from '../../../core/server/api/core/productions/[id]/index.patch'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
@@ -72,7 +83,10 @@ export const handle = server({
   'GET /api/box-office/ticket-types': ticketTypesGet,
   'POST /api/box-office/productions/:id/bands': bandsPost,
   'GET /api/box-office/productions/:id/bands': bandsGet,
+  'PATCH /api/box-office/productions/:id/bands/:bandId': bandPatch,
+  'DELETE /api/box-office/productions/:id/bands/:bandId': bandDelete,
   'POST /api/box-office/productions/:id/prices': pricesPost,
+  'POST /api/box-office/productions/:id/prices/cancel-scheduled': pricesCancelScheduled,
   'PUT /api/box-office/performances/:id/sales': salesPut,
   'GET /api/box-office/performances/:id/sales': salesGet,
   'POST /api/box-office/performances/:id/sales/open': openPost,
@@ -91,6 +105,7 @@ export const handle = server({
   'GET /api/box-office/performances': performancesGet,
   'GET /api/box-office/performances/:id/door': doorGet,
   'POST /api/box-office/performances/:id/door/admit': doorAdmit,
+  'POST /api/box-office/performances/:id/door/override': doorOverride,
   'POST /api/box-office/performances/:id/sales/copy': copyPost,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
@@ -101,7 +116,10 @@ export const handle = server({
   'POST /api/box-office/orders/link/cancel': orderCancelPost,
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
+  'POST /api/box-office/orders/:id/split': splitPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/desk/performances': deskPerformancesGet,
+  'GET /api/box-office/desk/buyers': deskBuyersGet,
   'POST /api/box-office/orders/:id/exchange': exchangePost,
   'GET /api/box-office/reports/sales': reportsSalesGet,
   'GET /api/box-office/reports/sales.csv': reportsSalesCsv,
@@ -116,8 +134,12 @@ export const handle = server({
   'POST /api/box-office/comps/:id/withdraw': compWithdraw,
   'GET /api/box-office/book/performances/:id': bookGet,
   'POST /api/core/productions/:id/publish': publishProduction,
+  'PUT /api/core/productions/:id/effects': setProductionEffects,
+  'PUT /api/core/productions/:id/advisories': setProductionAdvisories,
   'PATCH /api/core/productions/:id': editProduction,
   'POST /api/payments/till/sale': tillSalePost,
+  'GET /api/payments/session': sessionGet,
+  'POST /api/payments/intents/:id/cancel': intentCancelPost,
   'POST /api/payments/till/summary': tillSummaryPost,
 })
 

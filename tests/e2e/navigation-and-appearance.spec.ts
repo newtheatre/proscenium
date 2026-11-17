@@ -121,3 +121,28 @@ test.describe('the colour mode a page arrives in', () => {
     })
   })
 })
+
+test.describe('the account menu on a phone', () => {
+  test.use({ ...as(staff), viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('the header shows only the mark, and the menu opens as a drawer that closes on going somewhere', async ({ page }) => {
+    await visit(page, '/')
+    const trigger = page.getByRole('button', { name: 'Open the menu for Nora Navigator' }).locator('visible=true')
+    await expect(trigger).toHaveCount(1)
+    await expect(trigger).not.toContainText('Nora Navigator')
+    await trigger.click()
+    const drawer = page.getByRole('dialog', { name: 'Nora Navigator' })
+    await expect(drawer.getByRole('button', { name: 'Dark' })).toBeVisible()
+    await drawer.getByRole('link', { name: 'My account' }).click()
+    await expect(page).toHaveURL(/\/account/)
+    await expect(drawer).toBeHidden()
+  })
+
+  test('signed out, Sign in is an icon that still says what it is', async ({ browser }) => {
+    const visitor = await browser.newContext({ baseURL: BASE, viewport: { width: 390, height: 844 }, extraHTTPHeaders: {} })
+    const page = await visitor.newPage()
+    await visit(page, '/')
+    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
+    await visitor.close()
+  })
+})

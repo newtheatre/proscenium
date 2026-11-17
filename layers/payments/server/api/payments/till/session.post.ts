@@ -1,4 +1,4 @@
-// The till opens the seller's session when they come to it with none open (selling proposal). It
+// The till opens the seller's session with their first sale when none is open (selling proposal). It
 // opens at the space the device used last, if that still exists, else at
 // payments.sessions.default-space, else at no space ("Unknown"); any of these can be changed later.
 // With a session already open, that one is returned and nothing changes.

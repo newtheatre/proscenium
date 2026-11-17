@@ -39,6 +39,8 @@
   "box-office.settings.orders.desk-seat-cap.help": "The most tickets a seller can put in one order at the desk, for group bookings.",
   "box-office.settings.sales.desk-until-after.label": "Desk sells until this long after the start",
   "box-office.settings.sales.desk-until-after.help": "How long after the performance starts the desk may still sell, for latecomers.",
+  "box-office.settings.sales.desk-email-domains.label": "Email providers suggested at the till",
+  "box-office.settings.sales.desk-email-domains.help": "When a seller types a name into the box for emailing the tickets, the till offers it at each of these, such as \"Use sam@gmail.com\". Write each as the part after the @.",
   "box-office.settings.retention.holds.label": "Keep the label of a staff hold for",
   "box-office.settings.retention.holds.help": "How long after the performance a hold placed by staff keeps its label, such as the name of the guests it was for.",
   "box-office.abilities.performance.manage.label": "Set up sales for a performance",

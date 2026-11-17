@@ -5,6 +5,7 @@
 import { all, first, nowMs } from '#kit'
 import { publicImages, type PublicImage } from './media'
 import type { PublicTerm } from './public'
+import { ageWording } from './guidance'
 
 export interface PublicFeature {
   termId: string
@@ -126,9 +127,9 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
   )
   if (!s || (s.state === 'archived' && !pastVisible)) return null
   const now = options.now ?? nowMs()
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null }>(
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, age_min: number | null, age_restricted: number, has_effects: number }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.state, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
-        p.last_ends_at,
+        p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
         (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
         (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
        FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id
@@ -151,6 +152,8 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
       cancelled: r.state === 'cancelled',
       past,
       poster: images.get(r.id)!.poster,
+      age: ageWording(r.age_min, !!r.age_restricted),
+      hasEffects: !!r.has_effects,
     }
   })
   return {

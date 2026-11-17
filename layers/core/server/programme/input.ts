@@ -32,6 +32,9 @@ const productionFields = z.object({
   contentNote: text(4000), // not-policy: public text's bound
   runningMinutes: z.number().int().positive().max(24 * 60).nullable(), // not-policy: a day
   intervalCount: z.number().int().min(0).max(10), // not-policy: a sane ceiling on intervals
+  intervalMinutes: z.number().int().min(0).max(120).nullable(), // not-policy: a sane ceiling on one interval
+  doorsBeforeMinutes: z.number().int().min(0).max(180).nullable(), // not-policy: the doors setting's ceiling
+  capacity: z.number().int().min(1).max(100_000).nullable(), // not-policy: a sane ceiling on a house
   externalBookingUrl: z.string().trim().url().startsWith('https://').max(2000).nullable(), // not-policy: an address's bound
   creditsPublic: z.boolean(),
   listed: z.boolean(),
@@ -60,9 +63,12 @@ const performanceFields = z.object({
   endsAt: instant,
   doorsAt: instant.nullable(),
   intervalCount: z.number().int().min(0).max(10).nullable(), // not-policy: a sane ceiling on intervals
+  intervalMinutes: z.number().int().min(0).max(120).nullable(), // not-policy: a sane ceiling on one interval
   capacity: z.number().int().min(0).max(100_000).nullable(), // not-policy: a sane ceiling on a house
   label: text(40), // not-policy: the table's bound on a label
   externalBookingUrl: z.string().trim().url().startsWith('https://').max(2000).nullable(), // not-policy: an address's bound
+  runningMinutes: z.number().int().min(1).max(1440).nullable(), // not-policy: at most a day long
+  doorsBeforeMinutes: z.number().int().min(0).max(180).nullable(), // not-policy: the doors setting's ceiling
 })
 
 export const performanceInput = performanceFields.partial().required({ venueId: true, spaceId: true, startsAt: true })
@@ -70,6 +76,10 @@ export const performancePatch = performanceFields.partial()
 
 export const accessInput = z.object({
   features: z.array(z.object({ termId: z.string().min(1), detail: text(200).default(null) })).max(20), // not-policy: the table's bound on a detail; a list's ceiling
+})
+
+export const effectExceptionsInput = z.object({
+  termIds: z.array(z.string().min(1)).max(20), // not-policy: a list's ceiling
 })
 
 export const cancelInput = z.object({
@@ -84,14 +94,29 @@ export const impactQuery = z.object({
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/ // not-policy: a time's shape
 
+/** One start time's days: ISO weekdays (1 is Monday) and local times, HH:mm. */
+export const runSlot = z.object({
+  days: z.array(z.number().int().min(1).max(7)).min(1).max(7), // not-policy: ISO weekdays
+  times: z.array(z.string().regex(TIME)).min(1).max(6), // not-policy: a sane ceiling on times a day
+})
+export const runSlots = z.array(runSlot).min(1).max(12) // not-policy: a sane ceiling on start times in a week
+
+// A pattern gives its start times as slots, or (as before slots) one list of days and of times.
 export const runPattern = z.object({
   venueId: z.string().min(1),
   spaceId: z.string().min(1),
   from: z.string().regex(DATE_ONLY),
   to: z.string().regex(DATE_ONLY),
-  days: z.array(z.number().int().min(1).max(7)).min(1).max(7), // not-policy: ISO weekdays
-  times: z.array(z.string().regex(TIME)).min(1).max(6), // not-policy: a sane ceiling on times a day
+  slots: runSlots.optional(),
+  days: runSlot.shape.days.optional(),
+  times: runSlot.shape.times.optional(),
   minutes: z.number().int().min(1).max(1440).nullable().optional(), // not-policy: at most a day long
+  doorsBeforeMinutes: z.number().int().min(0).max(180).nullable().optional(), // not-policy: the doors setting's ceiling
+}).refine(p => p.slots || (p.days && p.times), { message: 'Give the start times and their days.', path: ['slots'] })
+
+export const runPresetInput = z.object({
+  name: z.string().trim().min(1).max(80), // not-policy: the table's bound on a name
+  slots: runSlots,
 })
 
 export const runInput = z.object({
@@ -100,6 +125,8 @@ export const runInput = z.object({
   scheduled: z.boolean().default(true),
   capacity: z.number().int().min(0).max(100_000).nullable().optional(), // not-policy: a sane ceiling on a house
   intervalCount: z.number().int().min(0).max(10).nullable().optional(), // not-policy: a sane ceiling on intervals
+  intervalMinutes: z.number().int().min(0).max(120).nullable().optional(), // not-policy: a sane ceiling on one interval
+  externalBookingUrl: z.string().trim().url().startsWith('https://').max(2000).nullable().optional(), // not-policy: an address's bound
   label: text(40).optional(), // not-policy: the table's bound on a label
   performances: z.array(z.object({
     startsAt: z.number().int().positive(),

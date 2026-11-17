@@ -5,6 +5,7 @@
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
+import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
@@ -31,10 +32,10 @@ async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>
 }
 
 /** A reservation of `quantity` full-price tickets, as the buyer made it online. */
-async function reserved(h: House, quantity: number) {
+async function reserved(h: House, quantity: number, name = 'Desk Guest') {
   const made = await buy(h, quantity)
   if (!made.ok) throw new Error(made.code)
-  const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `desk${++guests}@example.org`, name: 'Desk Guest' }, null, { 'x-basket-token': made.basket.token })
+  const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `desk${++guests}@example.org`, name }, null, { 'x-basket-token': made.basket.token })
   expect(done.body.state, JSON.stringify(done.body)).toBe('reserved')
   return { orderId: made.basket.orderId, reference: done.body.reference as string, deskCode: done.body.deskCode as string, totalMinor: made.basket.totalMinor }
 }
@@ -115,6 +116,34 @@ describe('a reservation at the desk', () => {
     expect(await tickets(r.orderId)).toEqual([{ state: 'valid', admitted_at: null, admitted_scan_id: null }])
   })
 
+  it('is found by the buyer\'s name, with who booked and for what, soonest first', async () => {
+    const h = await house(4)
+    const first = await reserved(h, 1, 'Ottoline Quibble')
+    const second = await reserved(h, 1, 'Ottoline Quibble')
+    const found = await req('GET', '/api/box-office/desk/orders?q=quibble', undefined, seller)
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.orders.map((o: { orderId: string }) => o.orderId)).toEqual([first.orderId, second.orderId])
+    expect(found.body.orders[0]).toMatchObject({ buyer: 'Ottoline Quibble', performance: { title: expect.any(String), startsAt: expect.any(Number) } })
+    // A reference still finds just its own booking.
+    expect((await req('GET', `/api/box-office/desk/orders?q=${second.reference}`, undefined, seller)).body.orders).toHaveLength(1)
+  })
+
+  it('shows a payment left unfinished, such as by a reload, and cancelling it from the desk puts the reservation back', async () => {
+    const h = await house(4)
+    const r = await reserved(h, 2)
+    const left = await till({ orderId: r.orderId, expectedTotalMinor: r.totalMinor })
+    expect(left.status, JSON.stringify(left.body)).toBe(200)
+    // The page is reloaded: the till picks the sale up from the session, and the desk sees the booking waiting on it.
+    expect((await req('GET', '/api/payments/session', undefined, seller)).body.unfinished).toEqual({ intentId: left.body.intentId, amountMinor: r.totalMinor })
+    const found = await req('GET', `/api/box-office/desk/orders?q=${r.reference}`, undefined, seller)
+    expect(found.body.orders[0]).toMatchObject({ state: 'awaiting_payment', intentId: left.body.intentId })
+    const cancelled = await req('POST', `/api/payments/intents/${left.body.intentId}/cancel`, {}, seller)
+    expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200)
+    expect((await req('GET', `/api/box-office/desk/orders?q=${r.reference}`, undefined, seller)).body.orders[0]).toMatchObject({ state: 'reserved', intentId: null, amountDueMinor: r.totalMinor })
+    expect((await req('GET', '/api/payments/session', undefined, seller)).body.unfinished).toBeNull()
+    expect(await claimed(h)).toBe(2)
+  })
+
   it('is changed to who actually came: tickets off, on and of another type, with the amount due and the seats together', async () => {
     const h = await house(5)
     const r = await reserved(h, 3)
@@ -141,6 +170,35 @@ describe('a reservation at the desk', () => {
     expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
     expect(await tickets(r.orderId)).toHaveLength(4)
     expect(await deferred(h)).toBe(-3600)
+  })
+
+  it('is split so one of a group pays for their own tickets, and the rest stay reserved', async () => {
+    const h = await house(5)
+    const r = await reserved(h, 3)
+    const lines = (await rows<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' ORDER BY id", r.orderId)).map(l => l.id)
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: [lines[0]] }, onlooker)).status).toBe(403)
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: lines }, seller)).body.code).toBe('box-office.desk.split-all')
+
+    const split = await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: [lines[0], lines[1]] }, seller)
+    expect(split.status, JSON.stringify(split.body)).toBe(200)
+    expect(split.body).toMatchObject({ totalMinor: 2400, remainingMinor: 1200 })
+    expect(split.body.reference).not.toBe(r.reference)
+    const original = await order(r.orderId)
+    expect(original).toMatchObject({ state: 'reserved', total_minor: 1200 })
+    expect(await order(split.body.orderId)).toMatchObject({ state: 'reserved', total_minor: 2400, split_from_id: r.orderId, account_id: original.account_id })
+    // The seats moved with their claims: none was let go or taken again.
+    expect(await claimed(h)).toBe(3)
+    expect(await count("SELECT count(*) AS n FROM box_office_claims c JOIN box_office_holds k ON k.id = c.hold_id WHERE k.order_id = ? AND c.state = 'confirmed'", split.body.orderId)).toBe(2)
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/split`, { lineIds: [lines[0]] }, seller)).body.code).toBe('box-office.order.lines-changed')
+
+    // The part split off is paid at the till; the rest is still reserved, under the same reference.
+    const sale = await till({ orderId: split.body.orderId, expectedTotalMinor: 2400 })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    expect(await tickets(split.body.orderId)).toHaveLength(2)
+    expect(await tickets(r.orderId)).toEqual([])
+    expect(await order(r.orderId)).toMatchObject({ state: 'reserved', total_minor: 1200 })
+    expect(await deferred(h)).toBe(-2400)
   })
 })
 
@@ -181,6 +239,25 @@ describe('selling at the desk', () => {
     expect(owner!.address).toBe('desk.buyer@example.org')
     expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE \'box-office.order-confirmed%\'', made!.id)).toBe(1)
+  })
+
+  it('finds a buyer by name in the till\'s box and sends the tickets to them', async () => {
+    const h = await house(3)
+    const { accountId } = await commit(unit => findOrCreateAccount(unit.view(), { address: 'picked.buyer@example.org', name: 'Pickering Buyer', origin: 'guest' }))
+    const found = await req('GET', '/api/box-office/desk/buyers?q=Pickering', undefined, seller)
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.people).toEqual([expect.objectContaining({ id: accountId, label: 'Pickering Buyer', claimed: false })])
+    expect(JSON.stringify(found.body)).not.toContain('picked.buyer@example.org')
+    expect((await req('GET', '/api/box-office/desk/buyers?q=Pickering', undefined, onlooker)).status).toBe(403)
+    const desk = await req('GET', '/api/box-office/desk/performances', undefined, seller)
+    expect(desk.body.emailDomains).toContain('gmail.com')
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], accountId }
+    const sale = await till(input)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(made!.account_id).toBe(accountId)
+    expect((await till({ ...input, email: 'both@example.org' })).status).toBe(422)
+    expect((await till({ ...input, accountId: 'acc_nobody' })).body.code).toBe('box-office.desk.no-address')
   })
 
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {

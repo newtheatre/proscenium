@@ -1,7 +1,7 @@
-<!-- The Admin shell (R-33): the console's frame with a strip above the page header
-     that says where you are at every width, the theatre's mark where it is in the console and "Back to console" at the foot of the sidebar,
-     neutral buttons (no brand colour), and no Tonight or work queue. Below 1024 pixels the sidebar
-     is a drawer, opened from the strip. -->
+<!-- The Admin shell (R-33): the console's frame, with an "Admin" mark at the start of every page's
+     navbar so it says where you are at every width, the theatre's mark where it is in the console and
+     "Back to console" at the foot of the sidebar, neutral buttons (no brand colour), and no Tonight or
+     work queue. Below 1024 pixels the sidebar is a drawer, opened from the navbar's one menu button. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
@@ -12,6 +12,7 @@ const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.de
 const { data: navigation } = await useNavigation('admin')
 const open = ref(false)
 provide(DASHBOARD_SHELL, true)
+provide(ADMIN_SHELL, true)
 // A module's page (/admin/modules/<module>/...) frames whichever of its tabs is open.
 const module = computed(() => /^\/admin\/modules\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(route.path)?.[1])
 watch(() => route.fullPath, () => { open.value = false })
@@ -73,33 +74,20 @@ const groups = computed<NavigationMenuItem[]>(() => [
 
     <CommandPalette />
 
-    <!-- The strip sits above every page's own panel (PageFrame); main.css takes its height off the panel's. -->
-    <div class="flex min-w-0 flex-1 flex-col">
-      <div class="admin-strip flex h-9 shrink-0 items-center gap-2 border-b border-default bg-elevated px-4 text-sm font-medium">
-        <UDashboardSidebarToggle
-          class="lg:hidden"
-          :aria-label="t('core.admin.menu')"
-        />
-        <UIcon
-          name="i-lucide-shield-check"
-          class="size-4"
-        />
-        <span>{{ t('core.admin.strip') }}</span>
-      </div>
-      <main
-        id="main"
-        tabindex="-1"
-        class="admin-main flex min-w-0 flex-1 outline-none *:min-w-0 *:flex-1"
+    <!-- Each page renders its own panel (PageFrame), whose navbar carries the Admin mark. -->
+    <main
+      id="main"
+      tabindex="-1"
+      class="admin-main flex min-w-0 flex-1 outline-none *:min-w-0 *:flex-1"
+    >
+      <ModuleFrame
+        v-if="module"
+        :key="module"
+        :module="module"
       >
-        <ModuleFrame
-          v-if="module"
-          :key="module"
-          :module="module"
-        >
-          <slot />
-        </ModuleFrame>
-        <slot v-else />
-      </main>
-    </div>
+        <slot />
+      </ModuleFrame>
+      <slot v-else />
+    </main>
   </UDashboardGroup>
 </template>

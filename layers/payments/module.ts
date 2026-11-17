@@ -146,8 +146,6 @@ export default defineModule({
     'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
-      // The till is a live screen (selling proposal); the Money group links to it.
-      { id: 'payments.open-till', menu: 'console', group: 'money', section: 'everyday', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
       { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },
       // Every session, with the seller's own above them; a seller who may not see everyone's sees only theirs.

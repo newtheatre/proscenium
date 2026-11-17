@@ -18,6 +18,9 @@ import { resetRateLimits } from '#kit/ratelimit'
 import type { BookingAction, BookingSubject } from '#modules/core'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'POST /api/core/productions': createProduction,
   'PATCH /api/core/productions/:id': patchProduction,
@@ -51,7 +54,7 @@ async function show(options: { publish?: boolean, listed?: boolean, link?: strin
   const { body } = await req('POST', '/api/core/productions', { title: `Public show ${++n}`, kind: 'own' })
   await req('PATCH', `/api/core/productions/${body.id}`, {
     summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true,
-    listed: options.listed ?? true, externalBookingUrl: options.link ?? null,
+    listed: options.listed ?? true, externalBookingUrl: options.link ?? BOOKING,
   })
   if (options.publish ?? true) expect((await req('POST', `/api/core/productions/${body.id}/publish`, {})).status).toBe(200)
   return { id: body.id, slug: (await rows<{ slug: string }>('SELECT slug FROM core_productions WHERE id = ?', body.id))[0]!.slug }
@@ -89,7 +92,7 @@ describe('a production\'s public page', () => {
     expect(status, JSON.stringify(body)).toBe(200)
     expect(body).toMatchObject({ id: s.id, slug: s.slug, summary: 'A play.', category: { slug: 'play' }, state: 'published', past: false, credits: [] })
     expect(body.performances.map((p: { id: string }) => p.id)).toEqual([first])
-    expect(body.performances[0]).toMatchObject({ state: 'scheduled', venue: { name: 'The Playhouse' }, booking: null })
+    expect(body.performances[0]).toMatchObject({ state: 'scheduled', venue: { name: 'The Playhouse' }, booking: { external: true, link: BOOKING, state: 'available' } })
     // Internal fields stay out.
     expect(body).not.toHaveProperty('kind')
     expect(body).not.toHaveProperty('listed')

@@ -9,7 +9,7 @@ onMounted(async () => {
   const token = window.location.hash.slice(1)
   // Vue Router keeps its own data in the history state, so it is passed back rather than cleared.
   history.replaceState(history.state, '', window.location.pathname + window.location.search)
-  const answer = await callIdentity<{ next: string, offerPasskey: boolean }>('/api/core/sign-in/link', { token })
+  const answer = await callIdentity<{ next: string, offerPasskey: boolean, welcome: boolean }>('/api/core/sign-in/link', { token })
   if (!answer.ok) {
     refusal.value = answer.refusal
     return

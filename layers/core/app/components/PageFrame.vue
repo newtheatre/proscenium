@@ -42,6 +42,7 @@ const { recall } = useListMemory()
 const parents = computed(() => (props.trail ?? []).map(c => ({ label: c.label, to: recall(c.to), active: false })))
 const nearest = computed(() => parents.value.at(-1))
 const dashboard = inject(DASHBOARD_SHELL, false)
+const admin = inject(ADMIN_SHELL, false)
 const widths = { reading: 'width-reading', standard: 'width-standard', full: 'width-full' } as const
 const route = useRoute()
 const account = computed(() => shellOf(route.path) === 'account')
@@ -100,6 +101,13 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
       <UDashboardNavbar :title="title">
         <template #leading>
           <UDashboardSidebarCollapse />
+          <UBadge
+            v-if="admin"
+            icon="i-lucide-shield-check"
+            :label="t('core.admin.mark')"
+            color="neutral"
+            variant="subtle"
+          />
           <template v-if="nearest">
             <UBreadcrumb
               :items="parents"

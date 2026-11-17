@@ -10,8 +10,9 @@
 // reference. Not met turns the person away to the desk; a source that is off, failing or that this
 // steward may not ask admits them and marks the scan unchecked, so a source being down never holds
 // the queue.
-import { all, can, createUnit, first, newId, nowMs, requirements, useContext } from '#kit'
+import { all, can, createUnit, first, newId, nowMs, refuse, requirements, useContext } from '#kit'
 import { signing } from '#kit/signing'
+import { getTerm } from '#modules/core'
 import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
@@ -40,6 +41,23 @@ export interface ScanOutcome {
   requirement?: { reason: string | null, ticketType: string }
   /** Admitted without its requirement being checked again: the source was off, failing or not open to this steward. */
   unchecked?: boolean
+  /**
+   * Requirement not met: whether this steward may "Admit anyway" (R-30). Only for a holder of
+   * box-office.ticket-type.override-requirement, and never on their own order.
+   */
+  overridable?: boolean
+}
+
+/** The vocabulary a steward picks the reason from when admitting anyway. */
+export const OVERRIDE_REASONS = 'box-office.override-reason'
+const OVERRIDE = 'box-office.ticket-type.override-requirement'
+
+/** Whether the actor may admit this ticket anyway: they hold the override, and it is not on their own order. */
+async function mayOverride(ticketId: string, performanceId: string): Promise<boolean> {
+  const actor = useContext().actor
+  if (!(await can(actor, OVERRIDE as never, ['core.performance', performanceId])).allowed) return false
+  const order = await first<{ account_id: string | null }>('SELECT o.account_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id JOIN box_office_orders o ON o.id = l.order_id WHERE t.id = ?', ticketId)
+  return !!order && (!actor.accountId || order.account_id !== actor.accountId)
 }
 
 // Sources checked once, when the ticket is sold, and never at the door, whatever the ticket type's
@@ -131,7 +149,10 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ticketPerformanceId: ticket.performance_id }, ticket.id)
   // A ticket already in is said so without asking again; one not yet in is checked before it is admitted.
   const checked = ticket.admitted_at === null ? await recheck(ticket.id, input.performanceId) : { verdict: 'met' as const }
-  if (checked.verdict === 'not-met') return recorded({ result: 'requirement_not_met', ticketId: ticket.id, requirement: { reason: checked.reason, ticketType: checked.ticketType } }, ticket.id)
+  if (checked.verdict === 'not-met') {
+    const overridable = await mayOverride(ticket.id, input.performanceId)
+    return recorded({ result: 'requirement_not_met', ticketId: ticket.id, requirement: { reason: checked.reason, ticketType: checked.ticketType }, ...overridable ? { overridable } : {} }, ticket.id)
+  }
   const unchecked = checked.verdict === 'unchecked' ? 1 : 0
 
   // One conditional update admits and stamps; the scan row reads the stamp to say whether it was the one.
@@ -147,6 +168,45 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id, booking, ...unchecked ? { unchecked: true } : {} }
   const earlier = await first<{ scanned_at: number, device_label: string | null }>('SELECT s.scanned_at, s.device_label FROM box_office_tickets t JOIN box_office_scans s ON s.id = t.admitted_scan_id WHERE t.id = ?', ticket.id)
   return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null, booking }
+}
+
+export interface AdmitAnywayInput { performanceId: string, ticketId: string, reasonTermId: string, deviceLabel?: string | null }
+
+/**
+ * "Admit anyway" (R-30): admits a ticket whose requirement was not met at the entry recheck, by a
+ * holder of the override, with a reason from the theatre's list, audited. Refused on the steward's
+ * own order, and for a ticket that does not need it: one already in, void, for another night, or one
+ * whose requirement is met (or cannot be asked) now, which a plain scan admits.
+ */
+export async function admitAnyway(input: AdmitAnywayInput): Promise<ScanOutcome> {
+  const ticket = await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE id = ?', input.ticketId)
+  if (!ticket || ticket.performance_id !== input.performanceId) refuse('box-office.door.no-such-ticket', 'There is no such ticket for this performance.', { status: 404 })
+  if (ticket.state === 'void') refuse('box-office.door.override-void', 'This ticket is void, so it cannot be admitted.', { status: 409 })
+  if (ticket.admitted_at !== null) refuse('box-office.door.override-in', 'This ticket is already in.', { status: 409 })
+  if (!await mayOverride(ticket.id, input.performanceId))
+    refuse('box-office.door.override-own', 'You cannot admit a ticket on your own booking anyway.', { status: 403, remedy: 'Ask someone else on the door, or send them to the desk.' })
+  const term = await getTerm(input.reasonTermId)
+  if (!term || term.vocabularyKey !== OVERRIDE_REASONS || term.retired)
+    refuse('box-office.door.override-bad-reason', 'That reason is not on the list of reasons for admitting anyway.', { status: 422, fields: { reasonTermId: 'invalid' }, remedy: 'Choose a reason from the list.' })
+  const checked = await recheck(ticket.id, input.performanceId)
+  if (checked.verdict !== 'not-met') refuse('box-office.door.override-not-needed', 'This ticket no longer needs admitting anyway.', { status: 409, remedy: 'Scan it again.' })
+
+  const at = nowMs()
+  const actor = useContext().actor.accountId ?? null
+  const scanId = newId('scan')
+  const unit = createUnit()
+  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
+  unit.view().add({
+    sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, reason_term_id, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
+      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted_by_override' ELSE 'already_admitted' END, CASE WHEN t.admitted_scan_id = ?1 THEN ?7 END, 0, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, term.id],
+  })
+  unit.view().audit({ action: 'state', ability: OVERRIDE, record: ['core.performance', input.performanceId], detail: { ticketId: ticket.id, scanId, reasonTermId: term.id } })
+  await unit.commit()
+  const written = await first<{ result: string }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
+  const booking = await bookingOf(ticket.id, input.performanceId)
+  if (written?.result !== 'admitted_by_override') return { result: 'already_admitted', scanId, ticketId: ticket.id, booking }
+  return { result: 'admitted', scanId, ticketId: ticket.id, booking }
 }
 
 export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null }
@@ -183,11 +243,15 @@ export async function admitByName(input: AdmitByNameInput): Promise<{ admitted: 
   return { admitted: written.length, scanIds: written.map(r => r.id) }
 }
 
-export interface DoorSummary { tickets: number, admitted: number }
+/** Tickets issued and how many are in; `unpaid` is tickets reserved and not yet paid for, who may still come to the desk. */
+export interface DoorSummary { tickets: number, admitted: number, unpaid: number }
 
 /** How many valid tickets a performance has, and how many of them are in. */
 export async function doorSummary(performanceId: string): Promise<DoorSummary> {
   const row = await first<{ tickets: number, admitted: number | null }>(
     "SELECT count(*) AS tickets, sum(CASE WHEN admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted FROM box_office_tickets WHERE performance_id = ? AND state = 'valid'", performanceId)
-  return { tickets: Number(row?.tickets ?? 0), admitted: Number(row?.admitted ?? 0) }
+  const unpaid = await first<{ n: number }>(
+    `SELECT count(*) AS n FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id
+      WHERE l.performance_id = ? AND l.kind = 'ticket' AND l.state = 'live' AND o.state IN ('reserved', 'awaiting_payment')`, performanceId)
+  return { tickets: Number(row?.tickets ?? 0), admitted: Number(row?.admitted ?? 0), unpaid: Number(unpaid?.n ?? 0) }
 }

@@ -1,4 +1,5 @@
-<!-- A bar sale (S4): its lines with any refunds under each. A paid sale is never edited; its primary
+<!-- A bar sale (S4): its lines with any refunds under each, and its age checks: the answer that let it
+     through and any refusal made from its basket. A paid sale is never edited; its primary
      action is "Refund", which opens a panel to choose lines and quantities (or a goodwill amount), the
      reason and what happened to the goods. The button names the amount. Payments decides whether a
      second person must approve it. -->
@@ -6,6 +7,7 @@
 type State = 'open' | 'awaiting_payment' | 'paid' | 'void'
 interface Reversal { id: string, state: 'requested' | 'succeeded' | 'failed', quantity: number, amountMinor: number, reason: string, stockOutcome: string, at: number }
 interface Line { id: string, label: string, quantity: number, unitMinor: number, amountMinor: number, reversedQuantity: number, reversedMinor: number, reversals: Reversal[] }
+interface AgeCheck { outcome: 'not_needed' | 'id_checked' | 'self_attested' | 'refused', reason: string | null, product: string | null, at: number }
 interface Sale { id: string, reference: string, state: State, totalMinor: number, outlet: string, operatingDay: string, soldBy: string, at: number, paidAt: number | null, lines: Line[] }
 
 const { t } = useT()
@@ -16,7 +18,7 @@ const { dateTime, day } = useDates()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const reference = computed(() => String(route.params.reference))
-const { data, status, error, refresh } = await useAPI<{ sale: Sale, canRefund: boolean }>(() => `/api/bar/sales/${reference.value}`, { key: `bar:sale:${reference.value}` })
+const { data, status, error, refresh } = await useAPI<{ sale: Sale, ageChecks: AgeCheck[], canRefund: boolean }>(() => `/api/bar/sales/${reference.value}`, { key: `bar:sale:${reference.value}` })
 const { data: reasons } = await useAPI<{ terms: { id: string, label: string }[] }>('/api/core/vocabularies/bar.refund-reason/terms', { key: 'bar:refund-reasons', default: () => ({ terms: [] }) })
 
 const trail = computed(() => [{ label: t('bar.navigation.sales.label'), to: '/console/bar/sales' }])
@@ -69,6 +71,7 @@ async function refund() {
     saving.value = false
   }
 }
+const checkName = (c: AgeCheck) => [t(`bar.screens.age-checks.outcome.${c.outcome}`), c.reason].filter(Boolean).join(': ')
 const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, { amount: money(r.amountMinor), count: r.quantity, reason: r.reason, when: dateTime(r.at) })
 </script>
 
@@ -117,6 +120,20 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
               :key="l.id"
               :name="l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label"
               :description="[money(l.amountMinor), ...l.reversals.map(reversalText)].join(' · ')"
+            />
+          </RecordList>
+        </PageSection>
+        <PageSection
+          v-if="data.ageChecks.length"
+          :title="t('bar.screens.sale.age-checks')"
+        >
+          <RecordList :label="t('bar.screens.sale.age-checks')">
+            <RecordListItem
+              v-for="(c, i) in data.ageChecks"
+              :key="i"
+              :name="checkName(c)"
+              :description="[c.product, dateTime(c.at)].filter(Boolean).join(' · ')"
+              to="/console/bar/age-checks"
             />
           </RecordList>
         </PageSection>

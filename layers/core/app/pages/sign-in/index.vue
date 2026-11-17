@@ -29,7 +29,7 @@ const addressSchema = z.object({ address: z.email().max(254) }) // not-policy: t
 const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/, t('core.form.invalid.code', { count: CODE_LENGTH })) }) // not-policy: codes are six digits
 const addressForm = useTemplateRef('addressForm')
 const codeForm = useTemplateRef('codeForm')
-const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, providers: { id: string, label: string }[] } }>('core:me')
+const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, providers: { id: string, label: string }[], openSignUp?: boolean } }>('core:me')
 const providers = computed(() => me.value?.signIn?.providers ?? [])
 // Errors come back from a provider's callback; while one provider is offered it can be named.
 const providerName = computed(() => providers.value.length === 1 ? providers.value[0]!.label : 'Your provider')
@@ -53,6 +53,14 @@ async function withPasskey() {
   refusal.value = answer.refusal
 }
 
+// Offer the site's passkeys among the address box's suggestions (its autocomplete says webauthn).
+// Waits in the background; a pick signs in. Pressing the passkey button cancels it and starts afresh.
+onMounted(async () => {
+  const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', next ? { next } : {}, true)
+  if (answer.ok) return arriveSignedIn(answer.data)
+  if (answer.refusal.code !== 'core.passkey.cancelled') refusal.value = answer.refusal
+})
+
 async function sendLink() {
   busy.value = true
   refusal.value = null
@@ -70,7 +78,7 @@ async function sendLink() {
 async function useCode() {
   busy.value = true
   refusal.value = null
-  const answer = await callIdentity<{ next: string, offerPasskey: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
+  const answer = await callIdentity<{ next: string, offerPasskey: boolean, welcome: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
   busy.value = false
   if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
@@ -79,7 +87,10 @@ async function useCode() {
 </script>
 
 <template>
-  <IdentityCard :title="sent ? 'Check your email' : 'Sign in'">
+  <IdentityCard
+    :title="sent ? 'Check your email' : 'Sign in'"
+    :description="!sent && me?.signIn?.email && me?.signIn?.openSignUp ? 'New here? Signing in with your email creates your account.' : undefined"
+  >
     <UAlert
       v-if="providerError"
       role="alert"

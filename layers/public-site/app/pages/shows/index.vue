@@ -14,6 +14,8 @@ interface Entry {
   cancelled: boolean
   venues: string[]
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
+  age: string | null
+  hasEffects: boolean
 }
 interface Archive {
   years: { year: number, count: number }[]
@@ -138,6 +140,8 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
                 :when="range(p.openedAt, p.closedAt)"
                 :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
                 :cancelled="p.cancelled"
+                :age="p.age"
+                :effects="p.hasEffects"
               />
             </li>
           </ul>

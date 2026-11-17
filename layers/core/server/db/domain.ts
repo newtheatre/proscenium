@@ -318,6 +318,11 @@ export const productions = defineTable('core_productions', {
   contentNote: col.public(text('content_note')),
   runningMinutes: col.public(integer('running_minutes')),
   intervalCount: col.public(integer('interval_count').notNull().default(0)),
+  // Each interval's length in minutes, the doors' lead in minutes and the house, over the space's and
+  // the theatre's; null takes theirs. Bounded by the route's input: a CHECK would rebuild the table.
+  intervalMinutes: col.public(integer('interval_minutes')),
+  doorsBeforeMinutes: col.internal(integer('doors_before_minutes')),
+  capacity: col.internal(integer('capacity')),
   externalBookingUrl: col.public(text('external_booking_url')),
   creditsPublic: col.internal(integer('credits_public', { mode: 'boolean' }).notNull()),
   state: col.internal(text('state').notNull().default('draft')),
@@ -389,6 +394,18 @@ export const productionEffects = defineTable('core_production_effects', {
   extra: t => [
     primaryKey({ columns: [t.productionId, t.termId] }),
     check('core_production_effects_detail', sql`${t.detail} IS NULL OR length(${t.detail}) <= 300`),
+  ],
+})
+
+/** A staging effect a production uses but one performance does not ("not used at this performance"). The term must be one of the production's effects. */
+export const performanceEffectExceptions = defineTable('core_performance_effect_exceptions', {
+  performanceId: col.internal(text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' })),
+  termId: col.ref('core_terms'),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.performanceId, t.termId] }),
   ],
 })
 
@@ -472,6 +489,12 @@ export const spaces = defineTable('core_spaces', {
   // A short public note for finding the space, shown under the venue's directions. At most 200
   // characters, bounded by the route's input: a CHECK added now would rebuild the table.
   findingIt: col.public(text('finding_it')),
+  // How many minutes before the start this space's doors open, over the theatre's setting; null
+  // takes the setting. Bounded by the route's input, like finding_it.
+  doorsBeforeMinutes: col.internal(integer('doors_before_minutes')),
+  // The run preset the Add a run window starts from here, over core.programme.run-preset. No foreign
+  // key (it would rebuild the table): deleting a preset clears it in the same unit.
+  runPresetId: col.internal(text('run_preset_id')),
   state: col.internal(text('state').notNull().default('active')),
   sort: col.internal(integer('sort').notNull().default(0)),
   createdAt: col.createdAt(),
@@ -557,6 +580,27 @@ export const closures = defineTable('core_closures', {
  * `items` holds the performances still to make, as the person accepted them from the preview;
  * `done` counts how many of them the chunks have dealt with, so a repeated chunk does nothing.
  */
+/**
+ * A run preset: a named pattern of start times, each with the days of the week it runs on, that the
+ * Add a run window starts from. `slots` is JSON, [{ "days": [2, 3], "times": ["19:30"] }, ...].
+ */
+export const runPresets = defineTable('core_run_presets', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  slots: col.internal(text('slots').notNull()),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.internal(integer('updated_at').notNull()),
+}, {
+  id: 'rps',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_run_presets_name').on(sql`lower(${t.name})`),
+    check('core_run_presets_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+})
+
 export const performanceRuns = defineTable('core_performance_runs', {
   id: col.id(),
   productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
@@ -565,7 +609,9 @@ export const performanceRuns = defineTable('core_performance_runs', {
   scheduled: col.internal(integer('scheduled', { mode: 'boolean' }).notNull()),
   capacity: col.internal(integer('capacity')),
   intervalCount: col.internal(integer('interval_count')),
+  intervalMinutes: col.internal(integer('interval_minutes')),
   label: col.internal(text('label')),
+  externalBookingUrl: col.internal(text('external_booking_url')),
   items: col.internal(text('items').notNull()),
   total: col.internal(integer('total').notNull()),
   done: col.internal(integer('done').notNull().default(0)),
@@ -595,6 +641,8 @@ export const performances = defineTable('core_performances', {
   endsAt: col.public(integer('ends_at').notNull()),
   operatingDay: col.internal(text('operating_day').notNull()),
   intervalCount: col.public(integer('interval_count')),
+  // Each interval's length in minutes; null takes the production's, then the theatre's.
+  intervalMinutes: col.public(integer('interval_minutes')),
   capacity: col.internal(integer('capacity')),
   label: col.public(text('label')),
   externalBookingUrl: col.public(text('external_booking_url')),
@@ -731,4 +779,4 @@ export const webhookDeliveries = defineTable('core_webhook_deliveries', {
   ],
 })
 
-export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

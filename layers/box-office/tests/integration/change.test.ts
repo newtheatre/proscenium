@@ -132,4 +132,25 @@ describe('a performance with bookings', () => {
     expect((await req('PATCH', `/api/core/performances/${h.performanceId}`, { capacity: 2 })).body.code).toBe('box-office.change.capacity-below-sold')
     expect((await req('PATCH', `/api/core/performances/${h.performanceId}`, { capacity: 3 })).status).toBe(200)
   })
+
+  it('tells ticket holders when staging effects or a depicted warning are added, without naming a warning (C-57)', async () => {
+    await rows("INSERT INTO core_settings (key, value, updated_at) VALUES ('core.site.origin', ?, 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value", JSON.stringify('https://theatre.example'))
+    const h = await house(10)
+    const bought = await paid(h, 1)
+    await rows("UPDATE core_productions SET state = 'published', published_at = 1 WHERE id = ?", h.productionId)
+    const haze = (await inContext(() => listTerms('core.staging-effect'))).find(t => t.slug === 'haze')!.id
+    const violence = (await inContext(() => listTerms('core.advisory'))).find(t => t.slug === 'violence')!.id
+    expect((await req('PUT', `/api/core/productions/${h.productionId}/effects`, { effects: [{ termId: haze }] })).status).toBe(200)
+    await deliver()
+    expect(await told('box-office.guidance-added', bought)).toBe(1)
+    // A mentioned warning is not told; a depicted one is, without its name.
+    expect((await req('PUT', `/api/core/productions/${h.productionId}/advisories`, { advisories: [{ termId: violence, level: 'mentioned' }] })).status).toBe(200)
+    await deliver()
+    expect(await told('box-office.guidance-added', bought)).toBe(1)
+    expect((await req('PUT', `/api/core/productions/${h.productionId}/advisories`, { advisories: [{ termId: violence, level: 'depicted' }] })).status).toBe(200)
+    await deliver()
+    expect(await told('box-office.guidance-added', bought)).toBe(2)
+    const bodies = JSON.stringify(await rows('SELECT * FROM core_notifications WHERE type_key = ? AND subject_id = ?', 'box-office.guidance-added', bought))
+    expect(bodies.toLowerCase()).not.toContain('violence')
+  })
 })

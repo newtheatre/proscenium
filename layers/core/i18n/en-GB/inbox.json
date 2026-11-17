@@ -1,0 +1,22 @@
+{
+  "core.navigation.inbox.label": "Inbox",
+  "core.navigation.members-inbox.label": "Inbox",
+  "core.inbox.title": "Inbox",
+  "core.inbox.which": "Which messages",
+  "core.inbox.current": "Messages",
+  "core.inbox.archived": "Archived",
+  "core.inbox.unread": "Unread:",
+  "core.inbox.read-all": "Mark all read",
+  "core.inbox.all-read": "Every message is marked read",
+  "core.inbox.archive": "Archive {title}",
+  "core.inbox.restore": "Move {title} back to your messages",
+  "core.inbox.archived-toast": "Archived {title}",
+  "core.inbox.restored-toast": "Moved {title} back to your messages",
+  "core.inbox.older": "Show older messages",
+  "core.inbox.empty": "No messages",
+  "core.inbox.empty-help": "Messages from the theatre about your bookings and account appear here.",
+  "core.inbox.empty-archived": "Nothing archived",
+  "core.inbox.bell": "Inbox",
+  "core.inbox.bell-unread.one": "Inbox, 1 unread message",
+  "core.inbox.bell-unread.other": "Inbox, {count} unread messages"
+}

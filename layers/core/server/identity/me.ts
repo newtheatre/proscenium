@@ -23,8 +23,9 @@ export async function holdsPrivileged(accountId: string): Promise<boolean> {
 
 // The ways in a signed-out browser is offered. Passkeys are always on.
 // `providers` are the outside providers offered, in order, each with its id (the path segment) and label.
-export async function signInMethods(): Promise<{ email: boolean, providers: { id: string, label: string }[] }> {
-  return { email: !!(await useSetting('core.sign-in.email-link')), providers: await offeredProviders() }
+// `openSignUp` says whether signing in with a new address makes an account, so the page can say so.
+export async function signInMethods(): Promise<{ email: boolean, providers: { id: string, label: string }[], openSignUp: boolean }> {
+  return { email: !!(await useSetting('core.sign-in.email-link')), providers: await offeredProviders(), openSignUp: !!(await useSetting('core.sign-in.open-sign-up')) }
 }
 
 export async function describeMe(session: CurrentSession) {

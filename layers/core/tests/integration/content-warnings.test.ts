@@ -12,6 +12,9 @@ import { ensureVocabularies, listTermGroups } from '../../server/vocabularies/se
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'POST /api/core/productions': createProduction,
   'GET /api/core/productions/:id': getProduction,
@@ -107,13 +110,13 @@ describe('content warnings and effects', () => {
 
   it('need both answers to publish, and listing one clears its "none"', async () => {
     const id = await production()
-    await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true })
+    await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true, externalBookingUrl: BOOKING })
     expect((await req('POST', `/api/core/productions/${id}/publish`)).body.reason).toBe('To publish, the production needs its staging effects, or confirmation that it has none.')
     await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: true })
     expect((await req('POST', `/api/core/productions/${id}/publish`)).status).toBe(200)
 
     const other = await production()
-    await req('PATCH', `/api/core/productions/${other}`, { effectsConfirmedNone: true, advisoriesConfirmedNone: true })
+    await req('PATCH', `/api/core/productions/${other}`, { effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING })
     await req('PUT', `/api/core/productions/${other}/effects`, { effects: [{ termId: await term('core.staging-effect', 'haze') }] })
     await req('PUT', `/api/core/productions/${other}/advisories`, { advisories: [{ termId: await term('core.advisory', 'violence'), level: 'mentioned' }] })
     expect((await req('GET', `/api/core/productions/${other}`)).body.production).toMatchObject({ effectsConfirmedNone: false, advisoriesConfirmedNone: false })
@@ -130,7 +133,7 @@ describe('content warnings and effects', () => {
 
   it('announce what a change added, by term and level, never a person', async () => {
     const id = await production()
-    await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true })
+    await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING })
     await req('POST', `/api/core/productions/${id}/publish`)
     const strobe = await term('core.staging-effect', 'strobe')
     const violence = await term('core.advisory', 'violence')
@@ -198,5 +201,23 @@ describe('beforeYouCome', () => {
   it('is empty when there is nothing to say', async () => {
     const id = await production()
     expect((await inContext(() => beforeYouCome(id)))!.empty).toBe(true)
+  })
+})
+
+describe('the guidance health check', () => {
+  it('names productions with an assumed level or no answer on effects, and clears when put right', async () => {
+    const check = (await import('../../server/contributions/core.health-check/guidance')).default
+    const id = await production({ title: 'Old Show' })
+    await rows("UPDATE core_productions SET state = 'published', published_at = 1, summary = 's' WHERE id = ?", id)
+    const violence = await term('core.advisory', 'violence')
+    await rows("INSERT INTO core_production_advisories (production_id, term_id, level, level_assumed) VALUES (?, ?, 'depicted', 1)", id, violence)
+    const before = await inContext(() => check.check())
+    expect(before.state).toBe('warning')
+    expect(before.sentence).toContain('content warnings with no level yet')
+    expect(before.sentence).toContain('not said whether it uses staging effects')
+    expect(before.remedy).toContain('Old Show')
+    await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [{ termId: violence, level: 'discussed' }] })
+    await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: true })
+    expect(await inContext(() => check.check())).toMatchObject({ state: 'ok' })
   })
 })

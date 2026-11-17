@@ -14,6 +14,7 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const { brief } = useDates()
 const toast = useToast()
+const undo = useUndo()
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const isNew = computed(() => id.value === 'new')
@@ -106,7 +107,8 @@ async function setPaused(paused: boolean) {
   const name = hook.value.name
   const done = await act('state', () => $api(`/api/core/webhooks/${id.value}/state` as '/api/core/webhooks/:id/state', { method: 'POST', body: { paused } }).then(() => true))
   if (!done) return
-  toast.add({ title: t(paused ? 'core.webhooks.paused-toast' : 'core.webhooks.resumed-toast', { name }), color: 'success' })
+  // Pausing and resuming undo each other, so the toast offers the other.
+  undo.offer(t(paused ? 'core.webhooks.paused-toast' : 'core.webhooks.resumed-toast', { name }), () => setPaused(!paused))
   await Promise.all([refresh(), refreshLog()])
 }
 

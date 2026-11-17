@@ -1,11 +1,9 @@
 <script setup lang="ts">
+import { noOverrides, overrideErrors, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
 // first, and a module that refuses it says why. Times are shown and entered in the theatre's time
 // zone, whatever the viewer's.
-import { performancePatch } from '../../server/programme/input'
-import { blankAsNull } from '../../shared/validation'
-
 type State = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 interface Performance {
   id: string
@@ -15,6 +13,7 @@ interface Performance {
   doorsAt: number | null
   endsAt: number
   intervalCount: number | null
+  intervalMinutes: number | null
   capacity: number | null
   label: string | null
   externalBookingUrl: string | null
@@ -22,19 +21,27 @@ interface Performance {
   cancelReasonTermId: string | null
   cancelNote: string | null
   access: { termId: string, detail: string | null }[]
+  effectsOff: string[]
 }
 interface Option { id: string, label: string, retired: boolean }
 interface Run { id: string, total: number, done: number, state: 'running' | 'stopped' | 'done' | 'removing' | 'removed', stopReason: string | null, scheduled: boolean }
 interface Answer {
   performances: Performance[]
   runs: Run[]
-  options: { venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null }[] }[], access: Option[], reasons: Option[] }
+  options: {
+    venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null, doorsBeforeMinutes: number | null, runPresetId: string | null }[] }[]
+    access: Option[]
+    reasons: Option[]
+    effects: { id: string, label: string }[]
+    presets: { id: string, name: string, slots: RunSlot[] }[]
+  }
+  defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
 }
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
 
 const { t } = useT()
-const props = defineProps<{ productionId: string, title: string, intervalCount: number }>()
+const props = defineProps<{ productionId: string, title: string }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { $api } = useNuxtApp()
@@ -49,7 +56,20 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const TONES = { draft: 'neutral', scheduled: 'success', cancelled: 'danger', completed: 'info' } as const
 const performances = computed(() => data.value?.performances ?? [])
-const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity }))))
+const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId }))))
+/** What a performance in this space takes when it says nothing: the production's own over the space's over the theatre's. */
+function defaultsIn(spaceId: string): ShowDefaultValues {
+  const d = data.value!.defaults
+  const s = spaces.value.find(x => x.value === spaceId)
+  return {
+    runningMinutes: d.runningMinutes,
+    doorsBeforeMinutes: d.productionDoorsBeforeMinutes ?? s?.doorsBeforeMinutes ?? d.theatreDoorsBeforeMinutes,
+    intervalCount: d.intervalCount,
+    intervalMinutes: d.intervalMinutes,
+    capacity: d.productionCapacity ?? s?.capacity ?? null,
+    externalBookingUrl: d.externalBookingUrl,
+  }
+}
 const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?.label ?? 'A space no longer listed'
 /** Where, doors, end and seats, on one line. */
 const summaryOf = (p: Performance) => [place(p), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
@@ -83,12 +103,11 @@ function reach(id: string, kind: Kind): Promise<Reach> {
 
 // Adding and editing
 const editing = ref<Performance | null>(null)
-const intervalHelp = computed(() => `Left empty, the production's (${props.intervalCount}).`)
+const MINUTE = 60_000 // not-policy: milliseconds in a minute
 const open = ref(false)
-// Checked as it will be sent; the venue follows from the space.
-const formSchema = blankAsNull(performancePatch.required({ spaceId: true, startsAt: true }))
-const performanceForm = useTemplateRef('performanceForm')
-const form = ref({ spaceId: '', startsAt: null as number | null, endsAt: null as number | null, doorsAt: null as number | null, capacity: null as number | null, intervalCount: null as number | null, label: '', externalBookingUrl: '' })
+const form = ref({ spaceId: '', startsAt: null as number | null })
+const overrides = ref<ShowOverrides>(noOverrides())
+const shown = computed(() => form.value.spaceId && data.value ? defaultsIn(form.value.spaceId) : null)
 /** Whether a whole-day closure that blocks performances covers this day for the chosen space. */
 function closed(day: string): boolean {
   const space = spaces.value.find(x => x.value === form.value.spaceId)
@@ -96,41 +115,68 @@ function closed(day: string): boolean {
     && (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
     && dates.toLocal(c.startsAt).slice(0, 10) <= day && day <= dates.toLocal(c.endsAt - 1).slice(0, 10)) // not-policy: the length of a date
 }
+// Checked beside each field: a space, a start, and a booking link that is a web address.
+const performanceForm = useTemplateRef('performanceForm')
+function checkPerformance() {
+  const needed = (name: string) => ({ name, message: translate('core.form.invalid.required') })
+  return [
+    ...(form.value.spaceId ? [] : [needed('spaceId')]),
+    ...(form.value.startsAt ? [] : [needed('startsAt')]),
+    ...overrideErrors(overrides.value, shown.value, !!data.value?.defaults.sellsHere),
+  ]
+}
 function start(p: Performance | null) {
   refusal.value = null
   editing.value = p
-  form.value = (p
-    ? { spaceId: p.spaceId, startsAt: p.startsAt, endsAt: p.endsAt, doorsAt: p.doorsAt, capacity: p.capacity, intervalCount: p.intervalCount, label: p.label ?? '', externalBookingUrl: p.externalBookingUrl ?? '' }
-    : { spaceId: spaces.value[0]?.value ?? '', startsAt: null, endsAt: null, doorsAt: null, capacity: null, intervalCount: null, label: '', externalBookingUrl: '' })
+  form.value = { spaceId: p?.spaceId ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
+  overrides.value = noOverrides()
+  if (p) {
+    // A performance shows as changed only where it differs from the show's defaults.
+    const d = defaultsIn(p.spaceId)
+    const running = Math.round((p.endsAt - p.startsAt) / MINUTE)
+    const doors = p.doorsAt === null ? null : Math.round((p.startsAt - p.doorsAt) / MINUTE)
+    overrides.value = {
+      runningMinutes: running === d.runningMinutes ? null : running,
+      doorsBeforeMinutes: doors === null || doors === d.doorsBeforeMinutes ? null : doors,
+      intervalCount: p.intervalCount,
+      intervalMinutes: p.intervalMinutes,
+      capacity: p.capacity,
+      label: p.label ?? '',
+      bookedElsewhere: !!p.externalBookingUrl,
+      externalBookingUrl: p.externalBookingUrl ?? '',
+    }
+  }
   open.value = true
 }
 async function save() {
   const space = spaces.value.find(s => s.value === form.value.spaceId)
   if (!space) return
+  const o = overrides.value
+  const d = defaultsIn(space.value)
   const body: Record<string, unknown> = {
     venueId: space.venueId,
     spaceId: space.value,
     startsAt: form.value.startsAt,
-    capacity: form.value.capacity,
-    intervalCount: form.value.intervalCount,
-    label: form.value.label,
-    externalBookingUrl: form.value.externalBookingUrl.trim() || null,
+    capacity: o.capacity,
+    intervalCount: o.intervalCount,
+    intervalMinutes: o.intervalMinutes,
+    label: o.label,
+    externalBookingUrl: o.bookedElsewhere ? o.externalBookingUrl.trim() || null : null,
+    // Left empty, the end and doors come from the show's defaults; an edit always sends them, so the end moves with the start.
+    runningMinutes: o.runningMinutes ?? (editing.value ? d.runningMinutes : null),
+    doorsBeforeMinutes: o.doorsBeforeMinutes ?? (editing.value ? d.doorsBeforeMinutes : null),
   }
   const p = editing.value
   if (!p) {
-    // Left empty, the end and doors come from the running time and the theatre's settings.
-    if (form.value.endsAt) body.endsAt = form.value.endsAt
-    if (form.value.doorsAt) body.doorsAt = form.value.doorsAt
     if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added', performanceForm.value)) open.value = false
     return
   }
-  body.endsAt = form.value.endsAt ?? p.endsAt
-  body.doorsAt = form.value.doorsAt
   if (p.state === 'scheduled') {
     const kinds: Kind[] = []
-    if (form.value.startsAt !== p.startsAt || body.endsAt !== p.endsAt) kinds.push('reschedule')
+    const endsAt = form.value.startsAt! + (body.runningMinutes as number) * MINUTE
+    if (form.value.startsAt !== p.startsAt || endsAt !== p.endsAt) kinds.push('reschedule')
     if (form.value.spaceId !== p.spaceId) kinds.push('move')
-    if (form.value.capacity !== p.capacity) kinds.push('capacity')
+    if (o.capacity !== p.capacity) kinds.push('capacity')
     const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
     const refused = reached.find(r => r.refusal)?.refusal
     if (refused) {
@@ -196,6 +242,23 @@ async function saveAccess() {
   if (await run(() => call(p.id, '/access', 'PUT', { features }), 'Access saved')) accessFor.value = null
 }
 
+// Staging effects not used at one performance (C-55)
+const effectsFor = ref<Performance | null>(null)
+const effectsOpen = computed({ get: () => !!effectsFor.value, set: (v) => { if (!v) effectsFor.value = null } })
+const effectsOff = ref<Record<string, boolean>>({})
+const productionEffects = computed(() => data.value?.options.effects ?? [])
+function startEffects(p: Performance) {
+  refusal.value = null
+  effectsOff.value = Object.fromEntries(productionEffects.value.map(e => [e.id, p.effectsOff.includes(e.id)]))
+  effectsFor.value = p
+}
+async function saveEffects() {
+  const p = effectsFor.value
+  if (!p) return
+  const termIds = productionEffects.value.filter(e => effectsOff.value[e.id]).map(e => e.id)
+  if (await run(() => call(p.id, '/effects', 'PUT', { termIds }), 'Staging effects saved')) effectsFor.value = null
+}
+
 // Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
 const addingRun = ref(false)
 const runs = computed(() => data.value?.runs ?? [])
@@ -227,6 +290,7 @@ function actions(p: Performance) {
   if (p.state === 'draft' || p.state === 'scheduled') {
     items.push({ label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => start(p) })
     items.push({ label: 'Access', icon: 'i-lucide-accessibility', onSelect: () => startAccess(p) })
+    if (productionEffects.value.length) items.push({ label: 'Staging effects', icon: 'i-lucide-zap-off', onSelect: () => startEffects(p) })
   }
   if (p.state === 'scheduled') items.push({ label: 'Cancel', icon: 'i-lucide-calendar-x', color: 'error' as const, onSelect: () => startCancel(p) })
   if (p.state === 'cancelled' && p.startsAt > Date.now()) items.push({ label: 'Reinstate', icon: 'i-lucide-undo-2', onSelect: () => reinstate(p) })
@@ -277,7 +341,7 @@ function actions(p: Performance) {
       Add a venue with a space that can hold performances first.
     </p>
     <RefusalNotice
-      v-if="!open && !cancelling && !accessFor && !addingRun"
+      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun"
       :refusal="refusal"
     />
     <DataBoundary
@@ -337,16 +401,16 @@ function actions(p: Performance) {
         <UForm
           id="performance-form"
           ref="performanceForm"
-          :schema="formSchema"
           class="space-y-4"
           :state="form"
+          :validate="checkPerformance"
           novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
-            name="spaceId"
             label="Space"
+            name="spaceId"
             required
           >
             <USelectMenu
@@ -355,79 +419,22 @@ function actions(p: Performance) {
               :items="spaces"
             />
           </UFormField>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              name="startsAt"
-              label="Starts"
-              required
-            >
-              <FieldDateTime
-                v-model="form.startsAt"
-                :unavailable="closed"
-              />
-            </UFormField>
-            <UFormField
-              name="endsAt"
-              label="Ends"
-              :help="editing ? undefined : 'Left empty, from the running time.'"
-            >
-              <FieldDateTime
-                v-model="form.endsAt"
-                :unavailable="closed"
-              />
-            </UFormField>
-            <UFormField
-              name="doorsAt"
-              label="Doors open"
-              :help="editing ? 'Moves with the start unless you change it.' : 'Left empty, from the doors setting.'"
-            >
-              <FieldDateTime
-                v-model="form.doorsAt"
-                :unavailable="closed"
-              />
-            </UFormField>
-            <UFormField
-              name="capacity"
-              label="Capacity"
-              help="Left empty, the space's own."
-            >
-              <UInputNumber
-                v-model="form.capacity"
-                :min="0"
-              />
-            </UFormField>
-            <UFormField
-              name="intervalCount"
-              label="Intervals"
-              :help="intervalHelp"
-            >
-              <UInputNumber
-                v-model="form.intervalCount"
-                :min="0"
-                :max="10"
-              />
-            </UFormField>
-            <UFormField
-              name="label"
-              label="Label"
-              help="Such as Relaxed or Press night."
-            >
-              <UInput
-                v-model="form.label"
-                maxlength="40"
-              />
-            </UFormField>
-          </div>
           <UFormField
-            name="externalBookingUrl"
-            label="Booking link"
-            help="Only when this performance is sold elsewhere. Must start https://."
+            label="Starts"
+            name="startsAt"
+            required
           >
-            <UInput
-              v-model="form.externalBookingUrl"
-              type="url"
+            <FieldDateTime
+              v-model="form.startsAt"
+              :unavailable="closed"
             />
           </UFormField>
+          <ShowDefaults
+            v-if="shown && open"
+            v-model="overrides"
+            :defaults="shown"
+            :sells-here="data!.defaults.sellsHere"
+          />
         </UForm>
       </template>
       <template #footer>
@@ -556,11 +563,46 @@ function actions(p: Performance) {
         />
       </template>
     </UModal>
+    <UModal
+      v-model:open="effectsOpen"
+      title="Staging effects at this performance"
+      description="Tick any effect the production uses that this performance does not. The audience is told it is not used at this performance."
+    >
+      <template #body>
+        <UForm
+          id="performance-effects"
+          class="space-y-3"
+          :state="effectsOff"
+          novalidate
+          @submit="saveEffects"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <UCheckbox
+            v-for="e in productionEffects"
+            :key="e.id"
+            v-model="effectsOff[e.id]"
+            :label="`Not used: ${e.label}`"
+          />
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="performance-effects"
+          label="Save"
+        />
+      </template>
+    </UModal>
     <PerformanceRunDialog
+      v-if="data"
       v-model:open="addingRun"
       :production-id="productionId"
       :spaces="spaces"
+      :presets="data.options.presets"
+      :defaults="data.defaults"
+      :defaults-in="defaultsIn"
       @added="added"
+      @presets-changed="refresh()"
     />
   </PageSection>
 </template>

@@ -5,7 +5,7 @@
      cut-off has not passed, and the price less the fee goes back to the card; otherwise the box
      office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page. -->
 <script setup lang="ts">
-interface Order { accountUnclaimed?: boolean, orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, amountMinor: number }[], buyerCancel: { feeMinor: number, until: number } | null }
+interface Order { accountUnclaimed?: boolean, orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, band: string | null, amountMinor: number }[], buyerCancel: { feeMinor: number, until: number } | null }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string } }
 
 definePageMeta({ key: 'box-office-manage-booking' })
@@ -26,13 +26,16 @@ const performanceId = computed(() => order.value?.lines[0]?.performanceId)
 // A performance that has passed or been cancelled is not on the public pages: the booking still shows.
 const { data: page } = await useAPI<Page>(() => `/api/box-office/book/performances/${encodeURIComponent(performanceId.value ?? '')}`, { key: `box-office:manage:page:${performanceId.value}`, immediate: !!performanceId.value })
 
+// The part of the house, such as a wheelchair space, where the production has more than one.
+const kindOf = (l: Order['lines'][number]) => (l.band ? `${l.band}, ${l.ticketType}` : l.ticketType)
 const lines = computed(() => {
   const grouped = new Map<string, { label: string, count: number, amountMinor: number }>()
   for (const l of order.value?.lines ?? []) {
-    const row = grouped.get(l.ticketType) ?? { label: l.ticketType, count: 0, amountMinor: 0 }
+    const label = kindOf(l)
+    const row = grouped.get(label) ?? { label, count: 0, amountMinor: 0 }
     row.count++
     row.amountMinor += l.amountMinor
-    grouped.set(l.ticketType, row)
+    grouped.set(label, row)
   }
   return [...grouped.values()]
 })
@@ -183,7 +186,7 @@ async function cancel(all: boolean) {
                   v-for="(line, i) in order.lines"
                   :key="line.id"
                   :model-value="chosen.includes(line.id)"
-                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: line.ticketType, price: money(line.amountMinor, order.currency) })"
+                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: kindOf(line), price: money(line.amountMinor, order.currency) })"
                   @update:model-value="toggle(line.id, $event)"
                 />
               </fieldset>

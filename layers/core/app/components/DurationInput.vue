@@ -13,18 +13,26 @@ const props = defineProps<{
   disabled?: boolean
   /** Names the two controls for a screen reader when the field's label does not, as "Hold for". */
   label?: string
+  /** What an empty field stands for, in seconds: shown greyed in the number box, in its own unit. */
+  placeholder?: number | null
+  /** Only these units, such as hours and minutes for a running time. */
+  units?: DurationUnit[]
+  /** Fill the field's width, as in a grid of fields, instead of the usual fixed width. */
+  block?: boolean
 }>()
 const model = defineModel<number | null | undefined>()
 
 const { t } = useT()
 const seconds = (limit?: number | string) => limit === undefined ? undefined : parseDuration(limit)
-const offered = computed(() => unitsWithin(seconds(props.min), seconds(props.max)))
+const offered = computed(() => unitsWithin(seconds(props.min), seconds(props.max)).filter(u => !props.units || props.units.includes(u)))
 const count = ref<number | undefined>()
 const unit = ref<DurationUnit>(offered.value[0] ?? 'minute')
 
-watch(model, (value) => {
+watch([model, () => props.placeholder], ([value]) => {
   if (value === null || value === undefined) {
     count.value = undefined
+    // Empty, the unit is the one the greyed value reads best in.
+    if (props.placeholder) unit.value = durationParts(props.placeholder, offered.value).unit
     return
   }
   // A value this control just sent keeps the unit the person chose.
@@ -35,6 +43,11 @@ watch(model, (value) => {
 }, { immediate: true })
 
 const items = computed(() => offered.value.map(value => ({ value, label: t(`core.duration.${value}`, { count: count.value ?? 2 }) }))) // not-policy: the plural when empty
+const ghost = computed(() => {
+  if (props.placeholder === null || props.placeholder === undefined) return undefined
+  const n = props.placeholder / unitSeconds(unit.value)
+  return Number.isInteger(n) ? String(n) : undefined
+})
 const named = (part: string) => props.label ? `${props.label}: ${part}` : part
 
 // The count each unit allows inside the limits: from 60 to 86,400 seconds is 1 to 1,440 minutes.
@@ -61,14 +74,15 @@ function setUnit(value: DurationUnit) {
 </script>
 
 <template>
-  <UFieldGroup>
+  <UFieldGroup :class="block ? 'flex w-full' : undefined">
     <UInputNumber
       :model-value="count"
       :min="countMin"
       :max="countMax"
       :disabled="disabled"
       :aria-label="named(t('core.duration.amount'))"
-      class="w-32"
+      :placeholder="ghost"
+      :class="block ? 'min-w-0 flex-1' : 'w-32'"
       @update:model-value="setCount"
     />
     <USelect
@@ -77,7 +91,7 @@ function setUnit(value: DurationUnit) {
       value-key="value"
       :disabled="disabled"
       :aria-label="named(t('core.duration.unit'))"
-      class="w-32"
+      :class="block ? 'w-28 shrink-0' : 'w-32'"
       @update:model-value="setUnit($event as DurationUnit)"
     />
   </UFieldGroup>
