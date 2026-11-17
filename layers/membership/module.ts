@@ -79,6 +79,8 @@ export default defineModule({
   facts: defineFacts('membership', {
     'holder': factDecl({ standing: true }),
     'supporter': factDecl(),
+    // A voting scheme's members, after the qualifying period (MEM-09).
+    'voter': factDecl(),
     'scheme-holder': factDecl({ on: 'membership.scheme' }),
   }),
 
