@@ -201,8 +201,12 @@ export default defineModule({
       { id: 'membership.verification-list', required: false, to: '/admin/modules/membership/lists', order: 41 },
     ],
     // Applications waiting on staff: beside the Applications entry, and as a card on the console home.
-    'core.count': [{ id: 'membership.applications-waiting', file: 'applications-waiting' }],
-    'core.home-card': [{ id: 'membership.applications', home: 'console', ability: 'membership.membership.view', component: 'MembershipApplicationsCard', urgency: 'today', count: 'membership.applications-waiting' }],
+    'core.count': [{ id: 'membership.applications-waiting', file: 'applications-waiting' }, { id: 'membership.cards-held', file: 'cards-held' }],
+    'core.home-card': [
+      { id: 'membership.applications', home: 'console', ability: 'membership.membership.view', component: 'MembershipApplicationsCard', urgency: 'today', count: 'membership.applications-waiting' },
+      // The holder's own card, on the members' area home, while they hold a membership.
+      { id: 'membership.card', home: 'members', ability: 'signed-in', component: 'MembershipCardHomeCard', urgency: 'info', count: 'membership.cards-held' },
+    ],
     // A person's memberships, on their page in the console.
     'core.record-tab': [{ id: 'membership.account', record: 'core.account', ability: 'membership.membership.view', component: 'MembershipAccountTab', order: 30 }],
     'core.health-check': [
