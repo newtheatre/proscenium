@@ -3,7 +3,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { getList } from '../../../lists'
-import { checkLengthRule, hasMemberships, requireScheme, schemeFields } from '../../../schemes'
+import { checkLengthRule, hasMemberships, requireScheme, schemeFields, verifierConfig } from '../../../schemes'
 
 const COLUMN: Record<string, string> = {
   key: 'key', name: 'name', summary: 'summary', side: 'side', joinMode: 'join_mode', lengthRule: 'length_rule', fixedEndMonth: 'fixed_end_month',
@@ -25,14 +25,20 @@ export default defineRoute({
     refuse('membership.scheme.side-fixed', 'The side cannot change once anybody has held this scheme: it would give or take away the members\' area for all of them.', { status: 409, remedy: 'Close this scheme and open another on the other side.', fields: { side: 'membership.scheme.side-fixed' } })
   const merged = { ...scheme, ...input }
   if (input.lengthRule !== undefined || input.fixedEndMonth !== undefined || input.fixedEndDay !== undefined) checkLengthRule(merged)
-  // The list a list verifier checks against is the verifier's configuration.
+  // The verifier's configuration: the list it checks against, or the domains that pass.
   const verifier = input.verifier !== undefined ? input.verifier : scheme.verifier
-  if (input.listId !== undefined || input.verifier !== undefined) {
-    if (verifier === 'membership.list' && !(await getList(input.listId ?? undefined)))
-      refuse('membership.scheme.list-needed', 'Choose the list this scheme checks against.', { status: 422, fields: { listId: 'membership.scheme.list-needed' } })
+  const config = input.listId !== undefined || input.verifier !== undefined || input.domains !== undefined
+  let configJson: string | null = null
+  if (config) {
+    const before = verifierConfig(scheme)
+    if (verifier === 'membership.list') {
+      const listId = input.listId !== undefined ? input.listId : before.listId
+      if (!(await getList(listId ?? undefined))) refuse('membership.scheme.list-needed', 'Choose the list this scheme checks against.', { status: 422, fields: { listId: 'membership.scheme.list-needed' } })
+      configJson = JSON.stringify({ listId })
+    }
+    if (verifier === 'membership.email-domain') configJson = JSON.stringify({ domains: [...new Set(input.domains !== undefined ? input.domains ?? [] : before.domains ?? [])] })
   }
-  const changed = Object.keys(input).filter(k => k !== 'listId' && (input as Record<string, unknown>)[k] !== undefined)
-  const config = input.listId !== undefined || input.verifier !== undefined
+  const changed = Object.keys(input).filter(k => k !== 'listId' && k !== 'domains' && (input as Record<string, unknown>)[k] !== undefined)
   if (!changed.length && !config) return { schemeId: scheme.id }
   const value = (k: string) => {
     const v = (merged as Record<string, unknown>)[k]
@@ -40,7 +46,7 @@ export default defineRoute({
   }
   unit.add({
     sql: `UPDATE OR IGNORE membership_schemes SET ${[...changed.map(k => `${COLUMN[k]} = ?`), ...(config ? ['verifier_config = ?'] : [])].join(', ')}, updated_at = ? WHERE id = ? AND state = ?`,
-    params: [...changed.map(value), ...(config ? [verifier ? JSON.stringify({ listId: input.listId }) : null] : []), nowMs(), scheme.id, scheme.state],
+    params: [...changed.map(value), ...(config ? [configJson] : []), nowMs(), scheme.id, scheme.state],
   }).expect(1, { code: 'membership.scheme.changed', reason: 'The scheme was changed by somebody else, or its address is taken.', remedy: 'Reload it and try again.' })
   unit.audit({ action: 'update', record: ['membership.scheme', scheme.id], detail: { fields: config ? [...changed, 'verifier_config'] : changed } })
   return { schemeId: scheme.id }
