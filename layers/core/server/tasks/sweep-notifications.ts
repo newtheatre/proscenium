@@ -8,7 +8,7 @@ import { emailEventsSetAside } from '../db/domain'
 
 export default defineTask(async (unit) => {
   const at = nowMs()
-  const stuckAfter = await useSetting('core.notifications.stuck-after') as number * 1000 // not-policy: seconds to milliseconds
+  const stuckAfter = await useSetting('core.delivery.stuck-after') as number * 1000 // not-policy: seconds to milliseconds
   const limit = await useSetting('core.units.set-rows-limit') as number
 
   unit.add({ sql: 'UPDATE core_notification_deliveries SET state = \'retrying\', last_error = \'stuck\', next_attempt_at = ? WHERE state = \'sending\' AND next_attempt_at < ?', params: [at, at] })
