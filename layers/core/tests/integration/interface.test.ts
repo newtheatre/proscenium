@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import access from '../../server/api/core/access.get'
 import navigation from '../../server/api/core/navigation.get'
 import accountSections from '../../server/api/core/account-sections.get'
+import accountNotices from '../../server/api/core/account-notices.get'
 import home from '../../server/api/core/home.get'
 import recordTabs from '../../server/api/core/record-tabs.get'
 import history from '../../server/api/core/history.get'
@@ -24,6 +25,7 @@ const handle = server({
   'GET /api/core/record-tabs': recordTabs,
   'GET /api/core/history': history,
   'GET /api/core/account-sections': accountSections,
+  'GET /api/core/account-notices': accountNotices,
   'GET /api/core/settings': settingsGet,
   'PUT /api/core/settings': settingsPut,
 })
@@ -266,6 +268,43 @@ describe('counts and hideEmpty (UI-04)', () => {
 
   it('refuses account sections to someone signed out', async () => {
     expect((await call(handle, 'GET', '/api/core/account-sections')).status).toBe(401)
+  })
+})
+
+describe("My account's menu and what needs the person", () => {
+  type Item = { id: string, group?: string, attention?: number }
+  const menu = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/navigation?shell=account', { actor })).json() as { items: Item[] }).items
+  const notices = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/account-notices', { actor })).json() as { notices: { key: string, tone: string, title: string, params?: Record<string, string>, to?: string }[] }).notices
+
+  async function withAddress(actor: ReturnType<typeof person>, verified: boolean) {
+    const at = Date.now()
+    await env.DB.prepare('INSERT OR IGNORE INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, ?, \'self\', ?, ?)').bind(actor.accountId, 'Alex Rivers', at, at).run()
+    await env.DB.prepare('INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, ?, ?, \'self\', ?)')
+      .bind(`aem_${crypto.randomUUID().slice(0, 20)}`, actor.accountId, `alex-${crypto.randomUUID().slice(0, 8)}@example.org`, verified ? at : null, at).run()
+  }
+
+  it("puts the theatre's entries before the account's upkeep, an entry with no group at the theatre", async () => {
+    const items = await menu(audience())
+    expect(items.find(i => i.id === 'core.account-details')?.group).toBe('account')
+    expect(items.find(i => i.id === 'gallery.account')?.group).toBe('theatre')
+  })
+
+  it('marks Email addresses and says which address needs confirming, and only for its owner', async () => {
+    const actor = audience()
+    await withAddress(actor, true)
+    expect((await menu(actor)).find(i => i.id === 'core.account-email')?.attention).toBeUndefined()
+    expect((await notices(actor)).filter(n => n.key.startsWith('core.'))).toEqual([])
+
+    await withAddress(actor, false)
+    expect((await menu(actor)).find(i => i.id === 'core.account-email')?.attention).toBe(1)
+    const [notice] = (await notices(actor)).filter(n => n.key.startsWith('core.'))
+    expect(notice).toMatchObject({ tone: 'warning', title: 'core.account.notices.unconfirmed.title', to: '/account/email' })
+    expect(notice?.params?.address).toMatch(/@example\.org$/)
+    expect(await notices(audience())).toEqual([])
+  })
+
+  it('refuses notices to someone signed out', async () => {
+    expect((await call(handle, 'GET', '/api/core/account-notices')).status).toBe(401)
   })
 })
 

@@ -60,6 +60,23 @@ describe('renewal', () => {
   })
 })
 
+describe("renewal on My account's overview", () => {
+  const notices = async (who: Parameters<typeof req>[3]) => ((await req('GET', '/api/core/account-notices', undefined, who)).body.notices as { key: string, title: string, params?: { scheme?: string } }[])
+    .filter(n => n.key.startsWith('membership.'))
+
+  it('says a renewal is open from the day it opens until it is done', async () => {
+    const { who, id } = await member('Notice Me')
+    setClock(at('2027-10-16'))
+    expect(await notices(who)).toEqual([])
+    setClock(at('2027-10-17'))
+    const [open] = await notices(who)
+    expect(open).toMatchObject({ key: `membership.renewal-open:${id}`, title: 'membership.notices.renewal-open.title' })
+    expect(open?.params?.scheme).toMatch(/^Scheme \d+$/)
+    await req('POST', `/api/membership/mine/${id}/renew`, {}, who)
+    expect(await notices(who)).toEqual([])
+  })
+})
+
 describe('reminders', () => {
   it('sends renewal open, the last reminder and lapsed once each, and nothing after renewing', async () => {
     const { id } = await member('Reminded')
