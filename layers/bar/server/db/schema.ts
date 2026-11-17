@@ -229,6 +229,40 @@ export const saleLines = defineTable('bar_sale_lines', {
   ],
 })
 
+export const REVERSAL_STATES = ['requested', 'succeeded', 'failed'] as const
+export const STOCK_OUTCOMES = ['returned', 'wasted', 'none'] as const
+
+/**
+ * A paid line, or part of it, refunded or being refunded. Written when the refund is asked for, so it
+ * holds the quantity and amount against the line; it follows the Payments refund to succeeded or
+ * failed, and only succeeded moves income. Triggers cap what is held at what was sold.
+ */
+export const saleReversals = defineTable('bar_sale_reversals', {
+  id: col.id(),
+  saleLineId: col.ref('bar_sale_lines'),
+  refundId: col.internal(text('refund_id').notNull()),
+  state: col.internal(text('state', { enum: REVERSAL_STATES }).notNull()),
+  quantity: col.internal(integer('quantity').notNull()),
+  amountMinor: col.minor('amount_minor').notNull(),
+  reasonTerm: col.ref('core_terms'),
+  stockOutcome: col.internal(text('stock_outcome', { enum: STOCK_OUTCOMES }).notNull()),
+  requestedBy: col.account('requested_by', { role: 'actor', onMerge: 'alias' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bsrv',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('bar_sale_reversals_line').on(t.saleLineId, t.state),
+    index('bar_sale_reversals_refund').on(t.refundId),
+    check('bar_sale_reversals_state', sql`${t.state} IN (${inList(REVERSAL_STATES)})`),
+    check('bar_sale_reversals_stock', sql`${t.stockOutcome} IN (${inList(STOCK_OUTCOMES)})`),
+    check('bar_sale_reversals_quantity', sql`${t.quantity} >= 0`),
+    check('bar_sale_reversals_amount', sql`${t.amountMinor} > 0`),
+  ],
+})
+
 export const AGE_CHECK_OUTCOMES = ['not_needed', 'id_checked', 'self_attested', 'refused'] as const
 export const DESCRIPTION_MAX = 120 // not-policy: the register's description field, fixed by the specification
 
@@ -286,4 +320,4 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines, ageChecks, registerReviews }
+export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines, saleReversals, ageChecks, registerReviews }
