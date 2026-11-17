@@ -3,7 +3,7 @@
 import { defineRoute, newId, nowMs } from '#kit'
 import { checkLengthRule, schemeDefaults, schemeFields } from '../../../schemes'
 
-const input = schemeFields.partial({ summary: true, joinMode: true, fixedEndMonth: true, fixedEndDay: true, rolloverDays: true, renewalOpensDays: true, graceDays: true, reverifyOnRenewal: true, needsApproval: true, requiresPayment: true, voting: true, acceptsReference: true, holderMayEnd: true })
+const input = schemeFields.omit({ verifier: true, listId: true, domains: true }).partial({ summary: true, joinMode: true, fixedEndMonth: true, fixedEndDay: true, rolloverDays: true, renewalOpensDays: true, graceDays: true, reverifyOnRenewal: true, needsApproval: true, requiresPayment: true, voting: true, acceptsReference: true, holderMayEnd: true })
 
 export default defineRoute({ ability: 'membership.scheme.manage', rateLimit: 'write', idempotent: true, input }, async (_event, { input, unit }) => {
   const fields = { ...(await schemeDefaults()), summary: null, joinMode: 'apply' as const, fixedEndMonth: null, fixedEndDay: null, rolloverDays: 0, reverifyOnRenewal: true, needsApproval: false, requiresPayment: false, voting: false, acceptsReference: false, ...input }

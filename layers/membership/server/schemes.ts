@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import { all, first, refuse, useSetting } from '#kit'
 import { endsOnFor } from './dates'
+import { hasListKey, schemeList } from './lists'
 import { JOIN_MODES, LENGTH_RULES, SIDES } from './db/schema'
 
 export interface Scheme {
@@ -19,6 +20,7 @@ export interface Scheme {
   renewalOpensDays: number
   graceDays: number
   verifier: string | null
+  verifierConfig: string | null
   reverifyOnRenewal: boolean
   needsApproval: boolean
   requiresPayment: boolean
@@ -32,7 +34,7 @@ export interface LengthOption { id: string, name: string, count: number, state: 
 
 const COLUMNS = `id, key, name, summary, side, state, join_mode AS joinMode, length_rule AS lengthRule, fixed_end_month AS fixedEndMonth,
   fixed_end_day AS fixedEndDay, rollover_days AS rolloverDays, renewal_opens_days AS renewalOpensDays, grace_days AS graceDays,
-  verifier, reverify_on_renewal AS reverifyOnRenewal, needs_approval AS needsApproval, requires_payment AS requiresPayment,
+  verifier, verifier_config AS verifierConfig, reverify_on_renewal AS reverifyOnRenewal, needs_approval AS needsApproval, requires_payment AS requiresPayment,
   voting, accepts_reference AS acceptsReference, holder_may_end AS holderMayEnd, position`
 const BOOLEANS = ['reverifyOnRenewal', 'needsApproval', 'requiresPayment', 'voting', 'acceptsReference', 'holderMayEnd'] as const
 
@@ -73,6 +75,13 @@ export async function lengthOptions(schemeIds: readonly string[], onlyOffered = 
 export const KEY = /^[a-z0-9]+(-[a-z0-9]+)*$/ // not-policy: the shape of an address part
 
 /** The fields staff set on a scheme. Each one starts from a setting where the specification says so. */
+export const VERIFIERS = ['membership.staff', 'membership.email-domain', 'membership.list'] as const
+
+/** A scheme's verifier configuration (never a secret). */
+export function verifierConfig(scheme: { verifierConfig?: string | null }): { listId?: string, domains?: string[] } {
+  return scheme.verifierConfig ? JSON.parse(scheme.verifierConfig) : {}
+}
+
 export const schemeFields = z.object({
   key: z.string().trim().min(1).max(60).regex(KEY), // not-policy: the shape of an address part
   name: z.string().trim().min(1).max(80), // not-policy: the specification's bound
@@ -91,6 +100,10 @@ export const schemeFields = z.object({
   voting: z.boolean(),
   acceptsReference: z.boolean(),
   holderMayEnd: z.boolean(),
+  // The verifier and its configuration: a list's id, or the email domains that pass.
+  verifier: z.enum(VERIFIERS).nullable(),
+  listId: z.string().nullable(),
+  domains: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)).max(20).nullable(), // not-policy: the shape and bound of a list of domains
 })
 export type SchemeFields = z.infer<typeof schemeFields>
 
@@ -120,15 +133,17 @@ export interface ChecklistItem { code: string, done: boolean }
 
 /**
  * What opening a scheme needs (rule S4, and the rule that a members' scheme needs the members'
- * area). Verifiers, application forms and fees are later slices: until they exist, a scheme that
- * asks for any of them cannot be opened, and the checklist says why.
+ * area). Application forms and fees are later slices: until they exist, a scheme that asks for
+ * either cannot be opened, and the checklist says why.
  */
 export async function openChecklist(scheme: Scheme): Promise<ChecklistItem[]> {
   const options = (await lengthOptions([scheme.id], true)).get(scheme.id)!
   const items: ChecklistItem[] = []
   if (scheme.lengthRule !== 'indefinite') items.push({ code: 'length-option', done: options.length > 0 })
   if (scheme.side === 'members') items.push({ code: 'members-area', done: !!(await useSetting('core.members-area.enabled')) })
-  if (scheme.verifier) items.push({ code: 'verifier', done: false })
+  // A list needs its list and the key it is hashed with; a domain check needs a domain.
+  if (scheme.verifier === 'membership.list') items.push({ code: 'verifier', done: !!(await schemeList(scheme)) && await hasListKey() })
+  if (scheme.verifier === 'membership.email-domain') items.push({ code: 'verifier-domains', done: !!verifierConfig(scheme).domains?.length })
   if (scheme.needsApproval) items.push({ code: 'application-form', done: false })
   if (scheme.requiresPayment) items.push({ code: 'price', done: false })
   return items

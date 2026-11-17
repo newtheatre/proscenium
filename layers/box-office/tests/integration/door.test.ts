@@ -120,6 +120,22 @@ describe('the door list', () => {
     expect(everyone.body.rows[0]).toMatchObject({ tickets: 2, admitted: 2 })
   })
 
+  it('admits by name from the list, as many as asked, and never the same ticket twice', async () => {
+    const h = await freeHouse(4)
+    const codes = await tickets(h, 3)
+    const listed = await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)
+    const orderId = listed.body.rows[0].id as string
+    await scan(h, codes[2]!)
+    const one = await req('POST', `/api/box-office/performances/${h.performanceId}/door/admit`, { orderId, count: 1 }, steward)
+    expect(one.status).toBe(200)
+    expect(one.body.admitted).toBe(1)
+    const rest = await req('POST', `/api/box-office/performances/${h.performanceId}/door/admit`, { orderId, count: 5 }, steward)
+    expect(rest.body.admitted).toBe(1)
+    const again = await req('POST', `/api/box-office/performances/${h.performanceId}/door/admit`, { orderId, count: 1 }, steward)
+    expect(again.body.admitted).toBe(0)
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all`, undefined, steward)).body.rows[0]).toMatchObject({ tickets: 3, admitted: 3 })
+  })
+
   it('finds a booking by its reference', async () => {
     const h = await freeHouse(4)
     await tickets(h, 1)

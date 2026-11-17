@@ -46,11 +46,14 @@
   "membership.settings.help.link.help": "A page on this site, a web address or an email address. Used in \"Have a membership? Contact us\". Leave it empty to show the sentence without a link.",
   "membership.settings.rules.reminders-in-order": "The last renewal reminder must come after the first, so it must be a shorter time before the end.",
 
-  "membership.navigation.groups.membership.label": "Membership",
 
   "membership.abilities.scheme.view.label": "See membership schemes, including drafts and closed ones",
   "membership.abilities.scheme.manage.label": "Create, change, open, close and archive membership schemes",
   "membership.abilities.membership.view.label": "See who holds which membership, with dates and status",
+  "membership.abilities.membership.verify.label": "Pass or decline an application waiting to be checked",
   "membership.abilities.membership.add.label": "Add a member directly",
+  "membership.abilities.card.check.label": "Check whether somebody else holds a membership, at the desk or the door",
+  "membership.abilities.verification-list.check.label": "See the name behind a ticket bought with a membership reference",
+  "membership.abilities.verification-list.manage.label": "Load, add to and remove from verification lists, such as a students' union's list of student IDs",
   "membership.abilities.settings.manage.label": "Change membership settings"
 }
