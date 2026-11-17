@@ -21,9 +21,10 @@ interface Scheme {
   acceptsReference: boolean
   verifier: 'membership.staff' | 'membership.email-domain' | 'membership.list' | null
   verifierConfig: string | null
+  requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[] }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -41,7 +42,7 @@ const missing = computed(() => (data.value?.checklist ?? []).filter(i => !i.done
 const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRule === 'fixed' ? 'years' : 'months'}`))
 
 // Details: one form, saved as a whole.
-const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
+const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, requiresPayment: false, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(scheme, (s) => {
   if (!s) return
@@ -124,22 +125,33 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
 
 // Adding a member directly.
 const adding = ref(false)
-const member = reactive({ name: '', address: '', lengthOptionId: undefined as string | undefined, startsOn: '', endsOn: '', note: '', idempotency: '' })
+const member = reactive({ name: '', address: '', lengthOptionId: undefined as string | undefined, startsOn: '', endsOn: '', note: '', fee: 'link' as 'link' | 'waive', idempotency: '' })
+// P9: for a scheme whose fee is collected through the system, a link to pay or a waiver.
+const asksFee = computed(() => !!data.value?.feesOn)
+const byLink = computed(() => asksFee.value && member.fee === 'link')
 const memberRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function openAdd() {
-  Object.assign(member, { name: '', address: '', lengthOptionId: data.value?.options.find(o => o.state === 'offered')?.id, startsOn: '', endsOn: '', note: '', idempotency: crypto.randomUUID() })
+  Object.assign(member, { name: '', address: '', lengthOptionId: data.value?.options.find(o => o.state === 'offered')?.id, startsOn: '', endsOn: '', note: '', fee: 'link', idempotency: crypto.randomUUID() })
   memberRefusal.value = null
   adding.value = true
 }
 async function addMember() {
   memberRefusal.value = null
   try {
-    const added = await $api<{ endsOn: string | null, opensMembersArea: boolean }>(`/api/membership/schemes/${id.value}/members` as string, {
+    const added = await $api<{ endsOn: string | null, opensMembersArea: boolean, waiting?: string }>(`/api/membership/schemes/${id.value}/members` as string, {
       method: 'POST',
       headers: { 'idempotency-key': member.idempotency },
-      body: { name: member.name.trim() || undefined, address: member.address.trim(), lengthOptionId: member.lengthOptionId ?? null, startsOn: member.startsOn || undefined, endsOn: member.endsOn || undefined, note: member.note.trim() || undefined },
+      body: {
+        name: member.name.trim() || undefined, address: member.address.trim(), lengthOptionId: member.lengthOptionId ?? null, note: member.note.trim() || undefined,
+        ...(byLink.value ? {} : { startsOn: member.startsOn || undefined, endsOn: member.endsOn || undefined }),
+        ...(asksFee.value ? { fee: member.fee } : {}),
+      },
     })
     adding.value = false
+    if (added.waiting === 'payment') {
+      toast.add({ title: t('membership.screens.add-member.link-sent'), color: 'success' })
+      return
+    }
     toast.add({
       title: t('membership.screens.add-member.added'),
       description: t(added.opensMembersArea ? 'membership.screens.add-member.opens-area' : 'membership.screens.add-member.no-area'),
@@ -435,6 +447,11 @@ async function addMember() {
               </template>
             </UFormField>
             <USwitch
+              v-model="details.requiresPayment"
+              :label="t('membership.screens.scheme.requires-payment')"
+              :description="t('membership.screens.scheme.requires-payment-help')"
+            />
+            <USwitch
               v-model="details.holderMayEnd"
               :label="t('membership.screens.scheme.holder-may-end')"
               :description="t('membership.screens.scheme.holder-may-end-help')"
@@ -494,7 +511,19 @@ async function addMember() {
               :items="data.options.map(o => ({ value: o.id, label: o.name }))"
             />
           </UFormField>
-          <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField
+            v-if="asksFee"
+            :label="t('membership.screens.add-member.fee')"
+          >
+            <URadioGroup
+              v-model="member.fee"
+              :items="(['link', 'waive'] as const).map(v => ({ value: v, label: t(`membership.screens.add-member.fee-${v}`), description: t(`membership.screens.add-member.fee-${v}-help`) }))"
+            />
+          </UFormField>
+          <div
+            v-if="!byLink"
+            class="grid gap-4 sm:grid-cols-2"
+          >
             <UFormField
               :label="t('membership.screens.add-member.starts')"
               :help="t('membership.screens.add-member.starts-help')"
@@ -513,7 +542,8 @@ async function addMember() {
           </div>
           <UFormField
             :label="t('membership.screens.add-member.note')"
-            :help="t('membership.screens.add-member.note-help')"
+            :help="asksFee && member.fee === 'waive' ? t('membership.screens.add-member.waive-note-help') : t('membership.screens.add-member.note-help')"
+            :required="asksFee && member.fee === 'waive'"
           >
             <UTextarea
               v-model="member.note"
@@ -528,7 +558,7 @@ async function addMember() {
           type="submit"
           form="membership-add-member"
           loading-auto
-          :disabled="!member.address.trim()"
+          :disabled="!member.address.trim() || (asksFee && member.fee === 'waive' && !member.note.trim())"
           :label="t('membership.screens.add-member.submit')"
         />
       </template>

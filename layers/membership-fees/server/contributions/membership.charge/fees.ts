@@ -12,6 +12,6 @@ export default {
   void: voidCharge,
   async status(membershipId) {
     const charge = await chargeOf(membershipId)
-    return charge && { state: charge.state, amountMinor: charge.amount_minor, currency: charge.currency }
+    return charge && { id: charge.id, state: charge.state, amountMinor: charge.amount_minor, refundedMinor: charge.refunded_minor, currency: charge.currency }
   },
 } satisfies MembershipCharge
