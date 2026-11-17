@@ -15,6 +15,8 @@ const emit = defineEmits<{ settled: [{ intentId: string, amountMinor: number }] 
 
 const { t } = useT()
 const { $api } = useNuxtApp()
+const route = useRoute()
+const router = useRouter()
 const { currency, money, toMinor } = await useMoney()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
@@ -164,7 +166,8 @@ async function pay(succeeded = true) {
     else {
       const started = await $api<{ next: Next, state: string, settled: boolean, unfulfilled: boolean }>(`/api/payments/intents/${sale.value.intentId}/start` as string, {
         method: 'POST',
-        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, amountMinor: partMinor.value },
+        // The SumUp app sends the seller back to this screen, which picks the sale up again (resume).
+        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, amountMinor: partMinor.value, returnTo: route.path },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -200,6 +203,37 @@ function partTaken(amountMinor: number) {
 }
 const paidInPart = computed(() => (payment.value?.paidMinor ?? 0) > 0)
 
+// Back from a hand-off to another app, such as SumUp's: the page has loaded afresh, so the sale is
+// picked up again from its payment, and what the app said is shown. The address is then cleaned so a
+// reload does not repeat it.
+async function resume(intentId: string, said: string) {
+  try {
+    const now = await $api<Status>(`/api/payments/intents/${intentId}` as string)
+    sale.value = { intentId, amountMinor: now.amountMinor, key: crypto.randomUUID() }
+    payment.value = now
+    if (now.state === 'open' && !offered.value) offered.value = await $api<{ methods: Offer[] }>('/api/payments/till/methods')
+    if (now.state === 'succeeded') return done()
+    if (now.state === 'unfulfilled') return undone()
+    if (now.state !== 'open') return ended()
+    if (now.waiting) {
+      result.value = { kind: 'waiting' }
+      poll()
+    }
+    else if (said === 'succeeded') toast.add({ title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
+    else if (said === 'failed') result.value = { kind: 'declined' }
+    else toast.add({ title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+onMounted(() => {
+  const { intent, result: said, attempt, ...rest } = route.query
+  if (typeof intent !== 'string' || typeof said !== 'string' || !attempt) return
+  void router.replace({ query: rest })
+  if (open.value) void resume(intent, said)
+})
+
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
 
 async function cancel() {
@@ -215,6 +249,39 @@ async function cancel() {
   try {
     await $api(`/api/payments/intents/${sale.value.intentId}/cancel` as string, { method: 'POST', body: {} })
     ended()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    taking.value = false
+  }
+}
+
+// Paid in part, then the customer left (BO-35): the sale ends, and each payment goes back the way it
+// came. The seller hands back cash, and refunds on a standalone machine or the SumUp app, before
+// confirming; a card the site took goes back by itself.
+async function giveBack() {
+  if (!sale.value) return
+  const ok = await confirm({
+    verb: t('payments.screens.till.give-back-verb'),
+    thing: money(payment.value?.paidMinor ?? 0),
+    consequence: t('payments.screens.till.give-back-consequence'),
+    button: t('payments.screens.till.give-back-button'),
+  })
+  if (!ok) return
+  taking.value = true
+  try {
+    const out = await $api<{ handedBack: { amountMinor: number }[], sent: { amountMinor: number }[], unconfirmed: number }>(`/api/payments/intents/${sale.value.intentId}/give-back` as string, { method: 'POST', body: {} })
+    const sum = (list: { amountMinor: number }[]) => list.reduce((total, l) => total + l.amountMinor, 0)
+    const said = [
+      out.handedBack.length ? t('payments.screens.till.given-back-by-hand', { amount: money(sum(out.handedBack)) }) : '',
+      out.sent.length ? t('payments.screens.till.given-back-to-card', { amount: money(sum(out.sent)) }) : '',
+      out.unconfirmed ? t('payments.screens.till.given-back-unconfirmed') : '',
+    ].filter(Boolean).join(' ')
+    reset()
+    for (const p of panels.value) inputs[p.id] = null
+    toast.add({ title: t('payments.screens.till.given-back'), description: said || undefined, color: 'success' })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -471,13 +538,15 @@ function ended() {
                 </div>
               </template>
 
-              <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is refunded. -->
-              <p
+              <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is given back. -->
+              <UButton
                 v-if="paidInPart"
-                class="text-sm text-muted"
-              >
-                {{ t('payments.screens.till.no-cancel') }}
-              </p>
+                color="neutral"
+                variant="ghost"
+                :disabled="taking || waiting"
+                :label="t('payments.screens.till.give-back-button')"
+                @click="giveBack"
+              />
               <UButton
                 v-else
                 color="neutral"

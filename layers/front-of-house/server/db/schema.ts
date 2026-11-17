@@ -291,4 +291,195 @@ export const emergencyCards = defineTable('front_of_house_emergency_cards', {
   ],
 })
 
-export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards }
+export const INCIDENT_KINDS = ['incident', 'near_miss'] as const
+export const SEVERITIES = ['minor', 'moderate', 'serious'] as const
+export const INCIDENT_STATES = ['reported', 'in_review', 'closed'] as const
+export const INVOLVEMENTS = ['affected', 'witness', 'helped', 'other'] as const
+
+// Free text about an incident is the safety record: it outlives an erasure for the retention period.
+const kept = { erase: 'retain', until: 'front-of-house.retention.incidents', reason: 'front-of-house.retain.incident' } as const
+
+/**
+ * An incident or near miss. The row's own facts (number, kind, severity, dates) are the theatre's
+ * history; its free text may describe anyone listed on it, so it is kept for the retention period.
+ */
+export const incidents = defineTable('front_of_house_incidents', {
+  id: col.id(),
+  number: col.internal(integer('number').notNull()),
+  year: col.internal(integer('year').notNull()),
+  kind: col.internal(text('kind', { enum: INCIDENT_KINDS }).notNull()),
+  categoryId: col.ref('core_terms', { nullable: true }),
+  severity: col.internal(text('severity', { enum: SEVERITIES }).notNull().default('minor')),
+  state: col.internal(text('state', { enum: INCIDENT_STATES }).notNull().default('reported')),
+  performanceId: col.internal(text('performance_id')),
+  venueId: col.internal(text('venue_id')),
+  spaceId: col.internal(text('space_id')),
+  whereNote: col.internal(text('where_note')),
+  occurredAt: col.timestamp('occurred_at').notNull(),
+  whatHappened: col.freeText(text('what_happened').notNull(), kept),
+  immediateAction: col.freeText(text('immediate_action'), kept),
+  firstAidGiven: col.internal(integer('first_aid_given', { mode: 'boolean' }).notNull().default(false)),
+  emergencyServicesCalled: col.internal(integer('emergency_services_called', { mode: 'boolean' }).notNull().default(false)),
+  reportedBy: col.account('reported_by', { role: 'actor' }),
+  reportedAt: col.timestamp('reported_at').notNull(),
+  reviewerId: col.account('reviewer_id', { role: 'actor', nullable: true }),
+  closedBy: col.account('closed_by', { role: 'actor', nullable: true }),
+  closedAt: col.timestamp('closed_at'),
+  closingNote: col.freeText(text('closing_note'), kept),
+  // Set once the daily digest has carried it, for incidents below the immediate severity.
+  digestedAt: col.timestamp('digested_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'inc',
+  realm: 'operational',
+  retention: 'front-of-house.retention.incidents',
+  extra: t => [
+    uniqueIndex('front_of_house_incidents_number').on(t.year, t.number),
+    index('front_of_house_incidents_state').on(t.state, t.reportedAt),
+    index('front_of_house_incidents_reporter').on(t.reportedBy),
+    check('front_of_house_incidents_kind', sql`${t.kind} IN (${list(INCIDENT_KINDS)})`),
+    check('front_of_house_incidents_severity', sql`${t.severity} IN (${list(SEVERITIES)})`),
+    check('front_of_house_incidents_state', sql`${t.state} IN (${list(INCIDENT_STATES)})`),
+    // Either flag raises the severity to at least moderate.
+    check('front_of_house_incidents_floor', sql`${t.severity} <> 'minor' OR (${t.firstAidGiven} = 0 AND ${t.emergencyServicesCalled} = 0)`),
+    check('front_of_house_incidents_where', sql`${t.whereNote} IS NULL OR length(${t.whereNote}) <= 120`),
+    check('front_of_house_incidents_what', sql`length(${t.whatHappened}) BETWEEN 1 AND 4000`),
+    check('front_of_house_incidents_action', sql`${t.immediateAction} IS NULL OR length(${t.immediateAction}) <= 2000`),
+    check('front_of_house_incidents_closing', sql`${t.closingNote} IS NULL OR length(${t.closingNote}) <= 2000`),
+    check('front_of_house_incidents_closed', sql`${t.state} <> 'closed' OR (${t.closedAt} IS NOT NULL AND ${t.closingNote} IS NOT NULL)`),
+  ],
+})
+
+/** A person involved in an incident: an account when they have one, otherwise a name and contact. */
+export const incidentPeople = defineTable('front_of_house_incident_people', {
+  id: col.id(),
+  incidentId: col.ref('front_of_house_incidents'),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias', nullable: true }),
+  name: col.personal(text('name'), kept),
+  contact: col.personal(text('contact'), kept),
+  involvement: col.internal(text('involvement', { enum: INVOLVEMENTS }).notNull()),
+  isChild: col.internal(integer('is_child', { mode: 'boolean' }).notNull().default(false)),
+  // Injury and treatment. Sealed; cleared at once on erasure.
+  details: col.special('details'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'inp',
+  realm: 'operational',
+  subject: { account: 'account_id', unlinked: 'staff' },
+  retention: 'front-of-house.retention.incidents',
+  extra: t => [
+    index('front_of_house_incident_people_incident').on(t.incidentId),
+    index('front_of_house_incident_people_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
+    check('front_of_house_incident_people_who', sql`${t.accountId} IS NOT NULL OR ${t.name} IS NOT NULL`),
+    check('front_of_house_incident_people_name', sql`${t.name} IS NULL OR length(${t.name}) <= 120`),
+    check('front_of_house_incident_people_contact', sql`${t.contact} IS NULL OR length(${t.contact}) <= 200`),
+    check('front_of_house_incident_people_involvement', sql`${t.involvement} IN (${list(INVOLVEMENTS)})`),
+  ],
+})
+
+/** A follow-up action: something to do about a thing, never about a person. */
+export const incidentActions = defineTable('front_of_house_incident_actions', {
+  id: col.id(),
+  incidentId: col.ref('front_of_house_incidents'),
+  what: col.internal(text('what').notNull()),
+  ownerId: col.account('owner_id', { role: 'actor', nullable: true }),
+  dueOn: col.localDate('due_on'),
+  state: col.internal(text('state', { enum: ['open', 'done', 'dropped'] }).notNull().default('open')),
+  resolvedAt: col.timestamp('resolved_at'),
+  resolvedNote: col.internal(text('resolved_note')),
+  // The last day the owner was reminded, so a re-run of the daily task sends nothing twice.
+  chasedOn: col.localDate('chased_on'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ina',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('front_of_house_incident_actions_incident').on(t.incidentId),
+    index('front_of_house_incident_actions_due').on(t.state, t.dueOn),
+    check('front_of_house_incident_actions_what', sql`length(${t.what}) BETWEEN 1 AND 300`),
+    check('front_of_house_incident_actions_state', sql`${t.state} IN ('open', 'done', 'dropped')`),
+    check('front_of_house_incident_actions_note', sql`${t.resolvedNote} IS NULL OR length(${t.resolvedNote}) <= 300`),
+    check('front_of_house_incident_actions_dropped', sql`${t.state} <> 'dropped' OR ${t.resolvedNote} IS NOT NULL`),
+  ],
+})
+
+/** The log of an incident: comments and every change of state, severity and category. */
+export const incidentUpdates = defineTable('front_of_house_incident_updates', {
+  id: col.id(),
+  incidentId: col.ref('front_of_house_incidents'),
+  kind: col.internal(text('kind', { enum: ['comment', 'state', 'severity', 'category'] }).notNull()),
+  fromValue: col.internal(text('from_value')),
+  toValue: col.internal(text('to_value')),
+  body: col.freeText(text('body'), kept),
+  authorId: col.account('author_id', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'inu',
+  realm: 'operational',
+  subject: { via: 'incident_id' },
+  retention: 'front-of-house.retention.incidents',
+  appendOnly: true,
+  extra: t => [
+    index('front_of_house_incident_updates_incident').on(t.incidentId, t.createdAt),
+    check('front_of_house_incident_updates_kind', sql`${t.kind} IN ('comment', 'state', 'severity', 'category')`),
+    check('front_of_house_incident_updates_body', sql`${t.body} IS NULL OR length(${t.body}) <= 2000`),
+  ],
+})
+
+export const NOTE_TOPICS = ['audience', 'building', 'show', 'staffing', 'other'] as const
+
+/**
+ * The record of one performance. A draft is a live view; sign-off writes the snapshot, which holds no
+ * names and no free text. A trigger (written by hand in the migration) refuses any change to a
+ * signed-off row except setting distributed_at.
+ */
+export const nightReports = defineTable('front_of_house_night_reports', {
+  id: col.id(),
+  performanceId: col.internal(text('performance_id').notNull()),
+  state: col.internal(text('state', { enum: ['draft', 'signed_off'] }).notNull().default('draft')),
+  snapshot: col.internal(text('snapshot', { mode: 'json' })),
+  snapshotVersion: col.internal(integer('snapshot_version').notNull().default(1)),
+  signedOffBy: col.account('signed_off_by', { role: 'actor', nullable: true }),
+  signedOffAt: col.timestamp('signed_off_at'),
+  distributedAt: col.timestamp('distributed_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'nrp',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_night_reports_performance').on(t.performanceId),
+    index('front_of_house_night_reports_state').on(t.state),
+    check('front_of_house_night_reports_state', sql`${t.state} IN ('draft', 'signed_off')`),
+    check('front_of_house_night_reports_signed', sql`${t.state} = 'draft' OR (${t.snapshot} IS NOT NULL AND ${t.signedOffAt} IS NOT NULL)`),
+  ],
+})
+
+/** Notes on the night by topic, and addenda written after sign-off. About the night, never a person. */
+export const nightReportNotes = defineTable('front_of_house_night_report_notes', {
+  id: col.id(),
+  reportId: col.ref('front_of_house_night_reports'),
+  kind: col.internal(text('kind', { enum: ['note', 'addendum'] }).notNull()),
+  topic: col.internal(text('topic', { enum: NOTE_TOPICS }).notNull()),
+  body: col.internal(text('body').notNull()),
+  authorId: col.account('author_id', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'nrn',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('front_of_house_night_report_notes_report').on(t.reportId, t.createdAt),
+    check('front_of_house_night_report_notes_kind', sql`${t.kind} IN ('note', 'addendum')`),
+    check('front_of_house_night_report_notes_topic', sql`${t.topic} IN (${list(NOTE_TOPICS)})`),
+    check('front_of_house_night_report_notes_body', sql`length(${t.body}) BETWEEN 1 AND 2000`),
+  ],
+})
+
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates }

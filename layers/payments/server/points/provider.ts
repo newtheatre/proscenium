@@ -27,6 +27,11 @@ export interface ProviderAttempt {
   webhookUrl?: string
   /** The site's address, when a request started the payment, for a provider that sends a person back. */
   origin?: string
+  /**
+   * The screen to send a person back to, a path on this site, when the screen that started the
+   * payment said so. A provider that sends a person back signs it into its return address.
+   */
+  returnTo?: string
   /** Set when a person asks again after a start had no answer, so the first may still be running. */
   retrying?: boolean
 }

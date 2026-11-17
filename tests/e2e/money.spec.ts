@@ -119,10 +119,43 @@ test('the Till takes part of the total one way and the rest another', async ({ p
   await expect(page.getByText('£2.50 taken. Still to pay: £3.50', { exact: true })).toBeVisible()
   await expect(page.getByText('Paid so far: £2.50')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Give back what was taken' })).toBeVisible()
   await noViolations(page)
   await page.getByRole('radio', { name: 'Cash' }).first().check()
   await page.getByRole('button', { name: 'Cash taken: £3.50' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
+})
+
+test('the Till gives back what was taken when the customer leaves a sale paid in part', async ({ page }) => {
+  await visit(page, '/console/payments/till')
+  await page.getByLabel('Programmes sold').fill('1')
+  await page.getByLabel('Programmes sold').blur()
+  await page.getByRole('button', { name: 'Take payment of £3.00' }).click()
+  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await page.getByLabel(/^Amount to take this way/).fill('2')
+  await page.getByLabel(/^Amount to take this way/).blur()
+  await page.getByRole('button', { name: 'Cash taken: £2.00' }).click()
+  await expect(page.getByText('Paid so far: £2.00')).toBeVisible()
+  await page.getByRole('button', { name: 'Give back what was taken' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Give back what was taken' }).click()
+  await expect(page.getByText('Sale ended and payment given back', { exact: true })).toBeVisible()
+  await expect(page.getByText('£2.00 handed back.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+})
+
+test('the Till picks a sale up again when the SumUp app sends the seller back', async ({ page, playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
+  const made = await api.post('/api/payments/till/sale', { data: { panels: [{ basket: 'gallery', input: { count: 1 } }] }, headers: { 'idempotency-key': crypto.randomUUID() } })
+  expect(made.ok()).toBe(true)
+  const { intentId } = await made.json() as { intentId: string }
+
+  await visit(page, `/console/payments/till?attempt=att_none&intent=${intentId}&result=failed`)
+  await expect(page.getByText('Still to pay: £3.00')).toBeVisible()
+  await expect(page.getByText('The payment did not go through')).toBeVisible()
+  await expect(page).toHaveURL(/\/console\/payments\/till$/)
+  await noViolations(page)
+  expect((await api.post(`/api/payments/intents/${intentId}/cancel`, { data: {} })).ok()).toBe(true)
+  await api.dispose()
 })
 
 test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {

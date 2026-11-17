@@ -31,12 +31,25 @@ export default defineModule({
     'shifts.late-after': setting.duration({ default: '30m', min: '5m', max: '2h', change, audience: 'staff' }),
     // Off by default: the board warns instead.
     'checklists.block-house-open': setting.boolean({ default: false, change, audience: 'staff' }),
+    // What volunteer hours are counted from: the shift's times, or check-in to check-out.
+    'hours.count-from': setting.choice({ default: 'scheduled', options: ['scheduled', 'checked'], change, audience: 'staff' }),
+    // After the performance ends, when an unsigned report is chased.
+    'night-report.sign-off-by': setting.duration({ default: '12h', min: '1h', max: '7d', change, audience: 'staff' }),
+    'night-report.auto-distribute': setting.boolean({ default: true, change, audience: 'staff' }),
+    // When an incident nobody has opened is flagged.
+    'incidents.review-within': setting.duration({ default: '72h', min: '1h', max: '30d', change, audience: 'staff' }),
+    // At or above this, managers are told at once; below, in the daily digest.
+    'incidents.immediate-severity': setting.choice({ default: 'serious', options: ['minor', 'moderate', 'serious'], change, audience: 'staff' }),
+    // Shortening one deletes records at the next sweep, which cannot be undone: so it asks again.
+    'retention.incidents': setting.duration({ default: '3y', min: '1y', max: '10y', change, audience: 'staff', onChange: 'confirm' }),
+    'retention.incidents-child': setting.duration({ default: '21y', min: '3y', max: '25y', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('front-of-house', {
     'shift': { table: 'front_of_house_shifts', parent: 'core.performance' },
     'assignment': { table: 'front_of_house_assignments', parent: 'front-of-house.shift', owner: 'account_id' },
     'checklist-run': { table: 'front_of_house_checklist_runs', parent: 'core.performance' },
+    'incident': { table: 'front_of_house_incidents', owner: 'reported_by' },
   }),
 
   abilities: defineAbilities('front-of-house', {
@@ -49,6 +62,14 @@ export default defineModule({
     'checklist.manage': ability(),
     'duty.manage': ability(),
     'emergency-card.view': ability(),
+    // The reporter sees their own reports in limited form: the service limits what, not the ability.
+    'night-report.write': ability({ on: 'core.performance', implies: ['shift.view'] }),
+    'night-report.sign-off': ability({ on: 'core.performance', implies: ['night-report.write'] }),
+    'night-report.view': ability({ on: 'core.performance' }),
+    'hours.view': ability({ audit: 'read' }),
+    'incident.report': ability({ on: 'front-of-house.incident', owner: 'grants' }),
+    'incident.view': ability({ on: 'front-of-house.incident', risk: 'privileged', audit: 'read' }),
+    'incident.manage': ability({ on: 'front-of-house.incident', risk: 'privileged', implies: ['incident.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -69,6 +90,11 @@ export default defineModule({
       'front-of-house.assignment.confirmed': event({ version: 1, payload: assignment, internal: true }),
       // Released, withdrawn, declined or removed; the state is on the record.
       'front-of-house.assignment.released': event({ version: 1, payload: assignment, internal: true }),
+      // Never offered to webhooks: who was involved is not for outside systems.
+      'front-of-house.incident.reported': event({ version: 1, payload: z.object({ incidentId: z.string(), severity: z.enum(['minor', 'moderate', 'serious']) }), internal: true }),
+      'front-of-house.incident.closed': event({ version: 1, payload: z.object({ incidentId: z.string() }), internal: true }),
+      // Nothing financial waits on it.
+      'front-of-house.night-report.signed-off': event({ version: 1, payload: z.object({ performanceId: z.string() }), internal: false }),
       'front-of-house.checklist-run.completed': event({ version: 1, payload: z.object({ runId: z.string(), checklistId: z.string(), performanceId: z.string() }), internal: false }),
     },
     listens: {
@@ -81,6 +107,11 @@ export default defineModule({
   tasks: {
     // At most two reminders before each call time; `reminded` keeps a re-run from repeating one.
     'front-of-house.remind-shifts': task({ every: '15m' }),
+    // Reminds action owners and sends the incident digest.
+    'front-of-house.chase-actions': task({ dailyAt: '09:00' }),
+    // Completes shifts past their window and opens tonight's draft reports.
+    'front-of-house.close-shifts': task({ every: '15m' }),
+    'front-of-house.chase-night-reports': task({ dailyAt: '10:00' }),
   },
 
   // Other modules' parts of the board and the night report. Front of house calls none of them.
@@ -94,8 +125,21 @@ export default defineModule({
       { id: 'front-of-house.shift', file: 'shift' },
       { id: 'front-of-house.assignment', file: 'assignment' },
       { id: 'front-of-house.checklist-run', file: 'checklist-run' },
+      { id: 'front-of-house.incident', file: 'incident' },
     ],
     'core.vocabulary': [{
+      id: 'front-of-house.incident-category',
+      label: 'Kinds of incident',
+      terms: [
+        { slug: 'slip-or-fall', label: 'Slip or fall' },
+        { slug: 'illness', label: 'Illness' },
+        { slug: 'behaviour', label: 'Behaviour' },
+        { slug: 'fire-alarm', label: 'Fire alarm' },
+        { slug: 'building', label: 'Building' },
+        { slug: 'lost-child', label: 'Lost child' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
       id: 'front-of-house.exception-reason',
       label: 'Reasons a checklist item could not be done',
       terms: [
@@ -106,7 +150,10 @@ export default defineModule({
         { slug: 'other', label: 'Other' },
       ],
     }],
-    'core.notification-topic': [{ id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 }],
+    'core.notification-topic': [
+      { id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 },
+      { id: 'front-of-house.night-reports', side: 'members' as const, order: 61 },
+    ],
     // Messages to people on the rota about their own shifts, so none can be switched off.
     'core.notification-type': [{
       id: 'front-of-house.shift-changed',
@@ -212,6 +259,93 @@ export default defineModule({
         'en-GB': {
           subject: 'Cover needed: {{ duty }}, {{ show }}',
           body: 'Someone on the {{ duty }} shift for **{{ show }}** on {{ when }} has asked to give up their place. It stays theirs until someone takes it.',
+        },
+      },
+    }, {
+      // To holders of incident.manage. Number, kind, severity and a link: never what happened or who.
+      id: 'front-of-house.incident-reported',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'prompt' as const,
+      link: '/console/front-of-house/incidents/{{ incident }}',
+      variables: { reference: 'text' as const, kind: 'text' as const, severity: 'text' as const, incident: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ severity }} incident reported: {{ reference }}',
+          body: '{{ kind }} {{ reference }} has been reported, marked **{{ severity }}**. Open it to review it.',
+        },
+      },
+    }, {
+      id: 'front-of-house.incident-digest',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      link: '/console/front-of-house/incidents',
+      variables: { count: 'text' as const, incidents: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Incidents reported: {{ count }}',
+          body: 'These incidents were reported since the last summary:\n\n{{ incidents }}\n\nOpen the incidents list to review them.',
+        },
+      },
+    }, {
+      id: 'front-of-house.action-due',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      link: '/console/front-of-house/incidents',
+      variables: { what: 'text' as const, incident: 'text' as const, due: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Due tomorrow: {{ what }}',
+          body: 'The action "{{ what }}" from {{ incident }} is due tomorrow ({{ due }}). Mark it done when it is, or drop it with a reason.',
+        },
+      },
+    }, {
+      // Headline numbers and a link: never incident detail (question 9).
+      id: 'front-of-house.night-report-ready',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      topic: 'front-of-house.night-reports',
+      link: '/console/front-of-house/night-reports/{{ performance }}',
+      variables: { show: 'text' as const, worked: 'text' as const, incidents: 'text' as const, performance: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Night report: {{ show }}',
+          body: 'The night report for **{{ show }}** has been signed off. People on shift: {{ worked }}. Incidents: {{ incidents }}.',
+        },
+      },
+    }, {
+      id: 'front-of-house.night-report-unsigned',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      link: '/console/front-of-house/night-reports/{{ performance }}',
+      variables: { show: 'text' as const, performance: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Night report not signed off: {{ show }}',
+          body: 'The night report for **{{ show }}** is still a draft. Please check who worked and sign it off.',
+        },
+      },
+    }, {
+      id: 'front-of-house.action-overdue',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      link: '/console/front-of-house/incidents',
+      variables: { what: 'text' as const, incident: 'text' as const, due: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Overdue: {{ what }}',
+          body: 'The action "{{ what }}" from {{ incident }} was due on {{ due }} and is still open. Mark it done when it is, or drop it with a reason.',
         },
       },
     }],

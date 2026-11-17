@@ -39,3 +39,20 @@ export const checklistInput = z.object({
     required: z.boolean().optional(),
   }).strict()).max(60), // not-policy: shape bound
 }).strict()
+
+export const personInput = z.object({
+  accountId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  name: z.string().trim().min(1).max(120).nullish(), // not-policy: shape bound, as the table's CHECK
+  contact: z.string().trim().max(200).nullish(), // not-policy: shape bound, as the table's CHECK
+  involvement: z.enum(['affected', 'witness', 'helped', 'other']),
+  isChild: z.boolean().optional(),
+  details: z.string().trim().max(2000).nullish(), // not-policy: shape bound
+}).strict()
+
+// Calls at or after `from` and before `to`, in UTC milliseconds.
+export const hoursQuery = z.object({
+  from: z.coerce.number().int().nonnegative(),
+  to: z.coerce.number().int().positive(),
+  accountId: z.string().min(1).max(40).optional(), // not-policy: shape bound
+  dutyId: z.string().min(1).max(40).optional(), // not-policy: shape bound
+})

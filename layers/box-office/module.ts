@@ -60,6 +60,9 @@ export default defineModule({
     'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
     // The door finds a booking by the buyer's name as well as by its reference.
     'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
+    // Sales reports, by grant on a production for a visiting company's manager.
+    'report.view': ability({ on: 'core.production' }),
+    'report.export': ability({ on: 'core.production', implies: ['report.view'] }),
     // Asking for complimentary tickets names who they are for, by address.
     'comp.request': ability({ on: 'core.performance' }),
     // Approving issues the tickets. Never your own request.
@@ -107,6 +110,7 @@ export default defineModule({
       { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
       { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
+      { id: 'box-office.reports', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/reports/sales', icon: 'i-lucide-chart-column', ability: 'box-office.report.view', order: 38 },
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
       { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
     ],

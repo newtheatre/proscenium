@@ -88,6 +88,8 @@ export default defineModule({
   tasks: {
     // Erases names on list entries once they have been kept long enough after their end (V18).
     'membership.sweep-lists': task({ dailyAt: '03:40' }),
+    // Renewal is open, the last reminder, and lapsed (R8).
+    'membership.send-reminders': task({ dailyAt: '09:00' }),
   },
 
   contributes: {
@@ -98,6 +100,44 @@ export default defineModule({
       { id: 'membership.lists', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/lists', match: '/console/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],
+    // Renewal reminders (R7 to R9): service messages about something the person holds.
+    'core.notification-type': [{
+      id: 'membership.renewal-open',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { scheme: 'text' as const, ends: 'text' as const, link: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You can now renew: {{ scheme }}',
+          body: 'Your membership, **{{ scheme }}**, ends on {{ ends }}. You can renew it now, and the new one starts the day after.\n\n[Renew my membership]({{ link }})',
+        },
+      },
+    }, {
+      id: 'membership.renewal-final',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { scheme: 'text' as const, ends: 'text' as const, link: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your membership ends soon: {{ scheme }}',
+          body: 'Your membership, **{{ scheme }}**, ends on {{ ends }}. Renew it to keep it going without a gap.\n\n[Renew my membership]({{ link }})',
+        },
+      },
+    }, {
+      id: 'membership.lapsed',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { scheme: 'text' as const, ends: 'text' as const, link: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your membership has ended: {{ scheme }}',
+          body: 'Your membership, **{{ scheme }}**, ended on {{ ends }}. You can join again at any time.\n\n[See memberships]({{ link }})',
+        },
+      },
+    }],
     // On the audience side, so anyone can find how to join.
     'core.requirement': [{ id: 'membership', file: 'membership' }],
     'core.account-section': [
