@@ -25,6 +25,8 @@ export default defineModule({
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     // How long after curtain the desk may still sell, for latecomers.
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
+    // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com").
+    'sales.desk-email-domains': setting.list({ default: ['gmail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'icloud.com', 'yahoo.com', 'yahoo.co.uk', 'live.co.uk', 'btinternet.com'], of: 'text', maxLength: 253, change, audience: 'staff' }),
     // Show "N seats left" only at or under this many; 0 never shows it.
     'availability.show-remaining-under': setting.integer({ default: 20, min: 0, max: 1000, change, audience: 'public' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),

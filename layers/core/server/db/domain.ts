@@ -77,12 +77,31 @@ export const vocabularies = defineTable('core_vocabularies', {
   ordering: col.internal(text('ordering').notNull().default('manual')),
   locked: col.internal(integer('locked', { mode: 'boolean' }).notNull().default(false)),
   termClass: col.internal(text('term_class').notNull().default('public')),
+  // A grouped vocabulary keeps its terms under headings, and every live term needs one.
+  grouped: col.internal(integer('grouped', { mode: 'boolean' }).notNull().default(false)),
 }, {
   realm: 'operational',
   subject: 'none',
   extra: t => [
     check('core_vocabularies_ordering', sql`${t.ordering} IN ('manual', 'alphabetical')`),
     check('core_vocabularies_term_class', sql`${t.termClass} IN ('public', 'internal')`),
+  ],
+})
+
+/** A heading within a grouped vocabulary. One level deep; a heading with live terms cannot be removed. */
+export const termGroups = defineTable('core_term_groups', {
+  id: col.id(),
+  vocabularyKey: col.internal(text('vocabulary_key').notNull().references(() => vocabularies.key, { onDelete: 'restrict' })),
+  label: col.public(text('label').notNull()),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  id: 'tgr',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_term_groups_label').on(t.vocabularyKey, sql`lower(${t.label})`),
+    index('core_term_groups_order').on(t.vocabularyKey, t.sort),
+    check('core_term_groups_label_length', sql`length(${t.label}) BETWEEN 1 AND 80`),
   ],
 })
 
@@ -103,6 +122,8 @@ export const terms = defineTable('core_terms', {
   seeded: col.internal(integer('seeded', { mode: 'boolean' }).notNull().default(false)),
   retiredAt: col.timestamp('retired_at'),
   mergedIntoId: col.ref('core_terms', { nullable: true }),
+  // The heading a term sits under, in a grouped vocabulary.
+  groupId: col.internal(text('group_id').references(() => termGroups.id, { onDelete: 'restrict' })),
   createdAt: col.createdAt(),
 }, {
   id: 'trm',
@@ -113,6 +134,7 @@ export const terms = defineTable('core_terms', {
     // Two live terms in one vocabulary cannot share a label, ignoring case; a retired one can.
     uniqueIndex('core_terms_live_label').on(t.vocabularyKey, sql`lower(${t.label})`).where(sql`${t.retiredAt} IS NULL`),
     index('core_terms_order').on(t.vocabularyKey, t.sort),
+    index('core_terms_group').on(t.groupId),
     check('core_terms_label_length', sql`length(${t.label}) BETWEEN 1 AND 80`),
     check('core_terms_description_length', sql`${t.description} IS NULL OR length(${t.description}) <= 300`),
   ],
@@ -288,7 +310,10 @@ export const productions = defineTable('core_productions', {
   categoryTermId: col.ref('core_terms', { nullable: true }),
   seasonId: col.public(text('season_id').references(() => seasons.id, { onDelete: 'set null' })),
   companyName: col.public(text('company_name')),
-  ageGuidance: col.public(text('age_guidance')),
+  // Who it is for: a minimum age, as a recommendation or, when age_restricted, as a rule.
+  ageMin: col.public(integer('age_min')),
+  ageRestricted: col.public(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  effectsConfirmedNone: col.public(integer('effects_confirmed_none', { mode: 'boolean' }).notNull().default(false)),
   advisoriesConfirmedNone: col.public(integer('advisories_confirmed_none', { mode: 'boolean' }).notNull().default(false)),
   contentNote: col.public(text('content_note')),
   runningMinutes: col.public(integer('running_minutes')),
@@ -316,7 +341,8 @@ export const productions = defineTable('core_productions', {
     check('core_productions_kind', sql`${t.kind} IN ('own', 'visiting', 'hire', 'event')`),
     check('core_productions_title', sql`length(${t.title}) BETWEEN 1 AND 200`),
     check('core_productions_summary', sql`${t.summary} IS NULL OR length(${t.summary}) <= 300`),
-    check('core_productions_age', sql`${t.ageGuidance} IS NULL OR length(${t.ageGuidance}) <= 40`),
+    check('core_productions_age_min', sql`${t.ageMin} IS NULL OR ${t.ageMin} BETWEEN 0 AND 21`),
+    check('core_productions_age_restricted', sql`${t.ageRestricted} = 0 OR ${t.ageMin} IS NOT NULL`),
     check('core_productions_running', sql`${t.runningMinutes} IS NULL OR ${t.runningMinutes} > 0`),
     check('core_productions_intervals', sql`${t.intervalCount} >= 0`),
     check('core_productions_booking_url', sql`${t.externalBookingUrl} IS NULL OR ${t.externalBookingUrl} LIKE 'https://_%'`),
@@ -331,18 +357,38 @@ export const productionSlugs = defineTable('core_production_slugs', {
   retiredAt: col.internal(integer('retired_at').notNull()),
 }, { realm: 'operational', subject: 'none', appendOnly: true })
 
-/** The advisories a production carries, from the core.advisory vocabulary, each with a short detail. */
+/**
+ * The content warnings a production carries, from the core.advisory vocabulary: a level (how much
+ * of the topic the show holds) and a short detail. Their order is derived, never stored.
+ */
 export const productionAdvisories = defineTable('core_production_advisories', {
   productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
   termId: col.ref('core_terms'),
+  level: col.public(text('level').notNull()),
+  // Set only by the migration for a row that had no level: the page shows no level word until a person grades it.
+  levelAssumed: col.internal(integer('level_assumed', { mode: 'boolean' }).notNull().default(false)),
   detail: col.public(text('detail')),
-  sort: col.internal(integer('sort').notNull().default(0)),
 }, {
   realm: 'operational',
   subject: 'none',
   extra: t => [
     primaryKey({ columns: [t.productionId, t.termId] }),
     check('core_production_advisories_detail', sql`${t.detail} IS NULL OR length(${t.detail}) <= 300`),
+    check('core_production_advisories_level', sql`${t.level} IN ('mentioned', 'discussed', 'depicted')`),
+  ],
+})
+
+/** The staging effects a production uses (strobe, haze, loud noises), from core.staging-effect. Ungraded, always shown. */
+export const productionEffects = defineTable('core_production_effects', {
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  termId: col.ref('core_terms'),
+  detail: col.public(text('detail')),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.productionId, t.termId] }),
+    check('core_production_effects_detail', sql`${t.detail} IS NULL OR length(${t.detail}) <= 300`),
   ],
 })
 
@@ -685,4 +731,4 @@ export const webhookDeliveries = defineTable('core_webhook_deliveries', {
   ],
 })
 
-export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

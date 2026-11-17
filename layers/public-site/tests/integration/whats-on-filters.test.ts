@@ -58,7 +58,7 @@ async function season(name: string, state: 'draft' | 'published'): Promise<{ id:
 async function show(title: string, options: { category?: string, seasonId?: string } = {}): Promise<string> {
   const { body } = await req('POST', '/api/core/productions', { title, kind: 'own' })
   await req('PATCH', `/api/core/productions/${body.id}`, {
-    summary: 'A show.', categoryTermId: await term('core.production-category', options.category ?? 'play'), advisoriesConfirmedNone: true, seasonId: options.seasonId ?? null,
+    summary: 'A show.', categoryTermId: await term('core.production-category', options.category ?? 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, seasonId: options.seasonId ?? null,
   })
   expect((await req('POST', `/api/core/productions/${body.id}/publish`, {})).status).toBe(200)
   return body.id

@@ -1,0 +1,1 @@
+ALTER TABLE `box_office_ticket_types` ADD `channel` text DEFAULT 'all' NOT NULL;

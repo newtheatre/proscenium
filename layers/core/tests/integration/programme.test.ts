@@ -1,5 +1,5 @@
 // Part 3's season and production moves, C-01 to C-03 and the slug rule: publishing needs a summary,
-// a category and an answer on advisories; an old web address redirects for ever and is never given
+// a category and an answer on staging effects and on content warnings; an old web address redirects for ever and is never given
 // to another production; a published production announces changes to public fields only.
 import { beforeEach, describe, expect, it } from 'vitest'
 import listSeasons from '../../server/api/core/seasons/index.get'
@@ -12,6 +12,7 @@ import createProduction from '../../server/api/core/productions/index.post'
 import getProduction from '../../server/api/core/productions/[id]/index.get'
 import patchProduction from '../../server/api/core/productions/[id]/index.patch'
 import setAdvisories from '../../server/api/core/productions/[id]/advisories.put'
+import setEffects from '../../server/api/core/productions/[id]/effects.put'
 import publish from '../../server/api/core/productions/[id]/publish.post'
 import withdraw from '../../server/api/core/productions/[id]/withdraw.post'
 import deleteProduction from '../../server/api/core/productions/[id]/index.delete'
@@ -30,6 +31,7 @@ const handle = server({
   'GET /api/core/productions/:id': getProduction,
   'PATCH /api/core/productions/:id': patchProduction,
   'PUT /api/core/productions/:id/advisories': setAdvisories,
+  'PUT /api/core/productions/:id/effects': setEffects,
   'POST /api/core/productions/:id/publish': publish,
   'POST /api/core/productions/:id/withdraw': withdraw,
   'DELETE /api/core/productions/:id': deleteProduction,
@@ -57,7 +59,7 @@ async function term(vocabulary: string, slug: string): Promise<string> {
   return (await rows<{ id: string }>('SELECT id FROM core_terms WHERE vocabulary_key = ? AND slug = ?', vocabulary, slug))[0]!.id
 }
 async function ready(id: string) {
-  await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play about a play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true })
+  await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play about a play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true })
 }
 
 beforeEach(() => {
@@ -108,22 +110,27 @@ describe('productions', () => {
     expect((await req('POST', `/api/core/productions/${id}/publish`, {}, lead)).status).toBe(403)
   })
 
-  it('publish only with a summary, a category and an answer on advisories', async () => {
+  it('publish only with a summary, a category and an answer on staging effects and content warnings', async () => {
     const id = await production()
     const refused = await req('POST', `/api/core/productions/${id}/publish`)
     expect(refused.status).toBe(422)
-    expect(refused.body.reason).toBe('To publish, the production needs a summary, a category, its advisories, or confirmation that it has none.')
-    expect((await read(id)).needs).toEqual(['a summary', 'a category', 'its advisories, or confirmation that it has none'])
+    expect(refused.body.reason).toBe('To publish, the production needs a summary, a category, its staging effects, or confirmation that it has none, its content warnings, or confirmation that it has none.')
+    expect((await read(id)).needs).toEqual(['a summary', 'a category', 'its staging effects, or confirmation that it has none', 'its content warnings, or confirmation that it has none'])
 
     await req('PATCH', `/api/core/productions/${id}`, { summary: 'Short.', categoryTermId: await term('core.production-category', 'comedy') })
     const strobe = await term('core.advisory', (await rows<{ slug: string }>("SELECT slug FROM core_terms WHERE vocabulary_key = 'core.advisory' LIMIT 1"))[0]!.slug)
-    expect((await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [{ termId: strobe, detail: 'In act two' }] })).status).toBe(200)
+    expect((await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [{ termId: strobe, level: 'discussed', detail: 'In act two' }] })).status).toBe(200)
+    // Content warnings alone are half the answer: the effects still need listing or confirming as none.
+    expect((await req('POST', `/api/core/productions/${id}/publish`)).body.reason).toBe('To publish, the production needs its staging effects, or confirmation that it has none.')
+    await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: true })
     expect((await req('POST', `/api/core/productions/${id}/publish`)).status).toBe(200)
     expect((await read(id)).production).toMatchObject({ state: 'published' })
     expect(await rows('SELECT name FROM core_events WHERE name = ? AND record_id = ?', 'core.production.published', id)).toHaveLength(1)
 
     // Once published, it cannot be left without an answer on advisories, a summary or a category.
     expect((await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [] })).body.code).toBe('core.production.advisories-needed')
+    expect((await req('PUT', `/api/core/productions/${id}/effects`, { effects: [] })).status).toBe(200)
+    expect((await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: false })).body.code).toBe('core.production.effects-needed')
     expect((await req('PATCH', `/api/core/productions/${id}`, { summary: null })).body.code).toBe('core.production.needed-to-publish')
   })
 

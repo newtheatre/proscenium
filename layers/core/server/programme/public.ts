@@ -6,12 +6,17 @@
 import { all, first, nowMs, theatreTimeZone, useSetting } from '#kit'
 import { instantOfLocal, localDateOf } from '#kit/clock'
 import { productionBySlug } from './service'
+import { ageWording, guidanceFor, type GuidanceEffect, type GuidanceWarning } from './guidance'
 import { shownCredits, type ShownCredit } from './credits'
-import { bookingActions, type ShownBooking } from './booking'
+import { bookingActions, priceSummaries, type ShownBooking } from './booking'
+import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
 
 export interface PublicTerm { id: string, slug: string, label: string }
 export interface PublicNote { termId: string, label: string, detail: string | null }
+/** A content warning as the page shows it. A null level is a row nobody has graded yet: no level word. */
+export type PublicWarning = Pick<GuidanceWarning, 'termId' | 'label' | 'description' | 'heading' | 'level' | 'detail'>
+export type PublicEffect = Pick<GuidanceEffect, 'termId' | 'label' | 'description' | 'icon' | 'detail'>
 
 export interface PublicPerformance {
   id: string
@@ -37,8 +42,15 @@ export interface PublicProduction {
   category: PublicTerm | null
   season: { id: string, slug: string, name: string } | null
   companyName: string | null
+  /** The age in words, as a recommendation or a rule; null where none is set. */
   ageGuidance: string | null
-  advisories: PublicNote[]
+  ageMin: number | null
+  ageRestricted: boolean
+  /** Staging effects: always shown, never behind a control. */
+  effects: PublicEffect[]
+  effectsConfirmedNone: boolean
+  /** Content warnings in their derived order, most serious first. */
+  advisories: PublicWarning[]
   advisoriesConfirmedNone: boolean
   contentNote: string | null
   runningMinutes: number | null
@@ -50,6 +62,8 @@ export interface PublicProduction {
   poster: PublicImage | null
   photos: PublicImage[]
   performances: PublicPerformance[]
+  /** What it is sold at, while it has dates to come; null where nothing prices it. */
+  price: PriceSummary | null
 }
 
 export interface PublicProductionOptions {
@@ -74,7 +88,9 @@ interface ProductionRow {
   season_slug: string | null
   season_name: string | null
   company_name: string | null
-  age_guidance: string | null
+  age_min: number | null
+  age_restricted: number
+  effects_confirmed_none: number
   advisories_confirmed_none: number
   content_note: string | null
   running_minutes: number | null
@@ -103,7 +119,7 @@ interface PerformanceRow {
 const PRODUCTION = `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.description,
     c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
     s.id AS season_id, s.slug AS season_slug, s.name AS season_name,
-    p.company_name, p.age_guidance, p.advisories_confirmed_none, p.content_note, p.running_minutes, p.interval_count,
+    p.company_name, p.age_min, p.age_restricted, p.effects_confirmed_none, p.advisories_confirmed_none, p.content_note, p.running_minutes, p.interval_count,
     p.external_booking_url, p.state
   FROM core_productions p
   LEFT JOIN core_terms c ON c.id = p.category_term_id
@@ -122,10 +138,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
   if (found.moved) return { moved: found.slug }
   const now = options.now ?? nowMs()
   const performances = await publicPerformances([row], now, options.cancelledVisible ?? true)
-  const advisories = await all<{ term_id: string, label: string, detail: string | null }>(
-    'SELECT a.term_id, t.label, a.detail FROM core_production_advisories a JOIN core_terms t ON t.id = a.term_id WHERE a.production_id = ? ORDER BY a.sort',
-    row.id,
-  )
+  const guidance = (await guidanceFor(row.id))!
   return {
     id: row.id,
     slug: row.slug,
@@ -136,8 +149,12 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     category: row.category_id ? { id: row.category_id, slug: row.category_slug!, label: row.category_label! } : null,
     season: row.season_id ? { id: row.season_id, slug: row.season_slug!, name: row.season_name! } : null,
     companyName: row.company_name,
-    ageGuidance: row.age_guidance,
-    advisories: advisories.map(a => ({ termId: a.term_id, label: a.label, detail: a.detail })),
+    ageGuidance: ageWording(row.age_min, !!row.age_restricted),
+    ageMin: row.age_min,
+    ageRestricted: !!row.age_restricted,
+    effects: guidance.effects,
+    effectsConfirmedNone: !!row.effects_confirmed_none,
+    advisories: guidance.warnings.map(({ termId, label, description, heading, level, detail }) => ({ termId, label, description, heading, level, detail })),
     advisoriesConfirmedNone: !!row.advisories_confirmed_none,
     contentNote: row.content_note,
     runningMinutes: row.running_minutes,
@@ -147,6 +164,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     credits: await shownCredits(row.id, options.members ?? false),
     ...(await publicImages([row.id])).get(row.id)!,
     performances,
+    price: isPast(row.state, performances, now) ? null : (await priceSummaries([row.id]))[row.id] ?? null,
   }
 }
 
@@ -163,6 +181,8 @@ export interface PublicListing {
   lastEndsAt: number
   venues: string[]
   poster: PublicImage | null
+  /** What it is sold at, from Box office, or null where nothing prices it. */
+  price: PriceSummary | null
 }
 
 export interface WhatsOnOptions {
@@ -225,7 +245,7 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
       ORDER BY next_starts_at, p.id${limit}`,
     ...params,
   )
-  const images = await publicImages(rows.map(r => r.id))
+  const [images, prices] = await Promise.all([publicImages(rows.map(r => r.id)), priceSummaries(rows.map(r => r.id))])
   return rows.map(r => ({
     id: r.id,
     slug: r.slug,
@@ -237,6 +257,7 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
     lastEndsAt: r.last_ends_at,
     venues: (JSON.parse(r.venues) as string[]).sort(),
     poster: images.get(r.id)!.poster,
+    price: prices[r.id] ?? null,
   }))
 }
 
