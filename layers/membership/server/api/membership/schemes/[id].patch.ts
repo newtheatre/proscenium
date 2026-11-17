@@ -3,6 +3,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { getList } from '../../../lists'
+import { charger } from '../../../charge'
 import { checkLengthRule, hasMemberships, requireScheme, schemeFields, verifierConfig } from '../../../schemes'
 
 const COLUMN: Record<string, string> = {
@@ -10,6 +11,11 @@ const COLUMN: Record<string, string> = {
   fixedEndDay: 'fixed_end_day', rolloverDays: 'rollover_days', renewalOpensDays: 'renewal_opens_days', graceDays: 'grace_days',
   reverifyOnRenewal: 'reverify_on_renewal', needsApproval: 'needs_approval', requiresPayment: 'requires_payment', voting: 'voting',
   acceptsReference: 'accepts_reference', holderMayEnd: 'holder_may_end', verifier: 'verifier',
+}
+
+// A fee can only be asked for while Membership fees is on to collect it.
+function refuseFeesOff(): never {
+  return refuse('membership.scheme.fees-off', 'A fee can only be collected while the Membership fees module is on.', { status: 409, remedy: 'Switch Membership fees on in Admin > Modules first.', fields: { requiresPayment: 'membership.scheme.fees-off' } })
 }
 
 export default defineRoute({
@@ -23,6 +29,7 @@ export default defineRoute({
     refuse('membership.scheme.key-fixed', 'The address cannot change once the scheme has been opened, because people may have it saved.', { status: 409, fields: { key: 'membership.scheme.key-fixed' } })
   if (input.side !== undefined && input.side !== scheme.side && await hasMemberships(scheme.id))
     refuse('membership.scheme.side-fixed', 'The side cannot change once anybody has held this scheme: it would give or take away the members\' area for all of them.', { status: 409, remedy: 'Close this scheme and open another on the other side.', fields: { side: 'membership.scheme.side-fixed' } })
+  if (input.requiresPayment && !scheme.requiresPayment && !(await charger())) refuseFeesOff()
   const merged = { ...scheme, ...input }
   if (input.lengthRule !== undefined || input.fixedEndMonth !== undefined || input.fixedEndDay !== undefined) checkLengthRule(merged)
   // The verifier's configuration: the list it checks against, or the domains that pass.

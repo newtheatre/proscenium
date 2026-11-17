@@ -9,11 +9,12 @@ import AxeBuilder from '@axe-core/playwright'
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
 const owner = person('acc_bookowner', 'Book Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage', 'core.vocabulary.manage'])
-const manager = person('acc_bookmanager', 'Book Manager', ['core.production.create', 'core.production.edit', 'core.production.publish', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
+const manager = person('acc_bookmanager', 'Book Manager', ['core.production.create', 'core.production.edit', 'core.production.publish', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.promo.manage', 'payments.provider.manage'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
 const title = `The Booking Show ${stamp}`
 let performanceId = ''
+const promoCode = `FRIENDS${stamp}`
 
 async function post(api: APIRequestContext, path: string, data: unknown, method: 'post' | 'patch' = 'post') {
   const response = await api[method](path, { data, headers: { 'idempotency-key': crypto.randomUUID() } })
@@ -49,6 +50,7 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, '/api/payments/providers', { provider: 'cash', label: `Box office cash ${stamp}`, channels: ['desk'], mode: 'live' })
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await post(api, `/api/core/productions/${production.id}/publish`, {})
+  await post(api, '/api/box-office/promo-codes', { code: promoCode, effect: 'percent_off', value: 2000, maxPerOrder: 1 })
   await api.dispose()
 })
 
@@ -154,4 +156,21 @@ test('a buyer cancels paid tickets from their link when the theatre allows it, a
   expect(asked).toEqual({ lineIds: ['orl_e2e1'] })
   await expect(dialog).toBeHidden()
   await noViolations(page)
+})
+
+test('a buyer types a promo code, sees the saving on one ticket, and holds at that price', async ({ page }) => {
+  await visit(page, `/book/a/${performanceId}`)
+  await page.getByLabel('Promo code').fill('nosuchcode')
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await expect(page.getByText('We do not recognise that code.')).toBeVisible()
+  await page.getByLabel('Promo code').fill(promoCode.toLowerCase())
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await expect(page.getByText(`${promoCode} applied. The prices above include it.`)).toBeVisible()
+  await noViolations(page)
+  // The code is for one ticket an order: the second is at the full price.
+  await page.getByRole('button', { name: 'Increment' }).click()
+  await page.getByRole('button', { name: 'Increment' }).click()
+  await page.getByRole('button', { name: 'Hold 2 tickets, £18.00' }).click()
+  await expect(page).toHaveURL(/\/book\/basket$/)
+  await expect(page.getByRole('button', { name: 'Reserve and pay £18.00 at the box office' })).toBeVisible()
 })

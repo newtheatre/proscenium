@@ -25,6 +25,8 @@ export default defineRoute({
     lists: await all<{ id: string, name: string }>('SELECT id, name FROM membership_verification_lists ORDER BY name'),
     // Whether a fee is collected through the system, so adding a member asks how it is settled (P9).
     feesOn: scheme.requiresPayment && !!(await charger()),
+    // Whether Membership fees is on at all: while it is off, a fee cannot be asked for.
+    feesModuleOn: !!(await charger()),
     // Whether this viewer may import members from a file (MEM-49).
     canImport: (await can(actor, 'membership.membership.import', ['membership.scheme', scheme.id])).allowed,
   }

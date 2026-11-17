@@ -1,6 +1,10 @@
-<!-- One verification list (MEM-20, MEM-57; V18, V19): load a file into it, add or remove one entry,
-     check one reference, and change its details. Nothing here shows the list itself. -->
+<!-- One verification list (MEM-20, MEM-57; V18, V19). A strip of facts says what it holds; Load file
+     and Add entry sit at the top and open a window each, with Remove an entry and Delete in the
+     menu; the page itself checks one entry and keeps the list's details. Nothing here shows the
+     list itself. -->
 <script setup lang="ts">
+import { z } from 'zod'
+
 interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
 interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null, referenceLabel: string | null, referenceShape: Shape | null, uploadedAt: number }
 interface Detail { list: List, schemes: { id: string, name: string }[] }
@@ -20,7 +24,9 @@ const list = computed(() => data.value?.list)
 const base = computed(() => `/api/membership/lists/${id.value}`)
 const valueLabel = computed(() => t(`membership.screens.list.value-${list.value?.keyKind ?? 'reference'}`))
 
-// Loading a file: read in the browser, tried first, then loaded once the officer has seen the outcome.
+// Loading a file, in a window: read in the browser, tried first, then loaded once the officer has
+// seen the outcome.
+const loading = ref(false)
 const file = ref<File | null>(null)
 const preview = ref<Loaded | null>(null)
 const loadRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -42,32 +48,47 @@ async function load() {
   if (!done) return
   toast.add({ title: t('membership.screens.list.loaded', { count: done.loaded }), color: 'success' })
   file.value = null
+  loading.value = false
   await refresh()
 }
 
-// One entry by hand.
+// One entry by hand, added or removed in a window.
+const adding = ref(false)
 const entry = reactive({ value: '', endsOn: '', name: '' })
+const entrySchema = z.object({ value: z.string().trim().min(1).max(254) }) // not-policy: the route's bounds
+function openAdd() {
+  Object.assign(entry, { value: '', endsOn: '', name: '' })
+  entryRefusal.value = null
+  adding.value = true
+}
 const entryRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function addEntry() {
   entryRefusal.value = null
   try {
     await $api(`${base.value}/entries` as string, { method: 'POST', body: { value: entry.value, endsOn: entry.endsOn || null, name: entry.name.trim() || null } })
     toast.add({ title: t('membership.screens.list.entry-added'), color: 'success' })
-    Object.assign(entry, { value: '', endsOn: '', name: '' })
+    adding.value = false
     await refresh()
   }
   catch (e) {
     entryRefusal.value = toRefusal(e)
   }
 }
+const removingOpen = ref(false)
 const removing = ref('')
+const removeSchema = z.object({ removing: z.string().trim().min(1).max(254) }) // not-policy: the route's bounds
+function openRemove() {
+  removing.value = ''
+  removeRefusal.value = null
+  removingOpen.value = true
+}
 const removeRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function removeEntry() {
   removeRefusal.value = null
   try {
     await $api(`${base.value}/entries/remove` as string, { method: 'POST', body: { value: removing.value } })
     toast.add({ title: t('membership.screens.list.entry-removed'), color: 'success' })
-    removing.value = ''
+    removingOpen.value = false
     await refresh()
   }
   catch (e) {
@@ -78,6 +99,7 @@ async function removeEntry() {
 // Checking one value: whether it is on the list, until when, and whose it is.
 const checking = ref('')
 const checked = ref<Checked | null>(null)
+const checkSchema = z.object({ checking: z.string().trim().min(1).max(254) }) // not-policy: the route's bounds
 async function check() {
   checked.value = await $api<Checked>(`${base.value}/check` as string, { method: 'POST', body: { value: checking.value } })
 }
@@ -116,21 +138,49 @@ async function remove() {
     toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })
   }
 }
-const actions = computed(() => [{ label: t('membership.screens.list.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove }])
+const actions = computed(() => [
+  [{ label: t('membership.screens.list.remove-entry'), icon: 'i-lucide-user-minus', onSelect: openRemove }],
+  [{ label: t('membership.screens.list.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove }],
+])
+// What the list holds, at a glance.
+const facts = computed(() => {
+  const l = list.value
+  if (!l) return []
+  return [
+    { label: t('membership.screens.list.fact-holds'), value: t(`membership.screens.lists.kinds.${l.keyKind}`) },
+    { label: t('membership.screens.list.fact-entries'), value: String(l.entryCount) },
+    ...(l.validUntil ? [{ label: t('membership.screens.list.valid-until'), value: day(l.validUntil) }] : []),
+    { label: t('membership.screens.list.fact-loaded'), value: l.uploadedAt ? day(new Date(l.uploadedAt)) : t('membership.screens.list.fact-never') },
+    { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme') },
+  ]
+})
 </script>
 
 <template>
   <PageFrame
     :title="list?.name ?? t('membership.navigation.lists.label')"
-    :description="list ? `${t(`membership.screens.lists.kinds.${list.keyKind}`)} · ${t('membership.screens.lists.entries', { count: list.entryCount })}` : undefined"
+    width="reading"
   >
     <template
       v-if="list"
       #primary
     >
+      <UButton
+        icon="i-lucide-plus"
+        color="neutral"
+        variant="outline"
+        :label="t('membership.screens.list.add-entry')"
+        @click="openAdd"
+      />
+      <UButton
+        icon="i-lucide-upload"
+        :label="t('membership.screens.list.load')"
+        @click="loading = true"
+      />
       <RowActions
         :items="actions"
         :label="t('membership.screens.list.actions', { list: list.name })"
+        variant="outline"
       />
     </template>
     <DataBoundary
@@ -143,173 +193,48 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
         v-if="data && list"
         class="space-y-6"
       >
-        <UAlert
-          v-if="list.validUntil"
-          color="neutral"
-          variant="subtle"
-          icon="i-lucide-calendar-x"
-          :title="t('membership.screens.lists.valid-until', { date: day(list.validUntil) })"
-        />
-
-        <PageSection
-          :title="t('membership.screens.list.load')"
-          :description="t(`membership.screens.list.load-help-${list.keyKind}`)"
-        >
-          <div class="space-y-4">
-            <RefusalNotice :refusal="loadRefusal" />
-            <UFileUpload
-              v-model="file"
-              accept=".csv,text/csv,text/plain"
-              :label="t('membership.screens.list.file')"
-              :description="t('membership.screens.list.file-help')"
-              class="w-full"
-            />
-            <UAlert
-              v-if="preview"
-              :color="preview.refused.length ? 'warning' : 'success'"
-              variant="subtle"
-              :title="t('membership.screens.list.would-load', { count: preview.wouldLoad ?? 0 })"
-            >
-              <template
-                v-if="preview.refused.length"
-                #description
-              >
-                <p>{{ t('membership.screens.list.refused', { count: preview.refused.length }) }}</p>
-                <ul class="list-disc ps-5">
-                  <li
-                    v-for="r in preview.refused.slice(0, 10)"
-                    :key="r.line"
-                  >
-                    {{ t('membership.screens.list.refused-line', { line: r.line, reason: t(`membership.screens.list.reasons.${r.reason}`) }) }}
-                  </li>
-                </ul>
-              </template>
-            </UAlert>
-          </div>
-          <template #footer>
-            <UButton
-              icon="i-lucide-upload"
-              loading-auto
-              :disabled="!preview?.wouldLoad"
-              :label="t('membership.screens.list.load-button')"
-              @click="load"
-            />
-          </template>
-        </PageSection>
+        <FactStrip :facts="facts" />
 
         <PageSection
           :title="t('membership.screens.list.check')"
-          :description="t('membership.screens.list.check-help')"
+          :description="t(`membership.screens.list.check-help-${list.keyKind}`)"
         >
           <UForm
             :state="{ checking }"
-            class="flex flex-wrap items-end gap-3"
+            :schema="checkSchema"
             novalidate
             @submit="check"
           >
-            <UFormField :label="valueLabel">
-              <UInput
-                v-model="checking"
-                maxlength="254"
-                autocomplete="off"
-              />
+            <UFormField
+              name="checking"
+              :label="valueLabel"
+            >
+              <UFieldGroup class="w-full">
+                <UInput
+                  v-model="checking"
+                  maxlength="254"
+                  autocomplete="off"
+                  class="flex-1"
+                />
+                <UButton
+                  type="submit"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-search"
+                  loading-auto
+                  :label="t('membership.screens.list.check-button')"
+                />
+              </UFieldGroup>
             </UFormField>
-            <UButton
-              type="submit"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-search"
-              loading-auto
-              :disabled="!checking.trim()"
-              :label="t('membership.screens.list.check-button')"
-            />
           </UForm>
           <UAlert
             v-if="checked"
-            class="mt-4"
             :color="checked.found && checked.current ? 'success' : 'neutral'"
             variant="subtle"
+            :icon="checked.found && checked.current ? 'i-lucide-circle-check' : 'i-lucide-circle-x'"
             :title="!checked.found ? t('membership.screens.list.not-on') : checked.current ? t('membership.screens.list.on') : t('membership.screens.list.on-ended')"
             :description="checked.found ? [checked.name ? t('membership.screens.list.name-is', { name: checked.name }) : t('membership.screens.list.no-name'), checked.endsOn ? t('membership.screens.list.ends', { date: day(checked.endsOn) }) : '', checked.claimed ? t('membership.screens.list.claimed') : ''].filter(Boolean).join(' ') : undefined"
           />
-        </PageSection>
-
-        <PageSection
-          :title="t('membership.screens.list.by-hand')"
-          :description="t('membership.screens.list.by-hand-help')"
-        >
-          <div class="space-y-6">
-            <UForm
-              :state="entry"
-              class="space-y-4"
-              novalidate
-              @submit="addEntry"
-            >
-              <RefusalNotice :refusal="entryRefusal" />
-              <div class="grid gap-4 sm:grid-cols-3">
-                <UFormField
-                  :label="valueLabel"
-                  required
-                >
-                  <UInput
-                    v-model="entry.value"
-                    maxlength="254"
-                    autocomplete="off"
-                  />
-                </UFormField>
-                <UFormField
-                  :label="t('membership.screens.list.ends-on')"
-                  :help="t('membership.screens.list.ends-on-help')"
-                >
-                  <FieldDate v-model="entry.endsOn" />
-                </UFormField>
-                <UFormField
-                  :label="t('membership.screens.list.holder-name')"
-                  :help="t('membership.screens.list.holder-name-help')"
-                >
-                  <UInput
-                    v-model="entry.name"
-                    maxlength="120"
-                  />
-                </UFormField>
-              </div>
-              <UButton
-                type="submit"
-                icon="i-lucide-plus"
-                color="neutral"
-                variant="outline"
-                loading-auto
-                :disabled="!entry.value.trim()"
-                :label="t('membership.screens.list.add-entry')"
-              />
-            </UForm>
-            <UForm
-              :state="{ removing }"
-              class="flex flex-wrap items-end gap-3"
-              novalidate
-              @submit="removeEntry"
-            >
-              <UFormField
-                :label="t('membership.screens.list.remove-value', { value: valueLabel })"
-                :error="removeRefusal?.reason"
-              >
-                <UInput
-                  v-model="removing"
-                  maxlength="254"
-                  autocomplete="off"
-                />
-              </UFormField>
-              <UButton
-                type="submit"
-                icon="i-lucide-minus"
-                color="neutral"
-                variant="outline"
-                loading-auto
-                :disabled="!removing.trim()"
-                :label="t('membership.screens.list.remove-entry')"
-              />
-            </UForm>
-          </div>
         </PageSection>
 
         <PageSection :title="t('membership.screens.list.details')">
@@ -346,12 +271,6 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
               v-model:max="details.max"
               :label-error="detailsRefusal?.fields?.referenceLabel ? detailsRefusal.reason : undefined"
             />
-            <p
-              v-if="data.schemes.length"
-              class="text-sm text-muted"
-            >
-              {{ t('membership.screens.list.used-by', { schemes: data.schemes.map(s => s.name).join(', ') }) }}
-            </p>
           </UForm>
           <template #footer>
             <UButton
@@ -364,5 +283,148 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
         </PageSection>
       </div>
     </DataBoundary>
+
+    <UModal
+      v-model:open="loading"
+      :title="t('membership.screens.list.load')"
+      :description="list ? t(`membership.screens.list.load-help-${list.keyKind}`) : undefined"
+      @after:leave="file = null"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <RefusalNotice :refusal="loadRefusal" />
+          <UFileUpload
+            v-model="file"
+            accept=".csv,text/csv,text/plain"
+            :label="t('membership.screens.list.file')"
+            :description="t('membership.screens.list.file-help')"
+            class="w-full"
+          />
+          <UAlert
+            v-if="preview"
+            :color="preview.refused.length ? 'warning' : 'success'"
+            variant="subtle"
+            :title="t('membership.screens.list.would-load', { count: preview.wouldLoad ?? 0 })"
+          >
+            <template
+              v-if="preview.refused.length"
+              #description
+            >
+              <p>{{ t('membership.screens.list.refused', { count: preview.refused.length }) }}</p>
+              <ul class="list-disc ps-5">
+                <li
+                  v-for="r in preview.refused.slice(0, 10)"
+                  :key="r.line"
+                >
+                  {{ t('membership.screens.list.refused-line', { line: r.line, reason: t(`membership.screens.list.reasons.${r.reason}`) }) }}
+                </li>
+              </ul>
+            </template>
+          </UAlert>
+        </div>
+      </template>
+      <template #footer>
+        <UButton
+          icon="i-lucide-upload"
+          loading-auto
+          :disabled="!preview?.wouldLoad"
+          :label="t('membership.screens.list.load-button')"
+          @click="load"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="adding"
+      :title="t('membership.screens.list.add-entry')"
+      :description="t('membership.screens.list.add-help')"
+    >
+      <template #body>
+        <UForm
+          id="membership-list-entry"
+          :state="entry"
+          :schema="entrySchema"
+          class="space-y-4"
+          novalidate
+          @submit="addEntry"
+        >
+          <RefusalNotice :refusal="entryRefusal" />
+          <UFormField
+            name="value"
+            :label="valueLabel"
+            required
+          >
+            <UInput
+              v-model="entry.value"
+              maxlength="254"
+              autocomplete="off"
+            />
+          </UFormField>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              :label="t('membership.screens.list.ends-on')"
+              :help="t('membership.screens.list.ends-on-help')"
+            >
+              <FieldDate v-model="entry.endsOn" />
+            </UFormField>
+            <UFormField
+              :label="t('membership.screens.list.holder-name')"
+              :help="t('membership.screens.list.holder-name-help')"
+            >
+              <UInput
+                v-model="entry.name"
+                maxlength="120"
+              />
+            </UFormField>
+          </div>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-list-entry"
+          loading-auto
+          :label="t('membership.screens.list.add-entry')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="removingOpen"
+      :title="t('membership.screens.list.remove-entry')"
+      :description="t('membership.screens.list.remove-help')"
+    >
+      <template #body>
+        <UForm
+          id="membership-list-remove"
+          :state="{ removing }"
+          :schema="removeSchema"
+          novalidate
+          @submit="removeEntry"
+        >
+          <UFormField
+            name="removing"
+            :label="valueLabel"
+            :error="removeRefusal?.reason"
+            required
+          >
+            <UInput
+              v-model="removing"
+              maxlength="254"
+              autocomplete="off"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-list-remove"
+          color="error"
+          loading-auto
+          :label="t('membership.screens.list.remove-entry')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>
