@@ -5,6 +5,7 @@
 // already taken settles here, and one it cannot vouch for is left for the reconcile task.
 import { all, createUnit, externalCall, first, isRefusal, log, Refusal } from '#kit'
 import { addAttempt, recordAnswer, type AttemptRow } from './answers'
+import { paysForSales, testMoneyTakesSales } from './test-money'
 import { getIntent, intentStatus, type IntentStatus } from './intents'
 import { reconcileAttempt } from './tasks/reconcile-attempts'
 import { forProvider, providerAccount, providers } from './providers'
@@ -22,8 +23,8 @@ export interface StartInput {
   returnTo?: string
 }
 
-/** A screen of this site's console a hand-off may return to: a plain path, never another site. */
-export const RETURN_PATH = /^\/console(?:\/[\w-]+)*$/
+/** A screen of this site's console or live mode a hand-off may return to: a plain path, never another site. */
+export const RETURN_PATH = /^\/(?:console|live)(?:\/[\w-]+)*$/
 
 export interface StartResult { attemptId: string, next: NextStep, state: string, settled: boolean, unfulfilled: boolean }
 
@@ -95,10 +96,8 @@ export async function startAttempt(intentId: string, input: StartInput): Promise
   const channels = account ? JSON.parse(account.channels) as string[] : []
   if (!account?.active || !provider?.start || !channels.includes(intent.channel) || !provider.methods.some(m => m.method === input.method && m.channels.includes(intent.channel)))
     throw new Refusal('payments.attempt.method-unavailable', 'That way of paying is not set up here.', { status: 409 })
-  if (account.mode === 'test') {
-    const real = await first<{ n: number }>("SELECT count(*) AS n FROM payments_intent_parts WHERE intent_id = ? AND owner_module <> 'payments'", intent.id)
-    if (real?.n) throw new Refusal('payments.attempt.test-mode', 'This provider account is in test mode, so it cannot take payment for a real sale.', { status: 409 })
-  }
+  if (account.mode === 'test' && !(await testMoneyTakesSales()) && await paysForSales(intent.id))
+    throw new Refusal('payments.attempt.test-mode', 'This provider account is in test mode, so it cannot take payment for a real sale.', { status: 409, remedy: 'Use a live account, or on a test instance turn on "Test accounts take real sales" in the payments settings.' })
   if (input.readerId && !(await first('SELECT 1 FROM payments_readers WHERE id = ? AND provider_account_id = ? AND active = 1', input.readerId, account.id)))
     throw new Refusal('payments.attempt.reader-unavailable', 'That card reader is not paired with this account.', { status: 409 })
   const attempts = await all<AttemptRow>('SELECT * FROM payments_attempts WHERE intent_id = ?', intent.id)

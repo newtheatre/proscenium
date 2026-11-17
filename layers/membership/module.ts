@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, credentialDecl, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, credentialDecl, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -83,6 +83,12 @@ export default defineModule({
   }),
 
   tables,
+
+  points: {
+    // The fee collector (rules S5, P1). The membership-fees module answers it; while nothing does,
+    // a scheme that requires payment cannot be joined online.
+    'membership.charge': point({ kind: 'code', contract: 'charge' }),
+  },
 
   credentials: {
     // The key verification lists are hashed with (V10). Lists cannot be used until it is set. Typed
