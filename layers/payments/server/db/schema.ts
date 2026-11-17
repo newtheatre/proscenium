@@ -38,10 +38,15 @@ export const readers = defineTable('payments_readers', {
   updatedAt: col.updatedAt(),
 }, { id: 'rdr', realm: 'operational', subject: 'none' })
 
-/** One person's turn at a till, from opening to cashing up. */
+/**
+ * One person's turn at a till, from opening to cashing up. The till opens it; point_label is an
+ * optional note beside its place (space_id, a core space; none reads as unknown). closed_how says
+ * whether a person closed it or it closed itself after a quiet spell.
+ */
 export const sessions = defineTable('payments_sessions', {
   id: col.id(),
   pointLabel: col.internal(text('point_label').notNull()),
+  spaceId: col.internal(text('space_id')),
   openedBy: col.account('opened_by', { role: 'subject', onMerge: 'move', reason: 'a person has one open till session, a unique rule on this id' }),
   closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   openedAt: col.timestamp('opened_at').notNull(),
@@ -51,6 +56,7 @@ export const sessions = defineTable('payments_sessions', {
   expectedCashMinor: col.minor('expected_cash_minor'),
   countedCashMinor: col.minor('counted_cash_minor'),
   varianceNote: col.freeText(text('variance_note')),
+  closedHow: col.internal(text('closed_how', { enum: ['hand', 'quiet'] })),
   currency: col.currency('currency').notNull(),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
@@ -58,8 +64,8 @@ export const sessions = defineTable('payments_sessions', {
   id: 'till',
   realm: 'operational',
   extra: t => [
-    // A person has one open session.
-    uniqueIndex('payments_sessions_one_open').on(t.openedBy).where(sql`state <> 'closed'`),
+    // A person has one open session. One awaiting its count does not stop them opening the next.
+    uniqueIndex('payments_sessions_one_open').on(t.openedBy).where(sql`state = 'open'`),
     // The Till sessions list, newest first.
     index('payments_sessions_opened').on(t.openedAt),
     check('payments_sessions_state', sql`${t.state} IN ('open', 'counting', 'closed')`),

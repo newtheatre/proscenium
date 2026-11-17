@@ -16,5 +16,5 @@ export default defineRoute({
   const query = getQuery(event)
   const text = (name: string) => typeof query[name] === 'string' ? query[name] as string : undefined
   const { state, intentId, returnTo } = await handoffReturned(attemptId, getRouterParam(event, 'proof') ?? '', { status: text('smp-status'), txCode: text('smp-tx-code'), foreignTxId: text('foreign-tx-id') })
-  return sendRedirect(event, `${returnTo ?? '/console/payments/session'}?${new URLSearchParams({ attempt: attemptId, intent: intentId, result: state })}`)
+  return sendRedirect(event, `${returnTo ?? '/console/payments/sessions'}?${new URLSearchParams({ attempt: attemptId, intent: intentId, result: state })}`)
 })
