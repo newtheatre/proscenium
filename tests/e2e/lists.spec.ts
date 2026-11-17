@@ -87,6 +87,16 @@ test.describe('a list with views and rows that open', () => {
     await noViolations(page)
   })
 
+  test('a result that matched in a hidden column says which, and words that are too short are said not to be searched', async ({ page }) => {
+    await visit(page, '/console/gallery/shows?view=all&q=studio')
+    await expect(page.getByText('Matches Venue: Studio').first()).toBeVisible()
+    await visit(page, '/console/gallery/shows?view=all&q=ha')
+    await expect(page.getByRole('status').filter({ hasText: 'Nothing was searched' })).toBeVisible()
+    await visit(page, '/console/gallery/shows?view=all&q=ham+of')
+    await expect(page.getByRole('status').filter({ hasText: 'Words under three letters are not searched: of' })).toBeVisible()
+    await noViolations(page)
+  })
+
   test('the server names a key it does not know', async ({ page }) => {
     const response = await page.request.get('/api/gallery/shows?colour=red', { headers: { 'x-test-actor': JSON.stringify(staff) } })
     expect(response.status()).toBe(422)
