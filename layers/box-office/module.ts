@@ -264,6 +264,20 @@ export default defineModule({
         },
       },
     }, {
+      id: 'box-office.order-confirmed-guest',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      lane: 'prompt' as const,
+      // The confirmation for a buyer who has never signed in: the same, with core's link that opens their account.
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, paid: 'text' as const, codes: 'sealed' as const, link: 'sealed' as const, account: 'sealed' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your tickets: {{ show }}, {{ when }}',
+          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nPaid: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
+        },
+      },
+    }, {
       id: 'box-office.order-exchanged',
       category: 'transactional' as const,
       side: 'audience' as const,

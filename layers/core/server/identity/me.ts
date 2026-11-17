@@ -5,6 +5,7 @@ import { accountById, verifiedAddressesOf } from './accounts'
 import { kitGrantsOf } from './grants'
 import type { CurrentSession } from './sessions'
 import { authenticatorOf } from './authenticator'
+import { offeredProviders } from './providers'
 
 // Does the account still have a way in other than its passkeys (ID-14, "the only way in")?
 export async function hasOtherWayIn(accountId: string): Promise<boolean> {
@@ -21,9 +22,9 @@ export async function holdsPrivileged(accountId: string): Promise<boolean> {
 }
 
 // The ways in a signed-out browser is offered. Passkeys are always on.
-export async function signInMethods(): Promise<{ email: boolean, google: boolean }> {
-  const google = !!(await useSetting('core.sign-in.google')) && !!(await useSetting('core.sign-in.google-client-id'))
-  return { email: !!(await useSetting('core.sign-in.email-link')), google }
+// `providers` are the outside providers offered, in order, each with its id (the path segment) and label.
+export async function signInMethods(): Promise<{ email: boolean, providers: { id: string, label: string }[] }> {
+  return { email: !!(await useSetting('core.sign-in.email-link')), providers: await offeredProviders() }
 }
 
 export async function describeMe(session: CurrentSession) {

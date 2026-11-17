@@ -134,6 +134,18 @@ test('the header leads to what is on and to past shows', async ({ page }) => {
   await expect(header.getByRole('link', { name: 'Past shows' }).first()).toHaveAttribute('href', '/shows')
 })
 
+test('the sitemap lists the pages, the show where it lives, the venue and the season; robots.txt points to it', async ({ request }) => {
+  const sitemap = await request.get('/sitemap.xml')
+  expect(sitemap.status()).toBe(200)
+  expect(sitemap.headers()['content-type']).toContain('application/xml')
+  const xml = await sitemap.text()
+  for (const path of ['/', '/whats-on', '/shows', `/whats-on/${slug}`, `/shows/${pastSlug}`, `/venues/${venueSlug}`, `/seasons/${seasonSlug}`])
+    expect(xml).toContain(`<loc>http://localhost:8788${path}</loc>`)
+  const robots = await (await request.get('/robots.txt')).text()
+  expect(robots).toContain('Disallow: /console')
+  expect(robots).toContain('Sitemap: http://localhost:8788/sitemap.xml')
+})
+
 test('what\'s on works with scripts off', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false })
   const page = await context.newPage()
