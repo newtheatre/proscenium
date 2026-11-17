@@ -3,7 +3,8 @@
      that can be read at arm's length: green admitted, amber already in or a card to look at, blue not
      paid (a reservation's own QR code: the door takes no money, so they go to the box office or the
      bar), red anything that does not get in, including a ticket whose holder no longer qualifies for
-     its type (such as a lapsed member), who goes to the box office to change it. How many are in stays in view. Typing a code, finding
+     its type (such as a lapsed member), who goes to the box office to change it, unless a holder of the
+     override admits them anyway with a reason (R-30). How many are in stays in view. Typing a code, finding
      someone by name and pausing the camera are the large buttons at the foot. -->
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
@@ -17,10 +18,13 @@ interface Scan {
   reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
   requirement?: { reason: string | null, ticketType: string }
   unchecked?: boolean
+  ticketId?: string
+  overridable?: boolean
 }
 interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number }
 type Tone = 'success' | 'warning' | 'info' | 'error'
-interface Shown { tone: Tone, icon: string, headline: string, line: string, at: number }
+interface Shown { tone: Tone, icon: string, headline: string, line: string, at: number, override?: { ticketId: string, ticketType: string, reason: string | null } }
+interface Term { id: string, label: string }
 
 const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'info' }
 const ICONS: Record<Tone, string> = { success: 'i-lucide-circle-check', warning: 'i-lucide-circle-alert', info: 'i-lucide-hand-coins', error: 'i-lucide-circle-x' }
@@ -75,7 +79,11 @@ function describe(out: Scan): Shown {
   else if (out.result === 'not_paid' && out.reservation) {
     line = t('box-office.live-door.line.not_paid', { count: out.reservation.tickets, amount: money(out.reservation.amountDueMinor, out.reservation.currency), reference: out.reservation.reference })
   }
-  return { tone, icon: ICONS[tone], headline, line, at: Date.now() }
+  // R-30: a holder of the override may admit anyway, never on their own booking; the server says when.
+  const override = out.result === 'requirement_not_met' && out.overridable && out.ticketId && out.requirement
+    ? { ticketId: out.ticketId, ticketType: out.requirement.ticketType, reason: out.requirement.reason }
+    : undefined
+  return { tone, icon: ICONS[tone], headline, line, at: Date.now(), ...override ? { override } : {} }
 }
 
 function show(result: Shown) {
@@ -97,6 +105,38 @@ async function scan(code: string) {
   catch (e) {
     const refusal = toRefusal(e)
     show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: refusal.reason, at: Date.now() })
+  }
+}
+
+// "Admit anyway", with a reason from the theatre's list.
+const overriding = ref(false)
+const reasons = ref<Term[]>([])
+const reasonId = ref<string | undefined>()
+const overrideBusy = ref(false)
+async function openOverride() {
+  reasonId.value = undefined
+  overriding.value = true
+  if (!reasons.value.length) reasons.value = (await $api<{ terms: Term[] }>('/api/core/vocabularies/box-office.override-reason/terms')).terms
+}
+async function admitAnyway() {
+  const target = shown.value?.override
+  if (!target || !reasonId.value) return
+  overrideBusy.value = true
+  try {
+    const out = await $api<Scan>(`${base.value}/door/override`, { method: 'POST', body: { ticketId: target.ticketId, reasonTermId: reasonId.value } })
+    const reason = reasons.value.find(r => r.id === reasonId.value)?.label ?? ''
+    overriding.value = false
+    show(out.result === 'admitted'
+      ? { tone: 'success', icon: ICONS.success, headline: t('box-office.live-door.result.admitted_by_override'), line: t('box-office.live-door.line.admitted_by_override', { type: target.ticketType, reason }), at: Date.now() }
+      : describe(out))
+    await refresh()
+  }
+  catch (e) {
+    overriding.value = false
+    show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: toRefusal(e).reason, at: Date.now() })
+  }
+  finally {
+    overrideBusy.value = false
   }
 }
 
@@ -236,6 +276,16 @@ async function admit(row: Row, count: number) {
                   </p>
                 </div>
               </section>
+              <UButton
+                v-if="shown?.override"
+                icon="i-lucide-shield-check"
+                color="neutral"
+                variant="outline"
+                size="xl"
+                block
+                :label="t('box-office.live-door.override.button')"
+                @click="openOverride"
+              />
             </div>
             <aside
               v-if="recent.length"
@@ -330,6 +380,49 @@ async function admit(row: Row, count: number) {
             :label="t('core.scan.type-submit')"
             :disabled="!typed.trim()"
           />
+        </UForm>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="overriding"
+      :title="t('box-office.live-door.override.title')"
+      :description="shown?.override ? t('box-office.live-door.override.description', { type: shown.override.ticketType, reason: shown.override.reason ?? '' }) : undefined"
+    >
+      <template #body>
+        <UForm
+          class="space-y-4"
+          :state="{ reasonId }"
+          @submit="admitAnyway"
+        >
+          <UFormField
+            :label="t('box-office.live-door.override.reason')"
+            required
+          >
+            <USelect
+              v-model="reasonId"
+              :items="reasons"
+              value-key="id"
+              label-key="label"
+              size="xl"
+            />
+          </UFormField>
+          <div class="flex justify-end gap-2">
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="xl"
+              :label="t('core.form.cancel')"
+              @click="overriding = false"
+            />
+            <UButton
+              type="submit"
+              size="xl"
+              :loading="overrideBusy"
+              :disabled="!reasonId"
+              :label="t('box-office.live-door.override.confirm')"
+            />
+          </div>
         </UForm>
       </template>
     </UModal>
