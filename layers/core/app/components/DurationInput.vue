@@ -36,7 +36,16 @@ watch(model, (value) => {
 
 const items = computed(() => offered.value.map(value => ({ value, label: t(`core.duration.${value}`, { count: count.value ?? 2 }) }))) // not-policy: the plural when empty
 const named = (part: string) => props.label ? `${props.label}: ${part}` : part
-const longUnits = computed(() => offered.value.includes('month') || offered.value.includes('year'))
+
+// The count each unit allows inside the limits: from 60 to 86,400 seconds is 1 to 1,440 minutes.
+const countMin = computed(() => {
+  const least = seconds(props.min)
+  return least === undefined ? 0 : Math.ceil(least / unitSeconds(unit.value))
+})
+const countMax = computed(() => {
+  const most = seconds(props.max)
+  return most === undefined ? undefined : Math.floor(most / unitSeconds(unit.value))
+})
 
 function setCount(value: number | null | undefined) {
   count.value = value ?? undefined
@@ -44,36 +53,32 @@ function setCount(value: number | null | undefined) {
 }
 function setUnit(value: DurationUnit) {
   unit.value = value
-  if (count.value !== undefined) model.value = count.value * unitSeconds(value)
+  if (count.value === undefined) return
+  // Changing the unit keeps the count inside what the new unit allows.
+  count.value = Math.min(Math.max(count.value, countMin.value), countMax.value ?? Number.POSITIVE_INFINITY)
+  model.value = count.value * unitSeconds(value)
 }
 </script>
 
 <template>
-  <div class="space-y-1">
-    <UFieldGroup>
-      <UInputNumber
-        :model-value="count"
-        :min="0"
-        :disabled="disabled"
-        :aria-label="named(t('core.duration.amount'))"
-        class="w-32"
-        @update:model-value="setCount"
-      />
-      <USelect
-        :model-value="unit"
-        :items="items"
-        value-key="value"
-        :disabled="disabled"
-        :aria-label="named(t('core.duration.unit'))"
-        class="w-32"
-        @update:model-value="setUnit($event as DurationUnit)"
-      />
-    </UFieldGroup>
-    <p
-      v-if="longUnits"
-      class="text-xs text-muted"
-    >
-      {{ t('core.duration.long-units') }}
-    </p>
-  </div>
+  <UFieldGroup>
+    <UInputNumber
+      :model-value="count"
+      :min="countMin"
+      :max="countMax"
+      :disabled="disabled"
+      :aria-label="named(t('core.duration.amount'))"
+      class="w-32"
+      @update:model-value="setCount"
+    />
+    <USelect
+      :model-value="unit"
+      :items="items"
+      value-key="value"
+      :disabled="disabled"
+      :aria-label="named(t('core.duration.unit'))"
+      class="w-32"
+      @update:model-value="setUnit($event as DurationUnit)"
+    />
+  </UFieldGroup>
 </template>

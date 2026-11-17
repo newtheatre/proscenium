@@ -158,6 +158,9 @@ export default defineModule({
         { slug: 'other', label: 'Other' },
       ],
     }],
+    'core.navigation': [
+      { id: 'front-of-house.shifts', menu: 'members', to: '/members/front-of-house', icon: 'i-lucide-calendar-clock', ability: 'front-of-house.shift.sign-up', order: 30 },
+    ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],

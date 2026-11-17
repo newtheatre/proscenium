@@ -159,6 +159,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     context.actor = actor
 
     context.requestOrigin = requestUrl(event).origin
+    context.reads = ['GET', 'HEAD'].includes(event.method.toUpperCase())
     context.address = getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? undefined
     const who = actor.accountId ?? context.address ?? 'unknown'
     const rate = await countAgainstRate(decl.rateLimit, who)
