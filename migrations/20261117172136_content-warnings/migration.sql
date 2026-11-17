@@ -17,8 +17,9 @@ CREATE TABLE `core_term_groups` (
 	CONSTRAINT "core_term_groups_label_length" CHECK(length("label") BETWEEN 1 AND 80)
 );
 --> statement-breakpoint
-ALTER TABLE `core_productions` ADD `age_min` integer;--> statement-breakpoint
-ALTER TABLE `core_productions` ADD `age_restricted` integer DEFAULT false NOT NULL;--> statement-breakpoint
+-- core_productions is the parent of many tables, so it is never rebuilt: dropping it inside D1's transaction would fail on (or cascade through) its children. The new columns are added in place, with their checks on the columns, and the old age_guidance column stays unused (nothing reads or writes it).
+ALTER TABLE `core_productions` ADD `age_min` integer CONSTRAINT `core_productions_age_min` CHECK(`age_min` IS NULL OR `age_min` BETWEEN 0 AND 21);--> statement-breakpoint
+ALTER TABLE `core_productions` ADD `age_restricted` integer DEFAULT false NOT NULL CONSTRAINT `core_productions_age_restricted` CHECK(`age_restricted` = 0 OR `age_min` IS NOT NULL);--> statement-breakpoint
 ALTER TABLE `core_productions` ADD `effects_confirmed_none` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `core_terms` ADD `group_id` text REFERENCES core_term_groups(id) ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE `core_vocabularies` ADD `grouped` integer DEFAULT false NOT NULL;--> statement-breakpoint
@@ -49,58 +50,6 @@ INSERT INTO `__new_core_production_advisories`(`production_id`, `term_id`, `leve
 DROP TABLE `core_production_advisories`;--> statement-breakpoint
 ALTER TABLE `__new_core_production_advisories` RENAME TO `core_production_advisories`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
-PRAGMA foreign_keys=OFF;--> statement-breakpoint
-CREATE TABLE `__new_core_productions` (
-	`id` text PRIMARY KEY,
-	`slug` text NOT NULL,
-	`title` text NOT NULL,
-	`subtitle` text,
-	`summary` text,
-	`description` text,
-	`kind` text NOT NULL,
-	`category_term_id` text,
-	`season_id` text,
-	`company_name` text,
-	`age_min` integer,
-	`age_restricted` integer DEFAULT false NOT NULL,
-	`effects_confirmed_none` integer DEFAULT false NOT NULL,
-	`advisories_confirmed_none` integer DEFAULT false NOT NULL,
-	`content_note` text,
-	`running_minutes` integer,
-	`interval_count` integer DEFAULT 0 NOT NULL,
-	`external_booking_url` text,
-	`credits_public` integer NOT NULL,
-	`state` text DEFAULT 'draft' NOT NULL,
-	`cancel_reason_term_id` text,
-	`listed` integer DEFAULT true NOT NULL,
-	`published_at` integer,
-	`first_starts_at` integer,
-	`last_ends_at` integer,
-	`created_by` text,
-	`created_at` integer NOT NULL,
-	CONSTRAINT `fk_core_productions_category_term_id_core_terms_id_fk` FOREIGN KEY (`category_term_id`) REFERENCES `core_terms`(`id`),
-	CONSTRAINT `fk_core_productions_season_id_core_seasons_id_fk` FOREIGN KEY (`season_id`) REFERENCES `core_seasons`(`id`) ON DELETE SET NULL,
-	CONSTRAINT `fk_core_productions_cancel_reason_term_id_core_terms_id_fk` FOREIGN KEY (`cancel_reason_term_id`) REFERENCES `core_terms`(`id`),
-	CONSTRAINT "core_productions_state" CHECK("state" IN ('draft', 'published', 'withdrawn', 'cancelled')),
-	CONSTRAINT "core_productions_kind" CHECK("kind" IN ('own', 'visiting', 'hire', 'event')),
-	CONSTRAINT "core_productions_title" CHECK(length("title") BETWEEN 1 AND 200),
-	CONSTRAINT "core_productions_summary" CHECK("summary" IS NULL OR length("summary") <= 300),
-	CONSTRAINT "core_productions_age_min" CHECK("age_min" IS NULL OR "age_min" BETWEEN 0 AND 21),
-	CONSTRAINT "core_productions_age_restricted" CHECK("age_restricted" = 0 OR "age_min" IS NOT NULL),
-	CONSTRAINT "core_productions_running" CHECK("running_minutes" IS NULL OR "running_minutes" > 0),
-	CONSTRAINT "core_productions_intervals" CHECK("interval_count" >= 0),
-	CONSTRAINT "core_productions_booking_url" CHECK("external_booking_url" IS NULL OR "external_booking_url" LIKE 'https://_%'),
-	CONSTRAINT "core_productions_cancel_reason" CHECK(("state" = 'cancelled') = ("cancel_reason_term_id" IS NOT NULL))
-);
---> statement-breakpoint
-INSERT INTO `__new_core_productions`(`id`, `slug`, `title`, `subtitle`, `summary`, `description`, `kind`, `category_term_id`, `season_id`, `company_name`, `age_min`, `age_restricted`, `effects_confirmed_none`, `advisories_confirmed_none`, `content_note`, `running_minutes`, `interval_count`, `external_booking_url`, `credits_public`, `state`, `cancel_reason_term_id`, `listed`, `published_at`, `first_starts_at`, `last_ends_at`, `created_by`, `created_at`) SELECT `id`, `slug`, `title`, `subtitle`, `summary`, `description`, `kind`, `category_term_id`, `season_id`, `company_name`, `age_min`, `age_restricted`, `effects_confirmed_none`, `advisories_confirmed_none`, `content_note`, `running_minutes`, `interval_count`, `external_booking_url`, `credits_public`, `state`, `cancel_reason_term_id`, `listed`, `published_at`, `first_starts_at`, `last_ends_at`, `created_by`, `created_at` FROM `core_productions`;--> statement-breakpoint
-DROP TABLE `core_productions`;--> statement-breakpoint
-ALTER TABLE `__new_core_productions` RENAME TO `core_productions`;--> statement-breakpoint
-PRAGMA foreign_keys=ON;--> statement-breakpoint
-CREATE UNIQUE INDEX `core_productions_slug` ON `core_productions` (`slug`);--> statement-breakpoint
-CREATE INDEX `core_productions_listing` ON `core_productions` (`state`,`last_ends_at`);--> statement-breakpoint
-CREATE INDEX `core_productions_season` ON `core_productions` (`season_id`);--> statement-breakpoint
-CREATE INDEX `core_productions_category` ON `core_productions` (`category_term_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `core_term_groups_label` ON `core_term_groups` (`vocabulary_key`,lower("label"));--> statement-breakpoint
 CREATE INDEX `core_term_groups_order` ON `core_term_groups` (`vocabulary_key`,`sort`);--> statement-breakpoint
 CREATE INDEX `core_terms_group` ON `core_terms` (`group_id`);

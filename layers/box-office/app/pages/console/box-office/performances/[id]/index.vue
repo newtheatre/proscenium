@@ -3,7 +3,8 @@
      ticket type costs in each band, and when sales open and close. A production's bands are shared
      by all its performances, and so are its prices unless this performance is given its own, which
      can be handed back to the production's at any time; capacity and the sale window are this
-     performance's own. -->
+     performance's own. A price change can be set to take effect later, such as when an early-bird
+     offer ends; changes still to come are listed under the prices and can be cancelled. -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
@@ -13,12 +14,14 @@ interface Pool { bandId: string, capacity: number, claimed: number }
 interface Price { bandId: string, ticketTypeId: string, amountMinor: number }
 interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean }
 interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
+interface ScheduledPrice { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }
 interface Setup {
   sales: { state: Sales, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
   houseCapacity: number | null
   pools: Pool[]
   prices: Price[]
   priceLayers: PriceLayer[]
+  scheduledPrices: ScheduledPrice[]
   checklist: { code: string, done: boolean }[]
   performance: { id: string, productionId: string, title: string, label: string | null, startsAt: number, state: string }
   bands: Band[]
@@ -62,6 +65,11 @@ const capacity = ref<Record<string, number>>({})
 const prices = ref<Record<string, number | null>>({})
 const scope = ref<'all' | 'this'>('all')
 const scopes = computed(() => (['all', 'this'] as const).map(value => ({ value, label: t(`box-office.setup.prices.scope.${value}`) })))
+// When a change takes effect: now, or from a moment set ahead.
+const when = ref<'now' | 'later'>('now')
+const whens = computed(() => (['now', 'later'] as const).map(value => ({ value, label: t(`box-office.setup.prices.when.${value}`) })))
+const from = ref<number | null>(null)
+const soon = Date.now()
 // The sale window and limits.
 const windowForm = ref({ onSaleAt: null as number | null, offSaleAt: null as number | null, maxPerOrder: null as number | null, holdMinutes: null as number | null })
 const cell = (bandId: string, typeId: string) => `${bandId} ${typeId}`
@@ -123,7 +131,25 @@ async function savePrices() {
     toast.add({ title: t('box-office.setup.prices.unchanged'), color: 'neutral' })
     return
   }
-  await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: rows } }), t('box-office.setup.prices.saved'))
+  const later = when.value === 'later' && from.value !== null
+  const saved = await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: rows, ...(later ? { from: from.value } : {}) } }),
+    later ? t('box-office.setup.prices.scheduled', { when: dateTime(from.value!) }) : t('box-office.setup.prices.saved'))
+  if (saved && later) {
+    when.value = 'now'
+    from.value = null
+  }
+}
+
+// Changes set for later, in words: which ticket, what it becomes, from when, and for which performances.
+const typeName = (typeId: string) => types.value?.ticketTypes.find(type => type.id === typeId)?.name ?? ''
+const bandName = (bandId: string) => data.value?.bands.find(b => b.id === bandId)?.name ?? ''
+function becomes(s: ScheduledPrice): string {
+  if (s.inherits) return t('box-office.setup.prices.coming.inherits')
+  return s.amountMinor === null ? t('box-office.setup.prices.coming.unsold') : money(s.amountMinor)
+}
+async function cancelScheduled(s: ScheduledPrice) {
+  const d = data.value!
+  await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices/cancel-scheduled`, { method: 'POST', body: { bandId: s.bandId, ticketTypeId: s.ticketTypeId, performanceId: s.performanceId, from: s.from } }), t('box-office.setup.prices.coming.cancelled'))
 }
 async function inherit(bandId: string, typeId: string) {
   const d = data.value!
@@ -368,6 +394,25 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                   :items="scopes"
                 />
               </UFormField>
+              <UFormField :label="t('box-office.setup.prices.when.label')">
+                <URadioGroup
+                  v-model="when"
+                  orientation="horizontal"
+                  variant="table"
+                  :items="whens"
+                />
+              </UFormField>
+              <UFormField
+                v-if="when === 'later'"
+                :label="t('box-office.setup.prices.when.from')"
+                :help="t('box-office.setup.prices.when.from-help')"
+                required
+              >
+                <FieldDateTime
+                  v-model="from"
+                  :min="soon"
+                />
+              </UFormField>
               <fieldset
                 v-for="b in d.bands"
                 :key="b.id"
@@ -397,9 +442,38 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               </fieldset>
               <UButton
                 type="submit"
-                :label="t('box-office.setup.prices.save')"
+                :label="t(when === 'later' ? 'box-office.setup.prices.save-later' : 'box-office.setup.prices.save')"
+                :disabled="when === 'later' && from === null"
               />
             </UForm>
+            <div
+              v-if="d.scheduledPrices.length"
+              class="mt-6 space-y-2"
+            >
+              <h3 class="font-medium">
+                {{ t('box-office.setup.prices.coming.title') }}
+              </h3>
+              <ul class="divide-y divide-default">
+                <li
+                  v-for="s in d.scheduledPrices"
+                  :key="`${s.bandId} ${s.ticketTypeId} ${s.performanceId} ${s.from}`"
+                  class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                >
+                  <span>
+                    {{ t('box-office.setup.prices.coming.line', { band: bandName(s.bandId), type: typeName(s.ticketTypeId), becomes: becomes(s), when: dateTime(s.from) }) }}
+                    <span class="text-muted">· {{ t(s.performanceId ? 'box-office.setup.prices.scope.this' : 'box-office.setup.prices.scope.all') }}</span>
+                  </span>
+                  <UButton
+                    color="neutral"
+                    variant="link"
+                    icon="i-lucide-x"
+                    :label="t('box-office.setup.prices.coming.cancel')"
+                    :aria-label="t('box-office.setup.prices.coming.cancel-label', { type: typeName(s.ticketTypeId), band: bandName(s.bandId), when: dateTime(s.from) })"
+                    @click="cancelScheduled(s)"
+                  />
+                </li>
+              </ul>
+            </div>
           </PageSection>
 
           <PageSection

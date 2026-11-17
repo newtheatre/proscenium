@@ -1,7 +1,7 @@
 <!-- One show as a card in a list of them: what's on, the archive and the whats-on content component.
      The whole card is the link, drawn over it, so a press anywhere on the card opens the show. -->
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   to: string
   title: string
   description?: string | null
@@ -12,8 +12,11 @@ defineProps<{
   details?: string
   cancelled?: boolean
   orientation?: 'vertical' | 'horizontal'
+  /** What it costs, such as "From £6 · Member £4", in the currency's minor unit. */
+  price?: { currency: string, fromMinor: number | null, others: { label: string, amountMinor: number }[] } | null
 }>()
 const { t } = useT()
+const priceLine = computed(() => props.price ? priceSummary(props.price, t) : '')
 </script>
 
 <template>
@@ -55,6 +58,12 @@ const { t } = useT()
         class="text-sm text-muted"
       >
         {{ details }}
+      </p>
+      <p
+        v-if="priceLine"
+        class="text-sm"
+      >
+        {{ priceLine }}
       </p>
     </template>
   </UPageCard>

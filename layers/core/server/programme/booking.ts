@@ -2,7 +2,7 @@
 // and the first to answer for a performance wins. A performance none answers for books through its
 // own external link, then its production's; with neither it has no button.
 import { usePoint } from '#kit'
-import type { BookingAction, BookingAnswer, BookingSubject } from '../points/booking-action'
+import type { BookingAction, BookingAnswer, BookingSubject, PriceSummary } from '../points/booking-action'
 
 export interface BookingTarget extends BookingSubject {
   externalBookingUrl: string | null
@@ -27,6 +27,19 @@ export async function bookingActions(performances: BookingTarget[]): Promise<Rec
   for (const p of performances) {
     const link = p.externalBookingUrl ?? p.productionBookingUrl
     if (!out[p.id] && link) out[p.id] = { state: 'available', link, external: true }
+  }
+  return out
+}
+
+/** What each production is sold at, from the first contribution that says; a production none prices is left out. */
+export async function priceSummaries(productionIds: string[]): Promise<Record<string, PriceSummary>> {
+  const out: Record<string, PriceSummary> = {}
+  if (!productionIds.length) return out
+  for (const contribution of await usePoint<BookingAction>('core.booking-action')) {
+    const unanswered = productionIds.filter(id => !out[id])
+    if (!unanswered.length || !contribution.value.prices) continue
+    const answers = await contribution.value.prices(unanswered)
+    for (const id of unanswered) if (answers[id]) out[id] = answers[id]!
   }
   return out
 }
