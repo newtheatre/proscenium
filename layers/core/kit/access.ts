@@ -9,6 +9,7 @@ import { nowMs } from './clock'
 import { first } from './database'
 import { parseDuration } from './duration'
 import { Refusal } from './refusal'
+import { currentContext } from './context-store'
 import type { Actor, Grant } from './context'
 import type { AbilityName } from './registry-types'
 import type { H3Event } from 'h3'
@@ -94,8 +95,8 @@ const refuse = (code: string, reason: string, status: number, remedy?: string): 
  */
 export interface CanOptions {
   /**
-   * Overrides the ability's own freshness: true asks for a sign-in re-asserted within
-   * core.access.fresh-within, false asks for none. Only settings saves use it (Matt, 16 November:
+   * Overrides the ability's own freshness (and the rule that a read request asks for none): true
+   * asks for a sign-in re-asserted within core.access.fresh-within, false asks for none. Only settings saves use it (Matt, 16 November:
    * re-authentication only for a setting that asks for confirmation or a reason).
    */
   fresh?: boolean
@@ -163,7 +164,10 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
   if (!by) return refuse('core.access.denied', 'You do not have permission to do this.', 403, 'Ask an administrator for this permission.')
 
   if (decl.assurance === 'strong' && actor.assurance !== 'strong') return refuse('core.access.needs-strong-sign-in', 'This needs a stronger sign-in.', 403, 'Sign in with a passkey or a second factor, then try again.')
-  const fresh = options.fresh ?? decl.fresh
+  // Confirming it is you guards changes, not reads (Matt, 17 November): a screen loads, and shows its
+  // fields as editable, however long ago the person confirmed; the save asks. So a read request
+  // checks no freshness unless the caller asks for it, and "may change" flags it computes hold.
+  const fresh = options.fresh ?? (currentContext()?.reads ? false : decl.fresh)
   if (fresh) {
     const within = typeof fresh === 'string' ? parseDuration(fresh) : await useSetting('core.access.fresh-within')
     if (!actor.reassertedAt || nowMs() - actor.reassertedAt > (within as number) * 1000) // not-policy: seconds to milliseconds

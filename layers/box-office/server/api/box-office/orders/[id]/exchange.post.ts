@@ -21,6 +21,6 @@ export default defineRoute({
   const { preview, ...change } = input
   const quote = await exchangeQuote(record!.id!, change)
   if (preview) return quote
-  if (quote.differenceMinor < 0) await requireAbility(actor, 'box-office.order.refund', ['box-office.order', record!.id!])
+  if (quote.paid && quote.differenceMinor < 0) await requireAbility(actor, 'box-office.order.refund', ['box-office.order', record!.id!])
   return exchangeLines(unit.view(), record!.id!, { ...change, by: actor.accountId! })
 })

@@ -44,6 +44,11 @@ export interface RefundRequest {
   attemptId?: string
   /** The person asking; null for a refund the system asks for. */
   requestedBy: string | null
+  /**
+   * When this refund is one of several for one decision (an order paid in more than one payment),
+   * the whole amount, which is what the self-approve limit is judged against.
+   */
+  wholeMinor?: number
 }
 
 /**
@@ -65,7 +70,7 @@ export async function requestRefund(unit: UnitView, input: RefundRequest): Promi
     if ((attempt.answered_at ?? 0) + window * SECOND < nowMs()) throw new Refusal('payments.refund.too-late', 'This payment is too old to refund here.', { status: 409, remedy: 'Settle it with the payer another way.' })
   }
   const limit = await useSetting('payments.refunds.self-approve-up-to') as number
-  const oneStep = input.requestedBy === null || input.amountMinor <= limit
+  const oneStep = input.requestedBy === null || Math.max(input.amountMinor, input.wholeMinor ?? 0) <= limit
   const id = newId('rfd')
   const at = nowMs()
   unit.add({
