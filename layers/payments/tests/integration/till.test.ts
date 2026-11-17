@@ -111,10 +111,10 @@ describe('the till', () => {
     expect((await get('/api/payments/session', me)).body.session.expectedCashMinor).toBe(3750)
   })
 
-  it('lists the panels the seller may use in order, each with its component', async () => {
+  it('lists the panels the seller may use in order, each with its module and components', async () => {
     expect((await get('/api/payments/till/panels', seller())).body.panels).toEqual([
-      { id: 'tickets', label: 'tickets.desk.label', panel: 'TicketsTillPanel' },
-      { id: 'snacks', label: 'snacks.desk.label', panel: 'SnacksTillPanel' },
+      { id: 'tickets', module: 'tickets', label: 'tickets.desk.label', tab: 'tickets.desk.label', icon: null, panel: 'TicketsTillPanel', livePanel: null },
+      { id: 'snacks', module: 'snacks', label: 'snacks.desk.label', tab: 'snacks.desk.tab', icon: 'i-lucide-cookie', panel: 'SnacksTillPanel', livePanel: 'SnacksLiveTillPanel' },
     ])
     expect((await get('/api/payments/till/panels', seller([]))).body.panels.map((p: { id: string }) => p.id)).toEqual(['snacks'])
   })

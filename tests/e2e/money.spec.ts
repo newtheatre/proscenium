@@ -42,7 +42,6 @@ async function noViolations(page: Page) {
 }
 
 const SCREENS = [
-  ['/console/payments/till', 'Till'],
   ['/console/payments/session', 'My session'],
   ['/console/payments/sessions', 'Till sessions'],
   ['/console/payments/attention', 'Needs attention'],
@@ -68,6 +67,15 @@ for (const [path, title] of SCREENS) {
   })
 }
 
+test('the till is a live screen: a tile on Tonight and a link in the Money group', async ({ page }) => {
+  await visit(page, '/console/payments/sessions')
+  await expect(page.getByRole('link', { name: 'Open the till' })).toHaveAttribute('href', '/live/till')
+  await visit(page, '/live')
+  await page.getByRole('link', { name: 'Till' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
+  await noViolations(page)
+})
+
 test('My session opens a till with a float and shows the cash expected', async ({ page }) => {
   await visit(page, '/console/payments/session')
   await page.getByRole('textbox', { name: /^Till/ }).fill('Box office desk')
@@ -87,7 +95,7 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   expect([200, 409]).toContain(opened.status())
   await api.dispose()
 
-  await visit(page, '/console/payments/till')
+  await visit(page, '/live/till')
   await expect(page.getByRole('heading', { name: 'Gallery programmes' })).toBeVisible()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
@@ -114,7 +122,7 @@ async function amount(field: Locator, typed: string) {
 }
 
 test('the Till takes part of the total one way and the rest another', async ({ page }) => {
-  await visit(page, '/console/payments/till')
+  await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
@@ -138,7 +146,7 @@ test('the Till takes part of the total one way and the rest another', async ({ p
 })
 
 test('the Till gives back what was taken when the customer leaves a sale paid in part', async ({ page }) => {
-  await visit(page, '/console/payments/till')
+  await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('1')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Take payment of £3.00' }).click()
@@ -159,10 +167,10 @@ test('the Till picks a sale up again when the SumUp app sends the seller back', 
   expect(made.ok()).toBe(true)
   const { intentId } = await made.json() as { intentId: string }
 
-  await visit(page, `/console/payments/till?attempt=att_none&intent=${intentId}&result=failed`)
+  await visit(page, `/live/till?attempt=att_none&intent=${intentId}&result=failed`)
   await expect(page.getByText('Still to pay: £3.00')).toBeVisible()
   await expect(page.getByText('The payment did not go through')).toBeVisible()
-  await expect(page).toHaveURL(/\/console\/payments\/till$/)
+  await expect(page).toHaveURL(/\/live\/till$/)
   await noViolations(page)
   expect((await api.post(`/api/payments/intents/${intentId}/cancel`, { data: {} })).ok()).toBe(true)
   await api.dispose()
