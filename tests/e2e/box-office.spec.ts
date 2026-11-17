@@ -9,12 +9,14 @@ const person = (accountId: string, name: string, abilities: string[]) => ({ kind
 const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage'])
 const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
+const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const key = () => ({ 'idempotency-key': crypto.randomUUID() })
 // Names are unique to a run, so a retry in a fresh worker can set the stage again.
 const stamp = Date.now() % 1_000_000
 const typeName = `Desk price ${stamp}`
 let reference = ''
+let performanceId = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, headers: Record<string, string> = {}) {
   const response = await api.post(path, { data, headers: { ...key(), ...headers } })
@@ -41,6 +43,7 @@ test.beforeAll(async ({ playwright }) => {
   const venue = await post(api, '/api/core/venues', { name: `Desk Theatre ${stamp}` })
   const performance = await post(api, `/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 86_400_000, capacity: 100 })
   await post(api, `/api/core/performances/${performance.id}/schedule`, {})
+  performanceId = performance.id
   const type = await post(api, '/api/box-office/ticket-types', { name: typeName })
   const band = await post(api, `/api/box-office/productions/${production.id}/bands`, { name: 'Stalls' })
   expect((await api.put(`/api/box-office/performances/${performance.id}/sales`, { data: { pools: [{ bandId: band.bandId, capacity: 20 }] } })).ok()).toBe(true)
@@ -112,4 +115,34 @@ test('Sell finds a reservation by its reference and takes payment for it', async
   // Found again, it is paid for.
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
+})
+
+test.describe('the box office console', () => {
+  test.use(as(office))
+
+  test('Orders, Performances, a set-up, its door list and Ticket types open with no accessibility violations', async ({ page }) => {
+    await visit(page, '/console/box-office/orders')
+    await expect(page.getByRole('heading', { level: 1, name: 'Orders' })).toBeVisible()
+    await page.getByRole('searchbox').first().fill(reference)
+    await page.getByRole('link', { name: reference, exact: true }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: `Order ${reference}` })).toBeVisible()
+    await noViolations(page)
+
+    await visit(page, '/console/box-office/performances')
+    await expect(page.getByRole('heading', { level: 1, name: 'Performances' })).toBeVisible()
+    await noViolations(page)
+
+    await visit(page, `/console/box-office/performances/${performanceId}`)
+    await expect(page.getByRole('heading', { name: 'Seats to sell' })).toBeVisible()
+    await expect(page.getByText('On sale', { exact: true }).first()).toBeVisible()
+    await noViolations(page)
+
+    await visit(page, `/console/box-office/performances/${performanceId}/door`)
+    await expect(page.getByRole('heading', { level: 1, name: 'Door list' })).toBeVisible()
+    await noViolations(page)
+
+    await visit(page, '/console/box-office/ticket-types')
+    await expect(page.getByText(typeName)).toBeVisible()
+    await noViolations(page)
+  })
 })

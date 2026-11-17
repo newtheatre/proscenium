@@ -163,5 +163,17 @@
   "box-office.ticket-types.add.kind": "Kind",
   "box-office.ticket-types.add.proof": "What to bring",
   "box-office.ticket-types.add.proof-help": "Shown to the buyer, such as \"Bring your student ID\".",
-  "box-office.ticket-types.add.button": "Add ticket type"
+  "box-office.ticket-types.add.button": "Add ticket type",
+  "box-office.door.title": "Door list",
+  "box-office.door.set-up": "Set-up",
+  "box-office.door.filter.arrived": "Every ticket used",
+  "box-office.door.column.buyer": "Name",
+  "box-office.door.column.reference": "Reference",
+  "box-office.door.column.tickets": "Tickets",
+  "box-office.door.column.admitted": "In",
+  "box-office.door.view.waiting": "Still to arrive",
+  "box-office.door.view.all": "Everyone",
+  "box-office.door.admitted": "{admitted} of {tickets} in",
+  "box-office.door.empty.title": "Nobody to show",
+  "box-office.door.empty.description": "Bookings with tickets for this performance show here."
 }

@@ -27,14 +27,14 @@ export default defineModule({
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
-    'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public' }),
+    'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
     'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
-    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true }),
+    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Kept from each ticket when staff refund less the fee.
-    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true }),
-    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff' }),
+    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
@@ -53,7 +53,8 @@ export default defineModule({
     // Cancelling does not imply refunding: staff with only the first cancel with no refund.
     'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
     'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
-    'ticket.admit': ability({ on: 'core.performance' }),
+    // The door finds a booking by the buyer's name as well as by its reference.
+    'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 

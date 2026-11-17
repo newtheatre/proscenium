@@ -147,6 +147,14 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
 
         <div class="space-y-8">
           <RefusalNotice :refusal="refusal" />
+          <ULink
+            v-if="d.sales && d.sales.state !== 'draft'"
+            :to="`/console/box-office/performances/${encodeURIComponent(d.performance.id)}/door`"
+            class="inline-flex items-center gap-1 text-sm"
+          >
+            <UIcon name="i-lucide-door-open" />
+            {{ t('box-office.door.title') }}
+          </ULink>
           <RecordChecks
             :title="t('box-office.setup.checklist')"
             :checks="checks"

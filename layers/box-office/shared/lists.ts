@@ -45,3 +45,25 @@ export const ordersList = defineList('box-office.orders', {
   defaultView: 'live',
   defaultSort: { key: 'created', order: 'desc' },
 })
+
+/** Who is coming to one performance: one row for each order holding tickets for it. */
+export const doorList = defineList('box-office.door-list', {
+  filters: {
+    arrived: { kind: 'yes-no', label: 'Every ticket used' },
+  },
+  sorts: {
+    reference: { label: 'Reference', type: 'text', natural: 'asc' },
+  },
+  columns: {
+    buyer: { label: 'Name', always: true, card: true },
+    reference: { label: 'Reference', sort: 'reference', card: true },
+    tickets: { label: 'Tickets', card: true },
+    admitted: { label: 'In', card: true },
+  },
+  views: {
+    waiting: { label: 'Still to arrive', filters: { arrived: 'no' } },
+    all: { label: 'Everyone' },
+  },
+  defaultView: 'waiting',
+  defaultSort: { key: 'reference', order: 'asc' },
+})
