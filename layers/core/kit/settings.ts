@@ -18,10 +18,10 @@ interface Common {
   /** What the screen asks before saving: a written reason, or a second confirmation. */
   onChange?: 'reason' | 'confirm'
   /**
-   * Where the setting is shown (R-33): on its module's settings page in the console (`module`, the
-   * default) or with the site's own settings under /admin/settings (`site`). Nothing else changes.
+   * The address of a bespoke screen that manages this one setting, where only part of its group is
+   * bespoke. Where it is shown is otherwise declared per group, in the manifest's settingGroups.
    */
-  scope?: 'module' | 'site'
+  screen?: string
 }
 
 type WithDefault<V> = { default: V, unset?: false } | { default?: undefined, unset: true }
@@ -81,6 +81,7 @@ export const setting = {
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const COLOUR = /^#[0-9a-f]{6}$/i
+const SCREEN = /^\/(admin|console)(\/[a-z0-9-]+)+$/
 
 /**
  * A module's settings. Keys are written short (`holds.release-before`) and stored full
@@ -125,7 +126,8 @@ function checkEntry(key: string, entry: SettingEntry) {
   if ((entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) && !(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => KEBAB.test(o))))
     throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case')
   if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
-  if (entry.scope !== undefined && !['module', 'site'].includes(entry.scope)) throw new DeclarationError(f('scope'), "is 'module' or 'site'")
+  if ('scope' in entry) throw new DeclarationError(f('scope'), 'is gone: say where a group of settings is shown in the manifest\'s settingGroups')
+  if (entry.screen !== undefined && !(typeof entry.screen === 'string' && SCREEN.test(entry.screen))) throw new DeclarationError(f('screen'), 'is the address of a page, such as /admin/email')
   if (entry.kind === 'text' && entry.minLength !== undefined && !(Number.isInteger(entry.minLength) && entry.minLength >= 0 && entry.minLength <= entry.maxLength!)) throw new DeclarationError(f('minLength'), 'a whole number no larger than maxLength')
   if (entry.kind === 'time') {
     for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !(typeof entry[limit] === 'string' && TIME.test(entry[limit]))) throw new DeclarationError(f(limit), 'a time limit is written like 08:00')

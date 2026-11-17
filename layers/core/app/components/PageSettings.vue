@@ -36,6 +36,8 @@ interface SettingView {
 
 const { $api } = useNuxtApp()
 const props = defineProps<{
+  /** The page of settings to draw, by id (`core.sign-in`, `core.advanced`). The older module and scope props are going. */
+  page?: string
   /** The module whose settings these are (its own page in the console). Leave out for the site page. */
   module?: string
   /** 'site' draws every setting declared with scope 'site', whichever module declares it (Site administration). */
@@ -51,8 +53,11 @@ const props = defineProps<{
 const { t } = useT()
 const toast = useToast()
 const { confirm } = useConfirm()
-const site = props.scope === 'site'
-const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', { query: site ? { scope: 'site' } : { module: props.module, scope: 'module' }, key: site ? 'core:settings:site' : `core:settings:${props.module}` })
+const site = props.scope === 'site' || !!props.page
+const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', {
+  query: props.page ? { page: props.page } : site ? { scope: 'site' } : { module: props.module, scope: 'module' },
+  key: props.page ? `core:settings:page:${props.page}` : site ? 'core:settings:site' : `core:settings:${props.module}`,
+})
 
 // A module whose console page leaves some settings to Site administration says so, when the viewer may open them.
 const { data: alsoSite } = site || !props.module
