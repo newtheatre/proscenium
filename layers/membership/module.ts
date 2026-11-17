@@ -117,6 +117,19 @@ export default defineModule({
     ],
     // Renewal reminders (R7 to R9): service messages about something the person holds.
     'core.notification-type': [{
+      // P9: staff added the person to a scheme that requires payment and chose to send a link.
+      id: 'membership.pay-link',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { scheme: 'text' as const, amount: 'text' as const, link: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Pay for your membership: {{ scheme }}',
+          body: 'The theatre has added you as a member of **{{ scheme }}**. Your membership starts once the fee of {{ amount }} is paid.\n\nSign in to pay: [Pay for my membership]({{ link }})',
+        },
+      },
+    }, {
       id: 'membership.renewal-open',
       category: 'transactional' as const,
       side: 'audience' as const,
