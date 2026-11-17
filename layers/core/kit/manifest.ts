@@ -32,7 +32,17 @@ export interface TaskDecl {
 }
 export type PointDecl = { kind: 'data', schema: z.ZodType } | { kind: 'code', contract: string }
 export interface SecretDecl { needed: 'always' | 'when-used' | 'optional' }
-export interface CredentialDecl { needed: 'always' | 'when-used' | 'optional' }
+export interface CredentialDecl {
+  needed: 'always' | 'when-used' | 'optional'
+  /**
+   * The ability that may save or remove it on the shared keys form (KeysCard), for a credential the
+   * site has one of. Left out for one saved per record on its own screen, as a payment provider
+   * account's keys are. Saving always asks for a fresh sign-in.
+   */
+  manage?: string
+  /** Replacing or removing it breaks what was made with the old value, so the form asks first. */
+  confirm?: boolean
+}
 /**
  * One purpose a module signs under (F-37). The kit makes the key pair, makes a new current key every
  * `rotateEvery`, and keeps an old key for checking for `keepFor` after it stops signing, so anything
@@ -57,7 +67,8 @@ export type SettingPlace = 'console' | 'admin'
  * Where a group of settings (the first part of a short key, such as `sign-in`) is shown. Exactly one
  * home: a page of the module's own (`page`), the shared Advanced page (`advanced`), or a bespoke
  * screen that manages it (`screen`, left off every generated page). With none, the group is on the
- * module's own page in its `place`. Core has no page of its own, so each of its groups names one.
+ * module's own page in its `place`, Admin's page for the module (/admin/modules/<module>) unless it
+ * says 'console'. Core has no page of its own, so each of its groups names one.
  */
 export interface SettingGroupDecl { place?: SettingPlace, page?: string, advanced?: boolean, screen?: string }
 /**
@@ -237,6 +248,11 @@ export function validateManifest(m: ModuleManifest): void {
     for (const [name, decl] of Object.entries(m[section] ?? {})) {
       if (!SECRET.test(name)) throw new DeclarationError(`${section}.${name}`, `is ${snake(id).toUpperCase()}_<NAME> in capitals`)
       if (!['always', 'when-used', 'optional'].includes(decl?.needed)) throw new DeclarationError(`${section}.${name}.needed`, "is 'always', 'when-used' or 'optional'")
+      if (section === 'credentials') {
+        const c = decl as CredentialDecl
+        if (c.manage !== undefined && !(typeof c.manage === 'string' && /^[a-z][a-z0-9-]*\.[a-z][a-z0-9.-]*$/.test(c.manage))) throw new DeclarationError(`${section}.${name}.manage`, 'is the ability that manages it, <module>.<ability>') // not-policy: an ability's name
+        if (c.confirm !== undefined && typeof c.confirm !== 'boolean') throw new DeclarationError(`${section}.${name}.confirm`, 'is true or false')
+      }
     }
   }
   if (m.signing !== undefined) {

@@ -18,4 +18,19 @@ export interface ModuleView {
   missingSecrets: string[]
   screens: { id: string, menu: string }[]
   changedAt: number | null
+  icon: string
+  /** How many of its settings are on its page in Admin. */
+  settings: number
+  /** The first tab of its page this viewer may open, or null. */
+  open: string | null
+}
+
+/** One tab of a module's page in Admin, as GET /api/core/modules/:id/tabs answers it. */
+export interface ModuleTabView {
+  id: string
+  label: string
+  to: string
+  icon: string
+  /** A generated page of settings: its id. */
+  page: string | null
 }

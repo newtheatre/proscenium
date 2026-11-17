@@ -12,6 +12,8 @@ import putModule from '../../server/api/core/modules/[id].put'
 import viewer from '../../server/api/core/viewer.get'
 import settingsGet from '../../server/api/core/settings/index.get'
 import settingsPut from '../../server/api/core/settings/index.put'
+import settingsSearch from '../../server/api/core/settings/index-search.get'
+import moduleTabs from '../../server/api/core/modules/[id]/tabs.get'
 import { resetRateLimits } from '#kit/ratelimit'
 import { useSetting } from '#kit/settings-store'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
@@ -28,6 +30,8 @@ const handle = server({
   'GET /api/core/account-notices': accountNotices,
   'GET /api/core/settings': settingsGet,
   'PUT /api/core/settings': settingsPut,
+  'GET /api/core/settings/index': settingsSearch,
+  'GET /api/core/modules/:id/tabs': moduleTabs,
 })
 
 const staff = () => person(['gallery.sample.view', 'gallery.sample.manage'])
@@ -98,7 +102,8 @@ describe('navigation and the viewer', () => {
     expect(ids).not.toContain('system') // nothing of core's is theirs to open
     const gallery = body.groups.find(g => g.id === 'gallery')!
     expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.shows', 'gallery.form', 'gallery.choices', 'gallery.record', 'gallery.feedback', 'gallery.drafts'])
-    expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps', 'gallery.settings']) // its settings page sits in its own group
+    // Its settings are a tab of its page in Admin, opened from the console by the cog, not a console screen.
+    expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps'])
     expect(gallery.setup.map(e => e.id)).not.toContain('gallery.denied')
   })
 
@@ -147,6 +152,40 @@ describe('the generated settings page (UI-14)', () => {
   it('refuses a change by someone without the ability for that setting', async () => {
     const response = await call(handle, 'PUT', '/api/core/settings', { actor: reader(), body: { changes: [{ key: 'gallery.demo.title', value: 'Nope' }] } })
     expect(response.status).toBe(403)
+  })
+})
+
+describe("a module's page in Admin", () => {
+  type Tabs = { tabs: { id: string, label: string, to: string, page: string | null }[] }
+  const tabs = async (id: string, actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', `/api/core/modules/${id}/tabs`, { actor })).json()) as Tabs
+  const viewerOf = () => person(['core.health.view'])
+
+  it('has the module\'s settings as its first tab and About last, as far as the viewer may open them', async () => {
+    const both = person(['core.health.view', 'gallery.sample.manage'])
+    expect((await tabs('gallery', both)).tabs.map(t => `${t.label} ${t.to} ${t.page}`)).toEqual([
+      'core.modules.tab.settings /admin/modules/gallery gallery.admin',
+      'core.modules.tab.about /admin/modules/gallery/about null',
+    ])
+    expect((await tabs('gallery', staff())).tabs.map(t => t.page)).toEqual(['gallery.admin'])
+    expect((await tabs('gallery', viewerOf())).tabs.map(t => t.to)).toEqual(['/admin/modules/gallery/about'])
+    expect((await call(handle, 'GET', '/api/core/modules/nothing/tabs', { actor: staff() })).status).toBe(404)
+  })
+
+  it('keeps its tabs out of the sidebar, and they do not open Admin for console staff', async () => {
+    const admin = person(['core.settings.manage', 'core.modules.manage', 'gallery.sample.manage'])
+    const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=admin', { actor: admin })).json() as { groups: { id: string, everyday: { to: string }[] }[] }
+    expect(nav.groups.find(g => g.id === 'modules')?.everyday.map(e => e.to)).toEqual(['/admin/modules'])
+    expect((await decide('/admin/modules/gallery', admin)).decision).toBe('allow')
+    expect((await decide('/admin/modules/gallery', staff())).decision).toBe('not-found')
+    expect((await decide('/admin/modules/gallery/about', viewerOf())).decision).toBe('allow')
+    expect((await decide('/admin/modules/gallery', viewerOf())).decision).toBe('refused')
+  })
+
+  it('sends console staff who search for a setting to the console\'s settings window, and an administrator to the page', async () => {
+    type Index = { settings: { key: string, to: string }[] }
+    const index = async (actor: ReturnType<typeof person>) => ((await (await call(handle, 'GET', '/api/core/settings/index', { actor })).json()) as Index).settings.find(s => s.key === 'gallery.demo.title')?.to
+    expect(await index(staff())).toBe('/console?settings=gallery')
+    expect(await index(person(['core.settings.manage', 'gallery.sample.manage']))).toBe('/admin/modules/gallery')
   })
 })
 

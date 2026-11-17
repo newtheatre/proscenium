@@ -2,6 +2,8 @@
      each split into everyday work and set-up; a group with nothing the viewer may open is absent,
      not greyed. On a phone the sidebar becomes a drawer. -->
 <script setup lang="ts">
+import { resolveEntry } from '../../shared/navigation'
+
 const { t } = useT()
 const route = useRoute()
 const { data: brandData } = await useBrand()
@@ -10,6 +12,11 @@ const { data: navigation } = await useNavigation('console')
 const open = ref(false)
 provide(DASHBOARD_SHELL, true)
 watch(() => route.fullPath, () => { open.value = false })
+
+// The module the page belongs to: the cog at the end of its navbar opens that module's settings.
+const current = computed(() => resolveEntry((navigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup]), route.path)?.module)
+const { tabs: settingsTabs } = useModuleSettings(() => current.value)
+provide(CONSOLE_SETTINGS, computed(() => settingsTabs.value.length ? current.value : undefined))
 
 // One menu for the whole sidebar: a collapsible section for each module's group.
 const items = computed(() => sidebarGroups(navigation.value?.groups ?? [], { t, path: route.path, onSelect: () => { open.value = false } }))
@@ -56,6 +63,7 @@ const items = computed(() => sidebarGroups(navigation.value?.groups ?? [], { t, 
     </UDashboardSidebar>
 
     <CommandPalette />
+    <ModuleSettingsWindow />
 
     <!-- Each page renders its own panel (PageFrame); tabindex lets the skip link focus the page. -->
     <main

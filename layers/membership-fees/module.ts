@@ -68,6 +68,11 @@ export default defineModule({
     'payments.settlement': [{ id: 'membership-fees' }],
     // Its panel in the till: an application waiting for its fee, paid alone or with tickets (P8).
     'payments.desk-basket': [{ id: 'membership-fees' }],
+    // Setting up fees (MEM-45): a price for each scheme that requires payment.
+    'core.setup-step': [{ id: 'membership-fees.prices', required: false, to: '/console/membership-fees', order: 42 }],
+    'core.record-resolver': [{ id: 'membership-fees.charge', file: 'charge' }, { id: 'membership-fees.price', file: 'price' }],
+    // Expected to find none: a fee paid with no income in the ledger (tab 4).
+    'core.health-check': [{ id: 'membership-fees.unposted-charges', file: 'unposted-charges' }],
     // Fees are income in full on the day they are paid (P6).
     'finance.system-account': [{ id: 'income', name: 'Membership fee income', kind: 'income' }],
     'core.navigation': [

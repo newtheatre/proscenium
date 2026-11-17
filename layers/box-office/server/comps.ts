@@ -14,6 +14,7 @@ import { orderLines } from './db/schema'
 import type { LineRow, OrderRow } from './orders'
 import { pricesFor } from './prices'
 import { poolsOf } from './setup'
+import { ensureManagedTicketTypes, managedType } from './ticket-types'
 
 const REASONS = 'box-office.comp-reason'
 const HOLD = 60_000 // not-policy: the batch confirms the order it opens; the expiry only has to be in the future
@@ -90,8 +91,10 @@ export async function approveComps(unit: UnitView, requestId: string): Promise<C
   const request = await compById(requestId)
   if (!request) refuse('box-office.comp.not-found', 'There is no such request.', { status: 404 })
   if (request.state !== 'requested') refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
-  const type = await first<{ id: string, name: string }>("SELECT id, name FROM box_office_ticket_types WHERE kind = 'complimentary' AND active = 1 ORDER BY created_at LIMIT 1")
-  if (!type) refuse('box-office.comp.no-type', 'There is no complimentary ticket type to issue them on.', { status: 409, remedy: 'Add a ticket type of the kind Complimentary first.' })
+  // Box office keeps its own Complimentary type; it is made here if this site has not listed its types yet.
+  await ensureManagedTicketTypes()
+  const type = await managedType('box-office.complimentary')
+  if (!type) refuse('box-office.comp.no-type', 'The Complimentary ticket type has been retired, so there is nothing to issue them on.', { status: 409, remedy: 'Bring it back on the Ticket types screen.' })
   const pool = (await poolsOf(request.performance_id)).find(p => p.bandId === request.band_id)
   if (!pool) refuse('box-office.comp.bad-band', 'That band is no longer on sale for this performance.', { status: 409 })
   const cap = await useSetting('box-office.comps.per-performance') as number | null

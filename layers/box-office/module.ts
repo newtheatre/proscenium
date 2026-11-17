@@ -55,6 +55,9 @@ export default defineModule({
     'performance.manage': ability({ on: 'core.performance' }),
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
+    // Selling a ticket type with a requirement to someone the seller has checked by hand, such as a
+    // member not yet recorded. Audited with the seller; the online buyer never has it.
+    'ticket-type.override-requirement': ability({ on: 'core.performance' }),
     // Seeing orders includes finding them by the buyer's name or address.
     'order.view': ability({ on: 'box-office.order', owner: 'grants', implies: ['core.account.find'] }),
     'order.sell': ability({ on: 'core.performance', implies: ['order.view'] }),
@@ -87,6 +90,23 @@ export default defineModule({
     // Another kind of code the door reads, such as a membership card. Signed here, under the same
     // purpose, so no other module handles a key; a scan of one shows what it says and admits nobody.
     'box-office.door-code': point({ kind: 'code', contract: 'door-code' }),
+    // A ticket type a module needs, such as a companion ticket for the access scheme or a member
+    // price. Box office makes it and keeps it in step: the module owns its kind, its requirements
+    // and whether it needs a paid ticket beside it, and people only rename, order, retire and price it.
+    'box-office.ticket-type': point({
+      kind: 'data',
+      schema: z.object({
+        id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+        name: z.string().min(1).max(60), // not-policy: as long as a name a person may type
+        kind: z.enum(['standard', 'concession', 'companion', 'complimentary']),
+        requirementRefs: z.array(z.string().min(3)).max(10).optional(), // not-policy: a short list of alternatives
+        needsPaidTicket: z.boolean().optional(),
+        maxPerHolder: z.number().int().min(1).max(50).optional(), // not-policy: the order cap's own ceiling
+        recheckAtEntry: z.boolean().optional(),
+        proofNote: z.string().max(120).optional(), // not-policy: one line
+        sort: z.number().int().min(0).optional(),
+      }).strict(),
+    }),
   },
 
   events: {
@@ -106,6 +126,8 @@ export default defineModule({
     },
     // The decision recorded on the Bulk cancellation screen is carried out when the core's change goes through (R-11).
     listens: {
+      // Makes the ticket types a module declares when it is switched on, Box office's own included.
+      'core.module.enabled': 'managed-ticket-types',
       'core.performance.cancelled': 'follow-cancel',
       'core.performance.rescheduled': 'follow-reschedule',
       'core.performance.moved': 'follow-move',
@@ -127,6 +149,13 @@ export default defineModule({
   },
 
   contributes: {
+    // The ticket types whose rules Box office itself fixes. Companion tickets are for people on the
+    // access scheme, up to the companions it allows them (core.access-scheme:companions); complimentary
+    // tickets are issued only by approving a request, never sold.
+    'box-office.ticket-type': [
+      { id: 'companion', name: 'Companion', kind: 'companion', requirementRefs: ['core.access-scheme:companions'], needsPaidTicket: true, recheckAtEntry: false, sort: 90 },
+      { id: 'complimentary', name: 'Complimentary', kind: 'complimentary', sort: 99 },
+    ],
     // Box office owns its part of a payment: it makes the sale real when the money arrives.
     'payments.settlement': [{ id: 'box-office' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
@@ -142,6 +171,8 @@ export default defineModule({
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
       { id: 'box-office.reports', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/reports/sales', icon: 'i-lucide-chart-column', ability: 'box-office.report.view', order: 38 },
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
+      // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
+      { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
       { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
     ],
     // Ticket money is owed to the audience until the performance has taken place.

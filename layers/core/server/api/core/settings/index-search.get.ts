@@ -7,6 +7,8 @@ import { defineRoute } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import { holds, mayOpen } from '../../../interface/navigation'
+import { holdsAdmin } from '../../../interface/viewer'
+import { moduleTabOf } from '../../../../shared/navigation'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
   const on = await enabledModules()
@@ -21,6 +23,14 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     if (on.has(module)) changers.set(homeOf(key), (changers.get(homeOf(key)) ?? new Set()).add(entry.change))
   }
   const open = new Map<string, boolean>()
+  // A module's settings are a tab of its page in Admin; console staff open them in the console's settings window.
+  let admin: boolean | undefined
+  const linkTo = async (to: string) => {
+    const tabOf = moduleTabOf({ menu: 'admin', to })
+    if (!tabOf) return to
+    admin ??= await holdsAdmin(actor)
+    return admin ? to : `/console?settings=${tabOf}`
+  }
   for (const [key, { module, entry }] of registry.settings) {
     if (!on.has(module) || entry.sensitive) continue
     const where = homeOf(key)
@@ -34,7 +44,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
       module,
       page: home.page ?? null,
       screen: home.screen ?? null,
-      to: page?.to ?? home.screen!,
+      to: await linkTo(page?.to ?? home.screen!),
       scope: (page?.place ?? (home.screen!.startsWith('/admin/') ? 'admin' : 'console')) === 'admin' ? 'site' : 'module',
       section: short.split('.')[0]!,
       labelKey: `${module}.settings.${short}.label`,

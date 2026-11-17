@@ -27,5 +27,5 @@ export default defineRoute({
     else if (value !== undefined) await setCredential(unit.view(), name, value, { scope: account!.id, by: actor.accountId ?? null, record: ['payments.provider-account', account!.id] })
   }
   await unit.commit()
-  return { keys: (await credentialStatus(provider!.secrets, account!.id)).map(({ name, source, hint }) => ({ name, source, hint })) }
+  return { keys: (await credentialStatus(provider!.secrets, account!.id)).map(({ name, source, hint, start }) => ({ name, source, hint, start })) }
 })

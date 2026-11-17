@@ -71,6 +71,8 @@ export interface NavItem {
   /** The entry's group, for a flat menu drawn in groups (My account's). */
   group?: string
   order: number
+  /** The module the entry belongs to: the console's cog opens that module's settings. */
+  module?: string
 }
 
 export interface NavGroup {
@@ -79,6 +81,18 @@ export interface NavGroup {
   icon: string
   everyday: NavItem[]
   setup: NavItem[]
+}
+
+/** The address of a module's page in Admin; its settings, set-up screens and About are tabs below it. */
+export const moduleHome = (module: string) => `/admin/modules/${module}`
+
+/**
+ * The module whose page in Admin an entry is a tab of, or undefined. An admin entry at or below
+ * /admin/modules/<module> is drawn as a tab on that module's page, not in the sidebar.
+ */
+export function moduleTabOf(entry: { menu: string, to: string }): string | undefined {
+  if (entry.menu !== 'admin') return undefined
+  return /^\/admin\/modules\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(entry.to)?.[1]
 }
 
 /** The shell an address belongs to, or undefined for a theatre's own page. */

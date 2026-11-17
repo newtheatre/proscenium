@@ -79,6 +79,11 @@ export const ticketTypes = defineTable('box_office_ticket_types', {
   proofNote: col.public(text('proof_note')),
   needsPaidTicket: col.internal(integer('needs_paid_ticket', { mode: 'boolean' }).notNull().default(false)),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  // Set on a type a module declares through box-office.ticket-type: `<module>.<id>`. The module owns
+  // its rules (kind, requirements, needing a paid ticket); people may only rename, order and price it.
+  managedBy: col.internal(text('managed_by')),
+  // The order every list shows the types in; the name breaks a tie.
+  sort: col.internal(integer('sort').notNull().default(0)),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
@@ -87,6 +92,7 @@ export const ticketTypes = defineTable('box_office_ticket_types', {
   subject: 'none',
   extra: t => [
     uniqueIndex('box_office_ticket_types_name').on(t.name),
+    uniqueIndex('box_office_ticket_types_managed').on(t.managedBy).where(sql`managed_by IS NOT NULL`),
     check('box_office_ticket_types_kind', sql`${t.kind} IN ('standard', 'concession', 'companion', 'complimentary')`),
     check('box_office_ticket_types_holder', sql`${t.maxPerHolder} >= 1`),
   ],
@@ -282,6 +288,11 @@ export const orderLines = defineTable('box_office_order_lines', {
   promoRedemptionId: col.internal(text('promo_redemption_id')),
   passRedemptionId: col.internal(text('pass_redemption_id')),
   compRequestId: col.internal(text('comp_request_id')),
+  // For a ticket type with requirements: the reference that was met and who met it, copied onto the
+  // ticket when it is issued so the door can check it again.
+  requirementRef: col.internal(text('requirement_ref')),
+  requirementAccountId: col.account('requirement_account_id', { role: 'actor', nullable: true }),
+  requirementEvidenceId: col.internal(text('requirement_evidence_id')),
   state: col.internal(text('state', { enum: ['live', 'cancelled', 'exchanged'] }).notNull().default('live')),
   replacesLineId: col.ref('box_office_order_lines', { nullable: true }),
   createdAt: col.createdAt(),
@@ -293,6 +304,7 @@ export const orderLines = defineTable('box_office_order_lines', {
   extra: t => [
     index('box_office_order_lines_order').on(t.orderId),
     index('box_office_order_lines_performance').on(t.performanceId, t.state).where(sql`performance_id IS NOT NULL`),
+    index('box_office_order_lines_requirement').on(t.performanceId, t.ticketTypeId).where(sql`requirement_ref IS NOT NULL`),
     uniqueIndex('box_office_order_lines_claim').on(t.claimId).where(sql`claim_id IS NOT NULL`),
     check('box_office_order_lines_kind', sql`${t.kind} IN ('ticket', 'booking_fee', 'donation', 'pass_sale', 'exchange_fee', 'adjustment')`),
     check('box_office_order_lines_ticket', sql`${t.kind} <> 'ticket' OR (${t.performanceId} IS NOT NULL AND ${t.bandId} IS NOT NULL AND ${t.ticketTypeId} IS NOT NULL AND ${t.claimId} IS NOT NULL)`),

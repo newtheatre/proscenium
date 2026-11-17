@@ -1,10 +1,12 @@
 // Scanning with the camera, in a real browser with a pretend camera that shows a QR code: at the desk
 // a reservation's box office code is scanned and the booking opens; at the door a ticket is scanned
-// and admitted, then scanned again and found already in. Chromium's fake camera plays a Y4M file,
+// and admitted, then scanned again and found already in. The door in live mode opens with the camera
+// running, admits a ticket at once, and sends an unpaid reservation to the box office or the bar. Chromium's fake camera plays a Y4M file,
 // which is made here from the code, so what the camera "sees" is a real QR code read by the page.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { test, expect, type APIRequestContext, type Browser, type Page } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 import { encode } from 'uqr'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -19,6 +21,7 @@ let performanceId = ''
 let reference = ''
 let deskCode = ''
 let doorCode = ''
+let liveCode = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, headers: Record<string, string> = {}) {
   const response = await api.post(path, { data, headers: { 'idempotency-key': crypto.randomUUID(), ...headers } })
@@ -91,6 +94,9 @@ test.beforeAll(async ({ playwright }) => {
   const second = await post(buyer, '/api/box-office/baskets', { performanceId, lines: [{ bandId: band.bandId, ticketTypeId: free.ticketTypeId, quantity: 1 }] })
   const confirmed = await post(buyer, `/api/box-office/baskets/${second.orderId}/checkout`, { expectedTotalMinor: 0, email: `scan.door.${stamp}@example.org` }, { 'x-basket-token': second.token })
   doorCode = confirmed.doorCodes[0]
+  // Another, for the door in live mode.
+  const third = await post(buyer, '/api/box-office/baskets', { performanceId, lines: [{ bandId: band.bandId, ticketTypeId: free.ticketTypeId, quantity: 1 }] })
+  liveCode = (await post(buyer, `/api/box-office/baskets/${third.orderId}/checkout`, { expectedTotalMinor: 0, email: `scan.live.${stamp}@example.org` }, { 'x-basket-token': third.token })).doorCodes[0]
   await buyer.dispose()
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
@@ -139,6 +145,40 @@ test('the door admits a ticket scanned with the camera, and knows it when it com
     await page.getByRole('dialog').getByLabel('Or type the code').fill('NOT-A-CODE')
     await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
     await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'This code is not one of ours.' })).toBeVisible()
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+test('the door in live mode opens scanning, admits a ticket, and says Not paid for a reservation', async ({ playwright }) => {
+  const { browser, page } = await withCamera(playwright.chromium, cameraShowing(liveCode, `live-${stamp}`))
+  try {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await visit(page, `/live/door/${performanceId}`)
+    const banner = page.getByRole('status').filter({ hasText: /Admitted/ })
+    await expect(banner).toBeVisible({ timeout: 15_000 })
+    await expect(banner).toContainText(/1 of 1 on \S+ in/)
+    await expect(page.getByText(/^\d+ of \d+ in$/)).toBeVisible()
+    await page.screenshot({ path: 'test-results/live-door-desktop.png' })
+
+    // Pausing stops the camera; a reservation's code typed in is sent to pay.
+    await page.getByRole('button', { name: 'Pause camera' }).click()
+    await expect(page.getByText('Camera paused')).toBeVisible()
+    await page.getByRole('button', { name: 'Type a code' }).click()
+    await page.getByRole('dialog').getByLabel('Or type the code').fill(deskCode)
+    await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
+    const unpaid = page.getByRole('status').filter({ hasText: 'Not paid' })
+    await expect(unpaid).toBeVisible()
+    await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the box office or the bar to pay.`)
+    await expect(page.getByRole('dialog')).toBeHidden()
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
+    expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('button', { name: 'Resume camera' }).click()
+    await page.waitForTimeout(500)
+    await page.screenshot({ path: 'test-results/live-door-phone.png' })
   }
   finally {
     await browser.close()

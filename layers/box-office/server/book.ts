@@ -2,11 +2,12 @@
 // one performance of a published production, whether it is on sale, and each band's ticket types
 // and prices. It never says how many seats the house holds or how many are sold: a band is either
 // available or sold out.
-import { all, refuse, useSetting } from '#kit'
+import { refuse, requirements, useContext, useSetting } from '#kit'
 import { getPerformance, getProduction } from '#modules/core'
 import { availability } from './availability'
 import { timingFor, type PaymentTiming } from './reservations'
 import { salesOf } from './setup'
+import { sellableTypes } from './ticket-types'
 
 export interface BookingPage {
   performance: { id: string, startsAt: number, venue: string, state: string }
@@ -21,7 +22,11 @@ export interface BookingPage {
     bandId: string
     name: string
     soldOut: boolean
-    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number }[]
+    /**
+     * `most` is how many this visitor may have, for a type with requirements they meet; `unmet` is
+     * the source's own words when they do not, and the type cannot be chosen.
+     */
+    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string }[]
   }[]
 }
 
@@ -33,8 +38,19 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     refuse('box-office.book.not-found', 'There is no such performance.', { status: 404 })
   const found = await availability(performanceId)
   const sales = await salesOf(performanceId)
-  const types = new Map((await all<{ id: string, name: string, kind: string, proof_note: string | null, needs_paid_ticket: number, active: number }>(
-    'SELECT id, name, kind, proof_note, needs_paid_ticket, active FROM box_office_ticket_types')).map(t => [t.id, t]))
+  const types = await sellableTypes()
+  // What the visitor may have of each type with requirements, judged for them alone. A type whose
+  // source is off is withheld; a companion type is shown only to someone it is for.
+  const account = useContext().actor.accountId ?? null
+  const judged = new Map<string, { most?: number, unmet?: string } | null>()
+  for (const type of types.values()) {
+    if (!type.requirementRefs.length) continue
+    const answers = await requirements.check({ accounts: [account], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
+    const met = answers.find(a => a.verdict === 'met' && !a.unavailable)
+    if (met) judged.set(type.id, { most: met.quantity ?? type.maxPerHolder })
+    else if (answers.every(a => a.unavailable) || type.kind === 'companion') judged.set(type.id, null)
+    else judged.set(type.id, { unmet: answers.find(a => a.reason)?.reason ?? 'Only for people who qualify.' })
+  }
   return {
     performance: { id: performance.id, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}`, state: performance.state },
     production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle },
@@ -50,9 +66,9 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
       types: b.prices.flatMap((p) => {
         const type = types.get(p.ticketTypeId)
         // Complimentary tickets are given, never bought.
-        if (!type || !type.active || type.kind === 'complimentary') return []
-        return [{ ticketTypeId: type.id, name: type.name, kind: type.kind, proofNote: type.proof_note, needsPaidTicket: !!type.needs_paid_ticket || type.kind === 'companion', amountMinor: p.amountMinor }]
-      }),
+        if (!type || type.kind === 'complimentary' || judged.get(type.id) === null) return []
+        return [{ ticketTypeId: type.id, name: type.name, kind: type.kind, proofNote: type.proofNote, needsPaidTicket: type.needsPaidTicket || type.kind === 'companion', amountMinor: p.amountMinor, sort: type.sort, ...judged.get(type.id) }]
+      }).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(({ sort: _, ...type }) => type),
     })).filter(b => b.types.length),
   }
 }

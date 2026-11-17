@@ -35,10 +35,15 @@ test.describe('staff with the gallery abilities', () => {
     await expect(page.getByRole('dialog').getByRole('option').first()).toBeVisible()
   })
 
-  test('the settings search finds a setting by a word in its help', async ({ page }) => {
-    await visit(page, '/console/gallery/settings')
-    await page.getByRole('searchbox').first().fill('seats')
-    await expect(page.getByText('Most seats in one order').first()).toBeVisible()
+  test('the settings search finds a setting by a word in its help and opens it in the console\'s settings window', async ({ page }) => {
+    await visit(page, '/console/gallery/list')
+    await page.getByRole('button', { name: 'Search' }).first().click()
+    await page.getByRole('dialog').getByRole('textbox').fill('seats')
+    const hit = page.getByRole('dialog').getByRole('option', { name: /Most seats in one order/ })
+    await expect(hit).toBeVisible()
+    await hit.click()
+    await expect(page).toHaveURL(/settings=gallery&setting=gallery\./)
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'Gallery settings' })).toBeVisible()
   })
 })
 

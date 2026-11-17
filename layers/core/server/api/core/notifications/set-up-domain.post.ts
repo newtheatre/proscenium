@@ -19,7 +19,7 @@ export default defineRoute({
   const plan = await automaticPlan(event)
   if (plan.unavailable === 'workers-dev') refuse('core.notifications.automatic-workers-dev', 'A site on workers.dev cannot send email from its own address.', { status: 409, remedy: 'Add a custom domain to the Worker, open the site there, then try again.' })
   if (plan.unavailable === 'local') refuse('core.notifications.automatic-local', 'This site has no public domain to send email from.', { status: 409 })
-  if (plan.unavailable === 'no-token') refuse('core.notifications.automatic-no-token', 'Setting the domain up automatically needs a Cloudflare token.', { status: 409, remedy: 'Set the CORE_CLOUDFLARE_TOKEN secret on the Worker, with Email Sending edit and Zone read, or set the domain up by hand.' })
+  if (plan.unavailable === 'no-token') refuse('core.notifications.automatic-no-token', 'Setting the domain up automatically needs a Cloudflare token.', { status: 409, remedy: 'Save a Cloudflare token with Email Sending edit and Zone read under Keys on this page, or set the domain up by hand.' })
   const name = plan.proposed!
   const current = await useSetting('core.notifications.sending-domain') as string | null
   if (current && current !== name && input.replace !== true)

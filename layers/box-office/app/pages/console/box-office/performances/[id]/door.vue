@@ -2,7 +2,8 @@
      with how many of their tickets are used. Those still to arrive are the default view. Each row
      opens the order. A buyer with no ticket to scan is admitted from their row, one or all.
      Tickets and membership cards are scanned with the device's camera, one after another, or their
-     code typed in the same dialog; the result shows at once there and as a message. -->
+     code typed in the same dialog; the result shows at once there and as a message. The door itself
+     is the scanner in live mode, one button away. -->
 <script setup lang="ts">
 import { doorList } from '../../../../../../shared/lists'
 
@@ -84,6 +85,11 @@ const trail = computed(() => [
     :empty="{ title: t('box-office.door.empty.title'), description: t('box-office.door.empty.description'), icon: 'i-lucide-door-open' }"
   >
     <template #primary>
+      <UButton
+        :to="`/live/door/${encodeURIComponent(id)}`"
+        icon="i-lucide-maximize"
+        :label="t('box-office.door.open-live')"
+      />
       <CodeScanButton
         continuous
         typing

@@ -2,7 +2,7 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, setting, task, credentialDecl } from '#kit'
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
 
@@ -386,9 +386,10 @@ export const jobs = {
   'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
 }
 
-// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard.
-export const secrets = {
-  CORE_CLOUDFLARE_TOKEN: secret({ needed: 'optional' }),
+// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard. Typed
+// on Admin > Email sending (Matt, 17 November), or set as a Worker secret of the same name.
+export const credentials = {
+  CORE_CLOUDFLARE_TOKEN: credentialDecl({ needed: 'optional', manage: 'core.sender.manage' }),
 }
 
 export const calls = {

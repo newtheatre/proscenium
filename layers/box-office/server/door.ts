@@ -26,6 +26,22 @@ export interface ScanOutcome {
   ticketPerformanceId?: string
   /** A code of another kind (box-office.door-code), such as a membership card: what it says. */
   card?: { kind: string, headline: string, line: string, state: 'ok' | 'attention' }
+  /** Admitted or already in: the ticket and how much of its booking is in now. */
+  booking?: { reference: string, ticketType: string, admitted: number, tickets: number }
+  /** Not paid: the reservation the door sends to the box office or the bar, and what is owed. */
+  reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
+}
+
+/** The booking a ticket belongs to, at this performance: its reference, the ticket's type, and how many are in. */
+async function bookingOf(ticketId: string, performanceId: string): Promise<ScanOutcome['booking']> {
+  const row = await first<{ reference: string, type_name: string, order_id: string }>(
+    `SELECT o.reference, y.name AS type_name, o.id AS order_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id
+      JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types y ON y.id = l.ticket_type_id WHERE t.id = ?`, ticketId)
+  if (!row) return undefined
+  const counts = await first<{ tickets: number, admitted: number }>(
+    `SELECT count(*) AS tickets, sum(CASE WHEN t.admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted FROM box_office_tickets t
+      JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ? AND t.performance_id = ? AND t.state = 'valid'`, row.order_id, performanceId)
+  return { reference: row.reference, ticketType: row.type_name, admitted: Number(counts?.admitted ?? 0), tickets: Number(counts?.tickets ?? 0) }
 }
 
 export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null }
@@ -64,8 +80,13 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   }
   if (parts.length !== PARTS || parts[0] !== TICKET_KIND) {
     // What a reservation's message carries is not a ticket: the desk takes the payment first.
-    const reservation = await first<{ id: string }>("SELECT id FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
-    if (reservation) return { result: 'not_paid', scanId: null }
+    const reservation = await first<{ id: string, reference: string, total_minor: number, currency: string }>("SELECT id, reference, total_minor, currency FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
+    if (reservation) {
+      const lines = await all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live'", reservation.id)
+      // A reservation for another night is that, whether paid or not.
+      if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ticketPerformanceId: lines[0]!.performance_id }
+      return { result: 'not_paid', scanId: null, reservation: { reference: reservation.reference, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: reservation.total_minor, currency: reservation.currency } }
+    }
     return recorded({ result: 'unknown' })
   }
   const [kind, keyId, random, signature] = parts as [string, string, string, string]
@@ -85,9 +106,10 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   })
   await unit.commit()
   const written = await first<{ result: 'admitted' | 'already_admitted' }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
-  if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id }
+  const booking = await bookingOf(ticket.id, input.performanceId)
+  if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id, booking }
   const earlier = await first<{ scanned_at: number, device_label: string | null }>('SELECT s.scanned_at, s.device_label FROM box_office_tickets t JOIN box_office_scans s ON s.id = t.admitted_scan_id WHERE t.id = ?', ticket.id)
-  return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null }
+  return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null, booking }
 }
 
 export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null }
@@ -122,4 +144,13 @@ export async function admitByName(input: AdmitByNameInput): Promise<{ admitted: 
   await unit.commit()
   const written = await all<{ id: string }>(`SELECT id FROM box_office_scans WHERE result = 'admitted' AND id IN (${scanIds.map(() => '?').join(', ')})`, ...scanIds)
   return { admitted: written.length, scanIds: written.map(r => r.id) }
+}
+
+export interface DoorSummary { tickets: number, admitted: number }
+
+/** How many valid tickets a performance has, and how many of them are in. */
+export async function doorSummary(performanceId: string): Promise<DoorSummary> {
+  const row = await first<{ tickets: number, admitted: number | null }>(
+    "SELECT count(*) AS tickets, sum(CASE WHEN admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted FROM box_office_tickets WHERE performance_id = ? AND state = 'valid'", performanceId)
+  return { tickets: Number(row?.tickets ?? 0), admitted: Number(row?.admitted ?? 0) }
 }

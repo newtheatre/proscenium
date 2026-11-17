@@ -13,7 +13,7 @@ export default defineRoute({ ability: 'payments.provider.manage', rateLimit: 'de
       const keys = known.has(r.provider) ? await credentialStatus(known.get(r.provider)!.secrets, r.id) : []
       return {
         id: r.id, provider: r.provider, label: r.label, channels: JSON.parse(r.channels) as string[], mode: r.mode, externalRef: r.external_ref, active: r.active === 1,
-        keys: keys.map(({ name, source, hint }) => ({ name, source, hint })),
+        keys: keys.map(({ name, source, hint, start }) => ({ name, source, hint, start })),
         missingKeys: keys.filter(k => !k.source).map(k => k.name),
       }
     })),
