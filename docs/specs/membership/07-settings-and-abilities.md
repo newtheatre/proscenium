@@ -13,7 +13,18 @@ Each manifest declares `settingGroups`, and every setting has exactly one home. 
 | `membership-fees` | `checkout`, `refunds` and its other groups | The module's own page, `/console/membership-fees/settings`, place console |
 | `membership-fees` | `retention` | Marked `advanced`: drawn on `/admin/advanced` under the module's name |
 
-Each group's `change` ability is its module's settings ability, so each page shows one "Changed by people who can..." line. No setting here is declared `onChange: 'confirm'` or `'reason'`, so none asks for anything extra on saving. Every `duration` setting is entered with the kit's `DurationInput` (a number and a unit, a month being 30 days and a year 365); the stored value and the defaults and limits written below are unchanged.
+Each group's `change` ability is its module's settings ability, so each page shows one "Changed by people who can..." line. Six settings are declared `onChange: 'confirm'`, so saving one shows what will change, asks again, and asks for a fresh sign-in when the session is not fresh:
+
+| Setting | Why a silent change would matter |
+| --- | --- |
+| `membership.voting.qualifying-period` | Shortening it widens who may vote |
+| `membership.verification.list-keep-for` | Shortening it removes list entries at the next sweep, which changes who is verified and who gets a member price by reference |
+| `membership.retention.ended-after` | Shortening it anonymises ended memberships that cannot be brought back |
+| `membership-fees.refunds.cooling-off` | It is a public promise of a full refund, shown on the join page |
+| `membership-fees.retention.charges` | Shortening it removes charge rows that cannot be brought back |
+| `membership.verification.names-keep-for` | Shortening it erases names from list entries at the next sweep. Every setting whose value is a retention period is confirmed, here as in every module |
+
+No other setting asks for anything extra: the rest are starting values for new schemes, wording, or reminders, and a wrong value is put right by changing it back. Fee amounts and each scheme's verifier are not settings; they are changed on the scheme's own screen under their own abilities and are audited there. None is declared `'reason'`. Every `duration` setting is entered with the kit's `DurationInput` (a number and a unit, a month being 30 days and a year 365); the stored value and the defaults and limits written below are unchanged.
 
 ## Settings of `membership`
 

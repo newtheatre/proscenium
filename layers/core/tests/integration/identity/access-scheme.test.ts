@@ -244,7 +244,7 @@ describe('reading for a purpose (ID-39)', () => {
     await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })
     const answer = (await read()).body
     expect(answer.shared).toBe(true)
-    expect(answer.needs).toEqual(expect.arrayContaining([{ key: 'crowds', label: 'Difficulty with crowds', note: 'Quiet corner' }, { key: 'standing', label: 'Difficulty standing or queueing' }]))
+    expect(answer.needs).toEqual(expect.arrayContaining([{ key: 'crowds', label: 'Crowds and busy spaces', note: 'Quiet corner' }, { key: 'standing', label: 'Standing or queueing' }]))
     // The person sees the read, with the purpose.
     const reads = (await browser.get('/api/core/me/access')).body.reads
     expect(reads.some((r: any) => r.purpose === 'core.welfare')).toBe(true)
@@ -259,6 +259,46 @@ describe('reading for a purpose (ID-39)', () => {
     // Switching off stops reads at once.
     await browser.put('/api/core/me/access/sharing', { purpose: 'core.welfare', on: false })
     expect((await read()).body).toEqual({ shared: false })
+  })
+})
+
+describe('the wheelchair question and the entries the form sets (ID-38)', () => {
+  it('takes one wheelchair answer, refuses both, and adds the companion and "anything else" entries itself', async () => {
+    const { browser, need } = await applicant()
+    const both = await browser.post('/api/core/me/access', { needs: [{ term: need['wheelchair-stays'] }, { term: need['wheelchair-transfers'] }], companions: 0 })
+    expect(both.body.code).toBe('core.access.wheelchair-both')
+    // A wheelchair answer alone is enough to apply.
+    expect((await browser.post('/api/core/me/access', { needs: [{ term: need['wheelchair-transfers'] }], companions: 1, other: 'A seat on the end of a row' })).status).toBe(200)
+    const pending = (await browser.get('/api/core/me/access')).body.application.pending
+    expect(pending.needs.map((n: any) => n.term)).toEqual([need['wheelchair-transfers'], need['essential-companion'], need.other])
+    expect(pending.other).toBe('A seat on the end of a row')
+  })
+
+  it('offers each need with a plain description', async () => {
+    const { browser } = await applicant()
+    const needs = (await browser.get('/api/core/me/access')).body.needs as { key: string, label: string, description: string | null }[]
+    expect(needs.find(n => n.key === 'level-access')).toMatchObject({ label: 'Steps and stairs', description: expect.stringMatching(/ramp, a lift or a level route/) })
+    expect(needs.every(n => n.description)).toBe(true)
+  })
+})
+
+describe('apply for someone from the list (ID-42)', () => {
+  it('finds or makes the account and sends nothing, and says when they have applied already', async () => {
+    const desk = await reviewer()
+    const address = `caller-${Date.now()}@example.org`
+    const made = await desk.browser.post('/api/core/access-scheme/people', { name: 'Cal Caller', address })
+    expect(made.status).toBe(200)
+    expect(made.body).toMatchObject({ applied: false })
+    await deliver()
+    expect(to(address)).toEqual([])
+    const again = await desk.browser.post('/api/core/access-scheme/people', { name: 'Cal Caller', address })
+    expect(again.body.accountId).toBe(made.body.accountId)
+    const { need } = await applicant()
+    expect((await desk.browser.post(`/api/core/access-scheme/${made.body.accountId}/application`, { needs: [{ term: need.standing }], companions: 0 })).status).toBe(200)
+    expect((await desk.browser.post('/api/core/access-scheme/people', { name: 'Cal Caller', address })).body.applied).toBe(true)
+    // Only reviewers may, and not for themselves.
+    const outsider = await staff()
+    expect((await outsider.browser.post('/api/core/access-scheme/people', { name: 'X', address })).status).toBe(403)
   })
 })
 
