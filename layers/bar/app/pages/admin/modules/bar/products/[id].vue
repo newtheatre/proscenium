@@ -3,8 +3,8 @@
      rung up keeps what it was charged. A size or product that has been sold is retired, not deleted. -->
 <script setup lang="ts">
 interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
-interface Variant { id: string, name: string, barcode: string | null, active: boolean, prices: VariantPrice[] }
-interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, active: boolean, variants: Variant[] }
+interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
+interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, active: boolean, groupIds: string[], variants: Variant[] }
 interface List { id: string, name: string, standard: boolean, percentOff: number | null }
 
 const { t } = useT()
@@ -15,27 +15,40 @@ const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], lists: List[], canPrice: boolean }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
+const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], groups: { id: string, name: string }[], lists: List[], canPrice: boolean, canAllergens: boolean }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/admin/modules/bar/products' }])
 const categoryItems = computed(() => (data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name })))
 
-// The product's own fields.
-const editing = ref<{ name: string, categoryId: string, ageRestricted: boolean } | null>(null)
+const groupItems = computed(() => (data.value?.groups ?? []).map(g => ({ value: g.id, label: g.name })))
+const isMixer = computed(() => !!data.value?.product.variants.some(v => v.mixerMeasure && v.active))
+const groupNames = computed(() => (data.value?.product.groupIds ?? []).map(g => data.value!.groups.find(x => x.id === g)?.name).filter(Boolean).join(', '))
+
+// The product's own fields, the choices it asks at the till, and whether it can be a mixer.
+const editing = ref<{ name: string, categoryId: string, age: 'category' | 'yes' | 'no', groupIds: string[], mixer: boolean } | null>(null)
+const ageItems = computed(() => [
+  { value: 'category', label: t('bar.screens.add-product.age-as-category-plain') },
+  { value: 'yes', label: t('bar.screens.product.age-yes') },
+  { value: 'no', label: t('bar.screens.product.age-no') },
+])
 function edit() {
   const p = data.value!.product
   refusal.value = null
-  editing.value = { name: p.name, categoryId: p.categoryId, ageRestricted: p.ageRestricted }
+  editing.value = { name: p.name, categoryId: p.categoryId, age: p.ageFromCategory ? 'category' : p.ageRestricted ? 'yes' : 'no', groupIds: [...p.groupIds], mixer: isMixer.value }
 }
 async function patch(body: Record<string, unknown>) {
   await $api(`/api/bar/products/${id.value}` as string, { method: 'PATCH', body })
   await refresh()
 }
 async function save() {
+  const { groupIds, mixer, age, ...rest } = editing.value!
+  const fields = { ...rest, ageRestricted: age === 'category' ? null : age === 'yes' }
   refusal.value = null
   try {
-    await patch(editing.value!)
+    if (groupIds.join() !== data.value!.product.groupIds.join()) await $api(`/api/bar/products/${id.value}/choices` as string, { method: 'POST', body: { groupIds } })
+    if (mixer !== isMixer.value) await $api(`/api/bar/products/${id.value}/mixer` as string, { method: 'POST', body: { on: mixer } })
+    await patch(fields)
     editing.value = null
     toast.add({ title: t('bar.screens.product.saved'), color: 'success' })
   }
@@ -96,6 +109,46 @@ async function savePrice() {
     pricing.value = null
     toast.add({ title: t('bar.screens.product.price-saved'), color: 'success' })
     await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
+// Allergens, read from the label: two sets of the 14, and where the answer came from.
+const ALLERGENS = ['gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs'] as const
+type Answer = { contains: string[], mayContain: string[], checked: boolean, checkedAt: number | null }
+const allergens = ref<Answer | null>(null)
+async function loadAllergens() {
+  if (!data.value?.canAllergens) return
+  allergens.value = (await $api<{ answer: Answer }>(`/api/bar/products/${id.value}/allergens` as string)).answer
+}
+watch(() => data.value?.canAllergens, loadAllergens, { immediate: true })
+const allergenItems = computed(() => ALLERGENS.map(k => ({ value: k as string, label: t(`bar.allergen.${k}`) })))
+const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
+const allergenFacts = computed(() => {
+  const a = allergens.value
+  if (!a?.checked) return [{ label: t('bar.screens.product.allergens-state'), value: t('bar.screens.product.allergens-unchecked') }]
+  return [
+    { label: t('bar.screens.product.contains'), value: a.contains.length ? named(a.contains) : t('bar.screens.product.none-listed') },
+    { label: t('bar.screens.product.may-contain'), value: a.mayContain.length ? named(a.mayContain) : t('bar.screens.product.none-listed') },
+    { label: t('bar.screens.product.checked'), value: dateTime(a.checkedAt!) },
+  ]
+})
+const label = ref<{ contains: string[], mayContain: string[], source: 'label' | 'supplier' | 'other' } | null>(null)
+const sourceItems = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(`bar.screens.product.sources.${s}`) })))
+function editAllergens() {
+  refusal.value = null
+  label.value = { contains: [...allergens.value?.contains ?? []], mayContain: [...allergens.value?.mayContain ?? []], source: 'label' }
+}
+async function saveAllergens() {
+  const l = label.value!
+  refusal.value = null
+  try {
+    await $api(`/api/bar/products/${id.value}/allergens` as string, { method: 'POST', body: { ...l, mayContain: l.mayContain.filter(k => !l.contains.includes(k)) } })
+    label.value = null
+    toast.add({ title: t('bar.screens.product.allergens-saved'), color: 'success' })
+    await loadAllergens()
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -163,9 +216,28 @@ function planned(v: Variant, l: List): string | null {
           <FactStrip
             :facts="[
               { label: t('bar.screens.products.category'), value: data.categories.find(c => c.id === data!.product.categoryId)?.name ?? '' },
-              { label: t('bar.screens.product.age-check'), value: data.product.ageRestricted ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no') },
+              { label: t('bar.screens.product.age-check'), value: (data.product.ageRestricted ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no')) + (data.product.ageFromCategory ? ` ${t('bar.screens.product.from-category')}` : '') },
+              { label: t('bar.screens.product.choices'), value: groupNames || t('bar.screens.product.no-choices') },
+              { label: t('bar.screens.product.mixer'), value: isMixer ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no') },
             ]"
           />
+        </PageSection>
+
+        <PageSection
+          v-if="data.canAllergens && allergens"
+          :title="t('bar.screens.product.allergens')"
+          :description="t('bar.screens.product.allergens-help')"
+        >
+          <template #actions>
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-clipboard-check"
+              :label="t('bar.screens.product.check-label')"
+              @click="editAllergens"
+            />
+          </template>
+          <FactStrip :facts="allergenFacts" />
         </PageSection>
 
         <PageSection
@@ -238,10 +310,33 @@ function planned(v: Variant, l: List): string | null {
               :items="categoryItems"
             />
           </UFormField>
+          <UFormField
+            :label="t('bar.screens.product.age-check')"
+            :help="t('bar.screens.products.age-check-help')"
+            name="age"
+          >
+            <USelect
+              v-model="editing.age"
+              :items="ageItems"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('bar.screens.product.choices')"
+            :help="t('bar.screens.product.choices-help')"
+            name="groupIds"
+          >
+            <USelectMenu
+              v-model="editing.groupIds"
+              :items="groupItems"
+              value-key="value"
+              multiple
+              :placeholder="t('bar.screens.product.no-choices')"
+            />
+          </UFormField>
           <UCheckbox
-            v-model="editing.ageRestricted"
-            :label="t('bar.screens.products.age-check')"
-            :description="t('bar.screens.products.age-check-help')"
+            v-model="editing.mixer"
+            :label="t('bar.screens.product.mixer-tick')"
+            :description="t('bar.screens.product.mixer-help')"
           />
         </UForm>
       </template>
@@ -298,6 +393,63 @@ function planned(v: Variant, l: List): string | null {
           type="submit"
           form="bar-size"
           :label="t('bar.screens.save')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      :open="!!label"
+      :title="t('bar.screens.product.check-label')"
+      @update:open="v => { if (!v) label = null }"
+    >
+      <template #body>
+        <UForm
+          v-if="label"
+          id="bar-allergens"
+          novalidate
+          :state="label"
+          class="space-y-4"
+          @submit="saveAllergens"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <p class="text-sm text-muted">
+            {{ t('bar.screens.product.check-label-help') }}
+          </p>
+          <UFormField name="contains">
+            <UCheckboxGroup
+              v-model="label.contains"
+              :legend="t('bar.screens.product.contains')"
+              :items="allergenItems"
+              class="columns-2"
+            />
+          </UFormField>
+          <UFormField
+            :help="t('bar.screens.product.may-contain-help')"
+            name="mayContain"
+          >
+            <UCheckboxGroup
+              v-model="label.mayContain"
+              :legend="t('bar.screens.product.may-contain')"
+              :items="allergenItems.filter(i => !label!.contains.includes(i.value))"
+              class="columns-2"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('bar.screens.product.source')"
+            name="source"
+          >
+            <USelect
+              v-model="label.source"
+              :items="sourceItems"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="bar-allergens"
+          :label="t('bar.screens.product.allergens-record')"
         />
       </template>
     </UModal>

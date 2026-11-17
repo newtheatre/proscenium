@@ -5,6 +5,7 @@ import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#ki
 import { priceOn, nextChange, type ListRule, type PriceRow } from './pricing'
 import type { OUTLET_KINDS, TILL_LAYOUTS } from './db/schema'
 import { choiceGroups, groupsByProduct, priceGroups, type ChoiceGroup } from './choices'
+import { allergenAnswers, allergenSettings, tillAllergens, type ItemAllergens, type OptionAllergens } from './allergens'
 
 export const STANDARD = 'standard'
 
@@ -33,8 +34,8 @@ const currency = async () => await useSetting('core.locale.currency') as string
 export interface PriceList { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
 export interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
 export interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, position: number, active: boolean, prices: VariantPrice[] }
-export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, position: number, active: boolean, groupIds: string[], variants: Variant[] }
-export interface Category { id: string, name: string, position: number, colour: string | null, parentId: string | null, active: boolean, products: Product[] }
+export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, position: number, active: boolean, groupIds: string[], variants: Variant[] }
+export interface Category { id: string, name: string, position: number, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
 
 interface ListRow { id: string, name: string, system_key: string | null, restricted: number, falls_back: number, percent_off: number | null, active: number }
 
@@ -56,8 +57,8 @@ const rule = (l: PriceList): ListRule => ({ id: l.id, percentOff: l.percentOff, 
 /** The whole catalogue, with each variant's price in force on every list and any change planned. */
 export async function catalogue(options: { activeOnly?: boolean } = {}): Promise<{ categories: Category[], lists: PriceList[], currency: string }> {
   const active = options.activeOnly ? 'WHERE active = 1' : ''
-  const cats = await all<{ id: string, name: string, position: number, colour: string | null, parent_id: string | null, active: number }>(`SELECT id, name, position, colour, parent_id, active FROM bar_categories ${active} ORDER BY position, lower(name), id`)
-  const prods = await all<{ id: string, category_id: string, name: string, age_restricted: number, position: number, active: number }>(`SELECT id, category_id, name, age_restricted, position, active FROM bar_products ${active} ORDER BY position, lower(name), id`)
+  const cats = await all<{ id: string, name: string, position: number, colour: string | null, parent_id: string | null, age_restricted: number, usual_preset: string | null, active: number }>(`SELECT id, name, position, colour, parent_id, age_restricted, usual_preset, active FROM bar_categories ${active} ORDER BY position, lower(name), id`)
+  const prods = await all<{ id: string, category_id: string, name: string, age_restricted: number, age_from_category: number, position: number, active: number }>(`SELECT p.id, p.category_id, p.name, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted, p.age_from_category, p.position, p.active FROM bar_products p JOIN bar_categories c ON c.id = p.category_id ${options.activeOnly ? 'WHERE p.active = 1' : ''} ORDER BY p.position, lower(p.name), p.id`)
   const vars = await all<{ id: string, product_id: string, name: string, barcode: string | null, mixer_measure: number, position: number, active: number }>(`SELECT id, product_id, name, barcode, mixer_measure, position, active FROM bar_variants ${active} ORDER BY position, id`)
   const attached = await groupsByProduct()
   const lists = await priceLists()
@@ -78,17 +79,17 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
   const productsOf = new Map<string, Product[]>()
   for (const p of prods) {
     const list = productsOf.get(p.category_id) ?? []
-    list.push({ id: p.id, categoryId: p.category_id, name: p.name, ageRestricted: !!p.age_restricted, position: p.position, active: !!p.active, groupIds: attached.get(p.id) ?? [], variants: variantsOf.get(p.id) ?? [] })
+    list.push({ id: p.id, categoryId: p.category_id, name: p.name, ageRestricted: !!p.age_restricted, ageFromCategory: !!p.age_from_category, position: p.position, active: !!p.active, groupIds: attached.get(p.id) ?? [], variants: variantsOf.get(p.id) ?? [] })
     productsOf.set(p.category_id, list)
   }
   return {
-    categories: cats.map(c => ({ id: c.id, name: c.name, position: c.position, colour: c.colour, parentId: c.parent_id, active: !!c.active, products: productsOf.get(c.id) ?? [] })),
+    categories: cats.map(c => ({ id: c.id, name: c.name, position: c.position, colour: c.colour, parentId: c.parent_id, ageRestricted: !!c.age_restricted, usualPreset: c.usual_preset, active: !!c.active, products: productsOf.get(c.id) ?? [] })),
     lists,
     currency: await currency(),
   }
 }
 
-export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string, groupIds: string[], baseMinor: number }
+export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string, groupIds: string[], baseMinor: number, allergens?: ItemAllergens }
 export interface Menu {
   outletId: string
   outlet: string
@@ -100,7 +101,10 @@ export interface Menu {
   percentOff: number | null
   currency: string
   categories: { id: string, name: string, colour: string | null, parentId: string | null, items: MenuItem[] }[]
-  groups: ChoiceGroup[]
+  // Each option carries allergens too while they are switched on.
+  groups: (ChoiceGroup & { options: (ChoiceGroup['options'][number] & { allergens?: OptionAllergens })[] })[]
+  // The theatre's statement about shared equipment; null when it has none or allergens are off.
+  allergenStatement: string | null
 }
 
 /**
@@ -119,6 +123,16 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
   const { categories } = await catalogue({ activeOnly: true })
   const rows = await priceRows()
   const at = nowMs()
+  // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
+  // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
+  const priced = priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
+    const found = priceOn(rows, variantId, rule(percent ? standardList! : list!), std, at)
+    return found ? found.amountMinor : null
+  })
+  // Allergens ride on the menu, so the till's sheet works from what it loaded. Left off when switched off.
+  const allergenSet = await allergenSettings()
+  const productOfVariant = new Map(categories.flatMap(c => c.products.flatMap(p => p.variants.map(v => [v.id, p.id] as const))))
+  const al = allergenSet.enabled ? tillAllergens(await allergenAnswers(), priced, productOfVariant) : null
   return {
     outletId: outlet!.id,
     outlet: outlet!.name,
@@ -139,15 +153,11 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
         if (!priced) return []
         // The price the picks are added to: Standard's on a percentage list, which then takes its percentage off the whole.
         const base = percent ? priceOn(rows, v.id, rule(standardList!), std, at)?.amountMinor ?? priced.amountMinor : priced.amountMinor
-        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base }]
+        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base, ...(al ? { allergens: al.product(p.id, p.groupIds) } : {}) }]
       })),
     }))),
-    // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
-    // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
-    groups: priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
-      const priced = priceOn(rows, variantId, rule(percent ? standardList! : list!), std, at)
-      return priced ? priced.amountMinor : null
-    }),
+    groups: al ? priced.map(g => ({ ...g, options: g.options.map(o => ({ ...o, allergens: al.option(g.id, o.key) })) })) : priced,
+    allergenStatement: al ? allergenSet.statement : null,
   }
 }
 
@@ -175,7 +185,7 @@ export async function pricesFor(variantIds: string[], priceListId: string): Prom
 
 // ---- Categories, products and variants --------------------------------------------------------------
 
-export interface CategoryInput { name: string, colour?: string | null, parentId?: string | null, active?: boolean }
+export interface CategoryInput { name: string, colour?: string | null, parentId?: string | null, ageRestricted?: boolean, usualPreset?: string | null, active?: boolean }
 
 const PARENT_REFUSED = { code: 'bar.category.parent', reason: 'A sub-category sits under a top-level category, and a category with sub-categories cannot go under another.', remedy: 'Pick a top-level category, or none.' }
 // The parent, when one is named, is a top-level category in use other than this one.
@@ -195,32 +205,38 @@ export function addCategory(unit: UnitView, input: CategoryInput): string {
   const at = nowMs()
   const parentId = input.parentId ?? null
   unit.add({
-    sql: `INSERT INTO bar_categories (id, name, position, colour, parent_id, active, created_at, updated_at)
-          SELECT ?, ?, coalesce((SELECT max(position) + 1 FROM bar_categories), 0), ?, ?, 1, ?, ?
+    sql: `INSERT INTO bar_categories (id, name, position, colour, parent_id, age_restricted, usual_preset, active, created_at, updated_at)
+          SELECT ?, ?, coalesce((SELECT max(position) + 1 FROM bar_categories), 0), ?, ?, ?, ?, 1, ?, ?
           WHERE NOT EXISTS (SELECT 1 FROM bar_categories WHERE lower(name) = lower(?)) AND ${PARENT_OK}`,
-    params: [id, input.name, input.colour ?? null, parentId, at, at, input.name, parentId, parentId, id],
+    params: [id, input.name, input.colour ?? null, parentId, input.ageRestricted ? 1 : 0, input.usualPreset ?? null, at, at, input.name, parentId, parentId, id],
   }).expect(1, NAME_TAKEN('a category'))
   unit.audit({ action: 'create', record: ['bar.category', id] })
   return id
 }
 
 export async function updateCategory(unit: UnitView, id: string, input: Partial<CategoryInput>): Promise<void> {
-  const row = await first<{ name: string, colour: string | null, parent_id: string | null, active: number }>('SELECT name, colour, parent_id, active FROM bar_categories WHERE id = ?', id)
+  const row = await first<{ name: string, colour: string | null, parent_id: string | null, age_restricted: number, usual_preset: string | null, active: number }>('SELECT name, colour, parent_id, age_restricted, usual_preset, active FROM bar_categories WHERE id = ?', id)
   if (!row) refuse(GONE('category').code, GONE('category').reason, { status: 404 })
   const name = input.name ?? row!.name
   const parentId = input.parentId === undefined ? row!.parent_id : input.parentId
   if (parentId !== row!.parent_id) await checkParent(id, parentId)
   const moved = parentId !== row!.parent_id
   unit.add({
-    sql: `UPDATE bar_categories SET name = ?, colour = ?, parent_id = ?, active = ?, updated_at = ?
+    sql: `UPDATE bar_categories SET name = ?, colour = ?, parent_id = ?, age_restricted = ?, usual_preset = ?, active = ?, updated_at = ?
           WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bar_categories WHERE lower(name) = lower(?) AND id <> ?)
           AND (? = 0 OR (${PARENT_OK} AND NOT EXISTS (SELECT 1 FROM bar_categories c WHERE c.parent_id = ?)))`,
-    params: [name, input.colour === undefined ? row!.colour : input.colour, parentId, input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, name, id, moved ? 1 : 0, parentId, parentId, id, id],
+    params: [
+      name, input.colour === undefined ? row!.colour : input.colour, parentId,
+      input.ageRestricted === undefined ? row!.age_restricted : input.ageRestricted ? 1 : 0,
+      input.usualPreset === undefined ? row!.usual_preset : input.usualPreset,
+      input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, name, id, moved ? 1 : 0, parentId, parentId, id, id,
+    ],
   }).expect(1, NAME_TAKEN('a category'))
   unit.audit({ action: 'update', record: ['bar.category', id] })
 }
 
-export interface ProductInput { categoryId: string, name: string, ageRestricted?: boolean, active?: boolean }
+// ageRestricted null: as the category, which a change to the category then follows.
+export interface ProductInput { categoryId: string, name: string, ageRestricted?: boolean | null, active?: boolean }
 export interface FirstVariant { name?: string, amountMinor?: number | null }
 
 /** A product with its first variant ("Each" unless named), and that variant's Standard price if given. */
@@ -230,9 +246,9 @@ export async function addProduct(unit: UnitView, input: ProductInput, first: Fir
   const variantId = newId('bvar')
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO bar_products (id, category_id, name, age_restricted, position, active, created_at, updated_at)
-          SELECT ?, id, ?, ?, coalesce((SELECT max(position) + 1 FROM bar_products WHERE category_id = ?), 0), 1, ?, ? FROM bar_categories WHERE id = ? AND active = 1`,
-    params: [productId, input.name, input.ageRestricted ? 1 : 0, input.categoryId, at, at, input.categoryId],
+    sql: `INSERT INTO bar_products (id, category_id, name, age_restricted, age_from_category, position, active, created_at, updated_at)
+          SELECT ?, id, ?, ?, ?, coalesce((SELECT max(position) + 1 FROM bar_products WHERE category_id = ?), 0), 1, ?, ? FROM bar_categories WHERE id = ? AND active = 1`,
+    params: [productId, input.name, input.ageRestricted ? 1 : 0, input.ageRestricted === null ? 1 : 0, input.categoryId, at, at, input.categoryId],
   }).expect(1, { code: 'bar.category.unknown', reason: 'That category is not in use.' })
   unit.add({
     sql: 'INSERT INTO bar_variants (id, product_id, name, position, active, created_at, updated_at) VALUES (?, ?, ?, 0, 1, ?, ?)',
@@ -244,13 +260,18 @@ export async function addProduct(unit: UnitView, input: ProductInput, first: Fir
 }
 
 export async function updateProduct(unit: UnitView, id: string, input: Partial<ProductInput>): Promise<void> {
-  const row = await first<{ category_id: string, name: string, age_restricted: number, active: number }>('SELECT category_id, name, age_restricted, active FROM bar_products WHERE id = ?', id)
+  const row = await first<{ category_id: string, name: string, age_restricted: number, age_from_category: number, active: number }>('SELECT category_id, name, age_restricted, age_from_category, active FROM bar_products WHERE id = ?', id)
   if (!row) refuse(GONE('product').code, GONE('product').reason, { status: 404 })
   const categoryId = input.categoryId ?? row!.category_id
   unit.add({
-    sql: `UPDATE bar_products SET category_id = ?, name = ?, age_restricted = ?, active = ?, updated_at = ?
+    sql: `UPDATE bar_products SET category_id = ?, name = ?, age_restricted = ?, age_from_category = ?, active = ?, updated_at = ?
           WHERE id = ? AND EXISTS (SELECT 1 FROM bar_categories WHERE id = ? AND (active = 1 OR id = ?))`,
-    params: [categoryId, input.name ?? row!.name, input.ageRestricted === undefined ? row!.age_restricted : input.ageRestricted ? 1 : 0, input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, categoryId, row!.category_id],
+    params: [
+      categoryId, input.name ?? row!.name,
+      input.ageRestricted === undefined ? row!.age_restricted : input.ageRestricted ? 1 : 0,
+      input.ageRestricted === undefined ? row!.age_from_category : input.ageRestricted === null ? 1 : 0,
+      input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, categoryId, row!.category_id,
+    ],
   }).expect(1, { code: 'bar.category.unknown', reason: 'That category is not in use.' })
   unit.audit({ action: 'update', record: ['bar.product', id] })
 }

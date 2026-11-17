@@ -24,9 +24,11 @@ export interface BookingPage {
     soldOut: boolean
     /**
      * `most` is how many this visitor may have, for a type with requirements they meet; `unmet` is
-     * the source's own words when they do not, and the type cannot be chosen.
+     * the source's own words when they do not, and the type cannot be chosen, unless it takes a
+     * `reference`: then the visitor may type one for each ticket instead, such as a student ID,
+     * worded by the source ("NNT member? Enter your student ID").
      */
-    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string }[]
+    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, shape: string } }[]
   }[]
 }
 
@@ -42,14 +44,18 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   // What the visitor may have of each type with requirements, judged for them alone. A type whose
   // source is off is withheld; a companion type is shown only to someone it is for.
   const account = useContext().actor.accountId ?? null
-  const judged = new Map<string, { most?: number, unmet?: string } | null>()
+  const judged = new Map<string, { most?: number, unmet?: string, reference?: { label: string, shape: string } } | null>()
   for (const type of types.values()) {
     if (!type.requirementRefs.length) continue
     const answers = await requirements.check({ accounts: [account], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
     const met = answers.find(a => a.verdict === 'met' && !a.unavailable)
     if (met) judged.set(type.id, { most: met.quantity ?? type.maxPerHolder })
     else if (answers.every(a => a.unavailable) || type.kind === 'companion') judged.set(type.id, null)
-    else judged.set(type.id, { unmet: answers.find(a => a.reason)?.reason ?? 'Only for people who qualify.' })
+    else {
+      const described = await requirements.describe(type.requirementRefs)
+      const reference = type.requirementRefs.map(ref => described[ref]?.presentable).find(Boolean)
+      judged.set(type.id, { unmet: answers.find(a => a.reason)?.reason ?? 'Only for people who qualify.', ...(reference ? { reference } : {}) })
+    }
   }
   return {
     performance: { id: performance.id, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}`, state: performance.state },

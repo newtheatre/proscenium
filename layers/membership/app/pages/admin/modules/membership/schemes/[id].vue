@@ -26,7 +26,7 @@ interface Scheme {
   requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, canImport: boolean }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -36,6 +36,7 @@ const { toRefusal, fieldErrors } = useRefusal()
 const { day } = useDates()
 const toast = useToast()
 const { confirm } = useConfirm()
+const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<Detail>(() => `/api/membership/schemes/${id.value}`, { key: `membership:scheme:${id.value}` })
 
 const TONE = { draft: 'neutral', open: 'success', closed: 'warning', archived: 'neutral' } as const
@@ -55,7 +56,9 @@ watch(scheme, (s) => {
 async function saveDetails() {
   detailsRefusal.value = null
   const fixed = details.lengthRule === 'fixed'
-  const { checks, listId, domains, ...fields } = details
+  const { checks, listId, domains, requiresPayment, ...rest } = details
+  // While Membership fees is off the switch is locked, so the stored value is left as it is.
+  const fields = data.value?.feesModuleOn ? { ...rest, requiresPayment } : rest
   const verifier = checks === 'none' ? null : checks
   try {
     await $api(`/api/membership/schemes/${id.value}` as string, {
@@ -134,28 +137,48 @@ async function runImport() {
   importing.value = false
 }
 
-// Lengths.
+// Lengths: added from a window, withdrawn or offered again from the row's menu with an Undo.
 const option = reactive({ name: '', count: 12, idempotency: '' })
 const optionRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const addingOption = ref(false)
+const optionSchema = z.object({ name: z.string().trim().min(1).max(40), count: z.number().int().min(1).max(120) }) // not-policy: the route's bounds
 function resetOption() {
   Object.assign(option, { name: '', count: scheme.value?.lengthRule === 'fixed' ? 1 : 12, idempotency: crypto.randomUUID() })
 }
 watch(scheme, resetOption, { immediate: true })
+function openOption() {
+  resetOption()
+  optionRefusal.value = null
+  addingOption.value = true
+}
 async function addOption() {
   optionRefusal.value = null
   try {
     await $api(`/api/membership/schemes/${id.value}/options` as string, { method: 'POST', headers: { 'idempotency-key': option.idempotency }, body: { name: option.name, count: option.count } })
-    resetOption()
+    toast.add({ title: t('membership.screens.lengths.added', { name: option.name.trim() }), color: 'success' })
+    addingOption.value = false
     await refresh()
   }
   catch (e) {
     optionRefusal.value = toRefusal(e)
   }
 }
+const setOption = (o: Option, state: Option['state']) => $api(`/api/membership/schemes/${id.value}/options/${o.id}` as string, { method: 'PATCH', body: { state } })
 async function toggleOption(o: Option) {
-  await $api(`/api/membership/schemes/${id.value}/options/${o.id}` as string, { method: 'PATCH', body: { state: o.state === 'offered' ? 'withdrawn' : 'offered' } })
+  const to = o.state === 'offered' ? 'withdrawn' : 'offered'
+  await setOption(o, to)
   await refresh()
+  offer(t(`membership.screens.lengths.${to}-done`, { name: o.name }), async () => {
+    await setOption(o, o.state)
+    await refresh()
+  })
 }
+const optionActions = (o: Option) => [[o.state === 'offered'
+  ? { label: t('membership.screens.lengths.withdraw'), icon: 'i-lucide-archive', onSelect: () => toggleOption(o) }
+  : { label: t('membership.screens.lengths.offer'), icon: 'i-lucide-archive-restore', onSelect: () => toggleOption(o) }]]
+const offeredOptions = computed(() => (data.value?.options ?? []).filter(o => o.state === 'offered'))
+const withdrawnOptions = computed(() => (data.value?.options ?? []).filter(o => o.state === 'withdrawn'))
+const showWithdrawn = ref(false)
 const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthOptionId === optionId)?.endsOn
 
 // Adding a member directly.
@@ -286,64 +309,71 @@ async function addMember() {
         <PageSection
           v-if="scheme.lengthRule !== 'indefinite'"
           :title="t('membership.screens.lengths.title')"
-          :description="t('membership.screens.lengths.help', { unit })"
+          :description="t('membership.screens.lengths.help', { unit: unit.toLocaleLowerCase() })"
         >
-          <RecordList
+          <template
             v-if="data.options.length"
-            :label="t('membership.screens.lengths.title')"
+            #actions
           >
-            <RecordListItem
-              v-for="o in data.options"
-              :key="o.id"
-              :name="o.name"
-              :description="o.state === 'offered' && exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : t('membership.screens.lengths.withdrawn')"
-              :muted="o.state === 'withdrawn'"
-            >
+            <UButton
+              icon="i-lucide-plus"
+              color="neutral"
+              variant="outline"
+              :label="t('membership.screens.lengths.add')"
+              @click="openOption"
+            />
+          </template>
+          <EmptyState
+            v-if="!data.options.length"
+            :title="t('membership.screens.lengths.empty')"
+            :description="t('membership.screens.lengths.empty-help')"
+            icon="i-lucide-calendar-range"
+          >
+            <template #actions>
               <UButton
-                size="sm"
-                color="neutral"
-                variant="ghost"
-                :label="t(o.state === 'offered' ? 'membership.screens.lengths.withdraw' : 'membership.screens.lengths.offer')"
-                loading-auto
-                @click="toggleOption(o)"
-              />
-            </RecordListItem>
-          </RecordList>
-          <template #footer>
-            <UForm
-              :state="option"
-              :validate="() => needs({ name: option.name })"
-              class="flex flex-wrap items-end gap-3"
-              novalidate
-              @submit="addOption"
-            >
-              <UFormField
-                name="name"
-                :label="t('membership.screens.lengths.name')"
-                :error="optionRefusal?.reason"
-              >
-                <UInput
-                  v-model="option.name"
-                  maxlength="40"
-                  :placeholder="t('membership.screens.lengths.name-placeholder')"
-                />
-              </UFormField>
-              <UFormField :label="unit">
-                <UInputNumber
-                  v-model="option.count"
-                  :min="1"
-                  :max="120"
-                />
-              </UFormField>
-              <UButton
-                type="submit"
                 icon="i-lucide-plus"
-                color="neutral"
-                variant="outline"
-                loading-auto
                 :label="t('membership.screens.lengths.add')"
+                @click="openOption"
               />
-            </UForm>
+            </template>
+          </EmptyState>
+          <template v-else>
+            <RecordList
+              v-if="offeredOptions.length"
+              :label="t('membership.screens.lengths.title')"
+            >
+              <RecordListItem
+                v-for="o in offeredOptions"
+                :key="o.id"
+                :name="o.name"
+                :description="exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
+              >
+                <RowActions
+                  :items="optionActions(o)"
+                  :label="t('membership.screens.lengths.actions', { name: o.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              v-model:open="showWithdrawn"
+              :label="t('membership.screens.lengths.withdrawn-heading')"
+              :count="withdrawnOptions.length"
+            >
+              <RecordList :label="t('membership.screens.lengths.withdrawn-heading')">
+                <RecordListItem
+                  v-for="o in withdrawnOptions"
+                  :key="o.id"
+                  :name="o.name"
+                  :description="t('membership.screens.lengths.withdrawn')"
+                  muted
+                >
+                  <RowActions
+                    :items="optionActions(o)"
+                    :label="t('membership.screens.lengths.actions', { name: o.name })"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
           </template>
         </PageSection>
         <PageSection
@@ -417,9 +447,11 @@ async function addMember() {
               v-model:month="details.fixedEndMonth"
               v-model:day="details.fixedEndDay"
             />
-            <div class="grid gap-4 sm:grid-cols-3">
+            <div
+              v-if="details.lengthRule === 'fixed'"
+              class="grid gap-4 sm:grid-cols-2"
+            >
               <UFormField
-                v-if="details.lengthRule === 'fixed'"
                 :label="t('membership.screens.scheme.rollover')"
                 :help="t('membership.screens.scheme.rollover-help')"
               >
@@ -429,6 +461,8 @@ async function addMember() {
                   :max="180"
                 />
               </UFormField>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
               <UFormField
                 :label="t('membership.screens.scheme.renewal-opens')"
                 :help="t('membership.screens.scheme.renewal-opens-help')"
@@ -495,9 +529,11 @@ async function addMember() {
               </template>
             </UFormField>
             <USwitch
-              v-model="details.requiresPayment"
+              :model-value="data.feesModuleOn && details.requiresPayment"
+              :disabled="!data.feesModuleOn"
               :label="t('membership.screens.scheme.requires-payment')"
-              :description="t('membership.screens.scheme.requires-payment-help')"
+              :description="t(data.feesModuleOn ? 'membership.screens.scheme.requires-payment-help' : 'membership.screens.scheme.requires-payment-off')"
+              @update:model-value="details.requiresPayment = $event"
             />
             <USwitch
               v-model="details.holderMayEnd"
@@ -516,6 +552,57 @@ async function addMember() {
         </PageSection>
       </div>
     </DataBoundary>
+
+    <UModal
+      v-model:open="addingOption"
+      :title="t('membership.screens.lengths.add')"
+    >
+      <template #body>
+        <UForm
+          id="membership-length-form"
+          :state="option"
+          :schema="optionSchema"
+          class="grid gap-4 sm:grid-cols-2"
+          novalidate
+          @submit="addOption"
+        >
+          <RefusalNotice
+            :refusal="optionRefusal"
+            class="sm:col-span-2"
+          />
+          <UFormField
+            name="name"
+            :label="t('membership.screens.lengths.name')"
+            required
+          >
+            <UInput
+              v-model="option.name"
+              maxlength="40"
+              :placeholder="t('membership.screens.lengths.name-placeholder')"
+            />
+          </UFormField>
+          <UFormField
+            name="count"
+            :label="unit"
+            required
+          >
+            <UInputNumber
+              v-model="option.count"
+              :min="1"
+              :max="120"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-length-form"
+          loading-auto
+          :label="t('membership.screens.lengths.add')"
+        />
+      </template>
+    </UModal>
 
     <UModal
       v-model:open="adding"

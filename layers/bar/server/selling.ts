@@ -69,7 +69,7 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
   }
   const ids = [...new Set([...merged.values()].map(m => m.variantId))]
   const named = await all<{ id: string, variant: string, product: string, product_id: string, category_id: string, age_restricted: number, sizes: number }>(
-    `SELECT v.id, v.name AS variant, p.name AS product, p.id AS product_id, p.category_id, p.age_restricted,
+    `SELECT v.id, v.name AS variant, p.name AS product, p.id AS product_id, p.category_id, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted,
             (SELECT count(*) FROM bar_variants w WHERE w.product_id = p.id AND w.active = 1 AND w.mixer_measure = 0) AS sizes
        FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
       WHERE v.id IN (SELECT value FROM json_each(?)) AND v.active = 1 AND v.mixer_measure = 0 AND p.active = 1 AND c.active = 1`,

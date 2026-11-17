@@ -26,6 +26,11 @@ export default defineModule({
     'age-check.description': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
     'age-check.review-every': setting.duration({ default: '7d', min: '1d', max: '90d', change, audience: 'staff' }),
     'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
+    // Allergens (tab 10, approved 17 November): the till's sheet, the public chart, and how often a label is read again.
+    'allergens.enabled': setting.boolean({ default: true, change, audience: 'staff' }),
+    'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', change, audience: 'staff' }),
+    'allergens.statement': setting.text({ default: '', maxLength: 400, multiline: true, change, audience: 'public' }),
+    'allergens.publish': setting.boolean({ default: true, change, audience: 'staff' }),
   }),
 
   records: defineRecords('bar', {
@@ -33,6 +38,7 @@ export default defineModule({
     'product': { table: 'bar_products' },
     'price-list': { table: 'bar_price_lists' },
     'category': { table: 'bar_categories' },
+    'product-preset': { table: 'bar_product_presets' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
     'age-check': { table: 'bar_age_checks', owner: 'by' },
@@ -56,6 +62,8 @@ export default defineModule({
     'sale.refund': ability({ implies: ['sale.view'] }),
     'age-check.view': ability(),
     'age-check.review': ability({ implies: ['age-check.view'] }),
+    // Record and check allergens against labels. Everyone who sells reads them on the till.
+    'allergens.manage': ability(),
   }),
 
   tables,
@@ -132,6 +140,7 @@ export default defineModule({
       { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: 'bar.sale.view', order: 15 },
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
       { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
+      { id: 'bar.choices', menu: 'admin', group: 'modules', to: '/admin/modules/bar/choices', icon: 'i-lucide-list-checks', ability: 'bar.product.manage', order: 15 },
       { id: 'bar.price-lists', menu: 'admin', group: 'modules', to: '/admin/modules/bar/price-lists', match: '/admin/modules/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
       { id: 'bar.age-checks', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/age-checks', icon: 'i-lucide-id-card', ability: 'bar.age-check.view', order: 40 },
       { id: 'bar.outlets', menu: 'admin', group: 'modules', to: '/admin/modules/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },

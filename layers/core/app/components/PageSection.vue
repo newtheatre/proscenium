@@ -15,7 +15,7 @@ const id = useId()
   >
     <template #header>
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1 basis-64">
           <h2
             :id="id"
             class="font-semibold text-highlighted"

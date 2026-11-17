@@ -47,6 +47,11 @@ export const categories = defineTable('bar_categories', {
   colour: col.internal(text('colour')),
   // The category this one sits under. One level only: a parent never has a parent itself.
   parentId: col.ref('bar_categories', { nullable: true }),
+  // Products in it need the age check unless a product says otherwise (Wine, Beer, Spirits: yes).
+  ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  // The preset Add a product opens on for this category: a built-in key such as 'builtin:wine', or a
+  // bar_product_presets id. Not a reference, because built-ins live in code.
+  usualPreset: col.internal(text('usual_preset')),
   // A Finance account of the bar's own; null posts to bar.income.
   incomeAccountId: col.internal(text('income_account_id')),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
@@ -64,8 +69,9 @@ export const products = defineTable('bar_products', {
   id: col.id(),
   categoryId: col.ref('bar_categories'),
   name: col.public(text('name').notNull()),
-  // Selling it asks the age check.
+  // Selling it asks the age check. Ignored while ageFromCategory is set, when the category's answer applies.
   ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  ageFromCategory: col.internal(integer('age_from_category', { mode: 'boolean' }).notNull().default(false)),
   position: col.internal(integer('position').notNull()),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),
@@ -155,6 +161,30 @@ export const choiceOptions = defineTable('bar_choice_options', {
     uniqueIndex('bar_choice_options_name').on(t.groupId, sql`lower(${t.name})`),
     check('bar_choice_options_delta', sql`${t.deltaMinor} >= 0`),
   ],
+})
+
+/**
+ * The theatre's own product preset, saved from Add a product: what a kind of product usually has, never
+ * its name, prices or stock. `sizes` is JSON, [{ "name": "Pint", "measure": "568 ml" }, ...];
+ * `group_ids` is JSON, the choices it attaches in order. Built-in presets live in code.
+ */
+export const productPresets = defineTable('bar_product_presets', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  sizes: col.internal(text('sizes').notNull()),
+  groupIds: col.internal(text('group_ids').notNull()),
+  // null: as the category.
+  ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' })),
+  mixer: col.internal(integer('mixer', { mode: 'boolean' }).notNull().default(false)),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bpps',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('bar_product_presets_name').on(sql`lower(${t.name})`).where(sql`active = 1`)],
 })
 
 /** A group attached to a product, in the order the till asks them. */
@@ -426,6 +456,62 @@ export const ageChecks = defineTable('bar_age_checks', {
   ],
 })
 
+// The 14 allergens UK food law names, by key; their names are translations (bar.allergen.<key>).
+export const ALLERGENS = ['gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs'] as const
+export const ALLERGEN_LEVELS = ['contains', 'may_contain'] as const
+export const ALLERGEN_SOURCES = ['label', 'supplier', 'other'] as const
+
+/**
+ * What a product, or a choice option, contains or may contain, as last recorded from its label. One
+ * row per allergen named; an allergen with no row is not listed. Whether anything was checked at all is
+ * bar_allergen_checks', so "nothing listed" and "not checked" never look the same. With stock, entries
+ * move to stock items and products work theirs out; a product with no recipe keeps its own.
+ */
+export const allergenEntries = defineTable('bar_allergen_entries', {
+  id: col.id(),
+  productId: col.ref('bar_products', { nullable: true }),
+  optionId: col.ref('bar_choice_options', { nullable: true }),
+  allergen: col.public(text('allergen', { enum: ALLERGENS }).notNull()),
+  level: col.public(text('level', { enum: ALLERGEN_LEVELS }).notNull()),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bale',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_allergen_entries_product').on(t.productId, t.allergen).where(sql`product_id IS NOT NULL`),
+    uniqueIndex('bar_allergen_entries_option').on(t.optionId, t.allergen).where(sql`option_id IS NOT NULL`),
+    check('bar_allergen_entries_one', sql`(${t.productId} IS NULL) <> (${t.optionId} IS NULL)`),
+    check('bar_allergen_entries_allergen', sql`${t.allergen} IN (${inList(ALLERGENS)})`),
+    check('bar_allergen_entries_level', sql`${t.level} IN (${inList(ALLERGEN_LEVELS)})`),
+  ],
+})
+
+/** Each time someone checked a product's or option's allergens against its label: who, when, from what, and what they recorded. */
+export const allergenChecks = defineTable('bar_allergen_checks', {
+  id: col.id(),
+  productId: col.ref('bar_products', { nullable: true }),
+  optionId: col.ref('bar_choice_options', { nullable: true }),
+  source: col.internal(text('source', { enum: ALLERGEN_SOURCES }).notNull()),
+  // What was recorded, as allergen keys joined by commas, so the history reads without the entries.
+  contains: col.internal(text('contains').notNull()),
+  mayContain: col.internal(text('may_contain').notNull()),
+  by: col.account('by', { role: 'actor', onMerge: 'alias' }),
+  at: col.timestamp('at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'balc',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('bar_allergen_checks_product').on(t.productId, t.at),
+    index('bar_allergen_checks_option').on(t.optionId, t.at),
+    check('bar_allergen_checks_one', sql`(${t.productId} IS NULL) <> (${t.optionId} IS NULL)`),
+    check('bar_allergen_checks_source', sql`${t.source} IN (${inList(ALLERGEN_SOURCES)})`),
+  ],
+})
+
 /** A manager's signature on the register for a range of operating days, with the refusals it covered. */
 export const registerReviews = defineTable('bar_register_reviews', {
   id: col.id(),
@@ -448,4 +534,4 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews }
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks }

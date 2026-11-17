@@ -23,16 +23,17 @@ const { t } = useT()
         :placeholder="t('membership.screens.list.label-placeholder')"
       />
     </UFormField>
-    <UFormField
-      :label="t('membership.screens.list.shape')"
-      :help="t('membership.screens.list.shape-help')"
-    >
-      <div class="flex flex-wrap items-end gap-3">
-        <USelect
-          v-model="kind"
-          :items="(['digits', 'letters-and-digits'] as const).map(v => ({ value: v, label: t(`membership.screens.list.shapes.${v}`) }))"
-          class="w-48"
-        />
+    <fieldset class="space-y-2">
+      <legend class="text-sm font-medium text-default">
+        {{ t('membership.screens.list.shape') }}
+      </legend>
+      <div class="grid gap-4 sm:grid-cols-3">
+        <UFormField :label="t('membership.screens.list.characters')">
+          <USelect
+            v-model="kind"
+            :items="(['digits', 'letters-and-digits'] as const).map(v => ({ value: v, label: t(`membership.screens.list.shapes.${v}`) }))"
+          />
+        </UFormField>
         <UFormField :label="t('membership.screens.list.shortest')">
           <UInputNumber
             v-model="min"
@@ -48,6 +49,9 @@ const { t } = useT()
           />
         </UFormField>
       </div>
-    </UFormField>
+      <p class="text-sm text-muted">
+        {{ t('membership.screens.list.shape-help') }}
+      </p>
+    </fieldset>
   </div>
 </template>

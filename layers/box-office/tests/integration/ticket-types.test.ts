@@ -187,6 +187,83 @@ describe('a member price', () => {
   })
 })
 
+describe('a member price by reference', () => {
+  /** A member of a scheme that takes a reference, with their member number. */
+  async function referenced() {
+    const id = await memberScheme({ acceptsReference: true })
+    expect((await membershipReq('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })).status).toBe(200)
+    const added = await membershipReq('POST', `/api/membership/schemes/${id}/members`, { address: `r${Math.random().toString(36).slice(2)}@example.org`, name: 'Ada Reference' })
+    expect(added.status, JSON.stringify(added.body)).toBe(200)
+    const mine = await membershipReq('GET', '/api/membership/mine', undefined, person([], { accountId: added.body.accountId }))
+    return { accountId: added.body.accountId as string, membershipId: added.body.membershipId as string, number: mine.body.number.label as string }
+  }
+  async function memberHouse() {
+    const h = await house(20)
+    const type = await managed('membership.member')
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: type.id, amountMinor: 500 }] })).status).toBe(200)
+    return { h, type }
+  }
+  /** A basket bought without signing in, giving references for the member tickets. */
+  async function buyWith(h: House, ticketTypeId: string, references: string[], actor?: ReturnType<typeof person>) {
+    try {
+      return await inContext(async () => {
+        resetRateLimits()
+        const unit = createUnit()
+        const made = await createBasket(unit.view(), { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId, quantity: references.length, references }] })
+        await unit.commit()
+        return { ok: true as const, orderId: made.orderId }
+      }, actor)
+    }
+    catch (error: any) {
+      if (error?.name !== 'Refusal') throw error
+      return { ok: false as const, code: error.code as string, reason: error.reason as string }
+    }
+  }
+
+  it('is sold for a member number typed in place of signing in, kept on the line, and once per performance', async () => {
+    const { h, type } = await memberHouse()
+    const m = await referenced()
+    const first = await buyWith(h, type.id, [m.number])
+    expect(first.ok, JSON.stringify(first)).toBe(true)
+    const [line] = await rows<{ requirement_evidence_id: string, requirement_account_id: string, amount_minor: number }>('SELECT requirement_evidence_id, requirement_account_id, amount_minor FROM box_office_order_lines WHERE order_id = ?', (first as { orderId: string }).orderId)
+    expect(line).toEqual({ requirement_evidence_id: m.membershipId, requirement_account_id: m.accountId, amount_minor: 500 })
+    expect(await buyWith(h, type.id, [m.number])).toMatchObject({ ok: false, code: 'box-office.requirement.reference-used' })
+  })
+
+  it('refuses a reference given twice in one basket, and one that matches nobody, in the source\'s words', async () => {
+    const { h, type } = await memberHouse()
+    const m = await referenced()
+    expect(await buyWith(h, type.id, [m.number, m.number])).toMatchObject({ ok: false, code: 'box-office.requirement.reference-used' })
+    expect(await buyWith(h, type.id, ['M-999999'])).toMatchObject({ ok: false, code: 'box-office.requirement.reference-not-met', reason: expect.stringContaining('Have a membership? Contact us.') })
+  })
+
+  it('is sold at the desk on the buyer\'s reference by a seller who may not check by hand', async () => {
+    const { h, type } = await memberHouse()
+    const m = await referenced()
+    const seller = person(['box-office.order.sell'])
+    const priced = (references?: string[]) => inContext(async () => {
+      resetRateLimits()
+      try {
+        return (await pricedLines(h.performanceId, [{ bandId: h.bandId, ticketTypeId: type.id, quantity: 1, ...(references ? { references } : {}) }], Date.now(), { channel: 'desk', account: null })).lines
+      }
+      catch (error: any) {
+        if (error?.name !== 'Refusal') throw error
+        return error.code as string
+      }
+    }, seller)
+    expect(await priced()).toBe('box-office.requirement.desk')
+    expect(await priced([m.number])).toMatchObject([{ amountMinor: 500, requirement: { ref: 'membership:any', evidence: m.membershipId, accountId: m.accountId } }])
+  })
+
+  it('is offered on the booking page with the scheme\'s own words for the reference', async () => {
+    const { h, type } = await memberHouse()
+    await referenced()
+    await publish(h)
+    const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
+    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.', reference: { label: expect.stringMatching(/Enter your (member number|membership reference)/) } })
+  })
+})
+
 describe('a companion ticket', () => {
   it('is refused to someone not on the access scheme, even beside a paid ticket', async () => {
     const h = await house(20)
