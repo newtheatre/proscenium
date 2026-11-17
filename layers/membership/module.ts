@@ -61,6 +61,10 @@ export default defineModule({
     // Ending a membership (tab 4, "Ending"). A holder ends their own through My membership instead.
     'membership.end': ability({ on: 'membership.membership', implies: ['membership.view'] }),
     'membership.add': ability({ on: 'membership.scheme', implies: ['membership.view'] }),
+    // Correcting a membership's dates (D7, MEM-28). Nobody corrects their own.
+    'membership.update': ability({ on: 'membership.membership', owner: 'refuses', implies: ['membership.view'] }),
+    // Exporting the members list (MEM-27): a file of people, so privileged.
+    'membership.export': ability({ risk: 'privileged', implies: ['membership.view'] }),
     // Asking whether somebody else holds a membership: a seller checking a customer's member price,
     // a steward at the door. The requirement source's checkAbility.
     'card.check': ability({ on: 'membership.membership', audit: 'read' }),
