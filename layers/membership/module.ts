@@ -189,7 +189,7 @@ export default defineModule({
     // On the audience side, so anyone can find how to join.
     'core.requirement': [{ id: 'membership', file: 'membership' }],
     // Members in the command palette, by name, address or number, shown by scheme and number (tab 4).
-    'core.search-source': [{ id: 'membership.members', record: 'membership.membership', ability: 'membership.membership.view', route: '/api/membership/search' }],
+    'core.search-source': [{ id: 'membership.members', record: 'membership.membership', ability: 'membership.membership.view', route: '/api/membership/search', shells: ['console'] }],
     'core.record-resolver': [
       { id: 'membership.scheme', file: 'scheme' },
       { id: 'membership.membership', file: 'membership' },
