@@ -244,6 +244,8 @@ export const grants = defineTable('core_grants', {
   extra: t => [
     index('core_grants_account').on(t.accountId),
     index('core_grants_role').on(t.roleId),
+    // Who holds what, soonest to lapse first.
+    index('core_grants_expiry').on(t.expiresAt),
     check('core_grants_scope', sql`(scope = 'site' AND scope_module IS NULL AND scope_type IS NULL AND scope_id IS NULL)
       OR (scope = 'module' AND scope_module IS NOT NULL AND scope_type IS NULL AND scope_id IS NULL)
       OR (scope = 'record' AND scope_module IS NOT NULL AND scope_type IS NOT NULL AND scope_id IS NOT NULL)`),

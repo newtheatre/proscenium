@@ -49,6 +49,7 @@ export default defineModule({
       { id: 'core.credits', menu: 'account', to: '/account/credits', icon: 'i-lucide-scroll-text', ability: 'signed-in', order: 42, count: 'core.my-credits', hideEmpty: true },
       { id: 'core.access-scheme', menu: 'account', to: '/account/access', icon: 'i-lucide-accessibility', ability: 'signed-in', order: 40, count: 'core.access-scheme-offered', hideEmpty: true },
       { id: 'core.people', menu: 'console', group: 'people', section: 'everyday', to: '/console/people', icon: 'i-lucide-users', ability: 'core.account.read', order: 10 },
+      { id: 'core.grants', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/grants', icon: 'i-lucide-key-round', ability: 'core.grant.read', order: 20 },
       { id: 'core.access-scheme-queue', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/access-scheme', icon: 'i-lucide-accessibility', ability: 'core.access-scheme.read', order: 60, count: 'core.access-scheme-waiting' },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },

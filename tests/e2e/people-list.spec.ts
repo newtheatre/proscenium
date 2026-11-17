@@ -53,8 +53,22 @@ test.describe('someone who reads and disables accounts', () => {
   })
 })
 
-test.describe('without core.account.read', () => {
+test.describe('someone who reads grants', () => {
   test.use(as(['core.grant.read']))
+
+  test('opens Who holds what with its views, and not Accounts', async ({ page }) => {
+    await visit(page, '/console/people/grants')
+    await expect(page.getByRole('heading', { level: 1, name: 'Who holds what' })).toBeVisible()
+    for (const name of ['Current', 'About to lapse', 'Ended']) await expect(page.getByRole('tab', { name })).toBeVisible()
+    await noViolations(page)
+    // Someone with a console sees a refusal, not a missing page.
+    const response = await page.goto('/console/people')
+    expect(response?.status()).toBe(403)
+  })
+})
+
+test.describe('without core.account.read', () => {
+  test.use(as(['core.role.read']))
 
   test('Accounts is a missing page', async ({ page }) => {
     const response = await page.goto('/console/people')

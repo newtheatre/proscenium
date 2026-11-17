@@ -40,6 +40,54 @@ export const accountsList = defineList('core.accounts', {
   defaultSort: { key: 'name', order: 'asc' },
 })
 
+/**
+ * Who holds what (Identity Doc part 5): every grant with its holder, role, reach and end. The
+ * holder is found by name or address through findAccounts; role and module options are the
+ * theatre's own, supplied by the page. The default view is what is in force or about to be.
+ */
+export const grantsList = defineList('core.grants', {
+  filters: {
+    state: {
+      kind: 'choices',
+      label: 'State',
+      options: [
+        { value: 'live', label: 'In force' },
+        { value: 'pending', label: 'Not yet in force' },
+        { value: 'lapsing', label: 'About to lapse' },
+        { value: 'ended', label: 'Ended' },
+      ],
+    },
+    role: { kind: 'choice', label: 'Role' },
+    scope: {
+      kind: 'choice',
+      label: 'Reach',
+      options: [
+        { value: 'site', label: 'Everywhere' },
+        { value: 'module', label: 'One module' },
+        { value: 'record', label: 'One record' },
+      ],
+    },
+    module: { kind: 'choice', label: 'Module' },
+  },
+  sorts: {
+    ends: { label: 'Ends', type: 'date', natural: 'asc' },
+  },
+  columns: {
+    person: { label: 'Person', always: true, card: true },
+    role: { label: 'Role', card: true },
+    scope: { label: 'Reach' },
+    ends: { label: 'Ends', sort: 'ends', card: true },
+    state: { label: 'State', card: true },
+  },
+  views: {
+    current: { label: 'Current', filters: { state: 'live,pending,lapsing' } },
+    lapsing: { label: 'About to lapse', filters: { state: 'lapsing' } },
+    ended: { label: 'Ended', filters: { state: 'ended' } },
+  },
+  defaultView: 'current',
+  defaultSort: { key: 'ends', order: 'asc' },
+})
+
 /** Email addresses, searched by the address itself. Only verified ones ever find a person. */
 export const accountEmailsList = defineList('core.account-emails', {
   filters: {},

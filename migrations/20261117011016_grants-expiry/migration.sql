@@ -1,0 +1,1 @@
+CREATE INDEX `core_grants_expiry` ON `core_grants` (`expires_at`);
