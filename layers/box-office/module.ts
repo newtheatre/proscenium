@@ -197,6 +197,15 @@ export default defineModule({
         { slug: 'other', label: 'Other' },
       ],
     }, {
+      id: 'box-office.override-reason',
+      label: 'Reasons for admitting anyway',
+      terms: [
+        { slug: 'membership-shown', label: 'Membership shown in person' },
+        { slug: 'proof-shown', label: 'Proof shown in person' },
+        { slug: 'manager-decision', label: 'Manager\'s decision' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
       id: 'box-office.cancellation-reason',
       label: 'Reasons for cancelling tickets',
       terms: [
