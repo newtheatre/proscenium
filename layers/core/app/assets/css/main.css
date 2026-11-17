@@ -57,3 +57,23 @@
 
 /* Site administration: the strip above each page's panel takes 2.25rem off the panel's full height. */
 .admin-shell .admin-main > div { height: calc(100svh - 2.25rem); }
+
+/* The eight calendar colours (UI-35), apart from the brand and the status colours so no brand can
+   make them unreadable. Each sets a fill, its text (over 7:1 on the fill) and an edge that keeps 3:1
+   against the page, light and dark. A module names a colour, calendar-1 to calendar-8, never a value. */
+.calendar-1 { --cal-fill: var(--color-sky-100); --cal-text: var(--color-sky-950); --cal-edge: var(--color-sky-700); }
+.calendar-2 { --cal-fill: var(--color-violet-100); --cal-text: var(--color-violet-950); --cal-edge: var(--color-violet-700); }
+.calendar-3 { --cal-fill: var(--color-emerald-100); --cal-text: var(--color-emerald-950); --cal-edge: var(--color-emerald-700); }
+.calendar-4 { --cal-fill: var(--color-amber-100); --cal-text: var(--color-amber-950); --cal-edge: var(--color-amber-700); }
+.calendar-5 { --cal-fill: var(--color-rose-100); --cal-text: var(--color-rose-950); --cal-edge: var(--color-rose-700); }
+.calendar-6 { --cal-fill: var(--color-teal-100); --cal-text: var(--color-teal-950); --cal-edge: var(--color-teal-700); }
+.calendar-7 { --cal-fill: var(--color-indigo-100); --cal-text: var(--color-indigo-950); --cal-edge: var(--color-indigo-700); }
+.calendar-8 { --cal-fill: var(--color-stone-200); --cal-text: var(--color-stone-950); --cal-edge: var(--color-stone-600); }
+.dark .calendar-1 { --cal-fill: var(--color-sky-950); --cal-text: var(--color-sky-100); --cal-edge: var(--color-sky-400); }
+.dark .calendar-2 { --cal-fill: var(--color-violet-950); --cal-text: var(--color-violet-100); --cal-edge: var(--color-violet-400); }
+.dark .calendar-3 { --cal-fill: var(--color-emerald-950); --cal-text: var(--color-emerald-100); --cal-edge: var(--color-emerald-400); }
+.dark .calendar-4 { --cal-fill: var(--color-amber-950); --cal-text: var(--color-amber-100); --cal-edge: var(--color-amber-400); }
+.dark .calendar-5 { --cal-fill: var(--color-rose-950); --cal-text: var(--color-rose-100); --cal-edge: var(--color-rose-400); }
+.dark .calendar-6 { --cal-fill: var(--color-teal-950); --cal-text: var(--color-teal-100); --cal-edge: var(--color-teal-400); }
+.dark .calendar-7 { --cal-fill: var(--color-indigo-950); --cal-text: var(--color-indigo-100); --cal-edge: var(--color-indigo-400); }
+.dark .calendar-8 { --cal-fill: var(--color-stone-800); --cal-text: var(--color-stone-100); --cal-edge: var(--color-stone-400); }

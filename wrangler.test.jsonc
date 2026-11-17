@@ -10,5 +10,5 @@
   "durable_objects": { "bindings": [{ "name": "RATE_LIMITS", "class_name": "RateLimitCounter" }] },
   "migrations": [{ "tag": "core-rate-limits", "new_sqlite_classes": ["RateLimitCounter"] }],
   // Test values only. A real deployment sets its own as Worker secrets.
-  "vars": { "CORE_SESSION_KEY": "test-session-key-not-secret", "CORE_TURNSTILE_SECRET_KEY": "test-turnstile-secret", "CORE_ENCRYPTION_KEY": "test-encryption-key-not-secret" }
+  "vars": { "CORE_SESSION_KEY": "test-session-key-not-secret", "CORE_TURNSTILE_SECRET_KEY": "test-turnstile-secret", "CORE_ENCRYPTION_KEY": "test-encryption-key-not-secret", "MEMBERSHIP_LIST_KEY": "test-list-key-not-secret" }
 }

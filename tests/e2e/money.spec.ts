@@ -14,6 +14,7 @@ const treasurer = {
     'payments.session.open', 'payments.session.view', 'payments.session.close-any', 'payments.attempt.reconcile',
     'payments.attempt.attest', 'payments.refund.approve', 'payments.provider.manage', 'gallery.sample.view',
     'finance.ledger.view', 'finance.ledger.export', 'finance.account.manage', 'finance.period.close', 'finance.period.reopen', 'finance.posting.correct',
+    'payments.settings.manage', 'finance.settings.manage',
   ].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
@@ -53,6 +54,8 @@ const SCREENS = [
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
   ['/console/finance/export', 'Export'],
+  ['/console/payments/settings', 'Payments'],
+  ['/console/finance/settings', 'Finance'],
 ] as const
 
 for (const [path, title] of SCREENS) {
@@ -99,4 +102,15 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+})
+
+test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {
+  await visit(page, '/console/payments/sessions')
+  // Other browser tests open tills of the same name, so this looks for one and for its state.
+  await expect(page.getByRole('cell', { name: 'Box office desk' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Open', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('searchbox')).toBeVisible()
+  await visit(page, '/console/payments/sessions?view=counting')
+  await expect(page.getByRole('cell', { name: 'Open', exact: true })).toHaveCount(0)
+  await noViolations(page)
 })

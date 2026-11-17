@@ -10,6 +10,8 @@ const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'co
 const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
 const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit'])
+const producer = person('acc_compproducer', 'Pat Producer', ['box-office.comp.request'])
+const approver = person('acc_compapprover', 'Alex Approver', ['box-office.comp.request', 'box-office.comp.approve'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const key = () => ({ 'idempotency-key': crypto.randomUUID() })
 // Names are unique to a run, so a retry in a fresh worker can set the stage again.
@@ -120,7 +122,7 @@ test('Sell finds a reservation by its reference and takes payment for it', async
 test.describe('the box office console', () => {
   test.use(as(office))
 
-  test('Orders, Performances, a set-up, its door list and Ticket types open with no accessibility violations', async ({ page }) => {
+  test('Orders, Performances, a set-up, its door list (admitting by name) and Ticket types open with no accessibility violations', async ({ page }) => {
     await visit(page, '/console/box-office/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Orders' })).toBeVisible()
     await page.getByRole('searchbox').first().fill(reference)
@@ -140,9 +142,46 @@ test.describe('the box office console', () => {
     await visit(page, `/console/box-office/performances/${performanceId}/door`)
     await expect(page.getByRole('heading', { level: 1, name: 'Door list' })).toBeVisible()
     await noViolations(page)
+    // The reservation was paid for at the desk: its buyer is admitted from the list by name.
+    await page.getByRole('button', { name: `Admit one ticket for ${reference}` }).click()
+    await expect(page.getByText('1 admitted').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: `Admit one ticket for ${reference}` })).toHaveCount(0)
 
     await visit(page, '/console/box-office/ticket-types')
     await expect(page.getByText(typeName)).toBeVisible()
     await noViolations(page)
+  })
+})
+
+test.describe('complimentary tickets', () => {
+  test('a producer asks for tickets and an approver approves and sends them, with no accessibility violations', async ({ browser, playwright }) => {
+    const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(manager) })
+    expect([200, 409]).toContain((await api.post('/api/box-office/ticket-types', { data: { name: `Comp ${stamp}`, kind: 'complimentary' }, headers: key() })).status())
+    await api.dispose()
+
+    const askingContext = await browser.newContext(as(producer))
+    const asking = await askingContext.newPage()
+    await visit(asking, '/console/box-office/comps')
+    await expect(asking.getByRole('heading', { level: 1, name: 'Complimentary tickets' })).toBeVisible()
+    await noViolations(asking)
+    await asking.getByRole('combobox', { name: 'Performance' }).click()
+    await asking.getByRole('option', { name: /The Desk Show/ }).first().click()
+    await asking.getByRole('combobox', { name: 'Why' }).click()
+    await asking.getByRole('option', { name: 'Press' }).click()
+    await asking.getByLabel('Their name').fill('Rita Reviewer')
+    await asking.getByLabel('Their email address').fill(`rita.${stamp}@example.org`)
+    await asking.getByRole('button', { name: 'Send request' }).click()
+    await expect(asking.getByText('Request sent').first()).toBeVisible()
+    await expect(asking.getByText('For Rita Reviewer').first()).toBeVisible()
+    await askingContext.close()
+
+    const decidingContext = await browser.newContext(as(approver))
+    const deciding = await decidingContext.newPage()
+    await visit(deciding, '/console/box-office/comps')
+    await expect(deciding.getByRole('heading', { name: 'Waiting for a decision' })).toBeVisible()
+    await noViolations(deciding)
+    await deciding.getByRole('button', { name: 'Approve and send' }).first().click()
+    await expect(deciding.getByText('Approved, and the tickets sent').first()).toBeVisible()
+    await decidingContext.close()
   })
 })

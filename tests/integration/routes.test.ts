@@ -148,9 +148,15 @@ describe('settings (F-09)', () => {
   })
 
   it('applies cross-setting rules', async () => {
-    const response = await call(handle, 'PUT', '/api/core/settings/core.locale.currency', { actor: manager(), body: { value: 'gbp' } })
+    const response = await call(handle, 'PUT', '/api/core/settings/core.organisation.contact-email', { actor: person(['core.organisation.edit']), body: { value: 'not an address' } })
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ code: 'core.setting.rule-failed' })
+  })
+
+  it('refuses a choice outside its catalogue', async () => {
+    const response = await call(handle, 'PUT', '/api/core/settings/core.locale.currency', { actor: manager(), body: { value: 'gbp' } })
+    expect(response.status).toBe(422)
+    expect(await response.json()).toMatchObject({ code: 'core.setting.invalid' })
   })
 
   it('shows public settings, with text for quotable ones', async () => {

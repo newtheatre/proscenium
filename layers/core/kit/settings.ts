@@ -3,6 +3,7 @@
 import type { z } from 'zod'
 import { DeclarationError } from './refusal'
 import { formatDuration, isDuration, parseDuration } from './duration'
+import { catalogueValues, isCatalogue, type Catalogue } from './catalogues'
 
 export type Audience = 'public' | 'signed-in' | 'staff'
 
@@ -35,6 +36,8 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   maxLength?: number
   minLength?: number
   options?: readonly string[]
+  /** A choice from one of the kit's fixed lists instead of options of its own (catalogues.ts). */
+  catalogue?: Catalogue
   unit?: string
   record?: string
   schema?: z.ZodType
@@ -56,6 +59,18 @@ export type SettingKind = typeof KINDS[number]
 
 type Value<V, U> = U extends { unset: true } ? V | null : V
 
+/**
+ * One of a fixed set. Either the setting lists its own options (kebab-case or numbers, labelled from
+ * `<module>.settings.<group>.<name>.options.<option>`), or it names one of the kit's catalogues of
+ * standard codes (time zones, currencies, countries, languages), labelled by the browser. Either way
+ * the screen draws a dropdown, searchable once the list is long (shared/choices.ts).
+ */
+function choice<const Opt extends readonly string[], const O extends Common & WithDefault<Opt[number]> & { options: Opt }>(o: O & { options: Opt }): SettingEntry<Value<Opt[number], O>, 'choice'> & O
+function choice<const O extends Common & WithDefault<string> & { catalogue: Catalogue }>(o: O): SettingEntry<Value<string, O>, 'choice'> & O
+function choice(o: Common & { options?: readonly string[], catalogue?: Catalogue }) {
+  return { kind: 'choice', ...o }
+}
+
 export const setting = {
   boolean: <const O extends Common & WithDefault<boolean>>(o: O) => ({ kind: 'boolean', ...o }) as SettingEntry<Value<boolean, O>, 'boolean'> & O,
   integer: <const O extends Common & WithDefault<number> & { min?: number, max?: number, unit?: string }>(o: O) => ({ kind: 'integer', ...o }) as SettingEntry<Value<number, O>, 'integer'> & O,
@@ -66,8 +81,8 @@ export const setting = {
   /** HH:MM in the theatre's time zone; limits written the same way. */
   time: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
   text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
-  choice: <const Opt extends readonly string[], const O extends Common & WithDefault<Opt[number]> & { options: Opt }>(o: O & { options: Opt }) => ({ kind: 'choice', ...o }) as SettingEntry<Value<Opt[number], O>, 'choice'> & O,
-  list: <const O extends Common & WithDefault<readonly string[]> & { of: 'text' | 'choice', options?: readonly string[], maxLength?: number }>(o: O) => ({ kind: 'list', ...o }) as SettingEntry<Value<string[], O>, 'list'> & O,
+  choice,
+  list: <const O extends Common & WithDefault<readonly string[]> & { of: 'text' | 'choice', options?: readonly string[], catalogue?: Catalogue, maxLength?: number }>(o: O) => ({ kind: 'list', ...o }) as SettingEntry<Value<string[], O>, 'list'> & O,
   /** A record of the named type. Always starts unset. */
   reference: <const O extends Common & { record: string }>(o: O) => ({ kind: 'reference', unset: true, ...o }) as SettingEntry<string | null, 'reference'> & O,
   /** The escape hatch: anything a Zod schema accepts. Needs its own editor; never quotable. */
@@ -125,8 +140,15 @@ function checkEntry(key: string, entry: SettingEntry) {
   if (entry.kind === 'reference' && entry.default !== undefined) throw new DeclarationError(f('default'), 'a reference setting always starts unset')
   if (!entry.unset && entry.default === undefined) throw new DeclarationError(f('default'), 'give a default, or `unset: true` if the theatre must choose')
   if (entry.kind === 'text' && !(typeof entry.maxLength === 'number' && entry.maxLength > 0)) throw new DeclarationError(f('maxLength'), 'a text setting declares maxLength')
-  if ((entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) && !(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => OPTION.test(o))))
-    throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case or a number')
+  if (entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) {
+    if (entry.catalogue !== undefined) {
+      if (!isCatalogue(entry.catalogue)) throw new DeclarationError(f('catalogue'), 'names one of the kit\'s catalogues: time-zone, currency, country or language')
+      if (entry.options !== undefined) throw new DeclarationError(f('options'), 'a choice lists its own options or names a catalogue, not both')
+    }
+    else if (!(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => OPTION.test(o))))
+      throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case or a number, or names a catalogue')
+  }
+  else if (entry.catalogue !== undefined) throw new DeclarationError(f('catalogue'), 'only a choice, or a list of choices, names a catalogue')
   if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
   if ('scope' in entry) throw new DeclarationError(f('scope'), 'is gone: say where a group of settings is shown in the manifest\'s settingGroups')
   if (entry.screen !== undefined && !(typeof entry.screen === 'string' && SCREEN.test(entry.screen))) throw new DeclarationError(f('screen'), 'is the address of a page, such as /admin/email')
@@ -180,10 +202,10 @@ export function validateSettingValue(entry: SettingEntry, raw: unknown): Validat
       if (entry.minLength && raw.length < entry.minLength) return { ok: false, reason: `must be at least ${entry.minLength} ${entry.minLength === 1 ? 'character' : 'characters'}`, limit: 'minLength' }
       return raw.length <= entry.maxLength! ? { ok: true, value: raw } : { ok: false, reason: `must be at most ${entry.maxLength} characters`, limit: 'maxLength' }
     case 'choice':
-      return typeof raw === 'string' && entry.options!.includes(raw) ? { ok: true, value: raw } : { ok: false, reason: `must be one of ${entry.options!.join(', ')}`, limit: 'options' }
+      return typeof raw === 'string' && optionsOf(entry).includes(raw) ? { ok: true, value: raw } : { ok: false, reason: `must be ${oneOf(entry)}`, limit: 'options' }
     case 'list': {
       if (!Array.isArray(raw) || !raw.every(i => typeof i === 'string')) return { ok: false, reason: 'must be a list of text' }
-      if (entry.of === 'choice' && !raw.every(i => entry.options!.includes(i))) return { ok: false, reason: `each item must be one of ${entry.options!.join(', ')}`, limit: 'options' }
+      if (entry.of === 'choice' && !raw.every(i => optionsOf(entry).includes(i))) return { ok: false, reason: `each item must be ${oneOf(entry)}`, limit: 'options' }
       if (entry.maxLength && raw.some(i => i.length > entry.maxLength!)) return { ok: false, reason: `each item must be at most ${entry.maxLength} characters`, limit: 'maxLength' }
       return { ok: true, value: raw }
     }
@@ -208,6 +230,14 @@ export function validateSettingValue(entry: SettingEntry, raw: unknown): Validat
   }
   return { ok: false, reason: 'unknown kind' }
 }
+
+/** The values a choice (or a list of choices) allows: its own options, or its catalogue's. */
+export function optionsOf(entry: SettingEntry): readonly string[] {
+  return entry.catalogue ? catalogueValues(entry.catalogue) : entry.options ?? []
+}
+
+const CATALOGUE_WORDS: Record<Catalogue, string> = { 'time-zone': 'a time zone such as Europe/London', 'currency': 'a currency code such as GBP', 'country': 'a country code such as GB', 'language': 'a language the site is written in, such as en-GB' }
+const oneOf = (entry: SettingEntry) => entry.catalogue ? CATALOGUE_WORDS[entry.catalogue] : `one of ${entry.options!.join(', ')}`
 
 /** The value a setting has with no override: its default in stored form, or null when unset. */
 export function defaultValue(entry: SettingEntry): unknown {
