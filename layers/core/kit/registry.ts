@@ -215,8 +215,10 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
           if (!linked.has(target!.module)) fail(entry, `tables.${key}.${col}`, `${target!.module} owns ${c.ref.table}, so list it in requires`)
         }
         if (c.erase === 'retain' && !r.settings.has(c.until!)) fail(entry, `tables.${key}.${col}`, `retain until "${c.until}", which is not a setting`)
+        if (c.erase === 'retain') confirmsRetention(r.settings.get(c.until!)!.entry)
       }
       if (typeof meta.options.retention === 'string' && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      if (typeof meta.options.retention === 'string') confirmsRetention(r.settings.get(meta.options.retention)!.entry)
       // An internal column that erasure clears needs rows erasure can find: a subject of its own, or
       // a chain of parents (subject { via }) that ends at an account or an email.
       const clears = Object.entries(meta.columns).find(([, c]) => c.meta.class === 'internal' && c.meta.erase === 'clear')
@@ -332,4 +334,14 @@ function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntr
       r.settingAliases.set(setting.replaces, key)
     }
   }
+}
+
+/**
+ * A setting a table's retention names is a retention period, and shortening one lets the next sweep
+ * remove rows for good, so it always confirms (Settings registry, "A retention period always
+ * confirms"): onChange 'confirm' whatever the manifest says, unless it asks for a reason, which is
+ * stronger.
+ */
+function confirmsRetention(entry: SettingEntry): void {
+  if (entry.onChange !== 'reason') entry.onChange = 'confirm'
 }

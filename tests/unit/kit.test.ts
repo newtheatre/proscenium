@@ -231,6 +231,14 @@ describe('where settings are shown', () => {
   it('want every group of core to name its home', () => {
     expect(() => defineModule({ id: 'core', manifest: 1, since: '0.1.0', settings: defineSettings('core', { 'odd.one': setting.boolean({ default: true, change: 'core.settings.manage' }) }) } as any)).toThrow(/core has no settings page of its own/)
   })
+  it('make a setting a table keeps its rows by confirm, unless it already asks for a reason', () => {
+    const items = defineTable('lost_property_items', { id: col.id(), at: col.createdAt() }, { id: 'lpi', realm: 'system', subject: 'none', retention: 'lost-property.items.keep-for' })
+    const registry = buildRegistry([lost({ tables: { items } })])
+    expect(registry.settings.get('lost-property.items.keep-for')!.entry.onChange).toBe('confirm')
+    expect(registry.settings.get('lost-property.shelves.count')!.entry.onChange).toBeUndefined()
+    const strict = lost({ tables: { items }, settings: defineSettings('lost-property', { 'items.keep-for': setting.duration({ default: '30d', change: 'lost-property.items.manage', onChange: 'reason' }) }) })
+    expect(buildRegistry([strict]).settings.get('lost-property.items.keep-for')!.entry.onChange).toBe('reason')
+  })
   it('carry a renamed key, and refuse an old key that is still declared', () => {
     const renamed = lost({ settings: defineSettings('lost-property', { 'items.kept-for': setting.duration({ default: '30d', change: 'lost-property.items.manage', replaces: 'lost-property.items.keep-for' }) }) })
     expect(buildRegistry([renamed]).settingAliases.get('lost-property.items.keep-for')).toBe('lost-property.items.kept-for')

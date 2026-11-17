@@ -320,7 +320,10 @@ cannot be saved. A quotable public setting can be quoted in content as
 reason and `onChange: 'confirm'` a second confirmation; the `change` ability still decides who may.
 Saving a setting asks for a fresh sign-in (`core.access.fresh-within`) only when it declares
 `onChange`, whatever the ability's own `fresh` says (Matt, 16 November); `can(..., { fresh })`
-is the override, and only the settings saves use it. A section is reset by saving it with
+is the override, and only the kit's settings code may pass it (the conformance run checks). It
+changes freshness alone: a privileged ability still needs a strong sign-in. A setting that a table's
+`retention`, or a column's `retain until`, names is a retention period and always confirms: the
+registry makes it `onChange: 'confirm'` unless it asks for a reason. A section is reset by saving it with
 `reset: true` on each of its settings.
 
 Durations may also be written `6mo` or `7y`; a month is 30 days and a year 365. `formatDuration`

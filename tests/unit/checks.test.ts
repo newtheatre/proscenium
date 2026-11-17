@@ -126,3 +126,12 @@ describe('duration wording', () => {
     expect(namedDurationUnit('Keep the delivery log for')).toBeUndefined()
   })
 })
+
+describe('freshness overrides', () => {
+  it('finds can() or requireAbility() given fresh, on its line', async () => {
+    const { freshOverrides } = await import('../../scripts/checks/source')
+    expect(freshOverrides('const a = 1\nawait can(actor, \'x.y.z\', undefined, { fresh: false })')).toEqual([2])
+    expect(freshOverrides('await requireAbility(actor, entry.change as never, record(), { fresh: true })')).toEqual([1])
+    expect(freshOverrides('await can(actor, \'x.y.z\')\nconst fresh = { fresh: true }')).toEqual([])
+  })
+})

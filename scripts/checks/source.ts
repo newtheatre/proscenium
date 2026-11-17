@@ -159,6 +159,16 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
   return problems
 }
 
+/** Where a check may pass `fresh` to can() or requireAbility(): the settings saves, history and Revert. */
+const FRESH_OVERRIDE_HOMES = ['layers/core/server/settings/', 'layers/core/server/api/core/settings/', 'layers/core/kit/']
+
+/** The lines that pass `fresh` to can() or requireAbility(). */
+export function freshOverrides(source: string): number[] {
+  const out: number[] = []
+  for (const match of source.matchAll(/\b(?:can|requireAbility)\((?:[^()]|\([^()]*\))*\bfresh\s*:/g)) out.push(source.slice(0, match.index).split('\n').length)
+  return out
+}
+
 export function checkAbilities(modules: Loaded[], registry: any): string[] {
   const problems: string[] = []
   const required = new Set<string>()
@@ -175,6 +185,13 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
     }
   }
   for (const [key] of registry.abilities as Map<string, any>) if (!required.has(key)) problems.push(`abilities.${key}: is declared but nothing requires it`)
+  // Overriding an ability's freshness is for the kit's own settings saves alone (Foundations, 17 November).
+  for (const m of modules) {
+    for (const file of moduleFiles(m)) {
+      if (FRESH_OVERRIDE_HOMES.some(home => rel(file).startsWith(home))) continue
+      for (const line of freshOverrides(readFileSync(file, 'utf8'))) problems.push(`${rel(file)}:${line}: overrides an ability's freshness, which only the kit's settings saves may do`)
+    }
+  }
   for (const route of allRoutes(modules)) {
     const decl = route.ability && registry.abilities.get(route.ability)?.decl
     if (decl?.risk === 'privileged' && decl.fresh === false && route.method !== 'get' && route.method !== 'head') problems.push(`${route.file}: requires ${route.ability}, which skips freshness because it only reads, but this route changes something`)
