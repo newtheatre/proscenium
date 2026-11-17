@@ -1,11 +1,62 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "67a6ab73-afb4-4ba5-8f99-6b5515badb87",
+  "id": "4b0fed4c-d1de-46c0-a452-8b9b0eb36a8f",
   "prevIds": [
-    "f5254b98-2fda-4cb0-ae6c-4a9e19ba381f"
+    "0177e452-c8f8-4dc4-8478-74eae15f291d",
+    "39392595-c64a-42cb-bbb4-9b6bfbd1c27a",
+    "b1492d30-138a-499b-91ad-6ac7a68e998a",
+    "b92b42c6-0519-4cbf-94bb-a3c8e3f867d2"
   ],
   "ddl": [
+    {
+      "name": "bar_age_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_categories",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_openings",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_outlets",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_price_lists",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_prices",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_products",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_register_reviews",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_sale_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_sale_reversals",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_sales",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_variants",
+      "entityType": "tables"
+    },
     {
       "name": "box_office_bands",
       "entityType": "tables"
@@ -92,6 +143,10 @@
     },
     {
       "name": "core_audit",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_authenticators",
       "entityType": "tables"
     },
     {
@@ -473,6 +528,1156 @@
     {
       "name": "payments_webhook_events",
       "entityType": "tables"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "opening_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "sale_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "outcome",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "refusal_term",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "variant_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "colour",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "income_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "outlet_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "operating_day",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "opened_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "closed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "opened_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_openings",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "price_list_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "system_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "falls_back",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "percent_off",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "variant_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "price_list_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "effective_from",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "set_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_prices",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "category_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "age_restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "outlet_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "from_day",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "to_day",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "refusals",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "reviewed_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "reviewed_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "sale_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "variant_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "price_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "unit_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "discount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "sale_line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "refund_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "reason_term",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "stock_outcome",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "reference",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "opening_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "price_list_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "total_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "part_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "channel",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "sold_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "client_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "paid_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "voided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sales",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "product_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "barcode",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_variants",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
     },
     {
       "table": "box_office_bands",
@@ -966,6 +2171,16 @@
     },
     {
       "table": "box_office_exchanges",
+      "name": "moves",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_exchanges",
       "name": "difference_minor",
       "type": "integer",
       "notNull": true,
@@ -1177,6 +2392,16 @@
     {
       "table": "box_office_order_lines",
       "name": "claim_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "price_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -3218,6 +4443,76 @@
       "table": "core_audit",
       "name": "unit_id",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "secret_sealed",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "last_step",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "confirmed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "last_used_at",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -6479,6 +7774,26 @@
       "name": "code_hash",
       "type": "text",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_recovery_codes",
+      "name": "code_sealed",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_recovery_codes",
+      "name": "position",
+      "type": "integer",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -12385,6 +13700,324 @@
       "entityType": "columns"
     },
     {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_at",
+      "columns": [
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_sale",
+      "columns": [
+        {
+          "value": "sale_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_categories",
+      "name": "bar_categories_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_openings",
+      "name": "bar_openings_one_open",
+      "columns": [
+        {
+          "value": "outlet_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'open'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_openings",
+      "name": "bar_openings_day",
+      "columns": [
+        {
+          "value": "operating_day",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "bar_outlets_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "active = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "bar_outlets_one_desk",
+      "columns": [
+        {
+          "value": "kind",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "kind = 'desk' AND active = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "bar_price_lists_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "bar_price_lists_system_key",
+      "columns": [
+        {
+          "value": "system_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "system_key IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_prices",
+      "name": "bar_prices_in_force",
+      "columns": [
+        {
+          "value": "variant_id",
+          "isExpression": false
+        },
+        {
+          "value": "price_list_id",
+          "isExpression": false
+        },
+        {
+          "value": "effective_from",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_products",
+      "name": "bar_products_category",
+      "columns": [
+        {
+          "value": "category_id",
+          "isExpression": false
+        },
+        {
+          "value": "position",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "bar_register_reviews_at",
+      "columns": [
+        {
+          "value": "reviewed_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "bar_sale_lines_sale",
+      "columns": [
+        {
+          "value": "sale_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_line",
+      "columns": [
+        {
+          "value": "sale_line_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_refund",
+      "columns": [
+        {
+          "value": "refund_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_reference",
+      "columns": [
+        {
+          "value": "reference",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_client_key",
+      "columns": [
+        {
+          "value": "client_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_opening",
+      "columns": [
+        {
+          "value": "opening_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_intent",
+      "columns": [
+        {
+          "value": "intent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_variants",
+      "name": "bar_variants_name",
+      "columns": [
+        {
+          "value": "product_id",
+          "isExpression": false
+        },
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_variants",
+      "name": "bar_variants_barcode",
+      "columns": [
+        {
+          "value": "barcode",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "barcode IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "box_office_bands",
       "name": "box_office_bands_name",
       "columns": [
@@ -13098,6 +14731,20 @@
         }
       ],
       "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "core_authenticators_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -15409,6 +17056,306 @@
       "entityType": "indexes"
     },
     {
+      "table": "bar_age_checks",
+      "name": "fk_bar_age_checks_opening_id_bar_openings_id_fk",
+      "columns": [
+        "opening_id"
+      ],
+      "tableTo": "bar_openings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "fk_bar_age_checks_sale_id_bar_sales_id_fk",
+      "columns": [
+        "sale_id"
+      ],
+      "tableTo": "bar_sales",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "fk_bar_age_checks_refusal_term_core_terms_id_fk",
+      "columns": [
+        "refusal_term"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "fk_bar_age_checks_variant_id_bar_variants_id_fk",
+      "columns": [
+        "variant_id"
+      ],
+      "tableTo": "bar_variants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_openings",
+      "name": "fk_bar_openings_outlet_id_bar_outlets_id_fk",
+      "columns": [
+        "outlet_id"
+      ],
+      "tableTo": "bar_outlets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_openings",
+      "name": "fk_bar_openings_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "fk_bar_outlets_price_list_id_bar_price_lists_id_fk",
+      "columns": [
+        "price_list_id"
+      ],
+      "tableTo": "bar_price_lists",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "fk_bar_outlets_space_id_core_spaces_id_fk",
+      "columns": [
+        "space_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_prices",
+      "name": "fk_bar_prices_variant_id_bar_variants_id_fk",
+      "columns": [
+        "variant_id"
+      ],
+      "tableTo": "bar_variants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_prices",
+      "name": "fk_bar_prices_price_list_id_bar_price_lists_id_fk",
+      "columns": [
+        "price_list_id"
+      ],
+      "tableTo": "bar_price_lists",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_products",
+      "name": "fk_bar_products_category_id_bar_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "bar_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "fk_bar_register_reviews_outlet_id_bar_outlets_id_fk",
+      "columns": [
+        "outlet_id"
+      ],
+      "tableTo": "bar_outlets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "fk_bar_sale_lines_sale_id_bar_sales_id_fk",
+      "columns": [
+        "sale_id"
+      ],
+      "tableTo": "bar_sales",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "fk_bar_sale_lines_variant_id_bar_variants_id_fk",
+      "columns": [
+        "variant_id"
+      ],
+      "tableTo": "bar_variants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "fk_bar_sale_lines_price_id_bar_prices_id_fk",
+      "columns": [
+        "price_id"
+      ],
+      "tableTo": "bar_prices",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "fk_bar_sale_reversals_sale_line_id_bar_sale_lines_id_fk",
+      "columns": [
+        "sale_line_id"
+      ],
+      "tableTo": "bar_sale_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "fk_bar_sale_reversals_reason_term_core_terms_id_fk",
+      "columns": [
+        "reason_term"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "fk_bar_sales_opening_id_bar_openings_id_fk",
+      "columns": [
+        "opening_id"
+      ],
+      "tableTo": "bar_openings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "fk_bar_sales_price_list_id_bar_price_lists_id_fk",
+      "columns": [
+        "price_list_id"
+      ],
+      "tableTo": "bar_price_lists",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_variants",
+      "name": "fk_bar_variants_product_id_bar_products_id_fk",
+      "columns": [
+        "product_id"
+      ],
+      "tableTo": "bar_products",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_bands",
       "name": "fk_box_office_bands_displaces_band_id_box_office_bands_id_fk",
       "columns": [
@@ -15715,6 +17662,21 @@
         "claim_id"
       ],
       "tableTo": "box_office_claims",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_price_id_box_office_prices_id_fk",
+      "columns": [
+        "price_id"
+      ],
+      "tableTo": "box_office_prices",
       "columnsTo": [
         "id"
       ],
@@ -17339,6 +19301,114 @@
       "entityType": "pks"
     },
     {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_categories",
+      "name": "bar_categories_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_openings",
+      "name": "bar_openings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "bar_outlets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "bar_price_lists_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_prices",
+      "name": "bar_prices_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_products",
+      "name": "bar_products_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "bar_register_reviews_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "bar_sale_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_variants",
+      "name": "bar_variants_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "box_office_bands",
       "name": "box_office_bands_pk",
       "columns": [
@@ -17503,6 +19573,15 @@
     {
       "table": "core_audit",
       "name": "core_audit_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_authenticators",
+      "name": "core_authenticators_pk",
       "columns": [
         "id"
       ],
@@ -18246,6 +20325,138 @@
       ],
       "nameExplicit": false,
       "entityType": "uniques"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_outcome",
+      "value": "\"outcome\" IN ('not_needed', 'id_checked', 'self_attested', 'refused')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_reason",
+      "value": "(\"outcome\" = 'refused') = (\"refusal_term\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_description",
+      "value": "\"description\" IS NULL OR (\"outcome\" = 'refused' AND length(\"description\") <= 120)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_openings",
+      "name": "bar_openings_state",
+      "value": "\"state\" IN ('open', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_outlets",
+      "name": "bar_outlets_kind",
+      "value": "\"kind\" IN ('bar', 'kiosk', 'desk')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "bar_price_lists_percent",
+      "value": "\"percent_off\" IS NULL OR (\"percent_off\" BETWEEN 1 AND 100)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_price_lists",
+      "name": "bar_price_lists_standard",
+      "value": "\"system_key\" IS NULL OR (\"percent_off\" IS NULL AND \"active\" = 1)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_prices",
+      "name": "bar_prices_amount",
+      "value": "\"amount_minor\" IS NULL OR \"amount_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "bar_register_reviews_days",
+      "value": "\"to_day\" >= \"from_day\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_register_reviews",
+      "name": "bar_register_reviews_refusals",
+      "value": "\"refusals\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "bar_sale_lines_quantity",
+      "value": "\"quantity\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "bar_sale_lines_unit",
+      "value": "\"unit_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "bar_sale_lines_discount",
+      "value": "\"discount_minor\" >= 0 AND \"discount_minor\" <= \"unit_minor\" * \"quantity\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "bar_sale_lines_amount",
+      "value": "\"amount_minor\" = \"unit_minor\" * \"quantity\" - \"discount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_state",
+      "value": "\"state\" IN ('requested', 'succeeded', 'failed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_stock",
+      "value": "\"stock_outcome\" IN ('returned', 'wasted', 'none')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_quantity",
+      "value": "\"quantity\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_state",
+      "value": "\"state\" IN ('open', 'awaiting_payment', 'paid', 'void')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_channel",
+      "value": "\"channel\" IN ('till', 'desk', 'self')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_total",
+      "value": "\"total_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sales",
+      "name": "bar_sales_paid",
+      "value": "\"state\" <> 'paid' OR \"paid_at\" IS NOT NULL",
+      "entityType": "checks"
     },
     {
       "table": "box_office_bands",
