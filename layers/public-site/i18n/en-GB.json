@@ -86,5 +86,7 @@
   "public-site.season.not-found": "There is no such season.",
   "public-site.season.dates-soon": "Dates to be announced",
   "public-site.season.empty": "Nothing announced yet",
-  "public-site.season.empty-description": "Productions appear here as soon as they are announced."
+  "public-site.season.empty-description": "Productions appear here as soon as they are announced.",
+  "public-site.price.from": "From {amount}",
+  "public-site.price.other": "{label} {amount}"
 }
