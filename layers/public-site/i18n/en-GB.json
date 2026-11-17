@@ -1,0 +1,12 @@
+{
+  "public-site.module.name": "Public site",
+  "public-site.module.description": "The public pages: what's on, a page for each production, the archive of past shows and the calendar feed.",
+  "public-site.navigation.groups.public-site.label": "Public site",
+  "public-site.settings-sections.archive": "Past shows",
+  "public-site.settings-sections.listing": "Listings",
+  "public-site.settings.archive.public.label": "Past shows are public",
+  "public-site.settings.archive.public.help": "When off, every past production, the list of past shows and archived seasons answer \"not found\". Current shows are unaffected, and turning it back on restores everything.",
+  "public-site.settings.listing.cancelled-visible.label": "Show cancelled performances",
+  "public-site.settings.listing.cancelled-visible.help": "Keep a cancelled performance on the production's page, marked as cancelled, until its date has passed.",
+  "public-site.abilities.site.configure.label": "Change the public site's settings"
+}

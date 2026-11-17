@@ -36,5 +36,13 @@
   "payments.abilities.session.close-any.label": "Close someone else's till session, or countersign a cash difference",
   "payments.abilities.refund.request.label": "Ask for a refund from the Payments screens",
   "payments.abilities.refund.approve.label": "Approve or decline a refund someone else asked for",
-  "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records"
+  "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records",
+
+  "payments.figures.tills": "Tills open",
+  "payments.report.tills": "Tills",
+  "payments.report.sessions-closed": "Till sessions closed",
+  "payments.report.sessions-not-closed": "Till sessions not yet closed",
+  "payments.report.expected": "Cash expected",
+  "payments.report.counted": "Cash counted",
+  "payments.report.difference": "Difference"
 }

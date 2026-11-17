@@ -187,6 +187,12 @@ export const points = {
    * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
    */
   'core.change-guard': point({ kind: 'code', contract: 'change-guard' }),
+  /**
+   * The booking button for a performance on the public pages, in one of five states. Box office
+   * contributes. With no answer, the performance's external booking link is used, then the
+   * production's; with neither, no button shows.
+   */
+  'core.booking-action': point({ kind: 'code', contract: 'booking-action' }),
   /** Whether an account may read the files of a record with `record` access, keyed by the record type. */
   'core.file-access': point({ kind: 'code', contract: 'file-access' }),
   /**

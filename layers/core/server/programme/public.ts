@@ -1,0 +1,243 @@
+// The programme as the public sees it (part 4, routes; C-38 and C-39). Only published and cancelled
+// productions, only their scheduled, completed and (by choice) cancelled performances, only public
+// fields, and credits through shownCredits. The public site's routes read through here, and so may
+// any module with a public page of its own, such as Box office's booking pages, whether or not the
+// public site is switched on. Whether past shows are public is the public site's setting, not this.
+import { all, first, nowMs } from '#kit'
+import { productionBySlug } from './service'
+import { shownCredits, type ShownCredit } from './credits'
+import { bookingActions, type ShownBooking } from './booking'
+
+export interface PublicTerm { id: string, slug: string, label: string }
+export interface PublicNote { termId: string, label: string, detail: string | null }
+
+export interface PublicPerformance {
+  id: string
+  startsAt: number
+  doorsAt: number | null
+  endsAt: number
+  state: 'scheduled' | 'cancelled' | 'completed'
+  label: string | null
+  venue: { id: string, slug: string, name: string }
+  space: { id: string, name: string }
+  access: PublicNote[]
+  /** The booking button, or null where there is none (C-39: "where one exists"). */
+  booking: ShownBooking | null
+}
+
+export interface PublicProduction {
+  id: string
+  slug: string
+  title: string
+  subtitle: string | null
+  summary: string | null
+  description: string | null
+  category: PublicTerm | null
+  season: { id: string, slug: string, name: string } | null
+  companyName: string | null
+  ageGuidance: string | null
+  advisories: PublicNote[]
+  advisoriesConfirmedNone: boolean
+  contentNote: string | null
+  runningMinutes: number | null
+  intervalCount: number
+  state: 'published' | 'cancelled'
+  /** Worked out, not stored (part 3): cancelled, or its last performance not cancelled has ended. */
+  past: boolean
+  credits: ShownCredit[]
+  performances: PublicPerformance[]
+}
+
+export interface PublicProductionOptions {
+  /** Keep cancelled performances that have not yet ended (public-site.listing.cancelled-visible). */
+  cancelledVisible?: boolean
+  /** Show members-only credits as well, for the members' side. */
+  members?: boolean
+  now?: number
+}
+
+interface ProductionRow {
+  id: string
+  slug: string
+  title: string
+  subtitle: string | null
+  summary: string | null
+  description: string | null
+  category_id: string | null
+  category_slug: string | null
+  category_label: string | null
+  season_id: string | null
+  season_slug: string | null
+  season_name: string | null
+  company_name: string | null
+  age_guidance: string | null
+  advisories_confirmed_none: number
+  content_note: string | null
+  running_minutes: number | null
+  interval_count: number
+  external_booking_url: string | null
+  state: 'published' | 'cancelled'
+}
+
+interface PerformanceRow {
+  id: string
+  production_id: string
+  starts_at: number
+  doors_at: number | null
+  ends_at: number
+  state: PublicPerformance['state']
+  label: string | null
+  capacity: number | null
+  external_booking_url: string | null
+  venue_id: string
+  venue_slug: string
+  venue_name: string
+  space_id: string
+  space_name: string
+}
+
+const PRODUCTION = `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.description,
+    c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
+    s.id AS season_id, s.slug AS season_slug, s.name AS season_name,
+    p.company_name, p.age_guidance, p.advisories_confirmed_none, p.content_note, p.running_minutes, p.interval_count,
+    p.external_booking_url, p.state
+  FROM core_productions p
+  LEFT JOIN core_terms c ON c.id = p.category_term_id
+  LEFT JOIN core_seasons s ON s.id = p.season_id AND s.state IN ('published', 'archived')
+  WHERE p.state IN ('published', 'cancelled')`
+
+/**
+ * One production by its address. An old slug answers `{ moved }` with the current one, for a
+ * redirect; a production the public may not see answers null, as one that never existed would.
+ */
+export async function publicProduction(slug: string, options: PublicProductionOptions = {}): Promise<PublicProduction | { moved: string } | null> {
+  const found = await productionBySlug(slug)
+  if (!found) return null
+  const row = await first<ProductionRow>(`${PRODUCTION} AND p.id = ?`, found.id)
+  if (!row) return null
+  if (found.moved) return { moved: found.slug }
+  const now = options.now ?? nowMs()
+  const performances = await publicPerformances([row], now, options.cancelledVisible ?? true)
+  const advisories = await all<{ term_id: string, label: string, detail: string | null }>(
+    'SELECT a.term_id, t.label, a.detail FROM core_production_advisories a JOIN core_terms t ON t.id = a.term_id WHERE a.production_id = ? ORDER BY a.sort',
+    row.id,
+  )
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    subtitle: row.subtitle,
+    summary: row.summary,
+    description: row.description,
+    category: row.category_id ? { id: row.category_id, slug: row.category_slug!, label: row.category_label! } : null,
+    season: row.season_id ? { id: row.season_id, slug: row.season_slug!, name: row.season_name! } : null,
+    companyName: row.company_name,
+    ageGuidance: row.age_guidance,
+    advisories: advisories.map(a => ({ termId: a.term_id, label: a.label, detail: a.detail })),
+    advisoriesConfirmedNone: !!row.advisories_confirmed_none,
+    contentNote: row.content_note,
+    runningMinutes: row.running_minutes,
+    intervalCount: row.interval_count,
+    state: row.state,
+    past: isPast(row.state, performances, now),
+    credits: await shownCredits(row.id, options.members ?? false),
+    performances,
+  }
+}
+
+export interface PublicListing {
+  id: string
+  slug: string
+  title: string
+  subtitle: string | null
+  summary: string | null
+  category: PublicTerm | null
+  /** The next scheduled performance to start, or the one running now. */
+  nextStartsAt: number
+  /** The last scheduled performance's end. */
+  lastEndsAt: number
+  venues: string[]
+}
+
+/**
+ * What's on (C-38): published, listed productions with a scheduled performance still to come,
+ * soonest first. Unlisted productions keep their page but stay out of lists and feeds.
+ */
+export async function currentProductions(options: { now?: number } = {}): Promise<PublicListing[]> {
+  const now = options.now ?? nowMs()
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, next_starts_at: number, last_ends_at: number, venues: string }>(
+    `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
+        min(f.starts_at) AS next_starts_at, max(f.ends_at) AS last_ends_at,
+        json_group_array(DISTINCT v.name) AS venues
+       FROM core_productions p
+       JOIN core_performances f ON f.production_id = p.id AND f.state = 'scheduled' AND f.ends_at > ?
+       JOIN core_venues v ON v.id = f.venue_id
+       LEFT JOIN core_terms c ON c.id = p.category_term_id
+      WHERE p.state = 'published' AND p.listed = 1
+      GROUP BY p.id
+      ORDER BY next_starts_at, p.id`,
+    now,
+  )
+  return rows.map(r => ({
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    subtitle: r.subtitle,
+    summary: r.summary,
+    category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
+    nextStartsAt: r.next_starts_at,
+    lastEndsAt: r.last_ends_at,
+    venues: (JSON.parse(r.venues) as string[]).sort(),
+  }))
+}
+
+async function publicPerformances(productions: ProductionRow[], now: number, cancelledVisible: boolean): Promise<PublicPerformance[]> {
+  const byId = new Map(productions.map(p => [p.id, p]))
+  // Drafts are never public. A cancelled performance shows only until it would have ended, and only by choice.
+  const rows = await all<PerformanceRow>(
+    `SELECT f.id, f.production_id, f.starts_at, f.doors_at, f.ends_at, f.state, f.label, f.capacity, f.external_booking_url,
+        v.id AS venue_id, v.slug AS venue_slug, v.name AS venue_name, s.id AS space_id, s.name AS space_name
+       FROM core_performances f JOIN core_venues v ON v.id = f.venue_id JOIN core_spaces s ON s.id = f.space_id
+      WHERE f.production_id IN (SELECT value FROM json_each(?))
+        AND (f.state IN ('scheduled', 'completed') OR (f.state = 'cancelled' AND ? AND f.ends_at > ?))
+      ORDER BY f.starts_at, f.id`,
+    JSON.stringify([...byId.keys()]), cancelledVisible ? 1 : 0, now,
+  )
+  const access = new Map<string, PublicNote[]>()
+  if (rows.length) {
+    for (const a of await all<{ performance_id: string, term_id: string, label: string, detail: string | null }>(
+      `SELECT a.performance_id, a.term_id, t.label, a.detail FROM core_performance_access a JOIN core_terms t ON t.id = a.term_id
+        WHERE a.performance_id IN (SELECT value FROM json_each(?)) ORDER BY t.sort, t.id`,
+      JSON.stringify(rows.map(r => r.id)),
+    )) access.set(a.performance_id, [...(access.get(a.performance_id) ?? []), { termId: a.term_id, label: a.label, detail: a.detail }])
+  }
+  // A cancelled production books nothing; otherwise only a scheduled performance not yet over.
+  const bookable = rows.filter(r => r.state === 'scheduled' && r.ends_at > now && byId.get(r.production_id)!.state === 'published')
+  const booking = await bookingActions(bookable.map(r => ({
+    id: r.id,
+    productionId: r.production_id,
+    startsAt: r.starts_at,
+    endsAt: r.ends_at,
+    capacity: r.capacity,
+    externalBookingUrl: r.external_booking_url,
+    productionBookingUrl: byId.get(r.production_id)!.external_booking_url,
+  })))
+  return rows.map(r => ({
+    id: r.id,
+    startsAt: r.starts_at,
+    doorsAt: r.doors_at,
+    endsAt: r.ends_at,
+    state: r.state,
+    label: r.label,
+    venue: { id: r.venue_id, slug: r.venue_slug, name: r.venue_name },
+    space: { id: r.space_id, name: r.space_name },
+    access: access.get(r.id) ?? [],
+    booking: booking[r.id] ?? null,
+  }))
+}
+
+function isPast(state: PublicProduction['state'], performances: PublicPerformance[], now: number): boolean {
+  if (state === 'cancelled') return true
+  const ends = performances.filter(p => p.state !== 'cancelled').map(p => p.endsAt)
+  return ends.length > 0 && Math.max(...ends) <= now
+}

@@ -11,7 +11,8 @@ export const records = defineRecords('core', {
 
 export const abilities = defineAbilities('core', {
   'settings.manage': ability({ risk: 'privileged' }),
-  'modules.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
+  // Seeing the Modules screen is health.view's; whoever may switch modules may also see it.
+  'modules.manage': ability({ risk: 'privileged', grantAt: ['site'], implies: ['health.view'] }),
   'job.manage': ability({ on: 'core.job' }),
   // Reads the history panel of a record: who changed what and when, from the audit trail.
   'history.view': ability({ audit: false }),

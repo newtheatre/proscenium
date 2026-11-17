@@ -129,6 +129,9 @@ export default defineModule({
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
+    // The tills on a performance's operating day, for Front of house's board and night report.
+    'front-of-house.tonight-figure': [{ id: 'payments.tills', file: 'tills' }],
+    'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
       { id: 'payments.till', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
