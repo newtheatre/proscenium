@@ -11,10 +11,12 @@ import { hashOf, newReference, randomToken } from './codes'
 import { pricesFor, type Price } from './prices'
 import { poolsOf, salesOf } from './setup'
 import { entitle, type Buyer, type Requirement } from './entitlement'
+import { applyCode, judgeCode, redeem } from './promo-codes'
 import { sellableTypes, soldOn } from './ticket-types'
 
 export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number }
-export interface BasketInput { performanceId: string, lines: BasketLineInput[] }
+/** `promoCode`, as the buyer typed it (BO-17). */
+export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string }
 
 export interface Basket {
   orderId: string
@@ -111,6 +113,9 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one order.`, { status: 422, remedy: 'For a larger group, ask the box office.' })
 
   const { pool, lines, currency, guard } = await pricedLines(input.performanceId, input.lines, at, { channel: 'online', account: useContext().actor.accountId ?? null })
+  const typedCode = input.promoCode?.trim()
+  const discounted = typedCode ? await applyCode(await judgeCode(typedCode, input.performanceId, at), input.performanceId, lines) : lines.map(() => null)
+  const charged = lines.map((l, i) => l.amountMinor - (discounted[i]?.discountMinor ?? 0))
 
   unit.add({ sql: "UPDATE box_office_performance_sales SET updated_at = updated_at WHERE id = ? AND state = 'on_sale' AND (off_sale_at IS NULL OR off_sale_at > ?)", params: [sales.id, at] })
     .expect(1, NOT_ON_SALE.paused)
@@ -121,7 +126,7 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const token = randomToken()
   const holdFor = sales.holdMinutes !== null ? sales.holdMinutes * 60 : await useSetting('box-office.baskets.hold-for') as number // not-policy: minutes to seconds
   const expiresAt = at + holdFor * 1000 // not-policy: seconds to milliseconds
-  const totalMinor = lines.reduce((sum, l) => sum + l.amountMinor, 0)
+  const totalMinor = charged.reduce((sum, amount) => sum + amount, 0)
 
   unit.add({
     sql: "INSERT INTO box_office_orders (id, reference, channel, state, signed_in, currency, total_minor, basket_token_hash, expires_at, keep, created_at, updated_at) VALUES (?, ?, 'online', 'basket', 0, ?, ?, ?, ?, 0, ?, ?)",
@@ -130,12 +135,13 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   unit.add({ sql: "INSERT INTO box_office_holds (id, kind, order_id, created_at, updated_at) VALUES (?, 'basket', ?, ?, ?)", params: [holdId, orderId, at, at] })
   const claimed = (await claimSeats(unit, { holdId, requests: input.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
   guard(unit)
+  const redemptions = redeem(unit, orderId, discounted, claimed)
   const lineIds = unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
-    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null,
+    orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: discounted[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
+    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null,
   })))
   unit.expect(lines.length)
-  return { orderId, reference, token, expiresAt, currency, totalMinor, lines: lines.map((l, i) => ({ id: lineIds[i]!, bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: l.amountMinor })) }
+  return { orderId, reference, token, expiresAt, currency, totalMinor, lines: lines.map((l, i) => ({ id: lineIds[i]!, bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: charged[i]! })) }
 }
 
 export interface BasketView {
