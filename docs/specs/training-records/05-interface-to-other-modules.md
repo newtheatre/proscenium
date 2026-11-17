@@ -9,7 +9,7 @@ flowchart LR
     F["Front of house<br/>a shift role needs training"]
     B["Bar<br/>opening a till"]
     SP["Spaces<br/>booking the workshop"]
-    I["Inventory<br/>borrowing kit"]
+    I["Inventory<br/>planned: borrowing kit"]
   end
   subgraph CO["core"]
     RQ["core.requirement<br/>requirements.options<br/>requirements.describe<br/>requirements.check"]
@@ -45,7 +45,7 @@ Other modules need one thing from Training, the answer to "is this person traine
 
 | Kind | Names |
 | --- | --- |
-| Module | `training`; requires `forms`; uses `front-of-house`, `bar`, `spaces`, `inventory` |
+| Module | `training`; requires `forms`; uses `front-of-house`, `bar`, `spaces` |
 | Record types | `training.course`, `training.session`, `training.record`, `training.competency` |
 | Fact | `training.competent`, `training.course-trainer` |
 | Points offered | `training.step-source` (later release) |
@@ -66,7 +66,7 @@ Other modules need one thing from Training, the answer to "is this person traine
 
 A requirement is a condition a host module attaches to one of its own records: this shift role needs "Duty manager", opening a till needs "Till operator", booking the workshop needs "Workshop induction". The host stores the requirement and decides what an unmet one does. Training supplies the choices and the verdicts.
 
-The Foundations formats give one core point for this, `core.requirement`, shared by every host. Front of house, Bar, Spaces and Inventory attach training requirements through it, and Membership and Identity answer the same kind of question ("is a current member", "is over 18") through it. No module declares a point of its own for a per-person condition. A source contributes the contract below, and a host reaches it only through the kit's `requirements.options`, `requirements.describe`, `requirements.check` and `requirements.holder`.
+The Foundations formats give one core point for this, `core.requirement`, shared by every host. Front of house, Bar and Spaces attach training requirements through it, as an inventory module is intended to once it is specified and its id reserved, and Membership and Identity answer the same kind of question ("is a current member", "is over 18") through it. No module declares a point of its own for a per-person condition. A source contributes the contract below, and a host reaches it only through the kit's `requirements.options`, `requirements.describe`, `requirements.check` and `requirements.holder`.
 
 | Part of the contract | Meaning |
 | --- | --- |
