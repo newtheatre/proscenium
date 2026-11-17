@@ -1,0 +1,8 @@
+# Old addresses that should keep working, for a theatre moving from an old site. Each entry sends
+# its old address (from) on to a new one (to) for good, with a permanent redirect, so links and
+# search engines follow. `to` is a page on this site, such as /about or /whats-on/hamlet, or an
+# https address. An old address may carry its query, such as /show.php?id=12, to match only that.
+# `bun run check` fails an entry whose page does not exist.
+redirects: []
+#  - from: /about-us.html
+#    to: /about
