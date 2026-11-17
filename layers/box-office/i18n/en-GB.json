@@ -49,6 +49,7 @@
   "box-office.abilities.order.release.label": "Release a reservation, or mark one to keep",
   "box-office.abilities.ticket.admit.label": "Scan and admit at the door",
   "box-office.abilities.settings.manage.label": "Change box office settings",
+  "box-office.abilities.order.exchange.label": "Exchange tickets on an order for another performance or seats",
   "box-office.abilities.report.view.label": "See sales reports",
   "box-office.abilities.report.export.label": "Download sales reports",
   "box-office.navigation.reports.label": "Sales report",

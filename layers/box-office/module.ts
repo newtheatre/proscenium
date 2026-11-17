@@ -57,6 +57,8 @@ export default defineModule({
     'order.release': ability({ on: 'box-office.order', implies: ['order.view'] }),
     // Cancelling does not imply refunding: staff with only the first cancel with no refund.
     'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
+    // Exchanging a paid ticket for a cheaper one also needs order.refund, for the difference.
+    'order.exchange': ability({ on: 'box-office.order', owner: 'refuses', implies: ['order.view'] }),
     'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
     // The door finds a booking by the buyer's name as well as by its reference.
     'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
@@ -86,6 +88,7 @@ export default defineModule({
       'box-office.order.confirmed': event({ version: 1, payload: z.object({ orderId: z.string(), performanceIds: z.array(z.string()) }), internal: false }),
       // An abandoned basket or an unpaid order is noise outside, and a trace of someone who did not buy.
       'box-office.order.expired': event({ version: 1, payload: z.object({ orderId: z.string() }), internal: true }),
+      'box-office.order.exchanged': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
       'box-office.comp-request.requested': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
       'box-office.comp-request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), state: z.enum(['issued', 'declined', 'withdrawn']) }), internal: true }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
@@ -200,6 +203,20 @@ export default defineModule({
         'en-GB': {
           subject: 'Your tickets: {{ show }}, {{ when }}',
           body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nPaid: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.',
+        },
+      },
+    }, {
+      id: 'box-office.order-exchanged',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      lane: 'prompt' as const,
+      // The new door codes let their holder in, so they are sealed.
+      variables: { reference: 'text' as const, was: 'text' as const, now: 'text' as const, money: 'text' as const, codes: 'sealed' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your tickets have been exchanged: {{ reference }}',
+          body: 'We have exchanged tickets on booking **{{ reference }}**.\n\nWas: {{ was }}\n\nNow: **{{ now }}**\n\n{{ money }}\n\nThe old tickets no longer work. Your new tickets:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.',
         },
       },
     }, {

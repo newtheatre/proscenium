@@ -1,6 +1,6 @@
 <!-- One order (Box office specification, part 6, "Order"): its tickets and whether each has been
      used, its cancellations, and what may be done with it now. The server says which of release,
-     cancel and refund the viewer may do; a reservation can also be kept past its release time. -->
+     cancel, refund and exchange the viewer may do; a reservation can also be kept past its release time. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -26,7 +26,7 @@ interface Order {
   performance: { id: string, title: string, startsAt: number } | null
   lines: Line[]
   cancellations: Cancellation[]
-  can: { release: boolean, cancel: boolean, refund: boolean }
+  can: { release: boolean, cancel: boolean, refund: boolean, exchange: boolean }
 }
 
 const { t } = useT()
@@ -43,6 +43,9 @@ const { data, status, error, refresh } = await useAPI<Order>(() => `/api/box-off
 
 const TONES = { reserved: 'warning', awaiting_payment: 'info', confirmed: 'success', cancelled: 'neutral', expired: 'neutral' } as const
 const cancelling = ref(false)
+const exchanging = ref(false)
+// What can be exchanged: live tickets not yet used at the door.
+const exchangeable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live' && !l.admittedAt))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const at = (action: string): string => `/api/box-office/orders/${encodeURIComponent(id.value)}/${action}`
 
@@ -71,6 +74,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   if (!o) return []
   const groups: DropdownMenuItem[][] = []
   if (o.can.release) groups.push([{ label: t(o.keep ? 'box-office.order.keep.off' : 'box-office.order.keep.on'), icon: 'i-lucide-bookmark', onSelect: () => { void keep(!o.keep) } }])
+  if (o.can.exchange && exchangeable.value.length) groups.push([{ label: t('box-office.order.exchange.title'), icon: 'i-lucide-arrow-left-right', onSelect: () => { exchanging.value = true } }])
   const destructive: DropdownMenuItem[] = []
   if (o.can.release) destructive.push({ label: t('box-office.order.release.button'), icon: 'i-lucide-undo-2', onSelect: () => { void release() } })
   if (o.can.cancel) destructive.push({ label: t('box-office.order.cancel.title'), icon: 'i-lucide-circle-x', color: 'error', onSelect: () => { cancelling.value = true } })
@@ -145,7 +149,7 @@ const lineStatus = (l: Line) => l.state !== 'live'
                 <RecordListItem
                   v-for="c in d.cancellations"
                   :key="c.id"
-                  :name="t('box-office.order.cancellation.title', { count: c.lineCount, when: dateTime(c.at) })"
+                  :name="t(c.kind === 'exchange' ? 'box-office.order.cancellation.exchange-title' : 'box-office.order.cancellation.title', { count: c.lineCount, when: dateTime(c.at) })"
                   :description="[c.reason, c.note, c.by ? t('box-office.order.cancellation.by', { name: c.by }) : null, c.refunded ? t('box-office.order.cancellation.refunded') : null].filter(Boolean).join(' · ')"
                 />
               </RecordList>
@@ -160,6 +164,14 @@ const lineStatus = (l: Line) => l.state !== 'live'
         :paid="d.state === 'confirmed'"
         :can-refund="d.can.refund"
         @cancelled="refresh()"
+      />
+      <BoxOfficeExchangeDialog
+        v-model:open="exchanging"
+        :order-id="d.id"
+        :reference="d.reference"
+        :currency="d.currency"
+        :lines="exchangeable"
+        @exchanged="refresh()"
       />
     </template>
   </DataBoundary>
