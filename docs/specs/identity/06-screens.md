@@ -124,7 +124,7 @@ Interface fixes the prefixes: a person's own sections sit under `/account/` on t
 | Your details | `/account/details` |
 | Email addresses | `/account/email` |
 | Signing in | `/account/sign-in` |
-| Where you are signed in | `/account/sessions` |
+| Where you are signed in | a section of Signing in, `/account/sign-in` (since 2026-11-17) |
 | Access scheme | `/account/access` |
 | Your data | `/account/data` |
 | Member details | `/members/account/details` |
