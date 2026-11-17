@@ -30,6 +30,29 @@ test.describe('someone who reads accounts', () => {
   })
 })
 
+test.describe('someone who reads and disables accounts', () => {
+  test.use(as(['core.account.read', 'core.account.create', 'core.account.disable']))
+
+  test('opens a person from the list, sees their addresses, and can disable them', async ({ page }) => {
+    const name = `Rhiannon Pagetest ${Date.now()}`
+    const made = await page.request.post('/api/core/accounts', { data: { name, address: `rhiannon.${Date.now()}@example.org` } })
+    expect(made.ok()).toBe(true)
+    const { id } = await made.json() as { id: string }
+    await visit(page, '/console/people?view=unclaimed')
+    await page.getByRole('link', { name }).click()
+    await expect(page).toHaveURL(new RegExp(`/console/people/${id}`))
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Email addresses' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'How they sign in' })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('button', { name: /more actions|actions/i }).first().click()
+    await page.getByRole('menuitem', { name: 'Disable account' }).click()
+    await page.getByRole('radio', { name: 'They asked' }).check()
+    await page.getByRole('dialog').getByRole('button', { name: 'Disable account' }).click()
+    await expect(page.getByText(/^Disabled since/)).toBeVisible()
+  })
+})
+
 test.describe('without core.account.read', () => {
   test.use(as(['core.grant.read']))
 

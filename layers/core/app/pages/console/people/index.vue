@@ -39,6 +39,7 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     route="/api/core/people"
     :list="list"
     :row-label="label"
+    :row-to="(row: Row) => `/console/people/${encodeURIComponent(row.id)}`"
     :empty="{ title: t('core.people.empty.title'), description: t('core.people.empty.description'), icon: 'i-lucide-users' }"
   >
     <template #cell-name="{ row }">
