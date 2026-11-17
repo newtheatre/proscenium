@@ -68,6 +68,8 @@ export default defineModule({
   tasks: {
     // Expires baskets whose hold has lapsed and that no purchase has cleaned up on its way past.
     'box-office.sweep-holds': task({ every: '5m' }),
+    // Moves ticket money from deferred to income once its performance has taken place. The one trigger for it.
+    'box-office.recognise-income': task({ dailyAt: '04:10' }),
     // Releases reservations nobody has paid for, at the time the theatre set before the start.
     'box-office.release-reservations': task({ every: '5m' }),
   },
@@ -78,6 +80,11 @@ export default defineModule({
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
       { id: 'deferred-ticket-income', name: 'Deferred ticket income', kind: 'liability' },
+      { id: 'ticket-income', name: 'Ticket income', kind: 'income' },
+    ],
+    // Ticket money still deferred for a performance that has taken place holds up closing its period.
+    'finance.period-close-check': [
+      { id: 'box-office.unrecognised-income', file: 'unrecognised-income' },
     ],
     // Messages to buyers. Each is about a booking the person made, so none can be switched off.
     'core.notification-type': [{

@@ -1,7 +1,7 @@
 // Checks that read the source: imports, bindings, outside calls, announced events and queued jobs,
 // content tokens, translations, abilities nobody requires, and numbers that should be settings.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { ROOT, rel } from '../lib/paths.ts'
 import type { Loaded } from '../lib/load.ts'
 import { allRoutes } from './routes.ts'
@@ -112,6 +112,15 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     const partsDir = join(ROOT, m.found.root, 'i18n/en-GB')
     const parts = existsSync(partsDir) ? readdirSync(partsDir).filter(f => f.endsWith('.json')).map(f => join(partsDir, f)) : []
     const text: Record<string, string> = Object.assign({}, ...[file, ...parts].map(f => JSON.parse(readFileSync(f, 'utf8'))))
+    // JSON.parse keeps the last of two equal keys without a word, which is how a merge of two
+    // branches can quietly change wording (a flat catalogue writes one key per line).
+    for (const f of [file, ...parts]) {
+      const seen = new Set<string>()
+      for (const [, key] of readFileSync(f, 'utf8').matchAll(/^ {2}"([^"]+)":/gm)) {
+        if (seen.has(key!)) problems.push(`${relative(ROOT, f)}: ${key} is written twice; the second wins`)
+        seen.add(key!)
+      }
+    }
     const all = new Set(Object.keys(text))
     const keys = new Set(all)
     const need = (key: string, what: string) => {

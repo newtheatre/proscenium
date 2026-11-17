@@ -424,7 +424,6 @@
   "core.duration.minute.other": "minutes",
   "core.duration.second.one": "second",
   "core.duration.second.other": "seconds",
-  "core.duration.control-unit": "Unit",
   "core.duration.long-units": "A month counts as 30 days and a year as 365.",
   "core.settings-pages.theatre": "Theatre",
   "core.settings-pages.branding": "Branding",

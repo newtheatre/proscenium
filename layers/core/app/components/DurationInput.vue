@@ -11,8 +11,6 @@ const props = defineProps<{
   /** The most it may be: seconds, or written like 1h or 365d. */
   max?: number | string
   disabled?: boolean
-  /** What the number is, for a screen reader, where no form field names it. */
-  label?: string
 }>()
 const model = defineModel<number | null | undefined>()
 
@@ -54,7 +52,6 @@ function setUnit(value: DurationUnit) {
         :model-value="count"
         :min="0"
         :disabled="disabled"
-        :aria-label="label"
         class="w-32"
         @update:model-value="setCount"
       />
@@ -63,7 +60,7 @@ function setUnit(value: DurationUnit) {
         :items="items"
         value-key="value"
         :disabled="disabled"
-        :aria-label="t('core.duration.control-unit')"
+        :aria-label="t('core.duration.unit')"
         class="w-32"
         @update:model-value="setUnit($event as DurationUnit)"
       />
