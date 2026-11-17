@@ -25,6 +25,8 @@ interface Listing {
   lastEndsAt: number
   venues: string[]
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
+  age: string | null
+  hasEffects: boolean
   price: { currency: string, fromMinor: number | null, others: { label: string, amountMinor: number }[] } | null
 }
 
@@ -196,6 +198,8 @@ useHead(() => ({
               :price="p.price"
               :when="range(p.nextStartsAt, p.lastEndsAt)"
               :details="p.category?.label"
+              :age="p.age"
+              :effects="p.hasEffects"
             />
           </li>
         </ul>
