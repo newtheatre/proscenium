@@ -3,8 +3,7 @@
   "dialect": "sqlite",
   "id": "248d7557-04b5-4321-a0c9-a1ba4503809f",
   "prevIds": [
-    "0982a914-3092-4110-8cb3-abba244926a1",
-    "b4322e53-1927-4fe8-a933-f04992fd5fa7"
+    "429737dd-4466-4888-b730-8864466e4165"
   ],
   "ddl": [
     {
@@ -308,6 +307,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_run_presets",
+      "entityType": "tables"
+    },
+    {
       "name": "core_seasons",
       "entityType": "tables"
     },
@@ -584,16 +587,6 @@
     {
       "table": "bar_age_checks",
       "name": "variant_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_age_checks",
-      "name": "basket_key",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -7013,7 +7006,27 @@
     },
     {
       "table": "core_performance_runs",
+      "name": "interval_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
       "name": "label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
+      "name": "external_booking_url",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -7174,6 +7187,16 @@
     {
       "table": "core_performances",
       "name": "interval_count",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "interval_minutes",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -7703,6 +7726,36 @@
     },
     {
       "table": "core_productions",
+      "name": "interval_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "doors_before_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "capacity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
       "name": "external_booking_url",
       "type": "text",
       "notNull": false,
@@ -8006,6 +8059,66 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "slots",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -8574,6 +8687,26 @@
     {
       "table": "core_spaces",
       "name": "finding_it",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "doors_before_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "run_preset_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -13780,20 +13913,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "bar_age_checks",
-      "name": "bar_age_checks_basket",
-      "columns": [
-        {
-          "value": "basket_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "bar_categories",
       "name": "bar_categories_name",
       "columns": [
@@ -15618,6 +15737,20 @@
         {
           "value": "key",
           "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_run_presets",
+      "name": "core_run_presets_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
         }
       ],
       "isUnique": true,
@@ -19953,6 +20086,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_run_presets",
+      "name": "core_run_presets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_seasons",
       "name": "core_seasons_pk",
       "columns": [
@@ -21204,6 +21346,12 @@
       "entityType": "checks"
     },
     {
+      "table": "core_run_presets",
+      "name": "core_run_presets_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
       "table": "core_seasons",
       "name": "core_seasons_state",
       "value": "\"state\" IN ('draft', 'published', 'archived')",
@@ -21952,6 +22100,30 @@
       "name": "payments_sessions_note",
       "value": "\"variance_note\" IS NULL OR length(\"variance_note\") <= 200",
       "entityType": "checks"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "basket_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_age_checks",
+      "name": "bar_age_checks_basket",
+      "columns": [
+        {
+          "value": "basket_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
     }
   ],
   "renames": []
