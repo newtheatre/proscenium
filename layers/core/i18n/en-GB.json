@@ -167,6 +167,8 @@
   "core.skip-link": "Skip to content",
   "core.loading": "Loading",
   "core.undo.button": "Undo",
+  "core.undo.done": "Undone",
+  "core.undo.failed": "That could not be undone",
   "core.challenge.unavailable": "The check that you are a person could not load.",
   "core.challenge.unavailable-remedy": "Reload the page and try again. If a content blocker is on, allow challenges.cloudflare.com.",
   "core.failed.title": "Something went wrong",
