@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "dd16a90a-15fd-44c6-95e2-5d945548b344",
+  "id": "03ba3792-f139-4798-a873-37fe2174f3f8",
   "prevIds": [
-    "d5198a94-3f2e-4cf4-86b6-66fac3d152ae"
+    "9ce06000-7ae4-403b-a7c9-0c4c86d3a82d"
   ],
   "ddl": [
     {
@@ -384,6 +384,14 @@
     },
     {
       "name": "front_of_house_timings",
+      "entityType": "tables"
+    },
+    {
+      "name": "membership_fees_charges",
+      "entityType": "tables"
+    },
+    {
+      "name": "membership_fees_prices",
       "entityType": "tables"
     },
     {
@@ -9831,6 +9839,236 @@
       "entityType": "columns"
     },
     {
+      "table": "membership_fees_charges",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "price_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "channel",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "refunded_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "paid_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "scheme_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "length_option_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "applies_to",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "from_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "set_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "membership_length_options",
       "name": "id",
       "type": "text",
@@ -14041,6 +14279,60 @@
       "entityType": "indexes"
     },
     {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_once",
+      "columns": [
+        {
+          "value": "membership_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state <> 'void'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_intent",
+      "columns": [
+        {
+          "value": "intent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "membership_fees_prices_one_a_day",
+      "columns": [
+        {
+          "value": "scheme_id",
+          "isExpression": false
+        },
+        {
+          "value": "coalesce(length_option_id, '')",
+          "isExpression": true
+        },
+        {
+          "value": "applies_to",
+          "isExpression": false
+        },
+        {
+          "value": "from_date",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "membership_length_options",
       "name": "membership_length_options_count",
       "columns": [
@@ -15822,6 +16114,81 @@
       "entityType": "fks"
     },
     {
+      "table": "membership_fees_charges",
+      "name": "fk_membership_fees_charges_membership_id_membership_memberships_id_fk",
+      "columns": [
+        "membership_id"
+      ],
+      "tableTo": "membership_memberships",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "fk_membership_fees_charges_price_id_membership_fees_prices_id_fk",
+      "columns": [
+        "price_id"
+      ],
+      "tableTo": "membership_fees_prices",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "fk_membership_fees_charges_intent_id_payments_intents_id_fk",
+      "columns": [
+        "intent_id"
+      ],
+      "tableTo": "payments_intents",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "fk_membership_fees_prices_scheme_id_membership_schemes_id_fk",
+      "columns": [
+        "scheme_id"
+      ],
+      "tableTo": "membership_schemes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "fk_membership_fees_prices_length_option_id_membership_length_options_id_fk",
+      "columns": [
+        "length_option_id"
+      ],
+      "tableTo": "membership_length_options",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "membership_length_options",
       "name": "fk_membership_length_options_scheme_id_membership_schemes_id_fk",
       "columns": [
@@ -16976,6 +17343,24 @@
     {
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "membership_fees_prices_pk",
       "columns": [
         "id"
       ],
@@ -18180,6 +18565,42 @@
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_kind_check",
       "value": "\"kind\" IN ('house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear')",
+      "entityType": "checks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_amount",
+      "value": "\"amount_minor\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_state",
+      "value": "\"state\" IN ('open', 'paid', 'void', 'refunded', 'part-refunded')",
+      "entityType": "checks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_refunded",
+      "value": "\"refunded_minor\" >= 0 AND \"refunded_minor\" <= \"amount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "membership_fees_charges",
+      "name": "membership_fees_charges_paid",
+      "value": "\"state\" <> 'paid' OR (\"intent_id\" IS NOT NULL AND \"paid_at\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "membership_fees_prices_amount",
+      "value": "\"amount_minor\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "membership_fees_prices",
+      "name": "membership_fees_prices_applies",
+      "value": "\"applies_to\" IN ('join-and-renew', 'join', 'renew')",
       "entityType": "checks"
     },
     {
