@@ -7,6 +7,7 @@ import { defineRoute } from '#kit'
 import { listPerformances } from '../../../../../programme/performances'
 import { listVenues } from '../../../../../places/service'
 import { openRuns } from '../../../../../programme/runs'
+import { productionEffects } from '../../../../../programme/guidance'
 import { listTerms } from '../../../../../vocabularies/service'
 
 export default defineRoute({
@@ -16,12 +17,13 @@ export default defineRoute({
   input: z.object({}),
 }, async (_event, { record }) => {
   const option = (t: { id: string, label: string, retired: boolean }) => ({ id: t.id, label: t.label, retired: t.retired })
-  const [performances, runs, venues, access, reasons] = await Promise.all([
+  const [performances, runs, venues, access, reasons, effects] = await Promise.all([
     listPerformances({ productionId: record!.id }),
     openRuns(record!.id),
     listVenues({ archived: true }),
     listTerms('core.access-feature', { includeRetired: true }),
     listTerms('core.cancel-reason'),
+    productionEffects(record!.id),
   ])
   const used = new Set(performances.flatMap(p => [p.venueId, p.spaceId]))
   return {
@@ -33,6 +35,7 @@ export default defineRoute({
         .filter(v => (!v.archived && v.spaces.length) || used.has(v.id)),
       access: access.map(option),
       reasons: reasons.map(option),
+      effects: effects.map(e => ({ id: e.termId, label: e.label })),
     },
   }
 })

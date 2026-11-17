@@ -63,6 +63,7 @@
   "public-site.production.dates-soon": "Dates are still to be announced.",
   "public-site.production.doors": "Doors {time}",
   "public-site.production.access": "Access at this performance",
+  "public-site.production.effects-off": "Not used at this performance: {effects}",
   "public-site.production.date-cancelled": "Cancelled",
   "public-site.production.about": "About the production",
   "public-site.production.credits": "Cast and team",
