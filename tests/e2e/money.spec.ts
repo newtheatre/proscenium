@@ -103,3 +103,12 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 })
+
+test('the Ledger lists the sale with its entries open, and the Refunds view leaves it out', async ({ page }) => {
+  await visit(page, '/console/finance/ledger')
+  await expect(page.getByRole('cell', { name: 'Sale' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: '£6.00' }).first()).toBeVisible()
+  await noViolations(page)
+  await visit(page, '/console/finance/ledger?view=refunds')
+  await expect(page.getByRole('cell', { name: 'Sale' })).toHaveCount(0)
+})
