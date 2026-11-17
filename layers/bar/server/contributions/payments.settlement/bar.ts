@@ -4,6 +4,7 @@
 // and performance. When the payment ends without the money, the sale is open again with its lines.
 import { all, first, nowMs, refuse, type UnitView } from '#kit'
 import type { OwnerEntry, Part, Settlement } from '#modules/payments'
+import { refunded } from '../../refunds'
 
 const INCOME = { key: 'bar.income' }
 const NOT_WAITING = { code: 'bar.sale.not-waiting', reason: 'This bar sale is no longer waiting for this payment.' }
@@ -16,10 +17,9 @@ const saleFor = (part: Part) => first<SaleRow>(
   part.record,
 )
 
-/** The sale's income by account, as credits, or as debits for a refund. */
-async function income(sale: SaleRow, amountMinor: number, sign: 1 | -1): Promise<OwnerEntry[]> {
+/** The sale's income by account, as credits. */
+async function income(sale: SaleRow): Promise<OwnerEntry[]> {
   const where = { productionId: sale.production_id, performanceId: sale.performance_id }
-  if (sign === 1) return [{ account: INCOME, amountMinor, ...where }]
   const rows = await all<{ account: string | null, amount: number }>(
     `SELECT c.income_account_id AS account, sum(l.amount_minor) AS amount FROM bar_sale_lines l
        JOIN bar_variants v ON v.id = l.variant_id JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
@@ -40,15 +40,14 @@ export default {
       params: [part.id, at, at, sale!.id, part.intentId, part.amountMinor],
     }).expect(1, NOT_WAITING)
     unit.announce('bar.sale.paid', { saleId: sale!.id, openingId: sale!.opening_id }, { record: ['bar.sale', sale!.id] })
-    return await income(sale!, part.amountMinor, -1)
+    return await income(sale!)
   },
 
-  // Refunds of bar sales with reversals and stock are a later slice (BAR-19). Until then a refund
-  // made from Payments takes the income back from bar.income.
-  async refunded(_unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) {
+  // The money has gone back: the refund's reversals succeed and the income comes off (BAR-19).
+  async refunded(unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) {
     const sale = await saleFor(part)
     if (!sale) throw new Error(`No bar sale ${part.record} for payment part ${part.id}`)
-    return await income(sale, refund.amountMinor, 1)
+    return await refunded(unit, sale.id, refund, { productionId: sale.production_id, performanceId: sale.performance_id })
   },
 
   // The payment did not complete: the sale is open again with its lines, to change or pay again.

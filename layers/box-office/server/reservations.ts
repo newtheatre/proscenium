@@ -11,7 +11,7 @@
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
 import { first, inAccountScope, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
-import { findOrCreateAccount, getPerformance, notify, notifyAddress } from '#modules/core'
+import { findOrCreateAccount, getPerformance, isUnclaimed, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
@@ -182,6 +182,8 @@ export interface OrderView {
    * and the last moment to do it. Null when they may not, and the box office changes the booking.
    */
   buyerCancel: { feeMinor: number, until: number } | null
+  /** The buyer has never signed in, so the page may offer to open their account. Says nothing else about them. */
+  accountUnclaimed?: boolean
 }
 
 /**
@@ -222,6 +224,7 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
     releaseAt: order.release_at,
     lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
     buyerCancel: await buyerCancelTerms(order, lines),
+    accountUnclaimed: order.account_id ? await isUnclaimed(order.account_id) : false,
   }
 }
 

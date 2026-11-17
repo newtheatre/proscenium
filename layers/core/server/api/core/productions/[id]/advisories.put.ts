@@ -1,4 +1,4 @@
-// Sets a production's advisories, in order, each with an optional detail.
+// Sets a production's content warnings, each with a level and an optional detail.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { setAdvisories } from '../../../../programme/service'

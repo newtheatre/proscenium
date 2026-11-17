@@ -6,7 +6,7 @@ import {
   generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse,
   type AuthenticationResponseJSON, type RegistrationResponseJSON,
 } from '@simplewebauthn/server'
-import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, openColumn, refuse, sealColumn, useSetting, type UnitView } from '#kit'
 import { base64url, digest, fromBase64url, normaliseRecoveryCode, randomRecoveryCode } from './crypto'
 import { relyingParty } from './web'
 
@@ -151,8 +151,9 @@ export async function passkeyCount(accountId: string): Promise<number> {
 }
 
 /**
- * A new set of recovery codes, replacing any old set (ID-14). Only their hashes are kept; the
- * codes themselves are returned once, to be shown once.
+ * A new set of recovery codes, replacing any old set (ID-14). A keyed hash is what a code is checked
+ * against; the code is also kept sealed, so the person may see the set again, with the used ones
+ * marked, after confirming it is them (`myRecoveryCodes`).
  */
 export async function newRecoveryCodes(unit: UnitView, accountId: string): Promise<string[]> {
   const count = await useSetting('core.recovery.code-count') as number
@@ -160,9 +161,20 @@ export async function newRecoveryCodes(unit: UnitView, accountId: string): Promi
   unit.add({ sql: 'DELETE FROM core_recovery_codes WHERE account_id = ?', params: [accountId] })
   const at = nowMs()
   const params: unknown[] = []
-  for (const code of codes) params.push(newId('rcc', { random: true }), accountId, await digest('recovery', code), at)
-  unit.add({ sql: `INSERT INTO core_recovery_codes (id, account_id, code_hash, created_at) VALUES ${codes.map(() => '(?, ?, ?, ?)').join(', ')}`, params })
+  for (const [i, code] of codes.entries()) params.push(newId('rcc', { random: true }), accountId, await digest('recovery', code), await sealColumn(code), i, at)
+  unit.add({ sql: `INSERT INTO core_recovery_codes (id, account_id, code_hash, code_sealed, position, created_at) VALUES ${codes.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`, params })
   return codes
+}
+
+export interface ShownCode { code: string | null, used: boolean }
+
+/**
+ * The account's current set, in the order first shown, each with whether it has been used. A code
+ * from a set made before codes were kept answers null, and the page offers a new set instead.
+ */
+export async function myRecoveryCodes(accountId: string): Promise<ShownCode[]> {
+  const rows = await all<{ code_sealed: string | null, used_at: number | null }>('SELECT code_sealed, used_at FROM core_recovery_codes WHERE account_id = ? ORDER BY position, created_at, id', accountId) // exact-account: identity's own table, keyed by the living account
+  return Promise.all(rows.map(async r => ({ code: await openColumn(r.code_sealed), used: r.used_at !== null })))
 }
 
 /** Whether a typed code is one of the account's unused recovery codes. Spends nothing. */
