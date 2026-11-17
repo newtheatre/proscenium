@@ -143,7 +143,9 @@ Undone, or why it could not be. Use it in place of a plain success toast whereve
 exists; Seasons is the worked example. Browser `alert`, `confirm` and `prompt` are a lint error.
 
 A short list that needs a search only now and then takes `SearchToggle` beside its primary action:
-an icon that opens into a search box. Archived or finished records go below the others under a
+an icon that opens into a search box. Bind its `v-model:open` and, while it is open, give the
+primary button `:ui="{ label: open ? 'max-sm:sr-only' : '' }"`, so on a phone the button drops to
+its icon and both stay on one row. Archived or finished records go below the others under a
 `CollapsibleDivider` (label and count, closed until opened), so the list shows what is current.
 
 ## Calling the API, layouts and moving between pages
