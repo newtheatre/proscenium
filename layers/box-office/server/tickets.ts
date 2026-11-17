@@ -2,9 +2,9 @@
 // door"). A ticket is issued when its order is confirmed, one per ticket line, with a fresh random
 // code. The buyer gets the code inside a signed door code, `tkt.<key id>.<code>.<signature>`, which
 // a device can check with no connection; the database keeps only the hash of the code part.
-import type { UnitView } from '#kit'
+import { newId, type UnitView } from '#kit'
 import { signing } from '#kit/signing'
-import { tickets } from './db/schema'
+import { scans, tickets } from './db/schema'
 import { hashOf } from './codes'
 
 export const DOOR_CODE_PURPOSE = 'box-office.door-code'
@@ -36,15 +36,25 @@ export const signedPart = (kind: string, keyId: string, code: string) => `${kind
 
 /**
  * Adds a valid ticket for each line to the unit and returns the door codes, in the lines' order.
- * The codes exist only in what is returned: hand them to the buyer and keep them nowhere.
+ * The codes exist only in what is returned: hand them to the buyer and keep them nowhere. With
+ * `admit`, the buyer is at the desk: each ticket is admitted as it is issued, with its scan row,
+ * exactly as the door would have written it.
  */
-export async function issueTickets(unit: UnitView, lines: readonly { id: string, performance_id: string }[]): Promise<string[]> {
+export async function issueTickets(unit: UnitView, lines: readonly { id: string, performance_id: string }[], admit?: { by: string, at: number }): Promise<string[]> {
   const made = await Promise.all(lines.map(async (line) => {
     const code = base32(crypto.getRandomValues(new Uint8Array(CODE_BYTES)))
     const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
-    return { line, keyId, codeHash: await hashOf(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}` }
+    return { line, keyId, codeHash: await hashOf(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}`, scanId: admit ? newId('scan') : null }
   }))
-  unit.insertSet(tickets, made.map(m => ({ orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, keyId: m.keyId, state: 'valid' })))
+  const ids = unit.insertSet(tickets, made.map(m => ({
+    orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, keyId: m.keyId, state: 'valid', admittedAt: admit ? admit.at : null, admittedScanId: m.scanId,
+  })))
   unit.expect(made.length, { code: 'box-office.ticket.not-issued', reason: 'The tickets could not be issued.' })
+  if (admit) {
+    unit.insertSet(scans, made.map((m, i) => ({
+      id: m.scanId!, ticketId: ids[i]!, performanceId: m.line.performance_id, result: 'admitted', scannedBy: admit.by, deviceLabel: 'Desk', scannedAt: admit.at, receivedAt: admit.at,
+    })))
+    unit.expect(made.length, { code: 'box-office.ticket.not-issued', reason: 'The tickets could not be issued.' })
+  }
   return made.map(m => m.doorCode)
 }

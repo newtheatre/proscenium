@@ -1,0 +1,1 @@
+CREATE INDEX `box_office_orders_created` ON `box_office_orders` (`created_at`);

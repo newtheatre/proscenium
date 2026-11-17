@@ -38,7 +38,7 @@ export default {
     const waiting = sql`id = ${order.id} AND state = 'awaiting_payment' AND intent_id = ${part.intentId}`
     const reservation = await first('SELECT 1 AS one FROM box_office_holds WHERE order_id = ? AND kind = \'reservation\'', order.id)
     if (reservation) {
-      unit.add(sql`UPDATE box_office_orders SET state = 'reserved', intent_id = NULL, expires_at = NULL, updated_at = ${at} WHERE ${waiting}`)
+      unit.add(sql`UPDATE box_office_orders SET state = 'reserved', intent_id = NULL, session_id = NULL, admit_on_payment = 0, expires_at = NULL, updated_at = ${at} WHERE ${waiting}`)
       return
     }
     unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = 'payment_failed'
