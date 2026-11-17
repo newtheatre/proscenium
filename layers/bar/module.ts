@@ -111,6 +111,13 @@ export default defineModule({
     'payments.desk-basket': [{ id: 'bar' }],
     // Bar income, in full on the day the money is taken (tab 3, "What is posted to the ledger").
     'finance.system-account': [{ id: 'income', name: 'Bar income', kind: 'income' }],
+    // Setting up the bar (BAR-05): products and an outlet are required; other price lists and who may sell are not.
+    'core.setup-step': [
+      { id: 'bar.first-product', required: true, to: '/admin/modules/bar/products', order: 60 },
+      { id: 'bar.first-outlet', required: true, to: '/admin/modules/bar/outlets', order: 61 },
+      { id: 'bar.price-lists', required: false, to: '/admin/modules/bar/price-lists', order: 62 },
+      { id: 'bar.sellers', required: false, to: '/console/people/grants', order: 63 },
+    ],
     'core.record-resolver': [
       { id: 'bar.outlet', file: 'outlet' },
       { id: 'bar.product', file: 'product' },
