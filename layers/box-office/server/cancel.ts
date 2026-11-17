@@ -26,7 +26,16 @@ export interface CancelInput {
   /** From the theatre's list. Required when the order is paid for. */
   reasonTermId?: string | null
   note?: string | null
-  by: string
+  /** Null when the system cancels, for a performance that has been cancelled or changed. */
+  by: string | null
+  /**
+   * `staff` by default. `performance` is the box office manager's decision being carried out for a
+   * performance that was cancelled, rescheduled or moved (BO-52, BO-53): no reason is asked for,
+   * the refund needs no second approver, and the message says why.
+   */
+  kind?: 'staff' | 'performance'
+  /** For `performance`: what happened to it, as the message says it, such as "has been cancelled". */
+  what?: string
 }
 
 export interface Cancelled {
@@ -104,7 +113,8 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
     refuse('box-office.order.not-cancellable', 'Only a reservation or a confirmed booking can be cancelled.', { status: 409 })
   const paid = order.state === 'confirmed'
   // A reason is needed to cancel what was paid for. A reservation may go without one: nothing was paid, and the queue is waiting.
-  if (paid && !input.reasonTermId) refuse('box-office.order.bad-reason', 'Choose a reason for cancelling paid tickets.', { status: 422, fields: { reasonTermId: 'required' } })
+  const byPerformance = input.kind === 'performance'
+  if (paid && !input.reasonTermId && !byPerformance) refuse('box-office.order.bad-reason', 'Choose a reason for cancelling paid tickets.', { status: 422, fields: { reasonTermId: 'required' } })
   const term = input.reasonTermId ? await getTerm(input.reasonTermId) : null
   if (input.reasonTermId && (!term || term.vocabularyKey !== REASONS || term.retired))
     refuse('box-office.order.bad-reason', 'That reason is not on the list of reasons for cancelling.', { status: 422, remedy: 'Choose a reason from the list.' })
@@ -142,7 +152,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
   unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = 'cancelled'
     WHERE state = 'confirmed' AND id IN (SELECT claim_id FROM box_office_order_lines WHERE order_id = ${order.id} AND id IN (SELECT value FROM json_each(${ids})))`).expect(chosen.length, changed)
   if (paid) {
-    unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = 'cancelled', updated_at = ${at}
+    unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = ${byPerformance ? 'performance_cancelled' : 'cancelled'}, updated_at = ${at}
       WHERE state = 'valid' AND admitted_at IS NULL AND order_line_id IN (SELECT value FROM json_each(${ids}))`).expect(chosen.length, used)
   }
   const still = sql`id = ${order.id} AND state = ${order.state} AND total_minor = ${order.total_minor} AND ${input.reasonTermId ? assertTerm(input.reasonTermId, REASONS) : sql`1 = 1`}`
@@ -150,7 +160,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
     ? sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE ${still}`
     : sql`UPDATE box_office_orders SET state = 'cancelled', total_minor = ${totalMinor}, cancelled_at = ${at}, release_at = NULL, updated_at = ${at} WHERE ${still}`)
     .expect(1, changed)
-  const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: 'staff', reasonTermId: input.reasonTermId ?? null, note: input.note ?? null, lineIds: ids, refundId: refund?.id ?? null, feeMinor, by: input.by }])
+  const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: byPerformance ? 'performance_cancelled' : 'staff', reasonTermId: input.reasonTermId ?? null, note: input.note ?? null, lineIds: ids, refundId: refund?.id ?? null, feeMinor, by: input.by }])
 
   // The fee kept stops being owed to the audience now. It is whatever of each performance's lines
   // the refund does not take back, so the two together always empty what the lines had deferred.
@@ -174,6 +184,21 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
     const words = await wordsFor(order, lines, totalMinor)
     const left = kept.length ? await wordsFor(order, kept, totalMinor) : null
     const money = refund ? ` A refund of ${(await wordsFor(order, lines, refundMinor)).amount} will go back the way you paid.` : ''
+    if (byPerformance) {
+      await notify(unit, 'box-office.performance-cancelled', {
+        to: order.account_id,
+        variables: {
+          reference: order.reference,
+          show: words.show,
+          when: words.when,
+          what: input.what ?? 'has been cancelled',
+          money: (paid ? 'Your tickets have been cancelled.' : 'Your reservation has been cancelled, and there is nothing to pay.') + money,
+        },
+        subject: ['box-office.order', order.id],
+        dedupeKey: `performance-cancelled:${order.id}:${chosen[0]!.performance_id}`,
+      })
+      return { orderId: order.id, cancellationId: cancellationId!, state: kept.length ? order.state : 'cancelled', totalMinor, feeMinor, refund }
+    }
     await notify(unit, 'box-office.order-cancelled', {
       to: order.account_id,
       variables: {
