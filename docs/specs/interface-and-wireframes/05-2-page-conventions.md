@@ -184,6 +184,13 @@ One `LiveKeypad` component serves any live screen that takes a number: the bar t
 - **Undo beats confirm.** Where an act can be reversed, do it at once and offer Undo for ten seconds.
 - **Money:** any screen that takes or returns money shows the total it expects. If the server's total differs, the action is refused and both figures are shown.
 
+### Choices in forms
+
+- **A choice of many is square tick boxes.** Where a person may pick more than one option, the options are tick boxes (Nuxt UI `UCheckboxGroup`, or one `UCheckbox` per option when each ticked option opens its own field, such as a note). A tick box stays square whatever the brand's corner radius: the kit pins its corners, because a large radius would otherwise turn it into a circle.
+- **A choice of one is round radio buttons** (`URadioGroup`), or a select when there are more than about six options. A radio button is never used where more than one answer can be true, and a tick box is never used for "pick one".
+- **A yes or no on its own is one tick box** with a label that reads as a statement ("I use a wheelchair"). A follow-up question appears beneath it only once it is ticked, and is not asked otherwise (`showIf` on a `PageForm` field).
+- **Each option can carry a line of explanation** beneath its label, in plain words, when the label alone could be read two ways.
+
 ### Acting for someone, and modes
 
 - **On behalf of:** when staff act for a customer or member, a banner names the person for as long as that is true, and the act is recorded as such.

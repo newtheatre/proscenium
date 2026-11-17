@@ -14,6 +14,9 @@ export default defineAppConfig({
     selectMenu: { slots: { base: 'w-full' } },
     inputDate: { slots: { base: 'w-full' } },
     inputTime: { slots: { base: 'w-full' } },
+    // A tick box is square whatever the brand's corner radius, so a choice of many never looks like
+    // a choice of one (round is for radio buttons only). A rounder brand can make rounded-sm a circle.
+    checkbox: { slots: { base: 'rounded-[0.1875rem]' } },
     // Tables carry their own frame, so a page needs no wrapping card.
     table: { slots: { root: 'rounded-lg border border-default', thead: 'bg-elevated/50' } },
     // Dialogue actions sit on the right, so a footer takes its buttons directly.
