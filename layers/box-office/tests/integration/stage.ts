@@ -11,6 +11,8 @@ import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post
 import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import bandsPost from '../../server/api/box-office/productions/[id]/bands/index.post'
 import bandsGet from '../../server/api/box-office/productions/[id]/bands/index.get'
+import bandPatch from '../../server/api/box-office/productions/[id]/bands/[bandId].patch'
+import bandDelete from '../../server/api/box-office/productions/[id]/bands/[bandId].delete'
 import pricesPost from '../../server/api/box-office/productions/[id]/prices.post'
 import pricesCancelScheduled from '../../server/api/box-office/productions/[id]/prices/cancel-scheduled.post'
 import salesPut from '../../server/api/box-office/performances/[id]/sales/index.put'
@@ -81,6 +83,8 @@ export const handle = server({
   'GET /api/box-office/ticket-types': ticketTypesGet,
   'POST /api/box-office/productions/:id/bands': bandsPost,
   'GET /api/box-office/productions/:id/bands': bandsGet,
+  'PATCH /api/box-office/productions/:id/bands/:bandId': bandPatch,
+  'DELETE /api/box-office/productions/:id/bands/:bandId': bandDelete,
   'POST /api/box-office/productions/:id/prices': pricesPost,
   'POST /api/box-office/productions/:id/prices/cancel-scheduled': pricesCancelScheduled,
   'PUT /api/box-office/performances/:id/sales': salesPut,

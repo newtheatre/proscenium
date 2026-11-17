@@ -184,7 +184,7 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
   unit.announce('box-office.order.exchanged', { orderId: order.id, cancellationId: cancellationId! }, { record: ['box-office.order', order.id] })
   if (order.account_id) {
     const names = await typeNames(moves.map(m => m.ticketTypeId))
-    const newLines = newIds.map((id, i) => ({ id, performance_id: input.performanceId, band_id: moves[i]!.bandId, ticket_type_id: moves[i]!.ticketTypeId, amount_minor: moves[i]!.priceMinor, type_name: names.get(moves[i]!.ticketTypeId) ?? '', type_kind: 'standard' }))
+    const newLines = newIds.map((id, i) => ({ id, performance_id: input.performanceId, band_id: moves[i]!.bandId, ticket_type_id: moves[i]!.ticketTypeId, amount_minor: moves[i]!.priceMinor, type_name: names.get(moves[i]!.ticketTypeId) ?? '', type_kind: 'standard', band_name: null }))
     const was = await wordsFor(order, chosen, oldMinor)
     const now = await wordsFor(order, newLines, refund?.amountMinor ?? x.extraMinor)
     await notify(unit, 'box-office.order-exchanged', {

@@ -18,7 +18,7 @@ const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], lists: List[], canPrice: boolean }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/console/bar/products' }])
+const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/admin/modules/bar/products' }])
 const categoryItems = computed(() => (data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name })))
 
 // The product's own fields.
