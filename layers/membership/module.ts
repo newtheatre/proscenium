@@ -175,6 +175,11 @@ export default defineModule({
       { id: 'membership.membership', file: 'membership' },
       { id: 'membership.verification-list', file: 'verification-list' },
     ],
+    // Setting up membership (MEM-45): the first scheme is required; a list only for a scheme that checks one.
+    'core.setup-step': [
+      { id: 'membership.first-scheme', required: true, to: '/console/membership/schemes', order: 40 },
+      { id: 'membership.verification-list', required: false, to: '/console/membership/lists', order: 41 },
+    ],
     'core.health-check': [
       { id: 'membership.applications-waiting', file: 'applications-waiting' },
       { id: 'membership.open-schemes', file: 'open-schemes' },
