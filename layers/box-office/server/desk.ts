@@ -8,7 +8,7 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSetting, type UnitView } from '#kit'
-import { getPerformance } from '#modules/core'
+import { getPerformance, getProduction, listPerformances } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { claimSeats } from './capacity'
@@ -16,6 +16,7 @@ import { hashOf, newReference } from './codes'
 import { cancellations, orderLines } from './db/schema'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
+import { availability } from './availability'
 import { salesOf } from './setup'
 
 const DESK_HOLD = 30 * 60_000 // not-policy: as long as the till keeps a payment open; Payments ends the hold, not this time
@@ -236,4 +237,36 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   const totalMinor = after.reduce((sum, l) => sum + l.amountMinor, 0)
   unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
   return { orderId: order.id, totalMinor, amountDueMinor: totalMinor }
+}
+
+const AHEAD = 14 * 86_400_000 // not-policy: how far ahead the desk's list of performances looks, in milliseconds
+const MOST = 30 // not-policy: performances offered at the desk at once
+
+export interface DeskPerformance {
+  performanceId: string
+  title: string
+  startsAt: number
+  state: string
+  currency: string | null
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }[]
+}
+
+/** The performances a seller can sell for now: set up for sale, and not yet past the desk's closing time. */
+export async function deskPerformances(): Promise<DeskPerformance[]> {
+  const at = nowMs()
+  const until = (await useSetting('box-office.sales.desk-until-after') as number) * 1000 // not-policy: seconds to milliseconds
+  const sold = new Map((await all<{ performance_id: string, state: string }>("SELECT performance_id, state FROM box_office_performance_sales WHERE state <> 'draft'")).map(r => [r.performance_id, r.state]))
+  const coming = (await listPerformances({ state: 'scheduled', from: at - until, to: at + AHEAD })).filter(p => sold.has(p.id) && p.startsAt + until > at).slice(0, MOST)
+  const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
+  return Promise.all(coming.map(async (performance) => {
+    const [production, available] = await Promise.all([getProduction(performance.productionId), availability(performance.id)])
+    return {
+      performanceId: performance.id,
+      title: production.title,
+      startsAt: performance.startsAt,
+      state: sold.get(performance.id)!,
+      currency: available.currency,
+      rows: available.bands.flatMap(b => b.prices.map(x => ({ bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free }))),
+    }
+  }))
 }

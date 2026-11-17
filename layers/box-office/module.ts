@@ -90,6 +90,9 @@ export default defineModule({
     'payments.settlement': [{ id: 'box-office' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
+    'core.navigation': [
+      { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
+    ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
       { id: 'deferred-ticket-income', name: 'Deferred ticket income', kind: 'liability' },

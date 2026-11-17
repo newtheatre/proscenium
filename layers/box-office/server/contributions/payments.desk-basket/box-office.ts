@@ -8,7 +8,8 @@ export default {
   label: 'box-office.desk.label',
   // Seeing the panel takes the least a seller has; each use is then checked on its own record.
   ability: 'box-office.order.view',
-  order: 1,
+  order: 0,
+  panel: 'BoxOfficeTillPanel',
   prepare: deskPrepare,
   attach: deskAttach,
   summary: deskSummary,
