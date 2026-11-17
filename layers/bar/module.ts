@@ -40,6 +40,7 @@ export default defineModule({
     'category': { table: 'bar_categories' },
     'stock-item': { table: 'bar_stock_items' },
     'stock-location': { table: 'bar_stock_locations' },
+    'product-preset': { table: 'bar_product_presets' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
     'age-check': { table: 'bar_age_checks', owner: 'by' },

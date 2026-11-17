@@ -1,9 +1,11 @@
 <!-- Choose tickets (Box office specification, part 6; BO-10, BO-11): one performance's ticket types
      and prices in each part of the house, with steppers. The button says what it will do and what it
      costs; pressing it holds the seats, which is when the countdown starts, and goes on to Check and
-     pay. A companion ticket needs a paid ticket with it. No count of seats is ever shown. -->
+     pay. A companion ticket needs a paid ticket with it. No count of seats is ever shown. A member
+     price the visitor is not signed in for can take a reference instead, such as a student ID: one
+     box for each ticket, worded by Membership, shown only on that ticket type. -->
 <script setup lang="ts">
-interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string }
+interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, shape: string } }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string }
   production: { id: string, slug: string, title: string, subtitle: string | null }
@@ -39,7 +41,17 @@ const companionAlone = computed(() => chosen.value.length > 0 && chosen.value.ev
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
 const siteKey = useRuntimeConfig().public.turnstile?.siteKey
 const challenge = ref('')
-const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && (!siteKey || !!challenge.value))
+// References typed for a type the visitor may have only by giving one, one for each ticket in turn.
+const references = ref<Record<string, string[]>>({})
+const typing = (type: TicketType) => !!type.unmet && !!type.reference
+const referencesOf = (bandId: string, typeId: string, count: number) => (references.value[keyOf(bandId, typeId)] ?? []).slice(0, count).map(r => r.trim())
+function setReference(bandId: string, typeId: string, n: number, value: string) {
+  const list = [...(references.value[keyOf(bandId, typeId)] ?? [])]
+  list[n] = value
+  references.value = { ...references.value, [keyOf(bandId, typeId)]: list }
+}
+const referencesMissing = computed(() => chosen.value.some(c => typing(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).filter(Boolean).length < c.quantity))
+const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && (!siteKey || !!challenge.value))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
 
@@ -49,7 +61,7 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })) },
+      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.fullPath })
@@ -102,15 +114,30 @@ async function hold() {
                   v-for="type in band.types"
                   :key="type.ticketTypeId"
                   :label="t('box-office.book.type', { type: type.name, price: money(type.amountMinor, currency) })"
-                  :help="type.unmet ?? type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined)"
+                  :help="typing(type) ? type.reference!.label : (type.unmet ?? type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
                 >
-                  <UInputNumber
-                    v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
-                    :min="0"
-                    :max="type.unmet ? 0 : Math.min(data.maxPerOrder, type.most ?? data.maxPerOrder)"
-                    :disabled="!!type.unmet"
-                    :default-value="0"
-                  />
+                  <div class="space-y-2">
+                    <UInputNumber
+                      v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
+                      :min="0"
+                      :max="type.unmet && !typing(type) ? 0 : Math.min(data.maxPerOrder, type.most ?? data.maxPerOrder)"
+                      :disabled="!!type.unmet && !typing(type)"
+                      :default-value="0"
+                    />
+                    <template v-if="typing(type)">
+                      <UInput
+                        v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
+                        :key="n"
+                        :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
+                        :aria-label="t('box-office.book.reference', { label: type.reference!.label, n })"
+                        :placeholder="t('box-office.book.reference-placeholder', { n })"
+                        autocomplete="off"
+                        maxlength="64"
+                        class="block w-64"
+                        @update:model-value="setReference(band.bandId, type.ticketTypeId, n - 1, String($event))"
+                      />
+                    </template>
+                  </div>
                 </UFormField>
               </template>
             </section>
@@ -120,6 +147,12 @@ async function hold() {
               role="alert"
             >
               {{ t('box-office.book.companion-alone') }}
+            </p>
+            <p
+              v-if="referencesMissing"
+              class="text-sm text-muted"
+            >
+              {{ t('box-office.book.references-missing') }}
             </p>
             <p
               v-if="tooMany"

@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ac12026e-e51f-40ce-a194-d4e3e870ec57",
+  "id": "416a04ee-1c14-4146-9e5c-47146bbbbf52",
   "prevIds": [
     "01bbcc41-dd7e-49e2-beff-2196c2a5b11a"
   ],
@@ -55,11 +55,11 @@
       "entityType": "tables"
     },
     {
-      "name": "bar_products",
+      "name": "bar_product_presets",
       "entityType": "tables"
     },
     {
-      "name": "bar_recipe_lines",
+      "name": "bar_products",
       "entityType": "tables"
     },
     {
@@ -80,22 +80,6 @@
     },
     {
       "name": "bar_sales",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_stock_items",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_stock_levels",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_stock_locations",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_stock_movements",
       "entityType": "tables"
     },
     {
@@ -922,6 +906,26 @@
     },
     {
       "table": "bar_categories",
+      "name": "age_restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "usual_preset",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
       "name": "income_account_id",
       "type": "text",
       "notNull": false,
@@ -1117,16 +1121,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_choice_options",
-      "name": "stock_item_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -1373,16 +1367,6 @@
     {
       "table": "bar_outlets",
       "name": "space_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_outlets",
-      "name": "stock_location_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -1651,6 +1635,106 @@
       "entityType": "columns"
     },
     {
+      "table": "bar_product_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "sizes",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "group_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "age_restricted",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "mixer",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "bar_products",
       "name": "id",
       "type": "text",
@@ -1692,6 +1776,16 @@
     },
     {
       "table": "bar_products",
+      "name": "age_from_category",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
       "name": "position",
       "type": "integer",
       "notNull": true,
@@ -1722,86 +1816,6 @@
     },
     {
       "table": "bar_products",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "variant_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "stock_item_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "choice_group_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "quantity",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "position",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_recipe_lines",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -2333,386 +2347,6 @@
     {
       "table": "bar_sales",
       "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "category_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "base_unit",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "pack_size",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "pack_name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "count_unit_size",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "cost_minor",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "currency",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "reorder_level",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "full_weight_g",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "empty_weight_g",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "active",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_levels",
-      "name": "stock_item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_levels",
-      "name": "location_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_levels",
-      "name": "quantity",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_levels",
-      "name": "last_counted_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "space_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "venue_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "active",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "stock_item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "location_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "quantity",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "reason_term",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "source_type",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "source_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "idempotency_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -15437,6 +15071,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "bar_product_presets",
+      "name": "bar_product_presets_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "active = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "bar_products",
       "name": "bar_products_category",
       "columns": [
@@ -15451,42 +15099,6 @@
       ],
       "isUnique": false,
       "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "bar_recipe_lines_item",
-      "columns": [
-        {
-          "value": "variant_id",
-          "isExpression": false
-        },
-        {
-          "value": "stock_item_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "stock_item_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "bar_recipe_lines_group",
-      "columns": [
-        {
-          "value": "variant_id",
-          "isExpression": false
-        },
-        {
-          "value": "choice_group_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "choice_group_id IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -15616,88 +15228,6 @@
       "columns": [
         {
           "value": "intent_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "bar_stock_locations_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "active = 1",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_key",
-      "columns": [
-        {
-          "value": "idempotency_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_level",
-      "columns": [
-        {
-          "value": "stock_item_id",
-          "isExpression": false
-        },
-        {
-          "value": "location_id",
-          "isExpression": false
-        },
-        {
-          "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_source",
-      "columns": [
-        {
-          "value": "source_type",
-          "isExpression": false
-        },
-        {
-          "value": "source_id",
           "isExpression": false
         }
       ],
@@ -18983,21 +18513,6 @@
       "entityType": "fks"
     },
     {
-      "table": "bar_choice_options",
-      "name": "fk_bar_choice_options_stock_item_id_bar_stock_items_id_fk",
-      "columns": [
-        "stock_item_id"
-      ],
-      "tableTo": "bar_stock_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "bar_openings",
       "name": "fk_bar_openings_outlet_id_bar_outlets_id_fk",
       "columns": [
@@ -19088,21 +18603,6 @@
       "entityType": "fks"
     },
     {
-      "table": "bar_outlets",
-      "name": "fk_bar_outlets_stock_location_id_bar_stock_locations_id_fk",
-      "columns": [
-        "stock_location_id"
-      ],
-      "tableTo": "bar_stock_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "bar_prices",
       "name": "fk_bar_prices_variant_id_bar_variants_id_fk",
       "columns": [
@@ -19169,51 +18669,6 @@
         "category_id"
       ],
       "tableTo": "bar_categories",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "fk_bar_recipe_lines_variant_id_bar_variants_id_fk",
-      "columns": [
-        "variant_id"
-      ],
-      "tableTo": "bar_variants",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "fk_bar_recipe_lines_stock_item_id_bar_stock_items_id_fk",
-      "columns": [
-        "stock_item_id"
-      ],
-      "tableTo": "bar_stock_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "fk_bar_recipe_lines_choice_group_id_bar_choice_groups_id_fk",
-      "columns": [
-        "choice_group_id"
-      ],
-      "tableTo": "bar_choice_groups",
       "columnsTo": [
         "id"
       ],
@@ -19394,126 +18849,6 @@
         "price_list_id"
       ],
       "tableTo": "bar_price_lists",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "fk_bar_stock_items_category_id_bar_categories_id_fk",
-      "columns": [
-        "category_id"
-      ],
-      "tableTo": "bar_categories",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_levels",
-      "name": "fk_bar_stock_levels_stock_item_id_bar_stock_items_id_fk",
-      "columns": [
-        "stock_item_id"
-      ],
-      "tableTo": "bar_stock_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_levels",
-      "name": "fk_bar_stock_levels_location_id_bar_stock_locations_id_fk",
-      "columns": [
-        "location_id"
-      ],
-      "tableTo": "bar_stock_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "fk_bar_stock_locations_space_id_core_spaces_id_fk",
-      "columns": [
-        "space_id"
-      ],
-      "tableTo": "core_spaces",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "fk_bar_stock_locations_venue_id_core_venues_id_fk",
-      "columns": [
-        "venue_id"
-      ],
-      "tableTo": "core_venues",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "fk_bar_stock_movements_stock_item_id_bar_stock_items_id_fk",
-      "columns": [
-        "stock_item_id"
-      ],
-      "tableTo": "bar_stock_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "fk_bar_stock_movements_location_id_bar_stock_locations_id_fk",
-      "columns": [
-        "location_id"
-      ],
-      "tableTo": "bar_stock_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "fk_bar_stock_movements_reason_term_core_terms_id_fk",
-      "columns": [
-        "reason_term"
-      ],
-      "tableTo": "core_terms",
       "columnsTo": [
         "id"
       ],
@@ -21389,16 +20724,6 @@
       "entityType": "fks"
     },
     {
-      "table": "bar_stock_levels",
-      "name": "bar_stock_levels_pk",
-      "columns": [
-        "stock_item_id",
-        "location_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_access_profiles",
       "name": "core_access_profiles_pk",
       "columns": [
@@ -21671,8 +20996,8 @@
       "entityType": "pks"
     },
     {
-      "table": "bar_products",
-      "name": "bar_products_pk",
+      "table": "bar_product_presets",
+      "name": "bar_product_presets_pk",
       "columns": [
         "id"
       ],
@@ -21680,8 +21005,8 @@
       "entityType": "pks"
     },
     {
-      "table": "bar_recipe_lines",
-      "name": "bar_recipe_lines_pk",
+      "table": "bar_products",
+      "name": "bar_products_pk",
       "columns": [
         "id"
       ],
@@ -21727,33 +21052,6 @@
     {
       "table": "bar_sales",
       "name": "bar_sales_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "bar_stock_locations",
-      "name": "bar_stock_locations_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_pk",
       "columns": [
         "id"
       ],
@@ -22823,18 +22121,6 @@
       "entityType": "checks"
     },
     {
-      "table": "bar_recipe_lines",
-      "name": "bar_recipe_lines_one",
-      "value": "(\"stock_item_id\" IS NULL) <> (\"choice_group_id\" IS NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_recipe_lines",
-      "name": "bar_recipe_lines_quantity",
-      "value": "\"quantity\" >= 1",
-      "entityType": "checks"
-    },
-    {
       "table": "bar_register_reviews",
       "name": "bar_register_reviews_days",
       "value": "\"to_day\" >= \"from_day\"",
@@ -22928,54 +22214,6 @@
       "table": "bar_sales",
       "name": "bar_sales_paid",
       "value": "\"state\" <> 'paid' OR \"paid_at\" IS NOT NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_unit",
-      "value": "\"base_unit\" IN ('each', 'ml', 'g')",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_sizes",
-      "value": "\"pack_size\" >= 1 AND \"count_unit_size\" >= 1",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_cost",
-      "value": "\"cost_minor\" IS NULL OR \"cost_minor\" >= 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_reorder",
-      "value": "\"reorder_level\" IS NULL OR \"reorder_level\" >= 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_items",
-      "name": "bar_stock_items_weights",
-      "value": "(\"full_weight_g\" IS NULL) = (\"empty_weight_g\" IS NULL) AND (\"full_weight_g\" IS NULL OR \"full_weight_g\" > \"empty_weight_g\" AND \"empty_weight_g\" >= 0)",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_kind",
-      "value": "\"kind\" IN ('opening', 'delivery', 'sale', 'sale_reversal', 'wastage', 'adjustment', 'transfer_out', 'transfer_in')",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_sign",
-      "value": "\"quantity\" <> 0 AND (\"kind\" IN ('opening', 'adjustment') OR (\"kind\" IN ('delivery', 'transfer_in', 'sale_reversal')) = (\"quantity\" > 0))",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_stock_movements",
-      "name": "bar_stock_movements_wastage",
-      "value": "\"kind\" <> 'wastage' OR \"reason_term\" IS NOT NULL",
       "entityType": "checks"
     },
     {

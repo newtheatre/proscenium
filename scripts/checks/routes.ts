@@ -105,7 +105,7 @@ export function checkRoutes(registry: any, modules: Loaded[], options: { fatalOn
  * Address prefixes the platform owns (Module manifest tab, "Reserved address prefixes": the one
  * list). A theatre's own page may not sit under one, nor under anything starting with an underscore.
  */
-export const RESERVED_PREFIXES = ['account', 'members', 'console', 'admin', 'live', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing'] as const
+export const RESERVED_PREFIXES = ['account', 'members', 'console', 'admin', 'live', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing', 'awards'] as const
 
 function pageFiles(dir: string, extensions: string[]): string[] {
   if (!existsSync(dir)) return []
