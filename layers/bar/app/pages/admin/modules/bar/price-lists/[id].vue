@@ -14,7 +14,7 @@ const { money } = await useMoney()
 const { data, status, error, refresh } = await useAPI<{ categories: Category[], lists: List[] }>('/api/bar/price-lists', { key: 'bar:price-lists' })
 const list = computed(() => data.value?.lists.find(l => l.id === String(route.params.id)))
 const standard = computed(() => data.value?.lists.find(l => l.standard))
-const trail = computed(() => [{ label: t('bar.navigation.price-lists.label'), to: '/console/bar/price-lists' }])
+const trail = computed(() => [{ label: t('bar.navigation.price-lists.label'), to: '/admin/modules/bar/price-lists' }])
 
 const sizeName = (p: Product, v: Variant) => p.variants.length === 1 && v.name === 'Each' ? p.name : `${p.name}, ${v.name}`
 function here(v: Variant): string {
@@ -60,7 +60,7 @@ function onStandard(v: Variant): string {
               <RecordListItem
                 v-for="v in p.variants.filter(v => v.active)"
                 :key="v.id"
-                :to="`/console/bar/products/${p.id}`"
+                :to="`/admin/modules/bar/products/${p.id}`"
                 :name="sizeName(p, v)"
                 :description="list.standard ? here(v) : t('bar.screens.lists.beside-standard', { here: here(v), standard: onStandard(v) })"
               />
