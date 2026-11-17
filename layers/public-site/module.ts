@@ -19,10 +19,14 @@ export default defineModule({
     'archive.from-year': setting.integer({ unset: true, min: 1800, max: 9999, change, audience: 'public' }), // not-policy: the bounds of a year
     // Keep a cancelled performance listed, marked as cancelled, until its date passes.
     'listing.cancelled-visible': setting.boolean({ default: true, change, audience: 'public' }),
+    // Search engines are asked to stay away (every page noindex, robots.txt disallowing everything)
+    // until the theatre says its site is ready, on the site-readiness screen (C-42).
+    'search.hidden': setting.boolean({ default: true, change, audience: 'public', onChange: 'confirm' }),
   }),
   settingGroups: {
     archive: { place: 'admin' },
     listing: { place: 'admin' },
+    search: { screen: '/admin/site-readiness' },
   },
 
   contributes: {
@@ -30,9 +34,18 @@ export default defineModule({
     'core.public-component': [
       { id: 'whats-on', component: 'PublicSiteWhatsOn', alias: 'whats-on', description: 'What is on: every production with a date to come, or the soonest few (limit), narrowed by category, season or venue (slugs), as a grid or a list (layout).' },
     ],
+    // Site readiness, in Admin's Theatre group after Vocabularies (core part 6): it covers the whole
+    // site, brand and venues included, and opens Admin to the communications officer too.
+    'core.navigation': [
+      { id: 'public-site.readiness', menu: 'admin', group: 'theatre', to: '/admin/site-readiness', icon: 'i-lucide-list-checks', ability: 'public-site.readiness.view', order: 60 },
+    ],
+    'core.count': [{ id: 'public-site.readiness-outstanding', file: 'readiness-outstanding' }],
+    // Site readiness has items outstanding (core part 6, Admin overview).
+    'core.home-card': [{ id: 'public-site.readiness', home: 'admin', ability: 'public-site.readiness.view', component: 'PublicSiteReadinessCard', urgency: 'info', count: 'public-site.readiness-outstanding' }],
   },
 
   abilities: defineAbilities('public-site', {
     'site.configure': ability(),
+    'readiness.view': ability(),
   }),
 })

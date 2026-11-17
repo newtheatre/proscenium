@@ -9,7 +9,7 @@ import { png } from './images'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
-const owner = person('acc_siteowner', 'Site Owner', ['core.settings.manage', 'core.modules.manage', 'core.vocabulary.manage'])
+const owner = person('acc_siteowner', 'Site Owner', ['core.settings.manage', 'core.modules.manage', 'core.vocabulary.manage', 'public-site.site.configure'])
 const manager = person('acc_sitemanager', 'Site Manager', ['core.production.view', 'core.production.create', 'core.production.edit', 'core.production.publish', 'core.production.cancel', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.season.manage'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
@@ -134,13 +134,18 @@ test('the header leads to what is on and to past shows', async ({ page }) => {
   await expect(header.getByRole('link', { name: 'Past shows' }).first()).toHaveAttribute('href', '/shows')
 })
 
-test('the sitemap lists the pages, the show where it lives, the venue and the season; robots.txt points to it', async ({ request }) => {
+test('the sitemap lists the shows, the venue and the season but not a starter page; robots.txt points to it once search engines are let in', async ({ playwright, request }) => {
+  const settings = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
+  expect((await settings.put('/api/core/settings', { data: { changes: [{ key: 'public-site.search.hidden', value: false }], confirm: true } })).ok()).toBe(true)
+  await settings.dispose()
   const sitemap = await request.get('/sitemap.xml')
   expect(sitemap.status()).toBe(200)
   expect(sitemap.headers()['content-type']).toContain('application/xml')
   const xml = await sitemap.text()
-  for (const path of ['/', '/whats-on', '/shows', `/whats-on/${slug}`, `/shows/${pastSlug}`, `/venues/${venueSlug}`, `/seasons/${seasonSlug}`])
+  for (const path of ['/whats-on', '/shows', `/whats-on/${slug}`, `/shows/${pastSlug}`, `/venues/${venueSlug}`, `/seasons/${seasonSlug}`])
     expect(xml).toContain(`<loc>http://localhost:8788${path}</loc>`)
+  // The starter home page is still marked placeholder, so it is kept from search engines.
+  expect(xml).not.toContain('<loc>http://localhost:8788/</loc>')
   const robots = await (await request.get('/robots.txt')).text()
   expect(robots).toContain('Disallow: /console')
   expect(robots).toContain('Sitemap: http://localhost:8788/sitemap.xml')

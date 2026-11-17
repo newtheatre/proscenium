@@ -1,5 +1,6 @@
 ---
 title: Welcome
+placeholder: true
 description: This is the home page. Edit site/content/pages/index.md to change it.
 ---
 
