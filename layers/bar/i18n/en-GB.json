@@ -3,5 +3,11 @@
   "bar.module.description": "Drinks, snacks and merchandise: products and their sizes, price lists, the places that sell, and a panel in the till so drinks can go on the same payment as tickets. Needs Payments and Finance.",
   "bar.abilities.product.manage.label": "Set up the bar's categories, products and sizes",
   "bar.abilities.price.manage.label": "Set bar prices and price lists",
-  "bar.abilities.outlet.manage.label": "Set up the places that sell from the bar"
+  "bar.abilities.outlet.manage.label": "Set up the places that sell from the bar",
+  "bar.abilities.sale.sell.label": "Sell from the bar in the till",
+  "bar.abilities.opening.manage.label": "Close an outlet's trading",
+  "bar.abilities.settings.manage.label": "Change the bar settings",
+  "bar.settings-sections.sales": "Bar sales",
+  "bar.settings.sales.reference-prefix.label": "Bar sale reference starts with",
+  "bar.settings.sales.reference-prefix.help": "One to three capital letters, so a bar sale's reference is not mistaken for a booking reference."
 }
