@@ -2,7 +2,7 @@
 // modules which are switched on contribute, plus a settings page generated for each module that
 // has settings. The menu and the guard agree because they read the same declaration.
 import { can, usePoint, type Actor, type Decision } from '#kit'
-import { shows } from './counts'
+import { countOf, shows } from './counts'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import {
@@ -16,6 +16,8 @@ export interface DeclaredEntry extends NavigationEntry {
   label?: string
   /** The entry's count for this viewer, when it has one. */
   countValue?: number
+  /** How many things under the entry need this viewer, when it counts them. */
+  attentionValue?: number
   /** For a generated page of settings, the page's id. */
   settingsPage?: string
 }
@@ -97,7 +99,8 @@ export async function allowedEntries(actor: Actor, shell: ShellName): Promise<De
     if (!holds(await mayOpen(actor, entry))) continue
     // Hiding an empty entry is tidiness: the address still opens (the guard does not look at counts).
     const { show, value } = await shows(entry, actor)
-    if (show) out.push({ ...entry, countValue: value })
+    if (!show) continue
+    out.push({ ...entry, countValue: value, ...(entry.attention ? { attentionValue: await countOf(entry.attention, actor) } : {}) })
   }
   return out
 }
@@ -105,7 +108,12 @@ export async function allowedEntries(actor: Actor, shell: ShellName): Promise<De
 const byOrder = (a: NavItem, b: NavItem) => a.order - b.order || a.id.localeCompare(b.id)
 
 function item(entry: DeclaredEntry): NavItem {
-  return { id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0, module: entry.module }
+  return {
+    id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0, module: entry.module,
+    ...(entry.attentionValue ? { attention: entry.attentionValue } : {}),
+    // My account is drawn in groups; an entry that names none sits at the theatre.
+    ...(entry.menu === 'account' ? { group: entry.group ?? 'theatre' } : {}),
+  }
 }
 
 /** The flat list for a shell without groups, or the grouped sidebar for the console. */

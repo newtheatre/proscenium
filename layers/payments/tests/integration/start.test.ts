@@ -132,6 +132,41 @@ describe('test-mode-never-settles-live', () => {
   })
 })
 
+describe('test instance (payments.test-mode.takes-sales)', () => {
+  const takesSales = (on: boolean) => commit(unit => changeSetting(unit.view(), 'payments.test-mode.takes-sales', on, { reason: 'test', confirm: true }))
+
+  it('lets a test-mode account pay for a real sale, which settles and posts as live money would', async () => {
+    await takesSales(true)
+    try {
+      const { intentId, orderId } = await order(900)
+      world.startAnswer = { state: 'succeeded', feeMinor: 20 }
+      const out = await inContext(() => startAttempt(intentId, { providerAccountId: test, method: 'card_online' }))
+      expect(out).toMatchObject({ settled: true, unfulfilled: false })
+      expect(await state('tickets_orders', orderId)).toBe('paid')
+      expect(await postingsOf('payments.intent', intentId)).toEqual([{ kind: 'sale' }])
+      expect(await postingsOf('payments.attempt', out.attemptId)).toEqual([{ kind: 'fee' }])
+    }
+    finally {
+      await takesSales(false)
+    }
+  })
+
+  it('still keeps Payments\' own test payment as test money that posts nothing', async () => {
+    await takesSales(true)
+    try {
+      const admin = person(['payments.provider.manage'])
+      world.startAnswer = { state: 'succeeded', feeMinor: 5 }
+      const body = await (await post(`/api/payments/providers/${test}/test-payment`, admin, { method: 'card_online' })).json() as { intentId: string, attemptId: string, settled: boolean }
+      expect(body.settled).toBe(true)
+      expect(await postingsOf('payments.intent', body.intentId)).toEqual([])
+      expect(await postingsOf('payments.attempt', body.attemptId)).toEqual([])
+    }
+    finally {
+      await takesSales(false)
+    }
+  })
+})
+
 describe('setup test payment', () => {
   it('takes a test payment that Payments owns and posts nothing', async () => {
     const admin = person(['payments.provider.manage'])
