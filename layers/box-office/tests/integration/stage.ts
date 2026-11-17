@@ -46,6 +46,8 @@ import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
 import deskBuyersGet from '../../server/api/box-office/desk/buyers.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
+import sessionGet from '../../../payments/server/api/payments/session.get'
+import intentCancelPost from '../../../payments/server/api/payments/intents/[id]/cancel.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
 import exchangePost from '../../server/api/box-office/orders/[id]/exchange.post'
@@ -132,6 +134,8 @@ export const handle = server({
   'PUT /api/core/productions/:id/advisories': setProductionAdvisories,
   'PATCH /api/core/productions/:id': editProduction,
   'POST /api/payments/till/sale': tillSalePost,
+  'GET /api/payments/session': sessionGet,
+  'POST /api/payments/intents/:id/cancel': intentCancelPost,
   'POST /api/payments/till/summary': tillSummaryPost,
 })
 

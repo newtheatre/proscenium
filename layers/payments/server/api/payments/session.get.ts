@@ -4,7 +4,7 @@
 // mayOpen and mayViewAll say what the page shows: the card, the list of every session, or both.
 import { z } from 'zod'
 import { can, defineRoute, useSetting } from '#kit'
-import { awaitingCountOf, closesAt, lastSaleIn, sessionOf, summarise, waitingIn } from '../../sessions'
+import { awaitingCountOf, closesAt, lastSaleIn, sessionOf, summarise, unfinishedIn, waitingIn } from '../../sessions'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -22,6 +22,7 @@ export default defineRoute({
     cashTaken,
     session: session ? { ...await summarise(session, undefined, cashTaken), lastSaleAt: await lastSaleIn(session), closesAt: await closesAt(session) } : null,
     waiting: session ? await waitingIn(session.id) : [],
+    unfinished: session?.state === 'open' ? await unfinishedIn(session.id) : null,
     awaiting: await Promise.all(awaiting.map(s => summarise(s, undefined, cashTaken))),
   }
 })

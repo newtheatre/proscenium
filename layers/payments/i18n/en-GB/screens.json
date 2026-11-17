@@ -203,6 +203,8 @@
   "payments.screens.till.unfulfilled": "The money was taken but the sale could not be completed",
   "payments.screens.till.unfulfilled-help": "It is refunded in full automatically. Needs attention shows it until the refund goes through.",
   "payments.screens.till.cancelled": "Sale cancelled",
+  "payments.screens.till.picked-up": "A payment of {amount} was not finished",
+  "payments.screens.till.picked-up-help": "Take it now, or cancel it to start again.",
   "payments.screens.till.give-back-button": "Give back what was taken",
   "payments.screens.till.give-back-verb": "Give back",
   "payments.screens.till.give-back-consequence": "The sale ends and what was prepared for it is released. Hand back the cash, and refund on any card machine or in the SumUp app, before you confirm. A card payment the site took goes back to the card by itself.",
