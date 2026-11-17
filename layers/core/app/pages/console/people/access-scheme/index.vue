@@ -1,9 +1,8 @@
-<!-- The access scheme's queue (ID-40; identity spec part 6): open applications and changes, oldest
-     first, with how long each has waited. Names and states only; needs show once one is opened, and
-     opening one is recorded. -->
+<!-- The access scheme's queue (ID-40, ID-42; identity spec part 6): applications waiting for a
+     decision, oldest first, with how long each has waited. Names and states only; needs show once
+     one is opened, and opening one is recorded. The two ways to bring somebody in start here: email
+     them a link to apply, or fill the form in with them now. -->
 <script setup lang="ts">
-definePageMeta({ layout: 'console' })
-
 interface Row { accountId: string, name: string | null, change: boolean, submittedVia: 'self' | 'staff', waitingFor: number, overdue: boolean }
 
 const { t } = useT()
@@ -17,20 +16,37 @@ const columns = [
 ]
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const inviting = ref(false)
+// One dialogue for both ways in: 'invite' emails a link, 'apply' opens the form to fill in with them.
+const mode = ref<'invite' | 'apply' | null>(null)
+const open = computed({ get: () => mode.value !== null, set: (v: boolean) => { if (!v) mode.value = null } })
 const busy = ref(false)
-const invite = reactive({ name: '', address: '' })
+const person = reactive({ name: '', address: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+function start(m: 'invite' | 'apply') {
+  refusal.value = null
+  mode.value = m
+}
 
-async function sendInvitation() {
+async function go() {
   busy.value = true
   refusal.value = null
+  const body = { name: person.name, address: person.address }
   try {
-    await $api('/api/core/access-scheme/invitations', { method: 'POST', body: { name: invite.name, address: invite.address } })
-    toast.add({ title: t('core.access.invite.sent', { address: invite.address }), color: 'success' })
-    inviting.value = false
-    invite.name = ''
-    invite.address = ''
+    if (mode.value === 'invite') {
+      await $api('/api/core/access-scheme/invitations', { method: 'POST', body })
+      toast.add({ title: t('core.access.invite.sent', { address: person.address }), color: 'success' })
+      mode.value = null
+    }
+    else {
+      const found = await $api<{ accountId: string, applied: boolean }>('/api/core/access-scheme/people', { method: 'POST', body })
+      const page = `/console/people/access-scheme/${encodeURIComponent(found.accountId)}`
+      // Somebody who has applied already is shown their application, not a blank form.
+      if (found.applied) toast.add({ title: t('core.access.apply-for.already', { name: person.name }), color: 'info' })
+      mode.value = null
+      await navigateTo(found.applied ? page : `${page}/apply`)
+    }
+    person.name = ''
+    person.address = ''
   }
   catch (error) {
     refusal.value = toRefusal(error)
@@ -62,9 +78,16 @@ const filters = [{
     >
       <template #primary>
         <UButton
+          icon="i-lucide-file-pen-line"
+          :label="t('core.access.apply-for.button')"
+          @click="start('apply')"
+        />
+        <UButton
+          color="neutral"
+          variant="outline"
           icon="i-lucide-send"
           :label="t('core.access.invite.button')"
-          @click="inviting = true"
+          @click="start('invite')"
         />
       </template>
       <template #cell-name="{ row }">
@@ -89,15 +112,16 @@ const filters = [{
     </PageList>
 
     <UModal
-      v-model:open="inviting"
-      :title="t('core.access.invite.button')"
-      :description="t('core.access.invite.description')"
+      v-model:open="open"
+      :title="mode === 'apply' ? t('core.access.apply-for.button') : t('core.access.invite.button')"
+      :description="mode === 'apply' ? t('core.access.apply-for.description') : t('core.access.invite.description')"
     >
       <template #body>
-        <form
-          id="invite-to-apply"
+        <UForm
+          id="access-person"
           class="space-y-4"
-          @submit.prevent="sendInvitation"
+          :state="person"
+          @submit="go"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -105,9 +129,8 @@ const filters = [{
             required
           >
             <UInput
-              v-model="invite.name"
+              v-model="person.name"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -116,21 +139,20 @@ const filters = [{
             :error="refusal?.fields?.address ? refusal.reason : undefined"
           >
             <UInput
-              v-model="invite.address"
+              v-model="person.address"
               type="email"
               maxlength="254"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
           type="submit"
-          form="invite-to-apply"
+          form="access-person"
           :loading="busy"
-          :label="t('core.access.invite.send')"
-          :disabled="!invite.name.trim() || !invite.address.trim()"
+          :label="mode === 'apply' ? t('core.access.apply-for.continue') : t('core.access.invite.send')"
+          :disabled="!person.name.trim() || !person.address.trim()"
         />
       </template>
     </UModal>

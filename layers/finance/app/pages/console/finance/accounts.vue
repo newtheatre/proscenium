@@ -81,24 +81,16 @@ async function save() {
           :key="g.kind"
           :title="t(`finance.screens.accounts.kinds.${g.kind}`)"
         >
-          <ul class="divide-y divide-default rounded-lg border border-default">
-            <li
+          <RecordList :label="t(`finance.screens.accounts.kinds.${g.kind}`)">
+            <RecordListItem
               v-for="a in g.accounts"
               :key="a.id"
-              class="flex flex-wrap items-center gap-3 px-3 py-2"
-              :class="{ 'text-muted': !a.active }"
+              :description="a.scope ? `${moduleLabel(a.module)} · ${a.scope}` : moduleLabel(a.module)"
+              :muted="!a.active"
             >
-              <span class="w-24 font-mono text-sm">{{ a.code }}</span>
-              <div class="min-w-0 flex-1">
-                <p class="font-medium">
-                  {{ a.name }}
-                </p>
-                <p class="text-sm text-muted">
-                  {{ moduleLabel(a.module) }}<template v-if="a.scope">
-                    · {{ a.scope }}
-                  </template>
-                </p>
-              </div>
+              <template #name>
+                <span class="font-mono text-muted">{{ a.code }}</span> {{ a.name }}
+              </template>
               <StatusBadge
                 v-if="!a.active"
                 tone="neutral"
@@ -111,16 +103,14 @@ async function save() {
                   class="block"
                 >{{ money(b.balanceMinor, b.currency) }}</span>
               </span>
-              <UButton
+              <IconButton
                 icon="i-lucide-pencil"
-                :aria-label="t('finance.screens.accounts.edit-label', { account: a.name })"
-                color="neutral"
-                variant="ghost"
+                :label="t('finance.screens.accounts.edit-label', { account: a.name })"
                 size="sm"
                 @click="openEdit(a)"
               />
-            </li>
-          </ul>
+            </RecordListItem>
+          </RecordList>
         </PageSection>
       </div>
     </DataBoundary>
@@ -130,10 +120,11 @@ async function save() {
       :title="editing ? t('finance.screens.accounts.edit-title', { account: editing.name }) : t('finance.screens.accounts.add')"
     >
       <template #body>
-        <form
+        <UForm
           id="ledger-account"
+          :state="form"
           class="space-y-4"
-          @submit.prevent="save"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <div class="grid gap-4 sm:grid-cols-3">
@@ -146,7 +137,7 @@ async function save() {
               <UInput
                 v-model="form.code"
                 maxlength="40"
-                class="w-full font-mono"
+                class="font-mono"
               />
             </UFormField>
             <UFormField
@@ -157,7 +148,6 @@ async function save() {
               <UInput
                 v-model="form.name"
                 maxlength="80"
-                class="w-full"
               />
             </UFormField>
           </div>
@@ -169,7 +159,6 @@ async function save() {
               <USelect
                 v-model="form.kind"
                 :items="KINDS.map(k => ({ value: k, label: t(`finance.screens.accounts.kinds.${k}`) }))"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -181,7 +170,6 @@ async function save() {
               <USelect
                 v-model="form.module"
                 :items="(data?.modules ?? []).map(m => ({ value: m, label: moduleLabel(m) }))"
-                class="w-full"
               />
             </UFormField>
           </template>
@@ -197,7 +185,7 @@ async function save() {
           >
             {{ t('finance.screens.accounts.locked') }}
           </p>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

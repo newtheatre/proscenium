@@ -4,7 +4,7 @@
 // every request with its respond-by date and close it once each table that may hold rows linked to
 // no account has been searched by hand.
 import type { H3Event } from 'h3'
-import { all, createUnit, first, isEnabled, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
+import { all, createUnit, first, isEnabled, newId, nowMs, refuse, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { formatDuration } from '#kit/duration'
 import type { TableMeta } from '#kit/db'
@@ -13,7 +13,6 @@ import { notifyAddress } from '../notifications/send'
 import { accountById } from './accounts'
 import { digest, randomToken } from './crypto'
 import { eraseAccount, erasureHolds } from './erasure'
-import { relyingParty } from './web'
 import { fileUrl } from '../files/service'
 import type { IDENTITY_CHECKS } from '../db/identity'
 
@@ -77,7 +76,7 @@ export async function requestErasure(unit: UnitView, event: H3Event, actor: Acto
   })
   await notify(unit, 'core.erasure-confirm', {
     to: account.id,
-    variables: { link: `${relyingParty(event).origin}/sign-in/confirm-erasure#${token}`, wait: formatDuration(coolingOff) },
+    variables: { link: await siteUrl(`/sign-in/confirm-erasure#${token}`), wait: formatDuration(coolingOff) },
     dedupeKey: id,
   })
   unit.audit({ action: 'create', ...(actor.accountId === account.id ? {} : { ability: 'core.data-request.manage' }), record: ['core.data-request', id], detail: { kind: 'erasure', identityCheck: input.identityCheck ?? null } })
@@ -226,27 +225,4 @@ export async function closeRequest(unit: UnitView, actor: Actor, request: DataRe
   if (request.state === 'done' && open.length) refuse('core.data-request.checklist-open', 'Some tables have not been searched yet.', { status: 409, remedy: `Search and tick: ${open.map(l => l.table).join(', ')}.` })
   unit.add({ sql: 'UPDATE core_data_requests SET closed_at = ?, closed_by = ? WHERE id = ? AND closed_at IS NULL', params: [nowMs(), actor.accountId!, request.id] })
   unit.audit({ action: 'state', ability: 'core.data-request.manage', record: ['core.data-request', request.id], detail: { closed: true } })
-}
-
-/** The staff queue: every request not yet closed, oldest respond-by first. */
-export async function dataRequestQueue() {
-  const rows = await all<DataRequestRow & { name: string | null }>(
-    'SELECT r.*, coalesce(a.preferred_name, a.name) AS name FROM core_data_requests r JOIN core_accounts a ON a.id = r.account_id WHERE r.closed_at IS NULL ORDER BY r.respond_by',
-  )
-  const at = nowMs()
-  return rows.map(r => ({
-    id: r.id,
-    accountId: r.account_id,
-    name: r.name,
-    kind: r.kind,
-    state: r.state,
-    requestedAt: r.requested_at,
-    requestedBy: r.requested_by,
-    identityCheck: r.identity_check,
-    respondBy: r.respond_by,
-    overdue: r.respond_by < at,
-    notBefore: r.not_before,
-    holds: r.holds ? JSON.parse(r.holds) as string[] : [],
-    finishedAt: r.finished_at,
-  }))
 }

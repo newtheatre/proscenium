@@ -32,7 +32,7 @@ describe('roles (ID-22)', () => {
   it('stores what an ability implies with it', async () => {
     const id = await makeRole(['core.grant.manage'])
     const listed = (await owner.browser.get('/api/core/roles')).body.roles.find((r: any) => r.id === id)
-    expect(listed.abilities.sort()).toEqual(['core.account.search', 'core.grant.manage', 'core.grant.read'])
+    expect(listed.abilities.sort()).toEqual(['core.account.find', 'core.account.search', 'core.grant.manage', 'core.grant.read'])
   })
 
   it('give only what you hold: a role cannot be given an ability its maker lacks', async () => {

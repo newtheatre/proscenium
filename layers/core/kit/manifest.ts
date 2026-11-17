@@ -51,6 +51,22 @@ export interface Preset {
   facts?: Record<string, string[]>
 }
 
+/** Where a page of settings is: the console, beside the work it governs, or Site administration. */
+export type SettingPlace = 'console' | 'admin'
+/**
+ * Where a group of settings (the first part of a short key, such as `sign-in`) is shown. Exactly one
+ * home: a page of the module's own (`page`), the shared Advanced page (`advanced`), or a bespoke
+ * screen that manages it (`screen`, left off every generated page). With none, the group is on the
+ * module's own page in its `place`. Core has no page of its own, so each of its groups names one.
+ */
+export interface SettingGroupDecl { place?: SettingPlace, page?: string, advanced?: boolean, screen?: string }
+/**
+ * A generated page of settings, declared once; it also makes the page's navigation entry. `group`
+ * is the navigation group it sits in. `to` defaults to /admin/<page> or /console/<page>/settings for
+ * core, and /admin/modules/<module>/<page> or /console/<module>/settings/<page> for another module.
+ */
+export interface SettingPageDecl { place: SettingPlace, group: string, order?: number, icon?: string, to?: string }
+
 export interface ModuleManifest {
   id: string
   manifest: 1
@@ -62,6 +78,8 @@ export interface ModuleManifest {
   uses?: readonly string[]
   settings?: Record<string, SettingEntry<any, any>>
   settingRules?: { module: string, rules: SettingRule[] }
+  settingGroups?: Record<string, SettingGroupDecl>
+  settingPages?: Record<string, SettingPageDecl>
   abilities?: Record<string, AbilityDecl>
   facts?: Record<string, FactDecl>
   records?: Record<string, RecordDecl>
@@ -109,7 +127,7 @@ const SIGNING_MIN = 86_400 // not-policy: a signing key lives at least a day, in
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
 const kebab = new RegExp(`^${KEBAB}$`)
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9a-z.-]+)?$/
-const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
+const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export function snake(id: string): string {
@@ -144,6 +162,7 @@ export function validateManifest(m: ModuleManifest): void {
     if (!key.startsWith(`${id}.`)) throw new DeclarationError(`settings.${key}`, `belongs to another module: use defineSettings('${id}', {...})`)
   }
   if (m.settingRules && m.settingRules.module !== id) throw new DeclarationError('settingRules', `use defineSettingRules('${id}', [...])`)
+  validateSettingPlaces(m)
   for (const key of Object.keys(m.abilities ?? {})) if (!own('', `${KEBAB}\\.${KEBAB}`).test(key)) throw new DeclarationError(`abilities.${key}`, `is <module>.<record>.<verb>: use defineAbilities('${id}', {...})`)
   for (const key of Object.keys(m.facts ?? {})) if (!own('', KEBAB).test(key)) throw new DeclarationError(`facts.${key}`, `is <module>.<name>: use defineFacts('${id}', {...})`)
   for (const key of Object.keys(m.records ?? {})) if (!own('', KEBAB).test(key)) throw new DeclarationError(`records.${key}`, `is <module>.<noun>: use defineRecords('${id}', {...})`)
@@ -258,6 +277,43 @@ function checkPayload(field: string, schema: z.ZodObject<any>) {
     }
     else if (!['number', 'boolean', 'enum', 'literal', 'int', 'bigint'].includes(type)) {
       throw new DeclarationError(`${field}.payload.${key}`, `a payload field of type ${type} cannot be checked for personal data; use ids, enums, numbers or booleans`)
+    }
+  }
+}
+
+const PLACES = ['console', 'admin']
+const ADDRESS = /^\/(admin|console)(\/[a-z0-9-]+)+$/
+
+/** settingGroups and settingPages: their shapes, and that every group names at most one home. */
+function validateSettingPlaces(m: ModuleManifest): void {
+  const pages = m.settingPages ?? {}
+  for (const [page, decl] of Object.entries(pages)) {
+    const f = (name: string) => `settingPages.${page}.${name}`
+    if (!kebab.test(page)) throw new DeclarationError(`settingPages.${page}`, 'a page id is kebab-case')
+    if (!decl || !PLACES.includes(decl.place)) throw new DeclarationError(f('place'), "is 'console' or 'admin'")
+    if (typeof decl.group !== 'string' || !kebab.test(decl.group)) throw new DeclarationError(f('group'), 'names the navigation group the page sits in')
+    if (decl.to !== undefined && !(typeof decl.to === 'string' && ADDRESS.test(decl.to) && decl.to.startsWith(`/${decl.place}/`))) throw new DeclarationError(f('to'), `is an address under /${decl.place}`)
+    if (decl.order !== undefined && !Number.isInteger(decl.order)) throw new DeclarationError(f('order'), 'is a whole number')
+  }
+  for (const [group, decl] of Object.entries(m.settingGroups ?? {})) {
+    const f = (name: string) => `settingGroups.${group}.${name}`
+    if (!kebab.test(group)) throw new DeclarationError(`settingGroups.${group}`, 'a group is the first part of a setting\'s short key, kebab-case')
+    if (!decl || typeof decl !== 'object') throw new DeclarationError(`settingGroups.${group}`, 'is { place, page }, { advanced: true } or { screen }')
+    for (const key of Object.keys(decl)) if (!['place', 'page', 'advanced', 'screen'].includes(key)) throw new DeclarationError(f(key), 'is not a field of a setting group: place, page, advanced or screen')
+    if (decl.place !== undefined && !PLACES.includes(decl.place)) throw new DeclarationError(f('place'), "is 'console' or 'admin'")
+    const homes = [decl.page !== undefined, decl.advanced === true, decl.screen !== undefined].filter(Boolean).length
+    if (homes > 1) throw new DeclarationError(`settingGroups.${group}`, 'has one home: a page, the Advanced page or a bespoke screen, not more than one')
+    if (decl.advanced !== undefined && decl.advanced !== true) throw new DeclarationError(f('advanced'), 'is true or left out')
+    if (decl.page !== undefined && !(decl.page in pages)) throw new DeclarationError(f('page'), `"${decl.page}" is not one of ${m.id}'s settingPages`)
+    if (decl.page !== undefined && decl.place !== undefined && pages[decl.page]!.place !== decl.place) throw new DeclarationError(f('place'), `the page "${decl.page}" is in ${pages[decl.page]!.place}`)
+    if (decl.screen !== undefined && !(typeof decl.screen === 'string' && ADDRESS.test(decl.screen))) throw new DeclarationError(f('screen'), 'is the address of a page, such as /admin/email')
+  }
+  const groups = new Set(Object.keys(m.settings ?? {}).map(key => key.slice(m.id.length + 1).split('.')[0]!))
+  for (const group of Object.keys(m.settingGroups ?? {})) if (!groups.has(group)) throw new DeclarationError(`settingGroups.${group}`, `${m.id} declares no setting in this group`)
+  if (m.id === 'core') {
+    for (const group of groups) {
+      const decl = m.settingGroups?.[group]
+      if (!decl || !(decl.page || decl.advanced || decl.screen)) throw new DeclarationError(`settingGroups.${group}`, 'core has no settings page of its own, so each of its groups names a page, advanced: true or a screen')
     }
   }
 }

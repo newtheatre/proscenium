@@ -12,7 +12,7 @@ import { relyingParty } from '#modules/core'
 const KEY = 'box-office:site-origin'
 
 export async function fromRequest(event: H3Event): Promise<void> {
-  const origin = relyingParty(event).origin
+  const origin = (await relyingParty(event)).origin
   useContext().cache[KEY] = origin
   if (await cache.get<string>(KEY) === null) await cache.put(KEY, origin)
 }

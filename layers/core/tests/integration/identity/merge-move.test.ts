@@ -5,9 +5,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { NOT_YET, createUnit, inAccountScope, newId, recordMergeItems, useDb, type MergeHandler } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { sessions } from '../../../../payments/server/db/schema'
-import { Browser, deliver, env, grantDirectly, leaveIdentity, reset, signInByEmail, staff, useIdentity } from './helpers'
+import { Browser, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, signInByEmail, staff, useIdentity } from './helpers'
 import { inContext, rows, sent } from '../../../../../tests/integration/helpers'
 import { restartStalledMerges } from '../../../server/identity/merge-move'
+import { closeMerges } from '../../../server/identity/merge-undo'
 
 beforeAll(useIdentity)
 afterAll(leaveIdentity)
@@ -123,5 +124,112 @@ describe('stage two of a merge', () => {
       expect((await mergeOf(mergedAccountId)).completed_at).not.toBeNull()
       expect(calls).toHaveLength(1)
     })
+  })
+})
+
+describe('undoing a merge with two merge handlers', () => {
+  const calls: string[] = []
+  const handlerNamed = (name: string, notRestored = 0): MergeHandler => ({
+    merge() {
+      calls.push(`merge:${name}`)
+    },
+    undo() {
+      calls.push(`undo:${name}`)
+      return notRestored ? { notRestored, reason: `seats.merge.${name}-kept` } : undefined
+    },
+  })
+  let restore: () => void = () => {}
+
+  beforeEach(() => {
+    const entry = useRegistry().modules.get('seats')!
+    const before = { manifest: entry.manifest.contributes, handlers: entry.handlers.contributions }
+    ;(entry.manifest as any).contributes = { ...before.manifest, 'core.merge-handler': [{ id: 'seats.first', file: 'first' }, { id: 'seats.second', file: 'second' }] }
+    ;(entry.handlers as any).contributions = { ...before.handlers, 'core.merge-handler': { first: handlerNamed('first'), second: handlerNamed('second', 2) } }
+    restore = () => {
+      ;(entry.manifest as any).contributes = before.manifest
+      ;(entry.handlers as any).contributions = before.handlers
+    }
+    calls.length = 0
+  })
+  afterEach(() => restore())
+
+  it('runs the handlers\' undo in reverse order and records what one could not restore', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    await deliver()
+    expect(calls).toEqual(['merge:first', 'merge:second'])
+    const merge = await mergeOf(mergedAccountId)
+    expect(merge.completed_at).not.toBeNull()
+    const listedOf = async () => ((await admin.browser.get('/api/core/accounts/merges')).body.merges as { id: string }[]).find(m => m.id === merge.id)
+    expect(await listedOf()).toEqual(expect.objectContaining({ state: 'complete', undoable: true, waitingOn: [], notRestored: [] }))
+
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).status).toBe(200)
+    await deliver()
+    expect(calls).toEqual(['merge:first', 'merge:second', 'undo:second', 'undo:first'])
+    // The Merges screen says the merge is undone and what the module kept.
+    expect(await listedOf()).toEqual(expect.objectContaining({ state: 'undone', undoable: false, notRestored: [{ handler: 'seats.second', count: 2, reason: 'seats.merge.second-kept' }] }))
+    // Both people are told, at every address, that something could not be put back.
+    const told = mailbox.filter(m => m.subject === 'Your accounts at The Test Theatre have been separated again')
+    expect(told.length).toBeGreaterThan(0)
+    const addresses = (await rows<{ address: string }>('SELECT address FROM core_account_emails WHERE account_id IN (?, ?) AND verified_at IS NOT NULL', survivorId, mergedAccountId)).map(r => r.address).sort()
+    expect(told.map(m => m.address).sort()).toEqual(addresses)
+    const notes = await rows<{ detail: string }>('SELECT detail FROM core_audit WHERE record_id = ? AND detail LIKE \'%not-restored%\'', survivorId)
+    expect(notes.map(n => JSON.parse(n.detail))).toEqual([{ mergeId: merge.id, undo: 'not-restored', handler: 'seats.second', notRestored: 2, reason: 'seats.merge.second-kept' }])
+    expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: null }])
+  })
+})
+
+describe('undoing a merge, and closing it', () => {
+  it('waits until the merge is complete, then puts every listed row back and parts the accounts', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    const till = await tillSession(mergedAccountId)
+    const [email] = await rows<{ id: string }>('SELECT id FROM core_account_emails WHERE account_id = ?', mergedAccountId)
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    const merge = await mergeOf(mergedAccountId)
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).body.code).toBe('core.merge.still-moving')
+
+    await deliver()
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).status).toBe(200)
+    // The alias stands until the job's last unit.
+    expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: survivorId }])
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).body.code).toBe('core.merge.undoing')
+
+    await deliver()
+    expect(await rows('SELECT opened_by FROM payments_sessions WHERE id = ?', till)).toEqual([{ opened_by: mergedAccountId }])
+    expect(await rows('SELECT account_id FROM core_account_emails WHERE id = ?', email!.id)).toEqual([{ account_id: mergedAccountId }])
+    expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: null }])
+    expect(await rows<{ undone_at: number | null }>('SELECT undone_at FROM core_account_merges WHERE id = ?', merge.id)).toEqual([{ undone_at: expect.any(Number) }])
+  })
+
+  it('gives back, as a new grant, a grant the merge ended as a duplicate', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    const { roleId } = await grantDirectly(survivorId, ['core.role.read'])
+    const { grantId } = await grantDirectly(mergedAccountId, [], { roleId })
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    expect(await rows('SELECT ended_reason FROM core_grant_ends WHERE grant_id = ?', grantId)).toEqual([{ ended_reason: 'replaced' }])
+    await deliver()
+    const merge = await mergeOf(mergedAccountId)
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).status).toBe(200)
+    await deliver()
+    expect(await rows('SELECT account_id FROM core_grants g WHERE role_id = ? AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id) ORDER BY account_id', roleId))
+      .toEqual([survivorId, mergedAccountId].sort().map(account_id => ({ account_id })))
+  })
+
+  it('closes a complete merge once its window has passed: items go, the old account keeps only its alias', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    await env.DB.prepare('UPDATE core_accounts SET name = \'Old Name\' WHERE id = ?').bind(mergedAccountId).run()
+    await tillSession(mergedAccountId)
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    await deliver()
+    const merge = await mergeOf(mergedAccountId)
+    await env.DB.prepare('UPDATE core_account_merges SET undo_until = 1 WHERE id = ?').bind(merge.id).run()
+    await inContext(async () => {
+      const unit = createUnit()
+      await closeMerges(unit.view())
+      await unit.commit()
+    })
+    expect(await rows('SELECT count(*) AS n FROM core_account_merge_items WHERE merge_id = ?', merge.id)).toEqual([{ n: 0 }])
+    expect(await rows('SELECT name, merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ name: null, merged_into_id: survivorId }])
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).body.code).toBe('core.merge.cannot-undo')
   })
 })

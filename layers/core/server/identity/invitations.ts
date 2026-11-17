@@ -3,9 +3,8 @@
 // that signs them in and so claims it. After the link lapses an ordinary sign-in with the same
 // address does the same, because the grant waits on the account, not on the link.
 import type { H3Event } from 'h3'
-import { newId, nowMs, useSetting, type Actor, type UnitView } from '#kit'
+import { newId, nowMs, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { digest, randomToken } from './crypto'
-import { relyingParty } from './web'
 import { notify } from '../notifications/notify'
 
 export interface Invitation { tokenId: string, link: string }
@@ -25,7 +24,7 @@ export async function createInvitation(unit: UnitView, event: H3Event, actor: Ac
           VALUES (?, 'invite', ?, ?, ?, ?, 0, ?, ?)`,
     params: [tokenId, await digest('link', token), to.accountId, to.address, actor.accountId ?? null, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  const link = `${relyingParty(event).origin}/sign-in/link#${token}`
+  const link = await siteUrl(`/sign-in/link#${token}`)
   await notify(unit, 'core.invitation', { to: to.accountId, variables: { link, role: to.role }, dedupeKey: tokenId })
   return { tokenId, link }
 }

@@ -82,6 +82,11 @@ describe('list state in the address (UI-11)', () => {
     expect(decodeList({ status: 'gone' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'status' })
     expect(decodeList({ sort: 'x' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'sort' })
     expect(decodeList({ size: '30' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'size' })
+    // The site's page size stands in when the address names none, and the address still wins.
+    expect(decodeList({}, list, { today: '2026-11-16', defaultSize: 50 })).toMatchObject({ ok: true, value: { size: 50 } })
+    expect(decodeList({ size: '100' }, list, { today: '2026-11-16', defaultSize: 50 })).toMatchObject({ ok: true, value: { size: 100 } })
+    expect(serialiseList(parseList({}, list, 50), list, 50)).toEqual({})
+    expect(serialiseList(parseList({ size: '25' }, list, 50), list, 50)).toEqual({ size: '25' })
   })
 
   it('drops a filter the viewer may not use, and words directions by type', () => {
@@ -132,9 +137,9 @@ describe('setting controls (UI-14)', () => {
 
   it('turns a stored value into a control value and back', () => {
     expect(toControl({ kind: 'duration', value: 900 })).toBe('15m')
-    expect(toControl({ kind: 'money', value: 1250 })).toBe(12.5)
+    expect(toControl({ kind: 'money', value: 1250 })).toBe(1250)
     expect(toControl({ kind: 'boolean', value: null })).toBe(false)
-    expect(fromControl('money', 12.5)).toBe(1250)
+    expect(fromControl('money', 1250)).toBe(1250)
     expect(fromControl('custom', '{"a":1}')).toEqual({ a: 1 })
     expect(fromControl('text', '', true)).toBeNull()
   })
@@ -145,6 +150,10 @@ describe('setting controls (UI-14)', () => {
     expect(fromControl('rate', { count: undefined, per: '' })).toEqual({ count: null, per: '' })
     const words = { on: 'on', off: 'off', rate: (count: number, per: string) => `${count} in ${per}` }
     expect(controlText('rate', { count: 10, per: '10m' }, words)).toBe('10 in 10m')
+    const spoken = { ...words, duration: (text: string) => text.replace('m', ' minutes'), money: (minor: number) => `£${minor / 100}` }
+    expect(controlText('rate', { count: 10, per: '10m' }, spoken)).toBe('10 in 10 minutes')
+    expect(controlText('duration', '30m', spoken)).toBe('30 minutes')
+    expect(controlText('money', 1250, spoken)).toBe('£12.5')
     expect(toControl({ kind: 'custom', value: '08-01' })).toBe('08-01')
     expect(fromControl('custom', '08-01', false, '08-01')).toBe('08-01')
     expect(fromControl('custom', '{"a":1}', false, { a: 0 })).toEqual({ a: 1 })

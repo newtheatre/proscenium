@@ -21,41 +21,37 @@ export interface DeclaredEntry extends NavigationEntry {
 /** Core's own screens (modules, settings, jobs, credentials, health, audit) sit in the System group. */
 export const SYSTEM_GROUP = 'system'
 
-/** Where the site's own settings are shown (R-33): every setting declared with scope 'site'. */
-export const SITE_SETTINGS_PATH = '/admin/settings'
-
 /**
- * Every entry of every module that is on, plus a generated settings entry for each module with
- * settings of its own and one Site administration entry for the site's settings.
+ * Every entry of every module that is on, plus one for each page of settings that holds a setting
+ * of a module that is on. A page's entry is open to whoever may change one of its settings.
  */
 export async function declaredEntries(): Promise<DeclaredEntry[]> {
   const out: DeclaredEntry[] = []
   for (const c of await usePoint<NavigationEntry>('core.navigation')) out.push({ ...c.value, module: c.module })
   const on = await enabledModules()
+  const registry = useRegistry()
   const changers = new Map<string, Set<string>>()
-  const siteChangers = new Set<string>()
-  for (const { module, entry } of useRegistry().settings.values()) {
-    if (!on.has(module)) continue
-    if (entry.scope === 'site') siteChangers.add(entry.change)
-    else changers.set(module, (changers.get(module) ?? new Set()).add(entry.change))
+  for (const [key, { module, entry }] of registry.settings) {
+    const home = registry.settingHomes.get(key)
+    if (!on.has(module) || !home?.page) continue
+    changers.set(home.page, (changers.get(home.page) ?? new Set()).add(entry.change))
   }
-  if (siteChangers.size) {
-    out.push({ id: 'core.site-settings', module: 'core', label: 'core.settings-page.site-title', menu: 'admin', group: 'modules', to: SITE_SETTINGS_PATH, icon: 'i-lucide-settings-2', ability: [...siteChangers], order: 20 }) // not-policy: after Modules
-  }
-  for (const [module, abilities] of changers) {
-    // A module's settings page sits in the set-up half of the module's own group.
-    const own = out.find(e => e.module === module && e.menu === 'console' && e.group)?.group
+  for (const [pageId, abilities] of changers) {
+    const page = registry.settingPages.get(pageId)!
+    const short = pageId.slice(page.module.length + 1)
+    // A module's own console page sits in the set-up half of the module's own group.
+    const group = page.group ?? out.find(e => e.module === page.module && e.menu === 'console' && e.group)?.group ?? page.module
     out.push({
-      id: `${module}.settings`,
-      module,
-      label: `${module}.module.name`,
-      menu: 'console',
-      to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings`,
-      icon: 'i-lucide-settings-2',
+      id: short === 'settings' ? pageId : `${pageId}-settings`,
+      module: page.module,
+      label: page.label,
+      menu: page.place === 'admin' ? 'admin' : 'console',
+      to: page.to,
+      icon: page.icon,
       ability: [...abilities],
-      group: module === 'core' ? SYSTEM_GROUP : own ?? module,
-      section: 'setup',
-      order: module === 'core' ? 0 : 100, // not-policy: sort position, core's settings first
+      group,
+      ...(page.place === 'console' ? { section: 'setup' as const } : {}),
+      order: page.order,
     })
   }
   return out

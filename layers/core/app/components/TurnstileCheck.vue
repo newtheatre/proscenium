@@ -32,7 +32,6 @@ const options = {
       v-if="failed"
       role="alert"
       color="error"
-      variant="subtle"
       icon="i-lucide-circle-alert"
       :title="t('core.challenge.unavailable')"
       :description="t('core.challenge.unavailable-remedy')"

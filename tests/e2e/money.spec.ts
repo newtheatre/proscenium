@@ -12,8 +12,8 @@ const treasurer = {
   reassertedAt: Date.now(),
   grants: [
     'payments.session.open', 'payments.session.view', 'payments.session.close-any', 'payments.attempt.reconcile',
-    'payments.attempt.attest', 'payments.refund.approve', 'payments.provider.manage',
-    'finance.ledger.view', 'finance.account.manage', 'finance.period.close', 'finance.period.reopen', 'finance.posting.correct',
+    'payments.attempt.attest', 'payments.refund.approve', 'payments.provider.manage', 'gallery.sample.view',
+    'finance.ledger.view', 'finance.ledger.export', 'finance.account.manage', 'finance.period.close', 'finance.period.reopen', 'finance.posting.correct',
   ].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
@@ -22,6 +22,8 @@ test.beforeAll(async ({ playwright }) => {
   const owner = { kind: 'person', accountId: 'acc_moneyowner', name: 'Money Owner', assurance: 'strong', reassertedAt: Date.now(), grants: [grant('core.settings.manage'), grant('core.modules.manage')] }
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
   await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
+  // The till posts a sale to the ledger, which dates it in the theatre's time zone.
+  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'core.locale.time-zone', value: 'Europe/London' }], confirm: true } })).ok()).toBe(true)
   for (const id of ['finance', 'payments']) expect((await api.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
   await api.dispose()
 })
@@ -39,6 +41,7 @@ async function noViolations(page: Page) {
 }
 
 const SCREENS = [
+  ['/console/payments/till', 'Till'],
   ['/console/payments/session', 'My session'],
   ['/console/payments/sessions', 'Till sessions'],
   ['/console/payments/attention', 'Needs attention'],
@@ -47,6 +50,9 @@ const SCREENS = [
   ['/console/finance/ledger', 'Ledger'],
   ['/console/finance/accounts', 'Ledger accounts'],
   ['/console/finance/periods', 'Periods'],
+  ['/console/finance/productions', 'Production statements'],
+  ['/console/finance/reconcile', 'Reconciliation'],
+  ['/console/finance/export', 'Export'],
 ] as const
 
 for (const [path, title] of SCREENS) {
@@ -68,4 +74,29 @@ test('My session opens a till with a float and shows the cash expected', async (
   await expect(page.getByText('£50.00').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start counting' })).toBeEnabled()
   await noViolations(page)
+})
+
+test('the Till sells from a panel and takes cash for the total', async ({ page, playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
+  const key = () => ({ 'idempotency-key': crypto.randomUUID() })
+  expect((await api.post('/api/payments/providers', { data: { provider: 'cash', label: 'Cash drawer', channels: ['desk'], mode: 'live' }, headers: key() })).ok()).toBe(true)
+  const opened = await api.post('/api/payments/sessions', { data: { pointLabel: 'Foyer desk' }, headers: key() })
+  expect([200, 409]).toContain(opened.status())
+  await api.dispose()
+
+  await visit(page, '/console/payments/till')
+  await expect(page.getByRole('heading', { name: 'Gallery programmes' })).toBeVisible()
+  await page.getByLabel('Programmes sold').fill('2')
+  await page.getByLabel('Programmes sold').blur()
+  await expect(page.getByRole('button', { name: 'Take payment of £6.00' })).toBeEnabled()
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
+  await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
+  await page.getByRole('radio', { name: 'Cash' }).check()
+  await page.getByLabel(/^Cash handed over/).fill('10')
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Cash taken' }).click()
+  await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
+  await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 })
