@@ -9,6 +9,7 @@ import { accountLabel, assertTerm } from '#modules/core'
 import { requestRefund } from '#modules/payments'
 import type { OwnerEntry } from '#modules/payments'
 import { STOCK_OUTCOMES } from './db/schema'
+import { returnForRefund } from './stock'
 
 export const REASONS = 'bar.refund-reason'
 const INCOME = { key: 'bar.income' }
@@ -167,6 +168,8 @@ export async function refunded(unit: UnitView, saleId: string, refund: { id: str
     refund.id, saleId,
   )
   if (!rows.length) return [{ account: INCOME, amountMinor: refund.amountMinor, ...where }]
+  // Goods handed back go back to stock, before the reversals stop being requested.
+  await returnForRefund(unit, refund.id)
   const at = nowMs()
   unit.add({ sql: "UPDATE bar_sale_reversals SET state = 'succeeded', updated_at = ? WHERE refund_id = ? AND state = 'requested'", params: [at, refund.id] })
   unit.announce('bar.sale.refunded', { saleId, refundId: refund.id }, { record: ['bar.sale', saleId] })

@@ -38,6 +38,8 @@ export default defineModule({
     'product': { table: 'bar_products' },
     'price-list': { table: 'bar_price_lists' },
     'category': { table: 'bar_categories' },
+    'stock-item': { table: 'bar_stock_items' },
+    'stock-location': { table: 'bar_stock_locations' },
     'product-preset': { table: 'bar_product_presets' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
@@ -51,6 +53,8 @@ export default defineModule({
     'price.manage': ability({ risk: 'privileged' }),
     // Outlets: the places that sell, and the list each sells from.
     'outlet.manage': ability(),
+    // Stock items, where they are kept, and what each size uses up.
+    'stock.manage': ability(),
     // Use the bar's panel in the till, at an outlet.
     'sale.sell': ability({ on: 'bar.outlet' }),
     // Close an outlet's opening; the person who opened it may close it.

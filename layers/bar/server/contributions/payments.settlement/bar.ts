@@ -5,6 +5,7 @@
 import { all, first, nowMs, refuse, type UnitView } from '#kit'
 import type { OwnerEntry, Part, Settlement } from '#modules/payments'
 import { refunded } from '../../refunds'
+import { moveForSale } from '../../stock'
 
 const INCOME = { key: 'bar.income' }
 const NOT_WAITING = { code: 'bar.sale.not-waiting', reason: 'This bar sale is no longer waiting for this payment.' }
@@ -39,6 +40,8 @@ export default {
       sql: "UPDATE bar_sales SET state = 'paid', part_id = ?, paid_at = ?, updated_at = ? WHERE id = ? AND state = 'awaiting_payment' AND intent_id = ? AND total_minor = ?",
       params: [part.id, at, at, sale!.id, part.intentId, part.amountMinor],
     }).expect(1, NOT_WAITING)
+    // Its lines take stock from the outlet's location, by the recipes current now (never blocking).
+    await moveForSale(unit, sale!.id)
     unit.announce('bar.sale.paid', { saleId: sale!.id, openingId: sale!.opening_id }, { record: ['bar.sale', sale!.id] })
     return await income(sale!)
   },
