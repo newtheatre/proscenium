@@ -358,10 +358,12 @@ a layout, not a shell, and it has no navigation of its own.
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
   may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The console
   keeps narrowed tills: `<PaymentsTill :modules="['box-office']" />` on Box office's Sell, and the
-  Money group links to the live till ("Open the till") rather than holding its own. Coming to a till
-  opens the seller's till session at the place the device used last (else
-  `payments.sessions.default-space`, else unknown); the seller's own session is the "Your session"
-  card at the top of Money › Sessions, not a page of its own.
+  "Your session" card on Money › Sessions has an "Open the till" button rather than a menu entry.
+  The first sale at a till opens the seller's till session, so coming to a till by mistake leaves no
+  session behind. It opens at the place the device used last (else
+  `payments.sessions.default-space`, else unknown), which the strip above the till can change before
+  or after; the seller's own session is the "Your session" card at the top of Money › Sessions, not a
+  page of its own.
 - **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
   the device is offline the strip says that changes cannot be sent; a live screen should disable its
   writes then rather than lose them.

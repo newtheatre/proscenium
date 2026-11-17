@@ -74,7 +74,7 @@ async function deskSale(input: SaleInput, at: number) {
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
-export async function deskSummary(context: DeskContext): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
   const input = panelInput(context.input)
   if ('exchange' in input) {
     const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
