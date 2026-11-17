@@ -1,4 +1,5 @@
-<!-- Sign in (ID-01, ID-02, ID-04, ID-07): a passkey first, an emailed link and code, or Google. -->
+<!-- Sign in (ID-01, ID-02, ID-04, ID-07): a passkey first, an emailed link and code, or an outside
+     provider the theatre has switched on (Google so far), one button each. -->
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
@@ -21,17 +22,20 @@ const digits = ref<number[]>([])
 const code = computed(() => digits.value.join(''))
 const challenge = ref('')
 const sent = ref(false)
-const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, google: boolean } }>('core:me')
+const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, providers: { id: string, label: string }[], openSignUp?: boolean } }>('core:me')
+const providers = computed(() => me.value?.signIn?.providers ?? [])
+// Errors come back from a provider's callback; while one provider is offered it can be named.
+const providerName = computed(() => providers.value.length === 1 ? providers.value[0]!.label : 'Your provider')
 const errorCode = typeof route.query.error === 'string' ? route.query.error : null
-const providerErrors: Record<string, string> = {
-  'core.sign-in.provider-unverified': 'Google has not confirmed this account\'s email address. Confirm it with Google, or sign in another way.',
-  'core.sign-in.provider-domain': 'That Google account is not from an organisation that can sign in here. Choose another account.',
-  'core.sign-in.provider-cancelled': 'Google sign-in was cancelled.',
+const providerErrors = computed<Record<string, string>>(() => ({
+  'core.sign-in.provider-unverified': `${providerName.value} has not confirmed this account's email address. Confirm it with ${providerName.value}, or sign in another way.`,
+  'core.sign-in.provider-domain': `That ${providerName.value} account is not from an organisation that can sign in here. Choose another account.`,
+  'core.sign-in.provider-cancelled': `${providerName.value} sign-in was cancelled.`,
   'core.sign-in.closed': 'This theatre is not taking new accounts at the moment.',
   'core.account.disabled': 'This account is disabled. Contact the theatre to find out why.',
-}
-const providerError = errorCode ? (providerErrors[errorCode] ?? 'Google did not confirm who you are. Try again.') : null
-const googleHref = `/api/core/sign-in/google${next ? `?next=${encodeURIComponent(next)}` : ''}`
+}))
+const providerError = computed(() => errorCode ? (providerErrors.value[errorCode] ?? `${providerName.value} did not confirm who you are. Try again.`) : null)
+const providerHref = (id: string) => `/api/core/sign-in/${id}${next ? `?next=${encodeURIComponent(next)}` : ''}`
 
 async function withPasskey() {
   busy.value = true
@@ -41,6 +45,14 @@ async function withPasskey() {
   if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
+
+// Offer the site's passkeys among the address box's suggestions (its autocomplete says webauthn).
+// Waits in the background; a pick signs in. Pressing the passkey button cancels it and starts afresh.
+onMounted(async () => {
+  const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', next ? { next } : {}, true)
+  if (answer.ok) return arriveSignedIn(answer.data)
+  if (answer.refusal.code !== 'core.passkey.cancelled') refusal.value = answer.refusal
+})
 
 async function sendLink() {
   busy.value = true
@@ -58,7 +70,7 @@ async function sendLink() {
 async function useCode() {
   busy.value = true
   refusal.value = null
-  const answer = await callIdentity<{ next: string, offerPasskey: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
+  const answer = await callIdentity<{ next: string, offerPasskey: boolean, welcome: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
   busy.value = false
   if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
@@ -66,7 +78,10 @@ async function useCode() {
 </script>
 
 <template>
-  <IdentityCard :title="sent ? 'Check your email' : 'Sign in'">
+  <IdentityCard
+    :title="sent ? 'Check your email' : 'Sign in'"
+    :description="!sent && me?.signIn?.email && me?.signIn?.openSignUp ? 'New here? Signing in with your email creates your account.' : undefined"
+  >
     <UAlert
       v-if="providerError"
       role="alert"
@@ -86,14 +101,15 @@ async function useCode() {
         Sign in with a passkey
       </UButton>
       <UButton
-        v-if="me?.signIn?.google"
+        v-for="provider in providers"
+        :key="provider.id"
         block
         color="neutral"
         variant="outline"
-        :href="googleHref"
+        :href="providerHref(provider.id)"
         external
       >
-        Sign in with Google
+        Sign in with {{ provider.label }}
       </UButton>
       <template v-if="me?.signIn?.email">
         <USeparator label="or" />

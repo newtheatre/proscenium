@@ -1,5 +1,6 @@
 // Scan a code at the door (BO-40). The answer is always a result, never a refusal, so the screen
-// can show it at once: admitted, already in, void, another performance, not paid, or not ours.
+// can show it at once: admitted, already in, void, another performance, no longer qualifying for
+// the ticket's type, not paid, or not ours.
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'

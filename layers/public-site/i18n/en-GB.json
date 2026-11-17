@@ -50,8 +50,14 @@
   "public-site.production.minutes.one": "1 minute",
   "public-site.production.with-intervals": "{length}, with {count} intervals",
   "public-site.production.with-intervals.one": "{length}, with an interval",
-  "public-site.production.advisories": "Content advisories ({count})",
-  "public-site.production.no-advisories": "This production has no content advisories.",
+  "public-site.production.advisories": "Content warnings ({count})",
+  "public-site.production.effects": "Staging effects",
+  "public-site.production.level-mentioned": "Mentioned",
+  "public-site.production.level-discussed": "Discussed",
+  "public-site.production.level-depicted": "Depicted",
+  "public-site.production.no-advisories": "This production has no staging effects or content warnings.",
+  "public-site.production.no-effects": "This production has no staging effects to warn about.",
+  "public-site.production.no-warnings": "This production has no content warnings.",
   "public-site.production.dates": "Dates",
   "public-site.production.dates-soon": "Dates are still to be announced.",
   "public-site.production.doors": "Doors {time}",
@@ -80,5 +86,7 @@
   "public-site.season.not-found": "There is no such season.",
   "public-site.season.dates-soon": "Dates to be announced",
   "public-site.season.empty": "Nothing announced yet",
-  "public-site.season.empty-description": "Productions appear here as soon as they are announced."
+  "public-site.season.empty-description": "Productions appear here as soon as they are announced.",
+  "public-site.price.from": "From {amount}",
+  "public-site.price.other": "{label} {amount}"
 }

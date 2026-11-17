@@ -50,7 +50,7 @@ let venue: { venueId: string, spaceId: string }
 async function show(options: { publish?: boolean, listed?: boolean, link?: string } = {}): Promise<{ id: string, slug: string }> {
   const { body } = await req('POST', '/api/core/productions', { title: `Public show ${++n}`, kind: 'own' })
   await req('PATCH', `/api/core/productions/${body.id}`, {
-    summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true,
+    summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true,
     listed: options.listed ?? true, externalBookingUrl: options.link ?? null,
   })
   if (options.publish ?? true) expect((await req('POST', `/api/core/productions/${body.id}/publish`, {})).status).toBe(200)

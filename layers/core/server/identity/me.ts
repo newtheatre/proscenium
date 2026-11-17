@@ -4,6 +4,8 @@ import { useRegistry } from '#kit/registry'
 import { accountById, verifiedAddressesOf } from './accounts'
 import { kitGrantsOf } from './grants'
 import type { CurrentSession } from './sessions'
+import { authenticatorOf } from './authenticator'
+import { offeredProviders } from './providers'
 
 // Does the account still have a way in other than its passkeys (ID-14, "the only way in")?
 export async function hasOtherWayIn(accountId: string): Promise<boolean> {
@@ -20,9 +22,10 @@ export async function holdsPrivileged(accountId: string): Promise<boolean> {
 }
 
 // The ways in a signed-out browser is offered. Passkeys are always on.
-export async function signInMethods(): Promise<{ email: boolean, google: boolean }> {
-  const google = !!(await useSetting('core.sign-in.google')) && !!(await useSetting('core.sign-in.google-client-id'))
-  return { email: !!(await useSetting('core.sign-in.email-link')), google }
+// `providers` are the outside providers offered, in order, each with its id (the path segment) and label.
+// `openSignUp` says whether signing in with a new address makes an account, so the page can say so.
+export async function signInMethods(): Promise<{ email: boolean, providers: { id: string, label: string }[], openSignUp: boolean }> {
+  return { email: !!(await useSetting('core.sign-in.email-link')), providers: await offeredProviders(), openSignUp: !!(await useSetting('core.sign-in.open-sign-up')) }
 }
 
 export async function describeMe(session: CurrentSession) {
@@ -37,7 +40,8 @@ export async function describeMe(session: CurrentSession) {
     session: { id: session.id, assurance: session.assurance, methods: session.methods, reassertedAt: session.reassertedAt, limited: session.limited },
     passkeys,
     // ID-03: staff holding a privileged ability are told before they meet a refusal.
-    consoleNeedsPasskey: privileged && passkeys === 0,
+    // An authenticator app stands in for the passkey where the theatre accepts it as strong.
+    consoleNeedsPasskey: privileged && passkeys === 0 && !(await authenticatorOf(session.accountId) && await useSetting('core.sign-in.authenticator-is-strong')),
     at: nowMs(),
   }
 }

@@ -141,7 +141,7 @@ test('Sell takes the difference on an exchange for a dearer ticket', async ({ pa
   expect([200, 409]).toContain((await api.post('/api/payments/sessions', { data: { pointLabel: 'Office till' }, headers: key() })).status())
   await api.dispose()
   const booking = found.orders[0]
-  const exchange = { orderId: booking.orderId, reference: swapping, lineIds: [booking.lines[0].id], performanceId, ...premium, expectedDifferenceMinor: 300 }
+  const exchange = { orderId: booking.orderId, reference: swapping, performanceId, lines: [{ lineId: booking.lines[0].id, ...premium }], expectedDifferenceMinor: 300 }
   const officeContext = await browser.newContext(as(office))
   page = await officeContext.newPage()
   await visit(page, `/console/box-office/sell?exchange=${encodeURIComponent(JSON.stringify(exchange))}`)
@@ -187,6 +187,13 @@ test.describe('the box office console', () => {
     await page.getByRole('button', { name: /More actions/ }).click()
     await page.getByRole('menuitem', { name: 'Exchange tickets' }).click()
     await expect(page.getByRole('dialog', { name: 'Exchange tickets' })).toBeVisible()
+    await noViolations(page)
+    // Choosing a performance gives each ticket its own choice, starting from what it is now.
+    await page.getByLabel(/^New performance/).click()
+    await page.getByRole('option').first().click()
+    await expect(page.getByRole('group', { name: 'New seats and ticket type for each ticket' })).toBeVisible()
+    // Its own performance, with each ticket starting as it is, is nothing to exchange.
+    await expect(page.getByRole('alert').filter({ hasText: 'already for that performance, seats and ticket type' })).toBeVisible()
     await noViolations(page)
     await page.keyboard.press('Escape')
 

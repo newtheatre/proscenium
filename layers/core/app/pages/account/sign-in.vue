@@ -13,7 +13,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ passkeys: Passkey[], recoveryCodesLeft: number }>('/api/core/me/passkeys', { key: 'core:my-passkeys' })
+const { data, status, error, refresh } = await useAPI<{ passkeys: Passkey[], recoveryCodesLeft: number, authenticator: { addedAt: number } | null, authenticatorOffered: boolean }>('/api/core/me/passkeys', { key: 'core:my-passkeys' })
 
 const { dayLong: day } = useDates()
 const refusal = ref<RefusalView | null>(null)
@@ -58,9 +58,72 @@ async function newCodes() {
   }
 }
 
+// Adding an authenticator app: the secret to scan or type, then the first code it shows.
+const setup = ref<{ secret: string, uri: string } | null>(null)
+const appDigits = ref<number[]>([])
+const APP_CODE_LENGTH = 6 // not-policy: an authenticator app shows six digits
+// The secret in groups of four, easier to type by hand.
+const groupedSecret = computed(() => setup.value?.secret.match(/.{1,4}/g)?.join(' ') ?? '')
+
+async function startApp() {
+  refusal.value = null
+  try {
+    setup.value = await $api<{ secret: string, uri: string }>('/api/core/me/authenticator/start', { method: 'POST', body: {} })
+    appDigits.value = []
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
+async function confirmApp() {
+  refusal.value = null
+  try {
+    await $api('/api/core/me/authenticator/confirm', { method: 'POST', body: { code: appDigits.value.join('') } })
+    setup.value = null
+    toast.add({ title: t('core.me.sign-in.app-added'), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    appDigits.value = []
+    refusal.value = toRefusal(e)
+  }
+}
+
+async function removeApp() {
+  if (!await confirm({ verb: t('core.me.sign-in.remove-verb'), thing: t('core.me.sign-in.app-thing'), consequence: t('core.me.sign-in.app-remove-consequence') })) return
+  refusal.value = null
+  try {
+    await $api('/api/core/me/authenticator', { method: 'DELETE', body: {} })
+    toast.add({ title: t('core.me.sign-in.app-removed'), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
 function kept() {
   codes.value = null
   toast.add({ title: t('core.me.sign-in.codes-kept'), color: 'success' })
+}
+
+// The current set shown again, used ones struck through. Asks to confirm it is you in place.
+const shown = ref<{ codes: string[], used: boolean[] } | null>(null)
+
+async function showCodes() {
+  refusal.value = null
+  try {
+    const answer = await $api<{ codes: { code: string | null, used: boolean }[] }>('/api/core/me/recovery-codes/show', { method: 'POST', body: {} })
+    if (answer.codes.some(c => c.code === null)) {
+      toast.add({ title: t('core.me.sign-in.codes-not-kept'), color: 'warning' })
+      return
+    }
+    shown.value = { codes: answer.codes.map(c => c.code!), used: answer.codes.map(c => c.used) }
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
 }
 </script>
 
@@ -75,6 +138,14 @@ function kept() {
         :codes="codes"
         check-path="/api/core/me/recovery-codes/check"
         @kept="kept()"
+      />
+    </UCard>
+    <UCard v-else-if="shown">
+      <RecoveryCodes
+        :codes="shown.codes"
+        :used="shown.used"
+        review
+        @kept="shown = null"
       />
     </UCard>
     <div
@@ -138,6 +209,85 @@ function kept() {
           </PageSection>
 
           <PageSection
+            v-if="data.authenticator || data.authenticatorOffered"
+            :title="t('core.me.sign-in.app')"
+            :description="t('core.me.sign-in.app-help')"
+          >
+            <p
+              v-if="data.authenticator"
+              class="text-sm"
+            >
+              {{ t('core.me.sign-in.app-on', { date: day(data.authenticator.addedAt) }) }}
+            </p>
+            <div
+              v-else-if="setup"
+              class="flex flex-wrap items-start gap-6"
+            >
+              <div class="w-44 shrink-0">
+                <QrCode
+                  :value="setup.uri"
+                  :label="t('core.me.sign-in.app-qr')"
+                />
+              </div>
+              <UForm
+                :state="{ appDigits }"
+                class="flex flex-col gap-4"
+                @submit="confirmApp"
+              >
+                <p class="text-sm text-muted">
+                  {{ t('core.me.sign-in.app-cant-scan') }} <code class="font-mono text-default">{{ groupedSecret }}</code>
+                </p>
+                <UFormField
+                  :label="t('core.me.sign-in.app-code')"
+                  name="appDigits"
+                >
+                  <UPinInput
+                    v-model="appDigits"
+                    otp
+                    type="number"
+                    :length="APP_CODE_LENGTH"
+                    required
+                  />
+                </UFormField>
+                <div class="flex gap-2">
+                  <UButton
+                    type="submit"
+                    loading-auto
+                    :label="t('core.me.sign-in.app-turn-on')"
+                  />
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    :label="t('core.me.sign-in.app-cancel')"
+                    @click="setup = null"
+                  />
+                </div>
+              </UForm>
+            </div>
+            <template
+              v-if="!setup"
+              #footer
+            >
+              <UButton
+                v-if="data.authenticator"
+                color="error"
+                variant="ghost"
+                :label="t('core.me.sign-in.remove')"
+                @click="removeApp()"
+              />
+              <UButton
+                v-else
+                icon="i-lucide-smartphone"
+                color="neutral"
+                variant="outline"
+                loading-auto
+                :label="t('core.me.sign-in.app-add')"
+                @click="startApp()"
+              />
+            </template>
+          </PageSection>
+
+          <PageSection
             :title="t('core.me.sign-in.codes')"
             :description="t('core.me.sign-in.codes-help')"
           >
@@ -148,6 +298,14 @@ function kept() {
               v-if="data.passkeys.length"
               #footer
             >
+              <UButton
+                v-if="data.recoveryCodesLeft"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-eye"
+                :label="t('core.me.sign-in.show-codes')"
+                @click="showCodes()"
+              />
               <UButton
                 color="neutral"
                 variant="outline"

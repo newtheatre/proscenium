@@ -12,7 +12,7 @@ import ticketTypePatch from '../../server/api/box-office/ticket-types/[id].patch
 import ticketTypeDelete from '../../server/api/box-office/ticket-types/[id].delete'
 import ticketTypeOrder from '../../server/api/box-office/ticket-types/order.put'
 import bookGet from '../../server/api/box-office/book/performances/[id].get'
-import { createBasket } from '../../server/baskets'
+import { createBasket, pricedLines } from '../../server/baskets'
 import { scheme as memberScheme, req as membershipReq } from '../../../membership/tests/integration/stage'
 import { house, manager, NOV_16, ready, req, type House } from './stage'
 
@@ -31,13 +31,13 @@ async function api<T = any>(method: string, path: string, body?: unknown, actor:
   return { status: response.status, body: await response.json() as T }
 }
 
-interface Listed { id: string, name: string, kind: string, managedBy: string | null, available: boolean, active: boolean, used: boolean, requirementRefs: string[] }
+interface Listed { id: string, name: string, kind: string, managedBy: string | null, available: boolean, active: boolean, used: boolean, requirementRefs: string[], channel: string }
 const publisher = person(['core.production.edit', 'core.production.publish'])
 /** Gives the production what publishing asks for, then publishes it. */
 async function publish(h: House) {
   await inContext(async () => (await import('../../../core/server/vocabularies/service')).ensureVocabularies())
   const category = (await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.production-category' AND slug = 'play'"))[0]!.id
-  expect((await req('PATCH', `/api/core/productions/${h.productionId}`, { summary: 'A play to book for.', categoryTermId: category, advisoriesConfirmedNone: true }, publisher)).status).toBe(200)
+  expect((await req('PATCH', `/api/core/productions/${h.productionId}`, { summary: 'A play to book for.', categoryTermId: category, effectsConfirmedNone: true, advisoriesConfirmedNone: true }, publisher)).status).toBe(200)
   expect((await req('POST', `/api/core/productions/${h.productionId}/publish`, {}, publisher)).status).toBe(200)
 }
 
@@ -193,5 +193,37 @@ describe('a companion ticket', () => {
     const buyer = person([])
     expect(await buy(h, h.fullId, 1, buyer, [{ ticketTypeId: companion.id, quantity: 1 }])).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
     expect((await buy(h, h.fullId, 1, buyer)).ok).toBe(true)
+  })
+})
+
+describe('where a type is sold', () => {
+  it('keeps a box office only type off the booking page and online baskets, and an online only type off the desk', async () => {
+    const h = await house(20)
+    const door = await api('POST', '/api/box-office/ticket-types', { name: 'On the door', channel: 'desk' })
+    expect(door.status, JSON.stringify(door.body)).toBe(200)
+    const web = await api('POST', '/api/box-office/ticket-types', { name: 'Online saver', channel: 'online' })
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [
+      { bandId: h.bandId, ticketTypeId: door.body.ticketTypeId, amountMinor: 1500 },
+      { bandId: h.bandId, ticketTypeId: web.body.ticketTypeId, amountMinor: 900 },
+    ] })).status).toBe(200)
+    expect((await list()).find(t => t.id === door.body.ticketTypeId)).toMatchObject({ channel: 'desk' })
+
+    expect(await buy(h, door.body.ticketTypeId, 1)).toMatchObject({ ok: false, code: 'box-office.ticket-type.wrong-channel' })
+    expect((await buy(h, web.body.ticketTypeId, 1)).ok).toBe(true)
+    await publish(h)
+    const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
+    const offered = page.body.bands[0].types.map((t: { ticketTypeId: string }) => t.ticketTypeId)
+    expect(offered).toContain(web.body.ticketTypeId)
+    expect(offered).not.toContain(door.body.ticketTypeId)
+
+    // At the desk the other way round: the door price is sold, the online saver is refused.
+    const desk = (ticketTypeId: string) => inContext(() => pricedLines(h.performanceId, [{ bandId: h.bandId, ticketTypeId, quantity: 1 }], NOV_16, { channel: 'desk', account: null }))
+    expect((await desk(door.body.ticketTypeId)).lines[0]).toMatchObject({ amountMinor: 1500 })
+    await expect(desk(web.body.ticketTypeId)).rejects.toMatchObject({ code: 'box-office.ticket-type.wrong-channel' })
+
+    // Changing where a module's type is sold is a selling choice, so it is allowed.
+    const member = await managed('membership.member')
+    expect((await api('PATCH', `/api/box-office/ticket-types/${member.id}`, { channel: 'desk' })).status).toBe(200)
+    expect((await api('PATCH', `/api/box-office/ticket-types/${member.id}`, { channel: 'all' })).status).toBe(200)
   })
 })

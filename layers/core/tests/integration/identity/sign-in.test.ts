@@ -23,7 +23,7 @@ describe('email sign-in (ID-01)', () => {
     expect(message?.variables.code).toMatch(/^\d{6}$/)
     const used = await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })
     expect(used.status).toBe(200)
-    expect(used.body).toEqual({ next: '/', offerPasskey: true })
+    expect(used.body).toEqual({ next: '/', offerPasskey: true, welcome: true })
     const me = await browser.get('/api/core/me')
     expect(me.body).toMatchObject({ signedIn: true, session: { assurance: 'basic' }, addresses: [{ address: to, verified: true }] })
   })

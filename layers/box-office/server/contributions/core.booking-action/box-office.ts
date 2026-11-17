@@ -4,7 +4,9 @@
 // out, so the core falls back to the external link. Seats left are given only at or under the
 // theatre's setting, never the house's size.
 import { all, nowMs, useSetting } from '#kit'
-import type { BookingAction, BookingAnswer } from '#modules/core'
+import type { BookingAction, BookingAnswer, PriceSummary } from '#modules/core'
+import { pricesFor } from '../../prices'
+import { sellableTypes } from '../../ticket-types'
 
 interface Sale { performance_id: string, state: string, on_sale_at: number | null, off_sale_at: number | null }
 
@@ -51,4 +53,53 @@ async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promi
   return out
 }
 
-export default { actions } satisfies BookingAction
+/** Dates looked at for each production's price: enough to find its range without reading every one. */
+const DATES_PER_PRODUCTION = 10 // not-policy: a bound on one read, not a rule of the theatre
+
+/**
+ * What each production is sold at, from its dates to come that are or will be on sale. "From" is
+ * the lowest price open to anyone; each type that needs something (a membership, a concession)
+ * and comes in lower is given by its own name. Free tickets and tickets that ride on a paid one are
+ * not prices anyone books at, so they are left out.
+ */
+async function prices(productionIds: string[]): Promise<Record<string, PriceSummary>> {
+  if (!productionIds.length) return {}
+  const at = nowMs()
+  const [dates, types] = await Promise.all([
+    all<{ id: string, production_id: string }>(
+      `SELECT id, production_id FROM (SELECT f.id, f.production_id, row_number() OVER (PARTITION BY f.production_id ORDER BY f.starts_at) AS n
+          FROM core_performances f JOIN box_office_performance_sales s ON s.performance_id = f.id
+          WHERE f.production_id IN (SELECT value FROM json_each(?1)) AND f.state = 'scheduled' AND f.starts_at > ?2 AND s.state <> 'closed')
+        WHERE n <= ?3 -- not-policy: numbered parameters`,
+      JSON.stringify(productionIds), at, DATES_PER_PRODUCTION),
+    sellableTypes(),
+  ])
+  const priced = await Promise.all(dates.map(async d => ({ productionId: d.production_id, prices: await pricesFor(d.id, at) })))
+
+  const lowest = new Map<string, { currency: string, byType: Map<string, number> }>()
+  for (const { productionId, prices: rows } of priced) {
+    for (const price of rows) {
+      const type = types.get(price.ticketTypeId)
+      if (!type || type.kind === 'complimentary' || type.needsPaidTicket) continue
+      const entry = lowest.get(productionId) ?? { currency: price.currency, byType: new Map<string, number>() }
+      if (entry.currency !== price.currency) continue
+      const was = entry.byType.get(type.id)
+      if (was === undefined || price.amountMinor < was) entry.byType.set(type.id, price.amountMinor)
+      lowest.set(productionId, entry)
+    }
+  }
+
+  const out: Record<string, PriceSummary> = {}
+  for (const [productionId, { currency, byType }] of lowest) {
+    const open = [...byType].filter(([id]) => !types.get(id)!.requirementRefs.length).map(([, amount]) => amount)
+    const fromMinor = open.length ? Math.min(...open) : null
+    const others = [...byType]
+      .filter(([id, amount]) => types.get(id)!.requirementRefs.length && (fromMinor === null || amount < fromMinor))
+      .map(([id, amountMinor]) => ({ label: types.get(id)!.name, amountMinor }))
+      .sort((a, b) => a.amountMinor - b.amountMinor || a.label.localeCompare(b.label))
+    out[productionId] = { currency, fromMinor, others }
+  }
+  return out
+}
+
+export default { actions, prices } satisfies BookingAction

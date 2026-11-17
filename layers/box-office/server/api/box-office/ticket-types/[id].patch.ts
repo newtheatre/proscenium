@@ -18,6 +18,7 @@ export default defineRoute({
     requirementRefs: z.array(z.string().min(3).max(120)).max(10).optional(), // not-policy: as on adding
     maxPerHolder: z.number().int().min(1).max(50).optional(), // not-policy: as on adding
     recheckAtEntry: z.boolean().optional(),
+    channel: z.enum(['all', 'desk', 'online']).optional(),
   }).strict(),
 }, async (event, { input, unit }) => {
   const id = ticketTypeId(getRouterParam(event, 'id'))
