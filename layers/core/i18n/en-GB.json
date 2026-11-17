@@ -275,6 +275,8 @@
   "core.states.completed": "Completed",
   "core.counts.records": "{count} records",
   "core.counts.records.one": "1 record",
+  "core.counts.terms": "{count} terms",
+  "core.counts.terms.one": "1 term",
   "core.counts.productions": "{count} productions",
   "core.counts.productions.one": "1 production",
   "core.counts.add-performances": "Add {count} performances",

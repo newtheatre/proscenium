@@ -52,6 +52,7 @@
   "public-site.production.with-intervals.one": "{length}, with an interval",
   "public-site.production.advisories": "Content warnings ({count})",
   "public-site.production.effects": "Staging effects",
+  "public-site.production.effects-badge": "Staging effects",
   "public-site.production.level-mentioned": "Mentioned",
   "public-site.production.level-discussed": "Discussed",
   "public-site.production.level-depicted": "Depicted",

@@ -9,6 +9,8 @@ interface Listing {
   subtitle: string | null
   summary: string | null
   category: { label: string } | null
+  age: string | null
+  hasEffects: boolean
   nextStartsAt: number
   lastEndsAt: number
   venues: string[]
@@ -51,6 +53,8 @@ const list = computed(() => props.layout === 'list')
           :description="markdownText(p.summary) || p.subtitle"
           :poster="p.poster"
           :when="range(p.nextStartsAt, p.lastEndsAt)"
+          :age="p.age"
+          :effects="p.hasEffects"
           :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
           :orientation="list ? 'horizontal' : 'vertical'"
         />
