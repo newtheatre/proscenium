@@ -55,7 +55,7 @@ export const settings = defineSettings('core', {
   // Sending email (C-27, C-28, C-32). verified-domain is written only by the verify route.
   'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, onChange: 'confirm' }),
   'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, onChange: 'confirm' }),
-  'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
+  'notifications.email-footer': setting.text({ unset: true, maxLength: 500, multiline: true, change: 'core.template.edit' }),
   // The delivery pipeline (C-29), renamed from notifications.* so the engineering half sits on the
   // Advanced page. Each retry waits four times as long as the one before.
   'delivery.max-attempts': setting.integer({ replaces: 'core.notifications.max-attempts', default: 5, min: 1, max: 10, change: notificationConfigure }),

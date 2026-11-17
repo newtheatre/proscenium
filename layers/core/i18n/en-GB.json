@@ -399,7 +399,7 @@
   "core.settings-sections.organisation": "The organisation",
   "core.settings-sections.brand": "Look and feel",
   "core.settings-sections.files": "Uploaded files",
-  "core.settings-sections.notifications": "Email and notices",
+  "core.settings-sections.notifications": "Email",
   "core.settings-sections.delivery": "Email delivery",
   "core.settings-sections.lists": "Lists",
   "core.settings.lists.page-size.label": "Rows on a page of a list",

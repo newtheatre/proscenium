@@ -37,6 +37,8 @@ interface SettingView {
   min?: number | string
   max?: number | string
   maxLength?: number
+  /** A text of several lines, drawn as a text area. */
+  multiline?: boolean
   periodMin?: string
   periodMax?: string
   options?: string[]
@@ -59,6 +61,12 @@ const props = defineProps<{
   onlyChanged?: boolean
   /** Settings the screen already shows in its own way, left out here. */
   omit?: string[]
+  /** A screen with one section of settings may give it its own heading ("Email settings"). */
+  heading?: string
+}>()
+defineSlots<{
+  /** Beneath one setting's field: a screen's preview or warning, with the value as edited. */
+  'after-field'?: (props: { setting: SettingView, value: unknown }) => unknown
 }>()
 /** After a section saves, with the keys it changed, so a screen can refresh what it draws from them. */
 const emit = defineEmits<{ saved: [keys: string[]] }>()
@@ -250,7 +258,7 @@ onMounted(() => {
         :key="section.id"
         @submit.prevent="save(section.id, section.settings)"
       >
-        <PageSection :title="sectionTitle(section)">
+        <PageSection :title="heading ?? sectionTitle(section)">
           <p
             v-if="sharedAbility(section.settings)"
             class="mb-4 text-sm text-muted"
@@ -405,6 +413,16 @@ onMounted(() => {
                   class="w-48"
                   @update:model-value="onEdit(s, $event ? $event.toString().slice(0, 5) : '')"
                 />
+                <UTextarea
+                  v-else-if="s.kind === 'text' && s.multiline"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  :maxlength="s.maxLength"
+                  :rows="3"
+                  autoresize
+                  class="max-w-md"
+                  @update:model-value="onEdit(s, $event)"
+                />
                 <UInput
                   v-else
                   :model-value="draft[s.key]"
@@ -430,6 +448,11 @@ onMounted(() => {
                   {{ s.kind === 'rate' ? t('core.settings-page.rate-hint') : unitText(s) }}
                 </template>
               </UFormField>
+              <slot
+                name="after-field"
+                :setting="s"
+                :value="draft[s.key]"
+              />
 
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
                 <span v-if="s.overridden || resets[s.key]">

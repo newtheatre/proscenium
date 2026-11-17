@@ -35,6 +35,8 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   max?: unknown
   maxLength?: number
   minLength?: number
+  /** text only: several lines, such as an address, drawn as a text area. */
+  multiline?: boolean
   options?: readonly string[]
   /** A choice from one of the kit's fixed lists instead of options of its own (catalogues.ts). */
   catalogue?: Catalogue
@@ -80,7 +82,7 @@ export const setting = {
   duration: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'duration', ...o }) as SettingEntry<Value<number, O>, 'duration'> & O,
   /** HH:MM in the theatre's time zone; limits written the same way. */
   time: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
-  text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
+  text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number, multiline?: boolean }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
   choice,
   list: <const O extends Common & WithDefault<readonly string[]> & { of: 'text' | 'choice', options?: readonly string[], catalogue?: Catalogue, maxLength?: number }>(o: O) => ({ kind: 'list', ...o }) as SettingEntry<Value<string[], O>, 'list'> & O,
   /** A record of the named type. Always starts unset. */
@@ -152,6 +154,7 @@ function checkEntry(key: string, entry: SettingEntry) {
   if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
   if ('scope' in entry) throw new DeclarationError(f('scope'), 'is gone: say where a group of settings is shown in the manifest\'s settingGroups')
   if (entry.screen !== undefined && !(typeof entry.screen === 'string' && SCREEN.test(entry.screen))) throw new DeclarationError(f('screen'), 'is the address of a page, such as /admin/email')
+  if (entry.multiline !== undefined && !(entry.kind === 'text' && typeof entry.multiline === 'boolean')) throw new DeclarationError(f('multiline'), 'only a text setting is multiline, true or false')
   if (entry.kind === 'text' && entry.minLength !== undefined && !(Number.isInteger(entry.minLength) && entry.minLength >= 0 && entry.minLength <= entry.maxLength!)) throw new DeclarationError(f('minLength'), 'a whole number no larger than maxLength')
   if (entry.kind === 'time') {
     for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !(typeof entry[limit] === 'string' && TIME.test(entry[limit]))) throw new DeclarationError(f(limit), 'a time limit is written like 08:00')
