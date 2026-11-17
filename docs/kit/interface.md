@@ -118,7 +118,30 @@ row of figures on a record's summary and on a screen's totals.
 
 `bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
 (use `UForm` or `PageForm`), no `w-full` on a form control (controls already fill their field), no
-hand-built bordered list, no native date or time input, and no date formatted by hand.
+hand-built bordered list, no native date or time input, no date formatted by hand, no form without
+`novalidate`, and no native `required` on a control.
+
+## Checking a form
+
+A form is checked by its schema, never by the browser, so every problem shows beside its field in the
+app's words, and says what the server would say for the same value.
+
+- **Every `UForm` carries `novalidate`.** Keep `type="email"` and `type="url"` on inputs for the
+  keyboard they bring up; `novalidate` stops the browser's own bubble. `required` goes on the
+  `UFormField` (it draws the mark), never on the control.
+- **Pass the route's schema** (`:schema`), imported from the module's `server/input.ts` or a
+  `shared/` file, which must not import server code. A form that holds `''` for an empty field where
+  the route takes `null` wraps it: `blankAsNull(productionPatch)` (`shared/validation.ts`).
+- **Name each `UFormField`** with the body's key (`name="externalBookingUrl"`), so the schema's
+  message, and the server's, land on it.
+- **Show what the server refuses beside the field.** On a failed save,
+  `form.value?.setErrors(fieldErrors(refusal))` (`useRefusal()`); `RefusalNotice` keeps the summary.
+  `PageForm` does all of this itself.
+- **Do not disable the save button until the form is valid.** Let it be pressed and say what is
+  missing.
+- **Messages** come from `core.form.invalid.*` (`i18n/en-GB/validation.json`), installed for every
+  schema on both the app and the server, so zod's own wording ("Too small: expected string to have
+  >=1 characters") never reaches a person. A message a schema writes itself still wins.
 
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.

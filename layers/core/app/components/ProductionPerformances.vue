@@ -3,6 +3,9 @@
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
 // first, and a module that refuses it says why. Times are shown and entered in the theatre's time
 // zone, whatever the viewer's.
+import { performancePatch } from '../../server/programme/input'
+import { blankAsNull } from '../../shared/validation'
+
 type State = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 interface Performance {
   id: string
@@ -39,7 +42,7 @@ const { data, status, error, refresh } = await useAPI<Answer>(() => `/api/core/p
 const dates = useDates()
 // Whole-day closures that block performances grey out their days in the date fields; the server still decides.
 const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean }[] }>('/api/core/closures', { key: 'core:closures', lazy: true, server: false })
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -53,7 +56,8 @@ const summaryOf = (p: Performance) => [place(p), ...(p.doorsAt ? [`doors ${dates
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
 const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
 
-async function run(fn: () => Promise<unknown>, done?: string): Promise<boolean> {
+// A form's own save passes the form, so what the server refuses shows beside each field.
+async function run(fn: () => Promise<unknown>, done?: string, form?: { setErrors: (errors: { name: string, message: string }[]) => void } | null): Promise<boolean> {
   refusal.value = null
   try {
     const answer = await fn() as { warnings?: string[] } | undefined
@@ -65,6 +69,7 @@ async function run(fn: () => Promise<unknown>, done?: string): Promise<boolean> 
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    form?.setErrors(fieldErrors(refusal.value))
     return false
   }
 }
@@ -80,6 +85,9 @@ function reach(id: string, kind: Kind): Promise<Reach> {
 const editing = ref<Performance | null>(null)
 const intervalHelp = computed(() => `Left empty, the production's (${props.intervalCount}).`)
 const open = ref(false)
+// Checked as it will be sent; the venue follows from the space.
+const formSchema = blankAsNull(performancePatch.required({ spaceId: true, startsAt: true }))
+const performanceForm = useTemplateRef('performanceForm')
 const form = ref({ spaceId: '', startsAt: null as number | null, endsAt: null as number | null, doorsAt: null as number | null, capacity: null as number | null, intervalCount: null as number | null, label: '', externalBookingUrl: '' })
 /** Whether a whole-day closure that blocks performances covers this day for the chosen space. */
 function closed(day: string): boolean {
@@ -113,7 +121,7 @@ async function save() {
     // Left empty, the end and doors come from the running time and the theatre's settings.
     if (form.value.endsAt) body.endsAt = form.value.endsAt
     if (form.value.doorsAt) body.doorsAt = form.value.doorsAt
-    if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added')) open.value = false
+    if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added', performanceForm.value)) open.value = false
     return
   }
   body.endsAt = form.value.endsAt ?? p.endsAt
@@ -132,7 +140,7 @@ async function save() {
     const lines = reached.flatMap(r => r.lines)
     if (lines.length && !await confirm({ verb: 'Change', thing: thing(p), consequence: lines.join(' '), button: 'Change performance' })) return
   }
-  if (await run(() => call(p.id, '', 'PATCH', body), 'Performance saved')) open.value = false
+  if (await run(() => call(p.id, '', 'PATCH', body), 'Performance saved', performanceForm.value)) open.value = false
 }
 
 // Moves
@@ -328,12 +336,16 @@ function actions(p: Performance) {
       <template #body>
         <UForm
           id="performance-form"
+          ref="performanceForm"
+          :schema="formSchema"
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="spaceId"
             label="Space"
             required
           >
@@ -345,6 +357,7 @@ function actions(p: Performance) {
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField
+              name="startsAt"
               label="Starts"
               required
             >
@@ -354,6 +367,7 @@ function actions(p: Performance) {
               />
             </UFormField>
             <UFormField
+              name="endsAt"
               label="Ends"
               :help="editing ? undefined : 'Left empty, from the running time.'"
             >
@@ -363,6 +377,7 @@ function actions(p: Performance) {
               />
             </UFormField>
             <UFormField
+              name="doorsAt"
               label="Doors open"
               :help="editing ? 'Moves with the start unless you change it.' : 'Left empty, from the doors setting.'"
             >
@@ -372,6 +387,7 @@ function actions(p: Performance) {
               />
             </UFormField>
             <UFormField
+              name="capacity"
               label="Capacity"
               help="Left empty, the space's own."
             >
@@ -381,6 +397,7 @@ function actions(p: Performance) {
               />
             </UFormField>
             <UFormField
+              name="intervalCount"
               label="Intervals"
               :help="intervalHelp"
             >
@@ -391,6 +408,7 @@ function actions(p: Performance) {
               />
             </UFormField>
             <UFormField
+              name="label"
               label="Label"
               help="Such as Relaxed or Press night."
             >
@@ -401,6 +419,7 @@ function actions(p: Performance) {
             </UFormField>
           </div>
           <UFormField
+            name="externalBookingUrl"
             label="Booking link"
             help="Only when this performance is sold elsewhere. Must start https://."
           >
@@ -416,7 +435,6 @@ function actions(p: Performance) {
           type="submit"
           form="performance-form"
           :label="editing ? 'Save performance' : 'Add performance'"
-          :disabled="!form.spaceId || !form.startsAt"
         />
       </template>
     </UModal>
@@ -431,6 +449,7 @@ function actions(p: Performance) {
           id="cancel-performance"
           class="space-y-4"
           :state="cancelForm"
+          novalidate
           @submit="cancel"
         >
           <RefusalNotice :refusal="refusal" />
@@ -503,6 +522,7 @@ function actions(p: Performance) {
           id="performance-access"
           class="space-y-3"
           :state="accessChosen"
+          novalidate
           @submit="saveAccess"
         >
           <RefusalNotice :refusal="refusal" />

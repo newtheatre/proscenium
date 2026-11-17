@@ -3,6 +3,8 @@
      Approving issues the tickets at once and sends them to the person named. Nobody sees their own
      request among those waiting. -->
 <script setup lang="ts">
+import { compsInput } from '../../../../server/input'
+
 definePageMeta({ layout: 'console' })
 
 type State = 'requested' | 'approved' | 'declined' | 'issued' | 'withdrawn'
@@ -12,7 +14,8 @@ interface Comps { mine: Request[], waiting: Request[], performances: Offer[] }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
+const askForm = useTemplateRef('askForm')
 const { dateTime } = useDates()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -33,7 +36,6 @@ const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ valu
 watch(() => form.value.performanceId, () => {
   form.value.bandId = bandItems.value.length === 1 ? bandItems.value[0]!.value : ''
 })
-const ready = computed(() => !!(form.value.performanceId && form.value.bandId && form.value.reasonTermId && form.value.email.trim() && form.value.quantity > 0))
 
 const describe = (r: Request) => [`${r.show}, ${dateTime(r.startsAt)}`, r.band, t('box-office.comps.for', { name: r.forName ?? t('box-office.orders.no-buyer') }), r.reason].join(' · ')
 const nameOf = (r: Request) => t('box-office.comps.tickets', { count: r.quantity })
@@ -48,6 +50,7 @@ async function ask() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    askForm.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 
@@ -120,12 +123,16 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
             :description="t('box-office.comps.ask.description')"
           >
             <UForm
+              ref="askForm"
               class="space-y-4"
+              :schema="compsInput"
               :state="form"
+              novalidate
               @submit="ask"
             >
               <RefusalNotice :refusal="refusal" />
               <UFormField
+                name="performanceId"
                 :label="t('box-office.comps.ask.performance')"
                 required
               >
@@ -135,6 +142,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 />
               </UFormField>
               <UFormField
+                name="bandId"
                 :label="t('box-office.comps.ask.band')"
                 required
               >
@@ -145,6 +153,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 />
               </UFormField>
               <UFormField
+                name="quantity"
                 :label="t('box-office.comps.ask.quantity')"
                 required
               >
@@ -153,7 +162,10 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                   :min="1"
                 />
               </UFormField>
-              <UFormField :label="t('box-office.comps.ask.name')">
+              <UFormField
+                name="name"
+                :label="t('box-office.comps.ask.name')"
+              >
                 <UInput
                   v-model="form.name"
                   maxlength="120"
@@ -161,6 +173,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 />
               </UFormField>
               <UFormField
+                name="email"
                 :label="t('box-office.comps.ask.email')"
                 :help="t('box-office.comps.ask.email-help')"
                 required
@@ -173,6 +186,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 />
               </UFormField>
               <UFormField
+                name="reasonTermId"
                 :label="t('box-office.comps.ask.reason')"
                 required
               >
@@ -184,7 +198,6 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
               <UButton
                 type="submit"
                 :label="t('box-office.comps.ask.button')"
-                :disabled="!ready"
               />
             </UForm>
           </PageSection>

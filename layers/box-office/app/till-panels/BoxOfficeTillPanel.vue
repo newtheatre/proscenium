@@ -47,6 +47,9 @@ const admit = ref(false)
 // The buyer's address, if they want the tickets emailed. Optional; the till shows nothing back about them.
 const email = ref('')
 const emailToSend = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()) ? email.value.trim() : undefined)
+// An address that will not be used says so beside the field once the person moves on from it.
+const emailLeft = ref(false)
+const emailError = computed(() => emailLeft.value && email.value.trim() && !emailToSend.value ? t('core.form.invalid.email') : undefined)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 // Selling: how many of each kind of ticket for one performance.
@@ -93,6 +96,7 @@ watch(() => props.modelValue, (now) => {
   if (Object.keys(quantities.value).length) quantities.value = {}
   // The next buyer never sees the last one's address.
   email.value = ''
+  emailLeft.value = false
   if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
 })
 
@@ -215,6 +219,7 @@ function clear() {
     <template v-else>
       <UForm
         :state="{ query }"
+        novalidate
         @submit="find()"
       >
         <!-- The buttons sit on the box's own row, so the help line under it cannot push them out of line. -->
@@ -332,12 +337,14 @@ function clear() {
       :label="t('box-office.screens.panel.email')"
       :help="t('box-office.screens.panel.email-help')"
       name="email"
+      :error="emailError"
     >
       <UInput
         v-model="email"
         type="email"
         autocomplete="off"
         :disabled="locked"
+        @blur="emailLeft = true"
       />
     </UFormField>
     <UCheckbox

@@ -348,6 +348,7 @@ const shown = computed(() => props.large ? menu.value?.categories.filter(c => c.
           id="bar-refusal"
           :state="refusing"
           class="space-y-4"
+          novalidate
           @submit="saveRefusal"
         >
           <RefusalNotice :refusal="refusalProblem" />

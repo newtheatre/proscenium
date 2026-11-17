@@ -102,6 +102,7 @@ async function remove(name: string) {
   <UForm
     v-if="keys.length"
     :state="typed"
+    novalidate
     @submit="save"
   >
     <PageSection

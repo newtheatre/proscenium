@@ -218,6 +218,7 @@ async function reopen() {
           id="reopen-period"
           :state="{ reason }"
           class="space-y-4"
+          novalidate
           @submit="reopen"
         >
           <RefusalNotice :refusal="refusal" />

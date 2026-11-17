@@ -311,6 +311,7 @@ async function admit(row: Row, count: number) {
         <UForm
           class="flex items-end gap-2"
           :state="{ typed }"
+          novalidate
           @submit="submitTyped"
         >
           <UFormField

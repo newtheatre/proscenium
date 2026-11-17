@@ -274,6 +274,7 @@ function describe(type: TicketType): string {
         <UForm
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="add"
         >
           <UFormField
@@ -340,6 +341,7 @@ function describe(type: TicketType): string {
           id="box-office-ticket-type"
           class="space-y-4"
           :state="editForm"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="editRefusal" />

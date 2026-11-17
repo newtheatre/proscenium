@@ -135,6 +135,7 @@ const describe = (template: Template) => [
         <UForm
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="save"
         >
           <UFormField

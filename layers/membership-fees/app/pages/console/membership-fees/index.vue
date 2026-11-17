@@ -113,6 +113,7 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
           id="membership-fees-price"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

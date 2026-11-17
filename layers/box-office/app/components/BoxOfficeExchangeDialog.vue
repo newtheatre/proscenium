@@ -107,6 +107,7 @@ async function exchange() {
         id="box-office-exchange"
         class="space-y-4"
         :state="form"
+        novalidate
         @submit="exchange"
       >
         <RefusalNotice :refusal="refusal" />

@@ -121,7 +121,7 @@ describe('the interface check', () => {
       'const d = new Intl.DateTimeFormat(\'en-GB\')',
     ].join('\n')
     expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 4, 6, 7, 11])
-    expect(interfaceProblems('SettingsSections.vue', '<form>')).toEqual([])
+    expect(interfaceProblems('SettingsSections.vue', '<form novalidate>')).toEqual([])
     expect(interfaceProblems('RecordList.vue', '<ul class="divide-y rounded-lg border">')).toEqual([])
     expect(interfaceProblems('useDates.ts', 'new Intl.DateTimeFormat(language)')).toEqual([])
     // An icon-only button is IconButton's job; one with a label, or with content of its own, is not.
@@ -135,6 +135,30 @@ describe('the interface check', () => {
     ].join('\n')
     expect(interfaceProblems('page.vue', buttons).map(p => p.line)).toEqual([1])
     expect(interfaceProblems('IconButton.vue', buttons)).toEqual([])
+  })
+
+  it('leaves checking to the schema, not the browser\'s bubbles', async () => {
+    const { interfaceProblems } = await import('../../scripts/checks/interface')
+    const source = [
+      '<UForm',
+      '  :schema="schema"',
+      '  @submit="save"',
+      '>',
+      '  <UFormField',
+      '    name="email"',
+      '    required',
+      '  >',
+      '    <UInput',
+      '      v-model="email"',
+      '      required',
+      '    />',
+      '  </UFormField>',
+      '  <UForm nested />',
+      '</UForm>',
+      '<UForm novalidate :schema="schema" />',
+    ].join('\n')
+    expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 9])
+    expect(interfaceProblems('SettingsSections.vue', '<form @submit.prevent="save">').map(p => p.line)).toEqual([1])
   })
 })
 

@@ -89,6 +89,7 @@ async function add() {
         id="performance-run"
         :state="form"
         class="space-y-4"
+        novalidate
         @submit="planned ? add() : preview()"
       >
         <RefusalNotice :refusal="refusal" />

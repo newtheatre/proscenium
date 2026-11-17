@@ -249,6 +249,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               v-else
               :state="{ copyFrom }"
+              novalidate
               @submit="copySetup()"
             >
               <UFormField :label="t('box-office.setup.copy.from')">
@@ -280,6 +281,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="space-y-4"
               :state="capacity"
+              novalidate
               @submit="saveCapacity()"
             >
               <p
@@ -314,6 +316,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="flex flex-wrap items-end gap-2"
               :state="band"
+              novalidate
               @submit="addBand"
             >
               <UFormField
@@ -358,6 +361,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               v-else-if="d.bands.length"
               class="space-y-6"
               :state="prices"
+              novalidate
               @submit="savePrices"
             >
               <UFormField :label="t('box-office.setup.prices.scope.label')">
@@ -409,6 +413,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="space-y-4"
               :state="windowForm"
+              novalidate
               @submit="saveWindow"
             >
               <UFormField

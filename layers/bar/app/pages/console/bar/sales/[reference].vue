@@ -135,6 +135,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
           id="bar-refund"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="refund"
         >
           <RefusalNotice :refusal="refusal" />

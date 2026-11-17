@@ -236,6 +236,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
             id="front-of-house-report-dialog"
             class="space-y-4"
             :state="{ noteForm, noShows }"
+            novalidate
             @submit="submit"
           >
             <RefusalNotice :refusal="refusal" />

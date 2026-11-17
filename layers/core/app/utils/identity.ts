@@ -2,7 +2,7 @@
 // page shows the reason and remedy the server wrote rather than a generic error.
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 
-export interface Refusal { code: string, reason: string, remedy?: string }
+export interface Refusal { code: string, reason: string, remedy?: string, fields?: Record<string, string> }
 export type Answer<T> = { ok: true, data: T } | { ok: false, refusal: Refusal }
 
 export async function callIdentity<T>(path: string, body?: unknown, headers: Record<string, string> = {}): Promise<Answer<T>> {

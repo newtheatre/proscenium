@@ -139,6 +139,7 @@ async function remove(c: Closure) {
           id="new-closure"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
