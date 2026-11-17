@@ -9,6 +9,11 @@ import { sql } from 'drizzle-orm'
 import { all, createUnit, first, idSchema, newId, nowMs, refuse, requirements, usePoint, type UnitView } from '#kit'
 
 export const KINDS = ['standard', 'concession', 'companion', 'complimentary'] as const
+/** Where a type is sold: everywhere, only at the desk, or only online. */
+export const CHANNELS = ['all', 'desk', 'online'] as const
+export type Channel = (typeof CHANNELS)[number]
+/** Whether a type sold on `channel` may be sold by a sale on `selling`. */
+export const soldOn = (channel: Channel, selling: 'desk' | 'online'): boolean => channel === 'all' || channel === selling
 export type Kind = (typeof KINDS)[number]
 /** Kinds only a module may declare: each changes how the type is sold. */
 export const MANAGED_KINDS: readonly Kind[] = ['companion', 'complimentary']
@@ -36,6 +41,7 @@ interface Row {
   proof_note: string | null
   needs_paid_ticket: number
   active: number
+  channel: Channel
   managed_by: string | null
   sort: number
 }
@@ -50,6 +56,7 @@ export interface TicketType {
   proofNote: string | null
   needsPaidTicket: boolean
   active: boolean
+  channel: Channel
   sort: number
   /** The module that keeps this type, or null for one a person made. */
   managedBy: string | null
@@ -151,6 +158,7 @@ function toType(r: Row, declared: Map<string, unknown>, used: Set<string>): Tick
     proofNote: r.proof_note,
     needsPaidTicket: !!r.needs_paid_ticket,
     active: !!r.active,
+    channel: r.channel,
     sort: r.sort,
     managedBy: r.managed_by,
     available: !r.managed_by || declared.has(r.managed_by),
@@ -196,6 +204,7 @@ export interface TicketTypeInput {
   requirementRefs?: string[]
   maxPerHolder?: number
   recheckAtEntry?: boolean
+  channel?: Channel
   sort?: number
 }
 
@@ -203,8 +212,8 @@ export async function createTicketType(unit: UnitView, input: TicketTypeInput): 
   await checkRefs(input.requirementRefs ?? [])
   const id = newId('tty')
   const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_ticket_types (id, name, kind, requirement_refs, recheck_at_entry, max_per_holder, proof_note, needs_paid_ticket, active, sort, created_at, updated_at)
-    SELECT ${id}, ${input.name}, ${input.kind ?? 'standard'}, ${refsText(input.requirementRefs)}, ${(input.recheckAtEntry ?? true) ? 1 : 0}, ${input.maxPerHolder ?? 1}, ${input.proofNote ?? null}, 0, 1, ${input.sort ?? sql`(SELECT coalesce(max(sort) + 1, 0) FROM box_office_ticket_types)`}, ${at}, ${at}
+  unit.add(sql`INSERT INTO box_office_ticket_types (id, name, kind, requirement_refs, recheck_at_entry, max_per_holder, proof_note, needs_paid_ticket, active, channel, sort, created_at, updated_at)
+    SELECT ${id}, ${input.name}, ${input.kind ?? 'standard'}, ${refsText(input.requirementRefs)}, ${(input.recheckAtEntry ?? true) ? 1 : 0}, ${input.maxPerHolder ?? 1}, ${input.proofNote ?? null}, 0, 1, ${input.channel ?? 'all'}, ${input.sort ?? sql`(SELECT coalesce(max(sort) + 1, 0) FROM box_office_ticket_types)`}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ${input.name} COLLATE NOCASE)`)
     .expect(1, { code: 'box-office.ticket-type.name-taken', reason: 'There is already a ticket type with that name.' })
   unit.audit({ action: 'create', record: ['box-office.ticket-type', id] })
@@ -220,6 +229,7 @@ export interface TicketTypeChange {
   requirementRefs?: string[]
   maxPerHolder?: number
   recheckAtEntry?: boolean
+  channel?: Channel
 }
 
 const RULES: (keyof TicketTypeChange)[] = ['kind', 'requirementRefs', 'maxPerHolder', 'recheckAtEntry']
@@ -248,6 +258,7 @@ export async function updateTicketType(unit: UnitView, id: string, change: Ticke
   if (change.requirementRefs !== undefined) sets.push(sql`requirement_refs = ${refsText(change.requirementRefs)}`)
   if (change.maxPerHolder !== undefined) sets.push(sql`max_per_holder = ${change.maxPerHolder}`)
   if (change.recheckAtEntry !== undefined) sets.push(sql`recheck_at_entry = ${change.recheckAtEntry ? 1 : 0}`)
+  if (change.channel !== undefined) sets.push(sql`channel = ${change.channel}`)
   const name = change.name ?? row.name
   unit.add(sql`UPDATE box_office_ticket_types SET ${sql.join(sets, sql`, `)} WHERE id = ${id}
     AND NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ${name} COLLATE NOCASE AND id <> ${id})`)

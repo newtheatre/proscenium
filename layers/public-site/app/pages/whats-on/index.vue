@@ -15,6 +15,7 @@ interface Listing {
   lastEndsAt: number
   venues: string[]
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
+  price: { currency: string, fromMinor: number | null, others: { label: string, amountMinor: number }[] } | null
 }
 interface Filters {
   categories: { slug: string, label: string }[]
@@ -119,6 +120,7 @@ const groups = computed(() => {
               :title="p.title"
               :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
+              :price="p.price"
               :when="range(p.nextStartsAt, p.lastEndsAt)"
               :age="p.age"
               :effects="p.hasEffects"
