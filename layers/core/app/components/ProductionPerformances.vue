@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { noOverrides, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
+import { noOverrides, overrideErrors, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
 // first, and a module that refuses it says why. Times are shown and entered in the theatre's time
@@ -49,7 +49,7 @@ const { data, status, error, refresh } = await useAPI<Answer>(() => `/api/core/p
 const dates = useDates()
 // Whole-day closures that block performances grey out their days in the date fields; the server still decides.
 const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean }[] }>('/api/core/closures', { key: 'core:closures', lazy: true, server: false })
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -76,7 +76,8 @@ const summaryOf = (p: Performance) => [place(p), ...(p.doorsAt ? [`doors ${dates
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
 const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
 
-async function run(fn: () => Promise<unknown>, done?: string): Promise<boolean> {
+// A form's own save passes the form, so what the server refuses shows beside each field.
+async function run(fn: () => Promise<unknown>, done?: string, form?: { setErrors: (errors: { name: string, message: string }[]) => void } | null): Promise<boolean> {
   refusal.value = null
   try {
     const answer = await fn() as { warnings?: string[] } | undefined
@@ -88,6 +89,7 @@ async function run(fn: () => Promise<unknown>, done?: string): Promise<boolean> 
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    form?.setErrors(fieldErrors(refusal.value))
     return false
   }
 }
@@ -112,6 +114,16 @@ function closed(day: string): boolean {
   return (closures.value?.rows ?? []).some(c => c.allDay && c.blocksPerformances
     && (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
     && dates.toLocal(c.startsAt).slice(0, 10) <= day && day <= dates.toLocal(c.endsAt - 1).slice(0, 10)) // not-policy: the length of a date
+}
+// Checked beside each field: a space, a start, and a booking link that is a web address.
+const performanceForm = useTemplateRef('performanceForm')
+function checkPerformance() {
+  const needed = (name: string) => ({ name, message: translate('core.form.invalid.required') })
+  return [
+    ...(form.value.spaceId ? [] : [needed('spaceId')]),
+    ...(form.value.startsAt ? [] : [needed('startsAt')]),
+    ...overrideErrors(overrides.value, shown.value, !!data.value?.defaults.sellsHere),
+  ]
 }
 function start(p: Performance | null) {
   refusal.value = null
@@ -156,7 +168,7 @@ async function save() {
   }
   const p = editing.value
   if (!p) {
-    if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added')) open.value = false
+    if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added', performanceForm.value)) open.value = false
     return
   }
   if (p.state === 'scheduled') {
@@ -174,7 +186,7 @@ async function save() {
     const lines = reached.flatMap(r => r.lines)
     if (lines.length && !await confirm({ verb: 'Change', thing: thing(p), consequence: lines.join(' '), button: 'Change performance' })) return
   }
-  if (await run(() => call(p.id, '', 'PATCH', body), 'Performance saved')) open.value = false
+  if (await run(() => call(p.id, '', 'PATCH', body), 'Performance saved', performanceForm.value)) open.value = false
 }
 
 // Moves
@@ -388,13 +400,17 @@ function actions(p: Performance) {
       <template #body>
         <UForm
           id="performance-form"
+          ref="performanceForm"
           class="space-y-4"
           :state="form"
+          :validate="checkPerformance"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
             label="Space"
+            name="spaceId"
             required
           >
             <USelectMenu
@@ -405,6 +421,7 @@ function actions(p: Performance) {
           </UFormField>
           <UFormField
             label="Starts"
+            name="startsAt"
             required
           >
             <FieldDateTime
@@ -425,7 +442,6 @@ function actions(p: Performance) {
           type="submit"
           form="performance-form"
           :label="editing ? 'Save performance' : 'Add performance'"
-          :disabled="!form.spaceId || !form.startsAt"
         />
       </template>
     </UModal>
@@ -440,6 +456,8 @@ function actions(p: Performance) {
           id="cancel-performance"
           class="space-y-4"
           :state="cancelForm"
+          :validate="() => needs({ reasonTermId: cancelForm.reasonTermId })"
+          novalidate
           @submit="cancel"
         >
           <RefusalNotice :refusal="refusal" />
@@ -470,6 +488,7 @@ function actions(p: Performance) {
             </li>
           </ul>
           <UFormField
+            name="reasonTermId"
             label="Reason"
             required
           >
@@ -497,7 +516,7 @@ function actions(p: Performance) {
           form="cancel-performance"
           label="Cancel performance"
           color="error"
-          :disabled="!cancelForm.reasonTermId || !!cancelReach?.refusal"
+          :disabled="!!cancelReach?.refusal"
         />
       </template>
     </UModal>
@@ -512,6 +531,7 @@ function actions(p: Performance) {
           id="performance-access"
           class="space-y-3"
           :state="accessChosen"
+          novalidate
           @submit="saveAccess"
         >
           <RefusalNotice :refusal="refusal" />
@@ -555,6 +575,7 @@ function actions(p: Performance) {
           id="performance-effects"
           class="space-y-3"
           :state="effectsOff"
+          novalidate
           @submit="saveEffects"
         >
           <RefusalNotice :refusal="refusal" />

@@ -92,9 +92,12 @@ async function save() {
         <UForm
           class="space-y-4"
           :state="form"
+          :validate="() => needs({ body: form.body })"
+          novalidate
           @submit="save"
         >
           <UFormField
+            name="body"
             :label="t('front-of-house.emergency.body')"
             :help="t('front-of-house.emergency.body-help')"
             required
@@ -127,7 +130,6 @@ async function save() {
             <UButton
               type="submit"
               :label="t('front-of-house.save')"
-              :disabled="!form.body.trim()"
             />
             <UButton
               color="neutral"

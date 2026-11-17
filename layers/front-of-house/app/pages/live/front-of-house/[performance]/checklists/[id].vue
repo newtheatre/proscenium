@@ -222,7 +222,9 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
           v-if="problem"
           id="fh-problem"
           :state="problem"
+          :validate="() => needs({ reasonCode: problem?.reasonCode })"
           class="space-y-4"
+          novalidate
           @submit="saveProblem"
         >
           <RefusalNotice :refusal="refusal" />
@@ -254,7 +256,6 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
           type="submit"
           form="fh-problem"
           size="xl"
-          :disabled="!problem?.reasonCode"
           :loading="!!busy"
           :label="t('front-of-house.save')"
         />

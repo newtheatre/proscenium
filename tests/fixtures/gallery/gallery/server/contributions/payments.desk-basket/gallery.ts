@@ -4,7 +4,7 @@ import type { DeskBasket, DeskContext } from '#modules/payments'
 
 const PRICE = 300 // not-policy: a fixture's price
 
-const count = (context: DeskContext) => Math.max(0, Math.floor(Number((context.input as { count?: number })?.count) || 0))
+const count = (context: Pick<DeskContext, 'input'>) => Math.max(0, Math.floor(Number((context.input as { count?: number })?.count) || 0))
 
 export default {
   label: 'gallery.desk.label',
@@ -14,7 +14,7 @@ export default {
   async prepare(_unit: UnitView, context: DeskContext) {
     return { owner: { module: 'gallery', record: newId('gly') }, amountMinor: count(context) * PRICE }
   },
-  async summary(context: DeskContext) {
+  async summary(context: Pick<DeskContext, 'input'>) {
     const n = count(context)
     return { lines: [{ label: `Programmes × ${n}`, amountMinor: n * PRICE }], amountMinor: n * PRICE }
   },

@@ -64,6 +64,7 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
           method="get"
           role="search"
           class="flex flex-wrap items-end gap-2"
+          novalidate
           @submit="find"
         >
           <UFormField

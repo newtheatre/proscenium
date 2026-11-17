@@ -206,8 +206,8 @@ async function onFailure(error: unknown) {
     return
   }
   if (failure.fields) {
-    form.value?.setErrors(Object.entries(failure.fields).map(([name, message]) => ({ name, message: phrase(message) ?? message })))
-    summary.value = Object.entries(failure.fields).map(([name, message]) => ({ name, message: phrase(message) ?? message }))
+    form.value?.setErrors(fieldErrors(failure))
+    summary.value = fieldErrors(failure)
   }
   refusal.value = failure
 }
@@ -325,6 +325,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :state="state"
           :validate-on="['blur', 'change']"
           class="space-y-4"
+          novalidate
           @submit="onSubmit"
           @error="onError"
         >

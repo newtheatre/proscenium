@@ -236,6 +236,8 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
             id="front-of-house-report-dialog"
             class="space-y-4"
             :state="{ noteForm, noShows }"
+            :validate="() => needs({ body: dialog === 'note' ? noteForm.body : true })"
+            novalidate
             @submit="submit"
           >
             <RefusalNotice :refusal="refusal" />
@@ -248,6 +250,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
                 />
               </UFormField>
               <UFormField
+                name="body"
                 :label="t('front-of-house.report.note-body')"
                 required
               >
@@ -286,7 +289,6 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
             type="submit"
             form="front-of-house-report-dialog"
             :label="dialog === 'sign-off' ? t('front-of-house.report.sign-off') : t('front-of-house.save')"
-            :disabled="dialog === 'note' && !noteForm.body.trim()"
           />
         </template>
       </UModal>

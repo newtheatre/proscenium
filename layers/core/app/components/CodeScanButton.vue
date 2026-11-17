@@ -104,6 +104,7 @@ const { problem, starting } = useCodeCamera(video, open, (code) => {
           v-if="typing"
           class="flex items-end gap-2"
           :state="{ typed }"
+          novalidate
           @submit="submitTyped"
         >
           <UFormField

@@ -1,6 +1,7 @@
 <!-- Sign in (ID-01, ID-02, ID-04, ID-07): a passkey first, an emailed link and code, or an outside
      provider the theatre has switched on (Google so far), one button each. -->
 <script setup lang="ts">
+import { z } from 'zod'
 import type { Refusal } from '../../utils/identity'
 
 // Someone already signed in is sent on before the page is made. The page reads the same answer.
@@ -22,6 +23,12 @@ const digits = ref<number[]>([])
 const code = computed(() => digits.value.join(''))
 const challenge = ref('')
 const sent = ref(false)
+// What the two routes check, shown beside the field rather than in a browser bubble.
+const { t } = useT()
+const addressSchema = z.object({ address: z.email().max(254) }) // not-policy: the longest address
+const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/, t('core.form.invalid.code', { count: CODE_LENGTH })) }) // not-policy: codes are six digits
+const addressForm = useTemplateRef('addressForm')
+const codeForm = useTemplateRef('codeForm')
 const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, providers: { id: string, label: string }[], openSignUp?: boolean } }>('core:me')
 const providers = computed(() => me.value?.signIn?.providers ?? [])
 // Errors come back from a provider's callback; while one provider is offered it can be named.
@@ -61,6 +68,7 @@ async function sendLink() {
   busy.value = false
   if (!answer.ok) {
     refusal.value = answer.refusal
+    addressForm.value?.setErrors(fieldErrors(answer.refusal))
     return
   }
   if (answer.data.to) return navigateTo(answer.data.to, { external: true })
@@ -74,6 +82,7 @@ async function useCode() {
   busy.value = false
   if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
+  codeForm.value?.setErrors(fieldErrors(answer.refusal))
 }
 </script>
 
@@ -114,8 +123,11 @@ async function useCode() {
       <template v-if="me?.signIn?.email">
         <USeparator label="or" />
         <UForm
+          ref="addressForm"
+          :schema="addressSchema"
           :state="{ address }"
           class="flex flex-col gap-4"
+          novalidate
           @submit="sendLink"
         >
           <UFormField
@@ -126,7 +138,6 @@ async function useCode() {
               v-model="address"
               type="email"
               autocomplete="email webauthn"
-              required
             />
           </UFormField>
           <TurnstileCheck @token="challenge = $event" />
@@ -147,8 +158,11 @@ async function useCode() {
         If {{ address }} can sign in here, we have sent it a link and a six-digit code. The link works in this browser; the code works anywhere.
       </p>
       <UForm
+        ref="codeForm"
+        :schema="codeSchema"
         :state="{ code }"
         class="flex flex-col gap-4"
+        novalidate
         @submit="useCode"
       >
         <UFormField
@@ -160,7 +174,6 @@ async function useCode() {
             otp
             type="number"
             :length="CODE_LENGTH"
-            required
           />
         </UFormField>
         <UButton

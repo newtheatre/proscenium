@@ -7,7 +7,7 @@
 // A change may be set to take effect later (early-bird prices, a planned rise): its row simply
 // carries a later effective_from. Cancelling one adds a row at the same moment that repeats what
 // was in force before it; being newer, it wins at that moment, and the table stays append-only.
-import { all, nowMs, type UnitView } from '#kit'
+import { all, nowMs, useSetting, type UnitView } from '#kit'
 import { prices } from './db/schema'
 
 /** The newest row of one scope, for a row `x` of it: nothing newer of the same key and scope by `?2`. */
@@ -24,12 +24,40 @@ export const PRICES_IN_FORCE = `SELECT p.id, p.band_id, p.ticket_type_id, p.amou
     AND (p.performance_id IS NOT NULL OR NOT EXISTS (SELECT 1 FROM box_office_prices s WHERE s.band_id = p.band_id
       AND s.ticket_type_id = p.ticket_type_id AND s.performance_id = ?1 AND s.effective_from <= ?2 AND s.inherits = 0 AND ${NEWEST('s')}))`
 
-export interface Price { id: string, bandId: string, ticketTypeId: string, amountMinor: number, currency: string }
+/** `derived` marks a price no one set: the Wheelchair space's, taken from another type's (wheelchairPrices). */
+export interface Price { id: string, bandId: string, ticketTypeId: string, amountMinor: number, currency: string, derived?: true }
+
+/** The Wheelchair space type Box office keeps, while the access scheme runs. */
+export const WHEELCHAIR_TYPE = 'box-office.wheelchair'
 
 /** What each ticket type costs in each pooled band at this performance, now. Withdrawn prices are left out. */
 export async function pricesFor(performanceId: string, at = nowMs()): Promise<Price[]> {
   const rows = await all<{ id: string, band_id: string, ticket_type_id: string, amount_minor: number | null, currency: string }>(PRICES_IN_FORCE, performanceId, at)
-  return rows.filter(r => r.amount_minor !== null).map(r => ({ id: r.id, bandId: r.band_id, ticketTypeId: r.ticket_type_id, amountMinor: r.amount_minor!, currency: r.currency }))
+  const set = rows.filter(r => r.amount_minor !== null).map(r => ({ id: r.id, bandId: r.band_id, ticketTypeId: r.ticket_type_id, amountMinor: r.amount_minor!, currency: r.currency }))
+  return [...set, ...await wheelchairPrices(set)]
+}
+
+/**
+ * A wheelchair space costs the lowest price anyone can have in its band (Matt, 2026-11-17): the
+ * cheapest type sold everywhere that asks for nothing, such as Concession. A buyer who qualifies for
+ * a cheaper type, such as Member, pays that instead (baskets.ts). Its price row is the one it is
+ * taken from. A band where the theatre has set a Wheelchair space price of its own keeps that.
+ */
+async function wheelchairPrices(set: Price[]): Promise<Price[]> {
+  if (!set.length || !await useSetting('core.access-scheme.enabled')) return []
+  const types = await all<{ id: string, managed_by: string | null, requirement_refs: string | null, kind: string, channel: string, active: number }>(
+    'SELECT id, managed_by, requirement_refs, kind, channel, active FROM box_office_ticket_types')
+  const wheelchair = types.find(t => t.managed_by === WHEELCHAIR_TYPE && t.active)
+  if (!wheelchair) return []
+  const open = new Set(types.filter(t => t.active && t.channel === 'all' && (t.kind === 'standard' || t.kind === 'concession') && t.id !== wheelchair.id
+    && (!t.requirement_refs || t.requirement_refs === '[]')).map(t => t.id))
+  const out: Price[] = []
+  for (const bandId of new Set(set.map(p => p.bandId))) {
+    if (set.some(p => p.bandId === bandId && p.ticketTypeId === wheelchair.id)) continue
+    const lowest = set.filter(p => p.bandId === bandId && open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
+    if (lowest) out.push({ ...lowest, ticketTypeId: wheelchair.id, derived: true })
+  }
+  return out
 }
 
 export interface PriceInput {

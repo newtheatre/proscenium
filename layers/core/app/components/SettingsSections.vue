@@ -256,6 +256,7 @@ onMounted(() => {
       <form
         v-for="section in sections"
         :key="section.id"
+        novalidate
         @submit.prevent="save(section.id, section.settings)"
       >
         <PageSection :title="heading ?? sectionTitle(section)">

@@ -223,7 +223,9 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
           v-if="signing"
           id="bar-sign"
           :state="signing"
+          :validate="() => needs({ days: signing?.days.start && signing?.days.end })"
           class="space-y-4"
+          novalidate
           @submit="sign"
         >
           <RefusalNotice :refusal="refusal" />
@@ -255,7 +257,6 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
         <UButton
           type="submit"
           form="bar-sign"
-          :disabled="!signBody"
           :label="t('bar.screens.age-checks.sign-confirm')"
         />
       </template>

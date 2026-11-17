@@ -8,7 +8,9 @@ const props = withDefaults(defineProps<{
   min?: number
   max?: number
   disabled?: boolean
-}>(), { currency: undefined, min: 0, max: undefined })
+  /** Shows the plus and minus buttons; off where an amount is typed, such as a price list. */
+  steppers?: boolean
+}>(), { currency: undefined, min: 0, max: undefined, steppers: true })
 const model = defineModel<number | null>({ default: null })
 
 const { data: settings } = usePublicSettings()
@@ -31,5 +33,7 @@ const major = computed({
     :format-options="{ style: 'currency', currency: code }"
     :locale="language"
     :disabled="disabled"
+    :increment="steppers"
+    :decrement="steppers"
   />
 </template>

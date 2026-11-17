@@ -133,7 +133,33 @@ row of figures on a record's summary and on a screen's totals.
 
 `bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
 (use `UForm` or `PageForm`), no `w-full` on a form control (controls already fill their field), no
-hand-built bordered list, no native date or time input, and no date formatted by hand.
+hand-built bordered list, no native date or time input, no date formatted by hand, no form without
+`novalidate`, and no native `required` on a control.
+
+## Checking a form
+
+A form is checked by its schema, never by the browser, so every problem shows beside its field in the
+app's words, and says what the server would say for the same value.
+
+- **Every `UForm` carries `novalidate`.** Keep `type="email"` and `type="url"` on inputs for the
+  keyboard they bring up; `novalidate` stops the browser's own bubble. `required` goes on the
+  `UFormField` (it draws the mark), never on the control.
+- **Pass the route's schema** (`:schema`), imported from the module's `server/input.ts` or a
+  `shared/` file, which must not import server code. A form that holds `''` for an empty field where
+  the route takes `null` wraps it: `blankAsNull(productionPatch)` (`shared/validation.ts`).
+- **Name each `UFormField`** with the body's key (`name="externalBookingUrl"`), so the schema's
+  message, and the server's, land on it.
+- **Show what the server refuses beside the field.** On a failed save,
+  `form.value?.setErrors(fieldErrors(refusal))` (`useRefusal()`); `RefusalNotice` keeps the summary.
+  `PageForm` does all of this itself.
+- **Do not disable the save button until the form is valid.** Let it be pressed and say what is
+  missing. A form with no schema of its own names what it needs with `needs()`:
+  `:validate="() => needs({ name: form.name, note: paid ? form.note : true })"`, each key the
+  `name` of its `UFormField`; `true` stands for a field not needed just now. Disable a button only
+  for something no field can fix (a lookup still loading, a till locked).
+- **Messages** come from `core.form.invalid.*` (`i18n/en-GB/validation.json`), installed for every
+  schema on both the app and the server, so zod's own wording ("Too small: expected string to have
+  >=1 characters") never reaches a person. A message a schema writes itself still wins.
 
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. `useUndo().offer(message, undo)` is the success toast with an Undo button for ten
@@ -382,7 +408,15 @@ a layout, not a shell, and it has no navigation of its own.
   or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
-  may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The console
+  may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
+  one receipt beside the panels, grouped by panel, with the ways to pay on it: one press makes the
+  sale and starts that way of paying, and Split takes it in parts. On a narrow screen the receipt is
+  a sheet, opened from a bar at the foot that also takes payment. A panel is shown on the receipt by
+  the lines of its `summarise`; one that wants steppers on its lines, or them shown before the
+  server has answered, emits `receipt` with `{ lines, note?, added? }`: each line is
+  `{ key, label, detail?, quantity, amountMinor, more?, fewer? }`, `note` is a line that stays under
+  them with an optional action (the bar's age-check answer and "Change"), and `added` is
+  `{ label, undo }` for the foot bar's "Added: … Undo". The total is always the server's. The console
   keeps narrowed tills: `<PaymentsTill :modules="['box-office']" />` on Box office's Sell, and the
   "Your session" card on Money › Sessions has an "Open the till" button rather than a menu entry.
   The first sale at a till opens the seller's till session, so coming to a till by mistake leaves no

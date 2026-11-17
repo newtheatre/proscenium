@@ -131,10 +131,13 @@ const rowActions = (r: Row): DropdownMenuItem[] => {
           id="decline-refund"
           class="space-y-4"
           :state="{ reason }"
+          :validate="() => needs({ reason })"
+          novalidate
           @submit="decline"
         >
           <RefusalNotice :refusal="declineRefusal" />
           <UFormField
+            name="reason"
             :label="t('payments.screens.refunds.decline-reason')"
             required
           >
@@ -149,7 +152,6 @@ const rowActions = (r: Row): DropdownMenuItem[] => {
         <UButton
           type="submit"
           form="decline-refund"
-          :disabled="!reason"
           :label="t('payments.screens.refunds.decline-button')"
         />
       </template>

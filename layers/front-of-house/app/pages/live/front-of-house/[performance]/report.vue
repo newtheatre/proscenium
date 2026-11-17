@@ -163,7 +163,9 @@ const context = computed(() => data.value?.performance ? [data.value.performance
             <UForm
               v-if="d.state === 'draft' && d.can.write"
               :state="note"
+              :validate="() => needs({ body: note.body })"
               class="space-y-3"
+              novalidate
               @submit="addNote"
             >
               <UFormField
@@ -193,7 +195,6 @@ const context = computed(() => data.value?.performance ? [data.value.performance
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-message-square-plus"
-                :disabled="!note.body.trim()"
                 :loading="busy === 'note'"
                 :label="t('front-of-house.report.add-note')"
               />

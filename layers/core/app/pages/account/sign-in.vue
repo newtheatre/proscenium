@@ -4,13 +4,14 @@
      place. The server keeps the only way in: the last passkey stays unless a confirmed address or a
      linked provider can still sign the person in. New codes are shown once and typed back. -->
 <script setup lang="ts">
+import { z } from 'zod'
 import type { RefusalView } from '../../utils/refusal'
 
 interface Passkey { id: string, label: string, synced: boolean, addedAt: number, lastUsedAt: number | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ passkeys: Passkey[], recoveryCodesLeft: number, authenticator: { addedAt: number } | null, authenticatorOffered: boolean }>('/api/core/me/passkeys', { key: 'core:my-passkeys' })
@@ -62,6 +63,9 @@ async function newCodes() {
 const setup = ref<{ secret: string, uri: string } | null>(null)
 const appDigits = ref<number[]>([])
 const APP_CODE_LENGTH = 6 // not-policy: an authenticator app shows six digits
+const appCode = computed(() => appDigits.value.join(''))
+const appSchema = z.object({ code: z.string().regex(/^\d{6}$/, t('core.form.invalid.code', { count: APP_CODE_LENGTH })) }) // not-policy: six digits
+const appForm = useTemplateRef('appForm')
 // The secret in groups of four, easier to type by hand.
 const groupedSecret = computed(() => setup.value?.secret.match(/.{1,4}/g)?.join(' ') ?? '')
 
@@ -79,7 +83,7 @@ async function startApp() {
 async function confirmApp() {
   refusal.value = null
   try {
-    await $api('/api/core/me/authenticator/confirm', { method: 'POST', body: { code: appDigits.value.join('') } })
+    await $api('/api/core/me/authenticator/confirm', { method: 'POST', body: { code: appCode.value } })
     setup.value = null
     toast.add({ title: t('core.me.sign-in.app-added'), color: 'success' })
     await refresh()
@@ -87,6 +91,7 @@ async function confirmApp() {
   catch (e) {
     appDigits.value = []
     refusal.value = toRefusal(e)
+    appForm.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 
@@ -230,8 +235,11 @@ async function showCodes() {
                 />
               </div>
               <UForm
-                :state="{ appDigits }"
+                ref="appForm"
+                :schema="appSchema"
+                :state="{ code: appCode }"
                 class="flex flex-col gap-4"
+                novalidate
                 @submit="confirmApp"
               >
                 <p class="text-sm text-muted">
@@ -239,14 +247,13 @@ async function showCodes() {
                 </p>
                 <UFormField
                   :label="t('core.me.sign-in.app-code')"
-                  name="appDigits"
+                  name="code"
                 >
                   <UPinInput
                     v-model="appDigits"
                     otp
                     type="number"
                     :length="APP_CODE_LENGTH"
-                    required
                   />
                 </UFormField>
                 <div class="flex gap-2">

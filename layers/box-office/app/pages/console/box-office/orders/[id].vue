@@ -7,7 +7,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 definePageMeta({ layout: 'console' })
 
 type State = 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired'
-interface Line { id: string, kind: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, state: string, admittedAt: number | null, ticketState: string | null }
+interface Line { id: string, kind: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, state: string, admittedAt: number | null, ticketState: string | null, requirementPending?: boolean }
 interface Cancellation { id: string, kind: string, note: string | null, lineCount: number, refunded: boolean, feeMinor: number, reason: string | null, by: string | null, at: number }
 interface Order {
   id: string
@@ -138,6 +138,7 @@ const lineStatus = (l: Line) => l.state !== 'live'
                 v-for="line in tickets"
                 :key="line.id"
                 :name="t('box-office.order.line.title', { band: line.band ?? '', type: line.ticketType ?? '' })"
+                :description="line.requirementPending && line.state === 'live' ? t('box-office.order.line.pending') : undefined"
                 :muted="line.state !== 'live'"
               >
                 <span class="flex items-center gap-2">

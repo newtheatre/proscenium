@@ -110,6 +110,7 @@ async function setActive(o: Outlet, active: boolean) {
           id="bar-outlet"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

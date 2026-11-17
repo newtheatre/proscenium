@@ -5,7 +5,7 @@ import { browserSupportsWebAuthnAutofill, startAuthentication, startRegistration
 /** Set by "Not now" on the passkey offer. The server reads it by the same name. */
 export const PASSKEY_LATER_COOKIE = 'proscenium-passkey-later'
 
-export interface Refusal { code: string, reason: string, remedy?: string }
+export interface Refusal { code: string, reason: string, remedy?: string, fields?: Record<string, string> }
 export type Answer<T> = { ok: true, data: T } | { ok: false, refusal: Refusal }
 
 export async function callIdentity<T>(path: string, body?: unknown, headers: Record<string, string> = {}, method?: 'POST' | 'PATCH'): Promise<Answer<T>> {

@@ -109,6 +109,7 @@ async function archive() {
         :state="{ ...form, description: form.description.trim() || null, expiryDays: form.expiryRule === 'days' ? form.expiryDays : null }"
         :disabled="readOnly"
         class="space-y-6"
+        novalidate
         @submit="save"
       >
         <RefusalNotice :refusal="refusal" />

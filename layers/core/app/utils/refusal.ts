@@ -28,3 +28,12 @@ export function toRefusal(error: unknown): RefusalView {
     fields: data.fields,
   }
 }
+
+/**
+ * A refusal's field problems as a UForm's errors, so each shows beside its field rather than only in
+ * the notice at the top: `form.value?.setErrors(fieldErrors(refusal))`. Each UFormField needs the
+ * `name` the server checks (the body's key).
+ */
+export function fieldErrors(refusal: Pick<RefusalView, 'fields'> | null | undefined): { name: string, message: string }[] {
+  return Object.entries(refusal?.fields ?? {}).map(([name, message]) => ({ name, message: phrase(message) ?? message }))
+}
