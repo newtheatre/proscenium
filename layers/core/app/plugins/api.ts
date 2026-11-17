@@ -7,11 +7,20 @@
 // once. A screen therefore needs nothing of its own to get this. The dialogue's own requests are
 // left alone, so a refusal there cannot open a second dialogue. On the server it is the request's
 // own fetch, which carries the visitor's cookies to the API.
+import type { FetchOptions } from 'ofetch'
 import { CONFIRM_REASONS, type ConfirmReason } from '../composables/useConfirmItsYou'
 
 const OWN = '/api/core/me/reassert'
 
-type Fetch = typeof globalThis.$fetch
+// Nitro types `$fetch` over every route of the app. With about two hundred routes that union outgrows
+// the compiler ("Type instantiation is excessively deep"), so `$api` takes any address and the caller
+// says what it expects back. Nitro's typed `$fetch` stays as it is for modules that want it.
+export interface Api {
+  <T = unknown>(request: string, options?: FetchOptions): Promise<T>
+  raw: typeof globalThis.$fetch.raw
+  create: typeof globalThis.$fetch.create
+}
+type Fetch = Api
 
 export default defineNuxtPlugin(() => {
   if (import.meta.server) return { provide: { api: useRequestFetch() as Fetch } }
