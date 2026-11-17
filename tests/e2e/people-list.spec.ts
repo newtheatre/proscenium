@@ -38,7 +38,10 @@ test.describe('someone who reads and disables accounts', () => {
     const made = await page.request.post('/api/core/accounts', { data: { name, address: `rhiannon.${Date.now()}@example.org` } })
     expect(made.ok()).toBe(true)
     const { id } = await made.json() as { id: string }
-    await visit(page, '/console/people?view=unclaimed')
+    await visit(page, '/console/people')
+    // Not yet signed in, so hidden from the default view, which says so and links to it.
+    await page.getByRole('link', { name: /not yet signed in$/ }).first().click()
+    await expect(page).toHaveURL(/view=unclaimed/)
     await page.getByRole('link', { name }).click()
     await expect(page).toHaveURL(new RegExp(`/console/people/${id}`))
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()

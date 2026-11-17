@@ -101,5 +101,10 @@
   "core.grants.end.button": "End role",
   "core.grants.end.done": "Role ended",
   "core.grants.empty.title": "Nobody holds a role yet",
-  "core.grants.empty.description": "Roles given to people appear here, with when each ends."
+  "core.grants.empty.description": "Roles given to people appear here, with when each ends.",
+  "core.people.hidden.lead": "Also matching, not shown here:",
+  "core.people.hidden.unclaimed.one": "{count} not yet signed in",
+  "core.people.hidden.unclaimed.other": "{count} not yet signed in",
+  "core.people.hidden.anonymised.one": "{count} erased",
+  "core.people.hidden.anonymised.other": "{count} erased"
 }

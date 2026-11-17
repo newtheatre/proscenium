@@ -30,6 +30,13 @@ const list = computed(() => ({
   views: Object.fromEntries(Object.entries(accountsList.views).map(([key, v]) => [key, { ...v, label: t(`core.people.view.${key}`) }])),
 }))
 
+const route = useRoute()
+/** What the state filter left out of this answer, each a link to the view that shows it. */
+const hiddenOf = (result: Record<string, unknown>) => {
+  const hidden = (result.hidden ?? {}) as { unclaimed?: number, anonymised?: number }
+  return (['unclaimed', 'anonymised'] as const).flatMap(view => hidden[view] ? [{ view, count: hidden[view]! }] : [])
+}
+
 const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased') : (row.name ?? t('core.people.unnamed'))
 </script>
 
@@ -42,6 +49,24 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     :row-to="(row: Row) => `/console/people/${encodeURIComponent(row.id)}`"
     :empty="{ title: t('core.people.empty.title'), description: t('core.people.empty.description'), icon: 'i-lucide-users' }"
   >
+    <template #note="{ result }">
+      <p
+        v-if="hiddenOf(result).length"
+        class="text-sm text-muted"
+      >
+        {{ t('core.people.hidden.lead') }}
+        <template
+          v-for="(part, n) in hiddenOf(result)"
+          :key="part.view"
+        >
+          <span v-if="n">, </span>
+          <ULink
+            :to="{ query: { ...route.query, view: part.view, page: undefined } }"
+            class="underline"
+          >{{ t(`core.people.hidden.${part.view}`, { count: part.count }) }}</ULink>
+        </template>
+      </p>
+    </template>
     <template #cell-name="{ row }">
       <span>{{ label(row) }}</span>
       <span
