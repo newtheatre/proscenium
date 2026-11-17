@@ -43,6 +43,7 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/core/productions/${production.id}`, {
     summary: 'A play about a theatre that opens its doors.', categoryTermId: play.id, advisoriesConfirmedNone: true,
     runningMinutes: 135, intervalCount: 1, externalBookingUrl: 'https://tickets.example/public-show',
+    description: 'Our **first** show of the year.\n\n- A new play\n- Live music\n\n[Read the programme](https://example.org/programme)\n\n<script>window.typedScript = true</script>',
   }, 'patch')
   const venue = await post(api, '/api/core/venues', { name: `Public Theatre ${stamp}` })
   const at = (days: number) => Date.UTC(2031, 2, 10 + days, 19, 30)
@@ -110,6 +111,14 @@ test('the production page shows its dates, the booking link, the cancelled date 
   await expect(dates.getByText('Captioned')).toBeVisible()
   await expect(dates.locator('.line-through')).toHaveCount(1)
   await expect(dates.getByText('Cancelled', { exact: true })).toBeVisible()
+
+  // The description's Markdown is drawn, and what looks like HTML stays text.
+  const about = page.getByRole('region', { name: 'About the production' })
+  await expect(about.locator('strong')).toHaveText('first')
+  await expect(about.getByRole('listitem')).toHaveText(['A new play', 'Live music'])
+  await expect(about.getByRole('link', { name: 'Read the programme' })).toHaveAttribute('href', 'https://example.org/programme')
+  await expect(about.getByText('<script>window.typedScript = true</script>')).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { typedScript?: boolean }).typedScript)).toBeUndefined()
 
   const events = JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent() ?? '[]') as { '@type': string, 'name': string, 'eventStatus': string }[]
   expect(events.map(e => [e['@type'], e.name, e.eventStatus.split('/').pop()])).toEqual([['TheaterEvent', title, 'EventScheduled'], ['TheaterEvent', title, 'EventCancelled']])
