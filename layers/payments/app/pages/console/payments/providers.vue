@@ -3,8 +3,9 @@
      card readers paired with each; a test payment on an account in test mode; and payouts entered by
      hand from the provider's statement. Secrets are set on the Worker, never typed here. -->
 <script setup lang="ts">
-interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean, missingSecrets: string[] }
-interface Account { id: string, provider: string, label: string, channels: string[], mode: 'live' | 'test', externalRef: string | null, active: boolean }
+interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean }
+interface Key { name: string, source: 'saved' | 'saved-for-module' | 'worker-secret' | null, hint: string | null }
+interface Account { id: string, provider: string, label: string, channels: string[], mode: 'live' | 'test', externalRef: string | null, active: boolean, keys: Key[], missingKeys: string[] }
 type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', provider: string, secret: string, publishableKey: string } | { kind: 'waiting-for-reader' } | { kind: 'none' }
 
 const { t } = useT()
@@ -12,6 +13,7 @@ const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
+const { confirm } = useConfirm()
 const { data, status, error, refresh } = await useAPI<{ providers: Provider[], accounts: Account[] }>('/api/payments/providers', { key: 'payments:providers' })
 
 const providerName = (id: string) => t(`payments.screens.providers.names.${id}`)
@@ -84,6 +86,44 @@ async function checkTest(a: Account) {
   catch (e) {
     run.refusal = toRefusal(e)
   }
+}
+
+// An account's keys, typed here instead of in Cloudflare. A blank field keeps the saved key.
+const keyId = (name: string) => name.toLowerCase().replaceAll('_', '-')
+const keyLabel = (name: string) => t(`payments.screens.providers.keys.${keyId(name)}.label`)
+const typed = reactive<Record<string, Record<string, string>>>({})
+const savingKeys = ref<string | null>(null)
+const keysRefusal = reactive<Record<string, ReturnType<typeof toRefusal> | undefined>>({})
+const keyItems = (a: Account) => a.keys.map(k => ({ ...k, label: keyLabel(k.name), help: t(`payments.screens.providers.keys.${keyId(k.name)}.help`) }))
+const anyTyped = (a: Account) => Object.values(typed[a.id] ?? {}).some(v => v.trim())
+async function sendKeys(a: Account, keys: Record<string, string | null>, done: string) {
+  savingKeys.value = a.id
+  keysRefusal[a.id] = undefined
+  try {
+    await $api(`/api/payments/providers/${a.id}/keys` as string, { method: 'POST', body: { keys } })
+    typed[a.id] = {}
+    toast.add({ title: t(done), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    keysRefusal[a.id] = toRefusal(e)
+  }
+  finally {
+    savingKeys.value = null
+  }
+}
+function saveKeys(a: Account) {
+  const keys = Object.fromEntries(Object.entries(typed[a.id] ?? {}).map(([name, value]) => [name, value.trim()]).filter(([, value]) => value))
+  return sendKeys(a, keys, 'payments.screens.providers.keys.saved')
+}
+async function removeKey(a: Account, name: string) {
+  const sure = await confirm({
+    verb: t('payments.screens.providers.keys.remove-verb'),
+    thing: t('payments.screens.providers.keys.remove-thing', { key: keyLabel(name), account: a.label }),
+    consequence: t('payments.screens.providers.keys.remove-body'),
+    button: t('payments.screens.providers.keys.remove-button'),
+  })
+  if (sure) await sendKeys(a, { [name]: null }, 'payments.screens.providers.keys.removed')
 }
 
 // A payout entered by hand.
@@ -180,7 +220,7 @@ async function recordPayout() {
                       :label="t('payments.screens.providers.inactive')"
                     />
                     <StatusBadge
-                      v-else-if="providerOf(a)?.missingSecrets.length"
+                      v-else-if="a.missingKeys.length"
                       tone="danger"
                       :label="t('payments.screens.providers.not-ready')"
                     />
@@ -193,10 +233,10 @@ async function recordPayout() {
                 </template>
                 <div class="space-y-4">
                   <UAlert
-                    v-if="providerOf(a)?.missingSecrets.length"
+                    v-if="a.missingKeys.length"
                     color="error"
                     icon="i-lucide-key-round"
-                    :title="t('payments.screens.providers.missing', { secrets: providerOf(a)!.missingSecrets.join(', ') })"
+                    :title="t('payments.screens.providers.missing', { secrets: a.missingKeys.map(keyLabel).join(', ') })"
                     :description="t('payments.screens.providers.missing-help')"
                   />
                   <div v-if="providerOf(a)?.capabilities.includes('webhooks')">
@@ -208,6 +248,35 @@ async function recordPayout() {
                     </p>
                     <code class="mt-1 block break-all rounded bg-elevated px-2 py-1 text-xs">{{ webhookAddress(a) }}</code>
                   </div>
+                  <section
+                    v-if="a.keys.length"
+                    class="space-y-3"
+                  >
+                    <div>
+                      <p class="text-sm font-medium">
+                        {{ t('payments.screens.providers.keys.title') }}
+                      </p>
+                      <p class="text-sm text-muted">
+                        {{ t('payments.screens.providers.keys.intro') }}
+                      </p>
+                    </div>
+                    <RefusalNotice :refusal="keysRefusal[a.id] ?? null" />
+                    <CredentialFields
+                      :model-value="typed[a.id] ?? {}"
+                      :items="keyItems(a)"
+                      :disabled="savingKeys === a.id"
+                      @update:model-value="value => typed[a.id] = value"
+                      @remove="name => removeKey(a, name)"
+                    />
+                    <UButton
+                      :label="t('payments.screens.providers.keys.save')"
+                      icon="i-lucide-key-round"
+                      size="sm"
+                      :loading="savingKeys === a.id"
+                      :disabled="!anyTyped(a)"
+                      @click="saveKeys(a)"
+                    />
+                  </section>
                   <PaymentsReaders
                     v-if="providerOf(a)?.pairsReaders"
                     :account-id="a.id"
@@ -294,18 +363,7 @@ async function recordPayout() {
                 :key="p.id"
                 :name="providerName(p.id)"
                 :description="t(`payments.screens.providers.about.${p.id}`)"
-              >
-                <StatusBadge
-                  v-if="p.missingSecrets.length"
-                  tone="warning"
-                  :label="t('payments.screens.providers.needs', { secrets: p.missingSecrets.join(', ') })"
-                />
-                <StatusBadge
-                  v-else
-                  tone="success"
-                  :label="t('payments.screens.providers.ready')"
-                />
-              </RecordListItem>
+              />
             </RecordList>
           </PageSection>
         </div>

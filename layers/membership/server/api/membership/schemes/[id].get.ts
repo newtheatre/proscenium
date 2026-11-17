@@ -2,6 +2,7 @@
 // hold it, the lists it may check against, and the dates a membership taken today would run to (MEM-01's live example).
 import { getRouterParam } from 'h3'
 import { all, defineRoute } from '#kit'
+import { charger } from '../../../charge'
 import { todayOrNull } from '../../../memberships'
 import { exampleDates, hasMemberships, lengthOptions, openChecklist, requireScheme } from '../../../schemes'
 
@@ -22,5 +23,7 @@ export default defineRoute({
     example: day ? exampleDates(scheme, options, day) : [],
     // The lists it may check against, by name only: never their contents.
     lists: await all<{ id: string, name: string }>('SELECT id, name FROM membership_verification_lists ORDER BY name'),
+    // Whether a fee is collected through the system, so adding a member asks how it is settled (P9).
+    feesOn: scheme.requiresPayment && !!(await charger()),
   }
 })

@@ -12,7 +12,7 @@ here is stable before 1.0.
 | Account | `/account` | any signed-in person |
 | Members' area | `/members` | people for whom the fact `core.member` is true (false until Identity declares it) |
 | Console | `/console` | people holding any entry ability of a console entry |
-| Site administration | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
+| Admin | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
 | Live mode | `/live` | people holding the ability of at least one live entry (a tile on the Tonight hub); not found for anyone else. A layout, not a shell: see "Live mode" below |
 
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
@@ -42,7 +42,7 @@ contributes: {
 
 - The console's platform groups (Tonight to System) are declared by core, in a fixed order.
   A theatre's own group says `before` or `after` one of them.
-- Site administration is grouped like the console. Its six groups are declared by core with
+- Admin is grouped like the console. Its six groups are declared by core with
   `menu: 'admin'` on `core.navigation-group`, in a fixed order: theatre, modules, access, email,
   connections, upkeep. Every admin entry names one of them; only the shell's Overview, `/admin`
   itself, has none.
@@ -163,8 +163,9 @@ the server for actions and sources when it is first opened, not on every page.
   `order`, optional `to`, `icon`, `count`, `hideEmpty`): the `component` is the file name of a
   component in the module's `app/account-sections/` folder; it receives `headingId` and draws itself
   with the kit's `AccountCard` (title, a one-line description of how it stands, an optional status
-  word, the way in). On a phone the overview also lists, by group, every account entry no card
-  already leads to, since the menu is not there. A module that is off leaves nothing behind.
+  word, the way in). Below the cards the overview lists, by group, every account entry no card
+  already leads to, on a laptop as on a phone (where it stands in for the folded-away menu). A
+  module that is off leaves nothing behind.
 - **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
   returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
@@ -293,16 +294,16 @@ with the field's label as its legend. `ticks` takes `options` and, if short note
 `notes: { max, label }`; its value is an array of `{ value, note? }` for the ticked options, in the
 order of the options, and a note box opens under a tick only when `notes` is given.
 
-## Site administration (R-33)
+## Admin (R-33)
 
 The fourth shell, at `/admin` (menu value `admin`). It holds install-level screens; the console keeps
 day-to-day work and each module's own settings. Someone enters it by holding the ability of at least
-one admin entry (the viewer then has the side `admin` and the account menu shows "Site administration");
+one admin entry (the viewer then has the side `admin` and the account menu shows "Admin");
 anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the console's frame with a
 strip above the page header that says where you are at every width (and carries the drawer toggle
 below 1024 pixels), a "Back to console" (or "Back to the site") row where the theatre's mark is,
 neutral buttons (the `admin-shell` class on `body` swaps the brand colour out), and a browser title
-that starts "Site administration". A page uses it with `definePageMeta({ layout: 'admin' })`.
+that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
 
 - **Overview** at `/admin`: `PageHome` with `home="admin"`, cards from `core.home-card` with `home: 'admin'`.
 - **Pages of settings**: Theatre, Branding, Sign-in, Privacy and Advanced, each `PageSettings
@@ -331,6 +332,11 @@ a layout, not a shell, and it has no navigation of its own.
   `footer` slot. Its status strip shows the title, the context, whether the device is online and the
   way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
   or My account.
+- **The till** (`/live/till`, Payments) is the combined till for show nights: every
+  `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
+  may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The console
+  keeps narrowed tills: `<PaymentsTill :modules="['box-office']" />` on Box office's Sell, and the
+  Money group links to the live till ("Open the till") rather than holding its own.
 - **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
   the device is offline the strip says that changes cannot be sent; a live screen should disable its
   writes then rather than lose them.
@@ -348,16 +354,16 @@ ability. Sign-out posts `{}` to `/api/core/sign-out`; the sign-in page is read w
 Playwright with axe in light, dark and phone widths. Contrast, hydration and rate limits are
 all exercised there; the tests use one worker because they share a local database.
 
-### The console's and Site administration's sidebars
+### The console's and Admin's sidebars
 
 One menu: each navigation group of two or more entries is a collapsible section (open when it holds
 the current page), a group of one entry is a plain link, and there are no "Everyday" and "Set up"
 headings (everyday entries come first). The sidebar is resizable as well as collapsible (Nuxt UI's
 dashboard sidebar; the width is kept in a cookie). The foot holds a Documentation link (a placeholder
-pointing at the repository's docs until screens have help pages), a Site administration link for anyone
-who holds an admin entry, and the account menu. In Site administration the theatre's mark sits where it
+pointing at the repository's docs until screens have help pages), a Admin link for anyone
+who holds an admin entry, and the account menu. In Admin the theatre's mark sits where it
 does in the console and "Back to console" (or "Back to the site") sits at the foot instead of the
-Site administration link. The navbar keeps only search.
+Admin link. The navbar keeps only search.
 ## Lists: defineList, filters, sort and columns
 
 A list is declared once and read by the page, the data route and the export. The declaration is

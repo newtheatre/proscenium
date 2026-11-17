@@ -132,6 +132,9 @@ export const audit = defineTable('core_audit', {
 export const credentials = defineTable('core_credentials', {
   moduleId: col.internal(text('module_id').notNull()),
   name: col.internal(text('name').notNull()),
+  // The record a scoped credential belongs to, such as a payment provider account; '' when it is the
+  // module's one value.
+  scope: col.internal(text('scope').notNull().default('')),
   ciphertext: col.internal(text('ciphertext').notNull()),
   keyVersion: col.internal(integer('key_version').notNull()),
   setAt: col.timestamp('set_at').notNull(),
@@ -139,7 +142,7 @@ export const credentials = defineTable('core_credentials', {
   lastUsedAt: col.timestamp('last_used_at'),
   expiresAt: col.timestamp('expires_at'),
   hint: col.internal(text('hint')),
-}, { realm: 'system', extra: t => [primaryKey({ columns: [t.moduleId, t.name] })] })
+}, { realm: 'system', extra: t => [primaryKey({ columns: [t.moduleId, t.name, t.scope] })] })
 
 export const idempotencyKeys = defineTable('core_idempotency_keys', {
   key: col.internal(text('key').notNull()),

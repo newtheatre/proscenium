@@ -1,5 +1,7 @@
 <!-- One membership (tab 5, "A membership"): the person, scheme, number and status, its dates and how
-     it started, every check made on it, ending it with a note, and correcting its dates (MEM-28). -->
+     it started, every check made on it, ending it with a note, and correcting its dates (MEM-28).
+     Where the fees module is on and the reader may see fees, its fee too, with waiving an unpaid one
+     and asking for a refund of a paid one (P7, P9); the section is absent otherwise. -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
@@ -48,6 +50,49 @@ async function end() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+  }
+}
+
+// The fee, from the fees module when it is on. Absent when it is off or the reader may not see fees.
+interface Fee { charge: { id: string, state: 'open' | 'paid' | 'void' | 'refunded' | 'part-refunded', amountMinor: number, refundedMinor: number, currency: string, paidAt: number | null } | null, canWaive: boolean, canRefund: boolean }
+const fee = await useAPI<Fee>(() => `/api/membership-fees/memberships/${id.value}/charge`, { key: `membership:fee:${id.value}`, default: () => ({ charge: null, canWaive: false, canRefund: false }) })
+const charge = computed(() => fee.error.value ? null : fee.data.value?.charge ?? null)
+const money = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(minor / 100) // not-policy: minor units to units
+const feeLine = computed(() => {
+  const c = charge.value
+  if (!c) return ''
+  const parts = [t(`membership.membership.fee-states.${c.state}`, { amount: money(c.amountMinor, c.currency) })]
+  if (c.paidAt) parts.push(dateTime(c.paidAt))
+  if (c.refundedMinor) parts.push(t('membership.membership.fee-refunded', { amount: money(c.refundedMinor, c.currency) }))
+  return parts.join(' · ')
+})
+const waiving = ref(false)
+const waiveNote = ref('')
+const refunding = ref(false)
+const refundMinor = ref<number | null>(null)
+const feeRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+async function waive() {
+  feeRefusal.value = null
+  try {
+    await $api(`/api/membership-fees/charges/${charge.value!.id}/waive` as string, { method: 'POST', body: { note: waiveNote.value } })
+    waiving.value = false
+    toast.add({ title: t('membership.membership.waived-toast'), color: 'success' })
+    await Promise.all([refresh(), fee.refresh()])
+  }
+  catch (e) {
+    feeRefusal.value = toRefusal(e)
+  }
+}
+async function refund() {
+  feeRefusal.value = null
+  try {
+    const asked = await $api<{ state: 'requested' | 'approved' }>(`/api/membership-fees/charges/${charge.value!.id}/refund` as string, { method: 'POST', body: { amountMinor: refundMinor.value } })
+    refunding.value = false
+    toast.add({ title: t(asked.state === 'approved' ? 'membership.membership.refund-approved' : 'membership.membership.refund-requested'), color: 'success' })
+    await fee.refresh()
+  }
+  catch (e) {
+    feeRefusal.value = toRefusal(e)
   }
 }
 
@@ -126,6 +171,28 @@ async function saveDates() {
             {{ m.note }}
           </p>
         </PageSection>
+        <PageSection
+          v-if="charge"
+          :title="t('membership.membership.fee')"
+        >
+          <template #actions>
+            <UButton
+              v-if="fee.data.value?.canWaive"
+              color="neutral"
+              variant="outline"
+              :label="t('membership.membership.waive')"
+              @click="waiving = true; waiveNote = ''; feeRefusal = null"
+            />
+            <UButton
+              v-if="fee.data.value?.canRefund"
+              color="neutral"
+              variant="outline"
+              :label="t('membership.membership.refund')"
+              @click="refunding = true; refundMinor = charge.amountMinor - charge.refundedMinor; feeRefusal = null"
+            />
+          </template>
+          <p>{{ feeLine }}</p>
+        </PageSection>
         <PageSection :title="t('membership.membership.checks')">
           <p
             v-if="!data.checks.length"
@@ -184,6 +251,85 @@ async function saveDates() {
           loading-auto
           :disabled="!note.trim()"
           :label="t('membership.membership.end')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="waiving"
+      :title="t('membership.membership.waive-title', { name: m?.name ?? '' })"
+    >
+      <template #body>
+        <UForm
+          id="membership-waive"
+          :state="{ waiveNote }"
+          class="space-y-4"
+          @submit="waive"
+        >
+          <RefusalNotice :refusal="feeRefusal" />
+          <p class="text-sm text-muted">
+            {{ t('membership.membership.waive-consequence') }}
+          </p>
+          <UFormField
+            :label="t('membership.membership.end-note')"
+            :help="t('membership.membership.end-note-help')"
+            required
+          >
+            <UTextarea
+              v-model="waiveNote"
+              maxlength="500"
+              :rows="2"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-waive"
+          loading-auto
+          :disabled="!waiveNote.trim()"
+          :label="t('membership.membership.waive')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="refunding"
+      :title="t('membership.membership.refund-title', { name: m?.name ?? '' })"
+    >
+      <template #body>
+        <UForm
+          id="membership-refund"
+          :state="{ refundMinor }"
+          class="space-y-4"
+          @submit="refund"
+        >
+          <RefusalNotice :refusal="feeRefusal" />
+          <p class="text-sm text-muted">
+            {{ t('membership.membership.refund-consequence') }}
+          </p>
+          <UFormField
+            :label="t('membership.membership.refund-amount')"
+            required
+          >
+            <FieldMoney
+              v-model="refundMinor"
+              :currency="charge?.currency"
+              :min="1"
+              :max="charge ? charge.amountMinor - charge.refundedMinor : undefined"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-refund"
+          color="error"
+          loading-auto
+          :disabled="!refundMinor"
+          :label="t('membership.membership.refund')"
         />
       </template>
     </UModal>

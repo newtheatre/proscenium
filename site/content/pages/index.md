@@ -8,3 +8,8 @@ description: This is the home page. Edit site/content/pages/index.md to change i
 This theatre runs on Proscenium. Edit `site/content/pages/index.md` to change this page.
 
 Prices on this site are shown in :setting{name="core.locale.currency"}.
+
+## What's on
+
+::whats-on{limit="3"}
+::

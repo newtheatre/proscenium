@@ -38,7 +38,7 @@ export default {
 
   async start(attempt) {
     if (!attempt.origin) return { next: { kind: 'none' }, answer: { state: 'failed', failureCode: 'no-return-address' } }
-    const [key, appId] = [await credential(AFFILIATE_KEY), await credential(APP_ID)]
+    const [key, appId] = [await credential(AFFILIATE_KEY, attempt.providerAccountId), await credential(APP_ID, attempt.providerAccountId)]
     if (!key || !appId) throw new Error('The SumUp affiliate key or app id is not set')
     const { keyId, signature } = await signing.sign(HANDOFF_PURPOSE, handoffData(attempt.id, attempt.returnTo))
     const back = `${attempt.origin}/api/payments/handoff/${attempt.id}/${keyId}.${signature}${attempt.returnTo ? `.${encodeReturn(attempt.returnTo)}` : ''}`

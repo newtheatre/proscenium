@@ -31,9 +31,11 @@ export interface CancelInput {
   /**
    * `staff` by default. `performance` is the box office manager's decision being carried out for a
    * performance that was cancelled, rescheduled or moved (BO-52, BO-53): no reason is asked for,
-   * the refund needs no second approver, and the message says why.
+   * the refund needs no second approver, and the message says why. `customer` is the buyer cancelling
+   * from the link in their messages, as the theatre's settings allow: no reason, and a refund less
+   * the fee that is asked for by the system, so no second person approves it.
    */
-  kind?: 'staff' | 'performance'
+  kind?: 'staff' | 'performance' | 'customer'
   /** For `performance`: what happened to it, as the message says it, such as "has been cancelled". */
   what?: string
 }
@@ -114,7 +116,8 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
   const paid = order.state === 'confirmed'
   // A reason is needed to cancel what was paid for. A reservation may go without one: nothing was paid, and the queue is waiting.
   const byPerformance = input.kind === 'performance'
-  if (paid && !input.reasonTermId && !byPerformance) refuse('box-office.order.bad-reason', 'Choose a reason for cancelling paid tickets.', { status: 422, fields: { reasonTermId: 'required' } })
+  const byBuyer = input.kind === 'customer'
+  if (paid && !input.reasonTermId && !byPerformance && !byBuyer) refuse('box-office.order.bad-reason', 'Choose a reason for cancelling paid tickets.', { status: 422, fields: { reasonTermId: 'required' } })
   const term = input.reasonTermId ? await getTerm(input.reasonTermId) : null
   if (input.reasonTermId && (!term || term.vocabularyKey !== REASONS || term.retired))
     refuse('box-office.order.bad-reason', 'That reason is not on the list of reasons for cancelling.', { status: 422, remedy: 'Choose a reason from the list.' })
@@ -160,7 +163,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
     ? sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE ${still}`
     : sql`UPDATE box_office_orders SET state = 'cancelled', total_minor = ${totalMinor}, cancelled_at = ${at}, release_at = NULL, updated_at = ${at} WHERE ${still}`)
     .expect(1, changed)
-  const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: byPerformance ? 'performance_cancelled' : 'staff', reasonTermId: input.reasonTermId ?? null, note: input.note ?? null, lineIds: ids, refundId: refund?.id ?? null, feeMinor, by: input.by }])
+  const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: byPerformance ? 'performance_cancelled' : byBuyer ? 'customer' : 'staff', reasonTermId: input.reasonTermId ?? null, note: input.note ?? null, lineIds: ids, refundId: refund?.id ?? null, feeMinor, by: input.by }])
 
   // The fee kept stops being owed to the audience now. It is whatever of each performance's lines
   // the refund does not take back, so the two together always empty what the lines had deferred.

@@ -2,13 +2,14 @@
      against the cash counted and the reason for any difference. The chart above draws the last twelve
      closed sessions, so a till that is short every Friday shows as a pattern. A session left being
      counted, such as one whose difference needs a second person, can be closed here by someone
-     allowed to. Search finds sessions by who opened them. -->
+     allowed to. Search finds sessions by who opened them. Sessions that handled no cash, as where the
+     theatre takes none, leave the cash columns empty and stay out of the chart. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { sessionsList } from '../../../../shared/lists'
 
 type State = 'open' | 'counting' | 'closed'
-interface Row { canClose?: boolean, id: string, pointLabel: string, openedByName: string, closedByName: string | null, openedAt: number, closedAt: number | null, state: State, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
+interface Row { canClose?: boolean, handlesCash: boolean, id: string, pointLabel: string, openedByName: string, closedByName: string | null, openedAt: number, closedAt: number | null, state: State, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
 const ROUTE = '/api/payments/sessions'
 const TONES = { open: 'success', counting: 'warning', closed: 'neutral' } as const
@@ -32,7 +33,7 @@ const list = computed(() => ({
 // Each bar is named for when its session opened, and for its till when there is more than one. Two
 // rows with the same name would be drawn as one, so a repeat is numbered.
 const bars = computed(() => {
-  const counted = recent.value?.sessions ?? []
+  const counted = (recent.value?.sessions ?? []).filter(s => s.handlesCash)
   const tills = new Set(counted.map(s => s.pointLabel)).size > 1
   const seen = new Map<string, number>()
   return counted.map((s) => {
@@ -42,7 +43,7 @@ const bars = computed(() => {
     return { session: times > 1 ? `${name} (${times})` : name, expected: s.expectedCashMinor, counted: s.countedCashMinor ?? 0 }
   })
 })
-const differing = computed(() => (recent.value?.sessions ?? []).filter(s => s.varianceMinor).length)
+const differing = computed(() => (recent.value?.sessions ?? []).filter(s => s.handlesCash && s.varianceMinor).length)
 
 // Closing a session left being counted needs payments.session.close-any; the route says so on each row.
 const closing = ref<Row | null>(null)
@@ -81,13 +82,14 @@ async function closed() {
       />
     </template>
     <template #cell-expected="{ row }">
-      {{ money(row.expectedCashMinor, row.currency) }}
+      {{ row.handlesCash ? money(row.expectedCashMinor, row.currency) : '' }}
     </template>
     <template #cell-counted="{ row }">
-      {{ row.countedCashMinor === null ? '' : money(row.countedCashMinor, row.currency) }}
+      {{ row.countedCashMinor === null || !row.handlesCash ? '' : money(row.countedCashMinor, row.currency) }}
     </template>
     <template #cell-difference="{ row }">
-      <template v-if="row.varianceMinor">
+      <template v-if="!row.handlesCash" />
+      <template v-else-if="row.varianceMinor">
         <span class="font-medium">{{ signed(row.varianceMinor, row.currency) }}</span>
         <span
           v-if="row.varianceNote"

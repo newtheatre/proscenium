@@ -3,7 +3,8 @@
 // fields, and credits through shownCredits. The public site's routes read through here, and so may
 // any module with a public page of its own, such as Box office's booking pages, whether or not the
 // public site is switched on. Whether past shows are public is the public site's setting, not this.
-import { all, first, nowMs } from '#kit'
+import { all, first, nowMs, theatreTimeZone, useSetting } from '#kit'
+import { instantOfLocal, localDateOf } from '#kit/clock'
 import { productionBySlug } from './service'
 import { shownCredits, type ShownCredit } from './credits'
 import { bookingActions, type ShownBooking } from './booking'
@@ -164,24 +165,65 @@ export interface PublicListing {
   poster: PublicImage | null
 }
 
+export interface WhatsOnOptions {
+  /** A category term's slug. */
+  category?: string
+  /** A published or archived season's slug. */
+  season?: string
+  /** A venue's slug: only dates there count. */
+  venue?: string
+  /** YYYY-MM in the theatre's time zone: only dates starting that month count. */
+  month?: string
+  /** At most this many, soonest first. */
+  limit?: number
+  now?: number
+}
+
+export interface WhatsOnFilters {
+  categories: PublicTerm[]
+  seasons: { id: string, slug: string, name: string }[]
+  venues: { id: string, slug: string, name: string }[]
+  /** YYYY-MM, soonest first, in the theatre's time zone; empty until the time zone is set. */
+  months: string[]
+}
+
+// A date that is still to come and on sale to the public's eye: scheduled, not yet over, on a
+// published, listed production. Filters narrow the dates (venue, month) or the productions.
+const UPCOMING = `FROM core_productions p
+       JOIN core_performances f ON f.production_id = p.id AND f.state = 'scheduled' AND f.ends_at > ?
+       JOIN core_venues v ON v.id = f.venue_id
+       LEFT JOIN core_terms c ON c.id = p.category_term_id
+       LEFT JOIN core_seasons s ON s.id = p.season_id AND s.state IN ('published', 'archived')
+      WHERE p.state = 'published' AND p.listed = 1`
+
 /**
  * What's on (C-38): published, listed productions with a scheduled performance still to come,
- * soonest first. Unlisted productions keep their page but stay out of lists and feeds.
+ * soonest first, narrowed by category, season, venue or month (the screen's filters, and the
+ * whats-on content component's). Unlisted productions keep their page but stay out of lists and feeds.
  */
-export async function currentProductions(options: { now?: number } = {}): Promise<PublicListing[]> {
+export async function currentProductions(options: WhatsOnOptions = {}): Promise<PublicListing[]> {
   const now = options.now ?? nowMs()
+  const conditions: [string, unknown[]][] = []
+  if (options.category) conditions.push(['c.slug = ?', [options.category]])
+  if (options.season) conditions.push(['s.slug = ?', [options.season]])
+  if (options.venue) conditions.push(['v.slug = ?', [options.venue]])
+  if (options.month) {
+    const zone = await theatreTimeZone()
+    const [y, m] = options.month.split('-').map(Number) as [number, number]
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}` // not-policy: months in a year
+    conditions.push(['f.starts_at >= ? AND f.starts_at < ?', [instantOfLocal(`${options.month}-01`, '00:00', zone), instantOfLocal(`${next}-01`, '00:00', zone)]])
+  }
+  const where = conditions.map(([c]) => c)
+  const params = [now, ...conditions.flatMap(([, p]) => p)]
+  const limit = options.limit ? ` LIMIT ${Math.max(1, Math.floor(options.limit))}` : ''
   const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, next_starts_at: number, last_ends_at: number, venues: string }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
         min(f.starts_at) AS next_starts_at, max(f.ends_at) AS last_ends_at,
         json_group_array(DISTINCT v.name) AS venues
-       FROM core_productions p
-       JOIN core_performances f ON f.production_id = p.id AND f.state = 'scheduled' AND f.ends_at > ?
-       JOIN core_venues v ON v.id = f.venue_id
-       LEFT JOIN core_terms c ON c.id = p.category_term_id
-      WHERE p.state = 'published' AND p.listed = 1
+       ${UPCOMING}${where.map(w => ` AND ${w}`).join('')}
       GROUP BY p.id
-      ORDER BY next_starts_at, p.id`,
-    now,
+      ORDER BY next_starts_at, p.id${limit}`,
+    ...params,
   )
   const images = await publicImages(rows.map(r => r.id))
   return rows.map(r => ({
@@ -196,6 +238,35 @@ export async function currentProductions(options: { now?: number } = {}): Promis
     venues: (JSON.parse(r.venues) as string[]).sort(),
     poster: images.get(r.id)!.poster,
   }))
+}
+
+/** The choices what's on can be narrowed by: only those that something on now has. */
+export async function whatsOnFilters(options: { now?: number } = {}): Promise<WhatsOnFilters> {
+  const now = options.now ?? nowMs()
+  const rows = await all<{ category_id: string | null, category_slug: string | null, category_label: string | null, category_sort: number | null, season_id: string | null, season_slug: string | null, season_name: string | null, season_starts: string | null, venue_id: string, venue_slug: string, venue_name: string, starts_at: number }>(
+    `SELECT c.id AS category_id, c.slug AS category_slug, c.label AS category_label, c.sort AS category_sort,
+        s.id AS season_id, s.slug AS season_slug, s.name AS season_name, s.starts_on AS season_starts,
+        v.id AS venue_id, v.slug AS venue_slug, v.name AS venue_name, f.starts_at
+       ${UPCOMING}`,
+    now,
+  )
+  const zone = await useSetting('core.locale.time-zone') as string | null
+  const categories = new Map<string, PublicTerm & { sort: number }>()
+  const seasons = new Map<string, { id: string, slug: string, name: string, startsOn: string }>()
+  const venues = new Map<string, { id: string, slug: string, name: string }>()
+  const months = new Set<string>()
+  for (const r of rows) {
+    if (r.category_id) categories.set(r.category_id, { id: r.category_id, slug: r.category_slug!, label: r.category_label!, sort: r.category_sort ?? 0 })
+    if (r.season_id) seasons.set(r.season_id, { id: r.season_id, slug: r.season_slug!, name: r.season_name!, startsOn: r.season_starts ?? '' })
+    venues.set(r.venue_id, { id: r.venue_id, slug: r.venue_slug, name: r.venue_name })
+    if (zone) months.add(localDateOf(Math.max(r.starts_at, now), zone).slice(0, 7)) // not-policy: YYYY-MM of YYYY-MM-DD
+  }
+  return {
+    categories: [...categories.values()].sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label)).map(({ sort: _, ...c }) => c),
+    seasons: [...seasons.values()].sort((a, b) => a.startsOn.localeCompare(b.startsOn)).map(({ startsOn: _, ...s }) => s),
+    venues: [...venues.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    months: [...months].sort(),
+  }
 }
 
 async function publicPerformances(productions: ProductionRow[], now: number, cancelledVisible: boolean): Promise<PublicPerformance[]> {

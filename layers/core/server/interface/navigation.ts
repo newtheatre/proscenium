@@ -119,7 +119,7 @@ function item(entry: DeclaredEntry): NavItem {
 /** The flat list for a shell without groups, or the grouped sidebar for the console. */
 export async function navigationFor(actor: Actor, shell: ShellName): Promise<{ items: NavItem[], groups: NavGroup[] }> {
   const entries = await allowedEntries(actor, shell)
-  // The console and Site administration are grouped; the others are flat lists.
+  // The console and Admin are grouped; the others are flat lists.
   if (shell !== 'console' && shell !== 'admin') return { items: entries.map(item).sort(byOrder), groups: [] }
   const declared = (await declaredGroups()).filter(g => (g.menu ?? 'console') === shell)
   // Admin's Overview is the shell's home and sits in no group; a module's tabs are on its page.

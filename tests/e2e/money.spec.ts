@@ -20,12 +20,14 @@ const treasurer = {
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 
 test.beforeAll(async ({ playwright }) => {
-  const owner = { kind: 'person', accountId: 'acc_moneyowner', name: 'Money Owner', assurance: 'strong', reassertedAt: Date.now(), grants: [grant('core.settings.manage'), grant('core.modules.manage')] }
+  const owner = { kind: 'person', accountId: 'acc_moneyowner', name: 'Money Owner', assurance: 'strong', reassertedAt: Date.now(), grants: [grant('core.settings.manage'), grant('core.modules.manage'), grant('payments.settings.manage')] }
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
   await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
   // The till posts a sale to the ledger, which dates it in the theatre's time zone.
   expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'core.locale.time-zone', value: 'Europe/London' }], confirm: true } })).ok()).toBe(true)
   for (const id of ['finance', 'payments']) expect((await api.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
+  // The till tests take cash, which a theatre turns on; the last test turns it off again.
+  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: true }], confirm: true } })).ok()).toBe(true)
   await api.dispose()
 })
 test.use(as(treasurer))
@@ -42,7 +44,6 @@ async function noViolations(page: Page) {
 }
 
 const SCREENS = [
-  ['/console/payments/till', 'Till'],
   ['/console/payments/session', 'My session'],
   ['/console/payments/sessions', 'Till sessions'],
   ['/console/payments/attention', 'Needs attention'],
@@ -75,6 +76,15 @@ for (const [path, title] of [['/console/payments/session', 'Payments settings'],
   })
 }
 
+test('the till is a live screen: a tile on Tonight and a link in the Money group', async ({ page }) => {
+  await visit(page, '/console/payments/sessions')
+  await expect(page.getByRole('link', { name: 'Open the till' })).toHaveAttribute('href', '/live/till')
+  await visit(page, '/live')
+  await page.getByRole('link', { name: 'Till' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
+  await noViolations(page)
+})
+
 test('My session opens a till with a float and shows the cash expected', async ({ page }) => {
   await visit(page, '/console/payments/session')
   await page.getByRole('textbox', { name: /^Till/ }).fill('Box office desk')
@@ -94,7 +104,7 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   expect([200, 409]).toContain(opened.status())
   await api.dispose()
 
-  await visit(page, '/console/payments/till')
+  await visit(page, '/live/till')
   await expect(page.getByRole('heading', { name: 'Gallery programmes' })).toBeVisible()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
@@ -121,7 +131,7 @@ async function amount(field: Locator, typed: string) {
 }
 
 test('the Till takes part of the total one way and the rest another', async ({ page }) => {
-  await visit(page, '/console/payments/till')
+  await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
@@ -145,7 +155,7 @@ test('the Till takes part of the total one way and the rest another', async ({ p
 })
 
 test('the Till gives back what was taken when the customer leaves a sale paid in part', async ({ page }) => {
-  await visit(page, '/console/payments/till')
+  await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('1')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Take payment of £3.00' }).click()
@@ -166,10 +176,10 @@ test('the Till picks a sale up again when the SumUp app sends the seller back', 
   expect(made.ok()).toBe(true)
   const { intentId } = await made.json() as { intentId: string }
 
-  await visit(page, `/console/payments/till?attempt=att_none&intent=${intentId}&result=failed`)
+  await visit(page, `/live/till?attempt=att_none&intent=${intentId}&result=failed`)
   await expect(page.getByText('Still to pay: £3.00')).toBeVisible()
   await expect(page.getByText('The payment did not go through')).toBeVisible()
-  await expect(page).toHaveURL(/\/console\/payments\/till$/)
+  await expect(page).toHaveURL(/\/live\/till$/)
   await noViolations(page)
   expect((await api.post(`/api/payments/intents/${intentId}/cancel`, { data: {} })).ok()).toBe(true)
   await api.dispose()
@@ -193,4 +203,46 @@ test('the Ledger lists the sale with its entries open, and the Refunds view leav
   await noViolations(page)
   await visit(page, '/console/finance/ledger?view=refunds')
   await expect(page.getByRole('cell', { name: 'Sale' })).toHaveCount(0)
+})
+
+test('Providers takes a Stripe account\'s keys, shows only their last four characters, and removes one', async ({ page, playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
+  const label = `Stripe keys ${Date.now()}`
+  expect((await api.post('/api/payments/providers', { data: { provider: 'stripe', label, channels: ['online'], mode: 'test' }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
+  await api.dispose()
+  await visit(page, '/console/payments/providers')
+  const card = page.locator('div').filter({ has: page.getByText(label, { exact: true }) }).filter({ has: page.getByRole('button', { name: 'Save keys' }) }).last()
+  await expect(card.getByText('Missing Secret key, Webhook signing secret, Publishable key')).toBeVisible()
+  await card.getByLabel('Secret key').fill('sk_test_e2eabcdefghijklm1234')
+  await card.getByLabel('Webhook signing secret').fill('whsec_e2eabcdefghijklm5678')
+  await card.getByLabel('Publishable key').fill('pk_test_e2eabcdefghijklm9012')
+  await card.getByRole('button', { name: 'Save keys' }).click()
+  await expect(page.getByText('Keys saved', { exact: true }).first()).toBeVisible()
+  await expect(card.getByText('Saved, ending 1234')).toBeVisible()
+  await expect(card.getByText('Missing', { exact: false })).toHaveCount(0)
+  await expect(card.getByLabel('Secret key')).toHaveValue('')
+  await noViolations(page)
+  await card.getByRole('button', { name: 'Remove' }).first().click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove key' }).click()
+  await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
+  await expect(card.getByText('Missing Secret key')).toBeVisible()
+})
+
+test('without cash, My session asks for no float and closes in one step', async ({ page, playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
+  // Back to the default, which later files expect too.
+  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: false }], confirm: true } })).ok()).toBe(true)
+  await api.dispose()
+  const seller = { ...treasurer, accountId: 'acc_nocashseller', name: 'Nora No-Cash', grants: ['payments.session.open', 'payments.session.view'].map(grant) }
+  await page.context().setExtraHTTPHeaders(as(seller).extraHTTPHeaders)
+  await visit(page, '/console/payments/session')
+  await expect(page.getByLabel(/^Float/)).toHaveCount(0)
+  await page.getByRole('textbox', { name: /^Till/ }).fill('Card desk')
+  await page.getByRole('button', { name: 'Open session' }).click()
+  await expect(page.getByRole('heading', { name: 'Card desk' })).toBeVisible()
+  await expect(page.getByText('Cash expected now')).toHaveCount(0)
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Close session' }).click()
+  await expect(page.getByText('Session closed', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Open a till session' })).toBeVisible()
 })
