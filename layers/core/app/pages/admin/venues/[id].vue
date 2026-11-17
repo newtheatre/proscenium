@@ -4,7 +4,7 @@
 // use it and takes it out of pickers and the public site.
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { z } from 'zod'
-import { spaceInput, venuePatch } from '../../../../../server/places/input'
+import { spaceInput, venuePatch } from '../../../../server/places/input'
 
 interface Option { id: string, label: string, icon: string | null, retired: boolean }
 interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, managed: boolean, findingIt: string | null, archived: boolean }
@@ -119,7 +119,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
 <template>
   <PageFrame
     :title="venue?.name ?? 'Venue'"
-    :trail="[{ label: 'Venues', to: '/console/programme/venues' }]"
+    :trail="[{ label: 'Venues', to: '/admin/venues' }]"
     width="reading"
   >
     <template #status>
