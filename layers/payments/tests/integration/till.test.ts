@@ -98,7 +98,7 @@ describe('the till', () => {
     const me = seller()
     await post('/api/payments/sessions', me, { pointLabel: 'Foyer', floatMinor: 1000 }, true)
     const panels = [{ basket: 'tickets', input: { amountMinor: 2400 } }, { basket: 'snacks', input: { amountMinor: 350 } }]
-    expect((await post('/api/payments/till/summary', me, { panels })).body).toMatchObject({ amountMinor: 2750, panels: [{ basket: 'tickets', amountMinor: 2400 }, { basket: 'snacks', amountMinor: 350 }] })
+    expect((await post('/api/payments/till/summary', me, { panels })).body).toMatchObject({ amountMinor: 2750, panels: [{ basket: 'tickets', amountMinor: 2400 }, { basket: 'snacks', amountMinor: 350, ranAs: 'snacks' }] })
     expect((await get('/api/payments/methods', me)).body.methods).toContainEqual(expect.objectContaining({ providerAccountId: cash, method: 'cash' }))
     const sale = await post('/api/payments/till/sale', me, { panels }, true)
     expect(sale.body.amountMinor).toBe(2750)
