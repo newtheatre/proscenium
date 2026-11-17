@@ -29,6 +29,10 @@ import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
 import cancelPost from '../../server/api/box-office/orders/[id]/cancel.post'
 import amendPost from '../../server/api/box-office/orders/[id]/amend.post'
+import performancesGet from '../../server/api/box-office/performances/index.get'
+import doorGet from '../../server/api/box-office/performances/[id]/door.get'
+import ordersGet from '../../server/api/box-office/orders/index.get'
+import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
@@ -61,6 +65,10 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/pay': payPost,
   'POST /api/box-office/reservations/confirm': confirmPost,
   'GET /api/box-office/orders/link': orderLinkGet,
+  'GET /api/box-office/orders': ordersGet,
+  'GET /api/box-office/performances': performancesGet,
+  'GET /api/box-office/performances/:id/door': doorGet,
+  'GET /api/box-office/orders/:id': orderGet,
   'POST /api/box-office/orders/:id/release': releasePost,
   'POST /api/box-office/orders/:id/keep': keepPost,
   'POST /api/box-office/orders/link/cancel': orderCancelPost,

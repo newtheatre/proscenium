@@ -199,6 +199,8 @@ export const orders = defineTable('box_office_orders', {
     index('box_office_orders_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
     index('box_office_orders_expiring').on(t.state, t.expiresAt),
     index('box_office_orders_releasing').on(t.state, t.releaseAt),
+    // The Orders list, newest first.
+    index('box_office_orders_created').on(t.createdAt),
     check('box_office_orders_channel', sql`${t.channel} IN ('online', 'desk', 'phone')`),
     check('box_office_orders_state', sql`${t.state} IN ('basket', 'reserved', 'awaiting_payment', 'confirmed', 'cancelled', 'expired')`),
     check('box_office_orders_total', sql`${t.totalMinor} >= 0`),

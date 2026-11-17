@@ -27,14 +27,14 @@ export default defineModule({
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
-    'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public' }),
+    'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
     'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
-    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true }),
+    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Kept from each ticket when staff refund less the fee.
-    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true }),
-    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff' }),
+    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
@@ -45,14 +45,16 @@ export default defineModule({
     'performance.manage': ability({ on: 'core.performance' }),
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
-    'order.view': ability({ on: 'box-office.order', owner: 'grants' }),
+    // Seeing orders includes finding them by the buyer's name or address.
+    'order.view': ability({ on: 'box-office.order', owner: 'grants', implies: ['core.account.find'] }),
     'order.sell': ability({ on: 'core.performance', implies: ['order.view'] }),
     'order.take-payment': ability({ on: 'box-office.order', implies: ['order.view'] }),
     'order.release': ability({ on: 'box-office.order', implies: ['order.view'] }),
     // Cancelling does not imply refunding: staff with only the first cancel with no refund.
     'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
     'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
-    'ticket.admit': ability({ on: 'core.performance' }),
+    // The door finds a booking by the buyer's name as well as by its reference.
+    'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -92,6 +94,9 @@ export default defineModule({
     'payments.desk-basket': [{ id: 'box-office' }],
     'core.navigation': [
       { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
+      { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
+      { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
+      { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
