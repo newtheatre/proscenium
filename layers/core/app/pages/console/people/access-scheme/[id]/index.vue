@@ -182,6 +182,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
             <UForm
               class="space-y-4"
               :state="decision"
+              novalidate
               @submit="decide"
             >
               <URadioGroup

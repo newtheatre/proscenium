@@ -94,18 +94,23 @@ async function visit(page: Page, url: string) {
   return response
 }
 
+/** The receipt's first way to pay, which carries the total. */
+const payButton = (page: Page, amount: string) => page.getByRole('button', { name: new RegExp(` · ${amount.replace('.', '\\.')}$`) })
+/** Paying by cash from the receipt: one press makes the sale and asks for the cash. Other browser tests may have added a cash drawer too. */
+const cash = (page: Page) => page.getByRole('button', { name: /^Cash( ·|$)/ }).first()
+
 async function noViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
 
 async function payCash(page: Page, amount: string) {
-  await page.getByRole('button', { name: `Take payment of ${amount}` }).click()
+  await cash(page).click()
   await expect(page.getByText(`Still to pay: ${amount}`)).toBeVisible()
-  await page.getByRole('radio', { name: 'Cash' }).first().check()
   await page.getByRole('button', { name: 'Cash taken' }).click()
-  await expect(page.getByText(`Paid: ${amount}`, { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+  // The till says so once.
+  await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
 }
 
 test('Sell sells tickets at the desk for cash', async ({ page }) => {
@@ -115,12 +120,17 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Sell' }).first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
   const quantity = page.getByLabel(`Stalls, ${typeName}, £12.00`)
+  // How many are left is the field's help, which it names as its description.
+  const help = page.locator(`[id="${(await quantity.getAttribute('aria-describedby'))!.split(' ').at(-1)}"]`)
+  const before = Number((await help.textContent())!.match(/(\d+) left/)![1])
   await quantity.fill('2')
   await quantity.blur()
   await page.getByRole('checkbox', { name: 'Admit now' }).check()
-  await expect(page.getByRole('button', { name: 'Take payment of £24.00' })).toBeEnabled()
+  await expect(payButton(page, '£24.00')).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£24.00')
+  // The panel shows what is left after the sale without a reload.
+  await expect(help).toHaveText(`${before - 2} left`)
 })
 
 test('Sell finds a reservation by its reference and takes payment for it', async ({ page }) => {
@@ -131,7 +141,7 @@ test('Sell finds a reservation by its reference and takes payment for it', async
   await expect(page.getByRole('heading', { name: `Booking ${reference}` })).toBeVisible()
   await expect(page.getByText('Reserved, not paid')).toBeVisible()
   await expect(page.getByText('To pay: £12.00')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £12.00' })).toBeEnabled()
+  await expect(payButton(page, '£12.00')).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£12.00')
   // Found again, it is paid for.
@@ -144,7 +154,7 @@ test('a payment left by a reload is picked up again, and another till can cancel
   await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(unfinished)
   await page.getByRole('button', { name: 'Find' }).click()
-  await page.getByRole('button', { name: 'Take payment of £12.00' }).click()
+  await cash(page).click()
   await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
   // Reloaded mid-payment: the till carries on with the same payment.
   await page.reload()
@@ -163,7 +173,7 @@ test('a payment left by a reload is picked up again, and another till can cancel
   await noViolations(other)
   await other.getByRole('button', { name: 'Cancel that payment' }).click()
   await expect(other.getByText('Reserved, not paid')).toBeVisible()
-  await expect(other.getByRole('button', { name: 'Take payment of £12.00' })).toBeEnabled()
+  await expect(payButton(other, '£12.00')).toBeEnabled()
   await officeContext.close()
 })
 
@@ -208,7 +218,7 @@ test('Sell takes the difference on an exchange for a dearer ticket', async ({ pa
   page = await officeContext.newPage()
   await visit(page, `/console/box-office/sell?exchange=${encodeURIComponent(JSON.stringify(exchange))}`)
   await expect(page.getByRole('heading', { name: `Exchange on booking ${swapping}` })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £3.00' })).toBeEnabled()
+  await expect(payButton(page, '£3.00')).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£3.00')
 
@@ -229,9 +239,13 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
   await page.getByRole('tab', { name: 'Gallery programmes' }).click()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
-  await expect(page.getByRole('button', { name: 'Take payment of £6.00' })).toBeEnabled()
+  await expect(payButton(page, '£6.00')).toBeEnabled()
   await expect(page.getByRole('tab', { name: /^Gallery programmes/ })).toContainText('1')
   await noViolations(page)
+  // On a phone the till fits the screen: nothing scrolls sideways, however long a performance's name.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('tab', { name: 'Tickets', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
   await context.close()
 })
 
@@ -248,13 +262,12 @@ test('the till in live mode collects a reservation, changed to who came, and tak
   await expect(page.getByText('To pay: £27.00')).toBeVisible()
   await page.getByRole('button', { name: `Remove ${typeName}` }).click()
   await expect(page.getByText('To pay: £15.00')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £15.00' })).toBeEnabled()
+  await expect(payButton(page, '£15.00')).toBeEnabled()
   await noViolations(page)
-  await page.getByRole('button', { name: 'Take payment of £15.00' }).click()
-  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
 
 test.describe('the box office console', () => {
@@ -330,6 +343,28 @@ test.describe('the box office console', () => {
     await page.getByRole('searchbox', { name: 'Search ticket types' }).fill(spare)
     await expect(page.getByText(typeName, { exact: true })).toBeHidden()
     await expect(page.getByText(spare, { exact: true })).toBeVisible()
+    await noViolations(page)
+  })
+
+  test('a ticket preset is made with typed prices, with sections, and made the theatre\'s usual', async ({ page }) => {
+    const name = `Preset ${stamp}`
+    await visit(page, '/admin/modules/box-office/ticket-presets')
+    // Someone without Admin sees it in the settings window over the console.
+    await expect(page.getByRole('heading', { name: 'Ticket presets' }).first()).toBeVisible()
+    await page.getByRole('button', { name: 'New preset' }).first().click()
+    const dialog = page.getByRole('dialog', { name: 'New preset' })
+    await dialog.getByLabel('Name').fill(name)
+    await dialog.getByRole('spinbutton', { name: `Price of ${typeName}` }).fill('12')
+    await dialog.getByRole('switch', { name: 'Different prices for parts of the house' }).click()
+    await dialog.getByRole('textbox', { name: 'Name of section 2' }).fill('Balcony')
+    await dialog.getByRole('spinbutton', { name: `Price of ${typeName} in Balcony` }).fill('8')
+    await noViolations(page)
+    await dialog.getByRole('button', { name: 'Save preset' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByText(`Stalls: ${typeName} £12.00; Balcony: ${typeName} £8.00`, { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: `Actions for ${name}` }).click()
+    await page.getByRole('menuitem', { name: 'Make it the theatre\'s usual' }).click()
+    await expect(page.getByText('The theatre\'s usual').first()).toBeVisible()
     await noViolations(page)
   })
 })

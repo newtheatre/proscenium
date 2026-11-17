@@ -38,6 +38,11 @@ async function visit(page: Page, url: string) {
   return response
 }
 
+/** The receipt's first way to pay, which carries the total. */
+const payButton = (page: Page, amount: string) => page.getByRole('button', { name: new RegExp(` · ${amount.replace('.', '\\.')}$`) })
+/** Paying by cash from the receipt: one press makes the sale and asks for the cash. Other browser tests may have added a cash drawer too. */
+const cash = (page: Page) => page.getByRole('button', { name: /^Cash( ·|$)/ }).first()
+
 async function noViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
@@ -121,17 +126,16 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByRole('heading', { name: 'Gallery programmes' })).toBeVisible()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
-  await expect(page.getByRole('button', { name: 'Take payment of £6.00' })).toBeEnabled()
+  await expect(payButton(page, '£6.00')).toBeEnabled()
   await noViolations(page)
-  await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
+  await cash(page).click()
   await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
-  await page.getByRole('radio', { name: 'Cash' }).first().check() // other browser tests may have added a cash drawer too
   await page.getByLabel(/^Cash handed over/).fill('10')
   await noViolations(page)
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
   // The sale opened the session, shown as Your session above Till sessions with the cash expected.
   await expect(page.getByText(/^Your session since/)).toBeVisible()
   await visit(page, '/console/payments/sessions')
@@ -154,8 +158,7 @@ test('the Till takes part of the total one way and the rest another', async ({ p
   await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
-  await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
-  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await page.getByRole('button', { name: 'Split' }).click()
   // Typed as a seller types it, over the whole of what is there. Playwright's fill() sets the text in
   // one go, which the number field's own input checks sometimes refuse once it holds a formatted
   // amount, leaving the old one in place.
@@ -163,13 +166,14 @@ test('the Till takes part of the total one way and the rest another', async ({ p
   await amount(part, '7')
   await expect(page.getByText('Enter an amount above nothing and no more than £6.00.')).toBeVisible()
   await amount(part, '2.50')
+  await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken: £2.50' }).click()
   await expect(page.getByText('£2.50 taken. Still to pay: £3.50', { exact: true })).toBeVisible()
   await expect(page.getByText('Paid so far: £2.50')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Give back what was taken' })).toBeVisible()
   await noViolations(page)
-  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken: £3.50' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
 })
@@ -178,16 +182,16 @@ test('the Till gives back what was taken when the customer leaves a sale paid in
   await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('1')
   await page.getByLabel('Programmes sold').blur()
-  await page.getByRole('button', { name: 'Take payment of £3.00' }).click()
-  await page.getByRole('radio', { name: 'Cash' }).first().check()
+  await page.getByRole('button', { name: 'Split' }).click()
   await amount(page.getByLabel(/^Amount to take this way/), '2')
+  await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken: £2.00' }).click()
   await expect(page.getByText('Paid so far: £2.00')).toBeVisible()
   await page.getByRole('button', { name: 'Give back what was taken' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Give back what was taken' }).click()
   await expect(page.getByText('Sale ended and payment given back', { exact: true })).toBeVisible()
   await expect(page.getByText('£2.00 handed back.', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
 
 test('the Till picks a sale up again when the SumUp app sends the seller back', async ({ page, playwright }) => {

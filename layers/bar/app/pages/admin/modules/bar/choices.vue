@@ -229,6 +229,7 @@ async function saveAllergens() {
           id="bar-choice"
           :state="group"
           class="space-y-4"
+          novalidate
           @submit="saveGroup"
         >
           <RefusalNotice :refusal="refusal" />
@@ -319,6 +320,7 @@ async function saveAllergens() {
           id="bar-choice-option"
           :state="option"
           class="space-y-4"
+          novalidate
           @submit="saveOption"
         >
           <RefusalNotice :refusal="refusal" />
@@ -363,6 +365,7 @@ async function saveAllergens() {
           id="bar-option-allergens"
           :state="label"
           class="space-y-4"
+          novalidate
           @submit="saveAllergens"
         >
           <RefusalNotice :refusal="refusal" />

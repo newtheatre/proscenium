@@ -177,6 +177,7 @@ async function savePreset() {
         id="bar-add-product"
         :state="form"
         class="space-y-4"
+        novalidate
         @submit="add"
       >
         <RefusalNotice :refusal="refusal" />
@@ -334,6 +335,7 @@ async function savePreset() {
         id="bar-save-preset"
         :state="saving"
         class="space-y-4"
+        novalidate
         @submit="savePreset"
       >
         <RefusalNotice :refusal="saveRefusal" />

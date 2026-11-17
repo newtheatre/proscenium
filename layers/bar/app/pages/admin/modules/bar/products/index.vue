@@ -229,6 +229,7 @@ async function move(p: Product, direction: 'up' | 'down') {
           id="bar-category"
           :state="category"
           class="space-y-4"
+          novalidate
           @submit="saveCategory"
         >
           <RefusalNotice :refusal="refusal" />

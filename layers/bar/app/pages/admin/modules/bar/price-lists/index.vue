@@ -108,6 +108,7 @@ async function setActive(l: List, active: boolean) {
           id="bar-list"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />

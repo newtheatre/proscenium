@@ -95,6 +95,7 @@ const describe = (a: Application) => [
           id="membership-decide"
           :state="{ note }"
           class="space-y-4"
+          novalidate
           @submit="decide"
         >
           <RefusalNotice :refusal="refusal" />

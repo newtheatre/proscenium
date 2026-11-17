@@ -79,7 +79,8 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
 
   // A change set for later waits for its date, is listed meanwhile, and can be cancelled.
   await page.getByRole('radio', { name: 'From a later date' }).check()
-  await expect(page.getByRole('button', { name: 'Set prices for later' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Set prices for later' }).click()
+  await expect(page.getByText('This is needed.').first()).toBeVisible()
   const setup = await (await page.request.get(`/api/box-office/performances/${performanceId}/sales`)).json()
   const band = setup.bands.find((b: { name: string }) => b.name === 'Circle')
   const type = setup.priceLayers.find((l: { bandId: string }) => l.bandId === band.id)

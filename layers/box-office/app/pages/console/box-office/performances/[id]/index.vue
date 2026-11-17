@@ -12,7 +12,7 @@ type Sales = 'draft' | 'on_sale' | 'paused' | 'closed'
 interface Band { id: string, name: string, kind: string, sort: number }
 interface Pool { bandId: string, capacity: number, claimed: number }
 interface Price { bandId: string, ticketTypeId: string, amountMinor: number }
-interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean }
+interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean, managedBy?: string | null }
 interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
 interface ScheduledPrice { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }
 interface Setup {
@@ -40,8 +40,10 @@ const id = computed(() => String(route.params.id))
 
 const { data, status, error, refresh } = await useAPI<Setup>(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/sales`, { key: `box-office:setup:${id.value}` })
 const { data: types } = await useAPI<{ ticketTypes: TicketType[] }>('/api/box-office/ticket-types', { key: 'box-office:ticket-types', default: () => ({ ticketTypes: [] }) })
-// Complimentary tickets are issued by approving a request, never priced; a type whose module is off is not sold.
-const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary'))
+// Complimentary tickets are issued by approving a request, never priced; a type whose module is off is
+// not sold; a Wheelchair space costs the lowest price the buyer can have, so it is not priced here.
+const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary' && type.managedBy !== 'box-office.wheelchair'))
+const wheelchairSold = computed(() => (types.value?.ticketTypes ?? []).some(type => type.active && type.available !== false && type.managedBy === 'box-office.wheelchair'))
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const base = computed(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/sales`)
@@ -336,6 +338,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               v-else
               :state="{ copyFrom }"
+              novalidate
               @submit="copySetup()"
             >
               <UFormField :label="t('box-office.setup.copy.from')">
@@ -384,9 +387,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="flex flex-wrap items-end gap-2"
               :state="band"
+              :validate="() => needs({ name: band.name })"
+              novalidate
               @submit="addBand"
             >
               <UFormField
+                name="name"
                 :label="t('box-office.setup.bands.name')"
                 class="grow"
               >
@@ -406,7 +412,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                 :label="t('box-office.setup.bands.add')"
                 color="neutral"
                 variant="outline"
-                :disabled="!band.name.trim()"
               />
             </UForm>
           </PageSection>
@@ -418,6 +423,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="space-y-4"
               :state="capacity"
+              novalidate
               @submit="saveCapacity()"
             >
               <p
@@ -450,6 +456,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             :description="t('box-office.setup.prices.description')"
           >
             <p
+              v-if="wheelchairSold && activeTypes.length"
+              class="mb-4 text-sm text-muted"
+            >
+              {{ t('box-office.setup.prices.wheelchair') }}
+            </p>
+            <p
               v-if="!activeTypes.length"
               class="text-sm text-muted"
             >
@@ -462,6 +474,8 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               v-else-if="d.bands.length"
               class="space-y-6"
               :state="prices"
+              :validate="() => needs({ from: when === 'later' ? from : true })"
+              novalidate
               @submit="savePrices"
             >
               <UFormField :label="t('box-office.setup.prices.scope.label')">
@@ -482,6 +496,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               </UFormField>
               <UFormField
                 v-if="when === 'later'"
+                name="from"
                 :label="t('box-office.setup.prices.when.from')"
                 :help="t('box-office.setup.prices.when.from-help')"
                 required
@@ -521,7 +536,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               <UButton
                 type="submit"
                 :label="t(when === 'later' ? 'box-office.setup.prices.save-later' : 'box-office.setup.prices.save')"
-                :disabled="when === 'later' && from === null"
               />
             </UForm>
             <div
@@ -561,6 +575,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="space-y-4"
               :state="windowForm"
+              novalidate
               @submit="saveWindow"
             >
               <UFormField
@@ -610,9 +625,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="flex items-end gap-2"
               :state="{ newName }"
+              :validate="() => needs({ newName })"
+              novalidate
               @submit="rename"
             >
               <UFormField
+                name="newName"
                 :label="t('box-office.setup.bands.name')"
                 class="grow"
               >
@@ -625,7 +643,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               <UButton
                 type="submit"
                 :label="t('box-office.setup.bands.rename')"
-                :disabled="!newName.trim()"
               />
             </UForm>
           </template>

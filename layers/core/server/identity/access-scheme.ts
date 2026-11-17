@@ -399,6 +399,23 @@ export async function onScheme(accountId: string | undefined): Promise<boolean> 
   return row?.status === 'accepted'
 }
 
+/**
+ * Whether the person needs a wheelchair space, by their application: 'accepted' once the scheme has
+ * accepted it, 'submitted' while an application or change asking for one waits to be decided (Matt,
+ * 2026-11-17: enough to book, with the booking flagged for staff), or null.
+ */
+export async function wheelchairFor(accountId: string): Promise<'accepted' | 'submitted' | null> {
+  if (!await schemeEnabled()) return null
+  const row = await profileOf(accountId)
+  if (!row || row.status === 'rejected') return null
+  const stays = (await listTerms(NEEDS_VOCABULARY)).find(t => t.slug === WHEELCHAIR.stays)?.id
+  if (!stays) return null
+  const asks = (app: Application | null) => !!app?.needs.some(n => n.term === stays)
+  if (row.status === 'accepted' && asks(await openApp(row.payload))) return 'accepted'
+  // An application or change not yet decided waits in pending, whatever the status.
+  return asks(await openApp(row.pending)) ? 'submitted' : null
+}
+
 /** The companions an account may book now, for the requirement source. */
 export async function companionsFor(accountId: string): Promise<number> {
   const row = await profileOf(accountId)
