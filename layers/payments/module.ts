@@ -25,7 +25,7 @@ export default defineModule({
     'refunds.window': setting.duration({ default: '180d', min: '1d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     'sessions.variance-needs-second-person': setting.money({ default: 500, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
     'sessions.default-float': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff' }),
-    'cash.enabled': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'cash.enabled': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
   }),
