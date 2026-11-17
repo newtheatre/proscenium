@@ -5,9 +5,10 @@
 // it is released, and the sale is open again with its lines kept, to pay another way or change.
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSetting, type UnitView } from '#kit'
-import { operatingDayOf } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
+import { ageCheckSettings, recordSaleCheck } from './age-checks'
 import { pricesFor } from './catalogue'
+import { ensureOpening } from './openings'
 import { saleLines } from './db/schema'
 
 const MAX_LINES = 50 // not-policy: one basket's lines, far beyond a round of drinks
@@ -20,6 +21,8 @@ export const panelInput = z.object({
   clientKey: z.string().min(8).max(64), // not-policy: a device key's length
   lines: z.array(z.object({ variantId: z.string().min(1).max(64), quantity: z.number().int().min(1).max(MAX_QUANTITY) }).strict()).min(1).max(MAX_LINES), // not-policy: an id's length
   expectedTotalMinor: z.number().int().min(0),
+  // The seller's answer to the age prompt, when a line needs one. A refusal is recorded on its own.
+  ageCheck: z.enum(['not_needed', 'id_checked']).optional(),
 }).strict()
 export type PanelInput = z.infer<typeof panelInput>
 
@@ -30,7 +33,7 @@ function parse(value: unknown): PanelInput {
 }
 
 interface Outlet { id: string, name: string, price_list_id: string }
-interface Priced { variantId: string, quantity: number, label: string, unitMinor: number, amountMinor: number, priceId: string, categoryId: string }
+interface Priced { variantId: string, quantity: number, label: string, unitMinor: number, amountMinor: number, priceId: string, categoryId: string, ageRestricted: boolean }
 
 async function outletFor(id: string): Promise<Outlet> {
   const outlet = await first<Outlet>('SELECT id, name, price_list_id FROM bar_outlets WHERE id = ? AND active = 1', id)
@@ -49,8 +52,8 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
   const merged = new Map<string, number>()
   for (const l of input.lines) merged.set(l.variantId, (merged.get(l.variantId) ?? 0) + l.quantity)
   const ids = [...merged.keys()]
-  const named = await all<{ id: string, variant: string, product: string, category_id: string, sizes: number }>(
-    `SELECT v.id, v.name AS variant, p.name AS product, p.category_id,
+  const named = await all<{ id: string, variant: string, product: string, category_id: string, age_restricted: number, sizes: number }>(
+    `SELECT v.id, v.name AS variant, p.name AS product, p.category_id, p.age_restricted,
             (SELECT count(*) FROM bar_variants w WHERE w.product_id = p.id AND w.active = 1) AS sizes
        FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
       WHERE v.id IN (SELECT value FROM json_each(?)) AND v.active = 1 AND p.active = 1 AND c.active = 1`,
@@ -65,7 +68,7 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
     const price = prices.get(variantId)
     if (!price) refuse('bar.variant.no-price', `${label} has no price on this list.`, { status: 409, remedy: 'Take it out, or ask for a price to be set.' })
     const quantity = merged.get(variantId)!
-    return { variantId, quantity, label, unitMinor: price!.amountMinor, amountMinor: price!.amountMinor * quantity, priceId: price!.priceId, categoryId: n!.category_id }
+    return { variantId, quantity, label, unitMinor: price!.amountMinor, amountMinor: price!.amountMinor * quantity, priceId: price!.priceId, categoryId: n!.category_id, ageRestricted: !!n!.age_restricted }
   })
   return { outlet, priceListId, lines, totalMinor: lines.reduce((s, l) => s + l.amountMinor, 0) }
 }
@@ -91,6 +94,10 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   if (totalMinor !== input.expectedTotalMinor)
     refuse('bar.sale.total-changed', `The total is ${totalMinor} now, not ${input.expectedTotalMinor}.`, { status: 409, remedy: 'Check the basket and take payment again.' })
   if (totalMinor <= 0) refuse('bar.sale.zero', 'There is nothing to pay for in the bar basket.', { status: 422 })
+  const restricted = lines.find(l => l.ageRestricted)
+  const checks = await ageCheckSettings()
+  if (restricted && checks.enabled && !input.ageCheck)
+    refuse('bar.age-check.unanswered', `${restricted.label} needs an age check.`, { status: 409, remedy: 'Answer the age check, or refuse the sale.' })
 
   const at = nowMs()
   const existing = await first<{ id: string, state: string, opening_id: string }>('SELECT id, state, opening_id FROM bar_sales WHERE client_key = ?', input.clientKey)
@@ -103,11 +110,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   else {
     saleId = newId('bsal')
     // The outlet starts trading with its first sale (tab 3, "An opening": at the desk, and here at any outlet).
-    unit.add({
-      sql: `INSERT INTO bar_openings (id, outlet_id, performance_id, operating_day, state, opened_by, opened_at, created_at, updated_at)
-            SELECT ?, ?, NULL, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_openings WHERE outlet_id = ? AND state = 'open')`,
-      params: [newId('bopn'), outlet.id, await operatingDayOf(at), actor.accountId, at, at, at, outlet.id],
-    })
+    await ensureOpening(unit, outlet.id, actor.accountId ?? null, at)
     unit.add({
       sql: `INSERT INTO bar_sales (id, reference, opening_id, price_list_id, state, total_minor, currency, channel, sold_by, client_key, created_at, updated_at)
             SELECT ?, ?, o.id, ?, 'open', 0, ?, 'desk', ?, ?, ?, ? FROM bar_openings o WHERE o.outlet_id = ? AND o.state = 'open'`,
@@ -119,6 +122,8 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
     sql: "UPDATE bar_sales SET state = 'awaiting_payment', updated_at = ? WHERE id = ? AND state = 'open' AND total_minor = ?",
     params: [at, saleId, totalMinor],
   }).expect(1, SALE_GONE)
+  // Once per sale: a payment tried again for the same basket does not log a second check.
+  if (restricted && checks.enabled) recordSaleCheck(unit, saleId, input.ageCheck!, restricted.variantId, actor.accountId ?? null, at)
   unit.audit({ action: 'create', record: ['bar.sale', saleId], detail: { outletId: outlet.id, totalMinor } })
   return { owner: { module: 'bar', record: saleId }, amountMinor: totalMinor }
 }

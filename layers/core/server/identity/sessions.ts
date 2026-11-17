@@ -8,7 +8,7 @@ import type { ProviderId } from './providers'
 import { SESSION_COOKIE, readCookie, setSessionCookie, clearSessionCookie, deviceLabel } from './web'
 
 /** How a session was proved. An outside provider is named by its id (`providers.ts`). */
-export type Method = 'passkey' | 'link' | 'code' | 'setup' | 'recovery' | ProviderId
+export type Method = 'passkey' | 'link' | 'code' | 'setup' | 'recovery' | 'authenticator' | ProviderId
 export type Assurance = 'basic' | 'strong'
 
 export interface SessionRow {
