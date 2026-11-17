@@ -127,6 +127,13 @@ test('the home page lists what is on through ::whats-on', async ({ page }) => {
   await noViolations(page)
 })
 
+test('the header leads to what is on and to past shows', async ({ page }) => {
+  await visit(page, '/')
+  const header = page.getByRole('banner')
+  await expect(header.getByRole('link', { name: 'What\'s on' }).first()).toHaveAttribute('href', '/whats-on')
+  await expect(header.getByRole('link', { name: 'Past shows' }).first()).toHaveAttribute('href', '/shows')
+})
+
 test('what\'s on works with scripts off', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false })
   const page = await context.newPage()
