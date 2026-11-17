@@ -138,12 +138,14 @@ async function remove(c: Closure) {
         <UForm
           id="new-closure"
           :state="form"
+          :validate="() => needs({ title: form.title, ...(form.allDay ? { days: form.days.start } : { from: form.from, to: form.to }) })"
           class="space-y-4"
           novalidate
           @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="title"
             label="What it is"
             required
           >
@@ -166,6 +168,7 @@ async function remove(c: Closure) {
           />
           <UFormField
             v-if="form.allDay"
+            name="days"
             label="First and last day"
             help="For a single day, choose it twice."
             required
@@ -177,12 +180,14 @@ async function remove(c: Closure) {
             class="grid gap-4 sm:grid-cols-2"
           >
             <UFormField
+              name="from"
               label="From"
               required
             >
               <FieldDateTime v-model="form.from" />
             </UFormField>
             <UFormField
+              name="to"
               label="Until"
               required
             >
@@ -204,7 +209,6 @@ async function remove(c: Closure) {
           type="submit"
           form="new-closure"
           label="Record closure"
-          :disabled="!form.title.trim() || (form.allDay ? !form.days.start : !form.from || !form.to)"
         />
       </template>
     </UModal>

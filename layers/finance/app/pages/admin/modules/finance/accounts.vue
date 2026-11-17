@@ -123,6 +123,7 @@ async function save() {
         <UForm
           id="ledger-account"
           :state="form"
+          :validate="() => needs({ code: form.code, name: form.name, module: editing ? true : form.module })"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -130,6 +131,7 @@ async function save() {
           <RefusalNotice :refusal="refusal" />
           <div class="grid gap-4 sm:grid-cols-3">
             <UFormField
+              name="code"
               :label="t('finance.screens.accounts.code')"
               :help="t('finance.screens.accounts.code-help')"
               required
@@ -142,6 +144,7 @@ async function save() {
               />
             </UFormField>
             <UFormField
+              name="name"
               :label="t('finance.screens.accounts.name')"
               required
               class="sm:col-span-2"
@@ -163,6 +166,7 @@ async function save() {
               />
             </UFormField>
             <UFormField
+              name="module"
               :label="t('finance.screens.accounts.module')"
               :help="t('finance.screens.accounts.module-help')"
               required
@@ -193,7 +197,6 @@ async function save() {
           type="submit"
           form="ledger-account"
           :loading="busy"
-          :disabled="!form.code.trim() || !form.name.trim() || (!editing && !form.module)"
           :label="editing ? t('finance.screens.accounts.save') : t('finance.screens.accounts.add-button')"
         />
       </template>

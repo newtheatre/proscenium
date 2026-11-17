@@ -185,7 +185,9 @@ export async function house(capacity: number, options: { open?: boolean, houseCa
   if (!types) {
     const full = await req('POST', '/api/box-office/ticket-types', { name: 'Full price' })
     const concession = await req('POST', '/api/box-office/ticket-types', { name: 'Concession', kind: 'concession', proofNote: 'Bring proof' })
-    types = { fullId: full.body.ticketTypeId, concessionId: concession.body.ticketTypeId }
+    // A new site's own Full price and Concession serve when they were made already.
+    const named = async (name: string) => (await env.DB.prepare('SELECT id FROM box_office_ticket_types WHERE name = ?').bind(name).first<{ id: string }>())!.id
+    types = { fullId: full.body.ticketTypeId ?? await named('Full price'), concessionId: concession.body.ticketTypeId ?? await named('Concession') }
   }
   const band = await req('POST', `/api/box-office/productions/${production.body.id}/bands`, { name: 'Stalls' })
   expect(band.status, JSON.stringify(band.body)).toBe(200)

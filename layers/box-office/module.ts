@@ -44,12 +44,15 @@ export default defineModule({
     'comps.per-request': setting.integer({ default: 4, min: 1, max: 50, change, audience: 'staff' }),
     // Unset means no cap on approved complimentary tickets for one performance.
     'comps.per-performance': setting.integer({ unset: true, min: 0, max: 1000, change, audience: 'staff' }),
+    // The theatre's usual ticket preset, which a new show's tickets start from (show walkthrough, decision 2).
+    'presets.usual': setting.custom({ schema: z.string().regex(/^tps_[2-7a-z]{26}$/), unset: true, change: 'box-office.pricing.manage', audience: 'staff' }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
     'order': { table: 'box_office_orders', owner: 'account_id' },
     'ticket-type': { table: 'box_office_ticket_types' },
+    'ticket-preset': { table: 'box_office_ticket_presets' },
     // The requester owns the request; a grant on a performance or its production reaches it.
     'comp-request': { table: 'box_office_comp_requests', parent: 'core.performance', owner: 'requested_by' },
   }),
@@ -183,6 +186,7 @@ export default defineModule({
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
       { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40, settingsIn: ['box-office.performances'] },
+      { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [

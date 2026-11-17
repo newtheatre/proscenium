@@ -105,11 +105,13 @@ async function retire(r: Reader) {
           :id="`pair-${accountId}`"
           class="space-y-4"
           :state="form"
+          :validate="() => [...needs({ pairingCode: form.pairingCode, label: form.label }), ...(form.pairingCode.trim() && !/^[A-Za-z0-9]{8,9}$/.test(form.pairingCode.trim()) ? [{ name: 'pairingCode', message: translate('core.form.invalid.format') }] : [])]"
           novalidate
           @submit="pair"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="pairingCode"
             :label="t('payments.screens.readers.code')"
             required
             :error="refusal?.fields?.pairingCode ? refusal.reason : undefined"
@@ -122,6 +124,7 @@ async function retire(r: Reader) {
             />
           </UFormField>
           <UFormField
+            name="label"
             :label="t('payments.screens.readers.label')"
             :help="t('payments.screens.readers.label-help')"
             required
@@ -138,7 +141,6 @@ async function retire(r: Reader) {
           type="submit"
           :form="`pair-${accountId}`"
           :loading="busy"
-          :disabled="!/^[A-Za-z0-9]{8,9}$/.test(form.pairingCode.trim()) || !form.label.trim()"
           :label="t('payments.screens.readers.pair-button')"
         />
       </template>
