@@ -34,12 +34,12 @@ export async function verifySendingDomain(unit: UnitView): Promise<VerifyResult>
     const code = error instanceof MailError ? error.code : 'E_UNKNOWN'
     if (await useSetting('core.notifications.verified-domain')) {
       const reset = createUnit()
-      await changeSetting(reset, 'core.notifications.verified-domain', null, { reset: true })
+      await changeSetting(reset, 'core.notifications.verified-domain', null, { reset: true, confirm: true })
       await reset.commit()
     }
     return { verified: false, domain, code }
   }
-  await changeSetting(unit, 'core.notifications.verified-domain', domain)
+  await changeSetting(unit, 'core.notifications.verified-domain', domain, { confirm: true })
   return { verified: true, domain }
 }
 

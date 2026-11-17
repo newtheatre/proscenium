@@ -26,7 +26,7 @@ export const settings = defineSettings('core', {
   'organisation.charity-number': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
   // The day the theatre's own year ends, as MM-DD (31 July is 07-31). Identity's year-end expiry
   // of roles reads it; while it is unset, year end cannot be chosen as an expiry.
-  'organisation.year-end': setting.text({ unset: true, maxLength: 5, change: organisation }),
+  'organisation.year-end': setting.text({ unset: true, maxLength: 5, change: organisation, onChange: 'confirm' }),
 
   // Brand (C-35, C-36). Saved together through PUT /api/core/branding, which raises the revision.
   // Light or dark is the interface's (core.appearance.*), not the brand's.
@@ -36,7 +36,7 @@ export const settings = defineSettings('core', {
   'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
   'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
   // Programme (part 6). The other programme settings arrive with the screens they shape.
-  'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public' }),
+  'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public', onChange: 'confirm' }),
   'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
   'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
   // How long a production's team keeps its standing after the last performance ends (core.production-team).
@@ -49,22 +49,22 @@ export const settings = defineSettings('core', {
   'files.image-limit': setting.integer({ default: 10, min: 1, max: 50, unit: 'core.units.megabytes', change: filesConfigure, audience: 'signed-in' }),
   'files.document-limit': setting.integer({ default: 25, min: 1, max: 100, unit: 'core.units.megabytes', change: filesConfigure, audience: 'signed-in' }),
   'files.brand-limit': setting.integer({ default: 1, min: 1, max: 5, unit: 'core.units.megabytes', change: filesConfigure }),
-  'files.deleted-retention': setting.duration({ default: '30d', min: '0d', max: '365d', change: filesConfigure }),
+  'files.deleted-retention': setting.duration({ default: '30d', min: '0d', max: '365d', change: filesConfigure, onChange: 'confirm' }),
   'files.upload-timeout': setting.duration({ default: '1h', min: '5m', max: '24h', change: filesConfigure }),
 
   // Sending email (C-27, C-28, C-32). verified-domain is written only by the verify route.
-  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, screen: '/admin/email' }),
-  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, screen: '/admin/email' }),
+  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, screen: '/admin/email', onChange: 'confirm' }),
+  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, screen: '/admin/email', onChange: 'confirm' }),
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
   // The delivery pipeline (C-29), renamed from notifications.* so the engineering half sits on the
   // Advanced page. Each retry waits four times as long as the one before.
   'delivery.max-attempts': setting.integer({ replaces: 'core.notifications.max-attempts', default: 5, min: 1, max: 10, change: notificationConfigure }),
   'delivery.first-retry': setting.duration({ replaces: 'core.notifications.first-retry', default: '2m', min: '1m', max: '1h', change: notificationConfigure }),
   'delivery.stuck-after': setting.duration({ replaces: 'core.notifications.stuck-after', default: '10m', min: '5m', max: '2h', change: notificationConfigure }),
-  'delivery.log-retention': setting.duration({ replaces: 'core.notifications.log-retention', default: '400d', min: '30d', max: '2555d', change: notificationConfigure }),
-  'delivery.inbox-retention': setting.duration({ replaces: 'core.notifications.inbox-retention', default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in' }),
+  'delivery.log-retention': setting.duration({ replaces: 'core.notifications.log-retention', default: '400d', min: '30d', max: '2555d', change: notificationConfigure, onChange: 'confirm' }),
+  'delivery.inbox-retention': setting.duration({ replaces: 'core.notifications.inbox-retention', default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in', onChange: 'confirm' }),
   // C-52: the label put before the site's host when the sending domain is set up automatically.
-  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender }),
+  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender, onChange: 'confirm' }),
 })
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // not-policy: the calendar; 29 February is not every year's end
