@@ -25,6 +25,8 @@ export default defineModule({
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     // How long after curtain the desk may still sell, for latecomers.
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
+    // Show "N seats left" only at or under this many; 0 never shows it.
+    'availability.show-remaining-under': setting.integer({ default: 20, min: 0, max: 1000, change, audience: 'public' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
     'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
@@ -129,6 +131,8 @@ export default defineModule({
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.
     'core.change-guard': [{ id: 'box-office' }],
     'core.change-impact': [{ id: 'box-office' }],
+    // The booking button on the public pages: on sale, a few left, sold out, not yet, or closed.
+    'core.booking-action': [{ id: 'box-office' }],
     'core.navigation': [
       { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
       { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },

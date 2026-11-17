@@ -354,5 +354,9 @@
   "box-office.manage.cancel.button.other": "Cancel {count} tickets",
   "box-office.confirm.title": "Confirm your reservation",
   "box-office.confirm.body": "Press the button to reserve your tickets. You pay for them at the box office.",
-  "box-office.confirm.button": "Confirm my reservation"
+  "box-office.confirm.button": "Confirm my reservation",
+  "box-office.basket.checking": "Checking your payment…",
+  "box-office.basket.card-failed": "Your bank did not approve the payment. You can try again with another card.",
+  "box-office.basket.done.processing.title": "Your payment is on its way",
+  "box-office.basket.done.processing.body": "Your bank is still confirming the payment. We will email your tickets as soon as it does."
 }
