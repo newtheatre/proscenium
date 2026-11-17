@@ -51,6 +51,9 @@ export default defineModule({
     'opening.manage': ability({ on: 'bar.outlet' }),
     'settings.manage': ability({ risk: 'privileged' }),
     // The refusals register: reading it, and signing it as checked (which may erase a description).
+    // Bar sales: reading them, and asking for a refund of one (approval and sending are Payments').
+    'sale.view': ability(),
+    'sale.refund': ability({ implies: ['sale.view'] }),
     'age-check.view': ability(),
     'age-check.review': ability({ implies: ['age-check.view'] }),
   }),
@@ -63,10 +66,15 @@ export default defineModule({
       'bar.sale.paid': event({ version: 1, payload: z.object({ saleId: z.string(), openingId: z.string() }), internal: false }),
       'bar.opening.closed': event({ version: 1, payload: z.object({ openingId: z.string(), outletId: z.string() }), internal: false }),
       // For the duty manager's night report. Never carries the description.
+      'bar.sale.refunded': event({ version: 1, payload: z.object({ saleId: z.string(), refundId: z.string() }), internal: false }),
       'bar.age-check.refused': event({ version: 1, payload: z.object({ ageCheckId: z.string(), openingId: z.string() }), internal: true }),
     },
     // Standard is made when the bar is switched on.
-    listens: { 'core.module.enabled': 'standard-price-list' },
+    listens: {
+      'core.module.enabled': 'standard-price-list',
+      // A refund of the bar's part failed or was declined: its reversals let go.
+      'payments.refund.failed': 'refund-failed',
+    },
   },
 
   tasks: {
@@ -76,6 +84,17 @@ export default defineModule({
 
   contributes: {
     'core.vocabulary': [{
+      id: 'bar.refund-reason',
+      label: 'Reasons for refunding a bar sale',
+      terms: [
+        { slug: 'wrong-item', label: 'Wrong item' },
+        { slug: 'faulty', label: 'Faulty or off' },
+        { slug: 'spilled', label: 'Spilled' },
+        { slug: 'changed-mind', label: 'Customer changed their mind' },
+        { slug: 'goodwill', label: 'Goodwill' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
       id: 'bar.refusal-reason',
       label: 'Reasons for refusing a sale',
       terms: [
@@ -96,11 +115,13 @@ export default defineModule({
       { id: 'bar.outlet', file: 'outlet' },
       { id: 'bar.product', file: 'product' },
       { id: 'bar.price-list', file: 'price-list' },
+      { id: 'bar.sale', file: 'sale' },
     ],
     // The console's Bar group for everyday work; set-up screens are tabs of the bar's page in Admin.
     'core.navigation': [
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
+      { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: 'bar.sale.view', order: 15 },
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
       { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
       { id: 'bar.price-lists', menu: 'admin', group: 'modules', to: '/admin/modules/bar/price-lists', match: '/admin/modules/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
