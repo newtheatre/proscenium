@@ -150,8 +150,9 @@ the server for actions and sources when it is first opened, not on every page.
   `order`, optional `to`, `icon`, `count`, `hideEmpty`): the `component` is the file name of a
   component in the module's `app/account-sections/` folder; it receives `headingId` and draws itself
   with the kit's `AccountCard` (title, a one-line description of how it stands, an optional status
-  word, the way in). On a phone the overview also lists, by group, every account entry no card
-  already leads to, since the menu is not there. A module that is off leaves nothing behind.
+  word, the way in). Below the cards the overview lists, by group, every account entry no card
+  already leads to, on a laptop as on a phone (where it stands in for the folded-away menu). A
+  module that is off leaves nothing behind.
 - **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
   returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.

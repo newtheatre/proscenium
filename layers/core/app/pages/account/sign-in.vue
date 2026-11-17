@@ -1,4 +1,5 @@
-<!-- Signing in (ID-14; identity spec part 6): the person's passkeys and recovery codes. Adding or
+<!-- Signing in (ID-14; identity spec part 6): the person's passkeys and recovery codes, then where
+     they are signed in (ID-13, its own section since 2026-11-17). Adding or
      removing a passkey, and making new codes, need a fresh re-assertion, which `$api` asks for in
      place. The server keeps the only way in: the last passkey stays unless a confirmed address or a
      linked provider can still sign the person in. New codes are shown once and typed back. -->
@@ -158,6 +159,7 @@ function kept() {
           </PageSection>
         </div>
       </DataBoundary>
+      <SignedInBrowsers />
     </div>
   </PageFrame>
 </template>
