@@ -1,10 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7cdd08c7-e07e-4b1c-bafe-275f6b893da9",
+  "id": "f5254b98-2fda-4cb0-ae6c-4a9e19ba381f",
   "prevIds": [
-    "03ba3792-f139-4798-a873-37fe2174f3f8",
-    "58b9485f-61fc-46c8-a03d-81aaa105c432"
+    "bcf8ce7a-beb3-4187-8af3-42534b496462",
+    "ca6a8de6-f081-4835-af00-a32fa2856f01"
   ],
   "ddl": [
     {
@@ -289,6 +289,14 @@
     },
     {
       "name": "core_vocabularies",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_webhook_deliveries",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_webhooks",
       "entityType": "tables"
     },
     {
@@ -1231,6 +1239,36 @@
     },
     {
       "table": "box_office_order_lines",
+      "name": "requirement_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "requirement_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "requirement_evidence_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
       "name": "state",
       "type": "text",
       "notNull": true,
@@ -2106,6 +2144,26 @@
       "notNull": true,
       "autoincrement": false,
       "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "managed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
       "generated": null,
       "entityType": "columns"
     },
@@ -7500,6 +7558,246 @@
       "entityType": "columns"
     },
     {
+      "table": "core_webhook_deliveries",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "webhook_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "event_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "event_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "attempts",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "next_attempt_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "response_status",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "last_error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "sent_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "format",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "url",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "url_hint",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "secret",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "events",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "consecutive_failures",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "last_success_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "finance_accounts",
       "name": "id",
       "type": "text",
@@ -12157,6 +12455,24 @@
     },
     {
       "table": "box_office_order_lines",
+      "name": "box_office_order_lines_requirement",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "ticket_type_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "requirement_ref IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_order_lines",
       "name": "box_office_order_lines_claim",
       "columns": [
         {
@@ -12422,6 +12738,20 @@
       ],
       "isUnique": true,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "box_office_ticket_types_managed",
+      "columns": [
+        {
+          "value": "managed_by",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "managed_by IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -13690,6 +14020,74 @@
     {
       "table": "core_venues",
       "name": "core_venues_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "core_webhook_deliveries_event",
+      "columns": [
+        {
+          "value": "webhook_id",
+          "isExpression": false
+        },
+        {
+          "value": "event_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "core_webhook_deliveries_due",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "next_attempt_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "core_webhook_deliveries_log",
+      "columns": [
+        {
+          "value": "webhook_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "core_webhooks_name",
       "columns": [
         {
           "value": "lower(\"name\")",
@@ -15830,6 +16228,21 @@
       "entityType": "fks"
     },
     {
+      "table": "core_webhook_deliveries",
+      "name": "fk_core_webhook_deliveries_webhook_id_core_webhooks_id_fk",
+      "columns": [
+        "webhook_id"
+      ],
+      "tableTo": "core_webhooks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "finance_entries",
       "name": "fk_finance_entries_posting_id_finance_postings_id_fk",
       "columns": [
@@ -17183,6 +17596,24 @@
       "entityType": "pks"
     },
     {
+      "table": "core_webhook_deliveries",
+      "name": "core_webhook_deliveries_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "core_webhooks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "finance_accounts",
       "name": "finance_accounts_pk",
       "columns": [
@@ -18230,6 +18661,36 @@
       "table": "core_vocabularies",
       "name": "core_vocabularies_term_class",
       "value": "\"term_class\" IN ('public', 'internal')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_webhook_deliveries",
+      "name": "core_webhook_deliveries_state",
+      "value": "\"state\" IN ('queued', 'sending', 'sent', 'retrying', 'failed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "core_webhooks_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "core_webhooks_format",
+      "value": "\"format\" IN ('json', 'discord', 'slack')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "core_webhooks_secret",
+      "value": "\"format\" <> 'json' OR \"secret\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_webhooks",
+      "name": "core_webhooks_state",
+      "value": "\"state\" IN ('active', 'paused', 'failing')",
       "entityType": "checks"
     },
     {
