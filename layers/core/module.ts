@@ -43,7 +43,7 @@ export default defineModule({
       { id: 'core.account-sign-in', menu: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
       { id: 'core.account-sessions', menu: 'account', to: '/account/sessions', icon: 'i-lucide-monitor-smartphone', ability: 'signed-in', order: 35 },
       { id: 'core.account-data', menu: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },
-      { id: 'core.venues', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
+      { id: 'core.venues', menu: 'admin', group: 'theatre', to: '/admin/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
       { id: 'core.closures', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/closures', icon: 'i-lucide-calendar-x', ability: 'core.closure.manage', order: 35 },
       { id: 'core.email', menu: 'admin', group: 'email', to: '/admin/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
       { id: 'core.credits', menu: 'account', to: '/account/credits', icon: 'i-lucide-scroll-text', ability: 'signed-in', order: 42, count: 'core.my-credits', hideEmpty: true },
