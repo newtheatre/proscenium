@@ -34,6 +34,9 @@ export default defineNuxtConfig({
     '/console/programme/venues/**': { redirect: { to: '/console/venues/**', statusCode: 301 } },
     '/admin/venues': { redirect: { to: '/console/venues', statusCode: 301 } },
     '/admin/venues/**': { redirect: { to: '/console/venues/**', statusCode: 301 } },
+    // Core's Programme and People settings are tabs of Core's page in Admin, and the console's cog opens them.
+    '/console/programme/settings': { redirect: { to: '/console?settings=core', statusCode: 301 } },
+    '/console/people/settings': { redirect: { to: '/console?settings=core', statusCode: 301 } },
   },
   experimental: {
     // A link's page is fetched when a person points at or focuses it, not when the link scrolls
