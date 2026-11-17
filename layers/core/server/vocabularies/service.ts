@@ -286,32 +286,34 @@ function slugFrom(label: string): string {
   return label.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'term' // not-policy: a slug's pattern
 }
 
-export interface TermInput { label: string, description?: string | null, icon?: string | null }
+export interface TermInput { label: string, description?: string | null, icon?: string | null, groupId?: string | null }
 
 export async function addTerm(unit: UnitView, vocabularyKey: string, input: TermInput): Promise<string> {
   const vocabulary = await vocabularyOrRefuse(vocabularyKey)
   if (vocabulary.locked) LOCKED()
+  const groupId = await groupFor(vocabulary, input.groupId ?? null)
   const base = slugFrom(input.label)
   const taken = new Set((await all<{ slug: string }>('SELECT slug FROM core_terms WHERE vocabulary_key = ? AND (slug = ? OR slug LIKE ?)', vocabularyKey, base, `${base}-%`)).map(r => r.slug))
   let slug = base
   for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`
   const id = newId('trm')
   const next = await first<{ sort: number }>('SELECT coalesce(max(sort), -1) + 1 AS sort FROM core_terms WHERE vocabulary_key = ?', vocabularyKey)
-  unit.add(sql`INSERT INTO core_terms (id, vocabulary_key, slug, label, description, icon, sort, seeded, created_at)
-    SELECT ${id}, ${vocabularyKey}, ${slug}, ${input.label}, ${input.description ?? null}, ${input.icon ?? null}, ${next?.sort ?? 0}, 0, ${nowMs()}
+  unit.add(sql`INSERT INTO core_terms (id, vocabulary_key, slug, label, description, icon, sort, seeded, group_id, created_at)
+    SELECT ${id}, ${vocabularyKey}, ${slug}, ${input.label}, ${input.description ?? null}, ${input.icon ?? null}, ${next?.sort ?? 0}, 0, ${groupId}, ${nowMs()}
     WHERE ${labelFree(vocabularyKey, input.label)}`).expect(1, LABEL_TAKEN)
   unit.audit({ action: 'create', record: ['core.vocabulary', vocabularyKey], detail: { termId: id } })
   return id
 }
 
 export async function updateTerm(unit: UnitView, vocabularyKey: string, id: string, input: Partial<TermInput>): Promise<void> {
-  await vocabularyOrRefuse(vocabularyKey)
+  const vocabulary = await vocabularyOrRefuse(vocabularyKey)
   const row = await termOrRefuse(vocabularyKey, id)
+  const groupId = input.groupId === undefined ? row.group_id : await groupFor(vocabulary, input.groupId)
   const label = input.label ?? row.label
   const description = input.description === undefined ? row.description : input.description
   const icon = input.icon === undefined ? row.icon : input.icon
   const guard = row.retired_at === null ? labelFree(vocabularyKey, label, id) : sql`1`
-  unit.add(sql`UPDATE core_terms SET label = ${label}, description = ${description}, icon = ${icon} WHERE id = ${id} AND ${guard}`).expect(1, LABEL_TAKEN)
+  unit.add(sql`UPDATE core_terms SET label = ${label}, description = ${description}, icon = ${icon}, group_id = ${groupId} WHERE id = ${id} AND ${guard}`).expect(1, LABEL_TAKEN)
   unit.audit({ action: 'update', record: ['core.vocabulary', vocabularyKey], detail: { termId: id } })
 }
 
@@ -391,4 +393,77 @@ export async function updateVocabulary(unit: UnitView, key: string, input: Parti
   unit.add(sql`UPDATE core_vocabularies SET label = ${input.label ?? vocabulary.label}, description = ${input.description === undefined ? vocabulary.description : input.description},
     ordering = ${input.ordering ?? vocabulary.ordering} WHERE key = ${key}`).expect(1)
   unit.audit({ action: 'update', record: ['core.vocabulary', key] })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Headings (C-54): a grouped vocabulary keeps its terms under headings, one level deep.
+
+const GROUP_NOT_FOUND = () => refuse('core.term-group.not-found', 'This vocabulary has no such heading.', { status: 404 })
+const GROUP_TAKEN = { code: 'core.term-group.label-taken', reason: 'Another heading in this vocabulary has that label.', remedy: 'Choose a different label.' }
+
+/** The heading a term is to sit under: required, and one of this vocabulary's, in a grouped vocabulary; refused in any other. */
+async function groupFor(vocabulary: Vocabulary, groupId: string | null): Promise<string | null> {
+  if (!vocabulary.grouped) {
+    if (groupId) refuse('core.term.not-grouped', 'This vocabulary has no headings.', { status: 422, fields: { groupId: 'This vocabulary has no headings.' } })
+    return null
+  }
+  if (!groupId) refuse('core.term.group-needed', 'Every term needs a heading.', { status: 422, fields: { groupId: 'Choose a heading.' } })
+  if (!await first('SELECT 1 FROM core_term_groups WHERE id = ? AND vocabulary_key = ?', groupId, vocabulary.key)) refuse('core.term.group-unknown', 'Choose one of this vocabulary\'s headings.', { status: 422, fields: { groupId: 'Choose a heading.' } })
+  return groupId
+}
+
+async function groupedOrRefuse(key: string): Promise<Vocabulary> {
+  const vocabulary = await vocabularyOrRefuse(key)
+  if (!vocabulary.grouped) refuse('core.term.not-grouped', 'This vocabulary has no headings.', { status: 409 })
+  return vocabulary
+}
+
+/** The headings with how many terms (live or retired) sit under each. */
+export async function listTermGroupsWithUse(vocabularyKey: string): Promise<(TermGroup & { terms: number })[]> {
+  const rows = await all<{ id: string, vocabulary_key: string, label: string, sort: number, terms: number }>(
+    'SELECT g.id, g.vocabulary_key, g.label, g.sort, (SELECT count(*) FROM core_terms t WHERE t.group_id = g.id) AS terms FROM core_term_groups g WHERE g.vocabulary_key = ? ORDER BY g.sort, lower(g.label)', vocabularyKey)
+  return rows.map(r => ({ id: r.id, vocabularyKey: r.vocabulary_key, label: r.label, sort: r.sort, terms: r.terms }))
+}
+
+export async function addTermGroup(unit: UnitView, vocabularyKey: string, label: string): Promise<string> {
+  const vocabulary = await groupedOrRefuse(vocabularyKey)
+  if (vocabulary.locked) LOCKED()
+  const id = newId('tgr')
+  const next = await first<{ sort: number }>('SELECT coalesce(max(sort), -1) + 1 AS sort FROM core_term_groups WHERE vocabulary_key = ?', vocabularyKey)
+  unit.add(sql`INSERT INTO core_term_groups (id, vocabulary_key, label, sort)
+    SELECT ${id}, ${vocabularyKey}, ${label}, ${next?.sort ?? 0}
+    WHERE NOT EXISTS (SELECT 1 FROM core_term_groups WHERE vocabulary_key = ${vocabularyKey} AND lower(label) = lower(${label}))`).expect(1, GROUP_TAKEN)
+  unit.audit({ action: 'create', record: ['core.vocabulary', vocabularyKey], detail: { groupId: id } })
+  return id
+}
+
+export async function renameTermGroup(unit: UnitView, vocabularyKey: string, id: string, label: string): Promise<void> {
+  await groupedOrRefuse(vocabularyKey)
+  if (!await first('SELECT 1 FROM core_term_groups WHERE id = ? AND vocabulary_key = ?', id, vocabularyKey)) GROUP_NOT_FOUND()
+  unit.add(sql`UPDATE core_term_groups SET label = ${label} WHERE id = ${id} AND vocabulary_key = ${vocabularyKey}
+    AND NOT EXISTS (SELECT 1 FROM core_term_groups WHERE vocabulary_key = ${vocabularyKey} AND lower(label) = lower(${label}) AND id <> ${id})`).expect(1, GROUP_TAKEN)
+  unit.audit({ action: 'update', record: ['core.vocabulary', vocabularyKey], detail: { groupId: id } })
+}
+
+/** Puts the headings in the order given. Every heading of the vocabulary must be listed. */
+export async function reorderTermGroups(unit: UnitView, vocabularyKey: string, ids: string[]): Promise<void> {
+  await groupedOrRefuse(vocabularyKey)
+  const current = (await all<{ id: string }>('SELECT id FROM core_term_groups WHERE vocabulary_key = ?', vocabularyKey)).map(r => r.id)
+  const given = new Set(ids)
+  if (given.size !== ids.length || current.length !== ids.length || current.some(id => !given.has(id)))
+    refuse('core.term-group.order-stale', 'The headings changed while you were reordering them.', { remedy: 'Reload the list and reorder again.', status: 409 })
+  const order = JSON.stringify(ids.map((id, sort) => [id, sort]))
+  unit.add(sql`UPDATE core_term_groups SET sort = (SELECT json_extract(value, '$[1]') FROM json_each(${order}) WHERE json_extract(value, '$[0]') = core_term_groups.id)
+    WHERE vocabulary_key = ${vocabularyKey}`).expect(ids.length, { code: 'core.term-group.order-stale', reason: 'The headings changed while you were reordering them.', remedy: 'Reload the list and reorder again.' })
+  unit.audit({ action: 'update', record: ['core.vocabulary', vocabularyKey], detail: { reorderedGroups: ids.length } })
+}
+
+/** Removes an empty heading. One with terms under it, live or retired, stays until they are moved. */
+export async function removeTermGroup(unit: UnitView, vocabularyKey: string, id: string): Promise<void> {
+  const vocabulary = await groupedOrRefuse(vocabularyKey)
+  if (vocabulary.locked) LOCKED()
+  if (!await first('SELECT 1 FROM core_term_groups WHERE id = ? AND vocabulary_key = ?', id, vocabularyKey)) GROUP_NOT_FOUND()
+  unit.add(sql`DELETE FROM core_term_groups WHERE id = ${id} AND vocabulary_key = ${vocabularyKey} AND NOT EXISTS (SELECT 1 FROM core_terms WHERE group_id = ${id})`)
+    .expect(1, { code: 'core.term-group.not-empty', reason: 'Terms still sit under this heading.', remedy: 'Move them to another heading first.' })
+  unit.audit({ action: 'delete', record: ['core.vocabulary', vocabularyKey], detail: { groupId: id } })
 }
