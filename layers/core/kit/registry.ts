@@ -33,7 +33,7 @@ export interface Registry {
   /**
    * The generated pages of settings, by id `<module>.<page>`: every declared page, the shared
    * Advanced page (`core.advanced`), and a module's own page (`<module>.settings` in the console,
-   * `<module>.admin` in Site administration) where one of its groups uses it.
+   * `<module>.admin` in Admin) where one of its groups uses it.
    */
   settingPages: Map<string, SettingPage>
   /** Where each setting is shown: on exactly one generated page, or on one bespoke screen. */
@@ -70,7 +70,7 @@ export interface SettingPage {
 }
 export type SettingHome = { page: string, screen?: undefined } | { screen: string, page?: undefined }
 
-/** The shared page of engineering limits, under Upkeep in Site administration. */
+/** The shared page of engineering limits, under Upkeep in Admin. */
 export const ADVANCED_PAGE = 'core.advanced'
 const DEFAULT_PAGE = { console: 'settings', admin: 'admin' } as const
 const SETTINGS_ICON = 'i-lucide-settings-2'

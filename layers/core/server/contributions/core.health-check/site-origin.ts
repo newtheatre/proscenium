@@ -14,7 +14,7 @@ export default {
     if (typeof raw === 'string' && raw.trim() && !variable)
       return { state: 'failing', sentence: `CORE_SITE_ORIGIN is set to "${raw}", which is not an address such as https://tickets.example.org, so it is ignored.`, remedy: 'Correct the Worker variable CORE_SITE_ORIGIN, or remove it.' }
     if (variable && setting && variable !== setting)
-      return { state: 'warning', sentence: `The Worker variable CORE_SITE_ORIGIN (${variable}) is in force, and differs from the site's recorded address (${setting}).`, remedy: `Once ${variable} works, record it as the site's address under Site administration, Settings, then remove the variable.` }
+      return { state: 'warning', sentence: `The Worker variable CORE_SITE_ORIGIN (${variable}) is in force, and differs from the site's recorded address (${setting}).`, remedy: `Once ${variable} works, record it as the site's address on Admin, Theatre, then remove the variable.` }
     if (variable) return { state: 'ok', sentence: `The site's address is ${variable}, from the Worker variable CORE_SITE_ORIGIN.` }
     if (setting) return { state: 'ok', sentence: `The site's address is ${setting}.` }
     const here = normaliseOrigin(requestOrigin)
@@ -22,8 +22,8 @@ export default {
       state: 'warning',
       sentence: "The site's address has not been recorded, so links in emails sent by background work cannot be built, and other addresses are not redirected.",
       remedy: here
-        ? `Under Site administration, Settings, set "The site's address" to ${here} if that is the address people use, and confirm the change.`
-        : 'Under Site administration, Settings, set "The site\'s address" to the address people use, and confirm the change.',
+        ? `On Admin, Theatre, set "The site's address" to ${here} if that is the address people use, and confirm the change.`
+        : 'On Admin, Theatre, set "The site\'s address" to the address people use, and confirm the change.',
     }
   },
 } satisfies HealthCheck

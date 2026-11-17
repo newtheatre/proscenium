@@ -9,7 +9,7 @@ export type ChargeKind = 'join' | 'renew'
 /** What a membership would cost, or costs: the price in force on a day, copied onto the charge. */
 export interface ChargeQuote { priceId: string, amountMinor: number, currency: string }
 
-export interface ChargeStatus { state: 'open' | 'paid' | 'void' | 'refunded' | 'part-refunded', amountMinor: number, currency: string }
+export interface ChargeStatus { id: string, state: 'open' | 'paid' | 'void' | 'refunded' | 'part-refunded', amountMinor: number, refundedMinor: number, currency: string }
 
 export interface MembershipCharge {
   /** The price in force on `on` for the length chosen (a price for that length wins over one for every length), or null when none is set. */

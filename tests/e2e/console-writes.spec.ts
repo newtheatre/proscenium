@@ -1,7 +1,8 @@
 // Console forms that write through routes requiring an Idempotency-Key, submitted in a real browser
 // with nothing added by the test: the app's own fetch gives every write a key, so a screen never
 // fails with "This request needs an Idempotency-Key header". Adding a ticket type was the report;
-// a band and prices on a performance's set-up go through the same kind of route.
+// a band and prices on a performance's set-up go through the same kind of route. A price for one
+// performance only shows where it comes from and can be handed back to the production's.
 import { test, expect, type Page } from '@playwright/test'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -55,4 +56,19 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
   await page.getByRole('button', { name: 'Save prices' }).click()
   await expect(page.getByText('Prices saved').first()).toBeVisible()
   await expect(page.getByText('This request needs an Idempotency-Key header.')).toHaveCount(0)
+
+  // This performance alone gets its own price, which shows on both views and can be handed back.
+  await page.getByRole('radio', { name: 'This performance only' }).check()
+  await expect(page.getByText('Same as all performances.')).toBeVisible()
+  await page.getByLabel(typeName).fill('8.00')
+  await page.getByRole('button', { name: 'Save prices' }).click()
+  await expect(page.getByText('This performance only. All performances: £12.00.')).toBeVisible()
+  await page.getByRole('radio', { name: 'All performances' }).check()
+  await expect(page.getByLabel(typeName)).toHaveValue(/12\.00/)
+  await expect(page.getByText('This performance has its own price: £8.00.')).toBeVisible()
+  await page.getByRole('radio', { name: 'This performance only' }).check()
+  await page.getByRole('button', { name: 'Use the price for all performances' }).click()
+  await expect(page.getByText('This performance now uses the price for all performances').first()).toBeVisible()
+  await expect(page.getByText('Same as all performances.')).toBeVisible()
+  await expect(page.getByLabel(typeName)).toHaveValue(/12\.00/)
 })

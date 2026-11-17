@@ -35,7 +35,7 @@ export async function openPayment(unit: UnitView, membershipId: string, accountI
   if (charge.intent_id && (await intentStatus(charge.intent_id))?.state === 'open') return { intentId: charge.intent_id, amountMinor: charge.amount_minor, currency: charge.currency, fresh: false }
   const expiresAt = nowMs() + (await useSetting('membership-fees.checkout.pay-within') as number) * 1000 // not-policy: seconds to milliseconds
   const { intentId } = await collect(unit, { parts: [{ owner: { module: 'membership-fees', record: charge.id }, amountMinor: charge.amount_minor }], currency: charge.currency, expiresAt })
-  unit.add({ sql: "UPDATE membership_fees_charges SET intent_id = ?, updated_at = ? WHERE id = ? AND state = 'open'", params: [intentId, nowMs(), charge.id] })
+  unit.add({ sql: "UPDATE membership_fees_charges SET intent_id = ?, channel = 'online', updated_at = ? WHERE id = ? AND state = 'open'", params: [intentId, nowMs(), charge.id] })
     .expect(1, { code: 'membership-fees.pay.not-waiting', reason: 'This membership is not waiting for a payment.' })
   return { intentId, amountMinor: charge.amount_minor, currency: charge.currency, fresh: true }
 }
