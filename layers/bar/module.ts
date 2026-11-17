@@ -118,6 +118,13 @@ export default defineModule({
     'payments.desk-basket': [{ id: 'bar' }],
     // Bar income, in full on the day the money is taken (tab 3, "What is posted to the ledger").
     'finance.system-account': [{ id: 'income', name: 'Bar income', kind: 'income' }],
+    // Setting up the bar (BAR-05): products and an outlet are required; other price lists and who may sell are not.
+    'core.setup-step': [
+      { id: 'bar.first-product', required: true, to: '/admin/modules/bar/products', order: 60 },
+      { id: 'bar.first-outlet', required: true, to: '/admin/modules/bar/outlets', order: 61 },
+      { id: 'bar.price-lists', required: false, to: '/admin/modules/bar/price-lists', order: 62 },
+      { id: 'bar.sellers', required: false, to: '/console/people/grants', order: 63 },
+    ],
     'core.record-resolver': [
       { id: 'bar.outlet', file: 'outlet' },
       { id: 'bar.product', file: 'product' },
@@ -125,16 +132,16 @@ export default defineModule({
       { id: 'bar.choice-group', file: 'choice-group' },
       { id: 'bar.sale', file: 'sale' },
     ],
-    // The console's Bar group: set-up screens first; selling arrives with the till panel.
+    // The console's Bar group for everyday work; set-up screens are tabs of the bar's page in Admin.
     'core.navigation': [
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
       { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: 'bar.sale.view', order: 15 },
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
-      { id: 'bar.products', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/products', match: '/console/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
-      { id: 'bar.price-lists', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/price-lists', match: '/console/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
+      { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
+      { id: 'bar.price-lists', menu: 'admin', group: 'modules', to: '/admin/modules/bar/price-lists', match: '/admin/modules/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
       { id: 'bar.age-checks', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/age-checks', icon: 'i-lucide-id-card', ability: 'bar.age-check.view', order: 40 },
-      { id: 'bar.outlets', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },
+      { id: 'bar.outlets', menu: 'admin', group: 'modules', to: '/admin/modules/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },
     ],
   },
 })

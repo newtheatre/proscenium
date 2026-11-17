@@ -243,11 +243,15 @@ export async function admitByName(input: AdmitByNameInput): Promise<{ admitted: 
   return { admitted: written.length, scanIds: written.map(r => r.id) }
 }
 
-export interface DoorSummary { tickets: number, admitted: number }
+/** Tickets issued and how many are in; `unpaid` is tickets reserved and not yet paid for, who may still come to the desk. */
+export interface DoorSummary { tickets: number, admitted: number, unpaid: number }
 
 /** How many valid tickets a performance has, and how many of them are in. */
 export async function doorSummary(performanceId: string): Promise<DoorSummary> {
   const row = await first<{ tickets: number, admitted: number | null }>(
     "SELECT count(*) AS tickets, sum(CASE WHEN admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted FROM box_office_tickets WHERE performance_id = ? AND state = 'valid'", performanceId)
-  return { tickets: Number(row?.tickets ?? 0), admitted: Number(row?.admitted ?? 0) }
+  const unpaid = await first<{ n: number }>(
+    `SELECT count(*) AS n FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id
+      WHERE l.performance_id = ? AND l.kind = 'ticket' AND l.state = 'live' AND o.state IN ('reserved', 'awaiting_payment')`, performanceId)
+  return { tickets: Number(row?.tickets ?? 0), admitted: Number(row?.admitted ?? 0), unpaid: Number(unpaid?.n ?? 0) }
 }

@@ -32,10 +32,10 @@ async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>
 }
 
 /** A reservation of `quantity` full-price tickets, as the buyer made it online. */
-async function reserved(h: House, quantity: number) {
+async function reserved(h: House, quantity: number, name = 'Desk Guest') {
   const made = await buy(h, quantity)
   if (!made.ok) throw new Error(made.code)
-  const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `desk${++guests}@example.org`, name: 'Desk Guest' }, null, { 'x-basket-token': made.basket.token })
+  const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `desk${++guests}@example.org`, name }, null, { 'x-basket-token': made.basket.token })
   expect(done.body.state, JSON.stringify(done.body)).toBe('reserved')
   return { orderId: made.basket.orderId, reference: done.body.reference as string, deskCode: done.body.deskCode as string, totalMinor: made.basket.totalMinor }
 }
@@ -114,6 +114,18 @@ describe('a reservation at the desk', () => {
     expect(again.status, JSON.stringify(again.body)).toBe(200)
     expect(await payCash(again.body.intentId)).toMatchObject({ settled: true })
     expect(await tickets(r.orderId)).toEqual([{ state: 'valid', admitted_at: null, admitted_scan_id: null }])
+  })
+
+  it('is found by the buyer\'s name, with who booked and for what, soonest first', async () => {
+    const h = await house(4)
+    const first = await reserved(h, 1, 'Ottoline Quibble')
+    const second = await reserved(h, 1, 'Ottoline Quibble')
+    const found = await req('GET', '/api/box-office/desk/orders?q=quibble', undefined, seller)
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.orders.map((o: { orderId: string }) => o.orderId)).toEqual([first.orderId, second.orderId])
+    expect(found.body.orders[0]).toMatchObject({ buyer: 'Ottoline Quibble', performance: { title: expect.any(String), startsAt: expect.any(Number) } })
+    // A reference still finds just its own booking.
+    expect((await req('GET', `/api/box-office/desk/orders?q=${second.reference}`, undefined, seller)).body.orders).toHaveLength(1)
   })
 
   it('shows a payment left unfinished, such as by a reload, and cancelling it from the desk puts the reservation back', async () => {

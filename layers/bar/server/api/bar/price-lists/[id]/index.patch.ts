@@ -1,8 +1,8 @@
 // Changes a price list, or retires one no outlet sells from. Standard is always in use.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { updatePriceList } from '../../../catalogue'
-import { priceListPatch } from '../../../input'
+import { updatePriceList } from '../../../../catalogue'
+import { priceListPatch } from '../../../../input'
 
 export default defineRoute({
   ability: 'bar.price.manage',

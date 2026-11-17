@@ -121,7 +121,7 @@ export async function approveComps(unit: UnitView, requestId: string): Promise<C
     orderId, kind: 'ticket', performanceId: request.performance_id, bandId: request.band_id, ticketTypeId: type.id, claimId, listMinor: 0, discountMinor: 0, amountMinor: 0, compRequestId: requestId, state: 'live',
   })))
   unit.expect(claimed.length)
-  const lines: LineRow[] = lineIds.map(id => ({ id, performance_id: request.performance_id, band_id: request.band_id, ticket_type_id: type.id, amount_minor: 0, type_name: type.name, type_kind: 'complimentary' }))
+  const lines: LineRow[] = lineIds.map(id => ({ id, performance_id: request.performance_id, band_id: request.band_id, ticket_type_id: type.id, amount_minor: 0, type_name: type.name, type_kind: 'complimentary', band_name: null }))
   const confirmed = await confirmOrder(unit, order, lines, { from: 'basket', account: { id: request.for_account_id, signedIn: false } })
   unit.add(sql`UPDATE box_office_comp_requests SET state = 'issued', order_id = ${orderId}, updated_at = ${at} WHERE id = ${requestId} AND state = 'approved'`).expect(1, CHANGED)
   unit.announce('box-office.comp-request.decided', { requestId, state: 'issued' }, { record: ['box-office.comp-request', requestId] })

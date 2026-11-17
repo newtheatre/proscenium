@@ -73,7 +73,7 @@ async function saveProduct() {
   try {
     const made = await $api<{ productId: string }>('/api/bar/products', { method: 'POST', body: { ...product.value, variantName: product.value!.variantName || undefined } })
     product.value = null
-    await navigateTo(`/console/bar/products/${made.productId}`)
+    await navigateTo(`/admin/modules/bar/products/${made.productId}`)
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -173,7 +173,7 @@ async function move(p: Product, direction: 'up' | 'down') {
               :muted="!p.active"
             >
               <template #name>
-                <ULink :to="`/console/bar/products/${p.id}`">
+                <ULink :to="`/admin/modules/bar/products/${p.id}`">
                   {{ p.active ? p.name : t('bar.screens.products.retired-name', { name: p.name }) }}
                 </ULink>
               </template>
