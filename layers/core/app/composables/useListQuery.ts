@@ -2,7 +2,7 @@
 // list's declaration. Changes made while the Filters panel is open make one history entry between
 // them, so Back undoes the visit to the panel and not each field.
 import type { MaybeRefOrGetter } from 'vue'
-import { parseList, serialiseList, type ListDeclaration, type ListState } from '../../shared/list'
+import { DEFAULT_PAGE_SIZE, parseList, serialiseList, type ListDeclaration, type ListState } from '../../shared/list'
 
 type Declared = Pick<ListDeclaration, 'filters' | 'sorts' | 'defaultView' | 'defaultSort' | 'views'>
 
@@ -10,7 +10,10 @@ export function useListQuery(declaration: MaybeRefOrGetter<Declared>) {
   const list = computed(() => toValue(declaration))
   const route = useRoute()
   const router = useRouter()
-  const state = computed(() => parseList(route.query as Record<string, string | string[]>, list.value))
+  // The site's page size (core.lists.page-size), which an address without a size means.
+  const settings = usePublicSettings()
+  const defaultSize = computed(() => Number(settings.data.value?.['core.lists.page-size']?.value ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE)
+  const state = computed(() => parseList(route.query as Record<string, string | string[]>, list.value, defaultSize.value))
 
   // True from the first change made in a visit to the panel until the panel closes.
   let visiting = false
@@ -27,7 +30,7 @@ export function useListQuery(declaration: MaybeRefOrGetter<Declared>) {
     // Anything but a page change starts again at page one.
     if (patch.page === undefined) next.page = 1
     for (const [name, value] of Object.entries(next.filters)) if (!value) Reflect.deleteProperty(next.filters, name)
-    const query = serialiseList(next, list.value)
+    const query = serialiseList(next, list.value, defaultSize.value)
     return options.replace ? router.replace({ query }) : router.push({ query })
   }
 

@@ -11,8 +11,11 @@ import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import { defaultValue, RATE_COUNT } from '#kit/settings'
 import { isOverridden, useSetting } from '#kit/settings-store'
+import { configuredOrigin, requestUrl } from '#kit/origin'
 import { holds, mayOpen } from '../../../interface/navigation'
 import { lastChanges } from '../../../settings/history'
+
+const SITE_ORIGIN = 'core.site.origin'
 
 const ID = /^[a-z][a-z0-9-]*$/ // not-policy: the pattern of a module id
 
@@ -25,7 +28,7 @@ export default defineRoute({
     module: z.string().regex(ID).optional(),
     scope: z.enum(['module', 'site']).optional(),
   }).refine(i => [i.page, i.screen, i.module ?? (i.scope === 'site' ? 'site' : undefined)].filter(v => v !== undefined).length === 1, { message: 'Ask for one page, one screen, or (the older form) a module or scope=site.' }),
-}, async (_event, { input, actor }) => {
+}, async (event, { input, actor }) => {
   const registry = useRegistry()
   const on = await enabledModules()
   const placeOf = (pageId?: string) => pageId ? registry.settingPages.get(pageId)!.place : undefined
@@ -67,6 +70,8 @@ export default defineRoute({
       overridden: await isOverridden(key),
       /** The latest change, for "Changed by <name>, <date>" under the setting. */
       lastChange: changed.get(key) ?? null,
+      /** A value to offer while nothing is recorded: for the site's address, the one this page came on. */
+      suggestion: key === SITE_ORIGIN && !(await configuredOrigin()) ? requestUrl(event).origin : null,
       unset: entry.unset === true,
       sensitive: entry.sensitive === true,
       managed: entry.managed === true,

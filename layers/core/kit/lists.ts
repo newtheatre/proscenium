@@ -13,6 +13,7 @@ import { matchedFields, searchIndexName, searchQuery, searchWords } from './sear
 import { can } from './access'
 import { useContext } from './context'
 import { useRegistry } from './registry'
+import { useSetting } from './settings-store'
 import { instantOfLocal, previousDate } from './clock'
 import { theatreTimeZone, today } from './dates'
 import type { AbilityName } from './registry-types'
@@ -217,7 +218,9 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
   const hasDates = Object.entries(list.filters).some(([key, f]) => f.kind === 'dates' && (query[key] || viewFilters[key]))
   const day = hasDates ? await today() : '1970-01-01'
 
-  const decoded = decodeList(query, list, { can: a => held.has(a), today: day })
+  // The site's page size (core.lists.page-size) when the address names none.
+  const defaultSize = Number(await useSetting('core.lists.page-size' as never))
+  const decoded = decodeList(query, list, { can: a => held.has(a), today: day, defaultSize })
   if (!decoded.ok) refuse('core.list.unknown', decoded.reason, { status: 422, fields: { [decoded.key]: 'core.list.unknown' } })
   const q = (decoded as Extract<typeof decoded, { ok: true }>).value
   if (q.page * q.size > LIST_MAX_DEPTH) refuse('core.list.too-deep', `A list shows its first ${LIST_MAX_DEPTH.toLocaleString('en-GB')} rows.`, { status: 422, remedy: 'Narrow the list with a filter or a search, or export it.' })
