@@ -189,21 +189,17 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
                   :tone="TONES[c.visibility]"
                   :label="visibilityLabel(c.visibility)"
                 />
-                <UButton
+                <IconButton
                   size="sm"
-                  color="neutral"
-                  variant="ghost"
                   icon="i-lucide-arrow-up"
-                  :aria-label="`Move ${c.creditedName} up`"
+                  :label="`Move ${c.creditedName} up`"
                   :disabled="i === 0"
                   @click="move(section, i, -1)"
                 />
-                <UButton
+                <IconButton
                   size="sm"
-                  color="neutral"
-                  variant="ghost"
                   icon="i-lucide-arrow-down"
-                  :aria-label="`Move ${c.creditedName} down`"
+                  :label="`Move ${c.creditedName} down`"
                   :disabled="i === section.credits.length - 1"
                   @click="move(section, i, 1)"
                 />
@@ -215,12 +211,12 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
                   :aria-label="`Edit ${c.creditedName}`"
                   @click="start(c)"
                 />
-                <UButton
+                <IconButton
                   size="sm"
                   color="error"
                   variant="ghost"
                   icon="i-lucide-trash-2"
-                  :aria-label="`Remove ${c.creditedName}`"
+                  :label="`Remove ${c.creditedName}`"
                   @click="remove(c)"
                 />
               </div>

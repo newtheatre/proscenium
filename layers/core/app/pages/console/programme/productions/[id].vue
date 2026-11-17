@@ -30,6 +30,7 @@ interface Production {
 }
 interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: Option[], reasons: Option[], seasons: { id: string, name: string }[] } }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/productions/${String(route.params.id)}`)
@@ -131,7 +132,7 @@ async function remove() {
       <StatusBadge
         v-if="production"
         :tone="TONES[production.state]"
-        :label="production.state.charAt(0).toUpperCase() + production.state.slice(1)"
+        :label="t(`core.states.${production.state}`)"
       />
     </template>
     <template #primary>
@@ -249,15 +250,17 @@ async function remove() {
                 label="Category"
                 help="Needed to publish."
               >
-                <USelect
+                <USelectMenu
                   v-model="details.categoryTermId"
+                  value-key="value"
                   :items="categories"
                   placeholder="Choose a category"
                 />
               </UFormField>
               <UFormField label="Season">
-                <USelect
+                <USelectMenu
                   v-model="details.seasonId"
+                  value-key="value"
                   :items="seasons"
                 />
               </UFormField>

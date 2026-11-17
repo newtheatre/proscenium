@@ -62,13 +62,13 @@ const items = computed(() => {
       class="min-w-64"
       @update:model-value="model = $event ?? null"
     />
-    <UButton
+    <IconButton
       v-if="model"
       icon="i-lucide-x"
       color="neutral"
       variant="outline"
       :disabled="disabled"
-      :aria-label="t('core.record-field.clear')"
+      :label="t('core.record-field.clear')"
       @click="model = null"
     />
   </UFieldGroup>

@@ -6,6 +6,7 @@
 interface Term { id: string, slug: string, label: string, description: string | null, icon: string | null, seeded: boolean, retired: boolean, mergedIntoId: string | null, uses: number }
 interface Vocabulary { key: string, owner: string, label: string, description: string | null, ordering: 'manual' | 'alphabetical', locked: boolean }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const key = computed(() => String(route.params.key))
@@ -77,7 +78,7 @@ async function remove(term: Term) {
   await run(() => api(`/terms/${term.id}`, 'DELETE'), `Deleted ${term.label}`)
 }
 
-const uses = (term: Term) => term.uses === 1 ? '1 record' : `${term.uses} records`
+const uses = (term: Term) => t('core.counts.records', { count: term.uses })
 
 const actions = (term: Term) => [[
   { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEdit(term) },
@@ -170,34 +171,29 @@ const actions = (term: Term) => [[
               </UForm>
             </template>
             <UFieldGroup v-if="manual">
-              <UButton
+              <IconButton
                 icon="i-lucide-arrow-up"
                 color="neutral"
                 variant="outline"
                 size="sm"
-                :aria-label="`Move ${term.label} up`"
+                :label="`Move ${term.label} up`"
                 :disabled="index === 0"
                 @click="move(term, -1)"
               />
-              <UButton
+              <IconButton
                 icon="i-lucide-arrow-down"
                 color="neutral"
                 variant="outline"
                 size="sm"
-                :aria-label="`Move ${term.label} down`"
+                :label="`Move ${term.label} down`"
                 :disabled="index === live.length - 1"
                 @click="move(term, 1)"
               />
             </UFieldGroup>
-            <UDropdownMenu :items="actions(term)">
-              <UButton
-                icon="i-lucide-ellipsis"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :aria-label="`Actions for ${term.label}`"
-              />
-            </UDropdownMenu>
+            <RowActions
+              :items="actions(term)"
+              :label="`Actions for ${term.label}`"
+            />
           </RecordListItem>
         </RecordList>
       </PageSection>

@@ -180,6 +180,20 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   viewer's zone.
 - `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
 
+### Small parts
+
+- `IconButton`: a button that is only an icon. Its one `label` is the accessible name and a tooltip,
+  so a person with a pointer is told what the arrow or the bin does. `bun run check:conformance`
+  refuses an icon-only `UButton`.
+- `RowActions`: the ellipsis menu a row or a record ends with. It takes `items` and a `label`
+  ("Actions for Hamlet") and draws nothing when there are no items.
+- A status is named by the catalogue (`core.states.draft`), never by capitalising its key, and a
+  count comes from the catalogue's plural (`core.counts.records` with `count`).
+- A select whose list grows with the theatre's data (accounts, periods, spaces, seasons) is a
+  `USelectMenu` with `value-key="value"`, which can be searched. A short fixed list stays a `USelect`.
+- A button whose click handler is `async` takes `loading-auto` in place of a flag of its own.
+- History is a `UTimeline`.
+
 ### Charts
 
 `ChartFigure` wraps Nuxt UI's `UChart` (TanStack Charts, drawn as SVG on the server, so there is no

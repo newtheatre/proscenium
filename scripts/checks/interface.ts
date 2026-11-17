@@ -10,6 +10,7 @@ import { walk } from './source.ts'
 const RAW_FORM = ['PageSettings.vue', 'PageList.vue', 'ConfirmItsYouDialog.vue']
 const HAND_LIST = ['RecordList.vue']
 const DATE_TEXT = ['useDates.ts']
+const ICON_BUTTON = ['IconButton.vue']
 /** Controls app.config.ts already makes as wide as their field. */
 const CONTROLS = ['UInput', 'USelect', 'USelectMenu', 'UTextarea', 'UInputNumber', 'UInputTags', 'UInputDate', 'UInputTime', 'FieldDate', 'FieldDateRange', 'FieldDateTime', 'FieldMoney']
 
@@ -29,7 +30,16 @@ export function interfaceProblems(name: string, source: string): { line: number,
     if (/type="(date|datetime-local|time)"|'datetime-local'/.test(text)) problems.push({ line, problem: 'a native date or time input; use FieldDate, FieldDateRange, FieldDateTime or UInputTime, which follow the theatre\'s language and time zone' })
     if (/new Intl\.DateTimeFormat\(|\.toLocale(Date|Time)String\(/.test(text) && !DATE_TEXT.includes(name)) problems.push({ line, problem: 'formats a date by hand; use useDates(), so every screen agrees on language and time zone' })
   })
-  return problems
+  // A whole tag, since its attributes sit on lines of their own.
+  if (!ICON_BUTTON.includes(name)) {
+    for (const match of source.matchAll(/<UButton\b((?:[^>"]|"[^"]*")*?)\/>/g)) {
+      const attrs = match[1]!
+      if (/(^|\s):?icon=/.test(attrs) && /(^|\s):?aria-label=/.test(attrs) && !/(^|\s):?label=/.test(attrs)) {
+        problems.push({ line: source.slice(0, match.index).split('\n').length, problem: 'an icon-only UButton; use IconButton (or RowActions for an ellipsis menu), whose one label is both the accessible name and a tooltip' })
+      }
+    }
+  }
+  return problems.sort((x, y) => x.line - y.line)
 }
 
 export function checkInterface(modules: Loaded[]): string[] {

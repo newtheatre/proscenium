@@ -6,6 +6,7 @@
 interface Planned { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: 'past' | 'clash' | 'closed' | null, reason: string | null }
 interface Space { value: string, label: string, venueId: string }
 
+const { t } = useT()
 const props = defineProps<{ productionId: string, spaces: Space[] }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ added: [answer: { created: number } | { run: { id: string, total: number } }] }>()
@@ -190,7 +191,7 @@ async function add() {
         <UButton
           type="submit"
           form="performance-run"
-          :label="`Add ${kept.length} performance${kept.length === 1 ? '' : 's'}`"
+          :label="t('core.counts.add-performances', { count: kept.length })"
           :loading="busy"
           :disabled="!kept.length"
         />

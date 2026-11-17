@@ -87,6 +87,15 @@ watch(historyOpen, async (open) => {
 })
 const { dateTime: when } = useDates()
 const actionName = (action: string) => (te(`core.history.action.${action}`) ? t(`core.history.action.${action}`) : action)
+// What happened, who did it and when, newest first as the server gives them. A person's change has
+// a person's icon and the system's own a cog, so the two can be told apart down the line.
+const timeline = computed(() => (history.value ?? []).map((entry, i) => ({
+  value: i,
+  title: actionName(entry.action),
+  description: entry.who ?? t('core.history.system'),
+  date: when(entry.at),
+  icon: entry.who ? 'i-lucide-user' : 'i-lucide-cog',
+})))
 const { te } = useT()
 </script>
 
@@ -117,17 +126,12 @@ const { te } = useT()
         :label="t('core.history.open')"
         @click="historyOpen = true"
       />
-      <UDropdownMenu
-        v-if="actions.length"
+      <RowActions
         :items="actions"
-      >
-        <UButton
-          icon="i-lucide-ellipsis"
-          color="neutral"
-          variant="outline"
-          :aria-label="t('core.record.more-actions', { name: title })"
-        />
-      </UDropdownMenu>
+        :label="t('core.record.more-actions', { name: title })"
+        variant="outline"
+        size="md"
+      />
     </template>
 
     <FactStrip
@@ -219,22 +223,12 @@ const { te } = useT()
           :title="t('core.history.empty')"
           icon="i-lucide-history"
         />
-        <ol
+        <UTimeline
           v-else-if="history"
-          class="space-y-4"
-        >
-          <li
-            v-for="(entry, i) in history"
-            :key="i"
-          >
-            <p class="font-medium">
-              {{ actionName(entry.action) }}
-            </p>
-            <p class="text-sm text-muted">
-              {{ entry.who ?? t('core.history.system') }} · {{ when(entry.at) }}
-            </p>
-          </li>
-        </ol>
+          :items="timeline"
+          color="neutral"
+          size="xs"
+        />
         <p v-else>
           {{ t('core.history.loading') }}
         </p>

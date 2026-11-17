@@ -86,11 +86,9 @@ async function retire(r: Reader) {
           class="text-muted"
         />
         <span class="flex-1">{{ r.label }} <span class="text-muted">· {{ t('payments.screens.readers.since', { day: day(r.createdAt) }) }}</span></span>
-        <UButton
+        <IconButton
           icon="i-lucide-unplug"
-          :aria-label="t('payments.screens.readers.retire-label', { reader: r.label })"
-          color="neutral"
-          variant="ghost"
+          :label="t('payments.screens.readers.retire-label', { reader: r.label })"
           size="xs"
           @click="retire(r)"
         />

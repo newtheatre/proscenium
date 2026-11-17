@@ -103,11 +103,9 @@ async function save() {
                   class="block"
                 >{{ money(b.balanceMinor, b.currency) }}</span>
               </span>
-              <UButton
+              <IconButton
                 icon="i-lucide-pencil"
-                :aria-label="t('finance.screens.accounts.edit-label', { account: a.name })"
-                color="neutral"
-                variant="ghost"
+                :label="t('finance.screens.accounts.edit-label', { account: a.name })"
                 size="sm"
                 @click="openEdit(a)"
               />

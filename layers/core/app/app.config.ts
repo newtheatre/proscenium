@@ -11,7 +11,7 @@ export default defineAppConfig({
     inputTags: { slots: { root: 'w-full' } },
     // A select's placeholder is readable text (a filter shows its name there), so it meets 4.5:1.
     select: { slots: { base: 'w-full', placeholder: 'text-muted' } },
-    selectMenu: { slots: { base: 'w-full' } },
+    selectMenu: { slots: { base: 'w-full', placeholder: 'text-muted' } },
     // An empty part of a date or time (dd, mm) is readable text too, so it meets 4.5:1 as well.
     inputDate: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted' } },
     inputTime: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted' } },
