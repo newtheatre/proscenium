@@ -17,7 +17,7 @@ async function visit(page: Page, url: string) {
 const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 
 test.describe('a site owner with no console', () => {
-  test.use(as(siteOwner('Sol Site')))
+  test.use(as(siteOwner('Sol Site', ['core.audit.view'])))
 
   test('has the strip, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
@@ -26,6 +26,7 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
     await expect(page.getByText('Nothing needs attention')).toBeVisible()
+    await page.getByRole('navigation', { name: 'Site administration' }).getByRole('button', { name: 'Upkeep' }).click()
     await expect(page.getByRole('navigation', { name: 'Site administration' })).toContainText('Advanced')
     await noViolations(page)
   })
@@ -54,12 +55,12 @@ test.describe('a site owner with no console', () => {
     await visit(page, '/admin/advanced')
     await expect(page.getByText('[object Object]')).toHaveCount(0)
     const count = page.getByRole('spinbutton', { name: 'Rate limit: exports: how many times' })
-    const period = page.getByRole('textbox', { name: 'Rate limit: exports: in what period' })
+    const period = page.getByRole('spinbutton', { name: 'Rate limit: exports: in what period' })
     await expect(count).toHaveValue('10')
-    await expect(period).toHaveValue('1h')
+    await expect(period).toHaveValue('1')
     await count.fill('12')
     await count.blur()
-    await period.fill('2h')
+    await period.fill('2')
     const section = page.locator('form').filter({ has: count })
     await section.getByRole('button', { name: /^Save/ }).click()
     // Rate limits are confirmed: the dialog says what will change, and Go back saves nothing.
@@ -72,12 +73,38 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible() // not the toaster's own live-region copy
     await visit(page, '/admin/advanced')
     await expect(page.getByRole('spinbutton', { name: 'Rate limit: exports: how many times' })).toHaveValue('12')
-    await expect(page.getByRole('textbox', { name: 'Rate limit: exports: in what period' })).toHaveValue('2h')
+    await expect(page.getByRole('spinbutton', { name: 'Rate limit: exports: in what period' })).toHaveValue('2')
     await expect(page.getByText('Default: 10 in 1h.')).toBeVisible()
-    await period.fill('2d')
+    await period.fill('2')
+    await page.locator('[id^="setting-"]').filter({ has: period }).getByRole('combobox', { name: 'Unit' }).click()
+    await page.getByRole('option', { name: 'days' }).click()
     await page.locator('form').filter({ has: period }).getByRole('button', { name: /^Save/ }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Save the change' }).click()
     await expect(page.getByText(/period between 1 minute and 1 day/)).toBeVisible()
+  })
+
+  test('a changed setting shows who changed it, its history opens and Revert puts it back, and Settings history lists the change', async ({ page }) => {
+    await visit(page, '/admin/advanced')
+    const size = page.getByRole('combobox', { name: 'Rows on a page of a list' })
+    await expect(size).toBeVisible()
+    await size.click()
+    await page.getByRole('option', { name: '50' }).click()
+    const section = page.locator('form').filter({ has: size })
+    await section.getByRole('button', { name: /^Save/ }).click()
+    await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible()
+    await expect(section.getByRole('button', { name: /^Changed by the system, / })).toBeVisible()
+    await section.getByRole('button', { name: /^Changed by the system, .*Show the history of Rows on a page of a list/ }).click()
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toContainText('From 25 to 50.')
+    await noViolations(page)
+    await drawer.getByRole('button', { name: /^Revert Rows on a page of a list/ }).click()
+    await expect(page.getByText('Rows on a page of a list reverted', { exact: true })).toBeVisible()
+    await expect(drawer).toContainText('From 50 to 25.')
+    await page.keyboard.press('Escape')
+    await visit(page, '/admin/settings-history')
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings history' })).toBeVisible()
+    await expect(page.getByText('From 50 to 25.').first()).toBeVisible()
+    await noViolations(page)
   })
 
   test('is not offered the console', async ({ page }) => {

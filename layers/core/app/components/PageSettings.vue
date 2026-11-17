@@ -5,7 +5,8 @@
      is shown read-only with who can change it. -->
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
-import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
+import { controlText, durationText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
+import { parseDuration } from '../../kit/duration'
 
 interface SettingView {
   key: string
@@ -27,6 +28,8 @@ interface SettingView {
   onChange: 'reason' | 'confirm' | null
   changeLabelKey: string
   canChange: boolean
+  /** The latest change, for "Changed by <name>, <date>". */
+  lastChange?: { at: number, by: string | null } | null
   min?: number | string
   max?: number | string
   maxLength?: number
@@ -53,6 +56,9 @@ const { data, status, error, refresh } = await useAPI<{ page: { id: string, modu
 })
 const advanced = props.page === 'core.advanced'
 
+const history = ref<SettingView | null>(null)
+const when = (at: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(at)
+const changedLine = (s: SettingView) => s.lastChange?.by ? t('core.settings-history.line', { who: s.lastChange.by, when: when(s.lastChange.at) }) : t('core.settings-history.line-system', { when: s.lastChange ? when(s.lastChange.at) : '' })
 const draft = reactive<Record<string, any>>({})
 const resets = reactive<Record<string, boolean>>({})
 const problems = reactive<Record<string, string>>({})
@@ -153,6 +159,11 @@ const sharedAbility = (settings: SettingView[]) => {
 const resettable = (settings: SettingView[]) => settings.filter(s => s.canChange && s.overridden && !resets[s.key])
 function resetSection(settings: SettingView[]) {
   for (const s of resettable(settings)) resetToDefault(s)
+}
+/** A duration as the control holds it, text such as 2h, back to the seconds the input works in. */
+const secondsOf = (text: unknown) => {
+  try { return typeof text === 'string' && text ? parseDuration(text) : undefined }
+  catch { return undefined }
 }
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
 const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
@@ -275,15 +286,21 @@ onMounted(() => {
                     @update:model-value="onRate(s, { count: $event ?? undefined })"
                   />
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
-                  <UInput
-                    :model-value="rate(s).per"
+                  <DurationInput
+                    :model-value="secondsOf(rate(s).per)"
                     :disabled="!s.canChange"
-                    :aria-label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
-                    placeholder="10m"
-                    class="w-28"
-                    @update:model-value="onRate(s, { per: String($event) })"
+                    :label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
+                    @update:model-value="onRate(s, { per: $event ? durationText($event) : '' })"
                   />
                 </div>
+                <DurationInput
+                  v-else-if="s.kind === 'duration'"
+                  :model-value="secondsOf(draft[s.key])"
+                  :min="s.min"
+                  :max="s.max"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event === null || $event === undefined ? '' : durationText($event))"
+                />
                 <UInputTime
                   v-else-if="s.kind === 'time'"
                   :model-value="timeOf(draft[s.key])"
@@ -331,6 +348,15 @@ onMounted(() => {
                   {{ s.managed ? t('core.settings-page.managed') : t('core.settings-page.read-only', { ability: t(s.changeLabelKey) }) }}
                 </span>
                 <span v-else-if="!sharedAbility(section.settings)">{{ t('core.settings-page.who', { ability: t(s.changeLabelKey) }) }}</span>
+                <UButton
+                  v-if="s.lastChange && !s.sensitive"
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  :label="changedLine(s)"
+                  :aria-label="`${changedLine(s)}. ${t('core.settings-history.open-named', { setting: t(s.labelKey) })}`"
+                  @click="history = s"
+                />
               </div>
             </div>
           </div>
@@ -359,5 +385,20 @@ onMounted(() => {
         </PageSection>
       </form>
     </DataBoundary>
+    <USlideover
+      :open="!!history"
+      :title="history ? t('core.settings-history.drawer-title', { setting: t(history.labelKey) }) : ''"
+      :description="t('core.settings-history.drawer-description')"
+      @update:open="!$event && (history = null)"
+    >
+      <template #body>
+        <SettingChanges
+          v-if="history"
+          :query="{ key: history.key }"
+          :kind="history.kind"
+          @reverted="refresh()"
+        />
+      </template>
+    </USlideover>
   </PageFrame>
 </template>

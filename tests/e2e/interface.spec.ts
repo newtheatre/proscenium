@@ -362,8 +362,9 @@ test.describe('confirming it is you', () => {
     // Sent and not awaited: the request waits on the dialogue, as a save button's would.
     await page.evaluate(() => {
       void (globalThis as unknown as { useNuxtApp: () => { $api: (url: string, options: object) => Promise<unknown> } })
-        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
+        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.rate-limits.default', value: { count: 500, per: '1m' } }], confirm: true } }).catch(() => null)
     })
+    // Only a setting that declares onChange asks for a fresh sign-in; this one is confirmed.
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)
     await noViolations(page)
