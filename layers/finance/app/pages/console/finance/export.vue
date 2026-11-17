@@ -69,10 +69,9 @@ async function download() {
           :label="t('finance.screens.export.from')"
           required
         >
-          <UInput
+          <FieldDate
             v-model="form.from"
-            type="date"
-            class="w-full"
+            :max="form.to || undefined"
           />
         </UFormField>
         <UFormField
@@ -80,10 +79,9 @@ async function download() {
           required
           :error="refusal?.fields?.to ? refusal.reason : undefined"
         >
-          <UInput
+          <FieldDate
             v-model="form.to"
-            type="date"
-            class="w-full"
+            :min="form.from || undefined"
           />
         </UFormField>
       </div>

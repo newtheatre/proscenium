@@ -7,7 +7,7 @@ const { t } = useT()
 const { money } = await useMoney()
 const { data, status, error, refresh } = await useAPI<{ periods: Period[] }>('/api/finance/periods', { key: 'finance:periods' })
 const newestFirst = computed(() => [...(data.value?.periods ?? [])].reverse())
-const dateOf = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
+const { day: dateOf } = useDates()
 </script>
 
 <template>

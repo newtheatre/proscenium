@@ -7,6 +7,7 @@ import type { RefusalView } from './utils/refusal'
 const props = defineProps<{ error: NuxtError<Partial<RefusalView> | undefined> }>()
 const { t } = useT()
 const route = useRoute()
+const locale = useUiLocale()
 
 const refused = computed(() => props.error.statusCode === 403 && props.error.data?.reason)
 const missing = computed(() => props.error.statusCode === 404)
@@ -17,7 +18,7 @@ const description = computed(() => refused.value ? undefined : missing.value ? t
 </script>
 
 <template>
-  <UApp>
+  <UApp :locale="locale">
     <NuxtLayout name="default">
       <UError
         as="div"

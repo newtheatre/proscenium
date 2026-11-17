@@ -40,7 +40,7 @@ const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
 const app = computed(() => data.value?.application ?? null)
 const labelOf = (term: string) => data.value?.needs.find(n => n.id === term)?.label ?? t('core.access.retired-need')
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 
 const STATUS = {
   'submitted': { tone: 'info', key: 'core.access.review.status.submitted' },
