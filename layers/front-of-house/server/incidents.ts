@@ -111,8 +111,6 @@ interface IncidentRow {
   closing_note: string | null
 }
 
-export interface IncidentSummary { id: string, reference: string, kind: IncidentKind, severity: Severity, state: IncidentRow['state'], categoryId: string | null, occurredAt: number, reportedAt: number, venueId: string | null, openActions: number }
-
 async function row(id: string): Promise<IncidentRow> {
   const r = await first<IncidentRow>('SELECT * FROM front_of_house_incidents WHERE id = ?', id)
   if (!r) refuse('core.not-found', 'There is no such incident.', { status: 404 })
@@ -120,13 +118,6 @@ async function row(id: string): Promise<IncidentRow> {
 }
 
 /** Incidents for reviewers, newest first, with no free text and no people. */
-export async function listIncidents(filters: { state?: IncidentRow['state'] } = {}): Promise<IncidentSummary[]> {
-  const rows = await all<IncidentRow & { open_actions: number }>(
-    `SELECT i.*, (SELECT count(*) FROM front_of_house_incident_actions a WHERE a.incident_id = i.id AND a.state = 'open') AS open_actions
-     FROM front_of_house_incidents i ${filters.state ? 'WHERE i.state = ?' : ''} ORDER BY i.reported_at DESC`, ...(filters.state ? [filters.state] : []))
-  return rows.map(r => ({ id: r.id, reference: reference(r.year, r.number), kind: r.kind, severity: r.severity, state: r.state, categoryId: r.category_id, occurredAt: r.occurred_at, reportedAt: r.reported_at, venueId: r.venue_id, openActions: r.open_actions }))
-}
-
 /** What a reporter sees of their own reports: number, kind, state and their own words. Nothing else. */
 export async function myReports(accountId: string): Promise<{ id: string, reference: string, kind: IncidentKind, state: IncidentRow['state'], occurredAt: number, whatHappened: string }[]> {
   const rows = await all<IncidentRow>(`SELECT * FROM front_of_house_incidents WHERE reported_by IN (${accountScopeSql('?1')}) ORDER BY reported_at DESC`, accountId)

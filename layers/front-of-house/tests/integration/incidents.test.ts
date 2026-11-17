@@ -71,6 +71,20 @@ describe('FH-27: reporting', () => {
   })
 })
 
+describe('the reviewers\' list', () => {
+  it('shows those awaiting review by default, finds one by its number, and holds no free text', async () => {
+    const a = await report()
+    const listed = await req('GET', '/api/front-of-house/incidents', undefined, reviewer())
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200)
+    expect(listed.body.rows.find((r: any) => r.id === a.incidentId)).toEqual({ id: a.incidentId, reference: a.reference, kind: 'incident', severity: 'minor', state: 'reported', occurred: expect.any(Number), venue: null, actions: 0 })
+    expect(JSON.stringify(listed.body)).not.toContain('slipped')
+    const found = (await req('GET', `/api/front-of-house/incidents?q=${a.reference}&view=all`, undefined, reviewer())).body
+    expect(found.rows.map((r: any) => r.id)).toEqual([a.incidentId])
+    expect((await req('GET', '/api/front-of-house/incidents?q=nothing-like-a-number', undefined, reviewer())).body.total).toBe(0)
+    expect((await req('GET', '/api/front-of-house/incidents?state=closed', undefined, reviewer())).body.rows.find((r: any) => r.id === a.incidentId)).toBeUndefined()
+  })
+})
+
 describe('FH-28: routing', () => {
   it('tells reviewers at once of a serious incident, and of the rest in the morning digest, with no detail', async () => {
     const rhea = await realReviewer()
