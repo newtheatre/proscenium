@@ -1,75 +1,57 @@
-<!-- Modules (foundations part 7; interface W9): every module the installation has, grouped as Always
-     on, On, Available and Your theatre's own (x- modules). Each shows its name, what it does, its
-     stability, whether it is on and what it needs. Switching asks first, in ModuleSwitchDialog: on
-     lists what else switches on, its secrets and the screens that appear; off lists what goes, that
-     the data is kept, and what prevents it. A module that is on but missing a secret or credential
-     it always needs says so. Administrators with health.view see the page; only the owner switches. -->
+<!-- Modules (foundations part 7; interface W9), the catalogue: every module the installation has, as
+     cards with what it does, whether it is on and a toggle for whoever may switch it. Switching asks
+     first, in ModuleSwitchDialog. A module that is on opens on its own page, whose tabs hold its
+     settings and About. Administrators with health.view see the page; only the owner switches. -->
 <script setup lang="ts">
 import type { ModuleView } from '../../../utils/modules'
 
 const { t } = useT()
-const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
-const toast = useToast()
-const overlay = useOverlay()
 const { nameOf, descriptionOf, listOf } = useModuleWords()
 const { data, status, error, refresh } = await useAPI<{ modules: ModuleView[], manage: boolean }>('/api/core/modules', { key: 'core:modules' })
+const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [])
 
-const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const busy = ref<string | null>(null)
+const filter = ref<'all' | 'on' | 'off'>('all')
+const search = ref('')
+const filters = computed(() => [
+  { label: t('core.modules.filter.all'), value: 'all' },
+  { label: t('core.modules.filter.on'), value: 'on' },
+  { label: t('core.modules.filter.off'), value: 'off' },
+])
 
 const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : nameOf(a.id).localeCompare(nameOf(b.id))
-const groups = computed(() => {
-  const all = [...(data.value?.modules ?? [])].sort(byName)
-  const own = all.filter(m => m.owner === 'site')
-  const theirs = all.filter(m => m.owner !== 'site')
-  return [
-    { id: 'always-on', title: t('core.modules.group.always-on'), help: t('core.modules.group.always-on-help'), modules: theirs.filter(m => m.alwaysOn) },
-    { id: 'on', title: t('core.modules.group.on'), help: undefined, modules: theirs.filter(m => !m.alwaysOn && m.on) },
-    { id: 'available', title: t('core.modules.group.available'), help: t('core.modules.group.available-help'), modules: theirs.filter(m => !m.alwaysOn && !m.on) },
-    { id: 'own', title: t('core.modules.group.own'), help: t('core.modules.group.own-help'), modules: own },
-  ].filter(g => g.modules.length)
+const shown = computed(() => {
+  const words = search.value.trim().toLocaleLowerCase('en-GB')
+  return [...(data.value?.modules ?? [])]
+    .filter(m => filter.value === 'all' || (filter.value === 'on') === (m.on || m.alwaysOn))
+    .filter(m => !words || `${nameOf(m.id)} ${descriptionOf(m.id) ?? ''}`.toLocaleLowerCase('en-GB').includes(words))
+    .sort(byName)
 })
 
-const state = (m: ModuleView) => m.alwaysOn
-  ? { tone: 'info' as const, label: t('core.modules.state.always-on') }
-  : m.on ? { tone: 'success' as const, label: t('core.modules.state.on') } : { tone: 'neutral' as const, label: t('core.modules.state.off') }
-const missingCredentials = (m: ModuleView) => m.credentials.filter(c => c.needed === 'always' && !c.set)
-
-async function toggle(m: ModuleView) {
-  const on = !m.on
-  const { default: component } = await import('../../../components/ModuleSwitchDialog.vue')
-  const dialog = overlay.create(component, { destroyOnClose: true })
-  if ((await dialog.open({ module: m, on, modules: data.value?.modules ?? [] }).result) !== true) return
-  refusal.value = null
-  busy.value = m.id
-  try {
-    const result = await $api<{ switched: string[] }>(`/api/core/modules/${encodeURIComponent(m.id)}` as '/api/core/modules/:id', { method: 'PUT', body: { on, withRequired: on && m.alsoOn.length > 0 } })
-    const others = result.switched.filter(id => id !== m.id).map(nameOf)
-    toast.add({
-      title: on
-        ? (others.length ? t('core.modules.switched-on-with', { module: nameOf(m.id), others: listOf(others) }) : t('core.modules.switched-on', { module: nameOf(m.id) }))
-        : t('core.modules.switched-off', { module: nameOf(m.id) }),
-      color: 'success',
-    })
-    // The menus of every shell change with the modules that are on.
-    await refreshNuxtData()
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = null
-  }
-}
+const missing = (m: ModuleView) => m.on
+  ? [...m.missingSecrets.map(name => t('core.modules.missing-secret', { name })), ...m.credentials.filter(c => c.needed === 'always' && !c.set).map(c => t('core.modules.missing-credential', { name: c.name }))]
+  : []
+const footnote = (m: ModuleView) => m.settings
+  ? t('core.modules.settings-count', { count: m.settings })
+  : m.requires.length ? t('core.modules.needs', { modules: listOf(m.requires.map(nameOf)) }) : ''
 </script>
 
 <template>
   <PageFrame
     :title="t('core.modules.title')"
-    :description="t('core.modules.description')"
-    width="reading"
+    width="standard"
   >
+    <template #primary>
+      <UInput
+        v-model="search"
+        icon="i-lucide-search"
+        :placeholder="t('core.modules.search')"
+        :aria-label="t('core.modules.search')"
+        class="w-56 max-sm:hidden"
+      />
+    </template>
+    <p class="text-sm text-muted">
+      {{ t('core.modules.description') }}
+    </p>
     <DataBoundary
       :data="data"
       :status="status"
@@ -84,96 +66,119 @@ async function toggle(m: ModuleView) {
         :description="t('core.modules.view-only')"
       />
       <RefusalNotice :refusal="refusal" />
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <UTabs
+          v-model="filter"
+          :items="filters"
+          :content="false"
+          variant="link"
+          class="w-fit"
+        />
+        <UInput
+          v-model="search"
+          icon="i-lucide-search"
+          :placeholder="t('core.modules.search')"
+          :aria-label="t('core.modules.search')"
+          class="w-full sm:hidden"
+        />
+      </div>
       <EmptyState
-        v-if="!groups.length"
+        v-if="!shown.length"
         icon="i-lucide-blocks"
         :title="t('core.modules.empty')"
       />
-      <PageSection
-        v-for="group in groups"
-        :key="group.id"
-        :title="group.title"
-        :description="group.help"
+      <ul
+        v-else
+        class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
       >
-        <ul class="divide-y divide-default -my-4">
-          <li
-            v-for="m in group.modules"
-            :key="m.id"
-            class="py-4 space-y-2"
+        <li
+          v-for="m in shown"
+          :key="m.id"
+        >
+          <UCard
+            class="h-full"
+            :ui="{ root: 'flex h-full flex-col', body: 'flex flex-1 flex-col gap-3' }"
           >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0 flex-1 space-y-1">
+            <div class="flex items-start gap-3">
+              <div class="rounded-md bg-elevated p-2">
+                <UIcon
+                  :name="m.icon"
+                  class="size-5"
+                />
+              </div>
+              <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="font-medium text-highlighted">
+                  <h2 class="font-medium text-highlighted">
                     {{ nameOf(m.id) }}
-                  </h3>
-                  <StatusBadge
-                    :tone="state(m).tone"
-                    :label="state(m).label"
+                  </h2>
+                  <UBadge
+                    v-if="m.owner === 'site'"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    :label="t('core.modules.own')"
                   />
+                </div>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <StatusBadge
+                    v-if="m.alwaysOn"
+                    tone="info"
+                    :label="t('core.modules.state.always-on')"
+                  />
+                  <span
+                    v-else
+                    class="text-sm text-muted"
+                  >{{ t(m.on ? 'core.modules.state.on' : 'core.modules.state.off') }}</span>
                   <UBadge
                     v-if="m.stability !== 'stable'"
                     :color="m.stability === 'deprecated' ? 'warning' : 'neutral'"
                     variant="outline"
+                    size="sm"
                     :label="t(`core.modules.stability.${m.stability}`)"
                   />
                 </div>
-                <p
-                  v-if="descriptionOf(m.id)"
-                  class="text-sm text-muted"
-                >
-                  {{ descriptionOf(m.id) }}
-                </p>
-                <p
-                  v-if="m.requires.length"
-                  class="text-sm text-muted"
-                >
-                  {{ t('core.modules.needs', { modules: listOf(m.requires.map(nameOf)) }) }}
-                </p>
-                <p
-                  v-if="m.on && m.requiredBy.length"
-                  class="text-sm text-muted"
-                >
-                  {{ t('core.modules.needed-by', { modules: listOf(m.requiredBy.map(nameOf)) }) }}
-                </p>
               </div>
-              <UButton
+              <USwitch
                 v-if="data?.manage && !m.alwaysOn"
-                :label="t(m.on ? 'core.modules.switch-off' : 'core.modules.switch-on')"
-                :color="m.on ? 'neutral' : undefined"
-                :variant="m.on ? 'outline' : 'solid'"
+                :model-value="m.on"
                 :loading="busy === m.id"
                 :disabled="busy !== null && busy !== m.id"
-                @click="toggle(m)"
+                :aria-label="t('core.modules.toggle', { module: nameOf(m.id) })"
+                @update:model-value="toggle(m)"
               />
             </div>
-            <template v-if="m.on">
-              <UAlert
-                v-for="name in m.missingSecrets"
-                :key="name"
-                color="warning"
-                variant="subtle"
-                icon="i-lucide-triangle-alert"
-                :description="t('core.modules.missing-secret', { name })"
+            <div class="flex-1">
+              <p
+                v-if="descriptionOf(m.id)"
+                class="line-clamp-3 text-sm text-muted"
+              >
+                {{ descriptionOf(m.id) }}
+              </p>
+            </div>
+            <UAlert
+              v-for="line in missing(m)"
+              :key="line"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              :description="line"
+            />
+            <div class="flex items-center justify-between gap-2 text-sm">
+              <span class="text-muted">{{ footnote(m) }}</span>
+              <UButton
+                v-if="m.open"
+                :to="m.open"
+                :label="t('core.modules.open')"
+                :aria-label="t('core.modules.open-module', { module: nameOf(m.id) })"
+                trailing-icon="i-lucide-chevron-right"
+                color="neutral"
+                variant="ghost"
+                size="sm"
               />
-              <UAlert
-                v-for="c in missingCredentials(m)"
-                :key="c.name"
-                color="warning"
-                variant="subtle"
-                icon="i-lucide-triangle-alert"
-                :description="t('core.modules.missing-credential', { name: c.name })"
-              />
-            </template>
-            <p
-              v-if="m.stability === 'deprecated'"
-              class="text-sm text-warning"
-            >
-              {{ t('core.modules.deprecated-note') }}
-            </p>
-          </li>
-        </ul>
-      </PageSection>
+            </div>
+          </UCard>
+        </li>
+      </ul>
     </DataBoundary>
   </PageFrame>
 </template>

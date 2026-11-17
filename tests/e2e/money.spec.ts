@@ -54,8 +54,6 @@ const SCREENS = [
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
   ['/console/finance/export', 'Export'],
-  ['/console/payments/settings', 'Payments'],
-  ['/console/finance/settings', 'Finance'],
 ] as const
 
 for (const [path, title] of SCREENS) {
@@ -64,6 +62,15 @@ for (const [path, title] of SCREENS) {
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
     await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+    await noViolations(page)
+  })
+}
+
+for (const [path, title] of [['/console/payments/session', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
+  test(`${title} open from the cog on ${path} and have no violations`, async ({ page }) => {
+    await visit(page, path)
+    await page.getByRole('link', { name: title }).click()
+    await expect(page.getByRole('dialog').getByRole('heading', { name: title })).toBeVisible()
     await noViolations(page)
   })
 }

@@ -30,7 +30,7 @@ export function matchSettings(index: readonly SettingRef[], term: string, t: (ke
     const inLabel = label.toLowerCase()
     const both = `${inLabel} ${help.toLowerCase()} ${ref.key.toLowerCase()}`
     if (!wanted.every(w => both.includes(w))) continue
-    hits.push({ ...ref, label, help, to: `${ref.to}?setting=${encodeURIComponent(ref.key)}`, rank: wanted.every(w => inLabel.includes(w)) ? 0 : 1 })
+    hits.push({ ...ref, label, help, to: `${ref.to}${ref.to.includes('?') ? '&' : '?'}setting=${encodeURIComponent(ref.key)}`, rank: wanted.every(w => inLabel.includes(w)) ? 0 : 1 })
   }
   return hits.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label)).map(({ rank: _rank, ...hit }) => hit)
 }

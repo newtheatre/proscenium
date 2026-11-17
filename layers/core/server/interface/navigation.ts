@@ -6,7 +6,7 @@ import { shows } from './counts'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import {
-  ADMIN_GROUP_ORDER, abilityList, entryLabelKey, groupLabelKey, orderGroups,
+  ADMIN_GROUP_ORDER, abilityList, entryLabelKey, groupLabelKey, moduleHome, moduleTabOf, orderGroups,
   type NavGroup, type NavItem, type NavigationEntry, type NavigationGroupDecl, type ShellName,
 } from '../../shared/navigation'
 
@@ -16,7 +16,12 @@ export interface DeclaredEntry extends NavigationEntry {
   label?: string
   /** The entry's count for this viewer, when it has one. */
   countValue?: number
+  /** For a generated page of settings, the page's id. */
+  settingsPage?: string
 }
+
+/** Who may see a module's page in Admin without changing anything on it: its About tab and the catalogue. */
+export const MODULE_VIEWERS = ['core.modules.manage', 'core.health.view']
 
 /** Core's own screens (modules, settings, jobs, credentials, health, audit) sit in the System group. */
 export const SYSTEM_GROUP = 'system'
@@ -52,7 +57,12 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
       group,
       ...(page.place === 'console' ? { section: 'setup' as const } : {}),
       order: page.order,
+      settingsPage: pageId,
     })
+  }
+  // Every module's page has an About tab, for a module that is off too (the catalogue opens it).
+  for (const id of registry.modules.keys()) {
+    out.push({ id: `core.modules.about.${id}`, module: 'core', label: 'core.modules.tab.about', menu: 'admin', group: 'modules', to: `${moduleHome(id)}/about`, icon: 'i-lucide-info', ability: MODULE_VIEWERS, order: 1000 }) // not-policy: About is the last tab
   }
   return out
 }
@@ -95,7 +105,7 @@ export async function allowedEntries(actor: Actor, shell: ShellName): Promise<De
 const byOrder = (a: NavItem, b: NavItem) => a.order - b.order || a.id.localeCompare(b.id)
 
 function item(entry: DeclaredEntry): NavItem {
-  return { id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0 }
+  return { id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0, module: entry.module }
 }
 
 /** The flat list for a shell without groups, or the grouped sidebar for the console. */
@@ -104,8 +114,8 @@ export async function navigationFor(actor: Actor, shell: ShellName): Promise<{ i
   // The console and Site administration are grouped; the others are flat lists.
   if (shell !== 'console' && shell !== 'admin') return { items: entries.map(item).sort(byOrder), groups: [] }
   const declared = (await declaredGroups()).filter(g => (g.menu ?? 'console') === shell)
-  // Site administration's Overview is the shell's home and sits in no group.
-  const grouped = shell === 'admin' ? entries.filter(e => e.group) : entries
+  // Admin's Overview is the shell's home and sits in no group; a module's tabs are on its page.
+  const grouped = shell === 'admin' ? entries.filter(e => e.group && !moduleTabOf(e)) : entries
   const used = [...new Set(grouped.map(e => e.group ?? e.module))]
   const groups: NavGroup[] = []
   const placed = orderGroups(used.map((id) => {
@@ -124,4 +134,30 @@ export async function navigationFor(actor: Actor, shell: ShellName): Promise<{ i
     })
   }
   return { items: [], groups }
+}
+
+export interface ModuleTab {
+  id: string
+  /** Translation key of the tab's label. */
+  label: string
+  to: string
+  icon: string
+  /** A generated page of settings: its id, which the console's settings window draws in place. */
+  page: string | null
+}
+
+/**
+ * The tabs of a module's page in Admin this viewer may open, in order: its pages of settings and
+ * set-up screens, then About. The same tabs, less About, are the console's settings window.
+ */
+export async function moduleTabs(actor: Actor, module: string): Promise<ModuleTab[]> {
+  const tabs: (ModuleTab & { order: number })[] = []
+  for (const entry of await declaredEntries()) {
+    if (moduleTabOf(entry) !== module) continue
+    if (!holds(await mayOpen(actor, entry))) continue
+    // The module's own page of settings is its Settings tab; a named page keeps its name.
+    const label = entry.settingsPage === `${module}.admin` ? 'core.modules.tab.settings' : entry.label ?? entryLabelKey(entry.id)
+    tabs.push({ id: entry.id, label, to: entry.to, icon: entry.icon, page: entry.settingsPage ?? null, order: entry.order ?? 0 })
+  }
+  return tabs.sort((a, b) => a.order - b.order || a.to.length - b.to.length).map(({ order: _, ...tab }) => tab)
 }
