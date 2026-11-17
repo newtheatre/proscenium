@@ -17,6 +17,7 @@ const typed = ref('')
 const wrong = ref(false)
 const toast = useToast()
 const { data: brand } = await useBrand()
+const { dayLong } = useDates()
 
 const isUsed = (i: number) => !!props.used?.[i]
 const left = computed(() => props.codes.filter((_, i) => !isUsed(i)).length)
@@ -24,7 +25,7 @@ const left = computed(() => props.codes.filter((_, i) => !isUsed(i)).length)
 /** The set as plain text: what the download holds and what Copy puts on the clipboard. */
 function asText(): string {
   const site = brand.value?.name || window.location.host
-  const made = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  const made = dayLong(Date.now())
   return [
     `${site}: recovery codes`,
     `Saved ${made}. Each code works once, if you lose your passkey.`,
