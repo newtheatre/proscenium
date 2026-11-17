@@ -51,5 +51,13 @@
   "box-office.abilities.settings.manage.label": "Change box office settings",
   "box-office.abilities.report.view.label": "See sales reports",
   "box-office.abilities.report.export.label": "Download sales reports",
-  "box-office.navigation.reports.label": "Sales report"
+  "box-office.navigation.reports.label": "Sales report",
+  "box-office.settings-sections.comps": "Complimentary tickets",
+  "box-office.settings.comps.per-request.label": "Most complimentary tickets in one request",
+  "box-office.settings.comps.per-request.help": "Anyone asking for more makes a second request.",
+  "box-office.settings.comps.per-performance.label": "Most complimentary tickets for one performance",
+  "box-office.settings.comps.per-performance.help": "Approvals stop once a performance reaches this many. Nothing means no limit.",
+  "box-office.abilities.comp.request.label": "Ask for complimentary tickets",
+  "box-office.abilities.comp.approve.label": "Approve or decline complimentary tickets, never your own",
+  "box-office.navigation.comps.label": "Complimentary tickets"
 }
