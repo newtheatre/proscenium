@@ -3,6 +3,7 @@
 // edited the same way as a role. A privileged ability counts only once the theatre has confirmed it.
 import { all, nowMs, refuse, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
+import { impliedAbility } from '#kit/abilities'
 import { abilityError, checkAbilities, notHeld } from './roles'
 
 /** Every ability, with whether the actor holds it at site scope, for the role and fact editors. */
@@ -14,7 +15,7 @@ export async function abilityCatalogue(actor: Actor) {
     name,
     module,
     risk: decl.risk,
-    implies: (decl.implies ?? []).map(s => `${module}.${s}`),
+    implies: (decl.implies ?? []).map(entry => impliedAbility(module, entry)),
     label: `${module}.abilities.${name.slice(module.length + 1)}.label`,
     held: !missing.has(name),
   }))

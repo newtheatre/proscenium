@@ -13,9 +13,10 @@ export default defineModule({
   }),
   records: defineRecords('seats', { performance: record({ table: 'seats_performances' }) }),
   abilities: defineAbilities('seats', {
-    'orders.sell': ability({ on: 'seats.performance' }),
+    'orders.sell': ability({ on: 'seats.performance', implies: ['orders.find'] }),
     'settings.manage': ability({ risk: 'privileged', implies: ['orders.sell'] }),
     'members.look-up': ability({ audit: 'read' }),
+    'orders.find': ability({ impliable: true }),
   }),
   facts: defineFacts('seats', { regular: factDecl() }),
   tables,

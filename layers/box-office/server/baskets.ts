@@ -1,7 +1,8 @@
 // Baskets (Box office specification, part 3, "An order": nothing to basket). Pressing Hold tickets
 // writes the order, its hold, a claim for every ticket and a line for each, in one batch, or
 // nothing. The hold starts then and editing never moves its end. A basket has no account yet: it is
-// opened again with the token handed back here, which is stored only as its hash.
+// opened again with the token handed back here, which is stored only as its hash and stays the
+// browser's own through checkout.
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { orderLines } from './db/schema'
@@ -80,7 +81,7 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const totalMinor = lines.reduce((sum, l) => sum + l.amountMinor, 0)
 
   unit.add({
-    sql: "INSERT INTO box_office_orders (id, reference, channel, state, signed_in, currency, total_minor, link_token_hash, expires_at, keep, created_at, updated_at) VALUES (?, ?, 'online', 'basket', 0, ?, ?, ?, ?, 0, ?, ?)",
+    sql: "INSERT INTO box_office_orders (id, reference, channel, state, signed_in, currency, total_minor, basket_token_hash, expires_at, keep, created_at, updated_at) VALUES (?, ?, 'online', 'basket', 0, ?, ?, ?, ?, 0, ?, ?)",
     params: [orderId, reference, currency, totalMinor, await hashOf(token), expiresAt, at, at],
   })
   unit.add({ sql: "INSERT INTO box_office_holds (id, kind, order_id, created_at, updated_at) VALUES (?, 'basket', ?, ?, ?)", params: [holdId, orderId, at, at] })
@@ -105,7 +106,7 @@ export interface BasketView {
 /** A basket, for whoever holds its token. A lapsed basket holds nothing and says so. */
 export async function basketByToken(orderId: string, token: string): Promise<BasketView | null> {
   const order = await first<{ id: string, reference: string, state: string, expires_at: number | null, currency: string, total_minor: number }>(
-    'SELECT id, reference, state, expires_at, currency, total_minor FROM box_office_orders WHERE id = ? AND link_token_hash = ?', orderId, await hashOf(token))
+    'SELECT id, reference, state, expires_at, currency, total_minor FROM box_office_orders WHERE id = ? AND basket_token_hash = ?', orderId, await hashOf(token))
   if (!order) return null
   const lapsed = order.state === 'basket' && order.expires_at !== null && order.expires_at <= nowMs()
   const lines = lapsed

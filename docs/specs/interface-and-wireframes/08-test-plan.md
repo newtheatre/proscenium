@@ -1,6 +1,6 @@
 # 8. Test plan
 
-Thirty-four named cases must never regress. Each is filed under the tier that runs it in workstream 1's harness: unit (pure code), integration (the real runtime and database) or browser (a real browser against a running app).
+Thirty-seven named cases must never regress. Each is filed under the tier that runs it in workstream 1's harness: unit (pure code), integration (the real runtime and database) or browser (a real browser against a running app).
 
 ## Who sees what
 
@@ -44,6 +44,16 @@ Added 16 November 2026 with the list design.
 | **One visit, one step back** | Changing three filters in one visit to the panel, then Back, returns to the list as it was before the panel opened | Browser |
 | **Children follow parents** | A child filter keeps a parent when any child matches, shows only matching children with the count, and the page total counts parents | Integration |
 | **The way back is the list as left** | From a filtered, sorted list on page 3, opening a record and using the trail returns to the same filters, sort and page | Browser |
+
+## Settings
+
+Added 16 November 2026 with the settings redesign (R-37). "Settings page is generated", above, still stands.
+
+| Case | Proves | Tier |
+| --- | --- | --- |
+| **One home** | Every declared setting appears on exactly one generated page or its one named screen, and search opens that place | Integration |
+| **Revert is an ordinary save** | Reverting from the history needs the setting's own ability, obeys its limits and confirmation, and leaves a row marked "Reverted"; a sensitive setting offers none | Integration |
+| **Only declared settings prompt** | Saving a setting declared to confirm asks again and for a fresh sign-in; saving any other setting, in either shell, asks nothing | Browser |
 
 ## Offline and live
 

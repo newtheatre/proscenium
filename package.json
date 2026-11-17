@@ -23,6 +23,8 @@
     "test:integration": "vitest run --project integration",
     "test:browser": "PROSCENIUM_GALLERY=1 bun run build && playwright test",
     "db:generate": "bun scripts/db-generate.ts",
+    "search:drop": "bun scripts/search-indexes.ts drop",
+    "search:make": "bun scripts/search-indexes.ts make",
     "verify": "bun run check && bun run test && bun run test:browser"
   },
   "dependencies": {

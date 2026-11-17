@@ -17,13 +17,14 @@ export interface SalesRecord {
   offSaleAt: number | null
   maxPerOrder: number | null
   holdMinutes: number | null
+  paymentTiming: 'pay-now' | 'reserve' | 'buyer-chooses' | null
 }
 
 export interface Pool { id: string, bandId: string, bandName: string, bandKind: string, capacity: number, claimed: number }
 
-interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null }
+interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null }
 
-const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes })
+const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, paymentTiming: r.payment_timing })
 
 export async function salesOf(performanceId: string): Promise<SalesRecord | null> {
   const row = await first<SalesRow>('SELECT * FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
