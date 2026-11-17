@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { matchSettings, settingsPageOf } from '../../layers/core/shared/search'
+import { matchSettings } from '../../layers/core/shared/search'
 
 const index = [
-  { key: 'seats.hold.duration', module: 'seats', section: 'hold', labelKey: 'a.label', helpKey: 'a.help' },
-  { key: 'core.brand.name', module: 'core', section: 'brand', labelKey: 'b.label', helpKey: 'b.help' },
+  { key: 'seats.hold.duration', module: 'seats', to: '/console/seats/settings', section: 'hold', labelKey: 'a.label', helpKey: 'a.help' },
+  { key: 'core.brand.name', module: 'core', to: '/admin/branding', section: 'brand', labelKey: 'b.label', helpKey: 'b.help' },
 ]
 const words: Record<string, string> = {
   'a.label': 'Hold time', 'a.help': 'How long seats stay held for a customer.',
@@ -26,8 +26,6 @@ describe('matchSettings (UI-15)', () => {
   })
   it('returns nothing for an empty term and links to the setting on its own page', () => {
     expect(matchSettings(index, '  ', t)).toEqual([])
-    expect(matchSettings(index, 'theatre', t)[0]!.to).toBe('/console/core/settings?setting=core.brand.name')
-    expect(settingsPageOf('seats')).toBe('/console/seats/settings')
-    expect(settingsPageOf('core', 'site')).toBe('/admin/settings')
+    expect(matchSettings(index, 'theatre', t)[0]!.to).toBe('/admin/branding?setting=core.brand.name')
   })
 })

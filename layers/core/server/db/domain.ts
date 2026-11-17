@@ -147,7 +147,7 @@ export const notifications = defineTable('core_notifications', {
   id: 'ntf',
   realm: { column: 'side' },
   subject: { account: 'account_id', unlinked: 'staff' },
-  retention: 'core.notifications.log-retention',
+  retention: 'core.delivery.log-retention',
   extra: t => [
     // The key leaves the account out so it matches across a merge (R-34); the index keeps one per
     // account, and one for all sends to bare addresses (notifyAddress's keys are its own).
@@ -205,7 +205,7 @@ export const inboxItems = defineTable('core_inbox_items', {
 }, {
   id: 'inb',
   realm: { column: 'side' },
-  retention: 'core.notifications.inbox-retention',
+  retention: 'core.delivery.inbox-retention',
   onErasure: 'delete-row',
   extra: t => [
     index('core_inbox_items_account').on(t.accountId, t.side, t.archivedAt, t.createdAt),
