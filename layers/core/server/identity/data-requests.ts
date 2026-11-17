@@ -4,7 +4,7 @@
 // every request with its respond-by date and close it once each table that may hold rows linked to
 // no account has been searched by hand.
 import type { H3Event } from 'h3'
-import { all, createUnit, first, isEnabled, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
+import { all, createUnit, first, isEnabled, newId, nowMs, refuse, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { formatDuration } from '#kit/duration'
 import type { TableMeta } from '#kit/db'
@@ -13,7 +13,6 @@ import { notifyAddress } from '../notifications/send'
 import { accountById } from './accounts'
 import { digest, randomToken } from './crypto'
 import { eraseAccount, erasureHolds } from './erasure'
-import { relyingParty } from './web'
 import { fileUrl } from '../files/service'
 import type { IDENTITY_CHECKS } from '../db/identity'
 
@@ -77,7 +76,7 @@ export async function requestErasure(unit: UnitView, event: H3Event, actor: Acto
   })
   await notify(unit, 'core.erasure-confirm', {
     to: account.id,
-    variables: { link: `${(await relyingParty(event)).origin}/sign-in/confirm-erasure#${token}`, wait: formatDuration(coolingOff) },
+    variables: { link: await siteUrl(`/sign-in/confirm-erasure#${token}`), wait: formatDuration(coolingOff) },
     dedupeKey: id,
   })
   unit.audit({ action: 'create', ...(actor.accountId === account.id ? {} : { ability: 'core.data-request.manage' }), record: ['core.data-request', id], detail: { kind: 'erasure', identityCheck: input.identityCheck ?? null } })
