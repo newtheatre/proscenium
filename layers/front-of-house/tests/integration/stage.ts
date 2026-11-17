@@ -54,6 +54,19 @@ import checklistPut from '../../server/api/front-of-house/checklists/[id]/index.
 import checklistArchive from '../../server/api/front-of-house/checklists/[id]/archive.post'
 import cardsGet from '../../server/api/front-of-house/emergency-cards/index.get'
 import cardPut from '../../server/api/front-of-house/emergency-cards/[venueId].put'
+import incidentsPost from '../../server/api/front-of-house/incidents/index.post'
+import incidentsGet from '../../server/api/front-of-house/incidents/index.get'
+import incidentsMine from '../../server/api/front-of-house/incidents/mine.get'
+import incidentGet from '../../server/api/front-of-house/incidents/[id]/index.get'
+import incidentOpen from '../../server/api/front-of-house/incidents/[id]/open.post'
+import incidentReview from '../../server/api/front-of-house/incidents/[id]/review.post'
+import peoplePost from '../../server/api/front-of-house/incidents/[id]/people/index.post'
+import personPut from '../../server/api/front-of-house/incidents/[id]/people/[personId]/index.put'
+import personRemove from '../../server/api/front-of-house/incidents/[id]/people/[personId]/remove.post'
+import actionsPost from '../../server/api/front-of-house/incidents/[id]/actions/index.post'
+import actionResolve from '../../server/api/front-of-house/incidents/[id]/actions/[actionId]/resolve.post'
+import incidentClose from '../../server/api/front-of-house/incidents/[id]/close.post'
+import incidentReopen from '../../server/api/front-of-house/incidents/[id]/reopen.post'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -108,6 +121,19 @@ export const handle = server({
   'POST /api/front-of-house/checklists/:id/archive': checklistArchive,
   'GET /api/front-of-house/emergency-cards': cardsGet,
   'PUT /api/front-of-house/emergency-cards/:venueId': cardPut,
+  'POST /api/front-of-house/incidents': incidentsPost,
+  'GET /api/front-of-house/incidents': incidentsGet,
+  'GET /api/front-of-house/incidents/mine': incidentsMine,
+  'GET /api/front-of-house/incidents/:id': incidentGet,
+  'POST /api/front-of-house/incidents/:id/open': incidentOpen,
+  'POST /api/front-of-house/incidents/:id/review': incidentReview,
+  'POST /api/front-of-house/incidents/:id/people': peoplePost,
+  'PUT /api/front-of-house/incidents/:id/people/:personId': personPut,
+  'POST /api/front-of-house/incidents/:id/people/:personId/remove': personRemove,
+  'POST /api/front-of-house/incidents/:id/actions': actionsPost,
+  'POST /api/front-of-house/incidents/:id/actions/:actionId/resolve': actionResolve,
+  'POST /api/front-of-house/incidents/:id/close': incidentClose,
+  'POST /api/front-of-house/incidents/:id/reopen': incidentReopen,
 })
 
 export type Person = ReturnType<typeof person>

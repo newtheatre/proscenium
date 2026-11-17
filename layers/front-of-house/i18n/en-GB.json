@@ -7,6 +7,8 @@
   "front-of-house.settings-sections.shifts": "Shifts",
   "front-of-house.settings-sections.reminders": "Reminders",
   "front-of-house.settings-sections.checklists": "Checklists",
+  "front-of-house.settings-sections.incidents": "Incidents",
+  "front-of-house.settings-sections.retention": "Keeping records",
 
   "front-of-house.settings.shifts.window-before.label": "Shifts start to count before the call time",
   "front-of-house.settings.shifts.window-before.help": "How long before their call time people on a shift can use what the shift lets them do, such as scanning tickets. Changing this does not move shifts that already exist.",
@@ -30,6 +32,18 @@
   "front-of-house.settings.shifts.late-after.help": "How long after their call time someone who has not checked in is flagged on the board, as a prompt to whoever is leading the night.",
   "front-of-house.settings.checklists.block-house-open.label": "Keep the house closed until checklists are done",
   "front-of-house.settings.checklists.block-house-open.help": "When on, house open cannot be recorded while a checklist for before the show is unfinished. When off, the board warns instead.",
+  "front-of-house.settings.incidents.review-within.label": "Flag an incident nobody has opened after",
+  "front-of-house.settings.incidents.review-within.help": "How long a reported incident can wait before it is flagged as not yet reviewed.",
+  "front-of-house.settings.incidents.immediate-severity.label": "Tell reviewers at once about incidents at or above",
+  "front-of-house.settings.incidents.immediate-severity.help": "Incidents at or above this severity are sent to reviewers straight away. Less serious ones arrive in a summary each morning.",
+  "front-of-house.settings.incidents.immediate-severity.options.minor": "Minor",
+  "front-of-house.settings.incidents.immediate-severity.options.moderate": "Moderate",
+  "front-of-house.settings.incidents.immediate-severity.options.serious": "Serious",
+  "front-of-house.settings.retention.incidents.label": "Keep incident details for",
+  "front-of-house.settings.retention.incidents.help": "How long after an incident is closed the people involved and what was written about it are kept. The incident's number, kind and dates are always kept. Shortening this deletes older details at the next daily run.",
+  "front-of-house.settings.retention.incidents-child.label": "Keep incident details involving a child for",
+  "front-of-house.settings.retention.incidents-child.help": "The same, when a child was involved. Insurers and safeguarding guidance usually ask for longer. Shortening this deletes older details at the next daily run.",
+  "front-of-house.retain.incident": "Kept as the theatre's safety record of an incident, for the period the theatre has set.",
 
   "front-of-house.facts.on-shift.label": "On shift for the performance",
   "front-of-house.facts.leading-shift.label": "Leading the shift for the performance",
@@ -42,6 +56,9 @@
   "front-of-house.abilities.checklist.complete.label": "Work through checklists on the night",
   "front-of-house.abilities.checklist.manage.label": "Manage checklists and emergency cards",
   "front-of-house.abilities.emergency-card.view.label": "Open the emergency card",
+  "front-of-house.abilities.incident.report.label": "Report incidents and see their own reports",
+  "front-of-house.abilities.incident.view.label": "Read incidents, with the people involved and their welfare details",
+  "front-of-house.abilities.incident.manage.label": "Review and close incidents",
   "front-of-house.abilities.duty.manage.label": "Manage duties",
   "front-of-house.abilities.settings.manage.label": "Change front of house settings"
 }
