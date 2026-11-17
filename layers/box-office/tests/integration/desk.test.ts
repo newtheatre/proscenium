@@ -5,6 +5,7 @@
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
+import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
@@ -13,6 +14,7 @@ import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const seller = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
 const onlooker = person(['payments.session.open', 'box-office.order.view'])
+const finder = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment', 'core.account.search'])
 const count = async (sql: string, ...params: unknown[]) => (await rows<{ n: number }>(sql, ...params))[0]!.n
 const order = async (id: string) => (await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE id = ?', id))[0]!
 const claimed = async (h: House) => (await rows<{ claimed: number }>('SELECT claimed FROM box_office_pools WHERE performance_id = ?', h.performanceId))[0]!.claimed
@@ -52,7 +54,7 @@ beforeAll(async () => {
     await changeSetting(unit.view(), 'box-office.checkout.payment-timing', 'buyer-chooses', { reason: 'test', confirm: true })
   })
   cash = (await rows<{ id: string }>("SELECT id FROM payments_provider_accounts WHERE provider = 'cash'"))[0]!.id
-  for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
+  for (const who of [seller, onlooker, finder]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
 })
 
 describe('a reservation at the desk', () => {
@@ -181,6 +183,23 @@ describe('selling at the desk', () => {
     expect(owner!.address).toBe('desk.buyer@example.org')
     expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE \'box-office.order-confirmed%\'', made!.id)).toBe(1)
+  })
+
+  it('sends the tickets to a person picked by name, only for a seller who may search people', async () => {
+    const h = await house(3)
+    const { accountId } = await commit(unit => findOrCreateAccount(unit.view(), { address: 'picked.buyer@example.org', origin: 'guest' }))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], accountId }
+    const refused = await till(input)
+    expect(refused.status).toBe(403)
+    const desk = await req('GET', '/api/box-office/desk/performances', undefined, finder)
+    expect(desk.body.searchPeople).toBe(true)
+    expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.searchPeople).toBe(false)
+    const sale = await till(input, finder)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(made!.account_id).toBe(accountId)
+    expect((await till({ ...input, email: 'both@example.org' }, finder)).status).toBe(422)
+    expect((await till({ ...input, accountId: 'acc_nobody' }, finder)).body.code).toBe('box-office.desk.no-address')
   })
 
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {

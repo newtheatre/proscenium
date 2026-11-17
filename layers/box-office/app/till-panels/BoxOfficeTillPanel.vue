@@ -3,6 +3,8 @@
      the difference on an exchange to dearer tickets, sent here from the booking's page. The panel
      only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
+import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
+
 interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
@@ -38,15 +40,16 @@ function dropExchange() {
   void router.replace({ query })
 }
 
-const { data } = await useAPI<{ performances: Performance[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
+const { data } = await useAPI<{ performances: Performance[], searchPeople: boolean }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [], searchPeople: false }) })
 const performances = computed(() => data.value?.performances ?? [])
 
 const mode = ref<'sell' | 'collect'>('sell')
 const modes = computed(() => [{ label: t('box-office.screens.panel.sell'), value: 'sell' }, { label: t('box-office.screens.panel.collect'), value: 'collect' }])
 const admit = ref(false)
-// The buyer's address, if they want the tickets emailed. Optional; the till shows nothing back about them.
-const email = ref('')
-const emailToSend = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()) ? email.value.trim() : undefined)
+// Who the tickets are emailed to, if the buyer wants them: a person picked by name or a typed
+// address. Optional; the till shows nothing back about them.
+const buyer = ref<Buyer | undefined>()
+const sendTo = computed(() => !buyer.value ? {} : 'accountId' in buyer.value ? { accountId: buyer.value.accountId } : { email: buyer.value.email })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 // Selling: how many of each kind of ticket for one performance.
@@ -75,13 +78,13 @@ function say() {
   }
   if (mode.value === 'sell') {
     const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map(r => ({ bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity: quantities.value[keyOf(r)]! }))
-    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...(emailToSend.value ? { email: emailToSend.value } : {}) } : null)
+    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value } : null)
   }
   else {
     emit('update:modelValue', order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, order, exchange, emailToSend], say, { deep: true })
+watch([mode, admit, quantities, order, exchange, sendTo], say, { deep: true })
 onMounted(() => {
   if (exchange.value) say()
 })
@@ -91,8 +94,8 @@ watch(() => props.modelValue, (now) => {
   if (now !== null && now !== undefined) return
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
-  // The next buyer never sees the last one's address.
-  email.value = ''
+  // The next buyer never sees who the last one was.
+  buyer.value = undefined
   if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
 })
 
@@ -330,13 +333,12 @@ function clear() {
     <UFormField
       v-if="mode === 'sell' && !exchange"
       :label="t('box-office.screens.panel.email')"
-      :help="t('box-office.screens.panel.email-help')"
-      name="email"
+      :help="data?.searchPeople ? t('box-office.screens.panel.buyer.help-search') : t('box-office.screens.panel.email-help')"
+      name="buyer"
     >
-      <UInput
-        v-model="email"
-        type="email"
-        autocomplete="off"
+      <BoxOfficeBuyerPicker
+        v-model="buyer"
+        :search-people="data?.searchPeople ?? false"
         :disabled="locked"
       />
     </UFormField>
