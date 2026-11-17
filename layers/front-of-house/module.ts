@@ -160,6 +160,7 @@ export default defineModule({
     }],
     'core.navigation': [
       { id: 'front-of-house.shifts', menu: 'members', to: '/members/front-of-house', icon: 'i-lucide-calendar-clock', ability: 'front-of-house.shift.sign-up', order: 30 },
+      { id: 'front-of-house.tonight', menu: 'live', to: '/live/front-of-house', icon: 'i-lucide-drama', ability: ['front-of-house.shift.view', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], order: 10 },
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
       { id: 'front-of-house.night-reports', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/night-reports', icon: 'i-lucide-notebook-pen', ability: 'front-of-house.night-report.view', order: 30 },
