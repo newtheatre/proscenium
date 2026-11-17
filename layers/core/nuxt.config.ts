@@ -22,7 +22,7 @@ export default defineNuxtConfig({
   colorMode: { storage: 'cookie', storageKey: MODE_KEY, cookieAttrs: { path: '/', maxAge: MODE_COOKIE_AGE, sameSite: 'lax' } },
   runtimeConfig: { public: { turnstile: { siteKey: '' } } },
   alias: kitAliases(root),
-  // Screens that moved to Site administration (R-33): old bookmarks still arrive.
+  // Screens that moved to Admin (R-33): old bookmarks still arrive.
   routeRules: {
     // The catch-all page of site settings is gone: each group has one page of its own (settings build brief).
     '/admin/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },

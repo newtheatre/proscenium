@@ -1,4 +1,4 @@
-// Identity's screens in Site administration (identity spec part 6): Roles, one role, Facts and
+// Identity's screens in Admin (identity spec part 6): Roles, one role, Facts and
 // Sign-in, under the Access group, each opened by its own ability.
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
@@ -17,7 +17,7 @@ test.describe('someone who reads roles and sets up sign-in', () => {
 
   test('finds Roles, Facts and Sign-in under Access', async ({ page }) => {
     await visit(page, '/admin')
-    const nav = page.getByRole('navigation', { name: 'Site administration' })
+    const nav = page.getByRole('navigation', { name: 'Admin', exact: true })
     await nav.getByRole('button', { name: 'Access' }).click() // a group is a collapsible section
     for (const name of ['Roles', 'Facts', 'Sign-in']) await expect(nav.getByRole('link', { name })).toBeVisible()
   })

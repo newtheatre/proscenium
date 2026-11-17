@@ -10,13 +10,13 @@ Every setting is changed by `core.identity-settings.manage` unless the row says 
 
 | Groups | Home |
 | --- | --- |
-| `sign-in`, `sessions`, `recovery` | Site administration, Access: Sign-in, `/admin/sign-in` |
-| `privacy` | Site administration, Access: Privacy, `/admin/privacy` |
+| `sign-in`, `sessions`, `recovery` | Admin, Access: Sign-in, `/admin/sign-in` |
+| `privacy` | Admin, Access: Privacy, `/admin/privacy` |
 | `grants`, `members-area`, `access-scheme`, `emergency-contacts`, `merge` | The console, People: People settings |
-| `retention`, except `core.retention.armed` | Site administration, Upkeep: Advanced, `/admin/advanced` |
+| `retention`, except `core.retention.armed` | Admin, Upkeep: Advanced, `/admin/advanced` |
 | `core.retention.armed` | Identity's own Retention screen, `/admin/retention`, and nowhere else |
 
-Most settings save with no prompt, in Site administration as in the console. A few are declared `onChange: 'confirm'`, because a slip locks people out or weakens sign-in: `core.sign-in.email-link`, `core.sign-in.google`, `core.sign-in.google-domains`, `core.sign-in.managed-domains`, `core.sign-in.provider-is-strong` and `core.grants.allow-no-expiry`. `core.retention.armed` is declared `onChange: 'reason'`. Saving one of these shows what will change, asks again, and asks the person to confirm it is them in place only if the session is not fresh (`core.access.fresh-within`). The history of every setting, with Revert, is foundations' screen at `/admin/settings-history`. A duration is entered through the kit's `DurationInput`, where a month is 30 days and a year 365; what is stored does not change.
+Most settings save with no prompt, in Admin as in the console. A few are declared `onChange: 'confirm'`, because a slip locks people out or weakens sign-in: `core.sign-in.email-link`, `core.sign-in.google`, `core.sign-in.google-domains`, `core.sign-in.managed-domains`, `core.sign-in.provider-is-strong` and `core.grants.allow-no-expiry`. `core.retention.armed` is declared `onChange: 'reason'`. Saving one of these shows what will change, asks again, and asks the person to confirm it is them in place only if the session is not fresh (`core.access.fresh-within`). The history of every setting, with Revert, is foundations' screen at `/admin/settings-history`. A duration is entered through the kit's `DurationInput`, where a month is 30 days and a year 365; what is stored does not change.
 
 Every setting whose value is a retention period is also `onChange: 'confirm'`, by the platform's rule, because shortening one lets the next sweep delete rows for good. In identity those are `core.retention.unclaimed-after`, `core.retention.dormant-after`, `core.emergency-contacts.keep-after-standing`, `core.access-scheme.keep-rejected`, `core.merge.undo-window` and `core.privacy.export-lifetime`. `core.retention.run-cap` is a count, not a period, and saves with no prompt.
 
