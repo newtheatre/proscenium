@@ -382,7 +382,15 @@ a layout, not a shell, and it has no navigation of its own.
   or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
-  may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The console
+  may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
+  one receipt beside the panels, grouped by panel, with the ways to pay on it: one press makes the
+  sale and starts that way of paying, and Split takes it in parts. On a narrow screen the receipt is
+  a sheet, opened from a bar at the foot that also takes payment. A panel is shown on the receipt by
+  the lines of its `summarise`; one that wants steppers on its lines, or them shown before the
+  server has answered, emits `receipt` with `{ lines, note?, added? }`: each line is
+  `{ key, label, detail?, quantity, amountMinor, more?, fewer? }`, `note` is a line that stays under
+  them with an optional action (the bar's age-check answer and "Change"), and `added` is
+  `{ label, undo }` for the foot bar's "Added: … Undo". The total is always the server's. The console
   keeps narrowed tills: `<PaymentsTill :modules="['box-office']" />` on Box office's Sell, and the
   "Your session" card on Money › Sessions has an "Open the till" button rather than a menu entry.
   The first sale at a till opens the seller's till session, so coming to a till by mistake leaves no
