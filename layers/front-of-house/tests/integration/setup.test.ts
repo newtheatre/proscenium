@@ -6,12 +6,10 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { listTerms } from '#modules/core'
 import { setClock } from '#kit'
 import { deliver, env, inContext, rows } from '../../../../tests/integration/helpers'
-import { duty, holds, performance, ready, req, shift, shiftRow, volunteer, MINUTE, NOV_16 } from './stage'
+import { duty, holds, notes, performance, ready, req, shift, shiftRow, volunteer, MINUTE, NOV_16 } from './stage'
 
 beforeAll(ready)
 afterEach(() => setClock(undefined))
-
-const notes = (type: string, accountId: string) => rows<{ id: string }>('SELECT id FROM core_notifications WHERE type_key = ? AND account_id = ?', type, accountId)
 
 describe('FH-05: duties and rota templates', () => {
   it('edits and archives a duty; an archived duty takes no new shift', async () => {

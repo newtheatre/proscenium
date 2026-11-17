@@ -3,7 +3,7 @@
 // module's services: figures from Box office and Payments arrive through its own points. This file
 // grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'front-of-house.settings.manage'
@@ -22,6 +22,11 @@ export default defineModule({
     'shifts.window-after': setting.duration({ default: '60m', min: '0m', max: '6h', change, audience: 'staff' }),
     'shifts.sign-up-closes': setting.duration({ default: '2h', min: '0m', max: '14d', change, audience: 'staff' }),
     'shifts.confirmation': setting.choice({ default: 'automatic', options: ['automatic', 'manager'], change, audience: 'staff' }),
+    // Inside this before the call time, giving up a place waits for cover or a manager.
+    'shifts.release-notice': setting.duration({ default: '48h', min: '0m', max: '14d', change, audience: 'staff' }),
+    // 0 turns a reminder off.
+    'reminders.first': setting.duration({ default: '48h', min: '0m', max: '14d', change, audience: 'staff' }),
+    'reminders.second': setting.duration({ default: '3h', min: '0m', max: '48h', change, audience: 'staff' }),
   }),
 
   records: defineRecords('front-of-house', {
@@ -62,8 +67,14 @@ export default defineModule({
     },
   },
 
+  tasks: {
+    // At most two reminders before each call time; `reminded` keeps a re-run from repeating one.
+    'front-of-house.remind-shifts': task({ every: '15m' }),
+  },
+
   contributes: {
     'core.record-resolver': [{ id: 'front-of-house.shift', file: 'shift' }, { id: 'front-of-house.assignment', file: 'assignment' }],
+    'core.notification-topic': [{ id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 }],
     // Messages to people on the rota about their own shifts, so none can be switched off.
     'core.notification-type': [{
       id: 'front-of-house.shift-changed',
@@ -102,6 +113,73 @@ export default defineModule({
         'en-GB': {
           subject: 'Shift cancelled: {{ show }}',
           body: 'Your shift for **{{ show }}** on {{ when }} has been cancelled, so you are no longer needed. Thank you for signing up.',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-confirmed',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You are on the rota: {{ show }}',
+          body: 'Thank you. You are confirmed as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\nIf you find you cannot do it, give it up as early as you can from your shifts, so someone else can take it.',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-reminder',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Reminder: your shift for {{ show }}',
+          body: 'A reminder that you are on as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-removed',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You are no longer on a shift: {{ show }}',
+          body: 'You have been taken off the {{ duty }} shift for **{{ show }}** on {{ when }}, so you are not needed then. If you were not expecting this, ask the front-of-house manager.',
+        },
+      },
+    }, {
+      id: 'front-of-house.cover-taken',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your shift is covered: {{ show }}',
+          body: 'Someone has taken your {{ duty }} shift for **{{ show }}** on {{ when }}, so you are no longer needed then.',
+        },
+      },
+    }, {
+      // To managers. Members following the topic are told once Communications can name who is eligible.
+      id: 'front-of-house.cover-needed',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      topic: 'front-of-house.cover-needed',
+      link: '/members/front-of-house/open',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Cover needed: {{ duty }}, {{ show }}',
+          body: 'Someone on the {{ duty }} shift for **{{ show }}** on {{ when }} has asked to give up their place. It stays theirs until someone takes it.',
         },
       },
     }],

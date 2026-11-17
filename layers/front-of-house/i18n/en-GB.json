@@ -5,6 +5,7 @@
   "front-of-house.navigation.groups.front-of-house.label": "Front of house",
 
   "front-of-house.settings-sections.shifts": "Shifts",
+  "front-of-house.settings-sections.reminders": "Reminders",
 
   "front-of-house.settings.shifts.window-before.label": "Shifts start to count before the call time",
   "front-of-house.settings.shifts.window-before.help": "How long before their call time people on a shift can use what the shift lets them do, such as scanning tickets. Changing this does not move shifts that already exist.",
@@ -16,6 +17,17 @@
   "front-of-house.settings.shifts.confirmation.help": "Whether a sign-up is confirmed straight away or waits for a front-of-house manager to confirm it. Only a confirmed place lets someone work the night.",
   "front-of-house.settings.shifts.confirmation.options.automatic": "Confirm them straight away",
   "front-of-house.settings.shifts.confirmation.options.manager": "A manager confirms each one",
+
+  "front-of-house.settings.shifts.release-notice.label": "Ask for cover when giving up a shift within",
+  "front-of-house.settings.shifts.release-notice.help": "How close to the call time someone can no longer simply give up their place. Inside this time the place stays theirs until someone takes it as cover, and the front-of-house manager can see it needs covering.",
+  "front-of-house.settings.reminders.first.label": "First reminder before the call time",
+  "front-of-house.settings.reminders.first.help": "When the first reminder of a shift is sent. Set it to 0 to send no first reminder.",
+  "front-of-house.settings.reminders.second.label": "Second reminder before the call time",
+  "front-of-house.settings.reminders.second.help": "When the second reminder of a shift is sent. Set it to 0 to send no second reminder. Someone who signs up late gets only one reminder.",
+
+  "front-of-house.facts.on-shift.label": "On shift for the performance",
+  "front-of-house.facts.leading-shift.label": "Leading the shift for the performance",
+  "front-of-house.facts.rostered.label": "Has a shift coming up",
 
   "front-of-house.abilities.shift.sign-up.label": "Sign up for shifts",
   "front-of-house.abilities.shift.view.label": "See the rota for a performance",
