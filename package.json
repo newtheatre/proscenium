@@ -40,7 +40,6 @@
     "@stripe/stripe-js": "^10.3.0",
     "@tanstack/charts": "^1.5.0",
     "@vueuse/core": "^15.0.0",
-    "@vueuse/integrations": "^15.0.0",
     "drizzle-orm": "1.0.0-rc.5",
     "h3": "1.15.11",
     "jiti": "^2.6.1",
