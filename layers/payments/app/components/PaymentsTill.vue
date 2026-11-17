@@ -258,6 +258,39 @@ async function cancel() {
   }
 }
 
+// Paid in part, then the customer left (BO-35): the sale ends, and each payment goes back the way it
+// came. The seller hands back cash, and refunds on a standalone machine or the SumUp app, before
+// confirming; a card the site took goes back by itself.
+async function giveBack() {
+  if (!sale.value) return
+  const ok = await confirm({
+    verb: t('payments.screens.till.give-back-verb'),
+    thing: money(payment.value?.paidMinor ?? 0),
+    consequence: t('payments.screens.till.give-back-consequence'),
+    button: t('payments.screens.till.give-back-button'),
+  })
+  if (!ok) return
+  taking.value = true
+  try {
+    const out = await $api<{ handedBack: { amountMinor: number }[], sent: { amountMinor: number }[], unconfirmed: number }>(`/api/payments/intents/${sale.value.intentId}/give-back` as string, { method: 'POST', body: {} })
+    const sum = (list: { amountMinor: number }[]) => list.reduce((total, l) => total + l.amountMinor, 0)
+    const said = [
+      out.handedBack.length ? t('payments.screens.till.given-back-by-hand', { amount: money(sum(out.handedBack)) }) : '',
+      out.sent.length ? t('payments.screens.till.given-back-to-card', { amount: money(sum(out.sent)) }) : '',
+      out.unconfirmed ? t('payments.screens.till.given-back-unconfirmed') : '',
+    ].filter(Boolean).join(' ')
+    reset()
+    for (const p of panels.value) inputs[p.id] = null
+    toast.add({ title: t('payments.screens.till.given-back'), description: said || undefined, color: 'success' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    taking.value = false
+  }
+}
+
 function reset() {
   stopPolling()
   sale.value = null
@@ -505,13 +538,15 @@ function ended() {
                 </div>
               </template>
 
-              <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is refunded. -->
-              <p
+              <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is given back. -->
+              <UButton
                 v-if="paidInPart"
-                class="text-sm text-muted"
-              >
-                {{ t('payments.screens.till.no-cancel') }}
-              </p>
+                color="neutral"
+                variant="ghost"
+                :disabled="taking || waiting"
+                :label="t('payments.screens.till.give-back-button')"
+                @click="giveBack"
+              />
               <UButton
                 v-else
                 color="neutral"
