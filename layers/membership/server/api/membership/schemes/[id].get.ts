@@ -1,7 +1,7 @@
 // One scheme for its console screen: its fields, lengths, what opening it still needs, how many
-// hold it, and the dates a membership taken today would run to (MEM-01's live example).
+// hold it, the lists it may check against, and the dates a membership taken today would run to (MEM-01's live example).
 import { getRouterParam } from 'h3'
-import { defineRoute } from '#kit'
+import { all, defineRoute } from '#kit'
 import { todayOrNull } from '../../../memberships'
 import { exampleDates, hasMemberships, lengthOptions, openChecklist, requireScheme } from '../../../schemes'
 
@@ -20,5 +20,7 @@ export default defineRoute({
     // S2: the side is fixed once any membership exists.
     sideLocked: await hasMemberships(scheme.id),
     example: day ? exampleDates(scheme, options, day) : [],
+    // The lists it may check against, by name only: never their contents.
+    lists: await all<{ id: string, name: string }>('SELECT id, name FROM membership_verification_lists ORDER BY name'),
   }
 })

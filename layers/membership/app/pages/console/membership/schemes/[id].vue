@@ -19,9 +19,11 @@ interface Scheme {
   voting: boolean
   holderMayEnd: boolean
   acceptsReference: boolean
+  verifier: 'membership.list' | null
+  verifierConfig: string | null
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[] }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[] }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -39,18 +41,22 @@ const missing = computed(() => (data.value?.checklist ?? []).filter(i => !i.done
 const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRule === 'fixed' ? 'years' : 'months'}`))
 
 // Details: one form, saved as a whole.
-const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, acceptsReference: false })
+const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, acceptsReference: false, checks: false, listId: undefined as string | undefined })
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(scheme, (s) => {
-  if (s) Object.assign(details, { ...s, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31 })
+  if (!s) return
+  const listId = s.verifierConfig ? (JSON.parse(s.verifierConfig) as { listId?: string }).listId : undefined
+  const { verifier: _verifier, verifierConfig: _config, ...fields } = s
+  Object.assign(details, { ...fields, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31, checks: s.verifier === 'membership.list', listId })
 }, { immediate: true })
 async function saveDetails() {
   detailsRefusal.value = null
   const fixed = details.lengthRule === 'fixed'
+  const { checks, listId, ...fields } = details
   try {
     await $api(`/api/membership/schemes/${id.value}` as string, {
       method: 'PATCH',
-      body: { ...details, summary: details.summary.trim() || null, fixedEndMonth: fixed ? details.fixedEndMonth : null, fixedEndDay: fixed ? details.fixedEndDay : null },
+      body: { ...fields, summary: details.summary.trim() || null, fixedEndMonth: fixed ? details.fixedEndMonth : null, fixedEndDay: fixed ? details.fixedEndDay : null, verifier: checks ? 'membership.list' : null, listId: checks ? listId ?? null : null },
     })
     toast.add({ title: t('membership.screens.scheme.saved'), color: 'success' })
     await refresh()
@@ -388,6 +394,31 @@ async function addMember() {
               :label="t('membership.screens.scheme.accepts-reference')"
               :description="t('membership.screens.scheme.accepts-reference-help')"
             />
+            <USwitch
+              v-model="details.checks"
+              :label="t('membership.screens.scheme.checks')"
+              :description="t('membership.screens.scheme.checks-help')"
+            />
+            <UFormField
+              v-if="details.checks"
+              :label="t('membership.screens.scheme.list')"
+              :error="detailsRefusal?.fields?.listId ? detailsRefusal.reason : undefined"
+            >
+              <USelect
+                v-model="details.listId"
+                :items="data.lists.map(l => ({ value: l.id, label: l.name }))"
+                :placeholder="t('membership.screens.scheme.list-choose')"
+                class="sm:w-80"
+              />
+              <template #help>
+                <ULink
+                  to="/console/membership/lists"
+                  class="underline"
+                >
+                  {{ t('membership.screens.scheme.list-manage') }}
+                </ULink>
+              </template>
+            </UFormField>
             <USwitch
               v-model="details.holderMayEnd"
               :label="t('membership.screens.scheme.holder-may-end')"
