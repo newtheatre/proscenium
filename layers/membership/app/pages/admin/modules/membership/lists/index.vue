@@ -27,7 +27,7 @@ async function create() {
       body: { name: form.name, keyKind: form.keyKind, referenceLabel: reference ? form.referenceLabel : null, referenceShape: reference ? { kind: form.shapeKind, min: form.min, max: Math.max(form.min, form.max) } : null },
     })
     open.value = false
-    await navigateTo(`/console/membership/lists/${made.listId}`)
+    await navigateTo(`/admin/modules/membership/lists/${made.listId}`)
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -80,7 +80,7 @@ const describe = (l: List) => [
         <RecordListItem
           v-for="l in data.lists"
           :key="l.id"
-          :to="`/console/membership/lists/${l.id}`"
+          :to="`/admin/modules/membership/lists/${l.id}`"
           :name="l.name"
           :description="describe(l)"
         />

@@ -152,7 +152,7 @@ export default defineModule({
       { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },
       // Every session, with the seller's own above them; a seller who may not see everyone's sees only theirs.
       { id: 'payments.sessions', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/sessions', icon: 'i-lucide-receipt', ability: ['payments.session.view', 'payments.session.open'], order: 40 },
-      { id: 'payments.providers', menu: 'console', group: 'money', section: 'setup', to: '/console/payments/providers', icon: 'i-lucide-credit-card', ability: 'payments.provider.manage', order: 10 },
+      { id: 'payments.providers', menu: 'admin', group: 'modules', to: '/admin/modules/payments/providers', icon: 'i-lucide-credit-card', ability: 'payments.provider.manage', order: 10 },
       // The combined till's tile on the Tonight hub.
       { id: 'payments.live-till', menu: 'live', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 20 },
     ],

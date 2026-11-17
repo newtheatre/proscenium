@@ -8,3 +8,13 @@ export const DASHBOARD_SHELL: InjectionKey<boolean> = Symbol('core:dashboard-she
  * nothing when the page belongs to no module or the viewer may change none of its settings.
  */
 export const CONSOLE_SETTINGS: InjectionKey<Ref<string | undefined>> = Symbol('core:console-settings')
+
+/**
+ * Provided round a screen drawn inside another frame: a tab of a module's page in Admin, or the
+ * console's settings window. PageFrame then draws no panel or page header of its own, only a
+ * heading row with the way back, the status and the primary action, then the page.
+ */
+export const EMBEDDED_FRAME: InjectionKey<boolean> = Symbol('core:embedded-frame')
+
+/** Provided by the console's settings window round the screen it draws. */
+export const CONSOLE_WINDOW: InjectionKey<boolean> = Symbol('core:console-window')

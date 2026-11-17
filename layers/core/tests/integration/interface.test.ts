@@ -176,7 +176,9 @@ describe("a module's page in Admin", () => {
     const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=admin', { actor: admin })).json() as { groups: { id: string, everyday: { to: string }[] }[] }
     expect(nav.groups.find(g => g.id === 'modules')?.everyday.map(e => e.to)).toEqual(['/admin/modules'])
     expect((await decide('/admin/modules/gallery', admin)).decision).toBe('allow')
-    expect((await decide('/admin/modules/gallery', staff())).decision).toBe('not-found')
+    // Console staff are sent to the same screen in the console's settings window; anyone else finds nothing.
+    expect(await decide('/admin/modules/gallery?setting=gallery.demo.title', staff())).toEqual({ decision: 'redirect', to: `/console?settings=gallery&screen=${encodeURIComponent('/admin/modules/gallery?setting=gallery.demo.title')}` })
+    expect((await decide('/admin/modules/gallery', audience())).decision).toBe('not-found')
     expect((await decide('/admin/modules/gallery/about', viewerOf())).decision).toBe('allow')
     expect((await decide('/admin/modules/gallery', viewerOf())).decision).toBe('refused')
   })
@@ -190,6 +192,14 @@ describe("a module's page in Admin", () => {
 })
 
 describe("core's settings", () => {
+  it('put Programme and People on Core\'s page in Admin, which console staff open from the cog', async () => {
+    const programmer = person(['core.programme.configure', 'core.identity-settings.manage'])
+    const tabs = (await (await call(handle, 'GET', '/api/core/modules/core/tabs', { actor: programmer })).json()) as { tabs: { to: string, page: string | null }[] }
+    expect(tabs.tabs.map(t => `${t.to} ${t.page}`)).toEqual(['/admin/modules/core core.programme', '/admin/modules/core/people core.people'])
+    // Someone who may change only the programme's settings has no business in Admin.
+    expect((await decide('/admin/modules/core', person(['core.programme.configure']))).decision).toBe('not-found')
+  })
+
   it('have no console page of their own: each group is on one page, mostly in Admin', async () => {
     const organiser = person(['core.organisation.edit', 'core.settings.manage'])
     expect((await decide('/console/system/settings', organiser)).decision).toBe('not-found')
@@ -263,8 +273,10 @@ describe('Admin (R-33)', () => {
     expect(site.settings.every(s => s.scope === 'site')).toBe(true)
     expect(site.settings.map(s => s.key)).toContain('core.units.set-rows-limit')
     expect(site.settings.map(s => s.key)).not.toContain('core.notifications.sending-domain')
-    const people = await (await settings('module=core&scope=module', person(['core.identity-settings.manage', 'core.programme.configure']))).json() as Settings
-    expect(new Set(people.settings.map(s => s.page))).toEqual(new Set(['core.people', 'core.programme']))
+    // Core's Programme and People settings are tabs of its page in Admin, so nothing of core's is left in the console.
+    const people = await (await settings('module=core&scope=site', person(['core.identity-settings.manage', 'core.programme.configure']))).json() as Settings
+    expect([...new Set(people.settings.map(s => s.page))]).toEqual(expect.arrayContaining(['core.people', 'core.programme']))
+    expect((await settings('module=core&scope=module', person(['core.programme.configure']))).status).toBe(404)
     expect((await settings('scope=module')).status).toBe(422) // a scope of 'module' needs a module
   })
 })
