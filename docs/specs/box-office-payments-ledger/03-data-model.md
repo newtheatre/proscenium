@@ -143,6 +143,8 @@ Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so repo
 | `proof_note` | text | shown to the buyer and the door, such as "Bring student ID" | Public | keep |
 | `needs_paid_ticket` | integer | boolean; a companion ticket needs a paid ticket in the same order | Internal | keep |
 | `active` | integer | boolean | Internal | keep |
+| `managed_by` | text | null, or `<module>.<id>` for a type a module declares through `box-office.ticket-type` (part 5); unique when set. Its kind, requirements, `needs_paid_ticket`, `max_per_holder` and `recheck_at_entry` follow the declaration. Companion and complimentary types exist only this way | Internal | keep |
+| `sort` | integer | default 0; the order every list shows types in, the name breaking a tie | Internal | keep |
 
 ### `box_office_prices` (append-only)
 
@@ -264,6 +266,7 @@ One line per ticket, never a quantity, so each ticket can be refunded, exchanged
 | `promo_redemption_id` | text | at most one of this and the next | Internal | keep |
 | `pass_redemption_id` | text |  | Internal | keep |
 | `comp_request_id` | text | required when the ticket type is complimentary | Internal | keep |
+| `requirement_ref`, `requirement_account_id`, `requirement_evidence_id` | text | what a line with requirements met and who met it, copied onto its ticket when issued; the holder limit counts live lines by these | Internal | keep |
 | `state` | text | `live`, `cancelled`, `exchanged` | Internal | keep |
 | `replaces_line_id` | text | set on the new line of an exchange | Internal | keep |
 

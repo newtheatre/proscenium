@@ -3,7 +3,7 @@
      costs; pressing it holds the seats, which is when the countdown starts, and goes on to Check and
      pay. A companion ticket needs a paid ticket with it. No count of seats is ever shown. -->
 <script setup lang="ts">
-interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number }
+interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string }
   production: { id: string, slug: string, title: string, subtitle: string | null }
@@ -102,12 +102,13 @@ async function hold() {
                   v-for="type in band.types"
                   :key="type.ticketTypeId"
                   :label="t('box-office.book.type', { type: type.name, price: money(type.amountMinor, currency) })"
-                  :help="type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined)"
+                  :help="type.unmet ?? type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined)"
                 >
                   <UInputNumber
                     v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
                     :min="0"
-                    :max="data.maxPerOrder"
+                    :max="type.unmet ? 0 : Math.min(data.maxPerOrder, type.most ?? data.maxPerOrder)"
+                    :disabled="!!type.unmet"
                     :default-value="0"
                   />
                 </UFormField>
