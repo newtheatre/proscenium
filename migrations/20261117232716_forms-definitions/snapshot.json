@@ -1,14 +1,30 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "65760337-f3d1-441a-913c-c665a437c682",
+  "id": "a3c2cec5-3034-4eda-869f-009732377250",
   "prevIds": [
-    "270c5348-96c9-4119-b57c-b83c14b106da",
-    "7350bd5c-03eb-4f04-9bc3-83e05d438c30"
+    "416a04ee-1c14-4146-9e5c-47146bbbbf52",
+    "62e6b9f0-d64d-4047-bbc8-d4740093d530"
   ],
   "ddl": [
     {
+      "name": "awards_awards",
+      "entityType": "tables"
+    },
+    {
+      "name": "awards_types",
+      "entityType": "tables"
+    },
+    {
       "name": "bar_age_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_allergen_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_allergen_entries",
       "entityType": "tables"
     },
     {
@@ -45,6 +61,10 @@
     },
     {
       "name": "bar_product_choice_groups",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_product_presets",
       "entityType": "tables"
     },
     {
@@ -580,6 +600,316 @@
       "entityType": "tables"
     },
     {
+      "table": "awards_awards",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "type_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "recipient_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awarded_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awarded_for",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "citation",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "decided_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "decision_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "response_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "visibility",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'current'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "issued_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "revoked_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "revoked_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "revoke_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "gives_ticket_benefit",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "one_per_person",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "default_visibility",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'public'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_types",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "bar_age_checks",
       "name": "id",
       "type": "text",
@@ -710,6 +1040,156 @@
       "entityType": "columns"
     },
     {
+      "table": "bar_allergen_checks",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "product_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "option_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "contains",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "may_contain",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "product_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "option_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "allergen",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "level",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "bar_categories",
       "name": "id",
       "type": "text",
@@ -752,6 +1232,26 @@
     {
       "table": "bar_categories",
       "name": "parent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "age_restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_categories",
+      "name": "usual_preset",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -1470,6 +1970,106 @@
       "entityType": "columns"
     },
     {
+      "table": "bar_product_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "sizes",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "group_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "age_restricted",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "mixer",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "bar_products",
       "name": "id",
       "type": "text",
@@ -1502,6 +2102,16 @@
     {
       "table": "bar_products",
       "name": "age_restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "age_from_category",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -14840,6 +15450,78 @@
       "entityType": "columns"
     },
     {
+      "table": "awards_awards",
+      "name": "awards_awards_type",
+      "columns": [
+        {
+          "value": "type_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "awarded_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awards_awards_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "awards_types",
+      "name": "awards_types_key",
+      "columns": [
+        {
+          "value": "key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "awards_types",
+      "name": "awards_types_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "position",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "bar_age_checks",
       "name": "bar_age_checks_at",
       "columns": [
@@ -14878,6 +15560,78 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_product",
+      "columns": [
+        {
+          "value": "product_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_option",
+      "columns": [
+        {
+          "value": "option_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_product",
+      "columns": [
+        {
+          "value": "product_id",
+          "isExpression": false
+        },
+        {
+          "value": "allergen",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "product_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_option",
+      "columns": [
+        {
+          "value": "option_id",
+          "isExpression": false
+        },
+        {
+          "value": "allergen",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "option_id IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -15080,6 +15834,20 @@
       ],
       "isUnique": true,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "bar_product_presets_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "active = 1",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -18426,6 +19194,36 @@
       "entityType": "indexes"
     },
     {
+      "table": "awards_awards",
+      "name": "fk_awards_awards_type_id_awards_types_id_fk",
+      "columns": [
+        "type_id"
+      ],
+      "tableTo": "awards_types",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "awards_awards",
+      "name": "fk_awards_awards_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "bar_age_checks",
       "name": "fk_bar_age_checks_opening_id_bar_openings_id_fk",
       "columns": [
@@ -18477,6 +19275,66 @@
         "variant_id"
       ],
       "tableTo": "bar_variants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "fk_bar_allergen_checks_product_id_bar_products_id_fk",
+      "columns": [
+        "product_id"
+      ],
+      "tableTo": "bar_products",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "fk_bar_allergen_checks_option_id_bar_choice_options_id_fk",
+      "columns": [
+        "option_id"
+      ],
+      "tableTo": "bar_choice_options",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "fk_bar_allergen_entries_product_id_bar_products_id_fk",
+      "columns": [
+        "product_id"
+      ],
+      "tableTo": "bar_products",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "fk_bar_allergen_entries_option_id_bar_choice_options_id_fk",
+      "columns": [
+        "option_id"
+      ],
+      "tableTo": "bar_choice_options",
       "columnsTo": [
         "id"
       ],
@@ -20970,8 +21828,44 @@
       "entityType": "pks"
     },
     {
+      "table": "awards_awards",
+      "name": "awards_awards_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "awards_types",
+      "name": "awards_types_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "bar_age_checks",
       "name": "bar_age_checks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_pk",
       "columns": [
         "id"
       ],
@@ -21053,6 +21947,15 @@
     {
       "table": "bar_product_choice_groups",
       "name": "bar_product_choice_groups_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_product_presets",
+      "name": "bar_product_presets_pk",
       "columns": [
         "id"
       ],
@@ -22086,6 +22989,54 @@
       "entityType": "uniques"
     },
     {
+      "table": "awards_awards",
+      "name": "awards_awards_state",
+      "value": "\"state\" IN ('current', 'revoked')",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awards_awards_source",
+      "value": "\"source\" IN ('direct', 'nomination', 'import')",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awards_awards_visibility",
+      "value": "\"visibility\" IN ('public', 'members', 'hidden')",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awards_awards_name",
+      "value": "length(\"recipient_name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awards_awards_revoked",
+      "value": "(\"state\" = 'revoked') = (\"revoked_at\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_types",
+      "name": "awards_types_state_values",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_types",
+      "name": "awards_types_visibility",
+      "value": "\"default_visibility\" IN ('public', 'members', 'hidden')",
+      "entityType": "checks"
+    },
+    {
+      "table": "awards_types",
+      "name": "awards_types_name",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
       "table": "bar_age_checks",
       "name": "bar_age_checks_outcome",
       "value": "\"outcome\" IN ('not_needed', 'id_checked', 'self_attested', 'refused')",
@@ -22101,6 +23052,36 @@
       "table": "bar_age_checks",
       "name": "bar_age_checks_description",
       "value": "\"description\" IS NULL OR (\"outcome\" = 'refused' AND length(\"description\") <= 120)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_one",
+      "value": "(\"product_id\" IS NULL) <> (\"option_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_source",
+      "value": "\"source\" IN ('label', 'supplier', 'other')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_one",
+      "value": "(\"product_id\" IS NULL) <> (\"option_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_allergen",
+      "value": "\"allergen\" IN ('gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_level",
+      "value": "\"level\" IN ('contains', 'may_contain')",
       "entityType": "checks"
     },
     {
