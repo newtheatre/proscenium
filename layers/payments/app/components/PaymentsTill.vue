@@ -5,8 +5,12 @@
      have failed, so nobody pays twice. After a sale the panels are emptied; after a cancel they keep
      what was in them, so the seller can try again. A host narrows the till to some modules' panels
      (Box office's Sell shows only its own); live mode draws the panels as tabs over the one basket,
-     each with its larger live panel where its module has one. -->
+     each with its larger live panel where its module has one. Coming to the till opens the seller's
+     session if none is open, at the place this device used last; a strip above the panels says which
+     session sales go into and lets the seller move it. -->
 <script setup lang="ts">
+import type { YourSession } from '../../shared/sessions'
+
 interface Panel { id: string, module: string, label: string, tab: string, icon: string | null, panel: string, livePanel: string | null }
 interface Summary { basket: string, lines: { label: string, amountMinor: number }[], amountMinor: number }
 interface Offer { providerAccountId: string, provider: string, label: string, method: string, mode: 'live' | 'test', readers?: { id: string, label: string }[] }
@@ -30,8 +34,50 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
-const { data: session } = await useAPI<{ session: { id: string, state: string } | null }>('/api/payments/session', { key: 'payments:session' })
+const { data: session, refresh: refreshSession } = await useAPI<YourSession>('/api/payments/session', { key: 'payments:session' })
 const open = computed(() => session.value?.session?.state === 'open')
+const { time } = useDates()
+
+// The place this device last sold at, where its next session opens.
+const SPACE_KEY = 'payments.till.space'
+function deviceSpace(): string | null {
+  try { return localStorage.getItem(SPACE_KEY) || null }
+  catch { return null }
+}
+const opening = ref(false)
+const openingRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+/** Opens the seller's session if none is open. True once one is. */
+async function ensureSession(): Promise<boolean> {
+  if (open.value) return true
+  opening.value = true
+  openingRefusal.value = null
+  try {
+    await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace() } })
+    await refreshSession()
+  }
+  catch (e) {
+    openingRefusal.value = toRefusal(e)
+  }
+  finally {
+    opening.value = false
+  }
+  return open.value
+}
+onMounted(() => { if (session.value?.mayOpen && !open.value) void ensureSession() })
+
+async function move(spaceId: string | null) {
+  const current = session.value?.session
+  if (!current) return
+  try { localStorage.setItem(SPACE_KEY, spaceId ?? '') }
+  catch { /* storage refused: the next session opens at the default */ }
+  try {
+    await $api(`/api/payments/sessions/${current.id}` as string, { method: 'PATCH', body: { spaceId } })
+    await refreshSession()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
 const { data: loaded, status, error, refresh } = await useAPI<{ panels: Panel[] }>('/api/payments/till/panels', { key: 'payments:till-panels', immediate: open.value })
 watch(open, (now) => { if (now && !loaded.value) refresh() })
 
@@ -102,7 +148,19 @@ async function takePayment() {
   taking.value = true
   refusal.value = null
   try {
-    const made = await $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value }, headers: { 'idempotency-key': saleKey.value } })
+    // A session that closed itself while the till sat quiet is opened again, and the sale made in it.
+    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value }, headers: { 'idempotency-key': saleKey.value } })
+    let made: Awaited<ReturnType<typeof sell>>
+    try {
+      made = await sell()
+    }
+    catch (e) {
+      if (toRefusal(e).code !== 'payments.session.none') throw e
+      await refreshSession()
+      if (!await ensureSession()) throw e
+      saleKey.value = crypto.randomUUID()
+      made = await sell()
+    }
     sale.value = { ...made, key: crypto.randomUUID() }
     payment.value = { state: 'open', amountMinor: made.amountMinor, currency: currency.value, paidMinor: 0, waiting: false }
     result.value = null
@@ -248,7 +306,7 @@ onMounted(() => {
   const { intent, result: said, attempt, ...rest } = route.query
   if (typeof intent !== 'string' || typeof said !== 'string' || !attempt) return
   void router.replace({ query: rest })
-  if (open.value) void resume(intent, said)
+  if (session.value?.session) void resume(intent, said)
 })
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
@@ -341,14 +399,18 @@ function ended() {
   <div>
     <EmptyState
       v-if="!open"
-      :title="t('payments.screens.till.no-session')"
-      :description="t('payments.screens.till.no-session-help')"
+      :title="opening ? t('payments.screens.till.opening') : t('payments.screens.till.no-session')"
+      :description="opening ? undefined : t('payments.screens.till.no-session-help')"
       icon="i-lucide-calculator"
     >
-      <template #actions>
+      <template
+        v-if="!opening"
+        #actions
+      >
+        <RefusalNotice :refusal="openingRefusal" />
         <UButton
-          to="/console/payments/session"
-          :label="t('payments.screens.session.open-button')"
+          :label="t('payments.screens.till.open-session')"
+          @click="ensureSession"
         />
       </template>
     </EmptyState>
@@ -362,6 +424,24 @@ function ended() {
       @retry="refresh()"
     >
       <template #default>
+        <!-- Which session sales go into, and where it is; moving it is remembered on this device. -->
+        <div
+          v-if="session?.session"
+          class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted"
+        >
+          <span>{{ t('payments.screens.till.session-since', { time: time(session.session.openedAt) }) }}</span>
+          <PaymentsSessionPlace
+            :model-value="session.session.spaceId"
+            :disabled="!!sale"
+            @update:model-value="move"
+          />
+          <ULink
+            to="/console/payments/sessions"
+            class="underline"
+          >
+            {{ t('payments.screens.till.your-session') }}
+          </ULink>
+        </div>
         <EmptyState
           v-if="!panels.length"
           :title="t('payments.screens.till.no-panels')"
