@@ -24,6 +24,15 @@ export interface DeskBasket {
   panel: string
   /** Its place among the panels; Box office's comes first. */
   order?: number
+  /** A short name for its tab in the combined till, as a translation key; the label when absent. */
+  tab?: string
+  /** An icon for its tab in the combined till, such as "i-lucide-ticket". */
+  icon?: string
+  /**
+   * A larger panel for the combined till in live mode, by component name as `panel` is, taking the
+   * same props. Without one, `panel` is drawn there.
+   */
+  livePanel?: string
   /**
    * Adds to the unit whatever makes the sale real but unpaid, and says whose it is and how much
    * (above zero). Called in the batch that creates the intent.

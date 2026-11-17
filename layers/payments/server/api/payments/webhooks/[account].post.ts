@@ -21,7 +21,7 @@ export default defineRoute({
     throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
 
   const body = (await readRawBody(event, 'utf8')) ?? ''
-  const secret = provider.webhookSecret ? await credential(provider.webhookSecret) ?? undefined : undefined
+  const secret = provider.webhookSecret ? await credential(provider.webhookSecret, account.id) ?? undefined : undefined
   const verified = await provider.verifyWebhook({ body, headers: getRequestHeaders(event) as Record<string, string>, secret, url: getRequestURL(event).href, providerAccountId: account.id })
   if (!verified?.eventId) {
     setResponseStatus(event, BAD_REQUEST)

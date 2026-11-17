@@ -26,8 +26,8 @@ const NOT_STARTED_AFTER_MS = 10 * 60_000 // not-policy: SumUp's 60-second rule w
 
 interface Transaction { id: string, status: string, amount: number, currency: string, fee_amount?: number | null, events?: { type: string, status: string, amount: number }[] }
 
-async function secret(name: string): Promise<string> {
-  const value = await credential(name)
+async function secret(name: string, account: string): Promise<string> {
+  const value = await credential(name, account)
   if (!value) throw new Error(`${name} is not set`)
   return value
 }
@@ -48,7 +48,7 @@ function merchant(attempt: { externalRef: string | null }): string {
 /** The transaction SumUp holds for an attempt, found by the attempt's id; null while there is none. */
 async function transactionOf(attempt: ProviderAttempt): Promise<Transaction | null> {
   try {
-    return await sumup<Transaction>('GET', `/v2.1/merchants/${merchant(attempt)}/transactions`, { key: await secret(API_KEY), query: { foreign_transaction_id: attempt.id } })
+    return await sumup<Transaction>('GET', `/v2.1/merchants/${merchant(attempt)}/transactions`, { key: await secret(API_KEY, attempt.providerAccountId), query: { foreign_transaction_id: attempt.id } })
   }
   catch (error) {
     if (error instanceof SumUpError && error.status === 404) return null // not-policy: HTTP not found
@@ -81,7 +81,7 @@ const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map(b => b.toStri
 
 /** The token in an attempt's webhook address, from the API key, so it changes when the key does. */
 export async function webhookToken(providerAccountId: string, attemptId: string): Promise<string | null> {
-  const key = await credential(API_KEY)
+  const key = await credential(API_KEY, providerAccountId)
   if (!key) return null
   const hmac = await crypto.subtle.importKey('raw', new TextEncoder().encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return hex(await crypto.subtle.sign('HMAC', hmac, new TextEncoder().encode(`payments.sumup.webhook:${providerAccountId}:${attemptId}`)))
@@ -110,10 +110,10 @@ export default {
     const token = attempt.webhookUrl ? await webhookToken(attempt.providerAccountId, attempt.id) : null
     try {
       const created = await sumup<{ data: { client_transaction_id: string } }>('POST', `/v0.1/merchants/${merchant(attempt)}/readers/${encodeURIComponent(attempt.readerExternalRef)}/checkout`, {
-        key: await secret(API_KEY),
+        key: await secret(API_KEY, attempt.providerAccountId),
         body: {
           total_amount: { value: attempt.amountMinor, currency: attempt.currency, minor_unit: minorDigits(attempt.currency) },
-          affiliate: { app_id: await secret(APP_ID), key: await secret(AFFILIATE_KEY), foreign_transaction_id: attempt.id },
+          affiliate: { app_id: await secret(APP_ID, attempt.providerAccountId), key: await secret(AFFILIATE_KEY, attempt.providerAccountId), foreign_transaction_id: attempt.id },
           return_url: attempt.webhookUrl && token ? `${attempt.webhookUrl}?${new URLSearchParams({ attempt: attempt.id, token })}` : undefined,
         },
       })
@@ -134,7 +134,7 @@ export default {
     if (!attempt.readerExternalRef) return false
     // Stopping is asynchronous: SumUp reports the stopped payment as failed, through the webhook and
     // the transaction, so nothing here says it stopped.
-    await sumup('POST', `/v0.1/merchants/${merchant(attempt)}/readers/${encodeURIComponent(attempt.readerExternalRef)}/terminate`, { key: await secret(API_KEY) })
+    await sumup('POST', `/v0.1/merchants/${merchant(attempt)}/readers/${encodeURIComponent(attempt.readerExternalRef)}/terminate`, { key: await secret(API_KEY, attempt.providerAccountId) })
     return false
   },
 
@@ -145,7 +145,7 @@ export default {
     const refundedThere = (transaction.events ?? []).filter(e => e.type === 'REFUND' && e.status !== 'FAILED').reduce((sum, e) => sum + toMinor(Math.abs(e.amount), digits), 0)
     if (refundedThere >= refund.refundedBeforeMinor + refund.amountMinor) return { state: 'succeeded', providerRef: transaction.id }
     try {
-      await sumup('POST', `/v1.0/merchants/${merchant(refund.attempt)}/payments/${encodeURIComponent(transaction.id)}/refunds`, { key: await secret(API_KEY), body: { amount: toMajor(refund.amountMinor, digits) } })
+      await sumup('POST', `/v1.0/merchants/${merchant(refund.attempt)}/payments/${encodeURIComponent(transaction.id)}/refunds`, { key: await secret(API_KEY, refund.attempt.providerAccountId), body: { amount: toMajor(refund.amountMinor, digits) } })
       return { state: 'succeeded', providerRef: transaction.id }
     }
     catch (error) {
@@ -155,7 +155,7 @@ export default {
   },
 
   async pairReader(account, input) {
-    const reader = await sumup<{ id: string }>('POST', `/v0.1/merchants/${merchant(account)}/readers`, { key: await secret(API_KEY), body: { pairing_code: input.pairingCode, name: input.label } })
+    const reader = await sumup<{ id: string }>('POST', `/v0.1/merchants/${merchant(account)}/readers`, { key: await secret(API_KEY, account.id), body: { pairing_code: input.pairingCode, name: input.label } })
     if (!reader?.id) throw new Error('SumUp paired no reader')
     return { externalRef: reader.id }
   },

@@ -34,6 +34,12 @@ export default defineModule({
   abilities: defineAbilities('membership-fees', {
     // Privileged: a price is what members are asked to pay.
     'price.manage': ability({ on: 'membership.scheme', risk: 'privileged' }),
+    // A membership's charge and payment, on its page.
+    'charge.view': ability({ on: 'membership-fees.charge' }),
+    // Marking a fee as waived, with a reason (P9). Privileged: it gives a membership away.
+    'charge.waive': ability({ on: 'membership-fees.charge', risk: 'privileged', implies: ['charge.view'] }),
+    // Asking for a refund of a fee. Approval follows Payments' own rule (P7).
+    'refund.request': ability({ on: 'membership-fees.charge', implies: ['charge.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 

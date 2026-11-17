@@ -318,6 +318,11 @@ a layout, not a shell, and it has no navigation of its own.
   `footer` slot. Its status strip shows the title, the context, whether the device is online and the
   way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
   or My account.
+- **The till** (`/live/till`, Payments) is the combined till for show nights: every
+  `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
+  may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The console
+  keeps narrowed tills: `<PaymentsTill :modules="['box-office']" />` on Box office's Sell, and the
+  Money group links to the live till ("Open the till") rather than holding its own.
 - **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
   the device is offline the strip says that changes cannot be sent; a live screen should disable its
   writes then rather than lose them.

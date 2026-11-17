@@ -14,5 +14,8 @@
   "membership-fees.settings.retention.charges.help": "When the record of what a membership was charged is removed. Keep it at least as long as the ledger is kept.",
 
   "membership-fees.abilities.price.manage.label": "Set the fees for membership schemes",
+  "membership-fees.abilities.charge.view.label": "See a membership's fee and payment",
+  "membership-fees.abilities.charge.waive.label": "Waive a membership fee, with a reason",
+  "membership-fees.abilities.refund.request.label": "Ask for a refund of a membership fee",
   "membership-fees.abilities.settings.manage.label": "Change the membership fees settings"
 }
