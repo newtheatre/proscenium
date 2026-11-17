@@ -12,6 +12,7 @@ import { all, nowMs, searchWords, theatreTimeZone } from '#kit'
 import { instantOfLocal, localParts } from '#kit/clock'
 import { publicImages, type PublicImage } from './media'
 import type { PublicTerm } from './public'
+import { ageWording } from './guidance'
 
 export interface ArchiveEntry {
   id: string
@@ -27,6 +28,9 @@ export interface ArchiveEntry {
   cancelled: boolean
   venues: string[]
   poster: PublicImage | null
+  /** The age in words, and whether the show used staging effects: the compact form of its guidance, for cards. */
+  age: string | null
+  hasEffects: boolean
 }
 
 export interface ArchiveYear {
@@ -112,9 +116,9 @@ export async function pastProductions(options: ArchiveOptions = {}): Promise<Arc
 }
 
 async function entries(past: string, pastParams: unknown[], tail: string, tailParams: unknown[]): Promise<ArchiveEntry[]> {
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, company_name: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, opened_at: number, closed_at: number, venues: string }>(
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, company_name: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, opened_at: number, closed_at: number, venues: string, age_min: number | null, age_restricted: number, has_effects: number }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.company_name, p.state, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
-        d.opened_at, d.closed_at,
+        d.opened_at, d.closed_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
         (SELECT json_group_array(DISTINCT v.name) FROM core_performances f JOIN core_venues v ON v.id = f.venue_id
           WHERE f.production_id = p.id AND f.state <> 'draft') AS venues
        FROM (${past}) d
@@ -136,6 +140,8 @@ async function entries(past: string, pastParams: unknown[], tail: string, tailPa
     cancelled: r.state === 'cancelled',
     venues: (JSON.parse(r.venues) as string[]).sort(),
     poster: images.get(r.id)!.poster,
+    age: ageWording(r.age_min, !!r.age_restricted),
+    hasEffects: !!r.has_effects,
   }))
 }
 

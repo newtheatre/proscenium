@@ -35,6 +35,9 @@ import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'POST /api/core/productions': createProduction,
   'GET /api/core/productions/:id': getProduction,
@@ -302,7 +305,7 @@ describe('performances', () => {
 
   it('go with their production when it is cancelled: scheduled ones still to come only, with the same reason', async () => {
     const s = await stage()
-    await req('PATCH', `/api/core/productions/${s.productionId}`, { summary: 'A run to cancel.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true })
+    await req('PATCH', `/api/core/productions/${s.productionId}`, { summary: 'A run to cancel.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING })
     expect((await req('POST', `/api/core/productions/${s.productionId}/cancel`, { reasonTermId: await term('core.cancel-reason', 'other') })).body.code).toBe('core.production.not-cancellable')
     await req('POST', `/api/core/productions/${s.productionId}/publish`, {})
 

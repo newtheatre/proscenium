@@ -19,7 +19,7 @@ const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }
 test.describe('a site owner with no console', () => {
   test.use(as(siteOwner('Sol Site', ['core.audit.view'])))
 
-  test('has the strip, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
+  test('has the Admin mark, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
     await expect(page).toHaveTitle(/^Admin/)
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
@@ -182,9 +182,12 @@ test.describe('a person with no admin ability', () => {
 test.describe('on a phone, in dark mode', () => {
   test.use({ ...as(siteOwner('Pip Phone')), viewport: { width: 390, height: 844 }, colorScheme: 'dark' })
 
-  test('the strip carries the drawer toggle and the drawer opens', async ({ page }) => {
+  test('has one header with one menu button, and the drawer opens from it', async ({ page }) => {
     await visit(page, '/admin')
-    await page.getByRole('button', { name: 'Open or close the menu' }).first().click()
+    await expect(page.locator('#main').getByText('Admin', { exact: true })).toBeVisible()
+    const toggle = page.getByRole('button', { name: 'Open sidebar' })
+    await expect(toggle).toHaveCount(1)
+    await toggle.click()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await page.getByRole('link', { name: 'Advanced' }).click()
     await expect(page).toHaveURL(/\/admin\/advanced/)

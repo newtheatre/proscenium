@@ -31,6 +31,8 @@ export const spaceInput = z.object({
   accessInfo: text(4000).optional(), // not-policy: access text's bound
   managed: z.boolean().optional(),
   findingIt: text(200).optional(), // not-policy: a finding-it note's bound (R-36)
+  doorsBeforeMinutes: z.number().int().min(0).max(180).nullable().optional(), // not-policy: the doors setting's ceiling
+  runPresetId: z.string().min(1).nullable().optional(),
 })
 
 export const placeAccessInput = z.object({
