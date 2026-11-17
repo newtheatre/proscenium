@@ -401,23 +401,21 @@ function planned(v: Variant, l: List): string | null {
           <p class="text-sm text-muted">
             {{ t('bar.screens.product.check-label-help') }}
           </p>
-          <UFormField
-            :label="t('bar.screens.product.contains')"
-            name="contains"
-          >
+          <UFormField name="contains">
             <UCheckboxGroup
               v-model="label.contains"
+              :legend="t('bar.screens.product.contains')"
               :items="allergenItems"
               class="columns-2"
             />
           </UFormField>
           <UFormField
-            :label="t('bar.screens.product.may-contain')"
             :help="t('bar.screens.product.may-contain-help')"
             name="mayContain"
           >
             <UCheckboxGroup
               v-model="label.mayContain"
+              :legend="t('bar.screens.product.may-contain')"
               :items="allergenItems.filter(i => !label!.contains.includes(i.value))"
               class="columns-2"
             />
