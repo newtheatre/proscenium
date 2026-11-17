@@ -7,7 +7,7 @@
 // that ends without the money puts a reservation back as it was and lets a new sale's seats go.
 import { and, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { all, can, first, newId, nowMs, refuse, requireAbility, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
+import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
@@ -24,7 +24,8 @@ import { salesOf } from './setup'
 
 const DESK_HOLD = 30 * 60_000 // not-policy: as long as the till keeps a payment open; Payments ends the hold, not this time
 
-const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500) }).strict() // not-policy: the setting's own ceiling
+// `references`: a buyer's student IDs or member numbers, typed by the seller in place of checking by hand.
+const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500), references: z.array(z.string().max(64)).max(500).optional() }).strict() // not-policy: the setting's own ceiling; the longest reference any list holds
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
@@ -139,6 +140,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   guard(unit)
   unit.insertSet(orderLines, lines.map((l, i) => ({
     orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
+    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null,
   })))
   unit.expect(lines.length)
   unit.add(sql`UPDATE box_office_orders SET state = 'awaiting_payment', session_id = ${context.sessionId}, sold_by = ${actor.accountId ?? null}, admit_on_payment = ${input.sale.admit ? 1 : 0}, updated_at = ${at}
@@ -376,7 +378,8 @@ export interface DeskPerformance {
   startsAt: number
   state: string
   currency: string | null
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }[]
+  /** `reference`, on a member price: what the buyer may give instead of the seller checking by hand, worded by its source. */
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string } }[]
 }
 
 /**
@@ -397,7 +400,12 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
   const sold = new Map((await all<{ performance_id: string, state: string }>("SELECT performance_id, state FROM box_office_performance_sales WHERE state <> 'draft'")).map(r => [r.performance_id, r.state]))
   const coming = (await listPerformances({ state: 'scheduled', from: at - until, to: at + AHEAD })).filter(p => sold.has(p.id) && p.startsAt + until > at).slice(0, MOST)
   // An online-only type is not offered at the desk.
-  const names = new Map((await all<{ id: string, name: string }>("SELECT id, name FROM box_office_ticket_types WHERE channel <> 'online'")).map(t => [t.id, t.name]))
+  const kinds = await all<{ id: string, name: string, requirement_refs: string | null }>("SELECT id, name, requirement_refs FROM box_office_ticket_types WHERE channel <> 'online'")
+  const names = new Map(kinds.map(t => [t.id, t.name]))
+  // A member price can take the buyer's reference, such as a student ID, typed by the seller in place of checking by hand.
+  const refsOf = new Map(kinds.map(t => [t.id, t.requirement_refs ? JSON.parse(t.requirement_refs) as string[] : []]))
+  const described = await requirements.describe([...new Set([...refsOf.values()].flat())])
+  const referenceOf = (typeId: string) => (refsOf.get(typeId) ?? []).map(ref => described[ref]?.presentable).find(Boolean)
   return Promise.all(coming.map(async (performance) => {
     const [production, available] = await Promise.all([getProduction(performance.productionId), availability(performance.id)])
     return {
@@ -406,7 +414,10 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       startsAt: performance.startsAt,
       state: sold.get(performance.id)!,
       currency: available.currency,
-      rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map(x => ({ bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free }))),
+      rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map((x) => {
+        const reference = referenceOf(x.ticketTypeId)
+        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}) }
+      })),
     }
   }))
 }
