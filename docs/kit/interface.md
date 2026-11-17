@@ -280,6 +280,12 @@ with the field's label as its legend. `ticks` takes `options` and, if short note
 `notes: { max, label }`; its value is an array of `{ value, note? }` for the ticked options, in the
 order of the options, and a note box opens under a tick only when `notes` is given.
 
+A `checkbox` shows its `help` under its own label. A field with `showIf` is a follow-up and is set in
+under the question it follows. A long form can be divided into parts: `heading: true` on a `radio` or
+`ticks` field draws its question at heading size (an `h2` in its legend), as the head of the first
+part, and `section: '<heading>'` on a field draws a divider and that heading (an `h2`) above it. The
+access scheme's application form does both.
+
 ## Site administration (R-33)
 
 The fourth shell, at `/admin` (menu value `admin`). It holds install-level screens; the console keeps
