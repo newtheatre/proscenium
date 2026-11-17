@@ -2,7 +2,7 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, secret, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task } from '#kit'
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
 
@@ -39,6 +39,8 @@ export const settings = defineSettings('core', {
   'programme.credits-public': setting.boolean({ default: true, scope: 'site', change: programmeConfigure, audience: 'public' }),
   'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', scope: 'site', change: programmeConfigure, audience: 'public' }),
   'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', scope: 'site', change: programmeConfigure }),
+  // How long a production's team keeps its standing after the last performance ends (core.production-team).
+  'programme.team-standing-after': setting.duration({ default: '30d', min: '0d', max: '365d', scope: 'site', change: programmeConfigure }),
   'brand.logo': setting.reference({ record: 'core.file', scope: 'site', change: branding, audience: 'public', managed: true }),
   'brand.logo-dark': setting.reference({ record: 'core.file', scope: 'site', change: branding, audience: 'public', managed: true }),
   'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, scope: 'site', change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling
@@ -241,12 +243,43 @@ export const points = {
   }),
 }
 
+/**
+ * Core's one fact (part 6): the account is credited on the production, from the moment the credit is
+ * linked until core.programme.team-standing-after has passed since its last performance ended. A
+ * standing, so a cast member reaches the members' side; it grants nothing by default.
+ */
+export const facts = defineFacts('core', {
+  'production-team': factDecl({ on: 'core.production', standing: true }),
+})
+
 export const contributes = {
   'core.file-slot': [
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
-  'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
+  'core.erasure-handler': [{ id: 'core.files', file: 'files' }, { id: 'core.credits', file: 'credits' }],
+  // A person told their credit is linked (question 5). Optional, so they can switch it off.
+  'core.notification-topic': [{ id: 'core.credits', side: 'members' as const, order: 50 }],
+  'core.notification-type': [{
+    id: 'core.credit.added',
+    category: 'optional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    topic: 'core.credits',
+    link: '/account/credits',
+    variables: { production: 'text' as const, role: 'text' as const, link: 'url' as const },
+    wording: {
+      'en-GB': {
+        subject: 'You are credited on {{ production }}',
+        body: '{{ theatre }} has credited you as {{ role }} on {{ production }}.\n\nCredits are public unless you choose otherwise. You can make yours members only, or hide it, at any time.\n\n[See your credits]({{ link }})',
+      },
+    },
+  }],
+  // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
+  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }],
+  'core.account-section': [
+    { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
+  ],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
@@ -269,7 +302,7 @@ function terms(...list: [slug: string, label: string, icon?: string][]) {
 }
 
 /** The public fields of a production, as core.production.updated names them. */
-export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageGuidance', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories'] as const
+export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageGuidance', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories', 'credits'] as const
 
 export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),

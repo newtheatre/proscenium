@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// One production (C-02, C-03): its details, performances, advisories and web address, with publish,
-// withdraw, cancel (and bring back) and delete. Publishing names what is still missing. Credits and
-// media arrive with their slices.
+// One production (C-02, C-03, C-09): its details, performances, credits, advisories and web address, with publish,
+// withdraw, cancel (and bring back) and delete. Publishing names what is still missing. Media arrive
+// with their slice.
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -336,6 +336,11 @@ async function remove() {
           :title="production!.title"
           :interval-count="production!.intervalCount"
           @changed="refresh()"
+        />
+
+        <ProductionCredits
+          :production-id="production!.id"
+          :credits-public="production!.creditsPublic"
         />
 
         <PageSection
