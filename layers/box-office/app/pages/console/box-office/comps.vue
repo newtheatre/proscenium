@@ -16,6 +16,7 @@ const { toRefusal } = useRefusal()
 const { dateTime } = useDates()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 
 const { data, status, error, refresh } = await useAPI<Comps>('/api/box-office/comps', { key: 'box-office:comps' })
 const { data: reasons } = await useAPI<{ terms: { id: string, label: string }[] }>('/api/core/vocabularies/box-office.comp-reason/terms', { key: 'box-office:comp-reasons', default: () => ({ terms: [] }) })
@@ -37,14 +38,23 @@ const ready = computed(() => !!(form.value.performanceId && form.value.bandId &&
 
 const describe = (r: Request) => [`${r.show}, ${dateTime(r.startsAt)}`, r.band, t('box-office.comps.for', { name: r.forName ?? t('box-office.orders.no-buyer') }), r.reason].join(' · ')
 const nameOf = (r: Request) => t('box-office.comps.tickets', { count: r.quantity })
+// Requests withdrawn or declined fold away under a divider below the others.
+const closed = (r: Request) => r.state === 'withdrawn' || r.state === 'declined'
+const open = computed(() => (data.value?.mine ?? []).filter(r => !closed(r)))
+const finished = computed(() => (data.value?.mine ?? []).filter(closed))
+const showFinished = ref(false)
 
 async function ask() {
   refusal.value = null
   try {
-    await $api('/api/box-office/comps', { method: 'POST', body: { ...form.value, name: form.value.name.trim() || undefined, email: form.value.email.trim() } })
-    toast.add({ title: t('box-office.comps.asked'), color: 'success' })
+    const { requestId } = await $api<{ requestId: string }>('/api/box-office/comps', { method: 'POST', body: { ...form.value, name: form.value.name.trim() || undefined, email: form.value.email.trim() } })
     form.value = blank()
     await refresh()
+    // Undo withdraws the request, while nobody has decided it yet.
+    offer(t('box-office.comps.asked'), async () => {
+      await $api(`/api/box-office/comps/${encodeURIComponent(requestId)}/withdraw`, { method: 'POST', body: {} })
+      await refresh()
+    })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -196,35 +206,58 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
               :description="t('box-office.comps.empty.description')"
               icon="i-lucide-gift"
             />
-            <RecordList
-              v-else
-              :label="t('box-office.comps.mine')"
-            >
-              <RecordListItem
-                v-for="r in d.mine"
-                :key="r.id"
-                icon="i-lucide-gift"
-                :name="nameOf(r)"
-                :description="describe(r)"
-                :muted="r.state === 'withdrawn' || r.state === 'declined'"
+            <template v-else>
+              <RecordList
+                v-if="open.length"
+                :label="t('box-office.comps.mine')"
               >
-                <span class="inline-flex flex-wrap items-center gap-2">
-                  <StatusBadge
-                    :tone="TONES[r.state]"
-                    :label="t(`box-office.comps.state.${r.state}`)"
-                  />
-                  <UButton
-                    v-if="r.state === 'requested'"
-                    size="sm"
-                    variant="outline"
-                    color="neutral"
-                    :loading="busy === r.id"
-                    :label="t('box-office.comps.withdraw.button')"
-                    @click="act(r, 'withdraw')"
-                  />
-                </span>
-              </RecordListItem>
-            </RecordList>
+                <RecordListItem
+                  v-for="r in open"
+                  :key="r.id"
+                  icon="i-lucide-gift"
+                  :name="nameOf(r)"
+                  :description="describe(r)"
+                >
+                  <span class="inline-flex flex-wrap items-center gap-2">
+                    <StatusBadge
+                      :tone="TONES[r.state]"
+                      :label="t(`box-office.comps.state.${r.state}`)"
+                    />
+                    <UButton
+                      v-if="r.state === 'requested'"
+                      size="sm"
+                      variant="outline"
+                      color="neutral"
+                      :loading="busy === r.id"
+                      :label="t('box-office.comps.withdraw.button')"
+                      @click="act(r, 'withdraw')"
+                    />
+                  </span>
+                </RecordListItem>
+              </RecordList>
+              <CollapsibleDivider
+                v-model:open="showFinished"
+                :class="open.length ? 'mt-4' : undefined"
+                :label="t('box-office.comps.closed')"
+                :count="finished.length"
+              >
+                <RecordList :label="t('box-office.comps.closed')">
+                  <RecordListItem
+                    v-for="r in finished"
+                    :key="r.id"
+                    icon="i-lucide-gift"
+                    :name="nameOf(r)"
+                    :description="describe(r)"
+                    muted
+                  >
+                    <StatusBadge
+                      :tone="TONES[r.state]"
+                      :label="t(`box-office.comps.state.${r.state}`)"
+                    />
+                  </RecordListItem>
+                </RecordList>
+              </CollapsibleDivider>
+            </template>
           </PageSection>
         </div>
       </template>

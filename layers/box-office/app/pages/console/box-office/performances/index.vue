@@ -10,6 +10,13 @@ const { t } = useT()
 const { dateTime } = useDates()
 const { data, status, error, refresh } = await useAPI<{ performances: Row[] }>('/api/box-office/performances', { key: 'box-office:performances' })
 
+// A search that opens from its icon, by title or label.
+const search = ref('')
+const matching = computed(() => {
+  const words = search.value.trim().toLowerCase()
+  return (data.value?.performances ?? []).filter(p => !words || `${p.title} ${p.label ?? ''}`.toLowerCase().includes(words))
+})
+
 const TONES = { draft: 'neutral', on_sale: 'success', paused: 'warning', closed: 'neutral' } as const
 const badge = (row: Row) => !row.scheduled
   ? { tone: 'neutral' as const, label: t('box-office.performances.not-scheduled') }
@@ -23,6 +30,13 @@ const badge = (row: Row) => !row.scheduled
     :title="t('box-office.navigation.performances.label')"
     :description="t('box-office.performances.description')"
   >
+    <template #primary>
+      <SearchToggle
+        v-if="(data?.performances.length ?? 0) > 1"
+        v-model="search"
+        :label="t('box-office.performances.search')"
+      />
+    </template>
     <DataBoundary
       :data="data"
       :status="status"
@@ -36,12 +50,18 @@ const badge = (row: Row) => !row.scheduled
           :description="t('box-office.performances.empty.description')"
           icon="i-lucide-calendar"
         />
+        <p
+          v-else-if="!matching.length"
+          class="text-sm text-muted"
+        >
+          {{ t('box-office.performances.no-match', { words: search.trim() }) }}
+        </p>
         <RecordList
           v-else
           :label="t('box-office.navigation.performances.label')"
         >
           <RecordListItem
-            v-for="row in d.performances"
+            v-for="row in matching"
             :key="row.id"
             :to="`/console/box-office/performances/${encodeURIComponent(row.id)}`"
             :name="row.label ? `${row.title}, ${row.label}` : row.title"

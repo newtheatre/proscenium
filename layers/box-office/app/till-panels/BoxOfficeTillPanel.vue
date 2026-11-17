@@ -67,7 +67,8 @@ const searched = ref(false)
 const busy = ref(false)
 const adding = ref<string | undefined>(undefined)
 const orderRows = computed(() => performances.value.find(p => p.performanceId === order.value?.lines[0]?.performanceId)?.rows ?? [])
-const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: `${r.ticketType}, ${money(r.amountMinor)}` }))
+// The price shows under each choice in the list; the box shows the name, with the line's price beside it.
+const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: r.ticketType, description: money(r.amountMinor) }))
 const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: t('box-office.screens.panel.row', { band: r.band, type: r.ticketType, price: money(r.amountMinor) }) })))
 
 function say() {
@@ -300,7 +301,7 @@ function clear() {
           <li
             v-for="(line, i) in order.lines"
             :key="line.id"
-            class="flex flex-wrap items-center justify-between gap-2 text-sm"
+            class="flex items-center justify-between gap-2 text-sm"
           >
             <UCheckbox
               v-if="splitting"
@@ -313,12 +314,13 @@ function clear() {
               v-else-if="order.state === 'reserved' && typesFor(line).length > 1"
               :model-value="line.ticketTypeId"
               :items="typesFor(line)"
+              class="min-w-0 flex-1"
               :disabled="locked || busy"
               :aria-label="t('box-office.screens.panel.type', { n: i + 1 })"
               @update:model-value="(value: string) => amend({ retype: [{ lineId: line.id, ticketTypeId: value }] })"
             />
             <span v-else>{{ line.ticketType }}</span>
-            <span class="flex items-center gap-2">
+            <span class="flex shrink-0 items-center gap-2">
               <span v-if="line.admittedAt">{{ t('box-office.screens.panel.admitted') }}</span>
               <span>{{ money(line.amountMinor, order.currency) }}</span>
               <IconButton
@@ -343,6 +345,7 @@ function clear() {
             <USelect
               v-model="adding"
               :items="addChoices"
+              :placeholder="t('box-office.screens.panel.add-placeholder')"
               :disabled="locked || busy"
             />
           </UFormField>
