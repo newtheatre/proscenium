@@ -3,7 +3,7 @@
 import { expect } from 'vitest'
 import { changeSetting, createUnit, fact, newId, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
+import { call, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import schemesGet from '../../server/api/membership/schemes/index.get'
 import schemesAll from '../../server/api/membership/schemes/all.get'
 import schemesPost from '../../server/api/membership/schemes/index.post'
@@ -25,6 +25,9 @@ import listImport from '../../server/api/membership/lists/[id]/import.post'
 import entriesPost from '../../server/api/membership/lists/[id]/entries/index.post'
 import entriesRemove from '../../server/api/membership/lists/[id]/entries/remove.post'
 import listCheck from '../../server/api/membership/lists/[id]/check.post'
+import applicationsGet from '../../server/api/membership/applications/index.get'
+import decidePost from '../../server/api/membership/applications/[id]/decide.post'
+import withdrawPost from '../../server/api/membership/mine/[id]/withdraw.post'
 
 export const handle = server({
   'GET /api/membership/schemes': schemesGet,
@@ -48,10 +51,13 @@ export const handle = server({
   'POST /api/membership/lists/:id/entries': entriesPost,
   'POST /api/membership/lists/:id/entries/remove': entriesRemove,
   'POST /api/membership/lists/:id/check': listCheck,
+  'GET /api/membership/applications': applicationsGet,
+  'POST /api/membership/applications/:id/decide': decidePost,
+  'POST /api/membership/mine/:id/withdraw': withdrawPost,
 })
 
 export const NOV_17 = Date.UTC(2026, 10, 17, 12)
-export const officer = person(['membership.scheme.manage', 'membership.membership.add', 'membership.verification-list.manage'], { reassertedAt: NOV_17 })
+export const officer = person(['membership.scheme.manage', 'membership.membership.add', 'membership.verification-list.manage', 'membership.membership.verify'], { reassertedAt: NOV_17 })
 
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = officer): Promise<{ status: number, body: T }> {
   const headers = method === 'POST' ? { 'idempotency-key': newId('req') } : {}
@@ -79,4 +85,12 @@ export async function ready(): Promise<void> {
     await changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true })
     await unit.commit()
   })
+}
+
+/** A signed-in person with a real account, and a verified address if given. */
+export async function applicant(name: string, address?: string): Promise<ReturnType<typeof person>> {
+  const who = person([], { name })
+  await rows('INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, ?, \'self\', ?, ?) RETURNING id', who.accountId, name, NOV_17, NOV_17)
+  if (address) await rows('INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, ?, ?, \'self\', ?) RETURNING id', newId('aem'), who.accountId, address, NOV_17, NOV_17)
+  return who
 }

@@ -1,15 +1,15 @@
 // Joining a free scheme with nothing to check is one request (MEM-11; J2). Never asks for a name,
 // an address or a password: those are the account's (J7). A scheme that checks against a list is
-// joined in the same request when the check passes (V1 to V4, D9). Schemes that approve or charge
-// are joined through applications, which come in a later slice.
+// joined in the same request when the check passes (V1 to V4, D9); one checked by staff becomes an
+// application waiting in their queue (V2, V3). Schemes that approve or charge need the form builder
+// and the fees module, which do not exist yet.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, refuse, today } from '#kit'
 import { chooseLength, pendingOf } from '../../../../joining'
-import { holdsScheme, writeActive } from '../../../../memberships'
+import { holdsScheme, writeActive, writePending } from '../../../../memberships'
 import { requireScheme } from '../../../../schemes'
-import { schemeList } from '../../../../lists'
-import { passList, recordPass } from '../../../../verify'
+import { recordOutcome, recordPass, runVerifier } from '../../../../verify'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -25,14 +25,24 @@ export default defineRoute({
   const accountId = actor.accountId!
   if (scheme.state !== 'open') refuse('membership.join.not-open', 'This scheme is not taking new members.', { status: 409 })
   if (scheme.joinMode === 'staff-only') refuse('membership.join.staff-only', 'Membership of this scheme is given by the theatre.', { status: 409 })
-  const list = scheme.verifier ? await schemeList(scheme) : null
-  if ((scheme.verifier && !list) || scheme.needsApproval || scheme.requiresPayment)
+  if (scheme.needsApproval || scheme.requiresPayment)
     refuse('membership.join.not-online', 'This scheme cannot be joined online yet.', { status: 409, remedy: 'Contact the theatre to join.' })
-  if (await pendingOf(accountId, scheme.id)) refuse('membership.join.pending', 'You have already applied for this scheme.', { status: 409 })
+  // J3: a second attempt returns the first.
+  const open = await pendingOf(accountId, scheme.id)
+  if (open) return { membershipId: open, pending: true, waiting: 'staff-check' }
   // J4. Renewing inside the window is a later slice.
   if (await holdsScheme(accountId, scheme.id)) refuse('membership.join.already-held', 'You already hold this membership.', { status: 409 })
   const day = await today()
-  const pass = list ? await passList(list, accountId, input.reference, day) : null
+  const checked = await runVerifier(scheme, accountId, input.reference, day)
+  // V2: waiting for staff is an application, pending until they pass or decline it.
+  if (checked?.outcome === 'needs-staff') {
+    const option = await chooseLength(scheme, input.lengthOptionId)
+    const membershipId = writePending(unit, { scheme, accountId, lengthOptionId: option?.id ?? null })
+    recordOutcome(unit, membershipId, checked)
+    unit.audit({ action: 'create', record: ['membership.membership', membershipId], detail: { origin: 'applied', waiting: checked.reason } })
+    return { membershipId, pending: true, waiting: checked.reason }
+  }
+  const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null } : null
   // D9: an entry's own end date wins, and the membership then has no length option.
   const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId)
   const written = await writeActive(unit, {
@@ -40,6 +50,7 @@ export default defineRoute({
     ...(pass?.endsOn ? { endsOn: pass.endsOn } : {}),
   })
   if (pass) recordPass(unit, written.membershipId, accountId, pass)
+  else if (checked) recordOutcome(unit, written.membershipId, checked)
   unit.audit({ action: 'create', record: ['membership.membership', written.membershipId], detail: { origin: 'applied' } })
-  return { ...written, opensMembersArea: scheme.side === 'members' }
+  return { ...written, pending: false, opensMembersArea: scheme.side === 'members' }
 })
