@@ -60,7 +60,7 @@ async function load(append = false) {
 }
 watch(() => props.query, () => load(), { immediate: true, deep: true })
 
-const when = (at: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(at)
+const { dateTime: when } = useDates()
 const who = (c: SettingChange) => c.by ? (c.by.name ?? t('core.settings-history.someone')) : t('core.settings-history.system')
 const name = (c: SettingChange) => c.labelKey && te(c.labelKey) ? t(c.labelKey) : c.key
 

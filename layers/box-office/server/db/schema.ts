@@ -159,7 +159,17 @@ export const orders = defineTable('box_office_orders', {
   soldBy: col.account('sold_by', { role: 'actor', nullable: true }),
   sessionId: col.ref('payments_sessions', { nullable: true }),
   intentId: col.ref('payments_intents', { nullable: true }),
-  // Each opens the order for whoever holds the value, so each is cleared with the person.
+  // Each opens the order for whoever holds the value, so each is cleared with the person. The basket
+  // token is the browser's, from Hold tickets to the confirmation screen; the link token is the one
+  // in the order's messages.
+  basketTokenHash: col.personal(text('basket_token_hash'), { erase: 'clear' }),
+  // A guest's reservation waiting for its address to be proved: who to make the account for once
+  // the link is pressed. All four are cleared when the basket is reserved.
+  confirmTokenHash: col.personal(text('confirm_token_hash'), { erase: 'clear' }),
+  confirmExpiresAt: col.timestamp('confirm_expires_at'),
+  confirmEmail: col.personal(text('confirm_email'), { erase: 'clear' }),
+  confirmName: col.personal(text('confirm_name'), { erase: 'clear' }),
+  linkTokenExpiresAt: col.timestamp('link_token_expires_at'),
   linkTokenHash: col.personal(text('link_token_hash'), { erase: 'clear' }),
   deskCodeHash: col.personal(text('desk_code_hash'), { erase: 'clear' }),
   expiresAt: col.timestamp('expires_at'),
@@ -177,6 +187,9 @@ export const orders = defineTable('box_office_orders', {
   onErasure: 'keep-row',
   extra: t => [
     uniqueIndex('box_office_orders_reference').on(t.reference),
+    uniqueIndex('box_office_orders_basket_token').on(t.basketTokenHash).where(sql`basket_token_hash IS NOT NULL`),
+    uniqueIndex('box_office_orders_confirm_token').on(t.confirmTokenHash).where(sql`confirm_token_hash IS NOT NULL`),
+    // A trigger keeps the address waiting to be confirmed to a basket, whole, ending no later than the basket.
     uniqueIndex('box_office_orders_link').on(t.linkTokenHash).where(sql`link_token_hash IS NOT NULL`),
     uniqueIndex('box_office_orders_desk_code').on(t.deskCodeHash).where(sql`desk_code_hash IS NOT NULL`),
     index('box_office_orders_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
@@ -296,6 +309,8 @@ export const tickets = defineTable('box_office_tickets', {
   voidReason: col.internal(text('void_reason', { enum: ['cancelled', 'exchanged', 'reissued', 'performance_cancelled'] })),
   attendeeName: col.personal(text('attendee_name'), { erase: 'clear' }),
   admittedAt: col.timestamp('admitted_at'),
+  // The scan that admitted it, stamped by the same update as admitted_at: how a scan knows it was the one.
+  admittedScanId: col.internal(text('admitted_scan_id')),
   requirementRef: col.internal(text('requirement_ref')),
   requirementAccountId: col.account('requirement_account_id', { role: 'actor', nullable: true }),
   requirementEvidenceId: col.internal(text('requirement_evidence_id')),

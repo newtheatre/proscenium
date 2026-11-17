@@ -7,15 +7,14 @@ const emit = defineEmits<{ closed: [] }>()
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { money, toMinor } = await useMoney()
+const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 
-const counted = ref<number | undefined>(undefined)
+const countedMinor = ref<number | null>(null)
 const note = ref('')
 const busy = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const countedMinor = computed(() => (counted.value === undefined ? null : toMinor(counted.value, props.session.currency)))
 const difference = computed(() => (countedMinor.value === null ? null : countedMinor.value - props.session.expectedCashMinor))
 
 async function close() {
@@ -37,9 +36,10 @@ async function close() {
 </script>
 
 <template>
-  <form
+  <UForm
     class="space-y-4"
-    @submit.prevent="close"
+    :state="{ countedMinor, note }"
+    @submit="close"
   >
     <RefusalNotice :refusal="refusal" />
     <p>{{ t('payments.screens.close.expected', { amount: money(session.expectedCashMinor, session.currency) }) }}</p>
@@ -49,12 +49,10 @@ async function close() {
       required
       :error="refusal?.fields?.countedMinor ? refusal.reason : undefined"
     >
-      <UInputNumber
-        v-model="counted"
-        :min="0"
-        :step="0.01"
-        :format-options="{ style: 'currency', currency: session.currency }"
-        class="w-full sm:w-56"
+      <FieldMoney
+        v-model="countedMinor"
+        :currency="session.currency"
+        class="sm:w-56"
       />
     </UFormField>
     <p
@@ -75,7 +73,6 @@ async function close() {
         v-model="note"
         maxlength="200"
         :rows="2"
-        class="w-full"
       />
     </UFormField>
     <UButton
@@ -84,5 +81,5 @@ async function close() {
       :disabled="countedMinor === null || (!!difference && !note.trim())"
       :label="t('payments.screens.close.button')"
     />
-  </form>
+  </UForm>
 </template>

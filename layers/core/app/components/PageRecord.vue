@@ -85,8 +85,17 @@ watch(historyOpen, async (open) => {
     historyFailed.value = true
   }
 })
-const when = (at: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(at)
+const { dateTime: when } = useDates()
 const actionName = (action: string) => (te(`core.history.action.${action}`) ? t(`core.history.action.${action}`) : action)
+// What happened, who did it and when, newest first as the server gives them. A person's change has
+// a person's icon and the system's own a cog, so the two can be told apart down the line.
+const timeline = computed(() => (history.value ?? []).map((entry, i) => ({
+  value: i,
+  title: actionName(entry.action),
+  description: entry.who ?? t('core.history.system'),
+  date: when(entry.at),
+  icon: entry.who ? 'i-lucide-user' : 'i-lucide-cog',
+})))
 const { te } = useT()
 </script>
 
@@ -117,41 +126,27 @@ const { te } = useT()
         :label="t('core.history.open')"
         @click="historyOpen = true"
       />
-      <UDropdownMenu
-        v-if="actions.length"
+      <RowActions
         :items="actions"
-      >
-        <UButton
-          icon="i-lucide-ellipsis"
-          color="neutral"
-          variant="outline"
-          :aria-label="t('core.record.more-actions', { name: title })"
-        />
-      </UDropdownMenu>
+        :label="t('core.record.more-actions', { name: title })"
+        variant="outline"
+        size="md"
+      />
     </template>
 
-    <dl
+    <FactStrip
       v-if="summary.length || facts.length"
-      class="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-default p-4 sm:grid-cols-3 lg:grid-cols-6"
+      :facts="summary"
+      framed
+      class="mb-6 lg:grid-cols-6"
     >
-      <div
-        v-for="fact in summary"
-        :key="fact.label"
-      >
-        <dt class="text-xs text-muted">
-          {{ fact.label }}
-        </dt>
-        <dd class="font-medium text-highlighted">
-          {{ fact.value }}
-        </dd>
-      </div>
       <component
         :is="f.component"
         v-for="f in facts"
         :key="f.id"
         :record-id="recordId"
       />
-    </dl>
+    </FactStrip>
 
     <div :class="hasAside ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8' : ''">
       <!-- On a phone the side panel folds to one line above the tabs, so the poster does not push the work down. -->
@@ -228,22 +223,12 @@ const { te } = useT()
           :title="t('core.history.empty')"
           icon="i-lucide-history"
         />
-        <ol
+        <UTimeline
           v-else-if="history"
-          class="space-y-4"
-        >
-          <li
-            v-for="(entry, i) in history"
-            :key="i"
-          >
-            <p class="font-medium">
-              {{ actionName(entry.action) }}
-            </p>
-            <p class="text-sm text-muted">
-              {{ entry.who ?? t('core.history.system') }} · {{ when(entry.at) }}
-            </p>
-          </li>
-        </ol>
+          :items="timeline"
+          color="neutral"
+          size="xs"
+        />
         <p v-else>
           {{ t('core.history.loading') }}
         </p>

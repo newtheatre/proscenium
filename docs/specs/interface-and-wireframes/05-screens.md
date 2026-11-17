@@ -1,6 +1,6 @@
 # 5. Screens
 
-The interface layer itself owns 33 screens: the frames, the homes, and the screens no single module can own. Every other screen belongs to a module and is listed in that module's specification, built from the page types defined here.
+The interface layer itself owns 34 screens: the frames, the homes, and the screens no single module can own. Every other screen belongs to a module and is listed in that module's specification, built from the page types defined here.
 
 | Sub-tab | Holds |
 | --- | --- |
@@ -43,7 +43,7 @@ The interface layer itself owns 33 screens: the frames, the homes, and the scree
 | Console home | Work awaiting this person, then today | Anyone with a console ability | Home | Yes |
 | Command palette | Go to, find, do; shared with site administration | Anyone with a console or site administration ability | Overlay | Yes |
 | Help panel | This screen's documentation beside the screen | Anyone with a console or site administration ability | Overlay | Yes |
-| Module settings page | Generated from the registry, at `/console/<module>/settings` | Per setting's ability | Settings | Yes |
+| Generated settings page | Generated from the registry for each declared settings page: a module's at `/console/<module>/settings`, core's Programme settings and People settings in the console, and Theatre, Sign-in and Privacy in site administration (R-37) | Per setting's ability | Settings | Yes |
 | Module setup | A module's guided setup | Site owner or the module's manager | Steps | Yes |
 | Saved views manager | Rename, share and delete saved views | Anyone with a saved view | List | Later |
 
@@ -53,7 +53,7 @@ The interface layer itself owns 33 screens: the frames, the homes, and the scree
 | --- | --- | --- | --- | --- |
 | Site administration layout | The console's frame with the named strip, "Back to console" and its own sidebar | Anyone holding the ability of a site administration entry | Frame | Yes |
 | Overview | What needs attention, then the state of the installation, at `/admin` | Anyone holding the ability of a site administration entry | Home | Yes |
-| Settings (foundations' screen, drawn here) | Site-wide settings by module, and search across every setting, at `/admin/settings` | Anyone who may read settings | List and Settings | Yes |
+| Advanced, and Settings history (two screens) | Engineering limits from every module, under a warning, at `/admin/advanced`; every settings change, with Revert, at `/admin/settings-history`. The old `/admin/settings` redirects | Per setting's ability on Advanced; `core.audit.view` for the history | List and Settings | Yes |
 | Modules (foundations' screen, drawn here) | Switch on and off, with dependencies and setup state, at `/admin/modules` | Site owner | List | Yes |
 | Navigation | Reorder and rename members' sections, hide destinations, at `/admin/navigation` | Holder of `core.navigation.arrange` | Form | Later |
 | Appearance preview | The public site, members' area and console in the theatre's branding, light and dark, on core's Branding screen | Site owner | Record | Yes |

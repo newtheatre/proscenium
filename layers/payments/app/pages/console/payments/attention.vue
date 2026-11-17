@@ -64,51 +64,44 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
             :title="t('payments.screens.attention.unknown-title')"
             :description="t('payments.screens.attention.unknown-help')"
           >
-            <ul class="divide-y divide-default rounded-lg border border-default">
-              <li
+            <RecordList :label="t('payments.screens.attention.unknown-title')">
+              <RecordListItem
                 v-for="a in loaded.unknown"
                 :key="a.id"
-                class="space-y-3 px-3 py-3"
+                :name="`${money(a.amountMinor, a.currency)} · ${methodLabel(a.method)} · ${a.provider}`"
+                :description="a.providerRef ? `${t('payments.screens.attention.waited', { time: waited(a.waitingMs) })} · ${t('payments.screens.attention.reference', { reference: a.providerRef })}` : t('payments.screens.attention.waited', { time: waited(a.waitingMs) })"
               >
-                <div>
-                  <p class="font-medium">
-                    {{ money(a.amountMinor, a.currency) }} · {{ methodLabel(a.method) }} · {{ a.provider }}
-                  </p>
-                  <p class="text-sm text-muted">
-                    {{ t('payments.screens.attention.waited', { time: waited(a.waitingMs) }) }}<template v-if="a.providerRef">
-                      · {{ t('payments.screens.attention.reference', { reference: a.providerRef }) }}
-                    </template>
-                  </p>
-                </div>
-                <div class="flex flex-wrap items-end gap-2">
-                  <UFormField
-                    v-if="!a.providerRef"
-                    :label="t('payments.screens.attention.their-reference')"
-                    :hint="t('payments.screens.optional')"
-                  >
-                    <UInput
-                      v-model="references[a.id]"
-                      maxlength="200"
+                <template #below>
+                  <div class="flex flex-wrap items-end gap-2">
+                    <UFormField
+                      v-if="!a.providerRef"
+                      :label="t('payments.screens.attention.their-reference')"
+                      :hint="t('payments.screens.optional')"
+                    >
+                      <UInput
+                        v-model="references[a.id]"
+                        maxlength="200"
+                        size="sm"
+                      />
+                    </UFormField>
+                    <UButton
+                      :label="t('payments.screens.attention.succeeded-button')"
+                      icon="i-lucide-check"
                       size="sm"
+                      @click="settle(a, 'succeeded')"
                     />
-                  </UFormField>
-                  <UButton
-                    :label="t('payments.screens.attention.succeeded-button')"
-                    icon="i-lucide-check"
-                    size="sm"
-                    @click="settle(a, 'succeeded')"
-                  />
-                  <UButton
-                    :label="t('payments.screens.attention.failed-button')"
-                    icon="i-lucide-x"
-                    color="neutral"
-                    variant="outline"
-                    size="sm"
-                    @click="settle(a, 'failed')"
-                  />
-                </div>
-              </li>
-            </ul>
+                    <UButton
+                      :label="t('payments.screens.attention.failed-button')"
+                      icon="i-lucide-x"
+                      color="neutral"
+                      variant="outline"
+                      size="sm"
+                      @click="settle(a, 'failed')"
+                    />
+                  </div>
+                </template>
+              </RecordListItem>
+            </RecordList>
           </PageSection>
 
           <PageSection
@@ -116,20 +109,15 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
             :title="t('payments.screens.attention.unfulfilled-title')"
             :description="t('payments.screens.attention.unfulfilled-help')"
           >
-            <ul class="divide-y divide-default rounded-lg border border-default">
-              <li
+            <RecordList :label="t('payments.screens.attention.unfulfilled-title')">
+              <RecordListItem
                 v-for="i in loaded.unfulfilled"
                 :key="i.id"
-                class="flex flex-wrap items-center gap-3 px-3 py-2"
+                :name="money(i.amountMinor, i.currency)"
               >
-                <p class="flex-1 font-medium">
-                  {{ money(i.amountMinor, i.currency) }}
-                </p>
-                <p class="text-sm text-muted">
-                  {{ t('payments.screens.attention.since', { time: waited(i.sinceMs) }) }}
-                </p>
-              </li>
-            </ul>
+                <span class="text-sm text-muted">{{ t('payments.screens.attention.since', { time: waited(i.sinceMs) }) }}</span>
+              </RecordListItem>
+            </RecordList>
           </PageSection>
 
           <PageSection
@@ -137,20 +125,15 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
             :title="t('payments.screens.attention.failed-refunds-title')"
             :description="t('payments.screens.attention.failed-refunds-help')"
           >
-            <ul class="divide-y divide-default rounded-lg border border-default">
-              <li
+            <RecordList :label="t('payments.screens.attention.failed-refunds-title')">
+              <RecordListItem
                 v-for="r in loaded.failedRefunds"
                 :key="r.id"
-                class="flex flex-wrap items-center gap-3 px-3 py-2"
+                :name="`${money(r.amountMinor, r.currency)} · ${methodLabel(r.method)}`"
               >
-                <p class="flex-1 font-medium">
-                  {{ money(r.amountMinor, r.currency) }} · {{ methodLabel(r.method) }}
-                </p>
-                <p class="text-sm text-muted">
-                  {{ t('payments.screens.attention.since', { time: waited(r.sinceMs) }) }}
-                </p>
-              </li>
-            </ul>
+                <span class="text-sm text-muted">{{ t('payments.screens.attention.since', { time: waited(r.sinceMs) }) }}</span>
+              </RecordListItem>
+            </RecordList>
           </PageSection>
         </div>
       </template>

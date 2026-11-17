@@ -6,21 +6,22 @@
 interface Planned { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: 'past' | 'clash' | 'closed' | null, reason: string | null }
 interface Space { value: string, label: string, venueId: string }
 
-const props = defineProps<{ productionId: string, spaces: Space[], timeZone: string | undefined }>()
+const { t } = useT()
+const props = defineProps<{ productionId: string, spaces: Space[] }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ added: [answer: { created: number } | { run: { id: string, total: number } }] }>()
 
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
+const dates = useDates()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const DAYS = [{ value: '1', label: 'Mon' }, { value: '2', label: 'Tue' }, { value: '3', label: 'Wed' }, { value: '4', label: 'Thu' }, { value: '5', label: 'Fri' }, { value: '6', label: 'Sat' }, { value: '7', label: 'Sun' }]
-const form = ref({ spaceId: '', from: '', to: '', days: ['2', '3', '4', '5', '6'] as string[], times: '19:30', minutes: null as number | null, scheduled: true })
+const form = ref({ spaceId: '', dates: { start: '', end: '' }, days: ['2', '3', '4', '5', '6'] as string[], times: '19:30', minutes: null as number | null, scheduled: true })
 const planned = ref<Planned[] | null>(null)
 const busy = ref(false)
 const kept = computed(() => (planned.value ?? []).filter(p => !p.problem))
 const marked = computed(() => (planned.value ?? []).filter(p => p.problem).length)
-const when = computed(() => new Intl.DateTimeFormat('en-GB', { timeZone: props.timeZone, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }))
 
 watch(open, (v) => {
   if (!v) return
@@ -42,7 +43,7 @@ async function preview() {
   try {
     const answer = await $api<{ performances: Planned[] }>(`/api/core/productions/${props.productionId}/performances/plan` as string, {
       method: 'POST',
-      body: { venueId: s.venueId, spaceId: s.value, from: form.value.from, to: form.value.to, days: form.value.days.map(Number), times: times(), minutes: form.value.minutes },
+      body: { venueId: s.venueId, spaceId: s.value, from: form.value.dates.start, to: form.value.dates.end || form.value.dates.start, days: form.value.days.map(Number), times: times(), minutes: form.value.minutes },
     })
     planned.value = answer.performances
   }
@@ -84,10 +85,11 @@ async function add() {
     :ui="{ content: 'sm:max-w-2xl' }"
   >
     <template #body>
-      <form
+      <UForm
         id="performance-run"
+        :state="form"
         class="space-y-4"
-        @submit.prevent="planned ? add() : preview()"
+        @submit="planned ? add() : preview()"
       >
         <RefusalNotice :refusal="refusal" />
         <UFormField
@@ -97,31 +99,14 @@ async function add() {
           <USelect
             v-model="form.spaceId"
             :items="spaces"
-            class="w-full"
           />
         </UFormField>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField
-            label="First date"
-            required
-          >
-            <UInput
-              v-model="form.from"
-              type="date"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="Last date"
-            required
-          >
-            <UInput
-              v-model="form.to"
-              type="date"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
+        <UFormField
+          label="First and last date"
+          required
+        >
+          <FieldDateRange v-model="form.dates" />
+        </UFormField>
         <UFormField
           label="Days"
           required
@@ -140,7 +125,6 @@ async function add() {
           >
             <UInput
               v-model="form.times"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -150,7 +134,6 @@ async function add() {
             <UInputNumber
               v-model="form.minutes"
               :min="1"
-              class="w-full"
             />
           </UFormField>
         </div>
@@ -169,22 +152,25 @@ async function add() {
               , {{ marked }} left out
             </template>.
           </p>
-          <ul class="max-h-72 divide-y divide-default overflow-y-auto rounded-md border border-default text-sm">
-            <li
-              v-for="p in planned"
-              :key="p.startsAt"
-              class="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-              :class="p.problem ? 'text-muted' : ''"
-            >
-              <span :class="p.problem ? 'line-through' : ''">{{ when.format(p.startsAt) }}</span>
-              <span
-                v-if="p.reason"
-                class="text-error"
-              >{{ p.reason }}</span>
-            </li>
-          </ul>
+          <div class="max-h-72 overflow-y-auto">
+            <RecordList label="The performances this would add">
+              <RecordListItem
+                v-for="p in planned"
+                :key="p.startsAt"
+                :muted="!!p.problem"
+              >
+                <template #name>
+                  <span :class="p.problem ? 'font-normal line-through' : 'font-normal'">{{ dates.dateTime(p.startsAt) }}</span>
+                </template>
+                <span
+                  v-if="p.reason"
+                  class="text-sm text-error"
+                >{{ p.reason }}</span>
+              </RecordListItem>
+            </RecordList>
+          </div>
         </div>
-      </form>
+      </UForm>
     </template>
     <template #footer>
       <UButton
@@ -193,7 +179,7 @@ async function add() {
         form="performance-run"
         label="Show the dates"
         :loading="busy"
-        :disabled="!form.spaceId || !form.from || !form.to || !form.days.length || !times().length"
+        :disabled="!form.spaceId || !form.dates.start || !form.days.length || !times().length"
       />
       <template v-else>
         <UButton
@@ -205,7 +191,7 @@ async function add() {
         <UButton
           type="submit"
           form="performance-run"
-          :label="`Add ${kept.length} performance${kept.length === 1 ? '' : 's'}`"
+          :label="t('core.counts.add-performances', { count: kept.length })"
           :loading="busy"
           :disabled="!kept.length"
         />

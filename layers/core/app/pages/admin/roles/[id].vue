@@ -115,7 +115,6 @@ async function archive() {
         <UAlert
           v-if="role?.fixed"
           color="neutral"
-          variant="subtle"
           icon="i-lucide-lock"
           :title="t('core.roles.owner-fixed')"
         />
@@ -129,7 +128,6 @@ async function archive() {
             <UInput
               v-model="form.name"
               maxlength="80"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -140,7 +138,6 @@ async function archive() {
               v-model="form.description"
               maxlength="500"
               :rows="2"
-              class="w-full"
             />
           </UFormField>
           <UFormField

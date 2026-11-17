@@ -57,7 +57,7 @@ export async function issueEnrolmentLink(unit: UnitView, event: H3Event, actor: 
   })
   unit.audit({ action: 'create', ability: 'core.account.recover', record: ['core.account', accountId] })
   await credentialNotice(unit, accountId, 'enrolment-link')
-  return { link: `${relyingParty(event).origin}/sign-in/link#${token}`, expiresAt }
+  return { link: `${(await relyingParty(event)).origin}/sign-in/link#${token}`, expiresAt }
 }
 
 /** Uses an enrolment link: a recovery session for the account it names, spent once. */

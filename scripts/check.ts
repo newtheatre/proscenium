@@ -3,8 +3,9 @@
 import { loadRegistry, LoadError } from './lib/load.ts'
 import { checkPageAddresses, checkRoutes } from './checks/routes.ts'
 import { checkMigrations } from './checks/migrations.ts'
-import { checkAbilities, checkAccountComparisons, checkChangeCounts, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkTranslations } from './checks/source.ts'
+import { checkAbilities, checkAccountComparisons, checkChangeCounts, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkSealSpecial, checkTranslations } from './checks/source.ts'
 import { checkSite } from './checks/site.ts'
+import { checkInterface } from './checks/interface.ts'
 
 let failed = 0
 function report(name: string, problems: string[]) {
@@ -34,9 +35,11 @@ report('Events and jobs', checkEventsAndJobs(modules, registry))
 report('Imports, bindings and outside calls', checkImports(modules))
 report('Numbers that should be settings', checkPolicyNumbers(modules))
 report('Reads by account go through the account scope', checkAccountComparisons(modules, registry))
+report('sealSpecial and sealColumn write encrypted columns, never a token', checkSealSpecial(modules, registry))
 report('Counts of changed rows are tested against nought, and SQL never reads changes()', checkChangeCounts(modules))
 report('Translations', checkTranslations(modules, registry))
 report('Navigation coverage', checkNavigation(modules, registry))
+report('Screens are built from the kit', checkInterface(modules))
 report('Migrations', await checkMigrations(modules, registry))
 
 console.log('\nNot yet checked (they need modules that do not exist yet): the erasure scan, soft-dependency switching, and owned paths (fork CI only: bun run check:paths).')

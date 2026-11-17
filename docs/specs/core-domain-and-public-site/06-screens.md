@@ -18,7 +18,7 @@ On 16 November 2026 Matt added a fourth shell, Site administration at `/admin`, 
 | Message types, Template editor | Console | unchanged |
 | Delivery log | Console | unchanged |
 | Branding | Site administration | `/admin/branding` |
-| Organisation | Site administration | `/admin/organisation` |
+| Theatre (the generated settings page that holds the site, organisation and locale groups) | Site administration | `/admin/theatre` |
 | Vocabularies | Site administration | `/admin/vocabularies` |
 | Senders, with the sending-domain setup and the email outcomes step | Site administration | `/admin/email` |
 | Delivery health, with the suppression list | Site administration | `/admin/email/health` |
@@ -29,9 +29,11 @@ Each Site administration entry declares `menu: 'admin'` and one of the interface
 
 | Group | Core's entries, in order |
 | --- | --- |
-| `theatre` (Theatre) | Organisation, Branding, Vocabularies, then the interface's Navigation, then Site readiness |
+| `theatre` (Theatre) | Theatre, Branding, Vocabularies, then the interface's Navigation, then Site readiness |
 | `email` (Email) | Senders, Delivery health |
 | `connections` (Connections) | After the foundations' Credentials: Webhooks |
+
+The shell has six groups in a fixed order: Theatre, Modules, Access, Email, Connections and Upkeep, with Overview above them in no group (the interface specification owns the list, confirmed after ruling R-37). Core draws nothing of its own in Modules, Access or Upkeep; the public site module's settings page sits under Modules. Its `delivery`, `files` and `webhooks` settings appear on the Advanced page under Upkeep, which the interface builds, and the Theatre entry is the generated settings page described in part 6.
 
 Core declares all six groups of the shell (`theatre`, `email`, `connections`, `modules`, `access`, `upkeep`), because `core.navigation-group` now carries a `menu` field, `console` by default or `admin`. Core also declares the console's Communications group, so that Message types, Template editor and Delivery log have a home while the Communications module is off.
 
@@ -50,7 +52,7 @@ Moving a screen changes no ability. A person sees Site administration when they 
 | Production | `/whats-on/<slug>` while current, `/shows/<slug>` once past | Everyone | See the wireframe. |
 | Season | `/seasons/<slug>` | Everyone | One published or archived season's productions |
 | Archive | `/shows` | Everyone | Past productions by year, with search across title, company and credited names |
-| Venue | `/venues/<slug>` | Everyone | Address, map link, getting here, access, photos, what is on there |
+| Venue | `/venues/<slug>` | Everyone | Address, map link, getting here with each space's finding-it note beneath, access, photos, what is on there. A place is named "space, venue" here and on a production's dates |
 | News | `/news`, `/news/<slug>` | Everyone | Posts from `site/content/news/` |
 | Content page | Any other address | Everyone | A page from `site/content/` |
 | Not found |  | Everyone | A plain message, a search of what's on, and a link home. An old slug never lands here: it redirects. |
@@ -84,8 +86,8 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
-| Venues | `core.venue.manage` | Venues with their spaces nested. Add, edit, archive. |
-| Venue | `core.venue.manage` | Address, public text, access text, photos, and its spaces with capacity and kind |
+| Venues | `core.venue.manage` | Venues with their spaces nested, a space the theatre does not run marked as such. Add, edit, archive. |
+| Venue | `core.venue.manage` | Address, public text, access text, photos, and its spaces. Each space has its capacity and kind, a switch for whether the theatre runs it (on by default), and a short note on finding it. There is no such switch on the venue |
 | Closures | `core.closure.manage` | A list and a small calendar. Add a closure for the theatre, a venue or a space. Public holidays shown, greyed, from the feed. |
 
 ## Site and brand (Site administration, except Files)
@@ -93,7 +95,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
 | Branding | `core.branding.edit` | See the wireframe. |
-| Organisation | `core.organisation.edit` | Name, time zone, language, currency and day start, which are foundations settings shown on this page, with core's contact details, social links, legal name and year end. Changing the time zone or day start shows how many performances will be recalculated. |
+| Theatre | `core.organisation.edit` | Name, time zone, language, currency and day start, which are foundations settings shown on this page, with core's contact details, social links, legal name and year end. Changing the time zone or day start shows how many performances will be recalculated. |
 | Site readiness | `public-site.readiness.view` | A checklist: pages still marked as placeholder, missing brand items, images without alt text, components whose module is off, settings a page quotes that are still unset, whether search engines are being turned away. Each line links to where it is fixed, or names the file to edit. |
 | Vocabularies | `core.vocabulary.manage` | Every vocabulary, grouped by module, with "New vocabulary" for a list of the theatre's own. Inside one: terms in order, drag to reorder, rename, retire, merge, with a count of records using each. |
 | Files | `core.file.manage` | Every file: preview, owner, slot, size, state. Filter by owner type and state. Restore a deleted file before its purge date. Storage used. |
@@ -107,6 +109,10 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Senders | `core.sender.manage` | Sender identities and which topics use which. Whether the sending domain is verified. |
 | Delivery log | `core.delivery.read` | Deliveries, newest first: type, channel, state, time. The recipient shows only to someone who may see that person. Filter by state, type and date. Retry a failed one. |
 | Delivery health | `core.delivery.read` | Counts for the last day and week: sent, retrying, failed, bounced. Anything stuck. The suppression list, with "lift" for an address suppressed by mistake. |
+
+**The Email screen's settings section (story C-59).** The Email screen at `/admin/email` gains a section, "Email settings", below the senders. It shows and saves four settings that otherwise sit on the generated Theatre page: the sending label, the email footer, and the time and the day that digests go. Each field saves through the ordinary settings save, so the setting's own ability, its limits, its confirmation and its history entry all apply as they would on a generated page. A person who lacks a field's ability sees its value and cannot change it. Each field shows its default, offers Reset, and carries the "Changed by" line that opens its history. The sending label warns before saving when a sending domain is already set, because the label only takes effect the next time automatic setup runs. The footer shows a preview in the email layout beside the field. Once the section is built, the four settings name this screen as their home and leave the Theatre page in the same pull request (part 6).
+
+**Finding rows by a person.** By a foundations ruling of 16 November 2026, no core list queries the accounts table itself. Identity's part 4 gives two services, both exported from core's services. `searchAccounts` is the person picker, for choosing a person not yet on the screen (adding a credit, say), under `core.account.search`, which every preset with console work already holds. `findAccounts(text, list)` narrows a list already on the screen by its account holder and shows no name, under `core.account.find`. It answers an SQL subquery of account ids, which the list passes to the kit's `inAccountScope`, so no list of ids is ever bound, and it writes one audit `read` entry for each call, which never holds the text typed. `core.account.find` is impliable, and three core abilities imply it, one for each list that filters by person: `core.delivery.read` (the delivery log, by recipient), `core.file.manage` (Files, by an owner that is an account) and `core.production.view` (a production's credits, by the linked account). The public archive's search across credited names is a different thing: it reads the public text of published credits and touches no account.
 
 ## Site administration: webhooks
 

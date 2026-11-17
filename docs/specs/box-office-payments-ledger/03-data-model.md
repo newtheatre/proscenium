@@ -146,7 +146,7 @@ Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so repo
 
 ### `box_office_prices` (append-only)
 
-The price of one ticket type in one band. A price change is a new row; the newest row at the moment of sale wins, and an order line copies the amount, so an old order never changes.
+The price of one ticket type in one band. A price change is a new row; at the moment of sale a row for the performance itself outranks a row for the whole production, however new that one is, and among rows equally specific the newest wins. An order line copies the amount, so an old order never changes.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
@@ -226,17 +226,25 @@ Enforced in the database:
 | `intent_id` | ref `payments_intents` | the intent whose part pays for this order; null for a free order and for a reservation not yet being paid | Internal | keep |
 | `link_token_hash` | text | opens the order from the confirmation message without signing in | Internal | clear |
 | `desk_code_hash` | text | reserved orders: the code a buyer shows at the desk | Internal | clear |
+| link\_token\_expires\_at | timestamp | when the order's link stops working; every link token has an expiry on the row it opens (Foundations part 4, rules T1 to T4) | Internal | keep |
+| confirm\_token\_hash | text | a basket waiting for its buyer to confirm their email: the hash of the link token sent to them. Cleared when the link is used | Internal | clear |
+| confirm\_expires\_at | timestamp | when that token stops working; never later than the basket's own expiry | Internal | keep |
+| confirm\_email | text | the address being confirmed, since no account exists yet. Cleared in the batch that reserves the order or expires the basket | Personal | clear |
+| confirm\_name | text | the name that buyer typed, so the account made when the link is pressed has a name and the desk can find the reservation by it. Cleared with the address | Personal | clear |
+| basket\_token\_hash | text | the token the buyer's own browser was given when it first held tickets. Separate from link\_token\_hash, which is only ever the link in a message, because both can be live at once | Internal | clear |
 | `expires_at` | timestamp | baskets and orders awaiting payment | Internal | keep |
 | `extended_at` | timestamp | set by the one hold extension; null until then | Internal | keep |
 | `release_at` | timestamp | reserved orders: when the release task may expire it; null for never | Internal | keep |
 | `keep` | boolean | reserved orders: staff asked for it not to be released | Internal | keep |
+| admit\_on\_payment | boolean | desk orders: the seller chose Pay and admit, so the settle batch issues the tickets already admitted, with a scan row each | Internal | keep |
+| reserved\_at | timestamp | when the order was reserved; null for an order never reserved. A later change of ticket type is priced as of this moment | Internal | keep |
 | `confirmed_at`, `cancelled_at` | timestamp |  | Internal | keep |
 
-The buyer's name, email and phone live on their account (workstream 2), not here. An erased buyer's order keeps its lines, tickets and ledger postings; the account it points to is anonymised, and the order loses its access note and its email link.
+The buyer's name, email and phone live on their account (workstream 2), not here. The one exception is the name and address of a buyer who is not signed in and has yet to confirm their email, which a basket holds until the link is pressed or the basket expires. A trigger keeps the four confirm columns to a basket, all set or all null, ending no later than the basket; whatever reserves, edits or expires the basket clears them. An erased buyer's order keeps its lines, tickets and ledger postings; the account it points to is anonymised, and the order loses its access note and its email link.
 
 **An order with no account** is valid in exactly one case: a desk sale where the buyer gave no details (integration ruling R-15). The table declares `subject: { account: 'account_id', unlinked: 'staff' }`, and Identity lists it under "People without a sign-in". Such an order holds no personal data, so it has no erasure or merge duties, and it can have no access note. The online and phone paths can never create one, and an order can never be `reserved` without an account, because someone must be told and found again. Enforced by `CHECK (account_id IS NOT NULL OR state IN ('basket', 'expired') OR (channel = 'desk' AND access_note IS NULL AND state <> 'reserved'))`, and by the never-regress cases `online-order-always-has-an-account` and `reservation-needs-an-account` in part 8.
 
-**What retention does.** An order keeps no name, email or phone, so `box-office.retention.orders` governs only what the order itself holds: when it passes, the access note, the link and desk code hashes and any attendee names on its tickets are cleared, and the rows stay for the ledger. `box-office.retention.baskets` deletes expired baskets that never became orders. Unclaimed accounts are anonymised by Identity under its own setting.
+**What retention does.** An order keeps no name, email or phone, so `box-office.retention.orders` governs only what the order itself holds: when it passes, the access note, the link and desk code hashes, and its tickets' stored codes and any attendee names on them, are cleared, and the rows stay for the ledger. `box-office.retention.baskets` deletes expired baskets that never became orders. Unclaimed accounts are anonymised by Identity under its own setting.
 
 **Checkout consent.** The order stores nothing about consent. The module that contributes a consent question also supplies the statements that record the answer, and Box office adds them to the batch that confirms or reserves the order (part 4).
 
@@ -267,12 +275,14 @@ Issued when the order is confirmed. One per ticket line.
 | --- | --- | --- | --- | --- |
 | `order_line_id` | text | unique, not null | Internal | keep |
 | `performance_id` | text | not null; copied, so the door reads one table | Internal | keep |
-| `code_hash` | text | unique; the hash of the ticket's code, which is 128 random bits. The code itself goes to the buyer inside a signed door code and is never stored. A scan is verified, hashed, then looked up here | Internal | keep |
+| `code_hash` | text | unique; the hash of the ticket's code, which is 128 random bits. The code goes to the buyer inside a signed door code and is never stored in the clear. A scan is verified, hashed, then looked up here | Internal | keep |
+| code\_enc | text, encrypted | nullable. The same code, declared col.internal with encrypted: true and erase: 'clear' (Foundations, Data-class registry, "A kept credential"), kept only so the ticket can be shown or sent again without voiding the one the buyer already has: the door code is rebuilt by signing it afresh. Never read by a scan, never in the offline data, an event, a log or an export. Cleared when the ticket is voided and when box-office.retention.orders passes | Internal | clear |
 | `key_id` | text | the kit signing key that signed the door code, under the purpose `box-office.door-code` | Internal | keep |
 | `state` | text | `valid`, `void` | Internal | keep |
 | `void_reason` | text | `cancelled`, `exchanged`, `reissued`, `performance_cancelled` | Internal | keep |
 | `attendee_name` | text | optional, for named tickets | Personal | blank |
 | `admitted_at` | integer | null until admitted; set by a conditional update `WHERE admitted_at IS NULL AND state = 'valid'` | Internal | keep |
+| admitted\_scan\_id | ref box\_office\_scans | nullable; the scan that admitted the ticket, set by the same conditional update as admitted\_at. The scan row's result is taken from it: admitted when it is that scan's id, otherwise already admitted (Foundations part 3: a later statement never learns who won from a count of changed rows). Undoing a mis-scan clears both columns in one statement | Internal | keep |
 | `requirement_ref` | text | the requirement reference that was met; null for a ticket type with none | Internal | keep |
 | `requirement_account_id` | account (actor) | the account the requirement was met by, when it was met by account | Personal | keep reference |
 | `requirement_evidence_id` | text | the opaque evidence id the source returned. At least one of this and the account is set when `requirement_ref` is. The value a buyer presented is never stored | Internal | keep |
@@ -361,7 +371,7 @@ A season ticket or a multi-show pass as a product.
 | `pass_type_id` | ref | not null | Internal | keep |
 | `order_line_id` | ref | the line that sold it; null when issued by staff | Internal | keep |
 | `account_id` | account (subject) | not null; the holder | Personal | keep reference |
-| `code_hash` | text | unique; the hash of the pass's code, stored like a ticket's | Internal | keep |
+| `code_hash` | text | unique; the hash of the pass's code, stored like a ticket's, with a nullable code\_enc column beside it declared and used exactly as the ticket's is | Internal | keep |
 | `uses_total` | integer | null means unlimited within scope | Internal | keep |
 | `uses_taken` | integer | **CHECK (uses\_taken >= 0 AND (uses\_total IS NULL OR uses\_taken <= uses\_total))**; trigger-kept | Internal | keep |
 | `state` | text | `active`, `void`, `expired` | Internal | keep |

@@ -5,7 +5,6 @@
      overwriting. Up to about six fields it opens as a panel over the list; longer forms get a page. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
-import { parseDate } from '@internationalized/date'
 import type { z } from 'zod'
 import type { FormErrorEvent } from '@nuxt/ui'
 import { isConflict, mergeConflict, PANEL_FIELD_LIMIT } from '../../shared/form'
@@ -14,14 +13,21 @@ import type { RefusalView } from '../utils/refusal'
 export interface FormField {
   name: string
   label: string
-  kind: 'text' | 'email' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'radio' | 'ticks'
+  /** date holds "2027-09-01"; daterange { start, end } of those; datetime an instant in milliseconds, entered in
+   *  the theatre's time zone; money an amount in the currency's minor unit (pence). */
+  kind: 'text' | 'email' | 'textarea' | 'number' | 'money' | 'date' | 'daterange' | 'datetime' | 'select' | 'checkbox' | 'radio' | 'ticks'
   help?: string
   optional?: boolean
   placeholder?: string
-  /** Choices for select, radio and ticks. A radio's values may be numbers (0, 1 or 2 companions). */
-  options?: { value: string | number, label: string }[]
+  /**
+   * Choices for select, radio and ticks. A radio's values may be numbers (0, 1 or 2 companions).
+   * A description sits under its label, for radio and ticks.
+   */
+  options?: { value: string | number, label: string, description?: string }[]
   /** ticks only: each ticked option opens a short note of at most `max` characters; leave out for no notes. */
   notes?: { max: number, label: string }
+  /** Shows the field only while this answers true for the form's values, as a follow-up question. */
+  showIf?: (values: Record<string, any>) => boolean
   /** Sits beside the next field: only when the two are one thought (start and end). */
   pairWithNext?: boolean
 }
@@ -77,14 +83,13 @@ function setTick(g: FormField, value: string | number, on: boolean | 'indetermin
   const next = on === true ? [...kept, tickOf(g.name, value) ?? { value }] : kept
   state[g.name] = (g.options ?? []).flatMap(o => next.filter(x => x.value === o.value))
 }
+// A checkbox, a radio group and a checkbox group carry their own label (a group's is its legend).
+const ownsLabel = (g: FormField) => g.kind === 'checkbox' || g.kind === 'radio' || (g.kind === 'ticks' && !g.notes)
+function setTicks(g: FormField, values: string[]) {
+  state[g.name] = (g.options ?? []).filter(o => values.includes(String(o.value))).map(o => tickOf(g.name, o.value) ?? { value: o.value })
+}
 function setNote(g: FormField, value: string | number, note: string) {
   state[g.name] = ((state[g.name] as { value: string | number, note?: string }[] | undefined) ?? []).map(x => x.value === value ? (note ? { value, note } : { value }) : x)
-}
-
-// A date is kept as the server takes it (2027-09-01); the control works in calendar dates.
-function dateOf(value: unknown) {
-  try { return typeof value === 'string' && value ? parseDate(value) : undefined }
-  catch { return undefined }
 }
 
 const state = reactive<Record<string, any>>({ ...props.initial })
@@ -102,9 +107,10 @@ let theirsNow: Record<string, unknown> = {}
 // Two fields sit side by side only when they are one thought (start and end).
 const rows = computed(() => {
   const out: FormField[][] = []
-  for (let i = 0; i < props.fields.length; i++) {
-    const f = props.fields[i]!
-    const next = props.fields[i + 1]
+  const shown = props.fields.filter(f => !f.showIf || f.showIf(state))
+  for (let i = 0; i < shown.length; i++) {
+    const f = shown[i]!
+    const next = shown[i + 1]
     if (f.pairWithNext && next) {
       out.push([f, next])
       i++
@@ -254,11 +260,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-for="item in summary"
                 :key="item.name"
               >
-                <a
+                <ULink
                   :href="`#${item.id ?? item.name}`"
                   class="underline"
                   @click.prevent="focusField(item)"
-                >{{ labelOf(item.name) }}</a>: {{ item.message }}
+                >
+                  {{ labelOf(item.name) }}
+                </ULink>: {{ item.message }}
               </li>
             </ul>
           </template>
@@ -322,7 +330,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               v-for="g in row"
               :key="g.name"
               :name="g.name"
-              :label="g.kind === 'checkbox' ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
+              :label="ownsLabel(g) ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
               :help="g.help"
             >
               <UTextarea
@@ -332,10 +340,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <URadioGroup
                 v-else-if="g.kind === 'radio'"
                 v-model="state[g.name]"
-                :items="(g.options ?? []).map(o => ({ value: o.value, label: o.label }))"
+                :items="(g.options ?? []).map(o => ({ value: o.value, label: o.label, description: o.description }))"
                 value-key="value"
                 :legend="g.label"
-                orientation="horizontal"
+                :orientation="(g.options ?? []).some(o => o.description) ? 'vertical' : 'horizontal'"
+              />
+              <!-- A choice of many is square ticks (UCheckboxGroup), never a radio-like control.
+                   Only when each tick opens its own note is it a list of single checkboxes. -->
+              <UCheckboxGroup
+                v-else-if="g.kind === 'ticks' && !g.notes"
+                :model-value="((state[g.name] ?? []) as { value: string | number }[]).map(x => String(x.value))"
+                :items="(g.options ?? []).map(o => ({ value: String(o.value), label: o.label, description: o.description }))"
+                value-key="value"
+                :legend="g.label"
+                @update:model-value="(v: unknown) => setTicks(g, v as string[])"
               />
               <fieldset
                 v-else-if="g.kind === 'ticks'"
@@ -353,6 +371,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     :id="`${g.name}-${o.value}`"
                     :model-value="!!tickOf(g.name, o.value)"
                     :label="o.label"
+                    :description="o.description"
                     @update:model-value="setTick(g, o.value, $event)"
                   />
                   <UFormField
@@ -384,10 +403,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-else-if="g.kind === 'number'"
                 v-model="state[g.name]"
               />
-              <UInputDate
+              <FieldMoney
+                v-else-if="g.kind === 'money'"
+                v-model="state[g.name]"
+              />
+              <FieldDate
                 v-else-if="g.kind === 'date'"
-                :model-value="dateOf(state[g.name])"
-                @update:model-value="state[g.name] = $event ? $event.toString() : ''"
+                v-model="state[g.name]"
+              />
+              <FieldDateRange
+                v-else-if="g.kind === 'daterange'"
+                v-model="state[g.name]"
+              />
+              <FieldDateTime
+                v-else-if="g.kind === 'datetime'"
+                v-model="state[g.name]"
               />
               <UInput
                 v-else

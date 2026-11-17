@@ -4,7 +4,25 @@ Fourteen settings and fifteen abilities, written as entries for the foundations 
 
 ## Settings
 
-All are site-wide. What varies by list is a field on the list that defaults from a setting, as the integration thread recommended for every module.
+Every setting applies to the whole site. What varies by list is a field on the list that defaults from a setting, as the integration thread recommended for every module.
+
+**Where they are shown.** The manifest declares five groups in `settingGroups`, one for each first segment of a key. Four of them, `consent`, `sending`, `campaigns` and `imports`, have `place: 'console'`, name no page and so are drawn on the module's own generated page, whose id is `communications.settings` and whose address is `/console/communications/settings`. The fifth, `engine`, holds the three engineering limits (`tranche-size`, `stuck-after` and `results-after`) and is marked `advanced: true`, so it is drawn on the Advanced page, `core.advanced` at `/admin/advanced`, under the module's name and not on the module's page. No group names a bespoke `screen`, so each setting has exactly one home. Every setting names `communications.settings.manage` as the ability that changes it; a group carries no ability of its own, and the page shows one ability line for a section because its settings share one.
+
+**Saving.** Seven settings declare `onChange: 'confirm'`. Saving one shows what will change, asks again, and asks for a fresh sign-in when the session is not fresh. Freshness follows the setting, not the ability, so every other setting saves with no prompt.
+
+| Setting | Why it confirms |
+| --- | --- |
+| `communications.consent.double-opt-in` | Off, an unproved address joins a list without confirming |
+| `communications.consent.existing-customer` | On, a list may write to people who never ticked a box. Later |
+| `communications.consent.record-retention` | Shortened, the next purge deletes consent evidence that cannot be recovered |
+| `communications.campaigns.recipient-retention` | Shortened, the next purge deletes recipient rows that cannot be recovered |
+| `communications.campaigns.require-approval` | Off, a mailing no longer needs a second person. Later |
+| `communications.sending.per-minute` | Raised, mailings leave faster than the sending account may allow. Later |
+| `communications.sending.daily-limit` | Raised or set to none, the day's cap on mailings goes. Later |
+
+Quiet hours do not confirm: a wrong value sends a mailing at an unsociable hour and to nobody new. Nothing in `imports` confirms either, because the consent an imported address is given comes from the statement made at each import, not from a setting.
+
+**Durations.** Each duration is entered with the kit's `DurationInput`, a number and a unit, and stored as whole seconds. A month is 30 days and a year is 365 days, so the default of 13 months is 390 days and 6 years is 2,190 days. A stored value is shown in the largest unit that divides it exactly, so no label or help text names a unit: "How long consent records are kept", never "Years to keep consent records".
 
 | Key | Kind | Default | Bounds | Quotable | What it controls |
 | --- | --- | --- | --- | --- | --- |
@@ -12,13 +30,13 @@ All are site-wide. What varies by list is a field on the list that defaults from
 | `communications.consent.confirm-window` | duration | 7 days | 1 to 30 days | yes | How long a confirm link works |
 | `communications.consent.record-retention` | duration | 6 years | 1 to 10 years | yes | How long consent records are kept after a subscription ends |
 | `communications.consent.existing-customer` | toggle | off |  | no | Whether a list may use the existing-customer basis. Later |
-| `communications.sending.tranche-size` | number | 50 | 10 to 90 | no | Recipients handed to core in one unit of work, as one set. Never above `core.units.set-rows-limit` |
+| `communications.engine.tranche-size` | number | 50 | 10 to 90 | no | Recipients handed to core in one unit of work, as one set. Never above `core.units.set-rows-limit` |
 | `communications.sending.per-minute` | number | 120 | 10 to 1,000 | no | The most recipients of a mailing handed to core each minute. Later |
 | `communications.sending.daily-limit` | number | 0 (none) | 0 to 1,000,000 | no | A cap across all mailings in a day. Notices are never capped. Later |
 | `communications.sending.quiet-start` | time of day | 21:00 |  | no | Scheduled mailings do not start after this. Later |
 | `communications.sending.quiet-end` | time of day | 08:00 |  | no | Or before this. Equal values switch quiet hours off. Later |
-| `communications.sending.stuck-after` | duration | 30 minutes | 10 minutes to 6 hours | no | When the health check reports a campaign with no progress |
-| `communications.sending.results-after` | duration | 72 hours | 1 hour to 14 days | no | When final counts are copied even if core still has deliveries retrying |
+| `communications.engine.stuck-after` | duration | 30 minutes | 10 minutes to 6 hours | no | When the health check reports a campaign with no progress |
+| `communications.engine.results-after` | duration | 72 hours | 1 hour to 14 days | no | When final counts are copied even if core still has deliveries retrying |
 | `communications.campaigns.require-approval` | toggle | off |  | no | Whether a mailing needs a second person. Later |
 | `communications.campaigns.recipient-retention` | duration | 13 months | 1 to 36 months | yes | How long recipient rows are kept after a campaign finishes |
 | `communications.imports.file-retention` | duration | 30 days | 1 to 90 days | no | How long an import file is kept. Later |
@@ -28,7 +46,7 @@ Rules across settings:
 - `tranche-size` is bounded twice. A tranche is written set-wise from one JSON parameter, as Foundations rules for any fan-out, so it may never exceed `core.units.set-rows-limit`; and one unit of work is one D1 batch. Proof P-COM-1 in part 8 fixes the safe ceiling.
 - `per-minute` is a throttle on what this module hands over, not on what the provider accepts. Its default and that of `daily-limit` are set by proof P-COM-2 when mailings are built.
 - Quiet hours are in the theatre's time zone, from `getOrganisation()`.
-- Nothing here repeats a core setting. The sending domain, retries, the email footer and log retention are core's.
+- Nothing here repeats a core setting. The sending domain, the sending label and the email footer are core's `core.notifications.*`, managed on core's Email screen. Attempts, retries and how long the delivery log is kept are core's `core.delivery.*`.
 
 ### Presets
 
@@ -66,6 +84,8 @@ Notes on the entries:
 - **Assurance.** Privileged abilities default to strong, as the abilities registry rules.
 - **No lockout by declaration.** "The author cannot approve" is a guard in the service, not an ability rule.
 - **Facts.** The module declares none. A theatre may map `communications.notice.send` to another module's fact, such as front of house's on-shift duty manager, so the person running tonight can tell tonight's audience.
+
+**Implied ability.** `communications.subscriber.read` declares `implies: ['core.account.find']`. It guards the two lists that can be narrowed by account holder, a list's subscribers and a campaign's recipients, and `core.account.find` is the ability on identity's `findAccounts`. Core declares it `impliable: true` at risk standard, and this module requires core, so the declaration meets the abilities registry's rule. No other ability here implies another. "Add a person" uses identity's person picker under `core.account.search`, which the preset roles with console work already hold.
 
 ### Suggested role mapping
 

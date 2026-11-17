@@ -60,6 +60,11 @@ test.describe('a list with views and rows that open', () => {
     await noViolations(page)
   })
 
+  test('a page can say a line about the answer through the note slot', async ({ page }) => {
+    await visit(page, '/console/gallery/shows')
+    await expect(page.getByRole('status').filter({ hasText: '2 cancelled shows are not shown.' })).toBeVisible()
+  })
+
   test('the view that opens its rows starts them open', async ({ page }) => {
     await visit(page, '/console/gallery/shows')
     await expect(page.getByText('2026-11-20 19:30 (1)')).toBeVisible()

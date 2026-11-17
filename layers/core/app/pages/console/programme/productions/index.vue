@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // Productions (C-01): every production, with its state and season. "New production" starts a draft
 // and opens it. Dates, and so the next performance, arrive with performances.
+import { productionInput } from '../../../../../server/programme/input'
 
 interface Row { id: string, title: string, kind: string, state: 'draft' | 'published' | 'withdrawn' | 'cancelled', seasonId: string | null, companyName: string | null }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const { data: seasons } = await useAPI<{ rows: { id: string, name: string }[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
 const columns = [
@@ -19,21 +21,14 @@ const KINDS = [{ value: 'own', label: 'Our own production' }, { value: 'visiting
 const TONES = { draft: 'neutral', published: 'success', withdrawn: 'warning', cancelled: 'danger' } as const
 const seasonName = (id: string | null) => seasons.value?.rows.find(s => s.id === id)?.name ?? ''
 
-const { toRefusal } = useRefusal()
+// A short form, so it opens as a panel over the list, checked by the schema the server uses.
 const creating = ref(false)
-const form = reactive({ title: '', kind: 'own' })
-const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-async function create() {
-  refusal.value = null
-  try {
-    const { id } = await $api<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: form.title, kind: form.kind } })
-    creating.value = false
-    await navigateTo(`/console/programme/productions/${id}`)
-  }
-  catch (error) {
-    refusal.value = toRefusal(error)
-  }
-}
+const fields = [
+  { name: 'title', label: 'Title', kind: 'text' as const },
+  { name: 'kind', label: 'What it is', kind: 'radio' as const, options: KINDS },
+]
+const create = (values: Record<string, unknown>) => $api<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: values.title, kind: values.kind } })
+const created = (result: unknown) => navigateTo(`/console/programme/productions/${(result as { id: string }).id}`)
 </script>
 
 <template>
@@ -66,48 +61,20 @@ async function create() {
     <template #cell-state="{ row }">
       <StatusBadge
         :tone="TONES[row.state as Row['state']]"
-        :label="row.state.charAt(0).toUpperCase() + row.state.slice(1)"
+        :label="t(`core.states.${row.state}`)"
       />
     </template>
 
-    <UModal
+    <PageForm
       v-model:open="creating"
       title="New production"
       description="It starts as a draft. Nothing is public until you publish it."
-    >
-      <template #body>
-        <UForm
-          id="new-production"
-          :state="form"
-          class="space-y-4"
-          @submit="create"
-        >
-          <RefusalNotice :refusal="refusal" />
-          <UFormField
-            label="Title"
-            required
-          >
-            <UInput
-              v-model="form.title"
-              maxlength="200"
-            />
-          </UFormField>
-          <UFormField label="What it is">
-            <URadioGroup
-              v-model="form.kind"
-              :items="KINDS"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="new-production"
-          label="Create production"
-          :disabled="!form.title.trim()"
-        />
-      </template>
-    </UModal>
+      submit-label="Create production"
+      :schema="productionInput"
+      :fields="fields"
+      :initial="{ title: '', kind: 'own' }"
+      :submit="create"
+      @saved="created"
+    />
   </PageList>
 </template>

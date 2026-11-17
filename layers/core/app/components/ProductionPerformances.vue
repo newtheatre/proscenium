@@ -30,29 +30,28 @@ interface Answer {
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
 
+const { t } = useT()
 const props = defineProps<{ productionId: string, title: string, intervalCount: number }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<Answer>(() => `/api/core/productions/${props.productionId}/performances`, { key: `core:production:${props.productionId}:performances` })
-const { data: settings } = await usePublicSettings()
+const dates = useDates()
+// Whole-day closures that block performances grey out their days in the date fields; the server still decides.
+const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean }[] }>('/api/core/closures', { key: 'core:closures', lazy: true, server: false })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const TONES = { draft: 'neutral', scheduled: 'success', cancelled: 'danger', completed: 'info' } as const
-const timeZone = computed(() => (settings.value?.['core.locale.time-zone']?.value as string | undefined) ?? undefined)
-const longDate = computed(() => new Intl.DateTimeFormat('en-GB', { timeZone: timeZone.value, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }))
-const clock = computed(() => new Intl.DateTimeFormat('en-GB', { timeZone: timeZone.value, hour: '2-digit', minute: '2-digit' }))
-/** An instant as the value a date-time field holds, in the theatre's time zone. */
-const local = (ms: number | null) => ms === null ? '' : new Intl.DateTimeFormat('sv-SE', { timeZone: timeZone.value, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(ms).replace(' ', 'T')
-
 const performances = computed(() => data.value?.performances ?? [])
 const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity }))))
 const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?.label ?? 'A space no longer listed'
+/** Where, doors, end and seats, on one line. */
+const summaryOf = (p: Performance) => [place(p), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
-const thing = (p: Performance) => `the ${clock.value.format(p.startsAt)} performance of ${props.title} on ${longDate.value.format(p.startsAt).split(',')[0]}`
+const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
 
 async function run(fn: () => Promise<unknown>, done?: string): Promise<boolean> {
   refusal.value = null
@@ -81,13 +80,20 @@ function reach(id: string, kind: Kind): Promise<Reach> {
 const editing = ref<Performance | null>(null)
 const intervalHelp = computed(() => `Left empty, the production's (${props.intervalCount}).`)
 const open = ref(false)
-const form = ref({ spaceId: '', startsAt: '', endsAt: '', doorsAt: '', capacity: null as number | null, intervalCount: null as number | null, label: '', externalBookingUrl: '' })
+const form = ref({ spaceId: '', startsAt: null as number | null, endsAt: null as number | null, doorsAt: null as number | null, capacity: null as number | null, intervalCount: null as number | null, label: '', externalBookingUrl: '' })
+/** Whether a whole-day closure that blocks performances covers this day for the chosen space. */
+function closed(day: string): boolean {
+  const space = spaces.value.find(x => x.value === form.value.spaceId)
+  return (closures.value?.rows ?? []).some(c => c.allDay && c.blocksPerformances
+    && (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
+    && dates.toLocal(c.startsAt).slice(0, 10) <= day && day <= dates.toLocal(c.endsAt - 1).slice(0, 10)) // not-policy: the length of a date
+}
 function start(p: Performance | null) {
   refusal.value = null
   editing.value = p
   form.value = (p
-    ? { spaceId: p.spaceId, startsAt: local(p.startsAt), endsAt: local(p.endsAt), doorsAt: local(p.doorsAt), capacity: p.capacity, intervalCount: p.intervalCount, label: p.label ?? '', externalBookingUrl: p.externalBookingUrl ?? '' }
-    : { spaceId: spaces.value[0]?.value ?? '', startsAt: '', endsAt: '', doorsAt: '', capacity: null, intervalCount: null, label: '', externalBookingUrl: '' })
+    ? { spaceId: p.spaceId, startsAt: p.startsAt, endsAt: p.endsAt, doorsAt: p.doorsAt, capacity: p.capacity, intervalCount: p.intervalCount, label: p.label ?? '', externalBookingUrl: p.externalBookingUrl ?? '' }
+    : { spaceId: spaces.value[0]?.value ?? '', startsAt: null, endsAt: null, doorsAt: null, capacity: null, intervalCount: null, label: '', externalBookingUrl: '' })
   open.value = true
 }
 async function save() {
@@ -110,11 +116,11 @@ async function save() {
     if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added')) open.value = false
     return
   }
-  body.endsAt = form.value.endsAt || local(p.endsAt)
-  body.doorsAt = form.value.doorsAt || null
+  body.endsAt = form.value.endsAt ?? p.endsAt
+  body.doorsAt = form.value.doorsAt
   if (p.state === 'scheduled') {
     const kinds: Kind[] = []
-    if (form.value.startsAt !== local(p.startsAt) || body.endsAt !== local(p.endsAt)) kinds.push('reschedule')
+    if (form.value.startsAt !== p.startsAt || body.endsAt !== p.endsAt) kinds.push('reschedule')
     if (form.value.spaceId !== p.spaceId) kinds.push('move')
     if (form.value.capacity !== p.capacity) kinds.push('capacity')
     const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
@@ -278,60 +284,40 @@ function actions(p: Performance) {
         description="Add each performance as a draft, then schedule it when its time and space are settled."
         icon="i-lucide-calendar"
       />
-      <ul
+      <RecordList
         v-else
-        class="divide-y divide-default rounded-md border border-default"
+        label="Performances"
       >
-        <li
+        <RecordListItem
           v-for="p in performances"
           :key="p.id"
-          class="flex flex-wrap items-center gap-3 px-4 py-3"
+          :description="summaryOf(p)"
         >
-          <div class="min-w-0 flex-1">
-            <p class="font-medium">
-              {{ longDate.format(p.startsAt) }}<span
-                v-if="p.label"
-                class="text-muted"
-              > · {{ p.label }}</span>
-            </p>
-            <p class="text-sm text-muted">
-              {{ place(p) }}<template v-if="p.doorsAt">
-                · doors {{ clock.format(p.doorsAt) }}
-              </template> · ends {{ clock.format(p.endsAt) }}<template v-if="p.capacity !== null">
-                · {{ p.capacity }} seats
-              </template>
-            </p>
-            <div
-              v-if="p.access.length"
-              class="mt-1 flex flex-wrap gap-1"
-            >
-              <UBadge
-                v-for="a in p.access"
-                :key="a.termId"
-                :label="accessLabel(a.termId)"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              />
-            </div>
-          </div>
+          <template #name>
+            {{ dates.dateTime(p.startsAt) }}<span
+              v-if="p.label"
+              class="font-normal text-muted"
+            > · {{ p.label }}</span>
+            <UBadge
+              v-for="a in p.access"
+              :key="a.termId"
+              :label="accessLabel(a.termId)"
+              color="neutral"
+              size="sm"
+              class="ms-1"
+            />
+          </template>
           <StatusBadge
             :tone="TONES[p.state]"
-            :label="p.state.charAt(0).toUpperCase() + p.state.slice(1)"
+            :label="t(`core.states.${p.state}`)"
           />
-          <UDropdownMenu
-            v-if="actions(p).length"
+          <RowActions
             :items="actions(p)"
-          >
-            <UButton
-              icon="i-lucide-ellipsis"
-              color="neutral"
-              variant="ghost"
-              :aria-label="`Actions for ${longDate.format(p.startsAt)}`"
-            />
-          </UDropdownMenu>
-        </li>
-      </ul>
+            :label="`Actions for ${dates.dateTime(p.startsAt)}`"
+            size="md"
+          />
+        </RecordListItem>
+      </RecordList>
     </DataBoundary>
 
     <UModal
@@ -340,20 +326,21 @@ function actions(p: Performance) {
       :description="editing?.state === 'scheduled' ? 'It is scheduled, so a new time or space must be free.' : 'It starts as a draft. Nothing is public until it is scheduled.'"
     >
       <template #body>
-        <form
+        <UForm
           id="performance-form"
           class="space-y-4"
-          @submit.prevent="save"
+          :state="form"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
             label="Space"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.spaceId"
+              value-key="value"
               :items="spaces"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -361,30 +348,27 @@ function actions(p: Performance) {
               label="Starts"
               required
             >
-              <UInput
+              <FieldDateTime
                 v-model="form.startsAt"
-                type="datetime-local"
-                class="w-full"
+                :unavailable="closed"
               />
             </UFormField>
             <UFormField
               label="Ends"
               :help="editing ? undefined : 'Left empty, from the running time.'"
             >
-              <UInput
+              <FieldDateTime
                 v-model="form.endsAt"
-                type="datetime-local"
-                class="w-full"
+                :unavailable="closed"
               />
             </UFormField>
             <UFormField
               label="Doors open"
               :help="editing ? 'Moves with the start unless you change it.' : 'Left empty, from the doors setting.'"
             >
-              <UInput
+              <FieldDateTime
                 v-model="form.doorsAt"
-                type="datetime-local"
-                class="w-full"
+                :unavailable="closed"
               />
             </UFormField>
             <UFormField
@@ -394,7 +378,6 @@ function actions(p: Performance) {
               <UInputNumber
                 v-model="form.capacity"
                 :min="0"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -405,7 +388,6 @@ function actions(p: Performance) {
                 v-model="form.intervalCount"
                 :min="0"
                 :max="10"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -415,7 +397,6 @@ function actions(p: Performance) {
               <UInput
                 v-model="form.label"
                 maxlength="40"
-                class="w-full"
               />
             </UFormField>
           </div>
@@ -426,10 +407,9 @@ function actions(p: Performance) {
             <UInput
               v-model="form.externalBookingUrl"
               type="url"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -447,16 +427,16 @@ function actions(p: Performance) {
       :description="cancelling ? `Cancel ${thing(cancelling)}?` : undefined"
     >
       <template #body>
-        <form
+        <UForm
           id="cancel-performance"
           class="space-y-4"
-          @submit.prevent="cancel"
+          :state="cancelForm"
+          @submit="cancel"
         >
           <RefusalNotice :refusal="refusal" />
           <UAlert
             v-if="cancelReach?.refusal"
             color="error"
-            variant="subtle"
             icon="i-lucide-circle-x"
             :title="cancelReach.refusal.reason"
           >
@@ -488,7 +468,6 @@ function actions(p: Performance) {
               v-model="cancelForm.reasonTermId"
               :items="reasons"
               placeholder="Choose a reason"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -499,10 +478,9 @@ function actions(p: Performance) {
               v-model="cancelForm.note"
               :rows="2"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -521,10 +499,11 @@ function actions(p: Performance) {
       description="What this performance offers, such as captioning, with any detail."
     >
       <template #body>
-        <form
+        <UForm
           id="performance-access"
           class="space-y-3"
-          @submit.prevent="saveAccess"
+          :state="accessChosen"
+          @submit="saveAccess"
         >
           <RefusalNotice :refusal="refusal" />
           <div
@@ -547,7 +526,7 @@ function actions(p: Performance) {
               class="flex-1"
             />
           </div>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -561,7 +540,6 @@ function actions(p: Performance) {
       v-model:open="addingRun"
       :production-id="productionId"
       :spaces="spaces"
-      :time-zone="timeZone"
       @added="added"
     />
   </PageSection>

@@ -47,7 +47,7 @@ Public shell, audience side. Other modules add their own sections here through t
 | Email addresses | Add, verify and remove addresses; choose the address for tickets and receipts | Any signed-in person | First |
 | Signing in | Passkeys with their labels and last use; linked Google account; recovery codes | Any signed-in person | First |
 | Where you are signed in | Each session with its device and last use; end one, or all the others | Any signed-in person | First |
-| Access scheme | Before applying: what the scheme is and an "Apply" button. The form: ticks with optional notes, companions, who will read it. Afterwards: the application's state in plain words, the reviewer's message, change or leave, switches for other purposes, and every read by staff. The public page `/access` is the theatre's own content and carries the same button. | Any signed-in person | First |
+| Access scheme | Before applying: what the scheme is and an "Apply" button. The form: square tick boxes with a plain description and optional notes, "I use a wheelchair" with its follow-up, companions, anything else, and who will read it. Afterwards: the application's state in plain words, the reviewer's message, change or leave, switches for other purposes, and every read by staff. The public page `/access` is the theatre's own content and carries the same button. | Any signed-in person | First |
 | Your data | Download your data; ask for your account to be erased; see a request's progress; cancel it | Any signed-in person | First |
 
 ## Members' area
@@ -94,6 +94,12 @@ The fourth shell, at `/admin`, holds what is set up once for the whole installat
 
 All five declare menu `admin` and the group `access` (label "Access"), in this order: Roles at `/admin/roles`; Role at `/admin/roles/<role>`, reached from Roles with no menu entry of its own; Facts at `/admin/facts`; Sign-in at `/admin/sign-in`; Retention at `/admin/retention` when it ships. The shell needs no ability of its own: a holder of `core.role.read` or `core.identity-settings.manage` sees Site administration in the account menu and only the entries they may open, and anybody else gets page not found at `/admin`. A role's "who holds this" link crosses to the console's People group.
 
+Sign-in is a generated settings page: it draws the groups `sign-in`, `sessions` and `recovery`. Two more generated pages hold identity's settings and are not counted among its screens: Privacy at `/admin/privacy`, and People settings in the console's People group (grants, the members' area, the access scheme, emergency contacts and merge). Retention is identity's own screen, showing what each sweep would do and holding the arm control; the sweeps' other limits are on Site administration's Advanced page. Part 6 gives the home of every setting.
+
+The Sign-in page's sections run in this order: Signing in, Sessions, Recovery, then Access, which is foundations' group and holds `core.access.fresh-within`. A group is placed once for the whole core module, so a key that foundations or core domain later adds under one of identity's groups appears on that group's page.
+
+With the generated pages counted, the Access group of Site administration reads: Roles, Facts, Sign-in, Privacy, and later Retention.
+
 ## Rules for these screens
 
 1. **The account page in the console is assembled from sections, and each section belongs to a side.** A member of staff sees only the sections their abilities open. The page never shows an empty frame for a section they cannot see.
@@ -104,7 +110,7 @@ All five declare menu `admin` and the group `access` (label "Access"), in this o
 6. **The role editor ticks and locks abilities that come with one already ticked**, marks abilities that amount to full control, and switches off any the editor does not hold. This pattern is Flytower's (see Sources).
 7. **"What you can do" and the console's "Who holds what" read from the same resolver** as the server's checks, so they cannot disagree with it.
 
-Two further console screens run the access scheme, both needing `core.access-scheme.read`. "Access scheme" is the queue: open applications oldest first with how long each has waited, those due a review, and "Invite to apply"; it shows names and states only. "Application" is one person's application: what they asked for, the history of decisions, and the actions accept, reject, ask for more, verify and apply on their behalf, each needing `core.access-scheme.review`. They sit under People in the console's navigation.
+Two further console screens run the access scheme, both needing `core.access-scheme.read`. "Access scheme" is the queue: open applications oldest first with how long each has waited, those due a review, and the two ways to bring somebody in, "Apply for someone" (fill the form in with them now) and "Invite to apply" (email them a link); it shows names and states only. "Application" is one person's application: where it stands and what to do next, what they are asking for beside what is accepted now, the decision (accept, ask them a question, reject), verifying in person, and the history, each action needing `core.access-scheme.review`. Filling the form in for them appears there only when nothing is waiting for a decision. They sit under People in the console's navigation.
 
 On a person's page in the console, "Emergency contacts" (members' side) is closed until asked for: it appears only to a holder of `core.emergency-contact.read` and only for a person with a standing, and opening it asks for a reason and records the read. The page shows nothing about the access scheme unless the viewer holds `core.access-scheme.read`, or holds `core.access-profile.read` and the person switched on the welfare purpose; otherwise the section is absent, not empty. Box office and front of house see access needs on their own booking and house screens, from the copy on the booking, not here.
 

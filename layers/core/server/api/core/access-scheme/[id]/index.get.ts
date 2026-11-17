@@ -21,7 +21,7 @@ export default defineRoute({
     name: await accountLabel(record!.id),
     application: await openForReview(record!.id),
     history: await historyOf(record!.id),
-    needs: (await listTerms(NEEDS_VOCABULARY, { includeRetired: true })).map(t => ({ id: t.id, label: t.label, retired: t.retired })),
+    needs: (await listTerms(NEEDS_VOCABULARY, { includeRetired: true })).map(t => ({ id: t.id, key: t.slug, label: t.label, description: t.description, retired: t.retired })),
     allowNote: await useSetting('core.access-scheme.allow-note'),
   }
 })

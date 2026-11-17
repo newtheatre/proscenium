@@ -3,8 +3,9 @@
 import { DeclarationError } from './refusal'
 import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
+import type { ListSource } from './lists'
 import type { SettingEntry, SettingRule } from './settings'
-import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
+import { impliedAbility, type AbilityDecl, type FactDecl, type RecordDecl } from './abilities'
 import type { ModuleHandlers } from './handlers'
 import { setPersonalFields } from './log'
 
@@ -52,6 +53,8 @@ export interface Registry {
   points: Map<string, { module: string, decl: PointDecl }>
   /** Signing purposes (F-37), by purpose. */
   signing: Map<string, { module: string, decl: SigningDecl }>
+  /** List sources by list id (server/lists/<name>.ts). */
+  lists: Map<string, { module: string, source: ListSource }>
 }
 
 export interface SettingPage {
@@ -76,7 +79,7 @@ const SETTINGS_ICON = 'i-lucide-settings-2'
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
     modules: new Map(), settings: new Map(), settingRules: new Map(), settingPages: new Map(), settingHomes: new Map(), settingAliases: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
-    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(),
+    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
     throw new DeclarationError(field, message, `${entry.root}/module.ts`)
@@ -158,6 +161,14 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       list.push({ module: m.id, listener })
       r.listeners.set(event, list)
     }
+    for (const [file, value] of Object.entries(entry.handlers.lists ?? {})) {
+      const source = value as ListSource | undefined
+      const where = `${entry.root}/server/lists/${short(file)}.ts`
+      if (!source?.list?.id || !source.table) throw new DeclarationError('default', 'is not a list source made with defineListSource', where)
+      if (!source.list.id.startsWith(`${m.id}.`)) throw new DeclarationError('list', `"${source.list.id}" is not named under ${m.id}.`, where)
+      if (r.lists.has(source.list.id)) throw new DeclarationError('list', `"${source.list.id}" has two sources`, where)
+      r.lists.set(source.list.id, { module: m.id, source })
+    }
     for (const name of Object.keys(m.jobs ?? {})) if (!entry.handlers.jobs?.[name]) fail(entry, `jobs.${name}`, `the handler ${entry.root}/server/jobs/${short(name)}.ts does not exist`)
     for (const name of Object.keys(m.tasks ?? {})) if (!entry.handlers.tasks?.[name]) fail(entry, `tasks.${name}`, `the handler ${entry.root}/server/tasks/${short(name)}.ts does not exist`)
     for (const name of Object.keys(m.facts ?? {})) if (!entry.handlers.facts?.[name]) fail(entry, `facts.${name}`, `the resolver ${entry.root}/server/facts/${short(name)}.ts does not exist`)
@@ -187,6 +198,17 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
     }
     for (const [key, { decl }] of [...r.abilities].filter(([, a]) => a.module === m.id)) {
       if (decl.on && !r.records.has(decl.on)) fail(entry, `abilities.${key}.on`, `"${decl.on}" is not a record type`)
+      // Another module's ability may come with this one only when that module says it may, it is of
+      // risk normal, and its owner is core or a module this one requires, never one it only uses.
+      for (const implied of decl.implies ?? []) {
+        const full = impliedAbility(m.id, implied)
+        if (full === `${m.id}.${implied}`) continue
+        const target = r.abilities.get(full)
+        if (!target) fail(entry, `abilities.${key}.implies`, `"${full}" is not a declared ability`)
+        else if (target.module !== 'core' && !(m.requires ?? []).includes(target.module)) fail(entry, `abilities.${key}.implies`, `${target.module} owns "${full}", so list it in requires (uses is not enough)`)
+        else if (!target.decl.impliable) fail(entry, `abilities.${key}.implies`, `"${full}" does not declare impliable: true`)
+        else if (target.decl.risk === 'privileged') fail(entry, `abilities.${key}.implies`, `"${full}" is privileged, and only an ability of risk normal may be implied by another module`)
+      }
       if (decl.owner && decl.owner !== 'ignored') {
         const rec = decl.on ? r.records.get(decl.on) : undefined
         if (!rec?.decl.owner) fail(entry, `abilities.${key}.owner`, `owner: '${decl.owner}' needs a record type that declares an owner column`)
@@ -215,8 +237,10 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
           if (!linked.has(target!.module)) fail(entry, `tables.${key}.${col}`, `${target!.module} owns ${c.ref.table}, so list it in requires`)
         }
         if (c.erase === 'retain' && !r.settings.has(c.until!)) fail(entry, `tables.${key}.${col}`, `retain until "${c.until}", which is not a setting`)
+        if (c.erase === 'retain') confirmsRetention(r.settings.get(c.until!)!.entry)
       }
       if (typeof meta.options.retention === 'string' && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      if (typeof meta.options.retention === 'string') confirmsRetention(r.settings.get(meta.options.retention)!.entry)
       // An internal column that erasure clears needs rows erasure can find: a subject of its own, or
       // a chain of parents (subject { via }) that ends at an account or an email.
       const clears = Object.entries(meta.columns).find(([, c]) => c.meta.class === 'internal' && c.meta.erase === 'clear')
@@ -332,4 +356,14 @@ function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntr
       r.settingAliases.set(setting.replaces, key)
     }
   }
+}
+
+/**
+ * A setting a table's retention names is a retention period, and shortening one lets the next sweep
+ * remove rows for good, so it always confirms (Settings registry, "A retention period always
+ * confirms"): onChange 'confirm' whatever the manifest says, unless it asks for a reason, which is
+ * stronger.
+ */
+function confirmsRetention(entry: SettingEntry): void {
+  if (entry.onChange !== 'reason') entry.onChange = 'confirm'
 }

@@ -48,9 +48,10 @@ async function download() {
     :description="t('finance.screens.export.help')"
     width="reading"
   >
-    <form
+    <UForm
       class="space-y-4"
-      @submit.prevent="download"
+      :state="form"
+      @submit="download"
     >
       <RefusalNotice :refusal="refusal" />
       <UFormField
@@ -61,7 +62,7 @@ async function download() {
         <USelect
           v-model="period"
           :items="[...data.periods].reverse().map(p => ({ value: p.id, label: p.label }))"
-          class="w-full sm:w-64"
+          class="sm:w-64"
         />
       </UFormField>
       <div class="grid gap-4 sm:grid-cols-2">
@@ -69,10 +70,9 @@ async function download() {
           :label="t('finance.screens.export.from')"
           required
         >
-          <UInput
+          <FieldDate
             v-model="form.from"
-            type="date"
-            class="w-full"
+            :max="form.to || undefined"
           />
         </UFormField>
         <UFormField
@@ -80,10 +80,9 @@ async function download() {
           required
           :error="refusal?.fields?.to ? refusal.reason : undefined"
         >
-          <UInput
+          <FieldDate
             v-model="form.to"
-            type="date"
-            class="w-full"
+            :min="form.from || undefined"
           />
         </UFormField>
       </div>
@@ -94,6 +93,6 @@ async function download() {
         :disabled="!href"
         :label="t('finance.screens.export.button')"
       />
-    </form>
+    </UForm>
   </PageFrame>
 </template>

@@ -80,6 +80,7 @@ export default defineRoute({
       maxLength: entry.maxLength,
       options: entry.options,
       of: entry.of,
+      record: entry.record,
     })
   }
   const declared = input.page ? registry.settingPages.get(input.page) : undefined

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// One production (C-02, C-03): its details, performances, advisories and web address, with publish,
-// withdraw, cancel (and bring back) and delete. Publishing names what is still missing. Credits and
-// media arrive with their slices.
+// One production (C-02, C-03, C-09): its details, performances, credits, advisories and web address, with publish,
+// withdraw, cancel (and bring back) and delete. Publishing names what is still missing. Media arrive
+// with their slice.
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -30,6 +30,7 @@ interface Production {
 }
 interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: Option[], reasons: Option[], seasons: { id: string, name: string }[] } }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/productions/${String(route.params.id)}`)
@@ -131,7 +132,7 @@ async function remove() {
       <StatusBadge
         v-if="production"
         :tone="TONES[production.state]"
-        :label="production.state.charAt(0).toUpperCase() + production.state.slice(1)"
+        :label="t(`core.states.${production.state}`)"
       />
     </template>
     <template #primary>
@@ -249,15 +250,17 @@ async function remove() {
                 label="Category"
                 help="Needed to publish."
               >
-                <USelect
+                <USelectMenu
                   v-model="details.categoryTermId"
+                  value-key="value"
                   :items="categories"
                   placeholder="Choose a category"
                 />
               </UFormField>
               <UFormField label="Season">
-                <USelect
+                <USelectMenu
                   v-model="details.seasonId"
+                  value-key="value"
                   :items="seasons"
                 />
               </UFormField>
@@ -336,6 +339,11 @@ async function remove() {
           :title="production!.title"
           :interval-count="production!.intervalCount"
           @changed="refresh()"
+        />
+
+        <ProductionCredits
+          :production-id="production!.id"
+          :credits-public="production!.creditsPublic"
         />
 
         <PageSection

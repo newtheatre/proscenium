@@ -1,6 +1,8 @@
 // The shapes the programme routes accept, shared so a create and an edit agree on every bound.
 import { z } from 'zod'
-import { SLUG } from './service'
+
+// Nothing here imports server code, so a screen can check a form with the same schema its route uses.
+export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/ // not-policy: a slug's pattern
 
 const text = (max: number) => z.string().trim().max(max).transform(v => v || null).nullable()
 const DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape
@@ -99,3 +101,20 @@ export const runInput = z.object({
     doorsAt: z.number().int().positive().nullable(),
   })).min(1).max(5000), // not-policy: a sane ceiling on one run, about two years of daily shows
 })
+
+// Credits (C-09). A credit's printed name and role are each 1 to 120 characters, as the table says.
+const VISIBILITY = z.enum(['public', 'members', 'hidden'])
+const creditFields = z.object({
+  creditedName: z.string().trim().min(1).max(120), // not-policy: the table's bound on a printed name
+  role: z.string().trim().min(1).max(120), // not-policy: the table's bound on a role
+  sectionTermId: z.string().min(1),
+  accountId: z.string().min(1).nullable(),
+  visibility: VISIBILITY,
+})
+export const creditInput = creditFields.partial({ accountId: true, visibility: true })
+export const creditPatch = creditFields.partial()
+export const creditOrderInput = z.object({
+  sectionTermId: z.string().min(1),
+  ids: z.array(z.string().min(1)).min(1).max(500), // not-policy: a section's ceiling
+})
+export const ownCreditInput = z.object({ visibility: VISIBILITY })

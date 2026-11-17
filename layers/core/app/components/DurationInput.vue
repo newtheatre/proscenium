@@ -63,7 +63,7 @@ function setUnit(value: DurationUnit) {
         :items="items"
         value-key="value"
         :disabled="disabled"
-        :aria-label="t('core.duration.unit')"
+        :aria-label="t('core.duration.control-unit')"
         class="w-32"
         @update:model-value="setUnit($event as DurationUnit)"
       />

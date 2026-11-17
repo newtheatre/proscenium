@@ -16,6 +16,8 @@ export interface KitEnv {
   RATE_LIMITS?: DurableObjectNamespace
   CORE_ENCRYPTION_KEY?: string
   CORE_TURNSTILE_SECRET_KEY?: string
+  /** The site's origin when the recorded one is lost: prevails over core.site.origin. A plain variable. */
+  CORE_SITE_ORIGIN?: string
   /** "1" applies pending migrations on the first request. Set by dev, preview and tests only. */
   PROSCENIUM_AUTO_MIGRATE?: string
   [binding: string]: unknown
@@ -63,6 +65,10 @@ export interface KitContext {
   module?: string
   /** The caller's network address, set by a route; keys the presented-value rate limit. */
   address?: string
+  /** The origin the request arrived on, which stands in for the site's until one is recorded. */
+  requestOrigin?: string
+  /** Link tokens in the request's address (path parameters the route declares as tokens). */
+  tokens?: readonly string[]
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {

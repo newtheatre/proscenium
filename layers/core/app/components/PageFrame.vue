@@ -50,13 +50,11 @@ const widths = { reading: 'width-reading', standard: 'width-standard', full: 'wi
               :aria-label="t('core.trail.label')"
               class="max-sm:hidden"
             />
-            <UButton
+            <IconButton
               :to="nearest.to"
               icon="i-lucide-chevron-left"
-              color="neutral"
-              variant="ghost"
               class="sm:hidden"
-              :aria-label="t('core.trail.back-to', { where: nearest.label })"
+              :label="t('core.trail.back-to', { where: nearest.label })"
             />
           </template>
         </template>

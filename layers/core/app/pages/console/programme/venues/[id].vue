@@ -7,8 +7,8 @@ import type { z } from 'zod'
 import { spaceInput, venuePatch } from '../../../../../server/places/input'
 
 interface Option { id: string, label: string, icon: string | null, retired: boolean }
-interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, archived: boolean }
-interface Place { id: string, name: string, managed: boolean, addressLines: string | null, locality: string | null, postcode: string | null, country: string | null }
+interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, managed: boolean, findingIt: string | null, archived: boolean }
+interface Place { id: string, name: string, addressLines: string | null, locality: string | null, postcode: string | null, country: string | null }
 interface Venue extends Place { description: string | null, accessInfo: string | null, gettingHere: string | null, archived: boolean, spaces: Space[], access: { spaceId: string | null, termId: string, note: string | null }[] }
 
 const { $api } = useNuxtApp()
@@ -43,11 +43,11 @@ async function run(fn: () => Promise<unknown>, done?: string) {
 }
 
 // Details
-const details = reactive({ name: '', managed: true, addressLines: '', locality: '', postcode: '', country: null as string | null, description: '', gettingHere: '', accessInfo: '' })
+const details = reactive({ name: '', addressLines: '', locality: '', postcode: '', country: null as string | null, description: '', gettingHere: '', accessInfo: '' })
 watch(venue, (v) => {
   if (!v) return
   Object.assign(details, {
-    name: v.name, managed: v.managed, addressLines: v.addressLines ?? '', locality: v.locality ?? '', postcode: v.postcode ?? '',
+    name: v.name, addressLines: v.addressLines ?? '', locality: v.locality ?? '', postcode: v.postcode ?? '',
     country: v.country, description: v.description ?? '', gettingHere: v.gettingHere ?? '', accessInfo: v.accessInfo ?? '',
   })
 }, { immediate: true })
@@ -62,17 +62,23 @@ async function setArchived(archived: boolean) {
 // Spaces
 const spaceOpen = ref(false)
 const spaceId = ref<string | null>(null)
-const space = reactive({ name: '', kindTermId: '', defaultCapacity: null as number | null, performable: true, exclusive: true, description: '', accessInfo: '' })
+const space = reactive({ name: '', kindTermId: '', defaultCapacity: null as number | null, performable: true, exclusive: true, description: '', accessInfo: '', managed: true, findingIt: '' })
 function openSpace(s?: Space) {
   spaceId.value = s?.id ?? null
   Object.assign(space, s
-    ? { name: s.name, kindTermId: s.kindTermId, defaultCapacity: s.defaultCapacity, performable: s.performable, exclusive: s.exclusive, description: s.description ?? '', accessInfo: s.accessInfo ?? '' }
-    : { name: '', kindTermId: liveKinds.value[0]?.value ?? '', defaultCapacity: null, performable: true, exclusive: true, description: '', accessInfo: '' })
+    ? { name: s.name, kindTermId: s.kindTermId, defaultCapacity: s.defaultCapacity, performable: s.performable, exclusive: s.exclusive, description: s.description ?? '', accessInfo: s.accessInfo ?? '', managed: s.managed, findingIt: s.findingIt ?? '' }
+    : { name: '', kindTermId: liveKinds.value[0]?.value ?? '', defaultCapacity: null, performable: true, exclusive: true, description: '', accessInfo: '', managed: true, findingIt: '' })
   refusal.value = null
   spaceOpen.value = true
 }
 async function saveSpace(event: FormSubmitEvent<z.output<typeof spaceInput>>) {
   const body = event.data
+  // Changing who runs a space shows what other modules say it touches before it is saved (R-36).
+  const before = venue.value?.spaces.find(s => s.id === spaceId.value)
+  if (before && body.managed !== undefined && body.managed !== before.managed) {
+    const { lines } = await $api<{ lines: string[] }>(`${base.value}/spaces/${before.id}/impact` as string, { query: { managed: String(body.managed) } })
+    if (lines.length && !await confirm({ verb: 'Change', thing: before.name, consequence: lines.join(' '), button: 'Save space' })) return
+  }
   const ok = spaceId.value
     ? await run(() => api(`/spaces/${spaceId.value}`, 'PATCH', body), `Saved ${space.name}`)
     : await run(() => api('/spaces', 'POST', body), `Added ${space.name}`)
@@ -152,13 +158,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.name"
                 maxlength="120"
               />
-            </UFormField>
-            <UFormField
-              name="managed"
-              label="The theatre runs this venue"
-              help="Turn off for a venue the theatre visits or tours to."
-            >
-              <USwitch v-model="details.managed" />
             </UFormField>
             <UFormField
               name="addressLines"
@@ -281,19 +280,19 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               :muted="s.archived"
             >
               <StatusBadge
+                v-if="!s.managed"
+                tone="neutral"
+                label="Not run by the theatre"
+              />
+              <StatusBadge
                 v-if="s.archived"
                 tone="neutral"
                 label="Archived"
               />
-              <UDropdownMenu :items="spaceActions(s)">
-                <UButton
-                  icon="i-lucide-ellipsis"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  :aria-label="`Actions for ${s.name}`"
-                />
-              </UDropdownMenu>
+              <RowActions
+                :items="spaceActions(s)"
+                :label="`Actions for ${s.name}`"
+              />
             </RecordListItem>
           </RecordList>
         </PageSection>
@@ -403,6 +402,24 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             label="One thing at a time"
             description="Turn off for a space several groups can share at once, such as a foyer."
           />
+          <UFormField
+            name="managed"
+            label="The theatre runs this space"
+            help="Turn off for a space in a building someone else runs, or one the theatre visits."
+          >
+            <USwitch v-model="space.managed" />
+          </UFormField>
+          <UFormField
+            name="findingIt"
+            label="Finding it"
+            hint="Optional"
+            help="A short note shown under the venue's directions, such as which entrance and floor."
+          >
+            <UInput
+              v-model="space.findingIt"
+              maxlength="200"
+            />
+          </UFormField>
           <UFormField
             name="accessInfo"
             label="Access"

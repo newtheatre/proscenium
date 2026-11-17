@@ -5,8 +5,7 @@
      is shown read-only with who can change it. -->
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
-import { controlText, durationText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
-import { parseDuration } from '../../kit/duration'
+import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
 
 interface SettingView {
   key: string
@@ -35,6 +34,8 @@ interface SettingView {
   maxLength?: number
   options?: string[]
   of?: string
+  /** reference only: the record type it names. */
+  record?: string
 }
 
 const { $api } = useNuxtApp()
@@ -50,15 +51,17 @@ const props = defineProps<{
 const { t } = useT()
 const toast = useToast()
 const { confirm } = useConfirm()
+const { language, day: when } = useDates()
+const { data: publicSettings } = usePublicSettings()
+const currency = computed(() => (publicSettings.value?.['core.locale.currency']?.value as string | undefined) ?? 'GBP')
 const { data, status, error, refresh } = await useAPI<{ page: { id: string, module: string } | null, settings: SettingView[] }>('/api/core/settings', {
   query: { page: props.page },
   key: `core:settings:page:${props.page}`,
 })
 const advanced = props.page === 'core.advanced'
-
 const history = ref<SettingView | null>(null)
-const when = (at: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(at)
 const changedLine = (s: SettingView) => s.lastChange?.by ? t('core.settings-history.line', { who: s.lastChange.by, when: when(s.lastChange.at) }) : t('core.settings-history.line-system', { when: s.lastChange ? when(s.lastChange.at) : '' })
+
 const draft = reactive<Record<string, any>>({})
 const resets = reactive<Record<string, boolean>>({})
 const problems = reactive<Record<string, string>>({})
@@ -133,12 +136,7 @@ async function save(sectionId: string, settings: SettingView[]) {
   }
 }
 
-/** A numeric limit as the control shows it: money is typed in pounds, stored in pence. */
-function limit(s: SettingView, which: 'min' | 'max'): number | undefined {
-  const value = s[which]
-  if (typeof value !== 'number') return undefined
-  return s.kind === 'money' ? value / 100 : value // not-policy: pence to pounds
-}
+const limit = (s: SettingView, which: 'min' | 'max') => typeof s[which] === 'number' ? s[which] : undefined
 
 /** A time is stored as 19:30; the control works in clock times. */
 function timeOf(value: unknown) {
@@ -160,18 +158,31 @@ const resettable = (settings: SettingView[]) => settings.filter(s => s.canChange
 function resetSection(settings: SettingView[]) {
   for (const s of resettable(settings)) resetToDefault(s)
 }
-/** A duration as the control holds it, text such as 2h, back to the seconds the input works in. */
-const secondsOf = (text: unknown) => {
-  try { return typeof text === 'string' && text ? parseDuration(text) : undefined }
-  catch { return undefined }
-}
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
 const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
 const words = () => ({
   on: t('core.settings-page.on'),
   off: t('core.settings-page.off'),
   rate: (count: number, per: string) => t('core.settings-page.rate', { count, period: per }),
+  duration: durationWords,
+  money: (minor: number) => new Intl.NumberFormat(language.value, { style: 'currency', currency: currency.value }).format(minor / 10 ** (new Intl.NumberFormat(language.value, { style: 'currency', currency: currency.value }).resolvedOptions().maximumFractionDigits ?? 2)),
 })
+/** "30m" as "30 minutes", for the default and the confirmation. */
+function durationWords(text: string): string {
+  const match = /^(\d+)([smhdw])$/.exec(text)
+  if (!match) return text
+  // The browser's own wording, so one hour is not "1 hours" in any language.
+  const unit = { s: 'second', m: 'minute', h: 'hour', d: 'day', w: 'week' }[match[2] as 's' | 'm' | 'h' | 'd' | 'w']
+  return new Intl.NumberFormat(language.value, { style: 'unit', unit, unitDisplay: 'long' }).format(Number(match[1]))
+}
+// A custom setting's own control: a component in its module's app/setting-editors folder, named for
+// the key (finance.year.starts is SettingFinanceYearStarts). Without one it is typed as text.
+function editorOf(s: SettingView) {
+  const name = `Setting${s.key.split(/[.-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')}`
+  const component = resolveComponent(name)
+  return typeof component === 'string' ? null : component
+}
+const editors = computed(() => Object.fromEntries(shown.value.filter(s => s.kind === 'custom').map(s => [s.key, editorOf(s)])))
 const defaultText = (s: SettingView) => controlText(s.kind, toControl(s, s.default), words())
 const rate = (s: SettingView) => draft[s.key] as RateControl
 function onRate(s: SettingView, part: Partial<RateControl>) {
@@ -248,13 +259,48 @@ onMounted(() => {
                   @update:model-value="onEdit(s, $event)"
                 />
                 <UInputNumber
-                  v-else-if="s.kind === 'integer' || s.kind === 'money'"
+                  v-else-if="s.kind === 'integer'"
                   :model-value="draft[s.key]"
                   :disabled="!s.canChange"
                   :min="limit(s, 'min')"
                   :max="limit(s, 'max')"
-                  :format-options="s.kind === 'money' ? { style: 'currency', currency: 'GBP' } : undefined"
                   class="w-48"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <FieldMoney
+                  v-else-if="s.kind === 'money'"
+                  :model-value="draft[s.key] === '' ? null : draft[s.key]"
+                  :disabled="!s.canChange"
+                  :min="limit(s, 'min')"
+                  :max="limit(s, 'max')"
+                  class="w-48"
+                  @update:model-value="onEdit(s, $event ?? '')"
+                />
+                <FieldDuration
+                  v-else-if="s.kind === 'duration'"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  :label="t(s.labelKey)"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <FieldColour
+                  v-else-if="s.kind === 'colour'"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <FieldRecord
+                  v-else-if="s.kind === 'reference' && s.record"
+                  :model-value="draft[s.key] || null"
+                  :record="s.record"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event ?? '')"
+                />
+                <component
+                  :is="editors[s.key]"
+                  v-else-if="s.kind === 'custom' && editors[s.key]"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <USelect
@@ -286,21 +332,13 @@ onMounted(() => {
                     @update:model-value="onRate(s, { count: $event ?? undefined })"
                   />
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
-                  <DurationInput
-                    :model-value="secondsOf(rate(s).per)"
+                  <FieldDuration
+                    :model-value="rate(s).per"
                     :disabled="!s.canChange"
                     :label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
-                    @update:model-value="onRate(s, { per: $event ? durationText($event) : '' })"
+                    @update:model-value="onRate(s, { per: $event ?? '' })"
                   />
                 </div>
-                <DurationInput
-                  v-else-if="s.kind === 'duration'"
-                  :model-value="secondsOf(draft[s.key])"
-                  :min="s.min"
-                  :max="s.max"
-                  :disabled="!s.canChange"
-                  @update:model-value="onEdit(s, $event === null || $event === undefined ? '' : durationText($event))"
-                />
                 <UInputTime
                   v-else-if="s.kind === 'time'"
                   :model-value="timeOf(draft[s.key])"
