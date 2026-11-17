@@ -17,6 +17,9 @@ interface Show { id: string, title: string, opens: string, state: string, venue:
     :sub-row-label="(row: Show) => (row as unknown as Performance).when"
     :empty="{ title: 'No shows', description: 'Shows you add will be listed here.', icon: 'i-lucide-drama' }"
   >
+    <template #note="{ result }">
+      {{ (result.hidden as { cancelled: number }).cancelled }} cancelled shows are not shown.
+    </template>
     <template #subcell-state="{ row }">
       {{ (row as unknown as Performance).state }}
     </template>
