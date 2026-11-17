@@ -7,8 +7,14 @@
 // once. A screen therefore needs nothing of its own to get this. The dialogue's own requests are
 // left alone, so a refusal there cannot open a second dialogue. On the server it is the request's
 // own fetch, which carries the visitor's cookies to the API.
+//
+// Every write sent from the browser carries an Idempotency-Key, made here when the screen gave none,
+// so a route that requires one (`idempotent: true`) works from any screen without each screen
+// remembering to send it. The key is made once per call and sent again with the retry after
+// confirming, so a write that did reach the server is replayed rather than done twice.
 import type { FetchOptions, ResponseType } from 'ofetch'
 import { CONFIRM_REASONS, type ConfirmReason } from '../composables/useConfirmItsYou'
+import { withIdempotencyKey } from '../utils/idempotency'
 
 const OWN = '/api/core/me/reassert'
 
@@ -33,7 +39,8 @@ export default defineNuxtPlugin(() => {
   const base = globalThis.$fetch
   // Typed loosely inside: the typed fetch compares every route, which is too deep to restate here.
   const send = base as unknown as (request: unknown, options?: unknown) => Promise<unknown>
-  const api = (async (request: unknown, options?: unknown) => {
+  const api = (async (request: unknown, given?: unknown) => {
+    const options = withIdempotencyKey(given)
     try {
       return await send(request, options)
     }

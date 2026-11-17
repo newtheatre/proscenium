@@ -20,6 +20,7 @@ export type { Archive, ArchiveEntry, ArchiveYear, ArchiveOptions } from './progr
 export type { PublicProduction, PublicPerformance, PublicListing, PublicProductionOptions, WhatsOnOptions, WhatsOnFilters } from './programme/public'
 export type { PublicImage } from './programme/media'
 export type { ChangeImpact, ProposedChange } from './points/change-impact'
+export type { AccountNotice, AccountNoticeSource } from './points/account-notice'
 export { findOrCreateAccount } from './identity/guests'
 export type { FindOrCreateInput, FoundAccount, UnclaimedOrigin } from './identity/guests'
 export { canonicalAccount, accountLabel } from './identity/accounts'
