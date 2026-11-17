@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "6a90d1d6-8438-4dd7-90d5-8b71b9a030cd",
+  "id": "4a76b5ab-82c9-4809-a416-7c49f9223df7",
   "prevIds": [
     "7bf643ec-a253-4611-b18d-84a77f1eceb0"
   ],
@@ -100,6 +100,10 @@
     },
     {
       "name": "core_data_requests",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_email_events_set_aside",
       "entityType": "tables"
     },
     {
@@ -208,10 +212,6 @@
     },
     {
       "name": "core_production_advisories",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_production_credits",
       "entityType": "tables"
     },
     {
@@ -3053,6 +3053,46 @@
       "entityType": "columns"
     },
     {
+      "table": "core_email_events_set_aside",
+      "name": "queue_message_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "event_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "reason",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "set_aside_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "address_hash",
       "type": "text",
@@ -5394,86 +5434,6 @@
     },
     {
       "table": "core_production_advisories",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "production_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "account_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "credited_name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "role",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "section_term_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "visibility",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'public'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_credits",
       "name": "sort",
       "type": "integer",
       "notNull": true,
@@ -9069,6 +9029,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_at",
+      "columns": [
+        {
+          "value": "set_aside_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_emergency_contacts",
       "name": "core_emergency_contacts_account",
       "columns": [
@@ -9604,42 +9578,6 @@
         }
       ],
       "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "core_production_credits_order",
-      "columns": [
-        {
-          "value": "production_id",
-          "isExpression": false
-        },
-        {
-          "value": "section_term_id",
-          "isExpression": false
-        },
-        {
-          "value": "sort",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "core_production_credits_account",
-      "columns": [
-        {
-          "value": "account_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -11139,36 +11077,6 @@
       "entityType": "fks"
     },
     {
-      "table": "core_production_credits",
-      "name": "fk_core_production_credits_production_id_core_productions_id_fk",
-      "columns": [
-        "production_id"
-      ],
-      "tableTo": "core_productions",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "fk_core_production_credits_section_term_id_core_terms_id_fk",
-      "columns": [
-        "section_term_id"
-      ],
-      "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "core_production_slugs",
       "name": "fk_core_production_slugs_production_id_core_productions_id_fk",
       "columns": [
@@ -11893,6 +11801,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_pk",
+      "columns": [
+        "queue_message_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "core_email_suppressions_pk",
       "columns": [
@@ -12057,15 +11974,6 @@
     {
       "table": "core_place_access",
       "name": "core_place_access_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "core_production_credits_pk",
       "columns": [
         "id"
       ],
@@ -12664,6 +12572,18 @@
       "entityType": "checks"
     },
     {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_type",
+      "value": "\"event_type\" IS NULL OR \"event_type\" IN ('delivered', 'deferred', 'bounced', 'failed', 'rejected', 'complained')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_email_events_set_aside",
+      "name": "core_email_events_set_aside_reason",
+      "value": "\"reason\" IN ('unreadable', 'unmatched')",
+      "entityType": "checks"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "core_email_suppressions_reason",
       "value": "\"reason\" IN ('hard_bounce', 'complaint', 'manual')",
@@ -12835,24 +12755,6 @@
       "table": "core_production_advisories",
       "name": "core_production_advisories_detail",
       "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "core_production_credits_visibility",
-      "value": "\"visibility\" IN ('public', 'members', 'hidden')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "core_production_credits_name",
-      "value": "length(\"credited_name\") BETWEEN 1 AND 120",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_production_credits",
-      "name": "core_production_credits_role",
-      "value": "length(\"role\") BETWEEN 1 AND 120",
       "entityType": "checks"
     },
     {

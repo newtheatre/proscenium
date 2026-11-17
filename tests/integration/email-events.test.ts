@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { handleQueue } from '#kit/worker'
-import { EMAIL_EVENT_RETRY, setEmailEventsConsumer, type EmailEvent } from '#kit/email-events'
+import { EMAIL_EVENT_RETRY, setEmailEventsConsumer, setEmailEventsSetAside, type EmailEvent, type SetAside } from '#kit/email-events'
 import { env, performance, rows } from './helpers'
 
 function message(body: unknown, attempts = 1) {
@@ -19,6 +19,7 @@ const bounced = (messageId: string): EmailEvent => ({
 
 afterEach(() => {
   setEmailEventsConsumer(undefined)
+  setEmailEventsSetAside(undefined)
   vi.restoreAllMocks()
 })
 
@@ -51,14 +52,28 @@ describe('the EMAIL_EVENTS queue', () => {
     expect(await rows('SELECT sold FROM seats_performances WHERE id = ?', id)).toEqual([{ sold: 0 }])
   })
 
-  it('acknowledges and retries each message on its own, and says when one is set aside', async () => {
+  it('acknowledges and retries each message on its own, and sets aside one still unmatched on its last attempt', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    setEmailEventsConsumer(async event => event.payload.messageId === '<ok@m>' ? 'done' : 'not-yet')
+    const kept: SetAside[] = []
+    setEmailEventsSetAside(async (info) => { kept.push(info) })
+    const id = await performance(5)
+    setEmailEventsConsumer(async (event, unit) => {
+      if (event.payload.messageId === '<ok@m>') return 'done'
+      // What an unmatched outcome writes, such as a suppression, is committed all the same.
+      unit.add(sql`UPDATE seats_performances SET sold = sold + 1 WHERE id = ${id}`)
+      return 'unmatched'
+    })
     const ok = message(bounced('<ok@m>'))
+    const early = message(bounced('<early@m>'))
     const late = message(bounced('<late@m>'), EMAIL_EVENT_RETRY.setAsideAfter)
-    await handleQueue(batch([ok, late]), env)
+    await handleQueue(batch([ok, early, late]), env)
     expect(ok.ack).toHaveBeenCalledOnce()
-    expect(late.retry).toHaveBeenCalledOnce()
+    for (const m of [early, late]) {
+      expect(m.ack).not.toHaveBeenCalled()
+      expect(m.retry).toHaveBeenCalledWith({ delaySeconds: EMAIL_EVENT_RETRY.notYet })
+    }
+    expect(await rows('SELECT sold FROM seats_performances WHERE id = ?', id)).toEqual([{ sold: 2 }])
+    expect(kept).toEqual([{ queueMessageId: late.id, type: 'bounced', reason: 'unmatched' }])
     expect(warn.mock.calls.map(c => JSON.parse(c[0]).message)).toContain('core.email-events.set-aside')
   })
 
@@ -72,16 +87,29 @@ describe('the EMAIL_EVENTS queue', () => {
     await handleQueue(batch([m]), env)
     expect(m.retry).toHaveBeenCalledWith({ delaySeconds: EMAIL_EVENT_RETRY.failed })
     const logged = lines.join('\n')
-    expect(logged).toContain('cf.email.sending.message.bounced')
+    expect(logged).toContain('"type":"bounced"')
     expect(logged).not.toMatch(/someone@example\.org|Hamlet|<boom@m>/)
   })
 
-  it('acknowledges what it cannot read, and what nothing consumes yet', async () => {
+  it('never acknowledges what it cannot read: it is tried again, and set aside on its last attempt', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const kept: SetAside[] = []
+    setEmailEventsSetAside(async (info) => { kept.push(info) })
     const unreadable = message({ hello: 'world' })
+    const odd = message({ type: 'cf.email.sending.message.someday', note: 'someone@example.org' }, EMAIL_EVENT_RETRY.setAsideAfter)
+    await handleQueue(batch([unreadable, odd]), env)
+    for (const m of [unreadable, odd]) {
+      expect(m.ack).not.toHaveBeenCalled()
+      expect(m.retry).toHaveBeenCalledOnce()
+    }
+    // An unknown type name is kept as null, never as the text that came.
+    expect(kept).toEqual([{ queueMessageId: odd.id, type: null, reason: 'unreadable' }])
+  })
+
+  it('acknowledges what nothing consumes yet', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     const unconsumed = message(bounced('<x@m>'))
-    await handleQueue(batch([unreadable, unconsumed]), env)
-    expect(unreadable.ack).toHaveBeenCalledOnce()
+    await handleQueue(batch([unconsumed]), env)
     expect(unconsumed.ack).toHaveBeenCalledOnce()
   })
 
