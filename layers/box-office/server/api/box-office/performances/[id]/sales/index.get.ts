@@ -3,6 +3,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { capacityOf, getPerformance, getProduction } from '#modules/core'
+import { priceLayers } from '../../../../../prices'
 import { checklist, listBands, salesOf } from '../../../../../setup'
 
 export default defineRoute({
@@ -17,6 +18,8 @@ export default defineRoute({
     houseCapacity,
     pools: list.pools,
     prices: list.prices,
+    // Where each price comes from: every performance of the production, or this one's own.
+    priceLayers: await priceLayers(production.id, performance.id),
     checklist: list.items,
     // For the set-up screen: what the performance is, and every band its production has.
     performance: { id: performance.id, productionId: production.id, title: production.title, label: performance.label, startsAt: performance.startsAt, state: performance.state },

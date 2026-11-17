@@ -23,8 +23,8 @@ export interface StartInput {
   returnTo?: string
 }
 
-/** A screen of this site's console a hand-off may return to: a plain path, never another site. */
-export const RETURN_PATH = /^\/console(?:\/[\w-]+)*$/
+/** A screen of this site's console or live mode a hand-off may return to: a plain path, never another site. */
+export const RETURN_PATH = /^\/(?:console|live)(?:\/[\w-]+)*$/
 
 export interface StartResult { attemptId: string, next: NextStep, state: string, settled: boolean, unfulfilled: boolean }
 

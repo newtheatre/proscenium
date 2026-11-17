@@ -1,8 +1,9 @@
 <!-- Closing a session being counted: the cash counted, the difference from what was expected as it
      is typed, and the reason for any difference. Used on My session and, for someone allowed to close
-     any session, on Sessions. -->
+     any session, on Sessions. A session that handled no cash has nothing to count, so it closes with
+     none counted. -->
 <script setup lang="ts">
-const props = defineProps<{ session: { id: string, expectedCashMinor: number, currency: string } }>()
+const props = defineProps<{ session: { id: string, handlesCash: boolean, expectedCashMinor: number, currency: string } }>()
 const emit = defineEmits<{ closed: [] }>()
 
 const { t } = useT()
@@ -11,7 +12,7 @@ const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 
-const countedMinor = ref<number | null>(null)
+const countedMinor = ref<number | null>(props.session.handlesCash ? null : 0)
 const note = ref('')
 const busy = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -42,8 +43,14 @@ async function close() {
     @submit="close"
   >
     <RefusalNotice :refusal="refusal" />
-    <p>{{ t('payments.screens.close.expected', { amount: money(session.expectedCashMinor, session.currency) }) }}</p>
+    <p v-if="!session.handlesCash">
+      {{ t('payments.screens.close.no-cash') }}
+    </p>
+    <p v-else>
+      {{ t('payments.screens.close.expected', { amount: money(session.expectedCashMinor, session.currency) }) }}
+    </p>
     <UFormField
+      v-if="session.handlesCash"
       :label="t('payments.screens.close.counted')"
       :help="t('payments.screens.close.counted-help')"
       required
@@ -56,7 +63,7 @@ async function close() {
       />
     </UFormField>
     <p
-      v-if="difference !== null"
+      v-if="session.handlesCash && difference !== null"
       :class="difference === 0 ? 'text-muted' : 'font-medium'"
       aria-live="polite"
     >

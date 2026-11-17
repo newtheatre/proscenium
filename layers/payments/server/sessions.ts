@@ -2,7 +2,9 @@
 // with a float, takes payments in it, and cashes up: counting stops new payments, the cash counted is
 // compared with what is expected, and any difference is explained and posted to
 // payments.cash-variance. Above payments.sessions.variance-needs-second-person, a second person closes
-// a session with a difference.
+// a session with a difference. A theatre that takes no cash (payments.cash.enabled off, the default)
+// still opens sessions, since desk sales are made in one, but they hold no float and close with
+// nothing to count.
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { postEntries } from '#modules/finance'
@@ -30,7 +32,9 @@ export async function expectedCash(session: SessionRow): Promise<number> {
 /** Opens a session for the person. Refused while they have another not yet closed. */
 export async function openSession(unit: UnitView, input: { accountId: string, pointLabel: string, floatMinor?: number }): Promise<string> {
   if (await sessionOf(input.accountId)) throw new Refusal('payments.session.already-open', 'You already have a till session open.', { status: 409, remedy: 'Cash up that session first.' })
-  const float = input.floatMinor ?? await useSetting('payments.sessions.default-float') as number
+  const cash = await useSetting('payments.cash.enabled')
+  if (!cash && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' }, remedy: 'Leave the float empty, or turn on taking cash in Payments settings.' })
+  const float = input.floatMinor ?? (cash ? await useSetting('payments.sessions.default-float') as number : 0)
   if (!Number.isSafeInteger(float) || float < 0) throw new Refusal('payments.session.bad-float', 'The float is a whole amount, nothing or more.', { status: 422, fields: { floatMinor: 'payments.session.bad-float' } })
   const id = newId('till')
   const at = nowMs()
@@ -106,12 +110,15 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
   return { varianceMinor: variance }
 }
 
-export interface SessionSummary { id: string, pointLabel: string, openedBy: string, openedByName: string, closedBy: string | null, closedByName: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
+/** handlesCash: whether the session has cash to count, because cash is taken or it held a float or cash anyway. */
+export interface SessionSummary { handlesCash: boolean, id: string, pointLabel: string, openedBy: string, openedByName: string, closedBy: string | null, closedByName: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
-export async function summarise(session: SessionRow, names?: Map<string, string>): Promise<SessionSummary> {
+export async function summarise(session: SessionRow, names?: Map<string, string>, cashTaken?: boolean): Promise<SessionSummary> {
   const expected = session.expected_cash_minor ?? await expectedCash(session)
   const label = names ?? await labelsOf([session.opened_by, session.closed_by])
+  const cash = cashTaken ?? !!(await useSetting('payments.cash.enabled'))
   return {
+    handlesCash: cash || session.float_minor > 0 || expected !== 0 || (session.counted_cash_minor ?? 0) > 0,
     id: session.id,
     pointLabel: session.point_label,
     openedBy: session.opened_by,
@@ -137,7 +144,8 @@ export async function describeSessions(ids: string[]): Promise<SessionSummary[]>
   const byId = new Map(found.map(r => [r.id, r]))
   const rows = ids.flatMap(id => byId.get(id) ?? [])
   const names = await labelsOf(rows.flatMap(r => [r.opened_by, r.closed_by]))
-  return Promise.all(rows.map(r => summarise(r, names)))
+  const cash = !!(await useSetting('payments.cash.enabled'))
+  return Promise.all(rows.map(r => summarise(r, names, cash)))
 }
 
 const SECOND = 1000 // not-policy: settings hold seconds, times are milliseconds

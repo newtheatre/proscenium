@@ -13,10 +13,13 @@ export async function providerAccount(id: string): Promise<ProviderAccountRow | 
   return first<ProviderAccountRow>('SELECT * FROM payments_provider_accounts WHERE id = ?', id)
 }
 
-/** The secrets a provider needs that are not set. A provider missing one is unavailable. */
-export async function missingSecrets(provider: PaymentProvider): Promise<string[]> {
+/**
+ * The keys a provider needs that are not set for an account: saved for it, saved for every account,
+ * or a Worker secret. An account missing one is not offered for payment.
+ */
+export async function missingSecrets(provider: PaymentProvider, accountId = ''): Promise<string[]> {
   const missing: string[] = []
-  for (const name of provider.secrets) if (!(await credential(name))) missing.push(name)
+  for (const name of provider.secrets) if (!(await credential(name, accountId))) missing.push(name)
   return missing
 }
 
@@ -35,7 +38,7 @@ export async function methodsFor(channel: 'online' | 'desk'): Promise<MethodOffe
   for (const row of rows) {
     const provider = known.get(row.provider)
     if (!provider || !(JSON.parse(row.channels) as string[]).includes(channel)) continue
-    if ((await missingSecrets(provider)).length) continue
+    if ((await missingSecrets(provider, row.id)).length) continue
     for (const m of provider.methods) if (m.channels.includes(channel)) out.push({ providerAccountId: row.id, provider: row.provider, label: row.label, method: m.method, mode: row.mode })
   }
   return out

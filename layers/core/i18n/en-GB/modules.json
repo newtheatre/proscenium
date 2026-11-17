@@ -40,7 +40,7 @@
   "core.modules.dialog.kept": "Nothing is deleted. Its data is kept, its background work waits, and switching it back on brings everything back as it was.",
   "core.modules.dialog.prevented.one": "It cannot be switched off while {modules} needs it. Switch that off first.",
   "core.modules.dialog.prevented.other": "It cannot be switched off while {modules} need it. Switch those off first.",
-  "core.modules.dialog.shell.admin": "Site administration",
+  "core.modules.dialog.shell.admin": "Admin",
   "core.modules.dialog.shell.console": "Console",
   "core.modules.dialog.shell.members": "Members' area",
   "core.modules.dialog.shell.live": "Live",

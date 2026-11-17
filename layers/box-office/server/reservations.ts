@@ -11,8 +11,9 @@
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
 import { first, inAccountScope, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
-import { findOrCreateAccount, notify, notifyAddress } from '#modules/core'
+import { findOrCreateAccount, getPerformance, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
+import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
@@ -176,6 +177,31 @@ export interface OrderView {
   amountDueMinor: number
   releaseAt: number | null
   lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number }[]
+  /**
+   * Whether the buyer may cancel paid tickets here, and on what terms: the fee kept from each ticket
+   * and the last moment to do it. Null when they may not, and the box office changes the booking.
+   */
+  buyerCancel: { feeMinor: number, until: number } | null
+}
+
+/**
+ * The terms on which a buyer may cancel a paid booking themselves (Box office specification, part 4,
+ * "Cancelling and exchanging"): the theatre allows it, the booking was bought online, so the refund
+ * goes back to the card that paid with nobody at a till, and every performance on it is further off
+ * than the cut-off. Null when any of that fails.
+ */
+export async function buyerCancelTerms(order: Pick<OrderRow, 'state' | 'sold_by'>, lines: LineRow[]): Promise<OrderView['buyerCancel']> {
+  if (order.state !== 'confirmed' || order.sold_by !== null || !lines.length) return null
+  if (!await useSetting('box-office.cancellations.by-buyer')) return null
+  const before = await useSetting('box-office.cancellations.until-before') as number
+  let until = Number.POSITIVE_INFINITY
+  for (const performanceId of new Set(lines.map(l => l.performance_id))) {
+    const performance = await getPerformance(performanceId)
+    if (performance.state !== 'scheduled') return null
+    until = Math.min(until, performance.startsAt - before * 1000) // not-policy: seconds to milliseconds
+  }
+  if (until <= nowMs()) return null
+  return { feeMinor: await useSetting('box-office.cancellations.fee') as number, until }
 }
 
 /**
@@ -195,16 +221,34 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
     amountDueMinor: order.state === 'reserved' || order.state === 'awaiting_payment' ? order.total_minor : 0,
     releaseAt: order.release_at,
     lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
+    buyerCancel: await buyerCancelTerms(order, lines),
   }
 }
 
 /**
- * Cancel or reduce a reservation from its link (R-2): the seats go back on sale in the same batch.
- * With no lines named, the whole reservation is cancelled. Nothing was paid, so nothing is refunded.
+ * Cancel or reduce a booking from its link (R-2): the seats go back on sale in the same batch. With
+ * no lines named, the whole booking is cancelled. A reservation was not paid for, so nothing is
+ * refunded. A paid booking can be cancelled here only on the terms of buyerCancelTerms, and the
+ * price less the cancellation fee goes back the way it was paid.
  */
 export async function cancelFromLink(unit: UnitView, token: string, lineIds?: string[]): Promise<OrderView> {
   const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ?`, await hashOf(token)) : null
   if (!order || order.state === 'basket') refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
+  if (order.state === 'confirmed' && await buyerCancelTerms(order, await liveLines(order.id))) {
+    const done = await cancelLines(unit, order.id, { lineIds, refund: 'less-fee', by: null, kind: 'customer' })
+    const kept = (await liveLines(order.id)).filter(l => !lineIds || !lineIds.includes(l.id))
+    return {
+      orderId: order.id,
+      reference: order.reference,
+      state: done.state,
+      currency: order.currency,
+      totalMinor: done.totalMinor,
+      amountDueMinor: 0,
+      releaseAt: null,
+      lines: done.state === 'cancelled' ? [] : kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
+      buyerCancel: done.state === 'cancelled' ? null : await buyerCancelTerms(order, kept),
+    }
+  }
   if (order.state !== 'reserved')
     refuse('box-office.order.cancel-at-desk', 'This booking cannot be changed from here.', { status: 409, remedy: 'Ask the box office.' })
   const lines = await liveLines(order.id)
@@ -251,5 +295,6 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
     amountDueMinor: totalMinor,
     releaseAt: kept.length ? order.release_at : null,
     lines: kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor })),
+    buyerCancel: null,
   }
 }

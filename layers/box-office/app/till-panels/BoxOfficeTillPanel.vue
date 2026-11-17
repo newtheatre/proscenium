@@ -209,32 +209,35 @@ function clear() {
 
     <template v-else>
       <UForm
-        class="flex flex-wrap items-end gap-2"
         :state="{ query }"
         @submit="find()"
       >
+        <!-- The buttons sit on the box's own row, so the help line under it cannot push them out of line. -->
         <UFormField
           :label="t('box-office.screens.panel.find-label')"
           :help="t('box-office.screens.panel.find-help')"
-          class="grow"
         >
-          <UInput
-            v-model="query"
-            :disabled="locked"
-            autocomplete="off"
-          />
+          <div class="flex gap-2">
+            <UInput
+              v-model="query"
+              class="flex-1"
+              :disabled="locked"
+              autocomplete="off"
+            />
+            <UButton
+              type="submit"
+              :label="t('box-office.screens.panel.find')"
+              icon="i-lucide-search"
+              :loading="busy"
+              :disabled="locked || !query.trim()"
+            />
+            <CodeScanButton
+              icon-only
+              :disabled="locked"
+              @scanned="(code: string) => { query = code; find() }"
+            />
+          </div>
         </UFormField>
-        <UButton
-          type="submit"
-          :label="t('box-office.screens.panel.find')"
-          icon="i-lucide-search"
-          :loading="busy"
-          :disabled="locked || !query.trim()"
-        />
-        <CodeScanButton
-          :disabled="locked"
-          @scanned="(code: string) => { query = code; find() }"
-        />
       </UForm>
       <p
         v-if="searched && !order"

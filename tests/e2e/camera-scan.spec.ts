@@ -103,7 +103,18 @@ test('the desk finds a reservation by scanning its box office code with the came
   try {
     await visit(page, '/console/box-office/sell')
     await page.getByRole('tab', { name: 'Collect a reservation' }).click()
-    await page.getByRole('button', { name: 'Scan with camera' }).click()
+    // Find and the icon-only scan button share the code box's row, lined up with it.
+    const box = (await page.getByLabel(/^Booking reference or desk code/).boundingBox())!
+    const scanButton = page.getByRole('button', { name: 'Scan with camera' })
+    for (const button of [page.getByRole('button', { name: 'Find' }), scanButton]) {
+      const at = (await button.boundingBox())!
+      expect(Math.abs(at.y + at.height / 2 - (box.y + box.height / 2))).toBeLessThan(2)
+    }
+    await expect(scanButton).toHaveText('')
+    await scanButton.hover()
+    await expect(page.getByRole('tooltip')).toContainText('Scan with camera')
+    await page.screenshot({ path: 'test-results/desk-find-row.png' })
+    await scanButton.click()
     await expect(page.getByRole('heading', { name: `Booking ${reference}` })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByLabel(/^Booking reference or desk code/)).toHaveValue(deskCode)
   }

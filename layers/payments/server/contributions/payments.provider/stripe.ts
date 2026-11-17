@@ -1,10 +1,10 @@
 // Stripe, for card payments online (Box office specification, part 4; Matt's question 2). A payment is
 // a Stripe PaymentIntent: start creates one and hands its client secret to the checkout page, which
 // takes the card with Stripe's own form. Stripe's answer is always read back with status, never taken
-// from a webhook's body. Keys are Worker secrets in the first release (Matt's question 3): the secret
-// key, the webhook signing secret and the publishable key that the page's card form loads with. The
-// publishable key is not secret; it is kept with the other two so a theatre sets all three in one
-// place. A key for test mode starts sk_test_ or pk_test_.
+// from a webhook's body. Its keys are credentials, typed into each provider account on the Providers
+// screen (a Worker secret of the same name is used when none is saved): the secret key, the webhook
+// signing secret and the publishable key that the page's card form loads with. A key for test mode
+// starts sk_test_ or pk_test_.
 import { credential, nowMs } from '#kit'
 import { stripe, StripeError } from '../../calls/stripe/client'
 import type { PaymentProvider, ProviderAnswer, ProviderAttempt, RefundAnswer } from '../../points/provider'
@@ -24,8 +24,8 @@ interface Charge { balance_transaction: BalanceTransaction | string | null }
 interface PaymentIntent { id: string, status: string, client_secret: string, amount: number, currency: string, latest_charge: Charge | string | null }
 interface Refund { id: string, status: string, failure_reason?: string | null }
 
-async function secretKey(): Promise<string> {
-  const key = await credential(SECRET_KEY)
+async function secretKey(account: string): Promise<string> {
+  const key = await credential(SECRET_KEY, account)
   if (!key) throw new Error(`${SECRET_KEY} is not set`)
   return key
 }
@@ -34,8 +34,8 @@ async function secretKey(): Promise<string> {
  * The key the card form loads with. It is one of this provider's secrets, so an account without it is
  * not offered for payment (methodsFor), and the page is never handed a form it cannot load.
  */
-async function publishableKey(): Promise<string> {
-  return await credential(PUBLISHABLE_KEY) ?? ''
+async function publishableKey(account: string): Promise<string> {
+  return await credential(PUBLISHABLE_KEY, account) ?? ''
 }
 
 /** The fee Stripe kept, when it is in the payment's own currency. */
@@ -79,7 +79,7 @@ export async function signatureOk(header: string | undefined, body: string, secr
 async function read(attempt: ProviderAttempt): Promise<ProviderAnswer | 'unknown'> {
   if (!attempt.providerRef) return 'unknown'
   try {
-    return answerOf(await stripe<PaymentIntent>('GET', `/payment_intents/${encodeURIComponent(attempt.providerRef)}`, { key: await secretKey(), params: { expand: ['latest_charge.balance_transaction'] } }))
+    return answerOf(await stripe<PaymentIntent>('GET', `/payment_intents/${encodeURIComponent(attempt.providerRef)}`, { key: await secretKey(attempt.providerAccountId), params: { expand: ['latest_charge.balance_transaction'] } }))
   }
   catch (error) {
     if (error instanceof StripeError && error.code === 'resource_missing') return { state: 'failed', providerRef: attempt.providerRef, failureCode: 'resource_missing' }
@@ -95,7 +95,7 @@ export default {
 
   async start(attempt) {
     const intent = await stripe<PaymentIntent>('POST', '/payment_intents', {
-      key: await secretKey(),
+      key: await secretKey(attempt.providerAccountId),
       idempotencyKey: attempt.idempotencyKey,
       params: {
         amount: attempt.amountMinor,
@@ -104,7 +104,7 @@ export default {
         metadata: { attempt: attempt.id, intent: attempt.intentId },
       },
     })
-    return { next: { kind: 'client-secret', provider: 'stripe', secret: intent.client_secret, publishableKey: await publishableKey() }, providerRef: intent.id, answer: answerOf(intent) }
+    return { next: { kind: 'client-secret', provider: 'stripe', secret: intent.client_secret, publishableKey: await publishableKey(attempt.providerAccountId) }, providerRef: intent.id, answer: answerOf(intent) }
   },
 
   status: read,
@@ -112,15 +112,15 @@ export default {
   // A payment Stripe is still waiting on the person for: the form again, with the same payment.
   async resume(attempt) {
     if (!attempt.providerRef) return null
-    const intent = await stripe<PaymentIntent>('GET', `/payment_intents/${encodeURIComponent(attempt.providerRef)}`, { key: await secretKey() })
-    return WAITING_ON_PERSON.includes(intent.status) ? { kind: 'client-secret', provider: 'stripe', secret: intent.client_secret, publishableKey: await publishableKey() } : null
+    const intent = await stripe<PaymentIntent>('GET', `/payment_intents/${encodeURIComponent(attempt.providerRef)}`, { key: await secretKey(attempt.providerAccountId) })
+    return WAITING_ON_PERSON.includes(intent.status) ? { kind: 'client-secret', provider: 'stripe', secret: intent.client_secret, publishableKey: await publishableKey(attempt.providerAccountId) } : null
   },
 
   async refund(refund) {
     if (!refund.attempt.providerRef) return { state: 'failed', failureCode: 'no-payment-reference' }
     try {
       return refundAnswerOf(await stripe<Refund>('POST', '/refunds', {
-        key: await secretKey(),
+        key: await secretKey(refund.attempt.providerAccountId),
         idempotencyKey: refund.idempotencyKey,
         params: { payment_intent: refund.attempt.providerRef, amount: refund.amountMinor, metadata: { refund: refund.id } },
       }))

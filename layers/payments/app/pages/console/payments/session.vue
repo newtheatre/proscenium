@@ -1,9 +1,10 @@
 <!-- My session (Box office specification, part 5): open a till session with a float, see the cash
      expected in it, and cash up: counting stops new payments and closing compares the cash counted.
      A payment still waiting for an answer stops the count; each is named with the time it turns
-     unknown, after which it is settled on Needs attention. A hand-off to the SumUp app returns here. -->
+     unknown, after which it is settled on Needs attention. A hand-off to the SumUp app returns here.
+     Where no cash is taken a session has no float and closes in one step, with nothing to count. -->
 <script setup lang="ts">
-interface Session { id: string, pointLabel: string, openedAt: number, state: 'open' | 'counting' | 'closed', floatMinor: number, expectedCashMinor: number, currency: string }
+interface Session { handlesCash: boolean, id: string, pointLabel: string, openedAt: number, state: 'open' | 'counting' | 'closed', floatMinor: number, expectedCashMinor: number, currency: string }
 interface Waiting { id: string, method: string, amountMinor: number, currency: string, state: string, provider: string, startedAt: number, unknownAt: number | null }
 
 const { t } = useT()
@@ -13,7 +14,7 @@ const { money } = await useMoney()
 const { dateTime: when, time } = useDates()
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ session: Session | null, waiting: Waiting[] }>('/api/payments/session', { key: 'payments:session' })
+const { data, status, error, refresh } = await useAPI<{ cashTaken: boolean, session: Session | null, waiting: Waiting[] }>('/api/payments/session', { key: 'payments:session' })
 
 // The SumUp app sends the seller back here with what it says happened.
 const handoff = computed(() => {
@@ -30,7 +31,7 @@ async function open() {
   busy.value = true
   refusal.value = null
   try {
-    const floatMinor = opening.floatMinor ?? undefined
+    const floatMinor = data.value?.cashTaken ? opening.floatMinor ?? undefined : undefined
     await $api('/api/payments/sessions', { method: 'POST', body: { pointLabel: opening.pointLabel, floatMinor }, headers: { 'idempotency-key': opening.key } })
     opening.key = crypto.randomUUID()
     toast.add({ title: t('payments.screens.session.opened'), color: 'success' })
@@ -61,6 +62,38 @@ async function count() {
   }
 }
 
+// Without cash there is nothing to count, so counting and closing are one step: the count fixes no
+// cash expected, and the close records none counted. A close refused after the count leaves the session
+// being counted, where the close form offers the close again.
+async function closeWithoutCash() {
+  const session = data.value?.session
+  if (!session) return
+  busy.value = true
+  refusal.value = null
+  try {
+    await $api(`/api/payments/sessions/${session.id}/count` as string, { method: 'POST', body: {} })
+    await $api(`/api/payments/sessions/${session.id}/close` as string, { method: 'POST', body: { countedMinor: 0 } })
+    toast.add({ title: t('payments.screens.close.done'), color: 'success' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = false
+    await refresh()
+  }
+}
+
+const facts = (s: Session) => [
+  { label: t('payments.screens.session.opened-at'), value: when(s.openedAt), strong: false },
+  ...(s.handlesCash
+    ? [
+        { label: t('payments.screens.session.float'), value: money(s.floatMinor, s.currency), strong: false },
+        { label: t('payments.screens.session.expected'), value: money(s.expectedCashMinor, s.currency) },
+      ]
+    : []),
+]
+
 const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
 </script>
 
@@ -89,7 +122,7 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
         <PageSection
           v-if="!loaded.session"
           :title="t('payments.screens.session.open-title')"
-          :description="t('payments.screens.session.open-help')"
+          :description="t(loaded.cashTaken ? 'payments.screens.session.open-help' : 'payments.screens.session.open-help-no-cash')"
         >
           <UForm
             class="space-y-4"
@@ -109,6 +142,7 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
               />
             </UFormField>
             <UFormField
+              v-if="loaded.cashTaken"
               :label="t('payments.screens.session.float')"
               :hint="t('payments.screens.optional')"
               :help="t('payments.screens.session.float-help')"
@@ -139,13 +173,7 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
                 :label="t(`payments.screens.session.states.${loaded.session.state}`)"
               />
             </template>
-            <FactStrip
-              :facts="[
-                { label: t('payments.screens.session.opened-at'), value: when(loaded.session.openedAt), strong: false },
-                { label: t('payments.screens.session.float'), value: money(loaded.session.floatMinor, loaded.session.currency), strong: false },
-                { label: t('payments.screens.session.expected'), value: money(loaded.session.expectedCashMinor, loaded.session.currency) },
-              ]"
-            />
+            <FactStrip :facts="facts(loaded.session)" />
           </PageSection>
 
           <PageSection
@@ -173,7 +201,24 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
           </PageSection>
 
           <PageSection
-            v-if="loaded.session.state === 'open'"
+            v-if="loaded.session.state === 'open' && !loaded.session.handlesCash"
+            :title="t('payments.screens.close.button')"
+            :description="t('payments.screens.session.close-help-no-cash')"
+          >
+            <div class="space-y-4">
+              <RefusalNotice :refusal="refusal" />
+              <UButton
+                :loading="busy"
+                :disabled="loaded.waiting.length > 0"
+                :label="t('payments.screens.close.button')"
+                icon="i-lucide-lock"
+                @click="closeWithoutCash"
+              />
+            </div>
+          </PageSection>
+
+          <PageSection
+            v-else-if="loaded.session.state === 'open'"
             :title="t('payments.screens.session.cash-up-title')"
             :description="t('payments.screens.session.cash-up-help')"
           >
@@ -191,7 +236,7 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
 
           <PageSection
             v-else
-            :title="t('payments.screens.close.title')"
+            :title="t(loaded.session.handlesCash ? 'payments.screens.close.title' : 'payments.screens.close.button')"
           >
             <PaymentsCloseSession
               :session="loaded.session"

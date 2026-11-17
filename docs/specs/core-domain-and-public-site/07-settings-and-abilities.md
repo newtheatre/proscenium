@@ -8,7 +8,7 @@ Settings are site-wide. Where a value varies by record, such as a performance's 
 
 ## Settings: organisation
 
-Five facts about the theatre are foundations settings, because the kit is built on them, and are not repeated here: its name (`core.site.name`), time zone (`core.locale.time-zone`), language (`core.locale.language`), currency (`core.locale.currency`) and the hour the operating day begins (`core.locale.day-start`, default 04:00). Wherever this specification speaks of the theatre's name, time zone, language, currency or day rollover, it means those keys. The Theatre page in Site administration shows them beside the organisation settings below, so an administrator sees one page.
+Five facts about the theatre are foundations settings, because the kit is built on them, and are not repeated here: its name (`core.site.name`), time zone (`core.locale.time-zone`), language (`core.locale.language`), currency (`core.locale.currency`) and the hour the operating day begins (`core.locale.day-start`, default 04:00). Wherever this specification speaks of the theatre's name, time zone, language, currency or day rollover, it means those keys. The Theatre page in Admin shows them beside the organisation settings below, so an administrator sees one page.
 
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -117,16 +117,16 @@ By ruling R-37 (Matt's settings redesign of 16 November 2026, brief at `/mnt/pro
 
 | Group | Place | Home | Declared as |
 | --- | --- | --- | --- |
-| `site` (foundations' `core.site.name` and `core.site.origin`) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
-| `organisation` | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
-| `locale` (foundations' keys) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
-| `brand`, `appearance` | Site administration, Theatre | Branding, the bespoke screen | `{ place: 'admin', screen: '/admin/branding' }` |
-| `notifications` | Site administration, Email | Email, the bespoke screen | `{ place: 'admin', screen: '/admin/email' }` |
-| `delivery` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
-| `files` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
-| `webhooks` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` (ruled by Integration, 16 November 2026) |
+| `site` (foundations' `core.site.name` and `core.site.origin`) | Admin, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
+| `organisation` | Admin, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
+| `locale` (foundations' keys) | Admin, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
+| `brand`, `appearance` | Admin, Theatre | Branding, the bespoke screen | `{ place: 'admin', screen: '/admin/branding' }` |
+| `notifications` | Admin, Email | Email, the bespoke screen | `{ place: 'admin', screen: '/admin/email' }` |
+| `delivery` | Admin, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
+| `files` | Admin, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
+| `webhooks` | Admin, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` (ruled by Integration, 16 November 2026) |
 | `programme` | Console, Programme | Programme settings page | `{ place: 'console', page: 'core.programme' }` |
-| every `public-site.*` group | Site administration, Modules | the public site module's own settings page | `place: 'admin'`, page left to the module default (ruled by Integration, 16 November 2026) |
+| every `public-site.*` group | Admin, Modules | the public site module's own settings page | `place: 'admin'`, page left to the module default (ruled by Integration, 16 November 2026) |
 
 **As built, and where it ends.** The table above is the end state. The kit's format as built (kit PR 115, and the foundations specification's Settings registry) differs from the brief in three ways. No group names an ability: every setting names its own, as the tables in this part already do. Page ids take the form `[module].[page]`, so core's pages are `core.theatre`, `core.branding` and `core.programme`, with `core.advanced`, `[module].settings` and `[module].admin` reserved. And a setting may name a bespoke screen only once that screen shows and saves it. Until then it sits on a generated page, so some settings have an interim home:
 

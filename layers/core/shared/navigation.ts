@@ -18,7 +18,7 @@ export const CONSOLE_GROUP_ORDER = [
   'people', 'money', 'communications', 'forms', 'reports', 'system',
 ] as const
 
-/** Site administration's groups (R-33), in their fixed order. Every admin entry but the Overview names one. */
+/** Admin's groups (R-33), in their fixed order. Every admin entry but the Overview names one. */
 export const ADMIN_GROUP_ORDER = ['theatre', 'modules', 'access', 'email', 'connections', 'upkeep'] as const
 
 /**
@@ -49,7 +49,7 @@ export interface NavigationEntry {
 
 export interface NavigationGroupDecl {
   id: string
-  /** The console's groups by default; 'admin' for Site administration's. */
+  /** The console's groups by default; 'admin' for Admin's. */
   menu?: 'console' | 'admin'
   order?: number
   icon: string

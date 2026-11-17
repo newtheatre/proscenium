@@ -45,9 +45,12 @@ async function paid(h: House, quantity: number) {
   expect(started.body.state, JSON.stringify(started.body)).toBe('awaiting_payment')
   const attemptId = await commit(async unit => addAttempt(unit.view(), { intentId: started.body.intentId, providerAccountId: card, method: 'card_online', amountMinor: b.totalMinor }).id)
   expect(await inContext(() => recordAnswer(attemptId, { state: 'succeeded', providerRef: `cc_${attemptId}` }, { kind: 'poll' }))).toMatchObject({ settled: true })
-  const [row] = await rows<{ sealed_variables: string }>("SELECT sealed_variables FROM core_notifications WHERE type_key = 'box-office.order-confirmed' AND subject_id = ?", b.orderId)
+  const [row] = await rows<{ sealed_variables: string, payload: string }>("SELECT sealed_variables, payload FROM core_notifications WHERE type_key = 'box-office.order-confirmed' AND subject_id = ?", b.orderId)
   const codes = (JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!).codes as string).split('\n\n')
-  return { orderId: b.orderId, lines: await lineIds(b.orderId), codes }
+  const told = JSON.parse(row!.payload) as { link?: string }
+  const sealed = JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!) as { link?: string }
+  const link = (told.link ?? sealed.link)!
+  return { orderId: b.orderId, lines: await lineIds(b.orderId), codes, token: link.slice(link.lastIndexOf('/') + 1) }
 }
 
 const cancel = (orderId: string, body: Record<string, unknown>, actor = boxOfficeManager) => req('POST', `/api/box-office/orders/${orderId}/cancel`, { reasonTermId: reason, ...body }, actor)
@@ -205,5 +208,68 @@ describe('a refund after the performance has taken place', () => {
     await deliver()
     expect(await balance('box-office.deferred-ticket-income', h.performanceId)).toBe(0)
     expect(await balance('box-office.ticket-income', h.performanceId)).toBe(-1200)
+  })
+})
+
+describe('a buyer cancelling paid tickets from their link', () => {
+  const view = (token: string) => req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': token })
+  const byBuyer = (token: string, body: Record<string, unknown> = {}) => req('POST', '/api/box-office/orders/link/cancel', body, null, { 'x-order-token': token })
+  beforeAll(() => setClock(NOV_16))
+
+  it('is refused while the theatre has not switched it on', async () => {
+    const h = await house(4)
+    const o = await paid(h, 2)
+    expect((await view(o.token)).body).toMatchObject({ state: 'confirmed', buyerCancel: null })
+    expect((await byBuyer(o.token)).body).toMatchObject({ code: 'box-office.order.cancel-at-desk' })
+    expect(await claimed(h)).toBe(2)
+  })
+
+  it('refunds the price less the fee to the card, frees the seat and voids the ticket, with no second approver', async () => {
+    await set('box-office.cancellations.by-buyer', true)
+    await set('box-office.cancellations.fee', 150)
+    // Above the self-approve limit: a buyer's refund is the system's, by the theatre's own terms.
+    await set('payments.refunds.self-approve-up-to', 0)
+    const h = await house(4)
+    const o = await paid(h, 2)
+    const seen = (await view(o.token)).body
+    expect(seen.buyerCancel).toMatchObject({ feeMinor: 150 })
+    expect(seen.buyerCancel.until).toBeLessThan(Date.UTC(2027, 2, 31))
+
+    const done = await byBuyer(o.token, { lineIds: [o.lines[0]] })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toMatchObject({ state: 'confirmed', totalMinor: 1200, amountDueMinor: 0, lines: [{ id: o.lines[1] }] })
+    expect(await claimed(h)).toBe(1)
+    expect(await rows('SELECT t.state, t.void_reason FROM box_office_tickets t WHERE t.order_line_id = ?', o.lines[0])).toEqual([{ state: 'void', void_reason: 'cancelled' }])
+    expect(await rows('SELECT kind, fee_minor, by FROM box_office_cancellations WHERE order_id = ?', o.orderId)).toEqual([{ kind: 'customer', fee_minor: 150, by: null }])
+    expect(await rows('SELECT r.amount_minor, r.state, r.requested_by FROM payments_refunds r JOIN box_office_cancellations c ON c.refund_id = r.id WHERE c.order_id = ?', o.orderId))
+      .toEqual([{ amount_minor: 1050, state: 'approved', requested_by: null }])
+    // The fee is the theatre's; the rest of the ticket stops being owed once the refund is made.
+    await deliver()
+    expect(await balance('box-office.deferred-ticket-income', h.performanceId)).toBe(-1200)
+
+    // The rest of the booking, all at once.
+    expect((await byBuyer(o.token)).body).toMatchObject({ state: 'cancelled', lines: [], buyerCancel: null })
+    expect(await order(o.orderId)).toMatchObject({ state: 'cancelled', total_minor: 0 })
+    expect(await claimed(h)).toBe(0)
+    await set('payments.refunds.self-approve-up-to', 5000)
+    await set('box-office.cancellations.fee', 0)
+  })
+
+  it('stops at the cut-off before the performance', async () => {
+    const HOUR = 3_600_000
+    const h = await house(4, { startsAt: NOV_16 + 30 * HOUR })
+    const o = await paid(h, 1)
+    expect((await view(o.token)).body.buyerCancel).toMatchObject({ until: NOV_16 + 6 * HOUR })
+    advanceClock(7 * HOUR)
+    expect((await view(o.token)).body.buyerCancel).toBeNull()
+    expect((await byBuyer(o.token)).body).toMatchObject({ code: 'box-office.order.cancel-at-desk' })
+    expect(await claimed(h)).toBe(1)
+  })
+
+  it('leaves a used ticket alone', async () => {
+    const h = await house(4)
+    const o = await paid(h, 1)
+    await env.DB.prepare('UPDATE box_office_tickets SET admitted_at = ? WHERE order_line_id = ?').bind(NOV_16, o.lines[0]).run()
+    expect((await byBuyer(o.token)).body).toMatchObject({ code: 'box-office.order.already-admitted' })
   })
 })

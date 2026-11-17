@@ -36,7 +36,7 @@ export async function holdsConsole(actor: Actor): Promise<boolean> {
 }
 
 /**
- * Whether the actor may open Site administration (R-33): it has no ability of its own, so a person
+ * Whether the actor may open Admin (R-33): it has no ability of its own, so a person
  * sees it when they hold the ability of at least one admin entry.
  */
 export async function holdsAdmin(actor: Actor): Promise<boolean> {

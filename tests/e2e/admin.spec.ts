@@ -1,4 +1,4 @@
-// Site administration, the fourth shell (R-33): who may enter, how it differs from the console,
+// Admin, the fourth shell (R-33): who may enter, how it differs from the console,
 // the site settings page, the palette and the phone layout.
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
@@ -21,13 +21,13 @@ test.describe('a site owner with no console', () => {
 
   test('has the strip, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
-    await expect(page).toHaveTitle(/^Site administration/)
-    await expect(page.getByText('Site administration', { exact: true }).first()).toBeVisible()
+    await expect(page).toHaveTitle(/^Admin/)
+    await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
     await expect(page.getByText('Nothing needs attention')).toBeVisible()
-    await page.getByRole('navigation', { name: 'Site administration' }).getByRole('button', { name: 'Upkeep' }).click()
-    await expect(page.getByRole('navigation', { name: 'Site administration' })).toContainText('Advanced')
+    await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('button', { name: 'Upkeep' }).click()
+    await expect(page.getByRole('navigation', { name: 'Admin', exact: true })).toContainText('Advanced')
     await noViolations(page)
   })
 
@@ -152,9 +152,9 @@ test.describe('staff who also run the console', () => {
 
   test('move between the shells from the account menu, and the console sidebar has no link in', async ({ page }) => {
     await visit(page, '/console')
-    expect(await page.getByRole('navigation', { name: 'Console' }).innerText()).not.toContain('Site administration')
+    expect(await page.getByRole('navigation', { name: 'Console' }).innerText()).not.toContain('Admin')
     await page.getByRole('button', { name: /Open the menu for Sky Staff/ }).first().click()
-    await page.getByRole('menuitem', { name: 'Site administration' }).click()
+    await page.getByRole('menuitem', { name: 'Admin', exact: true }).click()
     await expect(page).toHaveURL(/\/admin$/)
     await expect(page.getByRole('link', { name: 'Back to console' })).toBeVisible()
   })
@@ -164,7 +164,7 @@ test.describe('staff who also run the console', () => {
     await page.keyboard.press('Control+k')
     await page.keyboard.type('Advanced')
     await expect(page.getByRole('dialog').getByRole('option', { name: /Advanced/ }).first()).toBeVisible()
-    await expect(page.getByRole('dialog')).toContainText('Site administration')
+    await expect(page.getByRole('dialog')).toContainText('Admin')
   })
 })
 
@@ -175,7 +175,7 @@ test.describe('a person with no admin ability', () => {
     expect((await page.goto('/admin'))?.status()).toBe(404)
     await visit(page, '/console')
     await page.getByRole('button', { name: /Open the menu for Nia None/ }).first().click()
-    await expect(page.getByRole('menuitem', { name: 'Site administration' })).toHaveCount(0)
+    await expect(page.getByRole('menuitem', { name: 'Admin', exact: true })).toHaveCount(0)
   })
 })
 
