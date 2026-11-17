@@ -3,14 +3,22 @@
      panels add up to, makes the one payment for the total in the seller's open session and takes it
      by any way to pay on offer at the desk. Another way is offered only once an attempt is known to
      have failed, so nobody pays twice. After a sale the panels are emptied; after a cancel they keep
-     what was in them, so the seller can try again. -->
+     what was in them, so the seller can try again. A host narrows the till to some modules' panels
+     (Box office's Sell shows only its own); live mode draws the panels as tabs over the one basket,
+     each with its larger live panel where its module has one. -->
 <script setup lang="ts">
-interface Panel { id: string, label: string, panel: string }
+interface Panel { id: string, module: string, label: string, tab: string, icon: string | null, panel: string, livePanel: string | null }
 interface Summary { basket: string, lines: { label: string, amountMinor: number }[], amountMinor: number }
 interface Offer { providerAccountId: string, provider: string, label: string, method: string, mode: 'live' | 'test', readers?: { id: string, label: string }[] }
 type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', secret: string } | { kind: 'waiting-for-reader' | 'none' }
 interface Status { state: string, amountMinor: number, currency: string, paidMinor: number, waiting: boolean }
 
+const props = defineProps<{
+  /** The modules whose panels to show; every panel the seller may use when absent. */
+  modules?: string[]
+  /** Live mode: the panels as tabs, drawn larger. */
+  live?: boolean
+}>()
 const emit = defineEmits<{ settled: [{ intentId: string, amountMinor: number }] }>()
 
 const { t } = useT()
@@ -29,7 +37,8 @@ watch(open, (now) => { if (now && !loaded.value) refresh() })
 
 // A panel component no layer supplies is left out rather than breaking the till.
 const panels = computed(() => (loaded.value?.panels ?? []).flatMap((p) => {
-  const component = resolveComponent(p.panel)
+  if (props.modules && !props.modules.includes(p.module)) return []
+  const component = resolveComponent((props.live && p.livePanel) || p.panel)
   return typeof component === 'string' ? [] : [{ ...p, component }]
 }))
 
@@ -70,6 +79,14 @@ watch(filled, () => {
   timer = setTimeout(sum, 300) // not-policy: a pause in typing before the total is asked again
 }, { deep: true })
 const summaryOf = (id: string) => summary.value?.panels.find(p => p.basket === id) ?? null
+
+// In live mode each panel is a tab once there are two; its badge counts the lines it adds to the sale.
+const tabbed = computed(() => props.live && panels.value.length > 1)
+const tab = ref<string | undefined>(undefined)
+const tabs = computed(() => panels.value.map((p) => {
+  const lines = summaryOf(p.id)?.lines.length ?? 0
+  return { value: p.id, label: t(p.tab), icon: p.icon ?? undefined, badge: lines ? String(lines) : undefined, slot: 'panel' as const }
+}))
 
 // The payment being taken: one intent for the total, paid by one way after another until it settles.
 const sale = ref<{ intentId: string, amountMinor: number, key: string } | null>(null)
@@ -353,9 +370,32 @@ function ended() {
         />
         <div
           v-else
-          class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
+          class="grid gap-6"
+          :class="live ? 'md:grid-cols-[minmax(0,1fr)_22rem] text-lg' : 'lg:grid-cols-[minmax(0,1fr)_20rem]'"
         >
-          <div class="space-y-6">
+          <!-- Every panel stays mounted, so a tab keeps what was put in it while another is shown. -->
+          <UTabs
+            v-if="tabbed"
+            v-model="tab"
+            :items="tabs"
+            :unmount-on-hide="false"
+            size="xl"
+            variant="link"
+          >
+            <template #panel="{ item }">
+              <component
+                :is="panels.find(p => p.id === item.value)!.component"
+                v-model="inputs[item.value]"
+                class="pt-4"
+                :locked="!!sale"
+                :summary="summaryOf(item.value)"
+              />
+            </template>
+          </UTabs>
+          <div
+            v-else
+            class="space-y-6"
+          >
             <PageSection
               v-for="p in panels"
               :key="p.id"
@@ -371,7 +411,8 @@ function ended() {
           </div>
 
           <aside
-            class="space-y-4 rounded-lg border border-default p-4 lg:sticky lg:top-4 lg:self-start"
+            class="space-y-4 rounded-lg border border-default p-4"
+            :class="live ? 'md:sticky md:top-16 md:self-start' : 'lg:sticky lg:top-4 lg:self-start'"
             :aria-label="t('payments.screens.till.total-label')"
           >
             <ul
@@ -475,6 +516,8 @@ function ended() {
                 <URadioGroup
                   v-else
                   v-model="choice"
+                  :size="live ? 'xl' : undefined"
+                  :variant="live ? 'card' : undefined"
                   :legend="t('payments.screens.till.how')"
                   :items="methods.map(m => ({ value: key(m), label: methodLabel(m), description: m.mode === 'test' ? t('payments.screens.providers.test-mode') : undefined }))"
                 />

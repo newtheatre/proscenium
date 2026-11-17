@@ -3,7 +3,7 @@
 // Declining is final; the person may apply again. Every decision is a verification row.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { defineRoute, first, nowMs, refuse, today } from '#kit'
+import { defineRoute, first, nowMs, refuse, today, useSetting } from '#kit'
 import { activatePending } from '../../../../memberships'
 import { requireScheme } from '../../../../schemes'
 import { recordOutcome } from '../../../../verify'
@@ -36,10 +36,13 @@ export default defineRoute({
     return { state: 'declined' }
   }
   recordOutcome(unit, record!.id, { outcome: 'passed', verifier }, actor.accountId, note)
-  // Approval and payment are not built yet, so a passed check is the last requirement.
+  // A2: with the fee still to pay, the applicant is now asked to pay, and the application expires if
+  // they do not (J5). Approval is not built yet.
   if (row!.needs_approval || row!.needs_payment) {
-    unit.add({ sql: 'UPDATE membership_memberships SET verified_at = ?, updated_at = ? WHERE id = ? AND state = \'pending\'', params: [nowMs(), nowMs(), record!.id] }).expect(1)
-    return { state: 'pending' }
+    const at = nowMs()
+    const expiresAt = row!.needs_payment ? at + (await useSetting('membership.applications.expire-after') as number) * 1000 : null // not-policy: seconds to milliseconds
+    unit.add({ sql: 'UPDATE membership_memberships SET verified_at = ?, expires_at = ?, updated_at = ? WHERE id = ? AND state = \'pending\'', params: [at, expiresAt, at, record!.id] }).expect(1)
+    return { state: 'pending', waiting: row!.needs_payment ? 'payment' : 'approval' }
   }
   const scheme = await requireScheme(row!.scheme_id)
   const dates = activatePending(unit, {
