@@ -15,7 +15,7 @@ export default defineRoute({
     email: z.string().trim().email().max(254).optional(), // not-policy: the longest address the mail standards allow
     name: z.string().trim().min(1).max(120).optional(), // not-policy: shape bound
   }).strict(),
-}, (event, { input, unit }) => {
-  fromRequest(event)
+}, async (event, { input, unit }) => {
+  await fromRequest(event)
   return requestReservation(unit.view(), { orderId: getRouterParam(event, 'id')!, token: getHeader(event, 'x-basket-token') ?? '', ...input })
 })
