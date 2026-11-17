@@ -94,7 +94,7 @@ describe('recovering a lost passkey (ID-08)', () => {
     const person = new Browser()
     const landed = await person.post('/api/core/sign-in/link', { token: fragment(second.body.link) })
     expect(landed.status).toBe(200)
-    expect(landed.body).toEqual({ next: '/account/passkey', offerPasskey: true })
+    expect(landed.body).toEqual({ next: '/account/passkey', offerPasskey: true, welcome: false })
     expect((await person.get('/api/core/me')).body.account.id).toBe(lockedOut)
     expect((await person.get('/api/core/me/sessions')).status).toBe(401)
     expect((await new Browser().post('/api/core/sign-in/link', { token: fragment(second.body.link) })).status).toBe(410)

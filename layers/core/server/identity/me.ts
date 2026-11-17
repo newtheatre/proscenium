@@ -20,9 +20,10 @@ export async function holdsPrivileged(accountId: string): Promise<boolean> {
 }
 
 // The ways in a signed-out browser is offered. Passkeys are always on.
-export async function signInMethods(): Promise<{ email: boolean, google: boolean }> {
+// `openSignUp` says whether signing in with a new address makes an account, so the page can say so.
+export async function signInMethods(): Promise<{ email: boolean, google: boolean, openSignUp: boolean }> {
   const google = !!(await useSetting('core.sign-in.google')) && !!(await useSetting('core.sign-in.google-client-id'))
-  return { email: !!(await useSetting('core.sign-in.email-link')), google }
+  return { email: !!(await useSetting('core.sign-in.email-link')), google, openSignUp: !!(await useSetting('core.sign-in.open-sign-up')) }
 }
 
 export async function describeMe(session: CurrentSession) {

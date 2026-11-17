@@ -1,4 +1,6 @@
-<!-- The passkey offer after an email sign-in (ID-03). Skippable; staff are told the console needs one. -->
+<!-- The passkey offer after an email sign-in (ID-03). Skippable: "Not now" is remembered in this browser
+     for 90 days, during which the offer is not made again (the server reads the cookie). Staff are told
+     the console needs one, and are asked every time until they have one. -->
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
@@ -9,6 +11,14 @@ const refusal = ref<Refusal | null>(null)
 const codes = ref<string[] | null>(null)
 // The account shell's guard has already sent a signed-out visitor to sign in (middleware/access.global.ts).
 const { data: me } = await useAPI<{ signedIn: boolean, consoleNeedsPasskey?: boolean }>('/api/core/me', { key: 'core:me' })
+
+const LATER_DAYS = 90 // not-policy: how long "Not now" lasts in this browser
+const later = useCookie(PASSKEY_LATER_COOKIE, { maxAge: LATER_DAYS * 24 * 60 * 60, sameSite: 'lax', path: '/' })
+
+function notNow() {
+  later.value = '1'
+  return navigateTo(next)
+}
 
 async function add() {
   refusal.value = null
@@ -48,7 +58,7 @@ async function add() {
         block
         color="neutral"
         variant="link"
-        :to="next"
+        @click="notNow()"
       >
         Not now
       </UButton>

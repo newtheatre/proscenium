@@ -10,5 +10,5 @@ export default defineRoute({
   input: z.object({ token: z.string().min(20).max(100) }), // not-policy: a link token is 43 characters
 }, async (event, { input, unit }) => {
   const done = await useLink(unit, event, input.token)
-  return { next: done.next ?? '/', offerPasskey: done.offerPasskey }
+  return { next: done.next ?? '/', offerPasskey: done.offerPasskey, welcome: done.welcome }
 })
