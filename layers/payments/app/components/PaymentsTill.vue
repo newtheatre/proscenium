@@ -104,6 +104,11 @@ const chosen = computed(() => methods.value.find(m => key(m) === choice.value))
 const key = (m: Offer) => `${m.providerAccountId}:${m.method}`
 const tendered = ref<number | undefined>(undefined)
 const readerId = ref<string | undefined>(undefined)
+// Part of what is due, taken by this way of paying; empty takes it all. The rest is then taken another way.
+const part = ref<number | undefined>(undefined)
+const partMinor = computed(() => (part.value === undefined || part.value === null ? undefined : toMinor(part.value)))
+const partTooMuch = computed(() => partMinor.value !== undefined && (partMinor.value <= 0 || partMinor.value > due.value))
+const taken = computed(() => partMinor.value ?? due.value)
 watch(chosen, (m) => {
   tendered.value = undefined
   readerId.value = m?.readers?.length === 1 ? m.readers[0]!.id : undefined
@@ -112,11 +117,13 @@ const methodLabel = (m: Offer) => (m.method === 'cash' ? t('payments.screens.met
 
 async function check() {
   if (!sale.value) return
+  const before = payment.value?.paidMinor ?? 0
   const now = await $api<Status>(`/api/payments/intents/${sale.value.intentId}` as string)
   payment.value = now
   if (now.state === 'succeeded') return done()
   if (now.state === 'unfulfilled') return undone()
   if (now.state !== 'open') return ended()
+  if (now.paidMinor > before) return partTaken(now.paidMinor - before)
   if (!now.waiting && result.value?.kind === 'waiting') result.value = { kind: 'declined' }
 }
 
@@ -145,7 +152,7 @@ async function pay(succeeded = true) {
       const tenderedMinor = m.method === 'cash' && tendered.value !== undefined ? toMinor(tendered.value) : undefined
       const answer = await $api<{ settled: boolean, unfulfilled: boolean, changeMinor: number }>(`/api/payments/intents/${sale.value.intentId}/attest` as string, {
         method: 'POST',
-        body: { providerAccountId: m.providerAccountId, method: m.method, tenderedMinor, succeeded: m.method === 'cash' ? undefined : succeeded },
+        body: { providerAccountId: m.providerAccountId, method: m.method, amountMinor: partMinor.value, tenderedMinor, succeeded: m.method === 'cash' ? undefined : succeeded },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -157,7 +164,7 @@ async function pay(succeeded = true) {
     else {
       const started = await $api<{ next: Next, state: string, settled: boolean, unfulfilled: boolean }>(`/api/payments/intents/${sale.value.intentId}/start` as string, {
         method: 'POST',
-        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value },
+        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, amountMinor: partMinor.value },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -180,6 +187,18 @@ async function pay(succeeded = true) {
     taking.value = false
   }
 }
+
+// A part is paid and the rest is still due: say what was taken and any change, and start the next way afresh.
+function partTaken(amountMinor: number) {
+  const change = changeMinor.value
+  stopPolling()
+  result.value = null
+  toast.add({ title: t('payments.screens.till.part-paid', { amount: money(amountMinor), due: money(due.value) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
+  changeMinor.value = 0
+  choice.value = undefined
+  part.value = undefined
+}
+const paidInPart = computed(() => (payment.value?.paidMinor ?? 0) > 0)
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
 
@@ -211,6 +230,7 @@ function reset() {
   payment.value = null
   result.value = null
   choice.value = undefined
+  part.value = undefined
   saleKey.value = crypto.randomUUID()
 }
 function done() {
@@ -339,6 +359,12 @@ function ended() {
               <p class="font-medium">
                 {{ t('payments.screens.till.due', { amount: money(due) }) }}
               </p>
+              <p
+                v-if="paidInPart"
+                class="text-sm text-muted"
+              >
+                {{ t('payments.screens.till.paid-so-far', { amount: money(payment?.paidMinor ?? 0) }) }}
+              </p>
 
               <UAlert
                 v-if="result?.kind === 'declined'"
@@ -387,6 +413,20 @@ function ended() {
                 />
 
                 <UFormField
+                  v-if="chosen"
+                  :label="t('payments.screens.till.part')"
+                  :hint="t('payments.screens.optional')"
+                  :help="t('payments.screens.till.part-help', { amount: money(due) })"
+                  :error="partTooMuch ? t('payments.screens.till.part-too-much', { amount: money(due) }) : undefined"
+                >
+                  <UInputNumber
+                    v-model="part"
+                    :min="0"
+                    :step="0.01"
+                    :format-options="{ style: 'currency', currency }"
+                  />
+                </UFormField>
+                <UFormField
                   v-if="chosen?.method === 'cash'"
                   :label="t('payments.screens.till.tendered')"
                   :hint="t('payments.screens.optional')"
@@ -416,8 +456,8 @@ function ended() {
                 >
                   <UButton
                     :loading="taking"
-                    :disabled="chosen.method === 'card_reader' && !readerId"
-                    :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved') : chosen.method === 'cash' ? t('payments.screens.till.cash-taken') : t('payments.screens.till.start')"
+                    :disabled="partTooMuch || (chosen.method === 'card_reader' && !readerId)"
+                    :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
                     @click="pay()"
                   />
                   <UButton
@@ -431,7 +471,15 @@ function ended() {
                 </div>
               </template>
 
+              <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is refunded. -->
+              <p
+                v-if="paidInPart"
+                class="text-sm text-muted"
+              >
+                {{ t('payments.screens.till.no-cancel') }}
+              </p>
               <UButton
+                v-else
                 color="neutral"
                 variant="ghost"
                 :disabled="taking"
