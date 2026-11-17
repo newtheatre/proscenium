@@ -42,7 +42,7 @@
   "core.merge.done": "The accounts are merged. Anything left to move moves in the background.",
   "core.picker.placeholder": "Choose a person",
   "core.picker.search": "Name or full email address",
-  "core.picker.type-more": "Type at least two letters of a name, or a whole email address.",
+  "core.picker.type-more": "Type at least three letters of a name, or a whole email address.",
   "core.picker.none": "Nobody matches.",
   "core.picker.failed": "The search did not work. Try again in a moment.",
   "core.picker.since": "Has signed in, since {date}",

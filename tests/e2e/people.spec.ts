@@ -39,7 +39,7 @@ test.describe('Merge accounts', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Merge accounts' })).toBeVisible()
     await noViolations(page)
     await page.getByRole('button', { name: 'The account to keep' }).click()
-    await expect(page.getByText('Type at least two letters')).toBeVisible()
+    await expect(page.getByText('Type at least three letters')).toBeVisible()
     await page.getByPlaceholder('Name or full email address').fill('Zzyzx Nobody')
     await expect(page.getByText('Nobody matches.')).toBeVisible()
   })

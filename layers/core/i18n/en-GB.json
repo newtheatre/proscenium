@@ -135,6 +135,7 @@
   "core.settings.rules.google-needs-client-secret": "Google sign-in needs the CORE_GOOGLE_CLIENT_SECRET Worker secret. Set it first.",
   "core.settings.rules.domains-are-domains": "Each entry must be a domain, such as newtheatre.org.uk, with no @ and no spaces.",
   "core.abilities.account.search.label": "Find people by name or address",
+  "core.abilities.account.find.label": "Search other lists by a person's name or address",
   "core.abilities.account.read.label": "See a person's details and how they sign in",
   "core.abilities.account.create.label": "Add people by name and address",
   "core.abilities.account.disable.label": "Disable and enable accounts",

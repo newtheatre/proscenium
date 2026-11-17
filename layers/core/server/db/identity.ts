@@ -47,6 +47,8 @@ export const accounts = defineTable('core_accounts', {
     check('core_accounts_preferred_name_length', sql`preferred_name IS NULL OR length(preferred_name) <= 60`),
     check('core_accounts_pronouns_length', sql`pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40`),
     index('core_accounts_merged_into').on(t.mergedIntoId),
+    // The accounts list's sort by name.
+    index('core_accounts_name').on(t.name),
   ],
 })
 

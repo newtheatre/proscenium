@@ -34,7 +34,7 @@ const items = computed(() => {
 let latest = 0
 async function search(q: string) {
   const asked = ++latest
-  if (q.trim().length < 2) {
+  if (q.trim().length < 3) {
     found.value = []
     loading.value = false
     return
@@ -78,7 +78,7 @@ watch(model, (id) => {
     class="w-full"
   >
     <template #empty>
-      {{ failed ? t('core.picker.failed') : term.trim().length < 2 ? t('core.picker.type-more') : t('core.picker.none') }}
+      {{ failed ? t('core.picker.failed') : term.trim().length < 3 ? t('core.picker.type-more') : t('core.picker.none') }}
     </template>
   </USelectMenu>
 </template>
