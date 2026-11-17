@@ -2,7 +2,7 @@
 // intent sum to it, a record has one open intent, a sale prepared and never paid is released, every
 // part settles or none does, an owner's entries total its part and reach only its own accounts, and
 // the one posting splits by part. The owners are the fixtures tickets and snacks.
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { changeSetting, createUnit, newId, nowMs, setClock } from '#kit'
 import { createIntent, cancelIntent, intentStatus, recordAnswer, attest } from '../../server/services'
 import { releaseParts, getIntent, partsOf } from '../../server/intents'
@@ -200,7 +200,13 @@ describe('all-parts-settle-or-none', () => {
   it('settles nothing when one owner refuses after the money was taken: the intent is unfulfilled', async () => {
     const prepared = await prepare({ amount: 1500 }, { amount: 300 })
     await env.DB.prepare("UPDATE snacks_sales SET state = 'released' WHERE id = ?").bind(prepared.saleId).run()
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
     await expectUnfulfilled(prepared, 1800)
+    // Why the owner refused is logged, as nothing else keeps it.
+    const line = warned.mock.calls.map(c => JSON.parse(String(c[0]))).find(l => l.message === 'payments.settlement-refused')
+    warned.mockRestore()
+    expect(line).toMatchObject({ intentId: prepared.intentId, module: 'snacks' })
+    expect(line.code).toMatch(/^snacks\./)
   })
 })
 
