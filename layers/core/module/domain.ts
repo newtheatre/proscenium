@@ -287,6 +287,8 @@ export const announces = {
   'core.performance.completed': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string() }), internal: false }),
   'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
   'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
+  // Whether the theatre runs a space changed (R-36): a bar or a hire may care.
+  'core.space.managed-changed': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string(), managed: z.boolean() }), internal: false }),
   'core.closure.created': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
   'core.closure.removed': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),

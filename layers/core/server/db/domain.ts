@@ -354,7 +354,6 @@ export const venues = defineTable('core_venues', {
   id: col.id(),
   slug: col.public(text('slug').notNull().unique()),
   name: col.public(text('name').notNull()),
-  managed: col.internal(integer('managed', { mode: 'boolean' }).notNull().default(true)),
   addressLines: col.public(text('address_lines')),
   locality: col.public(text('locality')),
   postcode: col.public(text('postcode')),
@@ -394,6 +393,12 @@ export const spaces = defineTable('core_spaces', {
   exclusive: col.internal(integer('exclusive', { mode: 'boolean' }).notNull().default(true)),
   description: col.public(text('description')),
   accessInfo: col.public(text('access_info')),
+  // Whether the theatre runs this space (R-36): a theatre may run some rooms in a building another
+  // body manages. Core treats managed and unmanaged spaces alike; other modules may ask.
+  managed: col.internal(integer('managed', { mode: 'boolean' }).notNull().default(true)),
+  // A short public note for finding the space, shown under the venue's directions. At most 200
+  // characters, bounded by the route's input: a CHECK added now would rebuild the table.
+  findingIt: col.public(text('finding_it')),
   state: col.internal(text('state').notNull().default('active')),
   sort: col.internal(integer('sort').notNull().default(0)),
   createdAt: col.createdAt(),

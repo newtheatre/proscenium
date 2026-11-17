@@ -13,8 +13,12 @@ import addSpace from '../../server/api/core/venues/[id]/spaces/index.post'
 import patchSpace from '../../server/api/core/venues/[id]/spaces/[space]/index.patch'
 import deleteSpace from '../../server/api/core/venues/[id]/spaces/[space]/index.delete'
 import archiveSpace from '../../server/api/core/venues/[id]/spaces/[space]/archive.post'
+import spaceImpact from '../../server/api/core/venues/[id]/spaces/[space]/impact.get'
+import { assertSpaceManaged, getSpace, listSpaces, placeName } from '../../server/places/service'
+import { sql } from 'drizzle-orm'
+import { useDb } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, person, rows, server } from '../../../../tests/integration/helpers'
+import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 
 const handle = server({
   'GET /api/core/venues': listVenues,
@@ -28,6 +32,7 @@ const handle = server({
   'PATCH /api/core/venues/:id/spaces/:space': patchSpace,
   'DELETE /api/core/venues/:id/spaces/:space': deleteSpace,
   'POST /api/core/venues/:id/spaces/:space/archive': archiveSpace,
+  'GET /api/core/venues/:id/spaces/:space/impact': spaceImpact,
 })
 const admin = person(['core.venue.manage'])
 const member = person([])
@@ -167,5 +172,44 @@ describe('access features', () => {
     const wrong = await put({ features: [{ termId: (await read(venueId)).kinds[0]!.id }] })
     expect(wrong.body.code).toBe('core.place-access.unknown')
     expect((await put({ features: [{ termId: lift }, { termId: lift }] })).body.code).toBe('core.place-access.repeated')
+  })
+})
+
+describe('who runs a space (R-36)', () => {
+  it('is set on each space, on by default, with a short note for finding it', async () => {
+    const { venueId, spaceId } = await venue('Portland Building')
+    const kind = (await read(venueId)).kinds[0]!.id
+    const studio = await json(call(handle, 'POST', `/api/core/venues/${venueId}/spaces`, { actor: admin, body: { name: 'Studio', kindTermId: kind, managed: false, findingIt: 'Second floor, by the lifts' } }))
+    expect(studio.status).toBe(200)
+    expect(await inContext(() => getSpace(spaceId))).toMatchObject({ managed: true, findingIt: null })
+    expect(await inContext(() => getSpace(studio.body.id))).toMatchObject({ managed: false, findingIt: 'Second floor, by the lifts' })
+    expect((await inContext(() => listSpaces({ venueId, managed: false }))).map(s => s.name)).toEqual(['Studio'])
+    // A note longer than 200 characters is refused, and the venue no longer takes an answer of its own.
+    expect((await json(call(handle, 'PATCH', `/api/core/venues/${venueId}/spaces/${spaceId}`, { actor: admin, body: { findingIt: 'x'.repeat(201) } }))).status).toBe(422)
+    await json(call(handle, 'PATCH', `/api/core/venues/${venueId}`, { actor: admin, body: { managed: false } }))
+    expect(await inContext(() => getSpace(spaceId))).toMatchObject({ managed: true })
+  })
+
+  it('announces a change, and offers it to other modules before it is saved', async () => {
+    const { venueId, spaceId } = await venue()
+    const impact = await json(call(handle, 'GET', `/api/core/venues/${venueId}/spaces/${spaceId}/impact?managed=false`, { actor: admin }))
+    expect(impact).toEqual({ status: 200, body: { lines: [] } })
+    expect((await json(call(handle, 'PATCH', `/api/core/venues/${venueId}/spaces/${spaceId}`, { actor: admin, body: { managed: false } }))).status).toBe(200)
+    // Saving the same answer again announces nothing more.
+    await json(call(handle, 'PATCH', `/api/core/venues/${venueId}/spaces/${spaceId}`, { actor: admin, body: { managed: false, name: 'Renamed' } }))
+    const events = await rows<{ payload: string }>("SELECT payload FROM core_events WHERE name = 'core.space.managed-changed' AND record_id = ?", spaceId)
+    expect(events.map(e => JSON.parse(e.payload))).toEqual([{ spaceId, venueId, managed: false }])
+  })
+
+  it('names a place as space and venue, and answers whether the theatre runs it inside a statement', async () => {
+    const { venueId, spaceId } = await venue('Trent Building')
+    const kind = (await read(venueId)).kinds[0]!.id
+    const studio = (await json(call(handle, 'POST', `/api/core/venues/${venueId}/spaces`, { actor: admin, body: { name: 'Studio', kindTermId: kind, managed: false } }))).body.id
+    expect(await inContext(() => placeName(studio))).toBe('Studio, Trent Building')
+    // The venue's own space, with its name, reads as the venue alone.
+    expect(await inContext(() => placeName(spaceId))).toBe('Trent Building')
+    const managed = (id: string) => inContext(async () => (await useDb().get<{ ok: number }>(sql`SELECT ${assertSpaceManaged(id)} AS ok`))!.ok)
+    expect(await managed(spaceId)).toBe(1)
+    expect(await managed(studio)).toBe(0)
   })
 })
