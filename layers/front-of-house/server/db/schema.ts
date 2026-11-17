@@ -150,4 +150,284 @@ export const assignments = defineTable('front_of_house_assignments', {
   ],
 })
 
-export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments }
+export const TIMING_KINDS = ['house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear'] as const
+
+/** A recorded moment of the night: house open, curtain up and the rest. One of each per performance. */
+export const timings = defineTable('front_of_house_timings', {
+  id: col.id(),
+  performanceId: col.internal(text('performance_id').notNull()),
+  kind: col.internal(text('kind', { enum: TIMING_KINDS }).notNull()),
+  at: col.timestamp('at').notNull(),
+  recordedBy: col.account('recorded_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'tmg',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_timings_kind').on(t.performanceId, t.kind),
+    check('front_of_house_timings_kind_check', sql`${t.kind} IN (${list(TIMING_KINDS)})`),
+  ],
+})
+
+/** A checklist for a moment of the night: before the house opens, after it clears. */
+export const checklists = defineTable('front_of_house_checklists', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  moment: col.internal(text('moment', { enum: ['pre-show', 'post-show', 'other'] }).notNull()),
+  // Null applies everywhere.
+  venueId: col.internal(text('venue_id')),
+  // Whose list it usually is: a hint for the board, not a restriction.
+  dutyId: col.ref('front_of_house_duties', { nullable: true }),
+  sortOrder: col.internal(integer('sort_order').notNull().default(0)),
+  archivedAt: col.timestamp('archived_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ckl',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    check('front_of_house_checklists_name', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('front_of_house_checklists_moment', sql`${t.moment} IN ('pre-show', 'post-show', 'other')`),
+  ],
+})
+
+/** One item of a checklist. Archived, never deleted, once a run has used it. */
+export const checklistItems = defineTable('front_of_house_checklist_items', {
+  id: col.id(),
+  checklistId: col.ref('front_of_house_checklists'),
+  label: col.internal(text('label').notNull()),
+  help: col.internal(text('help')),
+  kind: col.internal(text('kind', { enum: ['tick', 'reading'] }).notNull().default('tick')),
+  unit: col.internal(text('unit')),
+  required: col.internal(integer('required', { mode: 'boolean' }).notNull().default(true)),
+  sortOrder: col.internal(integer('sort_order').notNull().default(0)),
+  archivedAt: col.timestamp('archived_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'cki',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('front_of_house_checklist_items_list').on(t.checklistId, t.sortOrder),
+    check('front_of_house_checklist_items_label', sql`length(${t.label}) BETWEEN 1 AND 160`),
+    check('front_of_house_checklist_items_help', sql`${t.help} IS NULL OR length(${t.help}) <= 500`),
+    check('front_of_house_checklist_items_kind', sql`${t.kind} IN ('tick', 'reading')`),
+    check('front_of_house_checklist_items_unit', sql`${t.unit} IS NULL OR (${t.kind} = 'reading' AND length(${t.unit}) <= 20)`),
+  ],
+})
+
+/** One use of a checklist on one night. */
+export const checklistRuns = defineTable('front_of_house_checklist_runs', {
+  id: col.id(),
+  checklistId: col.ref('front_of_house_checklists'),
+  performanceId: col.internal(text('performance_id')),
+  venueId: col.internal(text('venue_id')),
+  localDate: col.localDate('local_date').notNull(),
+  state: col.internal(text('state', { enum: ['open', 'complete', 'complete_with_exceptions'] }).notNull().default('open')),
+  completedBy: col.account('completed_by', { role: 'actor', nullable: true }),
+  completedAt: col.timestamp('completed_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ckr',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_checklist_runs_performance').on(t.checklistId, t.performanceId).where(sql`performance_id IS NOT NULL`),
+    uniqueIndex('front_of_house_checklist_runs_day').on(t.checklistId, sql`coalesce(${t.venueId}, '')`, t.localDate).where(sql`performance_id IS NULL`),
+    check('front_of_house_checklist_runs_state', sql`${t.state} IN ('open', 'complete', 'complete_with_exceptions')`),
+  ],
+})
+
+/** The outcome of one item in one run. The label is copied, so a later rewording leaves the record alone. */
+export const checklistEntries = defineTable('front_of_house_checklist_entries', {
+  id: col.id(),
+  runId: col.ref('front_of_house_checklist_runs'),
+  itemId: col.ref('front_of_house_checklist_items'),
+  label: col.internal(text('label').notNull()),
+  outcome: col.internal(text('outcome', { enum: ['done', 'exception', 'not_applicable'] }).notNull()),
+  reading: col.internal(integer('reading')),
+  reasonCode: col.ref('core_terms', { nullable: true }),
+  // About the thing, not a person: anything about a person belongs in an incident.
+  reasonNote: col.internal(text('reason_note')),
+  doneBy: col.account('done_by', { role: 'actor' }),
+  // The device's time when the entry was queued offline.
+  doneAt: col.timestamp('done_at').notNull(),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'cke',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_checklist_entries_item').on(t.runId, t.itemId),
+    check('front_of_house_checklist_entries_outcome', sql`${t.outcome} IN ('done', 'exception', 'not_applicable')`),
+    check('front_of_house_checklist_entries_reason', sql`${t.outcome} <> 'exception' OR ${t.reasonCode} IS NOT NULL`),
+    check('front_of_house_checklist_entries_note', sql`${t.reasonNote} IS NULL OR length(${t.reasonNote}) <= 200`),
+  ],
+})
+
+/** A venue's evacuation and emergency instructions, kept on the device. */
+export const emergencyCards = defineTable('front_of_house_emergency_cards', {
+  id: col.id(),
+  venueId: col.internal(text('venue_id').notNull()),
+  // Markdown: routes, assembly point, who to call. Role titles and switchboard numbers, not private numbers.
+  body: col.internal(text('body').notNull()),
+  reviewedOn: col.localDate('reviewed_on').notNull(),
+  reviewedBy: col.account('reviewed_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'emg',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_emergency_cards_venue').on(t.venueId),
+    check('front_of_house_emergency_cards_body', sql`length(${t.body}) BETWEEN 1 AND 8000`),
+  ],
+})
+
+export const INCIDENT_KINDS = ['incident', 'near_miss'] as const
+export const SEVERITIES = ['minor', 'moderate', 'serious'] as const
+export const INCIDENT_STATES = ['reported', 'in_review', 'closed'] as const
+export const INVOLVEMENTS = ['affected', 'witness', 'helped', 'other'] as const
+
+// Free text about an incident is the safety record: it outlives an erasure for the retention period.
+const kept = { erase: 'retain', until: 'front-of-house.retention.incidents', reason: 'front-of-house.retain.incident' } as const
+
+/**
+ * An incident or near miss. The row's own facts (number, kind, severity, dates) are the theatre's
+ * history; its free text may describe anyone listed on it, so it is kept for the retention period.
+ */
+export const incidents = defineTable('front_of_house_incidents', {
+  id: col.id(),
+  number: col.internal(integer('number').notNull()),
+  year: col.internal(integer('year').notNull()),
+  kind: col.internal(text('kind', { enum: INCIDENT_KINDS }).notNull()),
+  categoryId: col.ref('core_terms', { nullable: true }),
+  severity: col.internal(text('severity', { enum: SEVERITIES }).notNull().default('minor')),
+  state: col.internal(text('state', { enum: INCIDENT_STATES }).notNull().default('reported')),
+  performanceId: col.internal(text('performance_id')),
+  venueId: col.internal(text('venue_id')),
+  spaceId: col.internal(text('space_id')),
+  whereNote: col.internal(text('where_note')),
+  occurredAt: col.timestamp('occurred_at').notNull(),
+  whatHappened: col.freeText(text('what_happened').notNull(), kept),
+  immediateAction: col.freeText(text('immediate_action'), kept),
+  firstAidGiven: col.internal(integer('first_aid_given', { mode: 'boolean' }).notNull().default(false)),
+  emergencyServicesCalled: col.internal(integer('emergency_services_called', { mode: 'boolean' }).notNull().default(false)),
+  reportedBy: col.account('reported_by', { role: 'actor' }),
+  reportedAt: col.timestamp('reported_at').notNull(),
+  reviewerId: col.account('reviewer_id', { role: 'actor', nullable: true }),
+  closedBy: col.account('closed_by', { role: 'actor', nullable: true }),
+  closedAt: col.timestamp('closed_at'),
+  closingNote: col.freeText(text('closing_note'), kept),
+  // Set once the daily digest has carried it, for incidents below the immediate severity.
+  digestedAt: col.timestamp('digested_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'inc',
+  realm: 'operational',
+  retention: 'front-of-house.retention.incidents',
+  extra: t => [
+    uniqueIndex('front_of_house_incidents_number').on(t.year, t.number),
+    index('front_of_house_incidents_state').on(t.state, t.reportedAt),
+    index('front_of_house_incidents_reporter').on(t.reportedBy),
+    check('front_of_house_incidents_kind', sql`${t.kind} IN (${list(INCIDENT_KINDS)})`),
+    check('front_of_house_incidents_severity', sql`${t.severity} IN (${list(SEVERITIES)})`),
+    check('front_of_house_incidents_state', sql`${t.state} IN (${list(INCIDENT_STATES)})`),
+    // Either flag raises the severity to at least moderate.
+    check('front_of_house_incidents_floor', sql`${t.severity} <> 'minor' OR (${t.firstAidGiven} = 0 AND ${t.emergencyServicesCalled} = 0)`),
+    check('front_of_house_incidents_where', sql`${t.whereNote} IS NULL OR length(${t.whereNote}) <= 120`),
+    check('front_of_house_incidents_what', sql`length(${t.whatHappened}) BETWEEN 1 AND 4000`),
+    check('front_of_house_incidents_action', sql`${t.immediateAction} IS NULL OR length(${t.immediateAction}) <= 2000`),
+    check('front_of_house_incidents_closing', sql`${t.closingNote} IS NULL OR length(${t.closingNote}) <= 2000`),
+    check('front_of_house_incidents_closed', sql`${t.state} <> 'closed' OR (${t.closedAt} IS NOT NULL AND ${t.closingNote} IS NOT NULL)`),
+  ],
+})
+
+/** A person involved in an incident: an account when they have one, otherwise a name and contact. */
+export const incidentPeople = defineTable('front_of_house_incident_people', {
+  id: col.id(),
+  incidentId: col.ref('front_of_house_incidents'),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias', nullable: true }),
+  name: col.personal(text('name'), kept),
+  contact: col.personal(text('contact'), kept),
+  involvement: col.internal(text('involvement', { enum: INVOLVEMENTS }).notNull()),
+  isChild: col.internal(integer('is_child', { mode: 'boolean' }).notNull().default(false)),
+  // Injury and treatment. Sealed; cleared at once on erasure.
+  details: col.special('details'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'inp',
+  realm: 'operational',
+  subject: { account: 'account_id', unlinked: 'staff' },
+  retention: 'front-of-house.retention.incidents',
+  extra: t => [
+    index('front_of_house_incident_people_incident').on(t.incidentId),
+    index('front_of_house_incident_people_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
+    check('front_of_house_incident_people_who', sql`${t.accountId} IS NOT NULL OR ${t.name} IS NOT NULL`),
+    check('front_of_house_incident_people_name', sql`${t.name} IS NULL OR length(${t.name}) <= 120`),
+    check('front_of_house_incident_people_contact', sql`${t.contact} IS NULL OR length(${t.contact}) <= 200`),
+    check('front_of_house_incident_people_involvement', sql`${t.involvement} IN (${list(INVOLVEMENTS)})`),
+  ],
+})
+
+/** A follow-up action: something to do about a thing, never about a person. */
+export const incidentActions = defineTable('front_of_house_incident_actions', {
+  id: col.id(),
+  incidentId: col.ref('front_of_house_incidents'),
+  what: col.internal(text('what').notNull()),
+  ownerId: col.account('owner_id', { role: 'actor', nullable: true }),
+  dueOn: col.localDate('due_on'),
+  state: col.internal(text('state', { enum: ['open', 'done', 'dropped'] }).notNull().default('open')),
+  resolvedAt: col.timestamp('resolved_at'),
+  resolvedNote: col.internal(text('resolved_note')),
+  // The last day the owner was reminded, so a re-run of the daily task sends nothing twice.
+  chasedOn: col.localDate('chased_on'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ina',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('front_of_house_incident_actions_incident').on(t.incidentId),
+    index('front_of_house_incident_actions_due').on(t.state, t.dueOn),
+    check('front_of_house_incident_actions_what', sql`length(${t.what}) BETWEEN 1 AND 300`),
+    check('front_of_house_incident_actions_state', sql`${t.state} IN ('open', 'done', 'dropped')`),
+    check('front_of_house_incident_actions_note', sql`${t.resolvedNote} IS NULL OR length(${t.resolvedNote}) <= 300`),
+    check('front_of_house_incident_actions_dropped', sql`${t.state} <> 'dropped' OR ${t.resolvedNote} IS NOT NULL`),
+  ],
+})
+
+/** The log of an incident: comments and every change of state, severity and category. */
+export const incidentUpdates = defineTable('front_of_house_incident_updates', {
+  id: col.id(),
+  incidentId: col.ref('front_of_house_incidents'),
+  kind: col.internal(text('kind', { enum: ['comment', 'state', 'severity', 'category'] }).notNull()),
+  fromValue: col.internal(text('from_value')),
+  toValue: col.internal(text('to_value')),
+  body: col.freeText(text('body'), kept),
+  authorId: col.account('author_id', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'inu',
+  realm: 'operational',
+  subject: { via: 'incident_id' },
+  retention: 'front-of-house.retention.incidents',
+  appendOnly: true,
+  extra: t => [
+    index('front_of_house_incident_updates_incident').on(t.incidentId, t.createdAt),
+    check('front_of_house_incident_updates_kind', sql`${t.kind} IN ('comment', 'state', 'severity', 'category')`),
+    check('front_of_house_incident_updates_body', sql`${t.body} IS NULL OR length(${t.body}) <= 2000`),
+  ],
+})
+
+export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates }

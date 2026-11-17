@@ -29,6 +29,44 @@ import publishPost from '../../server/api/front-of-house/shifts/[id]/publish.pos
 import unpublishPost from '../../server/api/front-of-house/shifts/[id]/unpublish.post'
 import cancelPost from '../../server/api/front-of-house/shifts/[id]/cancel.post'
 import signUpPost from '../../server/api/front-of-house/shifts/[id]/sign-up.post'
+import shiftGet from '../../server/api/front-of-house/shifts/[id]/index.get'
+import assignPost from '../../server/api/front-of-house/shifts/[id]/assign.post'
+import confirmPost from '../../server/api/front-of-house/assignments/[id]/confirm.post'
+import declinePost from '../../server/api/front-of-house/assignments/[id]/decline.post'
+import removePost from '../../server/api/front-of-house/assignments/[id]/remove.post'
+import releasePost from '../../server/api/front-of-house/assignments/[id]/release.post'
+import keepPost from '../../server/api/front-of-house/assignments/[id]/keep.post'
+import coverPost from '../../server/api/front-of-house/assignments/[id]/cover.post'
+import openShiftsGet from '../../server/api/front-of-house/open-shifts.get'
+import myShiftsGet from '../../server/api/front-of-house/me/shifts.get'
+import checkInPost from '../../server/api/front-of-house/assignments/[id]/check-in.post'
+import timingsPost from '../../server/api/front-of-house/performances/[id]/timings.post'
+import extendPost from '../../server/api/front-of-house/performances/[id]/extend.post'
+import tonightGet from '../../server/api/front-of-house/performances/[id]/tonight.get'
+import runGet from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/index.get'
+import runOpen from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/open.post'
+import itemPut from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/items/[itemId].put'
+import runComplete from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/complete.post'
+import runReopen from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/reopen.post'
+import checklistsGet from '../../server/api/front-of-house/checklists/index.get'
+import checklistsPost from '../../server/api/front-of-house/checklists/index.post'
+import checklistPut from '../../server/api/front-of-house/checklists/[id]/index.put'
+import checklistArchive from '../../server/api/front-of-house/checklists/[id]/archive.post'
+import cardsGet from '../../server/api/front-of-house/emergency-cards/index.get'
+import cardPut from '../../server/api/front-of-house/emergency-cards/[venueId].put'
+import incidentsPost from '../../server/api/front-of-house/incidents/index.post'
+import incidentsGet from '../../server/api/front-of-house/incidents/index.get'
+import incidentsMine from '../../server/api/front-of-house/incidents/mine.get'
+import incidentGet from '../../server/api/front-of-house/incidents/[id]/index.get'
+import incidentOpen from '../../server/api/front-of-house/incidents/[id]/open.post'
+import incidentReview from '../../server/api/front-of-house/incidents/[id]/review.post'
+import peoplePost from '../../server/api/front-of-house/incidents/[id]/people/index.post'
+import personPut from '../../server/api/front-of-house/incidents/[id]/people/[personId]/index.put'
+import personRemove from '../../server/api/front-of-house/incidents/[id]/people/[personId]/remove.post'
+import actionsPost from '../../server/api/front-of-house/incidents/[id]/actions/index.post'
+import actionResolve from '../../server/api/front-of-house/incidents/[id]/actions/[actionId]/resolve.post'
+import incidentClose from '../../server/api/front-of-house/incidents/[id]/close.post'
+import incidentReopen from '../../server/api/front-of-house/incidents/[id]/reopen.post'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -58,11 +96,49 @@ export const handle = server({
   'POST /api/front-of-house/shifts/:id/unpublish': unpublishPost,
   'POST /api/front-of-house/shifts/:id/cancel': cancelPost,
   'POST /api/front-of-house/shifts/:id/sign-up': signUpPost,
+  'GET /api/front-of-house/shifts/:id': shiftGet,
+  'POST /api/front-of-house/shifts/:id/assign': assignPost,
+  'POST /api/front-of-house/assignments/:id/confirm': confirmPost,
+  'POST /api/front-of-house/assignments/:id/decline': declinePost,
+  'POST /api/front-of-house/assignments/:id/remove': removePost,
+  'POST /api/front-of-house/assignments/:id/release': releasePost,
+  'POST /api/front-of-house/assignments/:id/keep': keepPost,
+  'POST /api/front-of-house/assignments/:id/cover': coverPost,
+  'GET /api/front-of-house/open-shifts': openShiftsGet,
+  'GET /api/front-of-house/me/shifts': myShiftsGet,
+  'POST /api/front-of-house/assignments/:id/check-in': checkInPost,
+  'POST /api/front-of-house/performances/:id/timings': timingsPost,
+  'POST /api/front-of-house/performances/:id/extend': extendPost,
+  'GET /api/front-of-house/performances/:id/tonight': tonightGet,
+  'GET /api/front-of-house/performances/:id/checklists/:checklistId': runGet,
+  'POST /api/front-of-house/performances/:id/checklists/:checklistId/open': runOpen,
+  'PUT /api/front-of-house/performances/:id/checklists/:checklistId/items/:itemId': itemPut,
+  'POST /api/front-of-house/performances/:id/checklists/:checklistId/complete': runComplete,
+  'POST /api/front-of-house/performances/:id/checklists/:checklistId/reopen': runReopen,
+  'GET /api/front-of-house/checklists': checklistsGet,
+  'POST /api/front-of-house/checklists': checklistsPost,
+  'PUT /api/front-of-house/checklists/:id': checklistPut,
+  'POST /api/front-of-house/checklists/:id/archive': checklistArchive,
+  'GET /api/front-of-house/emergency-cards': cardsGet,
+  'PUT /api/front-of-house/emergency-cards/:venueId': cardPut,
+  'POST /api/front-of-house/incidents': incidentsPost,
+  'GET /api/front-of-house/incidents': incidentsGet,
+  'GET /api/front-of-house/incidents/mine': incidentsMine,
+  'GET /api/front-of-house/incidents/:id': incidentGet,
+  'POST /api/front-of-house/incidents/:id/open': incidentOpen,
+  'POST /api/front-of-house/incidents/:id/review': incidentReview,
+  'POST /api/front-of-house/incidents/:id/people': peoplePost,
+  'PUT /api/front-of-house/incidents/:id/people/:personId': personPut,
+  'POST /api/front-of-house/incidents/:id/people/:personId/remove': personRemove,
+  'POST /api/front-of-house/incidents/:id/actions': actionsPost,
+  'POST /api/front-of-house/incidents/:id/actions/:actionId/resolve': actionResolve,
+  'POST /api/front-of-house/incidents/:id/close': incidentClose,
+  'POST /api/front-of-house/incidents/:id/reopen': incidentReopen,
 })
 
 export type Person = ReturnType<typeof person>
 
-export const manager = person(['core.production.create', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'front-of-house.duty.manage', 'front-of-house.shift.manage'])
+export const manager = person(['core.production.create', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'front-of-house.duty.manage', 'front-of-house.shift.manage', 'front-of-house.checklist.manage'])
 export const volunteer = (): Person => person(['front-of-house.shift.sign-up'])
 
 export const NOV_16 = Date.UTC(2026, 10, 16, 12)
@@ -71,7 +147,7 @@ let keys = 0
 let dutyCount = 0
 
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: Person = manager): Promise<{ status: number, body: T }> {
-  const headers = method === 'POST' ? { 'idempotency-key': `foh${++keys}-${newId('req')}` } : undefined
+  const headers = method !== 'GET' ? { 'idempotency-key': `foh${++keys}-${newId('req')}` } : undefined
   const response = await call(handle, method, path, { actor, body, headers })
   return { status: response.status, body: await response.json() as T }
 }
@@ -121,6 +197,8 @@ export async function shift(performanceId: string, dutyId: string, places = 2, p
   if (publish) expect((await req('POST', `/api/front-of-house/shifts/${made.body.shiftId}/publish`, {})).status).toBe(200)
   return made.body.shiftId
 }
+
+export const notes = (type: string, accountId: string) => rows<{ id: string }>('SELECT id FROM core_notifications WHERE type_key = ? AND account_id = ?', type, accountId)
 
 export const shiftRow = async (id: string) => (await rows<Record<string, number | string | null>>('SELECT * FROM front_of_house_shifts WHERE id = ?', id))[0]!
 

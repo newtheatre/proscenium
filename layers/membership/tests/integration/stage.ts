@@ -28,6 +28,11 @@ import listCheck from '../../server/api/membership/lists/[id]/check.post'
 import applicationsGet from '../../server/api/membership/applications/index.get'
 import decidePost from '../../server/api/membership/applications/[id]/decide.post'
 import withdrawPost from '../../server/api/membership/mine/[id]/withdraw.post'
+import mineEnd from '../../server/api/membership/mine/[id]/end.post'
+import membersGet from '../../server/api/membership/members.get'
+import membershipGet from '../../server/api/membership/memberships/[id].get'
+import membershipEnd from '../../server/api/membership/memberships/[id]/end.post'
+import schemesLookup from '../../server/api/membership/schemes/lookup.get'
 
 export const handle = server({
   'GET /api/membership/schemes': schemesGet,
@@ -54,10 +59,15 @@ export const handle = server({
   'GET /api/membership/applications': applicationsGet,
   'POST /api/membership/applications/:id/decide': decidePost,
   'POST /api/membership/mine/:id/withdraw': withdrawPost,
+  'POST /api/membership/mine/:id/end': mineEnd,
+  'GET /api/membership/members': membersGet,
+  'GET /api/membership/memberships/:id': membershipGet,
+  'POST /api/membership/memberships/:id/end': membershipEnd,
+  'GET /api/membership/schemes/lookup': schemesLookup,
 })
 
 export const NOV_17 = Date.UTC(2026, 10, 17, 12)
-export const officer = person(['membership.scheme.manage', 'membership.membership.add', 'membership.verification-list.manage', 'membership.membership.verify'], { reassertedAt: NOV_17 })
+export const officer = person(['membership.scheme.manage', 'membership.membership.add', 'membership.verification-list.manage', 'membership.membership.verify', 'membership.membership.end'], { reassertedAt: NOV_17 })
 
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = officer): Promise<{ status: number, body: T }> {
   const headers = method === 'POST' ? { 'idempotency-key': newId('req') } : {}

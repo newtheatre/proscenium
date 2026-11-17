@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute, idSchema, siteOrigin } from '#kit'
-import { startAttempt } from '../../../../start'
+import { RETURN_PATH, startAttempt } from '../../../../start'
 
 export default defineRoute({
   ability: 'payments.attempt.attest',
@@ -13,5 +13,7 @@ export default defineRoute({
     method: z.enum(['card_online', 'card_reader']),
     readerId: idSchema('rdr').optional(),
     amountMinor: z.number().int().positive().optional(),
+    // The screen to come back to after a hand-off to another app, such as the till.
+    returnTo: z.string().max(200).regex(RETURN_PATH).optional(), // not-policy: a path's bound
   }).strict(),
 }, async (event, { input }) => startAttempt(getRouterParam(event, 'id') ?? '', { ...input, origin: await siteOrigin() }))

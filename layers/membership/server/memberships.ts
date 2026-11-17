@@ -116,11 +116,12 @@ export async function writeActive(unit: UnitView, input: ActiveInput): Promise<{
 
 /**
  * A3: the number is one more than the highest, read and written in one statement; the unique index
- * settles a race. A person who has ever held a membership keeps theirs.
+ * settles a race. A person who has ever held a membership keeps theirs. The aggregate sits in a
+ * subquery because an aggregate always yields a row, which would otherwise issue number 1 again.
  */
 export function writeNumber(unit: UnitView, accountId: string, startsOn: string, at: number): void {
   unit.add({
-    sql: `INSERT INTO membership_members (id, account_id, number, first_joined_on, created_at) SELECT ?1, ?2, coalesce(max(number), 0) + 1, ?3, ?4 FROM membership_members WHERE NOT EXISTS (SELECT 1 FROM membership_members WHERE account_id IN (${accountScopeSql('?2')}))`,
+    sql: `INSERT INTO membership_members (id, account_id, number, first_joined_on, created_at) SELECT ?1, ?2, n, ?3, ?4 FROM (SELECT coalesce(max(number), 0) + 1 AS n FROM membership_members) WHERE NOT EXISTS (SELECT 1 FROM membership_members WHERE account_id IN (${accountScopeSql('?2')}))`,
     params: [newId('mbr'), accountId, startsOn, at],
   })
 }

@@ -23,3 +23,28 @@ export const templateInput = z.object({
 
 // Bulk actions name at most this many performances, so one unit stays within the set limit.
 export const performanceIds = z.array(z.string().min(1).max(40)).min(1).max(60) // not-policy: shape bound
+
+export const checklistInput = z.object({
+  name: z.string().trim().min(1).max(80), // not-policy: shape bound, as the table's CHECK
+  moment: z.enum(['pre-show', 'post-show', 'other']),
+  venueId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  dutyId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  sortOrder: z.number().int().min(0).max(1000).optional(), // not-policy: shape bound
+  items: z.array(z.object({
+    id: z.string().min(1).max(40).optional(), // not-policy: shape bound
+    label: z.string().trim().min(1).max(160), // not-policy: shape bound, as the table's CHECK
+    help: z.string().trim().max(500).nullish(), // not-policy: shape bound, as the table's CHECK
+    kind: z.enum(['tick', 'reading']).optional(),
+    unit: z.string().trim().max(20).nullish(), // not-policy: shape bound, as the table's CHECK
+    required: z.boolean().optional(),
+  }).strict()).max(60), // not-policy: shape bound
+}).strict()
+
+export const personInput = z.object({
+  accountId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  name: z.string().trim().min(1).max(120).nullish(), // not-policy: shape bound, as the table's CHECK
+  contact: z.string().trim().max(200).nullish(), // not-policy: shape bound, as the table's CHECK
+  involvement: z.enum(['affected', 'witness', 'helped', 'other']),
+  isChild: z.boolean().optional(),
+  details: z.string().trim().max(2000).nullish(), // not-policy: shape bound
+}).strict()

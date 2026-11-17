@@ -48,5 +48,21 @@ export default defineNuxtPlugin(() => {
   }) as unknown as Api
   // `raw` and `create` are the plain fetch's: only a call to `$api` itself confirms and retries.
   Object.assign(api, { raw: base.raw, create: base.create })
+
+  // A server render cannot ask anyone to confirm, so a screen reloaded while its loads need a
+  // recent sign-in arrives with those loads refused. Once the page is in the browser they are sent
+  // again through `$api`, which opens the dialogue (one for them all) and fills the screen after.
+  const nuxtApp = useNuxtApp()
+  if (nuxtApp.payload.serverRendered) {
+    nuxtApp.hooks.hookOnce('app:suspense:resolve', () => {
+      const refused = Object.entries(nuxtApp.payload._errors ?? {})
+        .filter(([, error]) => {
+          const e = error as { statusCode?: number, data?: { code?: string } | null } | null | undefined
+          return e?.statusCode === 403 && !!e.data?.code && CONFIRM_REASONS.includes(e.data.code)
+        })
+        .map(([key]) => key)
+      if (refused.length) void refreshNuxtData(refused)
+    })
+  }
   return { provide: { api } }
 })

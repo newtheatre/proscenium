@@ -3,7 +3,7 @@
      step, as is one that checks a list (a student ID, or a verified address); other schemes say how to
      join until applications are built. -->
 <script setup lang="ts">
-interface Mine { applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Mine { applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string }[], asksFor: string | null }
 
 const { t } = useT()
@@ -38,6 +38,16 @@ async function join(s: Offered) {
   }
 }
 const { confirm } = useConfirm()
+async function endMine(m: Mine['memberships'][number]) {
+  if (!(await confirm({ verb: t('membership.screens.mine.verb-end'), thing: m.schemeName, consequence: t(m.side === 'members' ? 'membership.screens.mine.confirm-end-members' : 'membership.screens.mine.confirm-end'), button: t('membership.screens.mine.end') }))) return
+  try {
+    await $api(`/api/membership/mine/${m.id}/end` as string, { method: 'POST', body: {} })
+    reloadNuxtApp()
+  }
+  catch (e) {
+    toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })
+  }
+}
 async function withdraw(a: Mine['applications'][number]) {
   if (!(await confirm({ verb: t('membership.screens.mine.verb-withdraw'), thing: a.schemeName, consequence: t('membership.screens.mine.confirm-withdraw'), button: t('membership.screens.mine.withdraw') }))) return
   try {
@@ -78,10 +88,20 @@ async function withdraw(a: Mine['applications'][number]) {
               :description="m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end')"
               :muted="m.status === 'lapsed'"
             >
-              <StatusBadge
-                :tone="TONE[m.status]"
-                :label="t(`membership.screens.derived.${m.status}`)"
-              />
+              <div class="flex items-center gap-2">
+                <StatusBadge
+                  :tone="TONE[m.status]"
+                  :label="t(`membership.screens.derived.${m.status}`)"
+                />
+                <UButton
+                  v-if="m.mayEnd && m.status !== 'lapsed'"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  :label="t('membership.screens.mine.end')"
+                  @click="endMine(m)"
+                />
+              </div>
             </RecordListItem>
           </RecordList>
         </PageSection>
