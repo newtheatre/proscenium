@@ -57,6 +57,11 @@ export default defineModule({
     'scheme.manage': ability({ on: 'membership.scheme', risk: 'privileged', implies: ['scheme.view'] }),
     'membership.view': ability({ on: 'membership.membership', owner: 'grants', audit: 'read', implies: ['core.account.find'] }),
     'membership.add': ability({ on: 'membership.scheme', implies: ['membership.view'] }),
+    // Asking whether somebody else holds a membership: a seller checking a customer's member price,
+    // a steward at the door. The requirement source's checkAbility.
+    'card.check': ability({ on: 'membership.membership', audit: 'read' }),
+    // Seeing the name behind a ticket bought by reference, through requirements.holder (V18, V19).
+    'verification-list.check': ability({ on: 'membership.verification-list', audit: 'read' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -75,6 +80,7 @@ export default defineModule({
       { id: 'membership.mine', menu: 'account', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],
     // On the audience side, so anyone can find how to join.
+    'core.requirement': [{ id: 'membership', file: 'membership' }],
     'core.account-section': [
       { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
     ],

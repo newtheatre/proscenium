@@ -18,6 +18,7 @@ interface Scheme {
   graceDays: number
   voting: boolean
   holderMayEnd: boolean
+  acceptsReference: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
 interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[] }
@@ -38,7 +39,7 @@ const missing = computed(() => (data.value?.checklist ?? []).filter(i => !i.done
 const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRule === 'fixed' ? 'years' : 'months'}`))
 
 // Details: one form, saved as a whole.
-const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true })
+const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, acceptsReference: false })
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(scheme, (s) => {
   if (s) Object.assign(details, { ...s, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31 })
@@ -382,6 +383,11 @@ async function addMember() {
                 />
               </UFormField>
             </div>
+            <USwitch
+              v-model="details.acceptsReference"
+              :label="t('membership.screens.scheme.accepts-reference')"
+              :description="t('membership.screens.scheme.accepts-reference-help')"
+            />
             <USwitch
               v-model="details.holderMayEnd"
               :label="t('membership.screens.scheme.holder-may-end')"

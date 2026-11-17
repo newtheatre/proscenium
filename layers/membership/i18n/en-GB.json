@@ -51,5 +51,7 @@
   "membership.abilities.scheme.manage.label": "Create, change, open, close and archive membership schemes",
   "membership.abilities.membership.view.label": "See who holds which membership, with dates and status",
   "membership.abilities.membership.add.label": "Add a member directly",
+  "membership.abilities.card.check.label": "Check whether somebody else holds a membership, at the desk or the door",
+  "membership.abilities.verification-list.check.label": "See the name behind a ticket bought with a membership reference",
   "membership.abilities.settings.manage.label": "Change membership settings"
 }
