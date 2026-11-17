@@ -138,4 +138,95 @@ export const outlets = defineTable('bar_outlets', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, prices, outlets }
+export const OPENING_STATES = ['open', 'closed'] as const
+export const SALE_STATES = ['open', 'awaiting_payment', 'paid', 'void'] as const
+export const CHANNELS = ['till', 'desk', 'self'] as const
+
+/** One period of trading at one outlet. An outlet has one open opening; closed is final. */
+export const openings = defineTable('bar_openings', {
+  id: col.id(),
+  outletId: col.ref('bar_outlets'),
+  performanceId: col.ref('core_performances', { nullable: true }),
+  operatingDay: col.localDate('operating_day').notNull(),
+  state: col.internal(text('state', { enum: OPENING_STATES }).notNull()),
+  openedBy: col.account('opened_by', { role: 'actor', onMerge: 'alias' }),
+  closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  openedAt: col.timestamp('opened_at').notNull(),
+  closedAt: col.timestamp('closed_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bopn',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_openings_one_open').on(t.outletId).where(sql`state = 'open'`),
+    index('bar_openings_day').on(t.operatingDay),
+    check('bar_openings_state', sql`${t.state} IN (${inList(OPENING_STATES)})`),
+  ],
+})
+
+/**
+ * One customer's basket and its payment. Anonymous: no account, no name. Its total is kept by a
+ * trigger from its lines; paid and void are final; it leaves open only with a line.
+ */
+export const sales = defineTable('bar_sales', {
+  id: col.id(),
+  reference: col.internal(text('reference').notNull()),
+  openingId: col.ref('bar_openings'),
+  priceListId: col.ref('bar_price_lists'),
+  state: col.internal(text('state', { enum: SALE_STATES }).notNull()),
+  totalMinor: col.minor('total_minor').notNull().default(0),
+  currency: col.currency('currency').notNull(),
+  intentId: col.internal(text('intent_id')),
+  partId: col.internal(text('part_id')),
+  channel: col.internal(text('channel', { enum: CHANNELS }).notNull()),
+  soldBy: col.account('sold_by', { role: 'actor', onMerge: 'alias' }),
+  // Made on the device, so a repeated request makes one sale.
+  clientKey: col.internal(text('client_key').notNull()),
+  paidAt: col.timestamp('paid_at'),
+  voidedAt: col.timestamp('voided_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bsal',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_sales_reference').on(t.reference),
+    uniqueIndex('bar_sales_client_key').on(t.clientKey),
+    index('bar_sales_opening').on(t.openingId, t.state),
+    index('bar_sales_intent').on(t.intentId),
+    check('bar_sales_state', sql`${t.state} IN (${inList(SALE_STATES)})`),
+    check('bar_sales_channel', sql`${t.channel} IN (${inList(CHANNELS)})`),
+    check('bar_sales_total', sql`${t.totalMinor} >= 0`),
+    check('bar_sales_paid', sql`${t.state} <> 'paid' OR ${t.paidAt} IS NOT NULL`),
+  ],
+})
+
+/** One size, a quantity and the price fixed when the line was written. Changed only while its sale is open. */
+export const saleLines = defineTable('bar_sale_lines', {
+  id: col.id(),
+  saleId: col.ref('bar_sales'),
+  variantId: col.ref('bar_variants'),
+  priceId: col.ref('bar_prices'),
+  quantity: col.internal(integer('quantity').notNull()),
+  unitMinor: col.minor('unit_minor').notNull(),
+  discountMinor: col.minor('discount_minor').notNull().default(0),
+  amountMinor: col.minor('amount_minor').notNull(),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bsln',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('bar_sale_lines_sale').on(t.saleId),
+    check('bar_sale_lines_quantity', sql`${t.quantity} >= 1`),
+    check('bar_sale_lines_unit', sql`${t.unitMinor} >= 0`),
+    check('bar_sale_lines_discount', sql`${t.discountMinor} >= 0 AND ${t.discountMinor} <= ${t.unitMinor} * ${t.quantity}`),
+    check('bar_sale_lines_amount', sql`${t.amountMinor} = ${t.unitMinor} * ${t.quantity} - ${t.discountMinor}`),
+  ],
+})
+
+export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines }

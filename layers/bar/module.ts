@@ -3,7 +3,8 @@
 // sale is a part of a Payments intent, and its income is posted to Finance by Payments' one sealed
 // posting. Bar and Box office never import each other; both plug into Payments' till.
 // This file grows with the build; it declares only what the code so far uses.
-import { ability, defineAbilities, defineModule, defineRecords } from '#kit'
+import { z } from 'zod'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting } from '#kit'
 import { tables } from './server/db/schema'
 
 export default defineModule({
@@ -13,11 +14,18 @@ export default defineModule({
   stability: 'experimental',
   requires: ['payments', 'finance'],
 
+  settings: defineSettings('bar', {
+    // Starts a bar sale's reference, so it is not mistaken for a booking reference.
+    'sales.reference-prefix': setting.text({ default: 'B', minLength: 1, maxLength: 3, change: 'bar.settings.manage', audience: 'staff' }),
+  }),
+
   records: defineRecords('bar', {
     'outlet': { table: 'bar_outlets' },
     'product': { table: 'bar_products' },
     'price-list': { table: 'bar_price_lists' },
     'category': { table: 'bar_categories' },
+    'opening': { table: 'bar_openings', owner: 'opened_by' },
+    'sale': { table: 'bar_sales', owner: 'sold_by' },
   }),
   abilities: defineAbilities('bar', {
     // Categories, products and their variants.
@@ -26,16 +34,29 @@ export default defineModule({
     'price.manage': ability({ risk: 'privileged' }),
     // Outlets: the places that sell, and the list each sells from.
     'outlet.manage': ability(),
+    // Use the bar's panel in the till, at an outlet.
+    'sale.sell': ability({ on: 'bar.outlet' }),
+    // Close an outlet's opening; the person who opened it may close it.
+    'opening.manage': ability({ on: 'bar.outlet' }),
+    'settings.manage': ability({ risk: 'privileged' }),
   }),
 
   tables,
 
   events: {
+    announces: {
+      // A sales feed for an outside accounts system: a sale and its opening, no person.
+      'bar.sale.paid': event({ version: 1, payload: z.object({ saleId: z.string(), openingId: z.string() }), internal: false }),
+      'bar.opening.closed': event({ version: 1, payload: z.object({ openingId: z.string(), outletId: z.string() }), internal: false }),
+    },
     // Standard is made when the bar is switched on.
     listens: { 'core.module.enabled': 'standard-price-list' },
   },
 
   contributes: {
+    // Drinks paid for at the till, alone or on the same payment as tickets (tab 4).
+    'payments.settlement': [{ id: 'bar' }],
+    'payments.desk-basket': [{ id: 'bar' }],
     // Bar income, in full on the day the money is taken (tab 3, "What is posted to the ledger").
     'finance.system-account': [{ id: 'income', name: 'Bar income', kind: 'income' }],
     'core.record-resolver': [
@@ -45,6 +66,9 @@ export default defineModule({
     ],
     // The console's Bar group: set-up screens first; selling arrives with the till panel.
     'core.navigation': [
+      // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
+      { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
+      { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
       { id: 'bar.products', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/products', match: '/console/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
       { id: 'bar.price-lists', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/price-lists', match: '/console/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
       { id: 'bar.outlets', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },
