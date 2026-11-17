@@ -332,6 +332,28 @@ test.describe('the box office console', () => {
     await expect(page.getByText(spare, { exact: true })).toBeVisible()
     await noViolations(page)
   })
+
+  test('a ticket preset is made with typed prices, with sections, and made the theatre\'s usual', async ({ page }) => {
+    const name = `Preset ${stamp}`
+    await visit(page, '/admin/modules/box-office/ticket-presets')
+    // Someone without Admin sees it in the settings window over the console.
+    await expect(page.getByRole('heading', { name: 'Ticket presets' }).first()).toBeVisible()
+    await page.getByRole('button', { name: 'New preset' }).first().click()
+    const dialog = page.getByRole('dialog', { name: 'New preset' })
+    await dialog.getByLabel('Name').fill(name)
+    await dialog.getByRole('spinbutton', { name: `Price of ${typeName}` }).fill('12')
+    await dialog.getByRole('switch', { name: 'Different prices for parts of the house' }).click()
+    await dialog.getByRole('textbox', { name: 'Name of section 2' }).fill('Balcony')
+    await dialog.getByRole('spinbutton', { name: `Price of ${typeName} in Balcony` }).fill('8')
+    await noViolations(page)
+    await dialog.getByRole('button', { name: 'Save preset' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByText(`Stalls: ${typeName} £12.00; Balcony: ${typeName} £8.00`, { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: `Actions for ${name}` }).click()
+    await page.getByRole('menuitem', { name: 'Make it the theatre\'s usual' }).click()
+    await expect(page.getByText('The theatre\'s usual').first()).toBeVisible()
+    await noViolations(page)
+  })
 })
 
 test.describe('complimentary tickets', () => {
