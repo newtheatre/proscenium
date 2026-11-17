@@ -172,6 +172,15 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await expect(unpaid).toBeVisible()
     await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the box office or the bar to pay.`)
     await expect(page.getByRole('dialog')).toBeHidden()
+
+    // A member whose membership has lapsed is sent to the box office with the members list's own words.
+    await page.route('**/scan', route => route.fulfill({ json: { result: 'requirement_not_met', scanId: 'scan_x', requirement: { reason: 'Membership not current.', ticketType: 'Member' } } }))
+    await page.getByRole('button', { name: 'Type a code' }).click()
+    await page.getByRole('dialog').getByLabel('Or type the code').fill('t.k.lapsed.member')
+    await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
+    const lapsed = page.getByRole('status').filter({ hasText: 'Does not qualify' })
+    await expect(lapsed).toContainText('Member: Membership not current. Send them to the box office to change the ticket.')
+    await page.unroute('**/scan')
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 

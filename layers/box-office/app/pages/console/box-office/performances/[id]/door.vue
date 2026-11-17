@@ -28,7 +28,7 @@ const toast = useToast()
 const { toRefusal } = useRefusal()
 const admitting = ref<string | null>(null)
 
-interface Scan { result: string, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' } }
+interface Scan { result: string, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
 const { time } = useDates()
 const lastScan = ref<{ text: string, color: 'success' | 'warning' | 'error' } | null>(null)
 const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'error', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
@@ -37,9 +37,11 @@ async function scan(code: string) {
   if (!code.trim()) return
   try {
     const out = await $api<Scan>(`/api/box-office/performances/${encodeURIComponent(id.value)}/scan`, { method: 'POST', body: { code: code.trim() } })
-    const text = out.result === 'card' && out.card
+    const said = out.result === 'card' && out.card
       ? `${out.card.headline}. ${out.card.line}`
       : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
+    // The source's own words for why not, and a note when nobody could check.
+    const text = [out.requirement?.reason, said, out.unchecked ? t('box-office.door.scan.unchecked') : null].filter(Boolean).join(' ')
     const color = out.result === 'card' && out.card?.state === 'attention' ? 'warning' : COLOUR[out.result] ?? 'error'
     lastScan.value = { text, color }
     toast.add({ title: text, color })
