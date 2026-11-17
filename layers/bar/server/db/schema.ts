@@ -229,4 +229,61 @@ export const saleLines = defineTable('bar_sale_lines', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines }
+export const AGE_CHECK_OUTCOMES = ['not_needed', 'id_checked', 'self_attested', 'refused'] as const
+export const DESCRIPTION_MAX = 120 // not-policy: the register's description field, fixed by the specification
+
+/**
+ * The refusals register: each time staff were prompted on a restricted sale, and every refusal. It
+ * records what staff did, never who the customer was. Append-only, except that the description of a
+ * person refused may be erased.
+ */
+export const ageChecks = defineTable('bar_age_checks', {
+  id: col.id(),
+  openingId: col.ref('bar_openings'),
+  saleId: col.ref('bar_sales', { nullable: true }),
+  outcome: col.internal(text('outcome', { enum: AGE_CHECK_OUTCOMES }).notNull()),
+  refusalTerm: col.ref('core_terms', { nullable: true }),
+  variantId: col.ref('bar_variants', { nullable: true }),
+  // What the person looked like, never who they are; only where the theatre has switched it on.
+  description: col.freeText(text('description'), { erase: 'clear' }),
+  by: col.account('by', { role: 'actor', onMerge: 'alias' }),
+  at: col.timestamp('at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bage',
+  realm: 'operational',
+  // No subject: no row reaches a person, and the one free-text column goes with the retention sweep.
+  retention: 'bar.retention.age-checks',
+  appendOnly: true,
+  extra: t => [
+    index('bar_age_checks_at').on(t.at),
+    index('bar_age_checks_sale').on(t.saleId),
+    check('bar_age_checks_outcome', sql`${t.outcome} IN (${inList(AGE_CHECK_OUTCOMES)})`),
+    check('bar_age_checks_reason', sql`(${t.outcome} = 'refused') = (${t.refusalTerm} IS NOT NULL)`),
+    check('bar_age_checks_description', sql`${t.description} IS NULL OR (${t.outcome} = 'refused' AND length(${t.description}) <= ${sql.raw(String(DESCRIPTION_MAX))})`),
+  ],
+})
+
+/** A manager's signature on the register for a range of operating days, with the refusals it covered. */
+export const registerReviews = defineTable('bar_register_reviews', {
+  id: col.id(),
+  outletId: col.ref('bar_outlets', { nullable: true }),
+  fromDay: col.localDate('from_day').notNull(),
+  toDay: col.localDate('to_day').notNull(),
+  refusals: col.internal(integer('refusals').notNull()),
+  reviewedBy: col.account('reviewed_by', { role: 'actor', onMerge: 'alias' }),
+  reviewedAt: col.timestamp('reviewed_at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'brev',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('bar_register_reviews_at').on(t.reviewedAt),
+    check('bar_register_reviews_days', sql`${t.toDay} >= ${t.fromDay}`),
+    check('bar_register_reviews_refusals', sql`${t.refusals} >= 0`),
+  ],
+})
+
+export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines, ageChecks, registerReviews }
