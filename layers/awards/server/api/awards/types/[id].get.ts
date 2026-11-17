@@ -1,0 +1,16 @@
+// One award type, with how many hold it and whether it can still be deleted.
+import { getRouterParam } from 'h3'
+import { can, defineRoute, first } from '#kit'
+import { hasAwards, requireType } from '../../../types'
+
+export default defineRoute({ ability: 'awards.type.view', record: event => ['awards.type', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { actor, record }) => {
+  const type = await requireType(record!.id)
+  const holders = (await first<{ n: number }>("SELECT count(*) AS n FROM awards_awards WHERE type_id = ? AND state = 'current'", type.id))?.n ?? 0
+  return {
+    type,
+    holders,
+    deletable: !(await hasAwards(type.id)),
+    canManage: (await can(actor, 'awards.type.manage', ['awards.type', type.id])).allowed,
+    canIssue: (await can(actor, 'awards.award.issue', ['awards.type', type.id])).allowed,
+  }
+})
