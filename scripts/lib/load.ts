@@ -16,7 +16,7 @@ export const ROOTS: { dir: string, owner: Owner }[] = [
   ...(process.env.PROSCENIUM_GALLERY === '1' ? [GALLERY] : []),
 ]
 
-export interface HandlerFile { kind: 'listeners' | 'jobs' | 'tasks' | 'facts' | 'calls' | 'contributions', name: string, point?: string, file: string }
+export interface HandlerFile { kind: 'listeners' | 'jobs' | 'tasks' | 'facts' | 'calls' | 'lists' | 'contributions', name: string, point?: string, file: string }
 export interface FoundModule { root: string, owner: Owner, manifestFile: string, handlerFiles: HandlerFile[] }
 
 export const jiti = createJiti(import.meta.url, {
@@ -40,7 +40,7 @@ export function findModules(roots = ROOTS): FoundModule[] {
       const manifestFile = join(ROOT, root, 'module.ts')
       if (!existsSync(manifestFile)) continue
       const handlerFiles: HandlerFile[] = []
-      for (const kind of ['listeners', 'jobs', 'tasks', 'facts', 'calls'] as const) {
+      for (const kind of ['listeners', 'jobs', 'tasks', 'facts', 'calls', 'lists'] as const) {
         for (const name of ts(join(ROOT, root, 'server', kind))) handlerFiles.push({ kind, name, file: `${root}/server/${kind}/${name}.ts` })
       }
       const contributions = join(ROOT, root, 'server/contributions')
@@ -71,7 +71,7 @@ export async function loadManifest(found: FoundModule): Promise<any> {
 
 /** The handler map the registry wants, keyed as the manifest names them. */
 export async function loadHandlers(found: FoundModule, manifest: any): Promise<Record<string, any>> {
-  const handlers: Record<string, any> = { listeners: {}, jobs: {}, tasks: {}, facts: {}, calls: {}, contributions: {} }
+  const handlers: Record<string, any> = { listeners: {}, jobs: {}, tasks: {}, facts: {}, calls: {}, lists: {}, contributions: {} }
   const prefix = `${manifest.id}.`
   for (const h of found.handlerFiles) {
     let value: unknown

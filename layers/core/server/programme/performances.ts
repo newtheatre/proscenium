@@ -34,6 +34,8 @@ export interface Performance {
   cancelReasonTermId: string | null
   cancelNote: string | null
   completedAt: number | null
+  /** Whether the theatre runs the performance's space (R-36). Core treats both alike. */
+  spaceManaged: boolean
 }
 
 export interface PerformanceInput {
@@ -66,9 +68,14 @@ interface PerformanceRow {
   cancel_reason_term_id: string | null
   cancel_note: string | null
   completed_at: number | null
+  space_managed: number
 }
 
+/** The performance's space's managed, beside the performance's own columns. */
+const SPACE_MANAGED = '(SELECT managed FROM core_spaces WHERE id = core_performances.space_id) AS space_managed'
+
 const toPerformance = (r: PerformanceRow): Performance => ({
+  spaceManaged: !!r.space_managed,
   id: r.id, productionId: r.production_id, venueId: r.venue_id, spaceId: r.space_id, startsAt: r.starts_at, doorsAt: r.doors_at, endsAt: r.ends_at,
   operatingDay: r.operating_day, intervalCount: r.interval_count, capacity: r.capacity, label: r.label, externalBookingUrl: r.external_booking_url,
   state: r.state, cancelledAt: r.cancelled_at, cancelReasonTermId: r.cancel_reason_term_id, cancelNote: r.cancel_note, completedAt: r.completed_at,
@@ -91,7 +98,7 @@ export async function productionOfPerformance(id: string): Promise<string> {
 // Reads (part 4, services)
 
 export async function getPerformance(id: string): Promise<Performance & { access: AccessFeature[], productionTitle: string, venueName: string, spaceName: string }> {
-  const row = await first<PerformanceRow & { production_title: string, venue_name: string, space_name: string }>(`SELECT f.*, p.title AS production_title, v.name AS venue_name, s.name AS space_name
+  const row = await first<PerformanceRow & { production_title: string, venue_name: string, space_name: string }>(`SELECT f.*, p.title AS production_title, v.name AS venue_name, s.name AS space_name, s.managed AS space_managed
     FROM core_performances f JOIN core_productions p ON p.id = f.production_id JOIN core_venues v ON v.id = f.venue_id JOIN core_spaces s ON s.id = f.space_id
     WHERE f.id = ?`, id)
   if (!row) refuse('core.performance.not-found', 'There is no such performance.', { status: 404 })
@@ -114,7 +121,7 @@ export async function listPerformances(query: PerformanceQuery): Promise<(Perfor
     where.push(clause)
     params.push(wanted)
   }
-  const rows = await all<PerformanceRow>(`SELECT * FROM core_performances ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY starts_at, id`, ...params)
+  const rows = await all<PerformanceRow>(`SELECT *, ${SPACE_MANAGED} FROM core_performances ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY starts_at, id`, ...params)
   const access = new Map<string, AccessFeature[]>()
   if (rows.length) {
     for (const a of await all<{ performance_id: string, term_id: string, detail: string | null }>('SELECT performance_id, term_id, detail FROM core_performance_access WHERE performance_id IN (SELECT value FROM json_each(?)) ORDER BY term_id', JSON.stringify(rows.map(r => r.id))))
@@ -125,7 +132,7 @@ export async function listPerformances(query: PerformanceQuery): Promise<(Perfor
 
 /** Everything on one operating day: front of house's "tonight". */
 export async function listPerformancesOnDay(operatingDay: string): Promise<Performance[]> {
-  return (await all<PerformanceRow>('SELECT * FROM core_performances WHERE operating_day = ? ORDER BY starts_at, id', operatingDay)).map(toPerformance)
+  return (await all<PerformanceRow>(`SELECT *, ${SPACE_MANAGED} FROM core_performances WHERE operating_day = ? ORDER BY starts_at, id`, operatingDay)).map(toPerformance)
 }
 
 /** The house capacity of one performance: its own if set, else its space's, else uncapped (null). */

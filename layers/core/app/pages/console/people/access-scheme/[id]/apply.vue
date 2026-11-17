@@ -9,7 +9,7 @@ definePageMeta({ layout: 'console' })
 interface Opened {
   name: string
   application: { status: string, inForce: AccessApplicationValue | null, pending: AccessApplicationValue | null } | null
-  needs: { id: string, label: string, retired: boolean }[]
+  needs: { id: string, key: string, label: string, description: string | null, retired: boolean }[]
   allowNote: boolean
 }
 
@@ -29,7 +29,7 @@ const { schema, fields, toForm, toBody } = useAccessApplicationForm(
 )
 const app = data.value.application
 const initial = toForm(app?.status === 'rejected' ? null : (app?.pending ?? app?.inForce))
-useSeoMeta({ title: () => t('core.access.review.behalf') })
+useSeoMeta({ title: () => t('core.access.review.behalf-for', { name: data.value?.name ?? t('core.access.queue.unnamed') }) })
 
 async function submit(values: Record<string, unknown>) {
   await $api<unknown>(`${base}/application` as string, { method: 'POST', body: toBody(values) })

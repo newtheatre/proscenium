@@ -8,7 +8,7 @@ interface Mine {
   enabled: boolean
   name?: string
   allowNote?: boolean
-  needs?: { id: string, key: string, label: string }[]
+  needs?: { id: string, key: string, label: string, description: string | null }[]
   application?: {
     status: 'submitted' | 'more-info' | 'accepted' | 'rejected'
     inForce: AccessApplicationValue | null
@@ -37,6 +37,7 @@ async function submit(values: Record<string, unknown>) {
 <template>
   <PageForm
     :title="data?.name ?? ''"
+    :description="t('core.access.form.who-reads-detail')"
     :submit-label="application && application.status !== 'rejected' ? t('core.access.form.send-change') : t('core.access.form.send')"
     :schema="schema"
     :fields="fields"

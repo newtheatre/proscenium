@@ -12,7 +12,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default', input: 
     enabled: true,
     name: await useSetting('core.access-scheme.name'),
     allowNote: await useSetting('core.access-scheme.allow-note'),
-    needs: (await listTerms(NEEDS_VOCABULARY)).map(t => ({ id: t.id, key: t.slug, label: t.label })),
+    needs: (await listTerms(NEEDS_VOCABULARY)).map(t => ({ id: t.id, key: t.slug, label: t.label, description: t.description })),
     application: await myApplication(accountId),
     sharing: await sharingOf(accountId, actor),
     reads: await readsOfApplication(accountId),

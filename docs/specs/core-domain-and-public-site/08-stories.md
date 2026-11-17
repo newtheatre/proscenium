@@ -4,7 +4,7 @@
 
 Each story has an id, who it is for, and acceptance criteria that a test can check. **First** means the first release of this workstream's subject, which is roadmap phase 2: "a theatre publishes a season and a what's-on page". **Later** means after it. The person named in a story describes who does the job and is not a preset role: part 6 maps every ability onto the identity specification's presets.
 
-58 stories: 44 first, 14 later. Thirteen were added at the end after Matt's decisions.
+59 stories: 45 first, 14 later. Thirteen were added at the end after Matt's decisions.
 
 ## Programme
 
@@ -71,7 +71,7 @@ Each story has an id, who it is for, and acceptance criteria that a test can che
 | --- | --- | --- | --- |
 | C-35 | As an administrator I set the theatre's look. | I pick one colour and see the application, an email and a ticket in light and dark before saving. Whatever colour I pick, text on it meets 4.5 to 1. Saving asks for a fresh passkey check. After saving, every shell, email and PDF uses it within a minute. | First |
 | C-36 | As an administrator I upload a logo safely. | An SVG containing a script, an external reference or a DOCTYPE is cleaned or refused. A raster logo has its metadata removed. A separate logo for dark mode is optional. | First |
-| C-37 | As an administrator I set the time zone and when the day rolls over. | Every time in the application shows in that zone. Changing either setting recalculates the operating day of every performance not yet completed, and says how many first. Both are foundations settings (core.locale.time-zone and core.locale.day-start), shown on core's organisation screen. | First |
+| C-37 | As an administrator I set the time zone and when the day rolls over. | Every time in the application shows in that zone. Changing either setting recalculates the operating day of every performance not yet completed, and says how many first. Both are foundations settings (core.locale.time-zone and core.locale.day-start), shown on the Theatre page in Site administration. | First |
 
 ## Public site
 
@@ -105,6 +105,12 @@ One more was added on 16 November 2026 at Matt's request, for the first release:
 | --- | --- | --- | --- |
 | C-52 | As an administrator I have the sending domain set up for me. | With the optional Cloudflare token present, "Set up automatically" creates the sending subdomain under the site's hostname, sets the sending domain, waits while Cloudflare reports it not ready, and verifies it, with no DNS typed by anyone. It asks for a fresh passkey check and is audited. Pressing it twice creates nothing twice. A sending domain already set is not replaced without confirmation. On a `workers.dev` address the button is replaced by an explanation. Without the token nothing changes and the manual route works. The token appears in no response, log or audit entry. | First |
 
+One more first-release story follows from the settings format as built (ruling R-37, part 6):
+
+| Id | Story | Acceptance criteria | Release |
+| --- | --- | --- | --- |
+| C-59 | As an administrator I change my theatre's email settings on the Email screen. | The Email screen shows and saves the sending label, the email footer, and the digest time and day. Each save goes through the ordinary settings save: the setting's own ability is checked, its limits hold, and a history entry is written. A person without a field's ability sees the value and cannot change it. Each field shows its default and offers Reset. From the same release the four settings appear on no generated page, and settings search opens the Email screen for them. | First |
+
 Six more came with the content warnings slice, which Matt accepted on 16 November 2026. Part 2 and part 4 give its design. "Slice" means the content warnings slice, built after the work now in hand; "later" means after that again.
 
 | Id | Story | Acceptance criteria | Release |
@@ -125,4 +131,4 @@ The slice also changes four existing stories when it is built, and not before:
 | C-39 read about a production | The layered display: age and effects always, a count of content warnings, one press for the list, a second for a detail. |
 | C-14 duplicate | Copies effects, content warnings, levels and age. |
 
-That makes 58 stories: 44 first, 14 later, of which two (C-53 and C-54) are the content warnings slice.
+That makes 59 stories: 45 first, 14 later, of which two (C-53 and C-54) are the content warnings slice.

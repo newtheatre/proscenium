@@ -14,7 +14,7 @@ const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
-const dateOf = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
+const { dayLong: dateOf } = useDates()
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
