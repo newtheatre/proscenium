@@ -9,17 +9,24 @@ import { addressFor } from './addresses'
 import { digest, randomCode, randomToken, sameText } from './crypto'
 import type { TokenRow } from './email-sign-in'
 import { passkeyCount } from './passkeys'
+import { authenticatorMakesStrong, authenticatorOf } from './authenticator'
 import { reassert, type CurrentSession } from './sessions'
 
-export type Way = 'passkey' | 'code'
+export type Way = 'passkey' | 'authenticator' | 'code'
 
-/** How this session may confirm: a passkey if the account has one, the code only for a basic session. */
-export async function waysToConfirm(session: CurrentSession): Promise<{ ways: Way[], address: string | null }> {
+/**
+ * How this session may confirm: a passkey if the account has one; an authenticator app if it has one
+ * (not for a recovery session); the emailed code only for a basic session on an account with no
+ * passkey. `authenticatorStrong` says whether the app's code would make this session strong.
+ */
+export async function waysToConfirm(session: CurrentSession): Promise<{ ways: Way[], address: string | null, authenticatorStrong: boolean }> {
   const ways: Way[] = []
-  if (await passkeyCount(session.accountId)) ways.push('passkey')
-  const address = session.assurance === 'basic' && !ways.length ? await addressFor(session.accountId, 'audience') : null
+  const passkey = (await passkeyCount(session.accountId)) > 0
+  if (passkey) ways.push('passkey')
+  if (!session.limited && await authenticatorOf(session.accountId)) ways.push('authenticator')
+  const address = session.assurance === 'basic' && !passkey ? await addressFor(session.accountId, 'audience') : null
   if (address) ways.push('code')
-  return { ways, address: address ? masked(address) : null }
+  return { ways, address: address ? masked(address) : null, authenticatorStrong: ways.includes('authenticator') && await authenticatorMakesStrong(session) }
 }
 
 /** "m•••@example.org": enough to know which inbox, not enough to read it off a shoulder. */
