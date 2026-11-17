@@ -12,6 +12,7 @@ import { cancelIntent, recordAnswer } from '../../../payments/server/services'
 import { expireIntent } from '../../../payments/server/tasks/expire-intents'
 import { env, inContext, rows, setModule } from '../../../../tests/integration/helpers'
 import { hashOf } from '../../server/codes'
+import { world } from '../../../../tests/fixtures/modules/cardco/server/contributions/payments.provider/cardco'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const MINUTE = 60_000
@@ -207,6 +208,28 @@ describe('paying online', () => {
     })
     expect((await order(b.orderId)).state).toBe('expired')
     expect((await pool(h)).claimed).toBe(0)
+  })
+
+  it('asks the provider at once when the buyer has just paid, and confirms the order without waiting for the webhook', async () => {
+    const h = await house(5)
+    const b = await basket(h, 2)
+    expect((await checkout(b)).status).toBe(200)
+    const pay = await req('POST', `/api/box-office/baskets/${b.orderId}/pay`, {}, null, { 'x-basket-token': b.token })
+    expect(pay.status, JSON.stringify(pay.body)).toBe(200)
+    const check = () => req('POST', `/api/box-office/baskets/${b.orderId}/check`, {}, null, { 'x-basket-token': b.token })
+    // The provider has no answer yet: still waiting, and nothing is marked unknown.
+    const waiting = await check()
+    expect(waiting.status, JSON.stringify(waiting.body)).toBe(200)
+    expect(waiting.body).toMatchObject({ state: 'awaiting_payment', totalMinor: 2400 })
+    // The money arrives; the page's next check finds it and the order is confirmed.
+    world.answers.set(`cc_${pay.body.attemptId}`, { state: 'succeeded', providerRef: `cc_${pay.body.attemptId}` })
+    const paid = await check()
+    expect(paid.body).toMatchObject({ state: 'confirmed', reference: b.reference })
+    expect((await order(b.orderId)).state).toBe('confirmed')
+    // Asked again after it settled, nothing changes.
+    expect((await check()).body.state).toBe('confirmed')
+    // The wrong token learns nothing.
+    expect((await req('POST', `/api/box-office/baskets/${b.orderId}/check`, {}, null, { 'x-basket-token': 'nope' })).status).toBe(404)
   })
 
   it('refuses a total the buyer did not see, quoting both, and an order with no address to send tickets to', async () => {

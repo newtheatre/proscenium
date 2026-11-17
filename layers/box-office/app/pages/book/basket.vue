@@ -11,6 +11,9 @@ type Outcome
   = | { state: 'confirmed', reference: string, totalMinor: number }
     | { state: 'reserved', reference: string, token: string, deskCode: string, amountDueMinor: number }
     | { state: 'confirm-email' }
+    | { state: 'processing' }
+
+interface CardStep { kind: 'client-secret', provider: string, secret: string, publishableKey: string }
 
 definePageMeta({ key: 'box-office-basket' })
 const { t } = useT()
@@ -19,6 +22,7 @@ const { toRefusal } = useRefusal()
 const { dateTime, time } = useDates()
 const { money } = await useMoney()
 const { viewer } = useViewer()
+const route = useRoute()
 useSeoMeta({ title: () => t('box-office.basket.title'), robots: 'noindex' })
 
 const remembered = ref<ReturnType<typeof recallBasket>>(null)
@@ -28,6 +32,10 @@ const loading = ref(true)
 const outcome = ref<Outcome | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
+// The card form, once the provider takes the card on this page; and whether we are asking if it paid.
+const card = ref<CardStep | null>(null)
+const checking = ref(false)
+const returnUrl = ref('')
 const form = ref({ name: '', email: '' })
 const siteKey = useRuntimeConfig().public.turnstile?.siteKey
 const challenge = ref('')
@@ -40,6 +48,11 @@ onMounted(async () => {
       basket.value = await $api<Basket>(`/api/box-office/baskets/${encodeURIComponent(remembered.value.orderId)}`, { headers: { 'x-basket-token': remembered.value.token } })
       // Back from the provider's page with the payment made.
       if (basket.value.state === 'confirmed') done({ state: 'confirmed', reference: basket.value.reference, totalMinor: basket.value.totalMinor })
+      // Back from the bank's own page: ask whether the money arrived, unless the bank said no.
+      else if (basket.value.state === 'awaiting_payment' && route.query.redirect_status) {
+        if (route.query.redirect_status === 'failed') refusal.value = { code: 'box-office.basket.card-failed', reason: t('box-office.basket.card-failed') } as ReturnType<typeof toRefusal>
+        else void settle()
+      }
       const performanceId = basket.value.lines[0]?.performanceId
       if (performanceId) page.value = await $api<Page>(`/api/box-office/book/performances/${encodeURIComponent(performanceId)}`)
     }
@@ -47,8 +60,36 @@ onMounted(async () => {
       basket.value = null
     }
   }
+  returnUrl.value = `${window.location.origin}/book/basket`
   loading.value = false
 })
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+/** Asks, a few times over a few seconds, whether the payment has settled. A slow bank is told it will be emailed. */
+async function settle() {
+  if (!basket.value || !remembered.value) return
+  const { orderId } = basket.value
+  const token = remembered.value.token
+  checking.value = true
+  refusal.value = null
+  try {
+    for (let i = 0; i < 8; i++) {
+      const now: Basket = await $api<Basket>(`/api/box-office/baskets/${encodeURIComponent(orderId)}/check`, { method: 'POST', body: {}, headers: { 'x-basket-token': token } })
+      basket.value = now
+      if (now.state === 'confirmed') return done({ state: 'confirmed', reference: now.reference, totalMinor: now.totalMinor })
+      if (now.state !== 'awaiting_payment') return
+      await sleep(1500)
+    }
+    done({ state: 'processing' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    checking.value = false
+  }
+}
 
 // The countdown: the seconds left, and a sentence for screen readers at fixed points only.
 const now = ref(Date.now())
@@ -107,6 +148,10 @@ async function pay() {
       basket.value = { ...basket.value, state: 'awaiting_payment', expiresAt: started.expiresAt ?? basket.value.expiresAt }
     }
     const next = await $api<{ next: { kind: string, url?: string }, settled: boolean }>(`/api/box-office/baskets/${encodeURIComponent(basket.value.orderId)}/pay`, { method: 'POST', body: {}, headers: { 'x-basket-token': remembered.value.token, 'idempotency-key': crypto.randomUUID() } })
+    if (next.next.kind === 'client-secret') {
+      card.value = next.next as unknown as CardStep
+      return
+    }
     if ((next.next.kind === 'redirect' || next.next.kind === 'handoff') && next.next.url) return navigateTo(next.next.url, { external: true })
     if (next.settled) return done({ state: 'confirmed', reference: basket.value.reference, totalMinor: basket.value.totalMinor })
     refusal.value = { code: 'box-office.basket.pay-unavailable', reason: t('box-office.basket.pay-unavailable'), remedy: canReserve.value ? t('box-office.basket.pay-unavailable-reserve') : undefined } as ReturnType<typeof toRefusal>
@@ -177,7 +222,7 @@ async function reserve() {
               />
             </template>
             <p v-else>
-              {{ t('box-office.basket.done.confirm-email.body') }}
+              {{ t(`box-office.basket.done.${outcome.state}.body`) }}
             </p>
           </template>
 
@@ -244,7 +289,31 @@ async function reserve() {
               </p>
             </section>
 
+            <p
+              v-if="checking"
+              class="flex items-center gap-2"
+              role="status"
+            >
+              <UIcon
+                name="i-lucide-loader-circle"
+                class="animate-spin"
+              />
+              {{ t('box-office.basket.checking') }}
+            </p>
+            <div
+              v-else-if="card"
+              class="space-y-4"
+            >
+              <RefusalNotice :refusal="refusal" />
+              <PaymentsCardForm
+                :next="card"
+                :label="t('box-office.basket.pay', { amount: money(basket.totalMinor, basket.currency) })"
+                :return-url="returnUrl"
+                @submitted="settle"
+              />
+            </div>
             <UForm
+              v-else
               class="space-y-4"
               :state="form"
               @submit="canPay ? pay() : reserve()"

@@ -23,6 +23,7 @@ import basketGet from '../../server/api/box-office/baskets/[id]/index.get'
 import reservePost from '../../server/api/box-office/baskets/[id]/reserve.post'
 import checkoutPost from '../../server/api/box-office/baskets/[id]/checkout.post'
 import payPost from '../../server/api/box-office/baskets/[id]/pay.post'
+import checkPost from '../../server/api/box-office/baskets/[id]/check.post'
 import confirmPost from '../../server/api/box-office/reservations/confirm.post'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
@@ -79,6 +80,7 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/reserve': reservePost,
   'POST /api/box-office/baskets/:id/checkout': checkoutPost,
   'POST /api/box-office/baskets/:id/pay': payPost,
+  'POST /api/box-office/baskets/:id/check': checkPost,
   'POST /api/box-office/reservations/confirm': confirmPost,
   'GET /api/box-office/orders/link': orderLinkGet,
   'GET /api/box-office/orders': ordersGet,
