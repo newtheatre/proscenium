@@ -57,6 +57,24 @@ Three more services read closures, added on 16 November 2026 at the Spaces modul
 
 A closure of a venue covers spaces added to that venue later, because the scope is worked out when asked and is not stored.
 
+Spaces are read through three services, written down on 16 November 2026 with integration ruling R-36, which put `managed` on the space:
+
+| Service | Returns or does |
+| --- | --- |
+| `getSpace(id)` | One space with its venue, capacity, kind, `managed` and its finding-it note. |
+| `listSpaces({ venueId, managed, performable })` | Active spaces, in venue then space order. A module that only works in spaces the theatre runs passes `managed: true`. |
+| `placeName(spaceId)` | The place as people are told it, "space, venue", in the reader's language. Where a space has the same name as its venue, the usual case for a theatre with one room, it answers the venue's name alone, so nobody reads "Studio, Studio". Every module's messages and screens use it, so a place is named one way. |
+
+`getPerformance` and `listPerformances` carry the space's `managed` with the space. No service returns a venue-level answer; a caller that wants "does this venue have a space we run" asks `listSpaces({ venueId, managed: true })`.
+
+Agreed with the Spaces module the same day, for a module whose records depend on a space being run by the theatre:
+
+| Item | What is specified |
+| --- | --- |
+| `assertSpaceManaged(spaceId)` | A statement predicate like `assertSpaceFree`: a condition the caller places on its own write, true while the space is active and managed. The caller may use its opposite. |
+| Event `core.space.managed-changed` | Announced when a space's `managed` changes, with `spaceId`, `venueId` and the new `managed`. It names no person and may leave in a webhook. |
+| `core.change-impact` | Changing `managed` on a space is offered to this point as the change `space.managed`, with the space id and the new value, before it is saved. The confirmation shows each module's line, such as how many room bookings are affected. Core does not offer it to `core.change-guard`: a module may warn about this change but not refuse it, because whether the theatre runs a room is a fact, not a request. |
+
 **Capacity has one owner for each level.** Core owns the house capacity of a performance, the `capacity` column, changed with `core.performance.schedule`. Box office owns how that house is divided into pools and seats. The total Box office puts on sale may not exceed `capacityOf()` unless its own override allows. Lowering the house capacity goes through `core.change-guard`, where Box office refuses a figure below what is held or sold, and it announces `core.performance.capacity-changed`.
 
 ### Vocabularies
@@ -448,6 +466,8 @@ The identity specification defines an access scheme a person applies to. Its pub
 Identity has confirmed the component's name and behaviour. It shows "Apply" to a person who is signed out or has not applied, and the state of their own application to one who has. While `core.access-scheme.enabled` is off it shows nothing, so the seeded wording is written to read sensibly without it, and the site-readiness screen says the page has nothing to offer. The page names the scheme with `:setting{name="core.access-scheme.name"}`, so it uses the theatre's own name for it. The form itself lives under `/account`.
 
 Identity's nineteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks. The nineteenth, `core.grants-expiring`, was added on 16 November 2026: members' side, transactional, sent once per sweep to those who can renew. Its key clashes with none of core's own types, and a transactional type on the members' side is one the format already allows.
+
+Box office told this workstream of three types on 16 November 2026, and the format holds all three. `box-office.reservation-confirm` goes to a buyer who is not signed in and carries the link that turns a basket into a reservation. No account exists until that link is pressed (the foundations rule on link tokens), so it is sent with notifyAddress, the case that service is for. It is transactional, email only, and its link is a sealed variable, which is what makes it email only. `box-office.order-reserved` is email only because it carries the desk code and the order's link, both sealed. `box-office.order-cancelled` goes to email and the inbox and carries nothing sealed. A transactional type has no preference switch, so none of the three can be turned off by the person.
 
 ## Fan-out: many rows in one unit of work
 

@@ -97,7 +97,7 @@ Registered with Foundations on 16 November 2026 and listed in its part 4 index. 
 | `release_reason` | text | at most 300 | free text | redact | The person's own words |
 | `minutes_worked` | integer | nullable, at least 0 | internal | keep | Set when the state becomes worked |
 | `reminded` | integer | not null, default 0 | internal | keep | How many reminders have gone |
-| freed\_by\_merge | text | nullable | internal | keep | The id of the merge that released this assignment because both accounts were on the shift, with the account it came from kept by the merge record. Cleared when Identity's 30-day undo window closes. See part 4, under the merge handler |
+| freed\_by\_merge | text | nullable | internal | keep | The id of the merge that released this assignment because both accounts were on the shift, with the account it came from kept by the merge record. Cleared when Identity's 30-day undo window closes. It is a claim stamp, in Foundations' sense. See part 3, "Account merge and undo" |
 
 On erasure the row is kept with its account reference following Identity's tombstone, so a past rota still adds up; the free text is redacted.
 

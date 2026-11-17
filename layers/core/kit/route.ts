@@ -2,7 +2,7 @@
 // the module is on, the rate limit, the challenge, the permission and then the input, so a caller
 // without the ability learns nothing about the input's shape; it opens the unit
 // of work, commits it after the handler returns, and shapes every refusal the same way.
-import { defineEventHandler, getHeader, getQuery, getRequestIP, readRawBody, setResponseHeader, setResponseStatus, type H3Event } from 'h3'
+import { defineEventHandler, getHeader, getQuery, getRequestIP, getRouterParams, readRawBody, setResponseHeader, setResponseStatus, type H3Event } from 'h3'
 import type { z } from 'zod'
 import { runInContext, useContext, type Actor, type KitContext, type KitEnv } from './context'
 import { Refusal, isRefusal, DeclarationError, type RefusalBody } from './refusal'
@@ -14,6 +14,7 @@ import { useRegistry } from './registry'
 import { verifyTurnstile } from './turnstile'
 import { nowMs } from './clock'
 import { requestUrl } from './origin'
+import { withoutTokens } from './tokens'
 import { useSetting } from './settings-store'
 import { ensureMigrated } from './migrations'
 import type { AbilityName } from './registry-types'
@@ -37,6 +38,11 @@ export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
    * upload; the kit leaves it unread and validates the query instead. Cannot be idempotent.
    */
   body?: 'json' | 'binary'
+  /**
+   * Path parameters that carry a link token (Foundations part 4, T4). The kit keeps their values out
+   * of the log, error reports, the idempotency record, audit rows, events and job payloads.
+   */
+  tokens?: readonly string[]
 }
 
 export interface RouteContext<I> {
@@ -58,6 +64,7 @@ export function checkRouteDeclaration(decl: RouteDeclaration<any>): void {
   if (decl.protect !== undefined && decl.protect !== 'turnstile') throw new DeclarationError('protect', "is 'turnstile'")
   if (decl.body !== undefined && decl.body !== 'json' && decl.body !== 'binary') throw new DeclarationError('body', "is 'json' or 'binary'")
   if (decl.body === 'binary' && decl.idempotent) throw new DeclarationError('idempotent', 'a binary body is not kept, so it cannot be replayed')
+  if (decl.tokens !== undefined && (!Array.isArray(decl.tokens) || !decl.tokens.every(t => typeof t === 'string' && /^[a-z][a-zA-Z0-9]*$/.test(t)))) throw new DeclarationError('tokens', 'names the path parameters that carry a link token')
 }
 
 function refusalResponse(event: H3Event, refusal: Refusal): RefusalBody {
@@ -124,6 +131,11 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
       }
       catch (error) {
         if (isRefusal(error)) return refusalResponse(event, error)
+        if (decl.tokens?.length && error instanceof Error) {
+          // An error report carries the message and stack; neither may carry the token.
+          error.message = withoutTokens(error.message)
+          if (error.stack) error.stack = withoutTokens(error.stack)
+        }
         throw error
       }
     })
@@ -131,6 +143,10 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
 
   async function handle(event: H3Event) {
     const context = useContext()
+    if (decl.tokens?.length) {
+      const params = getRouterParams(event, { decode: true })
+      context.tokens = decl.tokens.map(name => params[name]).filter((v): v is string => !!v)
+    }
     await ensureMigrated()
     const registry = useRegistry()
     const module = moduleOfPath(event.path)
@@ -192,7 +208,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     if (decl.idempotent) {
       const key = getHeader(event, 'idempotency-key')
       if (!key || key.length > 200) throw new Refusal('core.idempotency.key-missing', 'This request needs an Idempotency-Key header.', { status: 400 }) // not-policy: a sane header length
-      const route = `${method} ${event.path.split('?')[0]}`
+      const route = withoutTokens(`${method} ${event.path.split('?')[0]}`)
       const hash = await sha256(rawBody)
       const stored = await context.env.DB.prepare('SELECT request_hash, status, response, created_at FROM core_idempotency_keys WHERE key = ? AND route = ?').bind(key, route).first<{ request_hash: string, status: number, response: string, created_at: number }>()
       const keepFor = await useSetting('core.idempotency.keep-for') as number

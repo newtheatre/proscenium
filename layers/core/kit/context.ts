@@ -67,6 +67,8 @@ export interface KitContext {
   address?: string
   /** The origin the request arrived on, which stands in for the site's until one is recorded. */
   requestOrigin?: string
+  /** Link tokens in the request's address (path parameters the route declares as tokens). */
+  tokens?: readonly string[]
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {

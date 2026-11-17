@@ -10,6 +10,8 @@ export default defineModule({
   since: '0.1.0',
   stability: 'experimental',
   switchable: false,
+  // The till's browser test sells through a gallery panel when Payments and Finance are on.
+  uses: ['finance', 'payments'],
   abilities: defineAbilities('gallery', {
     'sample.view': ability(),
     'sample.manage': ability(),
@@ -22,6 +24,9 @@ export default defineModule({
     'demo.hold': setting.duration({ default: '15m', min: '5m', max: '1h', change: 'gallery.sample.manage' }),
   }),
   contributes: {
+    'payments.desk-basket': [{ id: 'gallery' }],
+    'payments.settlement': [{ id: 'gallery' }],
+    'finance.system-account': [{ id: 'income', name: 'Gallery income', kind: 'income' }],
     'core.count': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.none', file: 'none' }],
     'core.record-fact': [{ id: 'gallery.seats-held', record: 'gallery.production', ability: 'gallery.sample.view', component: 'GalleryFactSeats', order: 10 }],
     'core.record-check': [{ id: 'gallery.poster', file: 'has-poster' }],

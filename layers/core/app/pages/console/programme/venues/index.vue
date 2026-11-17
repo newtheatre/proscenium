@@ -3,8 +3,8 @@
 // theatre with one room never has to think about spaces.
 import { venueInput } from '../../../../../server/places/input'
 
-interface Space { id: string, name: string, defaultCapacity: number | null, archived: boolean }
-interface Row { id: string, name: string, locality: string | null, managed: boolean, archived: boolean, spaces: Space[] }
+interface Space { id: string, name: string, defaultCapacity: number | null, managed: boolean, archived: boolean }
+interface Row { id: string, name: string, locality: string | null, archived: boolean, spaces: Space[] }
 
 const { $api } = useNuxtApp()
 const columns = [
@@ -26,8 +26,9 @@ const fields = [
 const create = (values: Record<string, unknown>) => $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
 const created = (result: unknown) => navigateTo(`/console/programme/venues/${(result as { venueId: string }).venueId}`)
 
+// A space the theatre does not run (R-36) is marked in the list.
 const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
-  .map(s => (s.defaultCapacity ? `${s.name} (${s.defaultCapacity})` : s.name)).join(', ')
+  .map(s => `${s.defaultCapacity ? `${s.name} (${s.defaultCapacity})` : s.name}${s.managed ? '' : ', not run by the theatre'}`).join('; ')
 </script>
 
 <template>
@@ -50,12 +51,6 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
     <template #cell-name="{ row }">
       <span class="inline-flex items-center gap-2">
         {{ row.name }}
-        <UBadge
-          v-if="!row.managed"
-          label="Visiting"
-          color="neutral"
-          size="sm"
-        />
         <StatusBadge
           v-if="row.archived"
           tone="neutral"

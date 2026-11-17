@@ -50,12 +50,12 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
       module,
       label: `${module}.module.name`,
       menu: 'console',
-      to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings`,
+      to: `/console/${module}/settings`,
       icon: 'i-lucide-settings-2',
       ability: [...abilities],
-      group: module === 'core' ? SYSTEM_GROUP : own ?? module,
+      group: own ?? module,
       section: 'setup',
-      order: module === 'core' ? 0 : 100, // not-policy: sort position, core's settings first
+      order: 100, // not-policy: sort position, after the module's own entries
     })
   }
   return out
