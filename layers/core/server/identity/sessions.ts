@@ -6,7 +6,7 @@ import { first, newId, nowMs, useContext, useSetting, type UnitView } from '#kit
 import { digest, randomToken } from './crypto'
 import { SESSION_COOKIE, readCookie, setSessionCookie, clearSessionCookie, deviceLabel } from './web'
 
-export type Method = 'passkey' | 'link' | 'code' | 'google' | 'setup' | 'recovery'
+export type Method = 'passkey' | 'link' | 'code' | 'google' | 'setup' | 'recovery' | 'authenticator'
 export type Assurance = 'basic' | 'strong'
 
 export interface SessionRow {

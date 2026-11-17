@@ -18,6 +18,8 @@ export interface MergeStep { module: string, table: string, column: string, acti
 /** The core's own `handler` columns, and what stage one does to each. */
 const HANDLERS: Record<string, MergeStep['action']> = {
   'core_recovery_codes.account_id': 'delete',
+  // The survivor's authenticator stands; the merged-away one moves only if the survivor has none.
+  'core_authenticators.account_id': 'move-unless-present',
   'core_account_tokens.account_id': 'delete',
   'core_passkey_challenges.account_id': 'delete',
   'core_sessions.account_id': 'end-sessions',
