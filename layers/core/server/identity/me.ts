@@ -4,6 +4,7 @@ import { useRegistry } from '#kit/registry'
 import { accountById, verifiedAddressesOf } from './accounts'
 import { kitGrantsOf } from './grants'
 import type { CurrentSession } from './sessions'
+import { authenticatorOf } from './authenticator'
 
 // Does the account still have a way in other than its passkeys (ID-14, "the only way in")?
 export async function hasOtherWayIn(accountId: string): Promise<boolean> {
@@ -37,7 +38,8 @@ export async function describeMe(session: CurrentSession) {
     session: { id: session.id, assurance: session.assurance, methods: session.methods, reassertedAt: session.reassertedAt, limited: session.limited },
     passkeys,
     // ID-03: staff holding a privileged ability are told before they meet a refusal.
-    consoleNeedsPasskey: privileged && passkeys === 0,
+    // An authenticator app stands in for the passkey where the theatre accepts it as strong.
+    consoleNeedsPasskey: privileged && passkeys === 0 && !(await authenticatorOf(session.accountId) && await useSetting('core.sign-in.authenticator-is-strong')),
     at: nowMs(),
   }
 }
