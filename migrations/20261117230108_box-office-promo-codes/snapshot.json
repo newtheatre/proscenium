@@ -1,14 +1,21 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7ac51f91-ef33-4e95-8ec1-2f45ec104000",
+  "id": "86708a17-011b-4b36-b3fa-1b135909fc49",
   "prevIds": [
-    "270c5348-96c9-4119-b57c-b83c14b106da",
-    "7350bd5c-03eb-4f04-9bc3-83e05d438c30"
+    "01bbcc41-dd7e-49e2-beff-2196c2a5b11a"
   ],
   "ddl": [
     {
       "name": "bar_age_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_allergen_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_allergen_entries",
       "entityType": "tables"
     },
     {
@@ -693,6 +700,156 @@
     },
     {
       "table": "bar_age_checks",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "product_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "option_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "contains",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "may_contain",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "product_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "option_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "allergen",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "level",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_allergen_entries",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -14764,6 +14921,78 @@
       "entityType": "indexes"
     },
     {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_product",
+      "columns": [
+        {
+          "value": "product_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_option",
+      "columns": [
+        {
+          "value": "option_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_product",
+      "columns": [
+        {
+          "value": "product_id",
+          "isExpression": false
+        },
+        {
+          "value": "allergen",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "product_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_option",
+      "columns": [
+        {
+          "value": "option_id",
+          "isExpression": false
+        },
+        {
+          "value": "allergen",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "option_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "bar_categories",
       "name": "bar_categories_name",
       "columns": [
@@ -18346,6 +18575,66 @@
       "entityType": "fks"
     },
     {
+      "table": "bar_allergen_checks",
+      "name": "fk_bar_allergen_checks_product_id_bar_products_id_fk",
+      "columns": [
+        "product_id"
+      ],
+      "tableTo": "bar_products",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "fk_bar_allergen_checks_option_id_bar_choice_options_id_fk",
+      "columns": [
+        "option_id"
+      ],
+      "tableTo": "bar_choice_options",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "fk_bar_allergen_entries_product_id_bar_products_id_fk",
+      "columns": [
+        "product_id"
+      ],
+      "tableTo": "bar_products",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "fk_bar_allergen_entries_option_id_bar_choice_options_id_fk",
+      "columns": [
+        "option_id"
+      ],
+      "tableTo": "bar_choice_options",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "bar_categories",
       "name": "fk_bar_categories_parent_id_bar_categories_id_fk",
       "columns": [
@@ -20775,6 +21064,24 @@
       "entityType": "pks"
     },
     {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "bar_categories",
       "name": "bar_categories_pk",
       "columns": [
@@ -21897,6 +22204,36 @@
       "table": "bar_age_checks",
       "name": "bar_age_checks_description",
       "value": "\"description\" IS NULL OR (\"outcome\" = 'refused' AND length(\"description\") <= 120)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_one",
+      "value": "(\"product_id\" IS NULL) <> (\"option_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_checks",
+      "name": "bar_allergen_checks_source",
+      "value": "\"source\" IN ('label', 'supplier', 'other')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_one",
+      "value": "(\"product_id\" IS NULL) <> (\"option_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_allergen",
+      "value": "\"allergen\" IN ('gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_allergen_entries",
+      "name": "bar_allergen_entries_level",
+      "value": "\"level\" IN ('contains', 'may_contain')",
       "entityType": "checks"
     },
     {
