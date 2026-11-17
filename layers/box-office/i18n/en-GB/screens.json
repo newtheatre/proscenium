@@ -11,6 +11,8 @@
   "box-office.screens.panel.row": "{band}, {type}, {price}",
   "box-office.screens.panel.left": "{count} left",
   "box-office.screens.panel.admit": "Admit now",
+  "box-office.screens.panel.email": "Email the tickets (optional)",
+  "box-office.screens.panel.email-help": "Their tickets and receipt are emailed, and the order joins their bookings if they have an account. Nothing about them is shown here.",
   "box-office.screens.panel.admit-help": "They are going straight in: the tickets are marked as admitted when the payment succeeds.",
   "box-office.screens.panel.find-label": "Booking reference or desk code",
   "box-office.screens.panel.find-help": "Type it, or scan the code with the camera. Search by name is not yet available.",
