@@ -26,7 +26,8 @@ export const groupInput = z.object({
   mixerFixedMinor: amount.nullable().optional(),
 }).strict()
 export const groupPatch = groupInput.omit({ source: true }).partial().extend({ defaultKey: id.nullable().optional(), active: z.boolean().optional() }).strict()
-export const optionInput = z.object({ name, deltaMinor: amount.optional(), ageRestricted: z.boolean().optional() }).strict()
+// The stock item a recipe's slot for this group takes when this option is picked; none for "No mixer".
+export const optionInput = z.object({ name, deltaMinor: amount.optional(), ageRestricted: z.boolean().optional(), stockItemId: id.nullable().optional() }).strict()
 export const optionPatch = optionInput.partial().extend({ active: z.boolean().optional() }).strict()
 export const pickInput = z.object({ groupId: id, key: id }).strict()
 export type Pick = z.infer<typeof pickInput>
@@ -77,23 +78,27 @@ export function addOption(unit: UnitView, groupId: string, input: z.infer<typeof
   const optionId = newId('bcho')
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO bar_choice_options (id, group_id, name, delta_minor, age_restricted, position, active, created_at, updated_at)
-          SELECT ?, id, ?, ?, ?, coalesce((SELECT max(position) + 1 FROM bar_choice_options WHERE group_id = ?), 0), 1, ?, ? FROM bar_choice_groups
-           WHERE id = ? AND source = 'options' AND NOT EXISTS (SELECT 1 FROM bar_choice_options WHERE group_id = ? AND lower(name) = lower(?))`,
-    params: [optionId, input.name, input.deltaMinor ?? 0, input.ageRestricted ? 1 : 0, groupId, at, at, groupId, groupId, input.name],
-  }).expect(1, { code: 'bar.choice.option-not-added', reason: 'That option could not be added: the name is in use, or the choice takes its options from the mixers.', remedy: 'Choose another name.' })
+    sql: `INSERT INTO bar_choice_options (id, group_id, name, delta_minor, age_restricted, stock_item_id, position, active, created_at, updated_at)
+          SELECT ?, id, ?, ?, ?, ?, coalesce((SELECT max(position) + 1 FROM bar_choice_options WHERE group_id = ?), 0), 1, ?, ? FROM bar_choice_groups
+           WHERE id = ? AND source = 'options' AND NOT EXISTS (SELECT 1 FROM bar_choice_options WHERE group_id = ? AND lower(name) = lower(?))
+           AND (? IS NULL OR EXISTS (SELECT 1 FROM bar_stock_items WHERE id = ? AND active = 1))`,
+    params: [optionId, input.name, input.deltaMinor ?? 0, input.ageRestricted ? 1 : 0, input.stockItemId ?? null, groupId, at, at, groupId, groupId, input.name, input.stockItemId ?? null, input.stockItemId ?? null],
+  }).expect(1, { code: 'bar.choice.option-not-added', reason: 'That option could not be added: the name is in use, the choice takes its options from the mixers, or the stock item is not in use.', remedy: 'Choose another name or stock item.' })
   unit.audit({ action: 'update', record: ['bar.choice-group', groupId], detail: { optionAdded: optionId } })
   return optionId
 }
 
 export async function updateOption(unit: UnitView, optionId: string, input: z.infer<typeof optionPatch>): Promise<void> {
-  const row = await first<{ group_id: string, name: string, delta_minor: number, age_restricted: number, active: number }>('SELECT group_id, name, delta_minor, age_restricted, active FROM bar_choice_options WHERE id = ?', optionId)
+  const row = await first<{ group_id: string, name: string, delta_minor: number, age_restricted: number, stock_item_id: string | null, active: number }>('SELECT group_id, name, delta_minor, age_restricted, stock_item_id, active FROM bar_choice_options WHERE id = ?', optionId)
   if (!row) refuse(GONE('option').code, GONE('option').reason, { status: 404 })
   const name = input.name ?? row!.name
+  const itemId = input.stockItemId === undefined ? row!.stock_item_id : input.stockItemId
+  if (itemId && itemId !== row!.stock_item_id && !await first('SELECT 1 FROM bar_stock_items WHERE id = ? AND active = 1', itemId))
+    refuse('bar.stock-item.unknown', 'That stock item is not in use.', { status: 422 })
   unit.add({
-    sql: `UPDATE bar_choice_options SET name = ?, delta_minor = ?, age_restricted = ?, active = ?, updated_at = ?
+    sql: `UPDATE bar_choice_options SET name = ?, delta_minor = ?, age_restricted = ?, stock_item_id = ?, active = ?, updated_at = ?
           WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bar_choice_options WHERE group_id = ? AND lower(name) = lower(?) AND id <> ?)`,
-    params: [name, input.deltaMinor ?? row!.delta_minor, input.ageRestricted === undefined ? row!.age_restricted : input.ageRestricted ? 1 : 0,
+    params: [name, input.deltaMinor ?? row!.delta_minor, input.ageRestricted === undefined ? row!.age_restricted : input.ageRestricted ? 1 : 0, itemId,
       input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), optionId, row!.group_id, name, optionId],
   }).expect(1, NAME_TAKEN('an option'))
   unit.audit({ action: 'update', record: ['bar.choice-group', row!.group_id], detail: { optionChanged: optionId } })

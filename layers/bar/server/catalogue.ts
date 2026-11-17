@@ -382,21 +382,21 @@ export async function updatePriceList(unit: UnitView, id: string, input: Partial
 
 export type OutletKind = typeof OUTLET_KINDS[number]
 export type TillLayout = typeof TILL_LAYOUTS[number]
-export interface Outlet { id: string, name: string, kind: OutletKind, priceListId: string, priceList: string, spaceId: string | null, tillLayout: TillLayout, favourites: string[], active: boolean }
-export interface OutletInput { name: string, kind: OutletKind, priceListId?: string | null, spaceId?: string | null, tillLayout?: TillLayout, active?: boolean }
+export interface Outlet { id: string, name: string, kind: OutletKind, priceListId: string, priceList: string, spaceId: string | null, stockLocationId: string | null, tillLayout: TillLayout, favourites: string[], active: boolean }
+export interface OutletInput { name: string, kind: OutletKind, priceListId?: string | null, spaceId?: string | null, stockLocationId?: string | null, tillLayout?: TillLayout, active?: boolean }
 
 export async function outlets(): Promise<Outlet[]> {
-  const rows = await all<{ id: string, name: string, kind: OutletKind, price_list_id: string, list: string, space_id: string | null, till_layout: TillLayout, active: number }>(
-    'SELECT o.id, o.name, o.kind, o.price_list_id, l.name AS list, o.space_id, o.till_layout, o.active FROM bar_outlets o JOIN bar_price_lists l ON l.id = o.price_list_id ORDER BY o.active DESC, lower(o.name), o.id',
+  const rows = await all<{ id: string, name: string, kind: OutletKind, price_list_id: string, list: string, space_id: string | null, stock_location_id: string | null, till_layout: TillLayout, active: number }>(
+    'SELECT o.id, o.name, o.kind, o.price_list_id, l.name AS list, o.space_id, o.stock_location_id, o.till_layout, o.active FROM bar_outlets o JOIN bar_price_lists l ON l.id = o.price_list_id ORDER BY o.active DESC, lower(o.name), o.id',
   )
   const favourites = new Map<string, string[]>()
   for (const f of await all<{ outlet_id: string, variant_id: string }>('SELECT outlet_id, variant_id FROM bar_outlet_favourites ORDER BY outlet_id, position')) {
     favourites.set(f.outlet_id, [...favourites.get(f.outlet_id) ?? [], f.variant_id])
   }
-  return rows.map(r => ({ id: r.id, name: r.name, kind: r.kind, priceListId: r.price_list_id, priceList: r.list, spaceId: r.space_id, tillLayout: r.till_layout, favourites: favourites.get(r.id) ?? [], active: !!r.active }))
+  return rows.map(r => ({ id: r.id, name: r.name, kind: r.kind, priceListId: r.price_list_id, priceList: r.list, spaceId: r.space_id, stockLocationId: r.stock_location_id, tillLayout: r.till_layout, favourites: favourites.get(r.id) ?? [], active: !!r.active }))
 }
 
-const OUTLET_REFUSED = { code: 'bar.outlet.refused', reason: 'Another outlet in use has that name, the box office desk already has an outlet, or the price list is not in use.', remedy: 'Check the name, the kind and the list.' }
+const OUTLET_REFUSED = { code: 'bar.outlet.refused', reason: 'Another outlet in use has that name, the box office desk already has an outlet, or the price list or stock location is not in use.', remedy: 'Check the name, the kind and the list.' }
 
 export function addOutlet(unit: UnitView, input: OutletInput): string {
   ensureStandard(unit)
@@ -404,27 +404,30 @@ export function addOutlet(unit: UnitView, input: OutletInput): string {
   const at = nowMs()
   const list = input.priceListId ? '?' : "(SELECT id FROM bar_price_lists WHERE system_key = 'standard')"
   unit.add({
-    sql: `INSERT INTO bar_outlets (id, name, kind, price_list_id, space_id, till_layout, active, created_at, updated_at)
-          SELECT ?, ?, ?, l.id, ?, ?, 1, ?, ? FROM bar_price_lists l WHERE l.id = ${list} AND l.active = 1
+    sql: `INSERT INTO bar_outlets (id, name, kind, price_list_id, space_id, stock_location_id, till_layout, active, created_at, updated_at)
+          SELECT ?, ?, ?, l.id, ?, ?, ?, 1, ?, ? FROM bar_price_lists l WHERE l.id = ${list} AND l.active = 1
+          AND (? IS NULL OR EXISTS (SELECT 1 FROM bar_stock_locations WHERE id = ? AND active = 1))
           AND NOT EXISTS (SELECT 1 FROM bar_outlets WHERE active = 1 AND (lower(name) = lower(?) OR (kind = 'desk' AND ? = 'desk')))`,
-    params: [id, input.name, input.kind, input.spaceId ?? null, input.tillLayout ?? 'chips', at, at, ...(input.priceListId ? [input.priceListId] : []), input.name, input.kind],
+    params: [id, input.name, input.kind, input.spaceId ?? null, input.stockLocationId ?? null, input.tillLayout ?? 'chips', at, at, ...(input.priceListId ? [input.priceListId] : []), input.stockLocationId ?? null, input.stockLocationId ?? null, input.name, input.kind],
   }).expect(1, OUTLET_REFUSED)
   unit.audit({ action: 'create', record: ['bar.outlet', id] })
   return id
 }
 
 export async function updateOutlet(unit: UnitView, id: string, input: Partial<OutletInput>): Promise<void> {
-  const row = await first<{ name: string, kind: OutletKind, price_list_id: string, space_id: string | null, till_layout: TillLayout, active: number }>('SELECT name, kind, price_list_id, space_id, till_layout, active FROM bar_outlets WHERE id = ?', id)
+  const row = await first<{ name: string, kind: OutletKind, price_list_id: string, space_id: string | null, stock_location_id: string | null, till_layout: TillLayout, active: number }>('SELECT name, kind, price_list_id, space_id, stock_location_id, till_layout, active FROM bar_outlets WHERE id = ?', id)
   if (!row) refuse(GONE('outlet').code, GONE('outlet').reason, { status: 404 })
   const name = input.name ?? row!.name
   const kind = input.kind ?? row!.kind
   const active = input.active === undefined ? !!row!.active : input.active
   const listId = input.priceListId ?? row!.price_list_id
+  const locationId = input.stockLocationId === undefined ? row!.stock_location_id : input.stockLocationId
   unit.add({
-    sql: `UPDATE bar_outlets SET name = ?, kind = ?, price_list_id = ?, space_id = ?, till_layout = ?, active = ?, updated_at = ?
+    sql: `UPDATE bar_outlets SET name = ?, kind = ?, price_list_id = ?, space_id = ?, stock_location_id = ?, till_layout = ?, active = ?, updated_at = ?
           WHERE id = ? AND EXISTS (SELECT 1 FROM bar_price_lists WHERE id = ? AND active = 1)
+          AND (? IS NULL OR ? IS ? OR EXISTS (SELECT 1 FROM bar_stock_locations WHERE id = ? AND active = 1))
           AND (? = 0 OR NOT EXISTS (SELECT 1 FROM bar_outlets WHERE active = 1 AND id <> ? AND (lower(name) = lower(?) OR (kind = 'desk' AND ? = 'desk'))))`,
-    params: [name, kind, listId, input.spaceId === undefined ? row!.space_id : input.spaceId, input.tillLayout ?? row!.till_layout, active ? 1 : 0, nowMs(), id, listId, active ? 1 : 0, id, name, kind],
+    params: [name, kind, listId, input.spaceId === undefined ? row!.space_id : input.spaceId, locationId, input.tillLayout ?? row!.till_layout, active ? 1 : 0, nowMs(), id, listId, locationId, locationId, row!.stock_location_id, locationId, active ? 1 : 0, id, name, kind],
   }).expect(1, OUTLET_REFUSED)
   unit.audit({ action: 'update', record: ['bar.outlet', id] })
 }
