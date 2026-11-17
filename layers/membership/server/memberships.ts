@@ -128,14 +128,18 @@ export function writeNumber(unit: UnitView, accountId: string, startsOn: string,
   })
 }
 
-/** An application waiting on staff to check it (V2, V3): pending, with verification outstanding. */
-export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null, renewsId?: string | null }): string {
+/**
+ * An application (V2, V3, P1): pending, with what is outstanding. By default it waits on staff to
+ * check it. One that has passed its check and waits only for its fee is `verified` and `paying`, and
+ * expires at `expiresAt` because the next step is the applicant's (J5).
+ */
+export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null, renewsId?: string | null, verified?: boolean, paying?: boolean, expiresAt?: number | null }): string {
   const at = nowMs()
   const id = newId('mshp')
   unit.add({
-    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, renews_id, needs_verification, needs_approval, needs_payment, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, 1, 0, 0, ?, ?)`,
-    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.renewsId ? 'renewed' : 'applied', input.renewsId ?? null, at, at],
+    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, renews_id, needs_verification, needs_approval, needs_payment, verified_at, expires_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.renewsId ? 'renewed' : 'applied', input.renewsId ?? null, input.verified ? 0 : 1, input.paying ? 1 : 0, input.verified ? at : null, input.expiresAt ?? null, at, at],
   }).expect(1)
   return id
 }
@@ -144,13 +148,13 @@ export function writePending(unit: UnitView, input: { scheme: Scheme, accountId:
  * Activates a pending application whose last requirement has just been met (A1): its dates are set
  * now, from the day it activates. The check constraint refuses it while anything is outstanding.
  */
-export function activatePending(unit: UnitView, input: { id: string, scheme: Scheme, accountId: string, count: number, startsOn: string, endsOn?: string | null }): { startsOn: string, endsOn: string | null } {
+export function activatePending(unit: UnitView, input: { id: string, scheme: Scheme, accountId: string, count: number, startsOn: string, endsOn?: string | null, paid?: boolean }): { startsOn: string, endsOn: string | null } {
   const at = nowMs()
   const endsOn = input.endsOn !== undefined ? input.endsOn : endsOnFor(input.scheme, input.startsOn, input.count)
   unit.add({
     // D9: an end date from a list entry leaves the membership without a length option.
-    sql: `UPDATE membership_memberships SET state = 'active', starts_on = ?, ends_on = ?, verified_at = coalesce(verified_at, ?), activated_at = ?, expires_at = NULL, updated_at = ?${input.endsOn !== undefined ? ', length_option_id = NULL' : ''} WHERE id = ? AND state = 'pending'`,
-    params: [input.startsOn, endsOn, at, at, at, input.id],
+    sql: `UPDATE membership_memberships SET state = 'active', starts_on = ?, ends_on = ?, verified_at = coalesce(verified_at, ?), activated_at = ?, expires_at = NULL, updated_at = ?${input.paid ? ', paid_at = ?' : ''}${input.endsOn !== undefined ? ', length_option_id = NULL' : ''} WHERE id = ? AND state = 'pending'`,
+    params: [input.startsOn, endsOn, at, at, at, ...(input.paid ? [at] : []), input.id],
   }).expect(1, { code: 'membership.application.changed', reason: 'This application has already been dealt with.', remedy: 'Reload the page.' })
   writeNumber(unit, input.accountId, input.startsOn, at)
   unit.announce('membership.membership.started', { membershipId: input.id, schemeId: input.scheme.id, accountId: input.accountId }, { record: ['membership.membership', input.id] })
