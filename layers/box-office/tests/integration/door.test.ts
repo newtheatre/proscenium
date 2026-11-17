@@ -98,6 +98,8 @@ describe('scanning at the door', () => {
     // What the door shows, so it can send them to the box office or the bar to pay.
     const unpaid = { result: 'not_paid', scanId: null, reservation: { reference: reserved.body.reference, tickets: 1, amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
     expect((await scan(h, reserved.body.deskCode)).body).toEqual(unpaid)
+    // The live door counts them as still to come.
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, steward)).body).toMatchObject({ tickets: 0, admitted: 0, unpaid: 1 })
     expect((await scan(h, reserved.body.reference)).body).toEqual(unpaid)
     expect(await count('SELECT count(*) AS n FROM box_office_scans WHERE performance_id = ?', h.performanceId)).toBe(0)
     // At another performance's door it is not for tonight, paid or not.
@@ -110,7 +112,7 @@ describe('scanning at the door', () => {
     const codes = await tickets(h, 2)
     await scan(h, codes[0]!)
     const summary = await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, steward)
-    expect(summary.body).toMatchObject({ performance: { id: h.performanceId }, tickets: 2, admitted: 1 })
+    expect(summary.body).toMatchObject({ performance: { id: h.performanceId }, tickets: 2, admitted: 1, unpaid: 0 })
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, person([]))).status).toBe(403)
 
     // Tonight: performances today in the theatre's time zone. The house's performances are in March.

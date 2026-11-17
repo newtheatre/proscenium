@@ -80,7 +80,7 @@ async function setActive(l: List, active: boolean) {
           :muted="!l.active"
         >
           <template #name>
-            <ULink :to="`/console/bar/price-lists/${l.id}`">
+            <ULink :to="`/admin/modules/bar/price-lists/${l.id}`">
               {{ l.active ? l.name : t('bar.screens.products.retired-name', { name: l.name }) }}
             </ULink>
           </template>

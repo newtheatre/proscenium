@@ -139,3 +139,16 @@ Does NNT have staff or member prices at the bar today?
 - Tax on sales is unsupported, as in Finance.
 - Refund limits, two-person approval, the float and cash variance are Payments' settings and apply to the bar unchanged.
 - The only customer detail the bar keeps is the name on a bar tab (question 4).
+
+## Later design question: tills in several spaces, and stock by space
+
+Matt, 17 November: several tills can be open at once in different spaces, and a space may hold its own stock, separate from a venue-wide level. How should that work across more than one venue?
+
+What the model already allows:
+
+- Each outlet has its own opening, so several outlets trade at once.
+- Stock is kept per stock location (`bar_stock_levels` keyed by item and location).
+- Each outlet names the location its sales draw from.
+- Transfers move stock between locations.
+
+So "the studio bar has its own stock" is one more location. What it does not have yet is a link from a location to a space or venue, so there is no venue-wide total to roll up to. The stock slice should add a nullable `space_id` (or `venue_id`) on `bar_stock_locations`, and report levels grouped by venue, rather than adding venue-wide levels as a second store.

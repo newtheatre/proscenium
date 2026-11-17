@@ -1,0 +1,137 @@
+// The bar at the till in a real browser: a product with one size is added with one press, one with
+// several opens the size window, the lines sit on the till's receipt with steppers, the age check
+// is asked once and its answer stays on the receipt, and a refusal of the age-restricted lines
+// leaves the rest of the sale to carry on.
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
+
+const grant = (ability: string) => ({ ability, via: 'test' })
+const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
+const owner = person('acc_barowner', 'Bar Owner', ['core.settings.manage', 'core.modules.manage', 'payments.settings.manage', 'payments.provider.manage', 'bar.product.manage', 'bar.price.manage', 'bar.outlet.manage', 'bar.settings.manage'])
+const seller = person('acc_barseller', 'Bea Seller', ['bar.sale.sell', 'payments.session.open', 'payments.attempt.attest'])
+const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
+const key = () => ({ 'idempotency-key': crypto.randomUUID() })
+
+async function post(api: APIRequestContext, url: string, data: object) {
+  const response = await api.post(url, { data, headers: key() })
+  expect(response.ok(), `${url}: ${await response.text()}`).toBe(true)
+  return await response.json()
+}
+
+// Other browser tests share the database, so this one's products carry a name of their own.
+const run = Date.now().toString(36)
+const lager = `Lager ${run}`
+const cola = `Cola ${run}`
+
+test.beforeAll(async ({ playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
+  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }, { key: 'core.rate-limits.write', value: 10000 }] } })
+  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'core.locale.time-zone', value: 'Europe/London' }], confirm: true } })).ok()).toBe(true)
+  for (const id of ['finance', 'payments', 'bar']) expect((await api.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
+  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: true }], confirm: true } })).ok()).toBe(true)
+  await post(api, '/api/payments/providers', { provider: 'cash', label: 'Bar cash', channels: ['desk'], mode: 'live' })
+  const draught = await post(api, '/api/bar/categories', { name: `Draught ${run}`, colour: 'warning' })
+  const soft = await post(api, '/api/bar/categories', { name: `Soft ${run}`, colour: 'info' })
+  const beer = await post(api, '/api/bar/products', { categoryId: draught.categoryId, name: lager, ageRestricted: true, variantName: 'Pint', amountMinor: 420 })
+  await post(api, `/api/bar/products/${beer.productId}/variants`, { name: 'Half', amountMinor: 230 })
+  await post(api, '/api/bar/products', { categoryId: soft.categoryId, name: cola, amountMinor: 200 })
+  const outlets = await (await api.get('/api/bar/outlets')).json()
+  if (!outlets.outlets?.length) await post(api, '/api/bar/outlets', { name: `Foyer bar ${run}`, kind: 'bar' })
+  await api.dispose()
+})
+test.use(as(seller))
+
+async function visit(page: Page, url: string) {
+  const response = await page.goto(url)
+  await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+  return response
+}
+async function noViolations(page: Page) {
+  // A dialogue fading in is half transparent, and its contrast is judged on the half.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
+  expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
+}
+const tile = (page: Page, name: string) => page.getByRole('button', { name: new RegExp(`^${name}`) })
+const cash = (page: Page) => page.getByRole('button', { name: /^Cash( ·|$)/ }).first()
+
+test('one press adds a product sold one way; one with sizes asks which, and the age check once', async ({ page }) => {
+  await visit(page, '/live/till')
+  const receipt = page.getByRole('complementary', { name: 'Total to pay' })
+
+  // Sold one way: straight onto the receipt.
+  await tile(page, cola).click()
+  await expect(receipt.getByText(cola)).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  // Sold in two sizes: the tile says so, and opens the size window.
+  await expect(tile(page, lager)).toContainText('from £2.30')
+  await expect(tile(page, lager)).toContainText('2 sizes')
+  await tile(page, lager).click()
+  const sizes = page.getByRole('dialog', { name: lager })
+  await expect(sizes.getByRole('button', { name: /Half/ })).toBeVisible()
+  await noViolations(page)
+  await sizes.getByRole('button', { name: /Pint/ }).click()
+
+  // The first age-restricted line asks, once for the sale.
+  const prompt = page.getByRole('dialog', { name: /Does the customer look under/ })
+  await noViolations(page)
+  await prompt.getByRole('button', { name: 'No, clearly over' }).click()
+  await expect(receipt.getByText(/^Age check: looked over/)).toBeVisible()
+  await tile(page, lager).click()
+  await page.getByRole('dialog', { name: lager }).getByRole('button', { name: /Half/ }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  // The receipt's steppers change a line; the total follows.
+  await receipt.getByRole('button', { name: `One more ${lager}` }).first().click()
+  await expect(cash(page)).toBeEnabled()
+  await expect(receipt.getByText('£12.70', { exact: true })).toBeVisible() // two pints, a half and a cola
+  await receipt.getByRole('button', { name: `Remove ${lager}` }).click() // the half
+  await expect(receipt.getByText('£10.40', { exact: true })).toBeVisible()
+  await noViolations(page)
+
+  await cash(page).click()
+  await expect(page.getByText('Still to pay: £10.40')).toBeVisible()
+  await page.getByRole('button', { name: 'Cash taken' }).click()
+  await expect(page.getByText('Paid £10.40', { exact: true })).toBeVisible()
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
+})
+
+test('refusing the age-restricted lines leaves the rest of the sale to carry on', async ({ page }) => {
+  await visit(page, '/live/till')
+  const receipt = page.getByRole('complementary', { name: 'Total to pay' })
+  await tile(page, cola).click()
+  await tile(page, lager).click()
+  await page.getByRole('dialog', { name: lager }).getByRole('button', { name: /Pint/ }).click()
+  await page.getByRole('dialog', { name: /Does the customer look under/ }).getByRole('button', { name: 'Refuse sale' }).click()
+  const refusal = page.getByRole('dialog', { name: 'Refuse sale' })
+  await expect(refusal.getByRole('radio', { name: /The age-restricted drinks/ })).toBeChecked()
+  await noViolations(page)
+  await refusal.getByRole('button', { name: 'No ID', exact: true }).click()
+  await expect(page.getByText('Refusal recorded in the register', { exact: true })).toBeVisible()
+  await expect(receipt.getByText(cola)).toBeVisible()
+  await expect(receipt.getByText(lager)).toHaveCount(0)
+
+  // The whole sale, from the button above the tiles.
+  await page.getByRole('button', { name: 'Refuse sale' }).click()
+  await page.getByRole('dialog', { name: 'Refuse sale' }).getByRole('button', { name: 'Already drunk' }).click()
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
+})
+
+test('on a phone the sale is a bar at the foot with an undo, and opens as a sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await visit(page, '/live/till')
+  await tile(page, cola).click()
+  await tile(page, cola).click()
+  await expect(page.getByText(`Added: ${cola}`)).toBeVisible()
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByRole('button', { name: /· £2\.00$/ })).toBeEnabled()
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Sale (1)' }).click()
+  const sheet = page.getByRole('dialog', { name: /^Sale/ })
+  await expect(sheet.getByText(cola)).toBeVisible()
+  await sheet.getByRole('button', { name: `Remove ${cola}` }).click()
+  await expect(sheet.getByText('Nothing added yet.')).toBeVisible()
+})

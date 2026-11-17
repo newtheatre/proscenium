@@ -8,26 +8,29 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, retentionSeconds, useSetting, type UnitView } from '#kit'
 import { accountLabel, assertTerm, operatingDayOf } from '#modules/core'
-import { ageChecks, DESCRIPTION_MAX } from './db/schema'
+import { ageChecks, DESCRIPTION_MAX, ID_TYPES, REFUSAL_SCOPES } from './db/schema'
 import { ensureOpening } from './openings'
 
 export const REASONS = 'bar.refusal-reason'
 
-export async function ageCheckSettings(): Promise<{ enabled: boolean, challengeAge: number, description: boolean }> {
+export async function ageCheckSettings(): Promise<{ enabled: boolean, challengeAge: number, description: boolean, idTypes: readonly string[], refusalScope: true }> {
   return {
     enabled: await useSetting('bar.age-check.enabled') as boolean,
     challengeAge: await useSetting('bar.age-check.challenge-age') as number,
     description: await useSetting('bar.age-check.description') as boolean,
+    // The ID types the till may send with an ID check, and that a refusal takes a scope.
+    idTypes: ID_TYPES,
+    refusalScope: true,
   }
 }
 
 /** Logs the seller's answer for a sale, in the batch that starts its payment, unless it is already logged. */
-export function recordSaleCheck(unit: UnitView, saleId: string, outcome: 'not_needed' | 'id_checked', variantId: string, by: string | null, at: number): void {
+export function recordSaleCheck(unit: UnitView, saleId: string, outcome: 'not_needed' | 'id_checked', variantId: string, by: string | null, at: number, idType: string | null = null): void {
   unit.add({
-    sql: `INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, description, by, at, created_at)
-          SELECT ?, s.opening_id, s.id, ?, NULL, ?, NULL, ?, ?, ? FROM bar_sales s
+    sql: `INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, id_type, description, by, at, created_at)
+          SELECT ?, s.opening_id, s.id, ?, NULL, ?, ?, NULL, ?, ?, ? FROM bar_sales s
            WHERE s.id = ? AND NOT EXISTS (SELECT 1 FROM bar_age_checks WHERE sale_id = ? AND outcome <> 'refused')`,
-    params: [newId('bage'), outcome, variantId, by, at, at, saleId, saleId],
+    params: [newId('bage'), outcome, variantId, outcome === 'id_checked' ? idType : null, by, at, at, saleId, saleId],
   })
 }
 
@@ -39,6 +42,8 @@ export const refusalInput = z.object({
   description: z.string().trim().max(DESCRIPTION_MAX).nullable().optional(),
   // The basket the refusal was made from, when the rest of it carries on to a sale.
   basketKey: z.string().min(16).max(64).nullable().optional(), // not-policy: a basket key's length
+  // With a basket: whether only the age-restricted drinks or the whole sale was refused.
+  scope: z.enum(REFUSAL_SCOPES).optional(),
 }).strict()
 export type RefusalInput = z.infer<typeof refusalInput>
 
@@ -60,8 +65,8 @@ export async function recordRefusal(unit: UnitView, input: RefusalInput, by: str
   const at = nowMs()
   const id = newId('bage')
   await ensureOpening(unit, input.outletId, by, at)
-  unit.add(sql`INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, basket_key, description, by, at, created_at)
-    SELECT ${id}, o.id, NULL, 'refused', ${input.reasonTermId}, ${input.variantId ?? null}, ${input.basketKey ?? null}, ${description}, ${by}, ${at}, ${at}
+  unit.add(sql`INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, basket_key, refusal_scope, description, by, at, created_at)
+    SELECT ${id}, o.id, NULL, 'refused', ${input.reasonTermId}, ${input.variantId ?? null}, ${input.basketKey ?? null}, ${input.scope ?? null}, ${description}, ${by}, ${at}, ${at}
       FROM bar_openings o WHERE o.outlet_id = ${input.outletId} AND o.state = 'open' AND ${assertTerm(input.reasonTermId, REASONS)}`)
     .expect(1, { code: 'bar.age-check.bad-reason', reason: 'That reason is not on the list.', remedy: 'Choose a reason from the list.' })
   // The audit entry and the event say a refusal was recorded, never what the description says.

@@ -9,7 +9,7 @@ interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, t
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
-interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, lines: OrderLine[] }
+interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
 
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
 const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
@@ -63,6 +63,9 @@ watch(performanceId, () => { quantities.value = {} })
 // Collecting: one order, found by what the buyer shows.
 const query = ref('')
 const order = ref<Order | null>(null)
+// Several bookings found under one name: the seller picks the right one.
+const matches = ref<Order[]>([])
+const about = (o: Order) => [o.buyer, o.performance ? `${o.performance.title}, ${dateTime(o.performance.startsAt)}` : null].filter(Boolean).join(' · ')
 const searched = ref(false)
 const busy = ref(false)
 const adding = ref<string | undefined>(undefined)
@@ -106,7 +109,8 @@ async function find(text = query.value) {
   refusal.value = null
   try {
     const found = await $api<{ orders: Order[] }>('/api/box-office/desk/orders', { query: { q: text } })
-    order.value = found.orders[0] ?? null
+    matches.value = found.orders.length > 1 ? found.orders : []
+    order.value = found.orders.length === 1 ? found.orders[0]! : null
     searched.value = true
   }
   catch (e) {
@@ -187,6 +191,7 @@ function clear() {
   picked.value = []
   rest.value = null
   order.value = null
+  matches.value = []
   searched.value = false
   query.value = ''
 }
@@ -297,8 +302,32 @@ function clear() {
           </div>
         </UFormField>
       </UForm>
+      <ul
+        v-if="!order && matches.length"
+        class="space-y-2"
+        :aria-label="t('box-office.screens.panel.matches')"
+      >
+        <li
+          v-for="m in matches"
+          :key="m.orderId"
+        >
+          <UButton
+            color="neutral"
+            variant="outline"
+            class="w-full justify-between"
+            :disabled="locked"
+            @click="order = m; matches = []"
+          >
+            <span class="flex flex-col items-start text-left">
+              <span class="font-medium">{{ t('box-office.screens.panel.order', { reference: m.reference }) }}</span>
+              <span class="text-sm text-muted">{{ about(m) }}</span>
+            </span>
+            <span class="text-sm">{{ t(`box-office.screens.panel.states.${m.state}`) }}</span>
+          </UButton>
+        </li>
+      </ul>
       <p
-        v-if="searched && !order"
+        v-if="searched && !order && !matches.length"
         class="text-sm text-muted"
       >
         {{ t('box-office.screens.panel.none') }}
@@ -316,6 +345,12 @@ function clear() {
             :label="t(`box-office.screens.panel.states.${order.state}`)"
           />
         </div>
+        <p
+          v-if="about(order)"
+          class="text-sm text-muted"
+        >
+          {{ about(order) }}
+        </p>
         <ul class="space-y-2">
           <li
             v-for="(line, i) in order.lines"
