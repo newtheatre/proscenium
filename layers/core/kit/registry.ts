@@ -46,7 +46,7 @@ export interface Registry {
   tables: Map<string, { module: string, table: any, meta: TableMeta }>
   prefixes: Map<string, string>
   events: Map<string, { module: string, decl: EventDecl }>
-  listeners: Map<string, { module: string, listener: string }[]>
+  listeners: Map<string, { module: string, listener: string, deliverable?: true }[]>
   jobs: Map<string, { module: string, decl: JobDecl }>
   tasks: Map<string, { module: string, decl: TaskDecl }>
   calls: Map<string, { module: string, decl: CallDecl }>
@@ -147,7 +147,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         for (const [name, announced] of r.events) {
           if (announced.decl.internal) continue
           const list = r.listeners.get(name) ?? []
-          list.push({ module: m.id, listener })
+          list.push({ module: m.id, listener, deliverable: true })
           r.listeners.set(name, list)
         }
         continue

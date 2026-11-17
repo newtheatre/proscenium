@@ -42,6 +42,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'retention': advanced,
   'files': advanced,
   'delivery': advanced,
+  'webhooks': advanced,
   'lists': advanced,
   'programme': on('programme'),
   'grants': on('people'),

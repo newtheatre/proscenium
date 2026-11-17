@@ -3,6 +3,7 @@
 // queue message was lost, is queued again; and a notification whose every delivery is finished
 // loses its payload, so the log says what was sent without holding what it said. Sealed variables
 // never outlive seven days, sent or not. Email outcomes set aside go after the table's fixed retention.
+// Webhook deliveries are swept the same way (group 6).
 import { all, defineTask, nowMs, retentionSeconds, useSetting } from '#kit'
 import { emailEventsSetAside } from '../db/domain'
 
@@ -24,6 +25,14 @@ export default defineTask(async (unit) => {
     params: [],
   })
   unit.add({ sql: 'UPDATE core_notifications SET sealed_variables = NULL WHERE sealed_variables IS NOT NULL AND created_at < ?', params: [at - 7 * 86_400_000] }) // not-policy: the specification fixes seven days
+  // Webhook deliveries the same way: a dead send goes back to retrying, and anything due is queued again.
+  // A paused webhook's deliveries wait where they are until it resumes.
+  unit.add({ sql: 'UPDATE core_webhook_deliveries SET state = \'retrying\', last_error = \'stuck\', next_attempt_at = ? WHERE state = \'sending\' AND next_attempt_at < ?', params: [at, at] })
+  const hooks = await all<{ id: string }>(`SELECT d.id FROM core_webhook_deliveries d JOIN core_webhooks w ON w.id = d.webhook_id
+     WHERE w.state = 'active' AND ((d.state = 'queued' AND d.created_at < ?) OR (d.state = 'retrying' AND d.next_attempt_at < ?) OR (d.state = 'sending' AND d.next_attempt_at < ?))
+     ORDER BY d.created_at LIMIT ?`, at - stuckAfter, at, at, limit)
+  if (hooks.length) unit.enqueue('core.send-webhook', { deliveryIds: hooks.map(r => r.id) })
+
   const setAsideKept = await retentionSeconds(emailEventsSetAside)
   if (setAsideKept !== null) unit.add({ sql: 'DELETE FROM core_email_events_set_aside WHERE set_aside_at < ?', params: [at - setAsideKept * 1000] }) // not-policy: seconds to milliseconds
 })
