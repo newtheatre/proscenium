@@ -4,7 +4,7 @@
 // told why and what would let them through. A hidden link is tidiness; this is enforcement.
 import type { Actor } from '#kit'
 import { resolveEntry, shellOf, SHELL_PREFIXES } from '../../shared/navigation'
-import { declaredEntries, mayOpen } from './navigation'
+import { declaredEntries, holds, mayOpen } from './navigation'
 import { isEntitled, isSignedIn } from './viewer'
 
 export type AccessDecision
@@ -29,6 +29,10 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
   if (!isSignedIn(actor)) return { decision: 'sign-in' }
   if (!(await isEntitled(actor, shell))) return { decision: 'not-found' }
   const result = await mayOpen(actor, entry)
-  if (result.allowed) return { decision: 'allow' }
+  // A screen opens for anyone who holds its ability, as the menu shows it to them. Confirming it is
+  // you (a recent or a stronger sign-in) is asked by the API when the screen loads or does
+  // something, where the browser confirms in place; refusing the page here instead turned every
+  // reload of such a screen into a dead end, since a server render cannot ask.
+  if (result.allowed || holds(result)) return { decision: 'allow' }
   return { decision: 'refused', refusal: { code: result.code, reason: result.reason, remedy: result.remedy } }
 }

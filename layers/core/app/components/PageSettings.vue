@@ -7,6 +7,7 @@
 import { parseTime } from '@internationalized/date'
 import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
 import { durationParts } from '../../kit/duration'
+import { catalogueLabel, searchable, type CatalogueName } from '../../shared/choices'
 
 interface SettingView {
   key: string
@@ -36,6 +37,8 @@ interface SettingView {
   max?: number | string
   maxLength?: number
   options?: string[]
+  /** Where a choice's options are standard codes from one of the kit's lists, which list. */
+  catalogue?: CatalogueName | null
   of?: string
   /** reference only: the record type it names. */
   record?: string
@@ -166,7 +169,17 @@ function resetSection(settings: SettingView[]) {
 /** Offered while nothing is entered and the viewer may change it. */
 const suggests = (s: SettingView) => !!s.suggestion && s.canChange && !draft[s.key]
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
-const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
+// A choice's options: its own, labelled from the catalogue of strings, or a kit list's standard codes,
+// labelled by the browser and put in the order of their names. A value the list no longer has (a
+// renamed time zone) stays shown, so the control never reads as empty.
+const optionItems = computed(() => Object.fromEntries(all.value.filter(s => s.options).map((s) => {
+  const values = [...s.options!]
+  for (const v of [s.value].flat()) if (typeof v === 'string' && v && !values.includes(v)) values.push(v)
+  const items = values.map(o => ({ value: o, label: s.catalogue ? catalogueLabel(s.catalogue, o, language.value) : t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
+  if (s.catalogue === 'country') items.sort((a, b) => a.label.localeCompare(b.label, language.value))
+  return [s.key, items]
+})))
+const itemsOf = (s: SettingView) => optionItems.value[s.key] ?? []
 const words = () => ({
   on: t('core.settings-page.on'),
   off: t('core.settings-page.off'),
@@ -310,13 +323,49 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
+                <!-- A setting with a fixed set of values is a dropdown, with a search box once the
+                     list is long (shared/choices.ts); a list of them is square ticks. -->
+                <USelectMenu
+                  v-else-if="s.kind === 'choice' && searchable(itemsOf(s))"
+                  :model-value="draft[s.key] || undefined"
+                  :items="itemsOf(s)"
+                  value-key="value"
+                  :search-input="{ placeholder: t('core.settings-page.search-options') }"
+                  :placeholder="t('core.settings-page.choose')"
+                  virtualize
+                  :disabled="!s.canChange"
+                  class="max-w-md"
+                  @update:model-value="onEdit(s, $event ?? '')"
+                />
                 <USelect
                   v-else-if="s.kind === 'choice'"
-                  :model-value="draft[s.key]"
-                  :items="optionItems(s)"
+                  :model-value="draft[s.key] || undefined"
+                  :items="itemsOf(s)"
                   value-key="value"
+                  :placeholder="t('core.settings-page.choose')"
                   :disabled="!s.canChange"
                   class="w-64"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <USelectMenu
+                  v-else-if="s.kind === 'list' && s.of === 'choice' && searchable(itemsOf(s))"
+                  :model-value="draft[s.key]"
+                  :items="itemsOf(s)"
+                  value-key="value"
+                  multiple
+                  :search-input="{ placeholder: t('core.settings-page.search-options') }"
+                  :placeholder="t('core.settings-page.choose')"
+                  virtualize
+                  :disabled="!s.canChange"
+                  class="max-w-md"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <UCheckboxGroup
+                  v-else-if="s.kind === 'list' && s.of === 'choice'"
+                  :model-value="draft[s.key]"
+                  :items="itemsOf(s)"
+                  value-key="value"
+                  :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <UInputTags

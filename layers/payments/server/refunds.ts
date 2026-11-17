@@ -190,11 +190,15 @@ export async function confirmRefund(unit: UnitView, refundId: string, by: string
 
 export interface RefundSummary { id: string, partId: string, attemptId: string, owner: { module: string, record: string }, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, requestedByName: string | null, approvedBy: string | null, approvedByName: string | null, selfApproveLimitMinor: number, createdAt: number, /** A person hands the money back and confirms it: cash, or a provider that cannot refund itself. */ handBack: boolean }
 
-export async function listRefunds(states: RefundState[], limit: number): Promise<RefundSummary[]> {
-  const rows = await all<RefundRow & { owner_module: string, owner_record: string, currency: string, method: string, provider: string }>(
+/** The refunds with these ids, as Refunds shows them, in the order given. */
+export async function describeRefunds(ids: string[]): Promise<RefundSummary[]> {
+  if (!ids.length) return []
+  const found = await all<RefundRow & { owner_module: string, owner_record: string, currency: string, method: string, provider: string }>(
     `SELECT r.*, p.owner_module, p.owner_record, i.currency, a.method, pa.provider FROM payments_refunds r JOIN payments_intent_parts p ON p.id = r.part_id
       JOIN payments_intents i ON i.id = p.intent_id JOIN payments_attempts a ON a.id = r.attempt_id JOIN payments_provider_accounts pa ON pa.id = a.provider_account_id
-      WHERE r.state IN (SELECT value FROM json_each(?)) ORDER BY r.created_at DESC LIMIT ?`, JSON.stringify(states), limit)
+      WHERE r.id IN (SELECT value FROM json_each(?))`, JSON.stringify(ids))
+  const byId = new Map(found.map(r => [r.id, r]))
+  const rows = ids.flatMap(id => byId.get(id) ?? [])
   const names = await labelsOf(rows.flatMap(r => [r.requested_by, r.approved_by]))
   const name = (id: string | null) => (id ? names.get(id) ?? null : null)
   const known = await providers()
