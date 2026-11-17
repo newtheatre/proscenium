@@ -86,7 +86,8 @@ export const lengthOptions = defineTable('membership_length_options', {
 /** One person's holding of one scheme for one span. */
 export const memberships = defineTable('membership_memberships', {
   id: col.id(),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'one open application per person per scheme, and one person\'s memberships of a scheme count once' }),
+  // Moved by membership's merge handler (X2): one open application per person per scheme, so a duplicate is superseded first.
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
   schemeId: col.ref('membership_schemes'),
   lengthOptionId: col.ref('membership_length_options', { nullable: true }),
   realm: col.internal(text('realm', { enum: SIDES }).notNull()),

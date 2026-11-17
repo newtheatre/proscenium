@@ -185,6 +185,8 @@ export default defineModule({
     // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.
     // Ends live memberships in the erasure batch (X4); claimed list entries are let go and emptied.
     'core.erasure-handler': [{ id: 'membership', file: 'membership' }],
+    // X2, X3: a duplicate open application is superseded before the memberships move.
+    'core.merge-handler': [{ id: 'membership', file: 'membership' }],
     'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
     'core.account-section': [
       { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
