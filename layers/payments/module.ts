@@ -25,15 +25,19 @@ export default defineModule({
     'refunds.window': setting.duration({ default: '180d', min: '1d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     'sessions.variance-needs-second-person': setting.money({ default: 500, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
     'sessions.default-float': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff' }),
-    'cash.enabled': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'cash.enabled': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
+    // For a test instance only: a provider account in test mode takes payment for real sales, which
+    // then post to the ledger as live money would, so the whole journey can be tried with test cards.
+    'test-mode.takes-sales': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   // R-37: every other group sits on /console/payments/settings, the module's own page; how long
   // webhook bodies are kept is upkeep, on the shared Advanced page.
   settingGroups: {
-    retention: { advanced: true },
+    'retention': { advanced: true },
+    'test-mode': { advanced: true },
   },
 
   records: defineRecords('payments', {

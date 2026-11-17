@@ -82,16 +82,15 @@ const credits = computed(() => {
   }
   return [...sections.values()]
 })
-const paragraphs = computed(() => (production.value?.description ?? '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean))
 
 // The social card and the event data search engines read (schema.org TheaterEvent, one per date).
 const origin = useRequestURL().origin
 const absolute = (url: string) => new URL(url, origin).toString()
 useSeoMeta({
   title: () => production.value?.title ?? '',
-  description: () => production.value?.summary ?? undefined,
+  description: () => markdownText(production.value?.summary) || undefined,
   ogTitle: () => production.value?.title ?? '',
-  ogDescription: () => production.value?.summary ?? undefined,
+  ogDescription: () => markdownText(production.value?.summary) || undefined,
   ogType: 'website',
   ogUrl: () => absolute(`/${prefix}/${props.slug}`),
   ogImage: () => (production.value?.poster ? absolute(production.value.poster.url) : undefined),
@@ -105,7 +104,7 @@ useHead(() => {
     '@context': 'https://schema.org',
     '@type': 'TheaterEvent',
     'name': p.title,
-    'description': p.summary ?? undefined,
+    'description': markdownText(p.summary) || undefined,
     'startDate': new Date(f.startsAt).toISOString(),
     'endDate': new Date(f.endsAt).toISOString(),
     'eventStatus': f.state === 'cancelled' ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
@@ -161,9 +160,10 @@ useHead(() => {
               variant="subtle"
               :label="t('public-site.production.cancelled')"
             />
-            <p v-if="production.summary">
-              {{ production.summary }}
-            </p>
+            <MarkdownText
+              v-if="production.summary"
+              :text="production.summary"
+            />
             <p
               v-if="production.companyName"
               class="text-sm text-muted"
@@ -207,12 +207,11 @@ useHead(() => {
                     <span class="font-medium">{{ a.label }}</span><span v-if="a.detail">: {{ a.detail }}</span>
                   </li>
                 </ul>
-                <p
+                <MarkdownText
                   v-if="production.contentNote"
+                  :text="production.contentNote"
                   class="text-sm text-muted"
-                >
-                  {{ production.contentNote }}
-                </p>
+                />
               </div>
             </template>
           </UCollapsible>
@@ -287,7 +286,7 @@ useHead(() => {
           </p>
 
           <section
-            v-if="paragraphs.length"
+            v-if="production.description?.trim()"
             aria-labelledby="about-heading"
             class="space-y-3"
           >
@@ -297,13 +296,7 @@ useHead(() => {
             >
               {{ t('public-site.production.about') }}
             </h2>
-            <p
-              v-for="(text, i) in paragraphs"
-              :key="i"
-              class="whitespace-pre-line"
-            >
-              {{ text }}
-            </p>
+            <MarkdownText :text="production.description" />
           </section>
 
           <section
