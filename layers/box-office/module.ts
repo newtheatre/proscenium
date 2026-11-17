@@ -34,7 +34,10 @@ export default defineModule({
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
-    // Kept from each ticket when staff refund less the fee.
+    // Buyers cancelling their own paid tickets from the booking link; shipped off (Matt, question 6).
+    'cancellations.by-buyer': setting.boolean({ default: false, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'cancellations.until-before': setting.duration({ default: '24h', min: '0m', max: '30d', change, audience: 'public', quotable: true }),
+    // Kept from each ticket when staff refund less the fee, and on every buyer's cancellation.
     'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'comps.per-request': setting.integer({ default: 4, min: 1, max: 50, change, audience: 'staff' }),
     // Unset means no cap on approved complimentary tickets for one performance.
@@ -284,5 +287,10 @@ export default defineModule({
         },
       },
     }],
+  },
+
+  presets: {
+    'small-venue': { settings: { 'box-office.cancellations.by-buyer': true, 'box-office.orders.desk-seat-cap': 60 } },
+    'student-society': { settings: { 'box-office.comps.per-performance': 10 } },
   },
 })

@@ -1,6 +1,8 @@
 <!-- The door list for one performance (BO-40): who is coming, found by name or booking reference,
      with how many of their tickets are used. Those still to arrive are the default view. Each row
-     opens the order. A buyer with no ticket to scan is admitted from their row, one or all. -->
+     opens the order. A buyer with no ticket to scan is admitted from their row, one or all.
+     Tickets and membership cards are scanned with the device's camera, one after another, or their
+     code typed in the same dialog; the result shows at once there and as a message. -->
 <script setup lang="ts">
 import { doorList } from '../../../../../../shared/lists'
 
@@ -24,6 +26,30 @@ const { $api } = useNuxtApp()
 const toast = useToast()
 const { toRefusal } = useRefusal()
 const admitting = ref<string | null>(null)
+
+interface Scan { result: string, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' } }
+const { time } = useDates()
+const lastScan = ref<{ text: string, color: 'success' | 'warning' | 'error' } | null>(null)
+const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'error', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
+
+async function scan(code: string) {
+  if (!code.trim()) return
+  try {
+    const out = await $api<Scan>(`/api/box-office/performances/${encodeURIComponent(id.value)}/scan`, { method: 'POST', body: { code: code.trim() } })
+    const text = out.result === 'card' && out.card
+      ? `${out.card.headline}. ${out.card.line}`
+      : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
+    const color = out.result === 'card' && out.card?.state === 'attention' ? 'warning' : COLOUR[out.result] ?? 'error'
+    lastScan.value = { text, color }
+    toast.add({ title: text, color })
+    if (out.result === 'admitted') await refreshNuxtData(`core:list:${listRoute.value}`)
+  }
+  catch (error) {
+    const refusal = toRefusal(error)
+    lastScan.value = { text: refusal.reason, color: 'error' }
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+}
 
 async function admit(row: Row, count: number) {
   admitting.value = row.id
@@ -57,6 +83,16 @@ const trail = computed(() => [
     :row-to="(row: Row) => `/console/box-office/orders/${encodeURIComponent(row.id)}`"
     :empty="{ title: t('box-office.door.empty.title'), description: t('box-office.door.empty.description'), icon: 'i-lucide-door-open' }"
   >
+    <template #primary>
+      <CodeScanButton
+        continuous
+        typing
+        :label="t('box-office.door.scan.button')"
+        :status="lastScan?.text"
+        :status-color="lastScan?.color"
+        @scanned="scan"
+      />
+    </template>
     <template #cell-buyer="{ row }">
       {{ row.buyer ?? t('box-office.orders.no-buyer') }}
     </template>
