@@ -1,124 +1,24 @@
 <script setup lang="ts">
-// A production's poster and photos (C-23, C-24), managed on the production's own page. An image is
-// uploaded, checked and cleaned in the background, then described and put to use: a public image is
-// never used without a description. A new poster replaces the old in one step, and anything taken
-// off can be put back while its restore period lasts.
-import { useTimeoutFn } from '@vueuse/core'
-
-interface MediaFile {
-  id: string
-  slot: string
-  url: string | null
-  state: 'pending' | 'ready' | 'rejected' | 'deleted'
-  altText: string | null
-  width: number | null
-  height: number | null
-  rejectedReason: string | null
-  restorableUntil?: number
-}
-interface Media { poster: MediaFile | null, photos: MediaFile[], waiting: MediaFile[], removed: MediaFile[] }
+// A production's poster and photos (C-23, C-24): everything on the production page's Media tab. The
+// poster can also be changed from the page's side panel (ProductionPoster); both share one source.
+// A new poster replaces the old in one step, and anything taken off can be put back while its
+// restore period lasts.
+import { IMAGE_TYPES as ACCEPT, PHOTOS, POSTER, REFUSED_IMAGE as REFUSED, type MediaFile } from '../composables/useProductionMedia'
 
 const props = defineProps<{ productionId: string }>()
 
-const POSTER = 'core.production-poster'
-const PHOTOS = 'core.production-photos'
-const ACCEPT = 'image/png,image/jpeg,image/webp'
-const REFUSED: Record<string, string> = {
-  'type-not-accepted': 'This is not a PNG, JPEG or WebP image.',
-  'too-large': 'This image is larger than the theatre allows.',
-  'damaged': 'This image could not be read.',
-  'upload-timeout': 'This upload did not finish in time.',
-}
-
-const { $api } = useNuxtApp()
 const { day } = useDates()
-const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
-const toast = useToast()
-const base = computed(() => `/api/core/productions/${props.productionId}/media`)
-const { data, status, error, refresh } = await useAPI<Media>(base, { key: `core:production:${props.productionId}:media` })
-const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const busy = ref<string | null>(null)
-const descriptions = reactive<Record<string, string>>({})
-
-// While an upload is still being checked, look again shortly.
-const checking = computed(() => (data.value?.waiting ?? []).some(f => f.state === 'pending'))
-const { start: lookAgain } = useTimeoutFn(async () => {
-  await refresh()
-  if (checking.value) lookAgain()
-}, 1500, { immediate: false }) // not-policy: how soon to look at a file being checked
-watch(checking, on => on && lookAgain(), { immediate: true })
-
-async function run(key: string, fn: () => Promise<unknown>, done?: string) {
-  refusal.value = null
-  busy.value = key
-  try {
-    await fn()
-    await refresh()
-    if (done) toast.add({ title: done, color: 'success', icon: 'i-lucide-circle-check' })
-    return true
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-    return false
-  }
-  finally {
-    busy.value = null
-  }
-}
+const { data, status, error, refresh, refusal, busy, descriptions, upload: send, use, describe, remove, restore, move } = await useProductionMedia(props.productionId)
 
 // The pickers hold nothing between choices: each choice is uploaded at once and the picker emptied,
 // so choosing again never sends the earlier files twice.
 const picked = reactive<{ poster: File | null, photos: File[] }>({ poster: null, photos: [] })
-async function upload(slot: string, chosen: File | File[] | null | undefined) {
-  const files = [chosen ?? []].flat()
+function upload(slot: string, chosen: File | File[] | null | undefined) {
   picked.poster = null
   picked.photos = []
-  if (!files.length) return
-  await run(`upload:${slot}`, async () => {
-    for (const file of files) {
-      await $api('/api/core/files', { method: 'POST', query: { slot, owner: props.productionId, name: file.name }, body: file, headers: { 'content-type': file.type || 'application/octet-stream' } })
-    }
-  })
+  return send(slot, chosen)
 }
 
-async function use(file: MediaFile) {
-  const description = (descriptions[file.id] ?? file.altText ?? '').trim()
-  await run(`use:${file.id}`, async () => {
-    if (description !== (file.altText ?? '')) await $api(`/api/core/files/${file.id}`, { method: 'PATCH', body: { altText: description } })
-    await $api(base.value, { method: 'POST', body: { fileId: file.id } })
-  }, file.slot === POSTER ? 'Poster changed' : 'Photo added')
-}
-
-async function describe(file: MediaFile) {
-  const description = (descriptions[file.id] ?? '').trim()
-  if (!description || description === file.altText) return
-  await run(`describe:${file.id}`, () => $api(`/api/core/files/${file.id}`, { method: 'PATCH', body: { altText: description } }), 'Description saved')
-}
-
-async function remove(file: MediaFile) {
-  const inUse = file.state === 'ready' && (file.id === data.value?.poster?.id || data.value?.photos.some(p => p.id === file.id))
-  if (inUse && !await confirm({
-    verb: 'Remove',
-    thing: file.slot === POSTER ? 'the poster' : 'this photo',
-    consequence: 'It comes off the production at once. You can put it back from "Recently removed" for a while.',
-    button: 'Remove',
-  })) return
-  await run(`remove:${file.id}`, () => $api(`${base.value}/${file.id}`, { method: 'DELETE' }), inUse ? 'Removed' : undefined)
-}
-
-const restore = (file: MediaFile) => run(`restore:${file.id}`, () => $api(`${base.value}/${file.id}/restore`, { method: 'POST' }), file.slot === POSTER ? 'Poster put back' : 'Photo put back')
-
-async function move(index: number, by: -1 | 1) {
-  const ids = (data.value?.photos ?? []).map(p => p.id)
-  const [moved] = ids.splice(index, 1)
-  ids.splice(index + by, 0, moved!)
-  await run('order', () => $api(`${base.value}/order`, { method: 'PUT', body: { fileIds: ids } }))
-}
-
-watch(data, (d) => {
-  for (const f of [...(d?.waiting ?? []), ...(d?.photos ?? []), ...(d?.poster ? [d.poster] : [])]) descriptions[f.id] ??= f.altText ?? ''
-}, { immediate: true })
 const described = computed(() => [
   ...(data.value?.poster ? [{ file: data.value.poster, label: 'Poster' }] : []),
   ...(data.value?.photos ?? []).map((file, i) => ({ file, label: `Photo ${i + 1}` })),

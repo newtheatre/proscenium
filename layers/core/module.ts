@@ -59,6 +59,7 @@ export default defineModule({
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.calendar', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/calendar', icon: 'i-lucide-calendar-days', ability: 'core.production.view', order: 15 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },
+      { id: 'core.modules', menu: 'admin', group: 'modules', to: '/admin/modules', icon: 'i-lucide-blocks', ability: ['core.modules.manage', 'core.health.view'], order: 10 },
       { id: 'core.vocabularies', menu: 'admin', group: 'theatre', to: '/admin/vocabularies', icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 40 },
       // Identity's site administration (identity spec part 6): defining roles and facts, and how people sign in.
       { id: 'core.roles', menu: 'admin', group: 'access', to: '/admin/roles', match: '/admin/roles', icon: 'i-lucide-shield-user', ability: 'core.role.read', order: 10 },

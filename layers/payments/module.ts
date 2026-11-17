@@ -104,6 +104,7 @@ export default defineModule({
   secrets: {
     PAYMENTS_STRIPE_SECRET_KEY: secret({ needed: 'when-used' }),
     PAYMENTS_STRIPE_WEBHOOK_SECRET: secret({ needed: 'when-used' }),
+    PAYMENTS_STRIPE_PUBLISHABLE_KEY: secret({ needed: 'when-used' }),
     // SumUp's API key (the Cloud API only), and the affiliate app id and key that both the Cloud API's
     // reader checkout and the hand-off to the SumUp app carry.
     PAYMENTS_SUMUP_API_KEY: secret({ needed: 'when-used' }),

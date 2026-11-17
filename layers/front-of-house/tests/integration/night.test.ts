@@ -75,6 +75,28 @@ describe('FH-21: check-in', () => {
   })
 })
 
+describe('FH-19: live mode', () => {
+  it('lists today\'s performances for those who may see them, with what the viewer may do on the board', async () => {
+    const s = await onShift()
+    setClock(s.callAt)
+    const mine = (await req('GET', '/api/front-of-house/tonight', undefined, s.amy)).body
+    expect(mine.performances.map((x: any) => x.id)).toContain(s.p.id)
+    expect(mine.mayReport).toBe(false)
+    const outsider = (await req('GET', '/api/front-of-house/tonight', undefined, person([]))).body
+    expect(outsider).toEqual({ performances: [], mayReport: false, cards: [] })
+
+    const board = (await req('GET', `/api/front-of-house/performances/${s.p.id}/tonight`, undefined, s.amy)).body
+    expect(board.mine).toBe(s.a)
+    expect(board.openIncidents).toBeNull()
+    expect(board.can).toEqual({ lead: false, checklists: true, report: false, incident: false, emergency: true })
+    const lead = person(['front-of-house.assignment.check-in', 'front-of-house.incident.view'], { reassertedAt: s.callAt })
+    const led = (await req('GET', `/api/front-of-house/performances/${s.p.id}/tonight`, undefined, lead)).body
+    expect(led.mine).toBeNull()
+    expect(led.can.lead).toBe(true)
+    expect(led.openIncidents).toBe(0)
+  })
+})
+
 describe('FH-22: timings', () => {
   it('records each timing once, replaces it on a second tap, and audits the change', async () => {
     const s = await onShift()

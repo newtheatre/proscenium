@@ -43,6 +43,7 @@ import checkInPost from '../../server/api/front-of-house/assignments/[id]/check-
 import timingsPost from '../../server/api/front-of-house/performances/[id]/timings.post'
 import extendPost from '../../server/api/front-of-house/performances/[id]/extend.post'
 import tonightGet from '../../server/api/front-of-house/performances/[id]/tonight.get'
+import tonightListGet from '../../server/api/front-of-house/tonight.get'
 import runGet from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/index.get'
 import runOpen from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/open.post'
 import itemPut from '../../server/api/front-of-house/performances/[id]/checklists/[checklistId]/items/[itemId].put'
@@ -121,6 +122,7 @@ export const handle = server({
   'POST /api/front-of-house/performances/:id/timings': timingsPost,
   'POST /api/front-of-house/performances/:id/extend': extendPost,
   'GET /api/front-of-house/performances/:id/tonight': tonightGet,
+  'GET /api/front-of-house/tonight': tonightListGet,
   'GET /api/front-of-house/performances/:id/checklists/:checklistId': runGet,
   'POST /api/front-of-house/performances/:id/checklists/:checklistId/open': runOpen,
   'PUT /api/front-of-house/performances/:id/checklists/:checklistId/items/:itemId': itemPut,

@@ -2,7 +2,7 @@
 // pinned version), how it reads Stripe's answers, how it checks a webhook's signature, and refunds.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, nowMs, setClock } from '#kit'
-import { collect, methodsFor, requestRefund, startAttempt } from '../../server/services'
+import { collect, methodsFor, refreshIntent, requestRefund, startAttempt } from '../../server/services'
 import { STRIPE_VERSION, transport } from '../../server/calls/stripe/client'
 import stripeProvider from '../../server/contributions/payments.provider/stripe'
 import webhookRoute from '../../server/api/payments/webhooks/[account].post'
@@ -85,12 +85,14 @@ afterAll(() => {
   transport.fetch = real
   delete secrets.PAYMENTS_STRIPE_SECRET_KEY
   delete secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET
+  delete secrets.PAYMENTS_STRIPE_PUBLISHABLE_KEY
 })
 
 beforeEach(() => {
   setClock(NOV_16)
   secrets.PAYMENTS_STRIPE_SECRET_KEY = 'sk_live_test'
   secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET
+  secrets.PAYMENTS_STRIPE_PUBLISHABLE_KEY = 'pk_live_test'
   seen.length = 0
   sent.length = 0
   intents = new Map()
@@ -103,6 +105,11 @@ describe('connecting', () => {
     expect((await inContext(() => methodsFor('online'))).some(m => m.providerAccountId === account)).toBe(false)
     secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET
     expect((await inContext(() => methodsFor('online'))).some(m => m.providerAccountId === account)).toBe(true)
+  })
+
+  it('is not offered without the publishable key the card form loads with', async () => {
+    delete secrets.PAYMENTS_STRIPE_PUBLISHABLE_KEY
+    expect((await inContext(() => methodsFor('online'))).some(m => m.providerAccountId === account)).toBe(false)
   })
 })
 
@@ -118,8 +125,49 @@ describe('start', () => {
     expect(request!.body.get('metadata[attempt]')).toBe(out.attemptId)
     const [attempt] = await rows<{ provider_ref: string, idempotency_key: string, state: string }>('SELECT provider_ref, idempotency_key, state FROM payments_attempts WHERE id = ?', out.attemptId)
     expect(request!.headers['Idempotency-Key']).toBe(attempt!.idempotency_key)
-    expect(out.next).toEqual({ kind: 'client-secret', secret: `${attempt!.provider_ref}_secret` })
+    expect(out.next).toEqual({ kind: 'client-secret', provider: 'stripe', secret: `${attempt!.provider_ref}_secret`, publishableKey: 'pk_live_test' })
     expect(attempt!.state).toBe('pending')
+  })
+
+  it('hands the same payment back while the buyer has still to finish it, and nothing new is made', async () => {
+    const { intentId } = await order(1800)
+    const first = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_online' }))
+    const made = seen.filter(r => r.method === 'POST').length
+    const again = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_online' }))
+    expect(again.attemptId).toBe(first.attemptId)
+    expect(again.next).toEqual(first.next)
+    expect(seen.filter(r => r.method === 'POST').length).toBe(made)
+  })
+
+  it('refuses a second start once Stripe is working on the payment', async () => {
+    const { intentId } = await order(1900)
+    const first = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_online' }))
+    const [attempt] = await rows<{ provider_ref: string }>('SELECT provider_ref FROM payments_attempts WHERE id = ?', first.attemptId)
+    intents.get(attempt!.provider_ref)!.status = 'processing'
+    await expect(inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_online' }))).rejects.toMatchObject({ code: 'payments.attempt.in-flight' })
+  })
+})
+
+describe('refreshIntent', () => {
+  it('settles at once when Stripe says the payment succeeded, with no webhook', async () => {
+    const { intentId } = await order(2200)
+    const out = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_online' }))
+    const [attempt] = await rows<{ provider_ref: string }>('SELECT provider_ref FROM payments_attempts WHERE id = ?', out.attemptId)
+    intents.get(attempt!.provider_ref)!.status = 'succeeded'
+    const status = await inContext(() => refreshIntent(intentId))
+    expect(status).toMatchObject({ state: 'succeeded', paidMinor: 2200, waiting: false })
+  })
+
+  it('leaves a payment the buyer has not finished waiting, and does nothing once settled', async () => {
+    const { intentId } = await order(2300)
+    const out = await inContext(() => startAttempt(intentId, { providerAccountId: account, method: 'card_online' }))
+    expect(await inContext(() => refreshIntent(intentId))).toMatchObject({ state: 'open', paidMinor: 0, waiting: true })
+    const [attempt] = await rows<{ provider_ref: string }>('SELECT provider_ref FROM payments_attempts WHERE id = ?', out.attemptId)
+    intents.get(attempt!.provider_ref)!.status = 'succeeded'
+    await inContext(() => refreshIntent(intentId))
+    const asked = seen.length
+    expect(await inContext(() => refreshIntent(intentId))).toMatchObject({ state: 'succeeded', paidMinor: 2300 })
+    expect(seen.length).toBe(asked)
   })
 })
 
