@@ -3,6 +3,7 @@
   "box-office.module.description": "Selling tickets: what is on sale and for how much, seats held and sold, reservations paid for at the desk, orders, tickets and the door.",
   "box-office.navigation.groups.box-office.label": "Box office",
 
+  "box-office.settings-sections.cancellations": "Cancellations",
   "box-office.settings-sections.baskets": "Baskets",
   "box-office.settings-sections.orders": "Orders",
   "box-office.settings-sections.sales": "When sales close",
@@ -31,12 +32,16 @@
   "box-office.settings.reservations.max-tickets-per-person.help": "The most reserved tickets one person may hold for one performance, across all their reservations.",
   "box-office.settings.reservations.release-before.label": "Release unclaimed reservations before the start",
   "box-office.settings.reservations.release-before.help": "Reservations nobody has paid for are released this long before the performance starts, so the seats can be sold on the door. Nothing means staff release them by hand.",
+  "box-office.settings.cancellations.fee.label": "Cancellation fee for each ticket",
+  "box-office.settings.cancellations.fee.help": "Kept from each ticket when a cancellation is refunded less the fee. Nothing means the whole price goes back.",
   "box-office.settings.retention.holds.label": "Keep the label of a staff hold for",
   "box-office.settings.retention.holds.help": "How long after the performance a hold placed by staff keeps its label, such as the name of the guests it was for.",
 
   "box-office.abilities.performance.manage.label": "Set up sales for a performance",
   "box-office.abilities.performance.exceed-venue.label": "Sell more than the space holds",
   "box-office.abilities.pricing.manage.label": "Manage ticket types and prices",
+  "box-office.abilities.order.cancel.label": "Cancel tickets on an order, without refunding them",
+  "box-office.abilities.order.refund.label": "Ask for a refund of an order's tickets",
   "box-office.abilities.order.release.label": "Release a reservation, or mark one to keep",
   "box-office.abilities.ticket.admit.label": "Scan and admit at the door",
   "box-office.abilities.settings.manage.label": "Change box office settings"
