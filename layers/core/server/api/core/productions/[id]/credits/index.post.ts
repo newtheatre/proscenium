@@ -11,6 +11,6 @@ export default defineRoute({
   rateLimit: 'write',
   input: creditInput,
 }, async (event, { input, unit, record }) => {
-  const id = await addCredit(unit, record!.id, input, relyingParty(event).origin)
+  const id = await addCredit(unit, record!.id, input, (await relyingParty(event)).origin)
   return { id }
 })

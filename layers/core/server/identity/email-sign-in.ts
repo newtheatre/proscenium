@@ -67,7 +67,7 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
           VALUES (?, 'sign_in', ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     params: [id, await digest('link', token), await digest('code', `${id}:${code}`), await digest('browser', browser), existing?.account_id ?? null, address, input.next, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  const { origin } = relyingParty(event)
+  const { origin } = await relyingParty(event)
   unit.enqueue('core.send-sign-in-link', { tokenId: id, sealed: await sealValue('sign-in-mail', { address, link: `${origin}/sign-in/link#${token}`, code }) })
   return quiet
 }

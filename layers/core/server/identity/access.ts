@@ -12,7 +12,7 @@ const LIMITED_ROUTES = [/^\/api\/core\/me$/, /^\/api\/core\/me\/passkeys(\/optio
 
 export const identityAccess: AccessProvider = {
   async actor(event: H3Event): Promise<Actor> {
-    checkOrigin(event)
+    await checkOrigin(event)
     const session = await currentSession(event)
     if (!session) return { kind: 'anonymous' }
     if (session.limited && !LIMITED_ROUTES.some(r => r.test(event.path.split('?')[0]!))) return { kind: 'anonymous' }

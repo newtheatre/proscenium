@@ -1,7 +1,8 @@
 // The parts of identity that touch the browser: cookies, the return path, the origin check and the
 // relying party a passkey is bound to.
-import { getCookie, getHeader, getRequestURL, setCookie, deleteCookie, type H3Event } from 'h3'
+import { getCookie, getHeader, setCookie, deleteCookie, type H3Event } from 'h3'
 import { refuse } from '#kit'
+import { configuredOrigin, requestUrl } from '#kit/origin'
 
 /** The session. `__Host-` keeps it to this exact host, over HTTPS, for every path. */
 export const SESSION_COOKIE = '__Host-proscenium-session'
@@ -67,25 +68,36 @@ export function clearCookie(event: H3Event, name: string): void {
   deleteCookie(event, name, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' })
 }
 
-/** The site's own origin and host, which a passkey is bound to. */
-export function relyingParty(event: H3Event): { origin: string, id: string } {
-  // The Worker's own request carries the scheme the browser used. Nitro's request stand-in does
-  // not, so h3 would take an HTTPS page for http:// and refuse every change as from another site.
-  const request = event.web?.request ?? (event.context.cloudflare as { request?: Request } | undefined)?.request
-  const url = request ? new URL(request.url) : getRequestURL(event, { xForwardedHost: false, xForwardedProto: false })
-  return { origin: url.origin, id: url.hostname }
+/**
+ * The site's own origin and host, which a passkey is bound to: the recorded origin (core.site.origin,
+ * or CORE_SITE_ORIGIN), or the request's own until one is recorded. The request's address comes from
+ * the Worker's own request, which carries the scheme the browser used; Nitro's stand-in does not.
+ */
+export async function relyingParty(event: H3Event): Promise<{ origin: string, id: string }> {
+  const origin = (await configuredOrigin())?.origin ?? requestUrl(event).origin
+  return { origin, id: new URL(origin).hostname }
 }
+
+/**
+ * Not checked by host: a provider's webhook (authenticated by its signature) and first-run setup
+ * (Foundations part 4, "One origin, enforced").
+ */
+export const NOT_HOST_CHECKED = /^\/(api\/[a-z0-9-]+\/webhooks|api\/core\/setup|setup)(\/|$)/ // not-policy: a pattern of addresses
 
 /**
  * A change sent from another site is refused. Cookies are SameSite=Lax already; this is the second
  * lock, for browsers and paths where Lax does not hold.
  */
-export function checkOrigin(event: H3Event): void {
+export async function checkOrigin(event: H3Event): Promise<void> {
   const method = event.method.toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return
+  if (NOT_HOST_CHECKED.test(requestUrl(event).pathname)) return
+  // Once an origin is recorded, a change sent on any other host is refused, even with no Origin header.
+  const configured = await configuredOrigin()
+  if (configured && requestUrl(event).origin !== configured.origin) refuse('core.access.wrong-origin', 'Changes are made on the site\'s own address, so this one was refused.', { status: 403, remedy: `Use ${configured.origin}.` })
   const origin = getHeader(event, 'origin')
   if (!origin) return
-  if (origin !== relyingParty(event).origin) refuse('core.access.wrong-origin', 'This request came from another site, so it was refused.', { status: 403 })
+  if (origin !== (await relyingParty(event)).origin) refuse('core.access.wrong-origin', 'This request came from another site, so it was refused.', { status: 403 })
 }
 
 /** A short description of the browser for the sessions list, never the full user agent. */
