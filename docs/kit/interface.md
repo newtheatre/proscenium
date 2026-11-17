@@ -156,6 +156,24 @@ the server for actions and sources when it is first opened, not on every page.
   sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
   says so and offers up to three of the viewer's quick actions.
 
+## Dates, times and money
+
+One language and one time zone, set once: `UApp` takes its `locale` from `core.locale.language`
+(`useUiLocale()`), so Nuxt UI's date and time controls read day first on a 24-hour clock for `en-GB`.
+
+- **Text**: `useDates()` gives `day`, `dayLong`, `dayNamed`, `dateTime`, `time` and `range`. An instant
+  (milliseconds) is shown in the theatre's time zone, whatever the viewer's; a calendar date
+  (`2027-09-01`) is never shifted. Do not call `Intl.DateTimeFormat` in a screen.
+- **Fields**: `FieldDate` (takes and gives `2027-09-01`), `FieldDateRange` (`{ start, end }`),
+  `FieldDateTime` (an instant in milliseconds, entered in the theatre's time zone, which the field
+  names when the viewer is somewhere else) and `FieldMoney` (the currency's minor unit, typed in its
+  major unit). The date fields take `min`, `max` and `unavailable`, a function given a day. Do not use
+  `type="date"` or `type="datetime-local"`: a native picker ignores the locale and works in the
+  viewer's zone.
+- `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
+- A date control is typed part by part, so a browser test focuses its first part and types the digits
+  (`tests/e2e/date-fields.spec.ts` covers the kit fields; a module need not test them again).
+
 ## Choice fields in forms
 
 PageForm's `radio` takes `options: [{ value, label }]` (values may be numbers) and shows one group

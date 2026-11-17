@@ -3,11 +3,13 @@
 const { t } = useT()
 const { data: brand } = await useBrand()
 const site = computed(() => brand.value?.name ?? t('core.public.default-name'))
+// Nuxt UI's own words and its date and time controls follow the theatre's language.
+const locale = useUiLocale()
 useHead({ titleTemplate: title => title && title !== site.value ? `${title} · ${site.value}` : site.value })
 </script>
 
 <template>
-  <UApp>
+  <UApp :locale="locale">
     <NuxtLoadingIndicator />
     <!-- Reads each new page title to screen readers after a client-side navigation. -->
     <NuxtRouteAnnouncer />

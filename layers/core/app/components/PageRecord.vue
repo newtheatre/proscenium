@@ -85,7 +85,7 @@ watch(historyOpen, async (open) => {
     historyFailed.value = true
   }
 })
-const when = (at: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(at)
+const { dateTime: when } = useDates()
 const actionName = (action: string) => (te(`core.history.action.${action}`) ? t(`core.history.action.${action}`) : action)
 const { te } = useT()
 </script>

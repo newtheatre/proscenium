@@ -5,7 +5,6 @@
      overwriting. Up to about six fields it opens as a panel over the list; longer forms get a page. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
-import { parseDate } from '@internationalized/date'
 import type { z } from 'zod'
 import type { FormErrorEvent } from '@nuxt/ui'
 import { isConflict, mergeConflict, PANEL_FIELD_LIMIT } from '../../shared/form'
@@ -14,7 +13,9 @@ import type { RefusalView } from '../utils/refusal'
 export interface FormField {
   name: string
   label: string
-  kind: 'text' | 'email' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'radio' | 'ticks'
+  /** date holds "2027-09-01"; daterange { start, end } of those; datetime an instant in milliseconds, entered in
+   *  the theatre's time zone; money an amount in the currency's minor unit (pence). */
+  kind: 'text' | 'email' | 'textarea' | 'number' | 'money' | 'date' | 'daterange' | 'datetime' | 'select' | 'checkbox' | 'radio' | 'ticks'
   help?: string
   optional?: boolean
   placeholder?: string
@@ -79,12 +80,6 @@ function setTick(g: FormField, value: string | number, on: boolean | 'indetermin
 }
 function setNote(g: FormField, value: string | number, note: string) {
   state[g.name] = ((state[g.name] as { value: string | number, note?: string }[] | undefined) ?? []).map(x => x.value === value ? (note ? { value, note } : { value }) : x)
-}
-
-// A date is kept as the server takes it (2027-09-01); the control works in calendar dates.
-function dateOf(value: unknown) {
-  try { return typeof value === 'string' && value ? parseDate(value) : undefined }
-  catch { return undefined }
 }
 
 const state = reactive<Record<string, any>>({ ...props.initial })
@@ -384,10 +379,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-else-if="g.kind === 'number'"
                 v-model="state[g.name]"
               />
-              <UInputDate
+              <FieldMoney
+                v-else-if="g.kind === 'money'"
+                v-model="state[g.name]"
+              />
+              <FieldDate
                 v-else-if="g.kind === 'date'"
-                :model-value="dateOf(state[g.name])"
-                @update:model-value="state[g.name] = $event ? $event.toString() : ''"
+                v-model="state[g.name]"
+              />
+              <FieldDateRange
+                v-else-if="g.kind === 'daterange'"
+                v-model="state[g.name]"
+              />
+              <FieldDateTime
+                v-else-if="g.kind === 'datetime'"
+                v-model="state[g.name]"
               />
               <UInput
                 v-else

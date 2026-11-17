@@ -25,7 +25,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ available: boolean, requests: Request[] }>('/api/core/me/data-requests', { key: 'core:my-data-requests' })
 
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 const refusal = ref<RefusalView | null>(null)
 const asking = ref<'export' | 'erasure' | null>(null)
 
