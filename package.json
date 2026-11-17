@@ -28,6 +28,8 @@
     "verify": "bun run check && bun run test && bun run test:browser"
   },
   "dependencies": {
+    "@dnd-kit/helpers": "^0.5.3",
+    "@dnd-kit/vue": "^0.5.3",
     "@iconify-json/lucide": "^1.2.155",
     "@internationalized/date": "3.12.4",
     "@nuxt/content": "3.16.2",
@@ -45,7 +47,6 @@
     "jsqr": "1.4.0",
     "nuxt": "4.6.4",
     "reflect-metadata": "^0.2.2",
-    "sortablejs": "^1.15.7",
     "tailwindcss": "^4.3.5",
     "uqr": "0.1.2",
     "vue": "^3.5.0",
@@ -60,7 +61,6 @@
     "@nuxt/kit": "4.6.4",
     "@playwright/test": "1.63.0",
     "@types/node": "^24",
-    "@types/sortablejs": "^1.15.9",
     "drizzle-kit": "1.0.0-rc.5",
     "eslint": "^10.14.0",
     "typescript": "~5.9",
