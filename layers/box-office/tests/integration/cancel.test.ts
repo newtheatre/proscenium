@@ -45,7 +45,7 @@ async function paid(h: House, quantity: number) {
   expect(started.body.state, JSON.stringify(started.body)).toBe('awaiting_payment')
   const attemptId = await commit(async unit => addAttempt(unit.view(), { intentId: started.body.intentId, providerAccountId: card, method: 'card_online', amountMinor: b.totalMinor }).id)
   expect(await inContext(() => recordAnswer(attemptId, { state: 'succeeded', providerRef: `cc_${attemptId}` }, { kind: 'poll' }))).toMatchObject({ settled: true })
-  const [row] = await rows<{ sealed_variables: string, payload: string }>("SELECT sealed_variables, payload FROM core_notifications WHERE type_key = 'box-office.order-confirmed' AND subject_id = ?", b.orderId)
+  const [row] = await rows<{ sealed_variables: string, payload: string }>("SELECT sealed_variables, payload FROM core_notifications WHERE type_key IN ('box-office.order-confirmed', 'box-office.order-confirmed-guest') AND subject_id = ?", b.orderId)
   const codes = (JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!).codes as string).split('\n\n')
   const told = JSON.parse(row!.payload) as { link?: string }
   const sealed = JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!) as { link?: string }

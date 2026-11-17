@@ -4,9 +4,11 @@
 import type { H3Event } from 'h3'
 import { first, newId, nowMs, useContext, useSetting, type UnitView } from '#kit'
 import { digest, randomToken } from './crypto'
+import type { ProviderId } from './providers'
 import { SESSION_COOKIE, readCookie, setSessionCookie, clearSessionCookie, deviceLabel } from './web'
 
-export type Method = 'passkey' | 'link' | 'code' | 'google' | 'setup' | 'recovery' | 'authenticator'
+/** How a session was proved. An outside provider is named by its id (`providers.ts`). */
+export type Method = 'passkey' | 'link' | 'code' | 'setup' | 'recovery' | 'authenticator' | ProviderId
 export type Assurance = 'basic' | 'strong'
 
 export interface SessionRow {

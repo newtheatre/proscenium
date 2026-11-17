@@ -10,6 +10,9 @@ import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAd
 import { BROWSER_COOKIE, readCookie, setShortCookie } from './web'
 import { startSession } from './sessions'
 import { useEnrolmentLink } from './recovery'
+import { checkClaimable } from './claim'
+import { managedDomainProvider } from './providers'
+import { holdsPrivileged } from './me'
 
 export interface TokenRow {
   id: string
@@ -25,7 +28,7 @@ export interface TokenRow {
   used_at: number | null
 }
 
-export type RequestOutcome = { sent: true } | { provider: 'google', to: string }
+export type RequestOutcome = { sent: true } | { provider: string, to: string }
 
 /** Is this address's domain one whose people sign in only through the provider? */
 export async function isManaged(address: string): Promise<boolean> {
@@ -42,7 +45,8 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
   const address = normaliseAddress(input.address)
   if (await isManaged(address)) {
     const query = new URLSearchParams({ login_hint: address, ...(input.next ? { next: input.next } : {}) })
-    return { provider: 'google', to: `/api/core/sign-in/google?${query}` }
+    const provider = managedDomainProvider()
+    return { provider: provider.id, to: `/api/core/sign-in/${provider.id}?${query}` }
   }
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
@@ -74,10 +78,32 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
 async function tokenByHash(hash: string): Promise<TokenRow | null> {
   // A staff-issued enrolment link lands on the same page and opens a recovery session (ID-08).
   // An invitation's link signs in exactly as a sign-in link does, and so claims the account.
-  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'enrol_passkey\', \'invite\')', hash)
+  // A claim link from a guest's confirmation email does the same, while the account is unclaimed.
+  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'enrol_passkey\', \'invite\', \'claim\')', hash)
 }
 
-export interface SignedIn { accountId: string, next: string | null, offerPasskey: boolean, created: boolean }
+export interface SignedIn {
+  accountId: string
+  next: string | null
+  offerPasskey: boolean
+  created: boolean
+  /** The account has no name yet, so the welcome step asks for one. */
+  welcome: boolean
+}
+
+/** Set by "Not now" on the passkey offer; read here so the offer is skipped while it lasts. */
+export const PASSKEY_LATER_COOKIE = 'proscenium-passkey-later'
+
+/**
+ * Whether to offer a passkey after an email sign-in: when the account has none, and the person has
+ * not said "Not now" lately. Somebody whose roles reach the console is asked every time, because
+ * the console needs one.
+ */
+async function shouldOfferPasskey(event: H3Event, accountId: string): Promise<boolean> {
+  if (await first('SELECT 1 AS one FROM core_passkeys WHERE account_id = ? LIMIT 1', accountId)) return false
+  if (!readCookie(event, PASSKEY_LATER_COOKIE)) return true
+  return holdsPrivileged(accountId)
+}
 
 async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'link' | 'code'): Promise<SignedIn> {
   const address = row.address!
@@ -94,8 +120,8 @@ async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'li
   const { accountId, created } = await accountForProvenAddress(unit, address, 'self')
   await startSession(unit, event, { accountId, methods: [method], assurance: 'basic' })
   unit.audit({ action: 'sign-in', record: ['core.account', accountId], detail: { method } })
-  const passkey = await first('SELECT 1 AS one FROM core_passkeys WHERE account_id = ? LIMIT 1', accountId)
-  return { accountId, next: row.next_path, offerPasskey: !passkey, created }
+  const account = await accountById(accountId)
+  return { accountId, next: row.next_path, offerPasskey: await shouldOfferPasskey(event, accountId), created, welcome: !account?.name }
 }
 
 /** Uses an emailed link. A second use, even a moment later in a race, signs nobody in. */
@@ -104,9 +130,10 @@ export async function useLink(unit: UnitView, event: H3Event, token: string): Pr
   if (!row) refuse('core.sign-in.link-unknown', 'This link is not valid.', { status: 410, remedy: 'Ask for a new email.' })
   if (row.used_at) refuse('core.sign-in.link-used', 'This link has been used.', { status: 410, remedy: 'Ask for a new email if you need to sign in again.' })
   if (row.expires_at <= nowMs()) refuse('core.sign-in.link-expired', 'This link has expired.', { status: 410, remedy: 'Ask for a new email.' })
+  if (row.purpose === 'claim') await checkClaimable(row)
   unit.add({ sql: 'UPDATE core_account_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL', params: [nowMs(), row.id] })
     .expect(1, { code: 'core.sign-in.link-used', reason: 'This link has been used.', remedy: 'Ask for a new email if you need to sign in again.' })
-  if (row.purpose === 'enrol_passkey') return { ...(await useEnrolmentLink(unit, event, row)), offerPasskey: true, created: false }
+  if (row.purpose === 'enrol_passkey') return { ...(await useEnrolmentLink(unit, event, row)), offerPasskey: true, created: false, welcome: false }
   return finish(unit, event, row, 'link')
 }
 
