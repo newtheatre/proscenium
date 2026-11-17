@@ -104,7 +104,7 @@ A List page, and the approver's working screen. Only requests the viewer may dec
 
 ### All bookings
 
-A List page with the standard filter, sort, saved views and export. Columns: time, bookable, title, purpose, booker, state, flags (late cancel, no-show, override). Saved views shipped: Today, This week, No-shows, Overrides.
+A List page with the standard filter, sort, saved views and export. Columns: time, bookable, title, purpose, booker, state, flags (late cancel, no-show, override). Saved views shipped: Today, This week, No-shows, Overrides. Finding bookings by the booker's name or email goes through identity's findAccounts(text), whose answer scopes the list by account (survivor and aliases); it needs identity's ability core.account.find, which spaces.booking.view implies (part 6), so everyone who may open this list may search it; each use is audited by that service without the text typed, and Spaces never searches accounts itself.
 
 ### A booking (console)
 
@@ -112,7 +112,7 @@ The members' Record page with more: the booker as a link to their account, the n
 
 ### Rooms and resources
 
-A List page of bookables in two groups. For spaces, core's active spaces are all listed, each either bookable (with its state) or carrying a "Make bookable" action; a space is edited in core, and the row links there. "Add a resource" makes one.
+A List page of bookables in two groups. For spaces, core's active spaces are all listed, each either bookable (with its state) or carrying a "Make bookable" action, which for a space the theatre does not run reads "Add as an external room" and asks for the owner's contact; a space is edited in core, and the row links there. "Add a resource" makes one.
 
 A bookable's Record page has four tabs:
 
@@ -129,7 +129,7 @@ A List page in tier order, with drag or keyboard reordering inside a tier. A pur
 
 ### Settings
 
-The standard Settings page for the keys in part 6, grouped as Booking limits, Approval, Bumping, Calendar and Records.
+The standard Settings page for the keys in part 6, drawn by setting group: Bookings, Series, Requests, Bumping, Calendar, Reminders and No-shows. No label or help text names a unit of time, because a duration is shown in the largest unit that divides it exactly. It is the page the kit generates for the module, and the one home of every Spaces setting: each of the module's setting groups keeps the default place, the console, and the default page, this one. No group is marked advanced, none has a bespoke screen, and nothing of Spaces is drawn in Site administration. A duration is entered with the kit's DurationInput, a number and a unit, where a month is 30 days and a year 365; what is stored does not change. Saving asks for confirmation or a reason only where a setting declares onChange confirm or reason, which here is spaces.bookings.keep-for alone (part 6).
 
 ## Home cards and other placements
 

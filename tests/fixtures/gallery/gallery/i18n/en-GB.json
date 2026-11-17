@@ -28,5 +28,7 @@
   "gallery.navigation.record.label": "Sample record",
   "gallery.list-columns.sales.label": "Sales",
   "gallery.record-tabs.tickets.label": "Tickets",
-  "gallery.navigation.choices.label": "Sample choices"
+  "gallery.navigation.choices.label": "Sample choices",
+  "gallery.desk.label": "Gallery programmes",
+  "gallery.desk.amount": "Programmes sold"
 }

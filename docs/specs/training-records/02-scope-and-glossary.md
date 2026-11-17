@@ -21,7 +21,7 @@ Training answers one question for the rest of the platform: is this person train
 | Left out | Why | Where it belongs |
 | --- | --- | --- |
 | Practice mode for operational screens | The catalogue lists it under Training, but it is a way of running any live screen on data that is not real. Interface already has the banner rule for it. It needs every live module's cooperation and none of Training's tables | Interface and Foundations, as a platform capability. Settled by integration: it is out of Training, and a later story for Interface with Foundations |
-| Deciding what a shift, a till or a booking requires | The host module owns its own records and attaches requirements to them | Front of house, Bar, Spaces, Inventory |
+| Deciding what a shift, a till or a booking requires | The host module owns its own records and attaches requirements to them | Front of house, Bar and Spaces, and an inventory module once one is specified |
 | Blocking, warning or overriding when a requirement is not met | Training gives a verdict with a reason. The host decides what the verdict does | The host module |
 | Hosting course material | A step links to a content page, a file in core's file store, or an address. Training is not a learning platform: no video hosting, no SCORM | The theatre's own pages and core files |
 | Quizzes and assessments | A form does this. Training offers a form slot on a step and an outcome action that signs the step off | Form builder |
@@ -40,7 +40,7 @@ The module arrives after the box office, in roadmap phase 5 (NNT parity). Within
 | Kind | Module | For |
 | --- | --- | --- |
 | requires | `forms` | Questions at sign-up and the knowledge check. Forms is always on, so this costs nothing |
-| uses | `front-of-house`, `bar`, `spaces`, `inventory` | Only so presets may suggest requirement and ability mappings. Training never calls them |
+| uses | `front-of-house`, `bar`, `spaces`. An inventory module is intended to join them, attaching training requirements to borrowing kit. Its id is added here when its specification is accepted, which is when Foundations reserves the id | Only so presets may suggest requirement and ability mappings. Training never calls them |
 
 Training needs nothing but the core to do its whole job. No module lists Training in `requires`: every host reaches it through the point `core.requirement` or through its two facts, `training.competent` and `training.course-trainer`, and all three read correctly as empty when Training is off.
 

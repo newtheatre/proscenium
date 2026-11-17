@@ -64,7 +64,7 @@ NNT and every theatre that adopts the platform already has a mailing list somewh
 
 Three things were assumed when this specification was first written: that a tranche of 50 recipients fits one D1 batch, that a 10,000-recipient mailing does not delay a ticket email, and that Cloudflare's email sending reports a bounce and a complaint. Part 8 lists them as P-COM-1 to P-COM-3.
 
-**Decided: the proofs may be run before the build is scheduled**, shared with core. The bounce half of P-COM-3 has passed (part 8 and the end of part 3). P-COM-1 and the complaint half of P-COM-3 are still to run. P-COM-2 waits for the release that adds mailings, and with it the defaults for the per-minute rate and the daily limit.
+**Decided: the proofs may be run before the build is scheduled**, shared with core. The bounce half of P-COM-3 has passed (part 8 and the end of part 3). Matt decided the same day that the complaint half will not be run: the complaint path is built to Cloudflare's documentation and stays unproved. P-COM-1 is still to run. P-COM-2 waits for the release that adds mailings, and with it the defaults for the per-minute rate and the daily limit.
 
 ## 10. A public archive of mailings
 

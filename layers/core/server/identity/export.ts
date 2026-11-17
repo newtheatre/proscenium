@@ -24,7 +24,8 @@ async function zone(): Promise<string> {
 
 /**
  * Columns never put in a download, whatever their class: special category data (a module that
- * holds some adds it, opened, through its contributor), anything kept encrypted, and secrets the
+ * holds some adds it, opened, through its contributor), anything kept encrypted, an internal value
+ * erasure clears (a hash of a link token), and secrets the
  * person could not use and nobody should copy: hashes, keys, tokens and the like.
  */
 const SECRET = /(^|_)(hash|secret|token|key|nonce|challenge|signature|counter|sealed)(_|$)/ // not-policy: names of secrets
@@ -41,7 +42,7 @@ export function exportPlan(): ExportTable[] {
     const match = matchOf(meta, tables)
     if (!match) continue
     const columns = Object.values(meta.columns)
-      .filter(c => c.meta.class !== 'special' && !c.meta.encrypted && !SECRET.test(c.sql))
+      .filter(c => c.meta.class !== 'special' && !c.meta.encrypted && !(c.meta.class === 'internal' && c.meta.erase === 'clear') && !SECRET.test(c.sql))
       .map(c => c.sql)
     if (columns.length) out.push({ table: name, module, match, columns })
   }

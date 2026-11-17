@@ -133,11 +133,12 @@ describe('the generated settings page (UI-14)', () => {
   })
 })
 
-describe("core's own settings page", () => {
-  it('is served at /console/system/settings, not /console/core/settings, for core\'s settings of module scope', async () => {
-    const organiser = person(['core.organisation.edit'])
-    expect((await decide('/console/system/settings', organiser)).decision).toBe('allow')
+describe("core's settings", () => {
+  it('have no console page: they are the site\'s, in Site administration only', async () => {
+    const organiser = person(['core.organisation.edit', 'core.settings.manage'])
+    expect((await decide('/console/system/settings', organiser)).decision).toBe('not-found')
     expect((await decide('/console/core/settings', organiser)).decision).toBe('not-found')
+    expect((await decide('/admin/settings', organiser)).decision).toBe('allow')
   })
 })
 
@@ -167,12 +168,12 @@ describe('Site administration (R-33)', () => {
     expect(site.settings.length).toBeGreaterThan(0)
     expect(site.settings.every(s => s.scope === 'site')).toBe(true)
     expect(site.settings.map(s => s.key)).toContain('core.units.set-rows-limit')
-    // Compatible: a module's settings without a scope are all of them, each saying where it belongs.
+    // Core's own settings are all the site's: a module's settings without a scope say where each belongs.
     const all = await (await settings('module=core', person(['core.settings.manage', 'core.organisation.edit']))).json() as Settings
-    expect(new Set(all.settings.map(s => s.scope))).toEqual(new Set(['module', 'site']))
-    const own = await (await settings('module=core&scope=module', person(['core.organisation.edit']))).json() as Settings
-    expect(own.settings.every(s => s.scope === 'module')).toBe(true)
-    expect(own.settings.map(s => s.key)).toContain('core.organisation.week-start')
+    expect(new Set(all.settings.map(s => s.scope))).toEqual(new Set(['site']))
+    expect(all.settings.map(s => s.key)).toContain('core.organisation.week-start')
+    const own = await settings('module=core&scope=module', person(['core.organisation.edit']))
+    expect(own.status === 404 || ((await own.json()) as Settings).settings.length === 0).toBe(true) // nothing is left at module scope
     expect((await settings('scope=site', staff())).status).toBe(404)
     expect((await settings('scope=module')).status).toBe(422) // a scope of 'module' needs a module
   })

@@ -20,7 +20,7 @@ The layout is the foundations data-class registry's, as core domain uses it: a l
 | `cimp` | communications\_imports | Time |
 | `cseg` | communications\_segments (later release) | Time |
 
-All nine prefixes are registered by Foundations (ruling N9 in part 4). The manage and confirm links are separate random tokens stored hashed, never a row id.
+All nine prefixes are registered by Foundations (ruling N9 in part 4). Links follow Foundations' token rules T1 to T4. The confirm link and the preferences link are random 32-byte tokens from the kit's `linkTokens`, stored as a hash with an expiry on the subscription row they open. The manage link is a signed token and needs no column. No address ever carries a row id in the clear or anything sealed.
 
 ## Group 1: lists and consent
 
@@ -72,11 +72,12 @@ communications\_subscriptions: realm from side; subject account\_id, email or se
 | source | text | not null, a code | internal | keep | signup, checkout, account, form, staff, import |
 | confirm\_token\_hash | text | unique where set | internal | clear | Cleared on confirmation |
 | confirm\_expires\_at | timestamp |  | internal | keep |  |
-| manage\_token\_hash | text | not null, unique | internal | clear | Behind the manage link |
+| preferences\_token\_hash | text | nullable; unique where set | internal | clear | Behind a preferences link, made when the person asks for one. Cleared on use or expiry |
 | subscribed\_at, unsubscribed\_at | timestamp |  | internal | keep |  |
 | unsubscribe\_reason | text | a code | internal | keep | link, mail-client, account, staff, topic-off, complaint |
 | set\_aside\_account\_id | account, role subject, on merge alias | nullable; set only together with set\_aside\_merge\_id | internal | clear | The account a row belonged to before a merge set it aside. Such a row is on no list: every read ignores it |
 | set\_aside\_merge\_id | text | nullable | internal | keep | Identity's id for the merge. No reference. The row is deleted when that merge's undo window closes |
+| preferences\_expires\_at | timestamp | set with preferences\_token\_hash | internal | keep | 24 hours after the link is made |
 
 A members' list takes account subjects only: a member is always an account. An email-subject row is never turned into an account row. When its owner later proves the address to identity, identity finds the row by that address for My account, download and erasure, and nothing moves.
 
@@ -235,7 +236,7 @@ Merge is staged and repeatable, can be undone for 30 days, and a column is an al
 | One subscribed, one pending | subscribed, because the person has confirmed once. The pending row's confirm token is cleared |
 | Both pending | pending, keeping the survivor's token |
 
-The other row is not deleted. It is set aside: its account\_id is copied to set\_aside\_account\_id and cleared, and set\_aside\_merge\_id names the merge, so the move has nothing to collide with and an undo can return the row. Its state is left as it was. The step lists each such row through the kit's helper as a merge item of kind set-aside, marked for deletion at the close, so identity deletes it when the merge's undo window closes and this module runs no purge of its own for it. The survivor's manage token is kept, and one consent record with source merge is written for the list, keyed so that a repeat writes nothing more. A row with no counterpart is simply moved.
+The other row is not deleted. It is set aside: its account\_id is copied to set\_aside\_account\_id and cleared, and set\_aside\_merge\_id names the merge, so the move has nothing to collide with and an undo can return the row. Its state is left as it was. The step lists each such row through the kit's helper as a merge item of kind set-aside, marked for deletion at the close, so identity deletes it when the merge's undo window closes and this module runs no purge of its own for it. One consent record with source merge is written for the list, keyed so that a repeat writes nothing more. A row with no counterpart is simply moved. A manage link that names a set-aside row gives the one answer for a link that no longer works.
 
 **When a merge is undone.** Identity moves the `move` column back first, then runs this module's undo, which is one unit of work and safe to repeat:
 
