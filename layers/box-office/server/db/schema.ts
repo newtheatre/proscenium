@@ -53,6 +53,9 @@ export const bands = defineTable('box_office_bands', {
   // Wheelchair bands only: the seating band whose seats are removed to make each space.
   displacesBandId: col.ref('box_office_bands', { nullable: true }),
   displacesUnits: col.internal(integer('displaces_units').notNull().default(2)),
+  // The seats this section holds at every performance, set on the production's Tickets tab. Null
+  // means the rest of the house: what the space holds less the other sections.
+  seats: col.internal(integer('seats')),
   sort: col.internal(integer('sort').notNull().default(0)),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
@@ -130,6 +133,41 @@ export const prices = defineTable('box_office_prices', {
     index('box_office_prices_lookup').on(t.productionId, t.bandId, t.ticketTypeId, t.effectiveFrom),
     check('box_office_prices_amount', sql`${t.amountMinor} IS NULL OR ${t.amountMinor} >= 0`),
   ],
+})
+
+/**
+ * A ticket preset: the tickets a new show starts from (show walkthrough, Matt 2026-11-17). `sections`
+ * is a JSON list of { name, seats, prices: [{ ticketTypeId, amountMinor }] }; a show priced the same
+ * across the house has one section with no name and no seat count. A price left out is not sold.
+ */
+export const ticketPresets = defineTable('box_office_ticket_presets', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  sections: col.internal(text('sections').notNull()),
+  createdBy: col.account('created_by', { role: 'actor', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'tps',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('box_office_ticket_presets_name').on(sql`lower(${t.name})`),
+    check('box_office_ticket_presets_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+})
+
+/** A space's usual ticket preset, used in place of the theatre's for shows there. One per space. */
+export const spaceTicketPresets = defineTable('box_office_space_ticket_presets', {
+  id: col.id(),
+  spaceId: col.internal(text('space_id').notNull()),
+  presetId: col.ref('box_office_ticket_presets'),
+  createdAt: col.createdAt(),
+}, {
+  id: 'stp',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('box_office_space_ticket_presets_space').on(t.spaceId)],
 })
 
 /** The capacity of one band at one performance. `claimed` is written only by the claims' triggers. */
@@ -494,4 +532,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
