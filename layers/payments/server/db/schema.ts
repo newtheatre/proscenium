@@ -60,6 +60,8 @@ export const sessions = defineTable('payments_sessions', {
   extra: t => [
     // A person has one open session.
     uniqueIndex('payments_sessions_one_open').on(t.openedBy).where(sql`state <> 'closed'`),
+    // The Till sessions list, newest first.
+    index('payments_sessions_opened').on(t.openedAt),
     check('payments_sessions_state', sql`${t.state} IN ('open', 'counting', 'closed')`),
     check('payments_sessions_float', sql`${t.floatMinor} >= 0`),
     check('payments_sessions_note', sql`${t.varianceNote} IS NULL OR length(${t.varianceNote}) <= 200`),
@@ -198,6 +200,8 @@ export const refunds = defineTable('payments_refunds', {
   extra: t => [
     uniqueIndex('payments_refunds_idempotency_key').on(t.idempotencyKey),
     index('payments_refunds_part').on(t.partId),
+    // The Refunds list, newest first.
+    index('payments_refunds_created').on(t.createdAt),
     index('payments_refunds_waiting').on(t.state).where(sql`state IN ('requested', 'approved', 'sent', 'failed')`),
     check('payments_refunds_amount', sql`${t.amountMinor} > 0`),
     check('payments_refunds_state', sql`${t.state} IN ('requested', 'approved', 'sent', 'succeeded', 'failed', 'declined')`),

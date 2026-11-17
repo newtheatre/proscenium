@@ -153,14 +153,6 @@ export async function shiftsOf(performanceId: string): Promise<Shift[]> {
   return rows.map(toShift)
 }
 
-/** Publishes a draft shift so members can see it and sign up. */
-export function publishShift(unit: UnitView, shift: Shift): void {
-  unit.add({ sql: 'UPDATE front_of_house_shifts SET state = \'published\', updated_at = ? WHERE id = ? AND state = \'draft\'', params: [nowMs(), shift.id] })
-    .expect(1, { code: 'front-of-house.shift-not-draft', reason: 'Only a draft shift can be published.' })
-  unit.announce('front-of-house.shift.published', { shiftId: shift.id, performanceId: shift.performanceId }, { record: ['front-of-house.shift', shift.id] })
-  unit.audit({ action: 'update', record: ['front-of-house.shift', shift.id], detail: { state: 'published' } })
-}
-
 /**
  * The performance moved in time (part 3, rule 3): every shift keeps its offsets, the call and the
  * window's opening from the start, the end and the window's closing from the end. One statement for
