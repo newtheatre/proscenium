@@ -149,3 +149,23 @@ describe('changes() in SQL', () => {
     ].join('\n'))).toEqual([1, 2])
   })
 })
+
+describe('duration wording', () => {
+  it('flags a label or help that names the unit, but not the ordinal second', async () => {
+    const { namedDurationUnit } = await import('../../scripts/checks/source')
+    expect(namedDurationUnit('Days to keep the log')).toBe('Days')
+    expect(namedDurationUnit('How long, in minutes, a hold lasts.')).toBe('minutes')
+    expect(namedDurationUnit('Wait 30 second before trying')).toBe('30 second')
+    expect(namedDurationUnit('How long a failed job waits before its second attempt.')).toBeUndefined()
+    expect(namedDurationUnit('Keep the delivery log for')).toBeUndefined()
+  })
+})
+
+describe('freshness overrides', () => {
+  it('finds can() or requireAbility() given fresh, on its line', async () => {
+    const { freshOverrides } = await import('../../scripts/checks/source')
+    expect(freshOverrides('const a = 1\nawait can(actor, \'x.y.z\', undefined, { fresh: false })')).toEqual([2])
+    expect(freshOverrides('await requireAbility(actor, entry.change as never, record(), { fresh: true })')).toEqual([1])
+    expect(freshOverrides('await can(actor, \'x.y.z\')\nconst fresh = { fresh: true }')).toEqual([])
+  })
+})

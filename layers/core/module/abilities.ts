@@ -16,6 +16,8 @@ export const abilities = defineAbilities('core', {
   // Reads the history panel of a record: who changed what and when, from the audit trail.
   'history.view': ability({ audit: false }),
   'health.view': ability({ grantAt: ['site'], audit: false }),
+  // Searches the audit trail and every setting's history; each search is itself recorded.
+  'audit.view': ability({ risk: 'privileged', fresh: false, audit: 'read', grantAt: ['site'] }),
   // Retiring a key at once invalidates every code it signed (F-37).
   'signing-key.retire': ability({ risk: 'privileged', grantAt: ['site'], implies: ['health.view'] }),
 })
