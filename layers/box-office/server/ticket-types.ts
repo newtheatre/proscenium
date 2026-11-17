@@ -204,7 +204,7 @@ export async function createTicketType(unit: UnitView, input: TicketTypeInput): 
   const id = newId('tty')
   const at = nowMs()
   unit.add(sql`INSERT INTO box_office_ticket_types (id, name, kind, requirement_refs, recheck_at_entry, max_per_holder, proof_note, needs_paid_ticket, active, sort, created_at, updated_at)
-    SELECT ${id}, ${input.name}, ${input.kind ?? 'standard'}, ${refsText(input.requirementRefs)}, ${(input.recheckAtEntry ?? true) ? 1 : 0}, ${input.maxPerHolder ?? 1}, ${input.proofNote ?? null}, 0, 1, ${input.sort ?? 0}, ${at}, ${at}
+    SELECT ${id}, ${input.name}, ${input.kind ?? 'standard'}, ${refsText(input.requirementRefs)}, ${(input.recheckAtEntry ?? true) ? 1 : 0}, ${input.maxPerHolder ?? 1}, ${input.proofNote ?? null}, 0, 1, ${input.sort ?? sql`(SELECT coalesce(max(sort) + 1, 0) FROM box_office_ticket_types)`}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ${input.name} COLLATE NOCASE)`)
     .expect(1, { code: 'box-office.ticket-type.name-taken', reason: 'There is already a ticket type with that name.' })
   unit.audit({ action: 'create', record: ['box-office.ticket-type', id] })
@@ -253,6 +253,21 @@ export async function updateTicketType(unit: UnitView, id: string, change: Ticke
     AND NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ${name} COLLATE NOCASE AND id <> ${id})`)
     .expect(1, { code: 'box-office.ticket-type.name-taken', reason: 'There is already a ticket type with that name.' })
   unit.audit({ action: 'update', record: ['box-office.ticket-type', id], detail: { fields: Object.keys(change).filter(k => change[k as keyof TicketTypeChange] !== undefined) } })
+}
+
+/**
+ * Puts every ticket type in the order given, as dragged on the Ticket types screen: the first is
+ * shown first on the console, the performance grid and the booking page. The list must name every
+ * type once, so an order made from a stale screen (someone added a type meanwhile) is refused.
+ */
+export function reorderTicketTypes(unit: UnitView, ids: string[]): void {
+  const stale = { code: 'box-office.ticket-type.order-stale', reason: 'The ticket types changed while you were ordering them.', remedy: 'Reload the page and try again.' }
+  if (new Set(ids).size !== ids.length) refuse(stale.code, stale.reason, { status: 409, remedy: stale.remedy })
+  const list = JSON.stringify(ids)
+  unit.add(sql`UPDATE box_office_ticket_types SET sort = (SELECT key FROM json_each(${list}) WHERE value = box_office_ticket_types.id), updated_at = ${nowMs()}
+    WHERE id IN (SELECT value FROM json_each(${list})) AND (SELECT count(*) FROM box_office_ticket_types) = ${ids.length}`)
+    .expect(ids.length, stale)
+  unit.audit({ action: 'update', ability: 'box-office.pricing.manage', detail: { ticketTypesOrdered: ids.length } })
 }
 
 /** Deletes a type a person made that nothing has been sold or priced under. Anything else is retired instead. */

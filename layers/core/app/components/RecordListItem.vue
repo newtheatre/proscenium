@@ -1,11 +1,12 @@
 <!-- One row of a RecordList: a name with an optional icon and a line of description, then whatever
-     the row ends with (a count, a badge, its actions). With `to`, the whole row is a link. What a
+     the row ends with (a count, a badge, its actions). The `leading` slot goes before the name, such as
+     a drag handle. With `to`, the whole row is a link. What a
      row needs under it (a short form, a detail) goes in the `below` slot. -->
 <script setup lang="ts">
 import { NuxtLink } from '#components'
 
 defineProps<{ to?: string, icon?: string, name?: string, description?: string, muted?: boolean }>()
-const slots = defineSlots<{ default?: () => unknown, name?: () => unknown, description?: () => unknown, below?: () => unknown }>()
+const slots = defineSlots<{ default?: () => unknown, leading?: () => unknown, name?: () => unknown, description?: () => unknown, below?: () => unknown }>()
 </script>
 
 <template>
@@ -16,6 +17,7 @@ const slots = defineSlots<{ default?: () => unknown, name?: () => unknown, descr
       class="flex items-center gap-3 px-4 py-3"
       :class="[to && 'hover:bg-elevated/50', muted && 'text-muted']"
     >
+      <slot name="leading" />
       <UUser
         :name="name"
         :description="description"
