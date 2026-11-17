@@ -4,7 +4,7 @@
 // once however many devices scan it together, and the scan row written next in the same batch takes
 // its result from that stamp: admitted if the stamp is its own id, already admitted otherwise. A desk code or a
 // booking reference admits nobody and writes no scan row.
-import { createUnit, first, newId, nowMs, useContext } from '#kit'
+import { all, createUnit, first, newId, nowMs, useContext } from '#kit'
 import { signing } from '#kit/signing'
 import { hashOf } from './codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
@@ -75,4 +75,38 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id }
   const earlier = await first<{ scanned_at: number, device_label: string | null }>('SELECT s.scanned_at, s.device_label FROM box_office_tickets t JOIN box_office_scans s ON s.id = t.admitted_scan_id WHERE t.id = ?', ticket.id)
   return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null }
+}
+
+export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null }
+
+/**
+ * Admits tickets of one order from the door list, for a buyer with no phone and no printout (part 6,
+ * "The door", find by name). Up to `count` of the order's valid tickets for this performance not
+ * yet in are admitted, each with its own scan row, by the same conditional stamp as a scan, so a
+ * ticket scanned on another device at the same moment is admitted once. Says how many went in.
+ */
+export async function admitByName(input: AdmitByNameInput): Promise<{ admitted: number, scanIds: string[] }> {
+  const waiting = await all<{ id: string }>(
+    `SELECT k.id FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id
+      WHERE l.order_id = ? AND k.performance_id = ? AND k.state = 'valid' AND k.admitted_at IS NULL ORDER BY k.id LIMIT ?`,
+    input.orderId, input.performanceId, input.count,
+  )
+  if (!waiting.length) return { admitted: 0, scanIds: [] }
+  const at = nowMs()
+  const actor = useContext().actor.accountId ?? null
+  const unit = createUnit()
+  const scanIds: string[] = []
+  for (const ticket of waiting) {
+    const scanId = newId('scan')
+    scanIds.push(scanId)
+    unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
+    unit.view().add({
+      sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
+        SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+      params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id],
+    })
+  }
+  await unit.commit()
+  const written = await all<{ id: string }>(`SELECT id FROM box_office_scans WHERE result = 'admitted' AND id IN (${scanIds.map(() => '?').join(', ')})`, ...scanIds)
+  return { admitted: written.length, scanIds: written.map(r => r.id) }
 }
