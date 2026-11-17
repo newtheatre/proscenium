@@ -521,5 +521,18 @@
   "core.live.offline-title": "This device is offline",
   "core.live.offline-description": "What is on screen stays readable, but changes cannot be sent until the connection returns.",
   "core.live.empty.title": "Nothing to open tonight",
-  "core.live.empty.description": "Screens for working a performance appear here when you are on shift or hold a role that uses them."
+  "core.live.empty.description": "Screens for working a performance appear here when you are on shift or hold a role that uses them.",
+  "core.scan.button": "Scan with camera",
+  "core.scan.title": "Scan a code",
+  "core.scan.description": "Hold the code up to the camera, inside the frame.",
+  "core.scan.camera": "Camera picture",
+  "core.scan.starting": "Starting the camera…",
+  "core.scan.problem.insecure": "The camera can only be used on a secure (https) address.",
+  "core.scan.problem.no-camera": "No camera was found on this device.",
+  "core.scan.problem.denied": "The camera is not allowed for this site. Allow it in the browser's settings to scan.",
+  "core.scan.problem.failed": "The camera could not be started.",
+  "core.scan.problem.type-instead": "You can still type the code instead.",
+  "core.scan.problem.type-below": "You can still type the code below.",
+  "core.scan.type-label": "Or type the code",
+  "core.scan.type-submit": "Check"
 }
