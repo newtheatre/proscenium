@@ -180,6 +180,24 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   viewer's zone.
 - `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
 
+### Charts
+
+`ChartFigure` wraps Nuxt UI's `UChart` (TanStack Charts, drawn as SVG on the server, so there is no
+client-only wrapper). It takes a `title`, which is the caption and the chart's accessible name, and a
+`summary`, one sentence that says what the chart shows and is read out in place of it. Both are
+required. Then `data`, `index`, `categories`, and a `format` for values, such as `money` from
+`useMoney`.
+
+Two rules:
+
+- **A chart never replaces a figure.** The numbers stay in text beside it, in a `FactStrip`, a table
+  or a list, because a chart cannot be read by a screen reader or copied into an email.
+- **Status colours stay status colours.** A chart uses the chart colours `ChartFigure` sets. Sold and
+  free are not green and red unless something is wrong.
+
+A chart with one bar says nothing a figure does not, so show one only when there are at least two
+things to compare. Rows that share a name along the bottom are drawn as one: give each its own.
+
 ### Controls for the setting kinds
 
 The generated settings page gives each kind of setting its own control, and the same fields are there
