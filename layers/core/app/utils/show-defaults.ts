@@ -1,4 +1,6 @@
 // What the show's defaults section (ShowDefaults.vue) takes and gives (run presets, Matt 2026-11-17).
+import { z } from 'zod'
+
 export interface ShowDefaultValues {
   runningMinutes: number
   doorsBeforeMinutes: number
@@ -21,6 +23,19 @@ export interface ShowOverrides {
 /** Overrides that change nothing: every field at the show's defaults. */
 export function noOverrides(): ShowOverrides {
   return { runningMinutes: null, doorsBeforeMinutes: null, intervalCount: null, intervalMinutes: null, capacity: null, label: '', bookedElsewhere: false, externalBookingUrl: '' }
+}
+
+const BOOKING_LINK = z.string().trim().url().startsWith('https://') // the routes' check on externalBookingUrl
+
+/**
+ * What is wrong with the overrides, as a form's errors by field name, so the booking link is checked
+ * beside its field rather than by the browser. Pass it to the form's `validate`.
+ */
+export function overrideErrors(o: ShowOverrides, defaults: ShowDefaultValues | null, sellsHere: boolean): { name: string, message: string }[] {
+  const link = o.externalBookingUrl.trim()
+  if (!link) return o.bookedElsewhere && sellsHere && !defaults?.externalBookingUrl ? [{ name: 'externalBookingUrl', message: translate('core.form.invalid.required') }] : []
+  const checked = BOOKING_LINK.safeParse(link)
+  return checked.success ? [] : [{ name: 'externalBookingUrl', message: checked.error.issues[0]!.message }]
 }
 
 /** One line of the start-times editor: a start time and the ISO weekdays it runs on, as strings. */

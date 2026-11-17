@@ -180,11 +180,14 @@ const actions = (s: Season) => [[
         <UForm
           id="season-form"
           :state="form"
+          :validate="() => needs({ name: form.name, days: form.days.start })"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="name"
             label="Name"
             required
           >
@@ -194,6 +197,7 @@ const actions = (s: Season) => [[
             />
           </UFormField>
           <UFormField
+            name="days"
             label="First and last day"
             required
           >
@@ -213,7 +217,6 @@ const actions = (s: Season) => [[
           type="submit"
           form="season-form"
           :label="editId ? 'Save season' : 'Add season'"
-          :disabled="!form.name.trim() || !form.days.start"
         />
       </template>
     </UModal>

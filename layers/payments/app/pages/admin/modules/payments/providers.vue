@@ -379,10 +379,13 @@ async function recordPayout() {
           id="add-provider"
           class="space-y-4"
           :state="form"
+          :validate="() => needs({ provider: form.provider, label: form.label, channels: form.channels, externalRef: form.provider === 'sumup' ? form.externalRef : true })"
+          novalidate
           @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="provider"
             :label="t('payments.screens.providers.provider')"
             required
           >
@@ -398,6 +401,7 @@ async function recordPayout() {
             {{ t(`payments.screens.providers.about.${chosen.id}`) }}
           </p>
           <UFormField
+            name="label"
             :label="t('payments.screens.providers.label')"
             :help="t('payments.screens.providers.label-help')"
             required
@@ -409,6 +413,7 @@ async function recordPayout() {
           </UFormField>
           <UFormField
             v-if="channelsOf(chosen).length > 1"
+            name="channels"
             :label="t('payments.screens.providers.channels')"
           >
             <UCheckboxGroup
@@ -427,6 +432,7 @@ async function recordPayout() {
           </UFormField>
           <UFormField
             v-if="form.provider === 'sumup'"
+            name="externalRef"
             :label="t('payments.screens.providers.merchant-code')"
             :help="t('payments.screens.providers.merchant-code-help')"
             required
@@ -443,7 +449,6 @@ async function recordPayout() {
           type="submit"
           form="add-provider"
           :loading="busy"
-          :disabled="!form.provider || !form.label.trim() || !form.channels.length || (form.provider === 'sumup' && !form.externalRef.trim())"
           :label="t('payments.screens.providers.add-button')"
         />
       </template>
@@ -459,10 +464,13 @@ async function recordPayout() {
           id="record-payout"
           class="space-y-4"
           :state="payout"
+          :validate="() => needs({ providerAccountId: payout.providerAccountId, paidMinor: payout.paidMinor, paidOn: payout.paidOn, reference: payout.reference })"
+          novalidate
           @submit="recordPayout"
         >
           <RefusalNotice :refusal="payoutRefusal" />
           <UFormField
+            name="providerAccountId"
             :label="t('payments.screens.payouts.account')"
             required
           >
@@ -473,6 +481,7 @@ async function recordPayout() {
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField
+              name="paidMinor"
               :label="t('payments.screens.payouts.paid')"
               :help="t('payments.screens.payouts.paid-help')"
               required
@@ -488,12 +497,14 @@ async function recordPayout() {
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField
+              name="paidOn"
               :label="t('payments.screens.payouts.paid-on')"
               required
             >
               <FieldDate v-model="payout.paidOn" />
             </UFormField>
             <UFormField
+              name="reference"
               :label="t('payments.screens.payouts.reference')"
               required
               :error="payoutRefusal?.code === 'payments.payout.already-entered' ? payoutRefusal.reason : undefined"
@@ -511,7 +522,6 @@ async function recordPayout() {
           type="submit"
           form="record-payout"
           :loading="busy"
-          :disabled="!payout.providerAccountId || payout.paidMinor === null || !payout.paidOn || !payout.reference.trim()"
           :label="t('payments.screens.payouts.record-button')"
         />
       </template>

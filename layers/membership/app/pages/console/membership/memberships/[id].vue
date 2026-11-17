@@ -223,7 +223,9 @@ async function saveDates() {
         <UForm
           id="membership-end"
           :state="{ note }"
+          :validate="() => needs({ note })"
           class="space-y-4"
+          novalidate
           @submit="end"
         >
           <RefusalNotice :refusal="refusal" />
@@ -231,6 +233,7 @@ async function saveDates() {
             {{ t('membership.membership.end-consequence') }}
           </p>
           <UFormField
+            name="note"
             :label="t('membership.membership.end-note')"
             :help="t('membership.membership.end-note-help')"
             required
@@ -249,7 +252,6 @@ async function saveDates() {
           form="membership-end"
           color="error"
           loading-auto
-          :disabled="!note.trim()"
           :label="t('membership.membership.end')"
         />
       </template>
@@ -263,7 +265,9 @@ async function saveDates() {
         <UForm
           id="membership-waive"
           :state="{ waiveNote }"
+          :validate="() => needs({ waiveNote })"
           class="space-y-4"
+          novalidate
           @submit="waive"
         >
           <RefusalNotice :refusal="feeRefusal" />
@@ -271,6 +275,7 @@ async function saveDates() {
             {{ t('membership.membership.waive-consequence') }}
           </p>
           <UFormField
+            name="waiveNote"
             :label="t('membership.membership.end-note')"
             :help="t('membership.membership.end-note-help')"
             required
@@ -288,7 +293,6 @@ async function saveDates() {
           type="submit"
           form="membership-waive"
           loading-auto
-          :disabled="!waiveNote.trim()"
           :label="t('membership.membership.waive')"
         />
       </template>
@@ -302,7 +306,9 @@ async function saveDates() {
         <UForm
           id="membership-refund"
           :state="{ refundMinor }"
+          :validate="() => needs({ refundMinor: refundMinor || null })"
           class="space-y-4"
+          novalidate
           @submit="refund"
         >
           <RefusalNotice :refusal="feeRefusal" />
@@ -310,6 +316,7 @@ async function saveDates() {
             {{ t('membership.membership.refund-consequence') }}
           </p>
           <UFormField
+            name="refundMinor"
             :label="t('membership.membership.refund-amount')"
             required
           >
@@ -328,7 +335,6 @@ async function saveDates() {
           form="membership-refund"
           color="error"
           loading-auto
-          :disabled="!refundMinor"
           :label="t('membership.membership.refund')"
         />
       </template>
@@ -342,7 +348,9 @@ async function saveDates() {
         <UForm
           id="membership-dates"
           :state="dates"
+          :validate="() => needs({ startsOn: dates.startsOn, endsOn: indefinite ? true : dates.endsOn, note: dates.note })"
           class="space-y-4"
+          novalidate
           @submit="saveDates"
         >
           <RefusalNotice :refusal="datesRefusal" />
@@ -350,12 +358,14 @@ async function saveDates() {
             {{ t('membership.membership.dates-consequence') }}
           </p>
           <UFormField
+            name="startsOn"
             :label="t('membership.membership.starts')"
             required
           >
             <FieldDate v-model="dates.startsOn" />
           </UFormField>
           <UFormField
+            name="endsOn"
             :label="t('membership.membership.ends')"
             :help="indefinite ? t('membership.membership.dates-end-help') : undefined"
             :required="!indefinite"
@@ -366,6 +376,7 @@ async function saveDates() {
             />
           </UFormField>
           <UFormField
+            name="note"
             :label="t('membership.membership.end-note')"
             :help="t('membership.membership.end-note-help')"
             required
@@ -383,7 +394,6 @@ async function saveDates() {
           type="submit"
           form="membership-dates"
           loading-auto
-          :disabled="!dates.note.trim() || !dates.startsOn || (!indefinite && !dates.endsOn)"
           :label="t('membership.membership.dates-save')"
         />
       </template>

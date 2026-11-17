@@ -3,6 +3,9 @@
 // details, dates, credits, media and guidance (age, effects, content warnings), a facts strip, and a side panel that stays beside
 // every tab with the poster, managed in place, and what publishing still needs.
 import type { DropdownMenuItem } from '@nuxt/ui'
+import { z } from 'zod'
+import { productionPatch } from '../../../../../server/programme/input'
+import { blankAsNull } from '../../../../../shared/validation'
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -42,7 +45,7 @@ const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/productions/${String(route.params.id)}`)
 const { data, status, error, refresh } = await useAPI<Answer>(base, { key: `core:production:${String(route.params.id)}` })
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -54,7 +57,8 @@ const reload = () => Promise.all([refresh(), refreshNuxtData(`core:record-checks
 function api(path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: object = {}): Promise<unknown> {
   return $api<unknown>(`${base.value}${path}` as string, { method, body })
 }
-async function run(fn: () => Promise<unknown>, done?: string) {
+// A form's own save passes the form, so what the server refuses shows beside each field.
+async function run(fn: () => Promise<unknown>, done?: string, form?: { setErrors: (errors: { name: string, message: string }[]) => void } | null) {
   refusal.value = null
   try {
     await fn()
@@ -64,6 +68,7 @@ async function run(fn: () => Promise<unknown>, done?: string) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    form?.setErrors(fieldErrors(refusal.value))
     return false
   }
 }
@@ -84,6 +89,11 @@ const details = reactive({
 // With nothing here selling tickets, every production is booked elsewhere (Matt, 2026-11-17).
 const sellsHere = computed(() => data.value?.sellsHere ?? true)
 const elsewhere = computed(() => !sellsHere.value || details.bookedElsewhere)
+// Checked as it will be sent, with the schema the route uses; booked elsewhere needs its link.
+const detailsForm = useTemplateRef('detailsForm')
+const detailsSchema = computed(() => elsewhere.value
+  ? blankAsNull(productionPatch.extend({ externalBookingUrl: productionPatch.shape.externalBookingUrl.unwrap().unwrap() }))
+  : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
 watch(production, (p) => {
   if (!p) return
   Object.assign(details, {
@@ -99,7 +109,7 @@ const saveDetails = () => run(() => api('', 'PATCH', {
   seasonId: details.seasonId === NONE ? null : details.seasonId,
   externalBookingUrl: elsewhere.value ? details.externalBookingUrl.trim() || null : null,
   runningMinutes: details.runningMinutes || null,
-}), 'Production saved')
+}), 'Production saved', detailsForm.value)
 
 // Moves
 const publish = () => run(() => api('/publish', 'POST'), 'Production published')
@@ -258,11 +268,15 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
           <PageSection title="Details">
             <UForm
               id="production-details"
+              ref="detailsForm"
+              :schema="detailsSchema"
               :state="details"
               class="space-y-4"
+              novalidate
               @submit="saveDetails"
             >
               <UFormField
+                name="title"
                 label="Title"
                 required
               >
@@ -271,13 +285,17 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   maxlength="200"
                 />
               </UFormField>
-              <UFormField label="Subtitle">
+              <UFormField
+                name="subtitle"
+                label="Subtitle"
+              >
                 <UInput
                   v-model="details.subtitle"
                   maxlength="200"
                 />
               </UFormField>
               <UFormField
+                name="summary"
                 label="Summary"
                 help="One or two sentences for lists and search results. Needed to publish."
               >
@@ -288,6 +306,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 />
               </UFormField>
               <UFormField
+                name="description"
                 label="About the production"
                 help="Shown on its public page. You can use **bold**, *italic*, lists, headings and links that start with https."
               >
@@ -298,13 +317,17 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 />
               </UFormField>
               <div class="grid gap-4 sm:grid-cols-2">
-                <UFormField label="What it is">
+                <UFormField
+                  name="kind"
+                  label="What it is"
+                >
                   <USelect
                     v-model="details.kind"
                     :items="KINDS"
                   />
                 </UFormField>
                 <UFormField
+                  name="categoryTermId"
                   label="Category"
                   help="Needed to publish."
                 >
@@ -315,7 +338,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                     placeholder="Choose a category"
                   />
                 </UFormField>
-                <UFormField label="Season">
+                <UFormField
+                  name="seasonId"
+                  label="Season"
+                >
                   <USelectMenu
                     v-model="details.seasonId"
                     value-key="value"
@@ -324,6 +350,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 </UFormField>
                 <UFormField
                   v-if="details.kind !== 'own'"
+                  name="companyName"
                   label="Company"
                 >
                   <UInput
@@ -393,6 +420,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   @update:model-value="details.bookedElsewhere = !!$event"
                 />
                 <UFormField
+                  name="slug"
                   label="Web address"
                   help="An old address keeps working once the production has been public."
                 >
@@ -429,7 +457,6 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 type="submit"
                 form="production-details"
                 label="Save production"
-                :disabled="!details.title.trim()"
               />
             </template>
           </PageSection>

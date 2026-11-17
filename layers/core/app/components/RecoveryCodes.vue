@@ -2,6 +2,8 @@
      typing one back; or shown again from Signing in (`review`), where used codes are struck through
      and nothing needs typing. Either way the set can be downloaded as a text file or copied. -->
 <script setup lang="ts">
+import { z } from 'zod'
+
 const props = defineProps<{
   codes: string[]
   checkPath?: string
@@ -15,6 +17,8 @@ const emit = defineEmits<{ kept: [code: string] }>()
 const headingId = useId()
 const typed = ref('')
 const wrong = ref(false)
+// One code typed back; left empty, the field says so.
+const typedSchema = z.object({ typed: z.string().trim().min(1) })
 const toast = useToast()
 const { data: brand } = await useBrand()
 const { dayLong } = useDates()
@@ -125,8 +129,10 @@ async function confirm() {
     />
     <UForm
       v-else
+      :schema="typedSchema"
       :state="{ typed }"
       class="flex flex-col gap-4"
+      novalidate
       @submit="confirm"
     >
       <UFormField
@@ -137,7 +143,6 @@ async function confirm() {
         <UInput
           v-model="typed"
           autocomplete="off"
-          required
         />
       </UFormField>
       <UButton

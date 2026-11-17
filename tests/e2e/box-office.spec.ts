@@ -108,7 +108,8 @@ async function payCash(page: Page, amount: string) {
   await cash(page).click()
   await expect(page.getByText(`Still to pay: ${amount}`)).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
-  await expect(page.getByText(`Paid: ${amount}`, { exact: true }).first()).toBeVisible()
+  // The till says so once.
+  await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 }
 
@@ -119,12 +120,17 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Sell' }).first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
   const quantity = page.getByLabel(`Stalls, ${typeName}, £12.00`)
+  // How many are left is the field's help, which it names as its description.
+  const help = page.locator(`[id="${(await quantity.getAttribute('aria-describedby'))!.split(' ').at(-1)}"]`)
+  const before = Number((await help.textContent())!.match(/(\d+) left/)![1])
   await quantity.fill('2')
   await quantity.blur()
   await page.getByRole('checkbox', { name: 'Admit now' }).check()
   await expect(payButton(page, '£24.00')).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£24.00')
+  // The panel shows what is left after the sale without a reload.
+  await expect(help).toHaveText(`${before - 2} left`)
 })
 
 test('Sell finds a reservation by its reference and takes payment for it', async ({ page }) => {
@@ -236,6 +242,10 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
   await expect(payButton(page, '£6.00')).toBeEnabled()
   await expect(page.getByRole('tab', { name: /^Gallery programmes/ })).toContainText('1')
   await noViolations(page)
+  // On a phone the till fits the screen: nothing scrolls sideways, however long a performance's name.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('tab', { name: 'Tickets', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
   await context.close()
 })
 
@@ -333,6 +343,28 @@ test.describe('the box office console', () => {
     await page.getByRole('searchbox', { name: 'Search ticket types' }).fill(spare)
     await expect(page.getByText(typeName, { exact: true })).toBeHidden()
     await expect(page.getByText(spare, { exact: true })).toBeVisible()
+    await noViolations(page)
+  })
+
+  test('a ticket preset is made with typed prices, with sections, and made the theatre\'s usual', async ({ page }) => {
+    const name = `Preset ${stamp}`
+    await visit(page, '/admin/modules/box-office/ticket-presets')
+    // Someone without Admin sees it in the settings window over the console.
+    await expect(page.getByRole('heading', { name: 'Ticket presets' }).first()).toBeVisible()
+    await page.getByRole('button', { name: 'New preset' }).first().click()
+    const dialog = page.getByRole('dialog', { name: 'New preset' })
+    await dialog.getByLabel('Name').fill(name)
+    await dialog.getByRole('spinbutton', { name: `Price of ${typeName}` }).fill('12')
+    await dialog.getByRole('switch', { name: 'Different prices for parts of the house' }).click()
+    await dialog.getByRole('textbox', { name: 'Name of section 2' }).fill('Balcony')
+    await dialog.getByRole('spinbutton', { name: `Price of ${typeName} in Balcony` }).fill('8')
+    await noViolations(page)
+    await dialog.getByRole('button', { name: 'Save preset' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByText(`Stalls: ${typeName} £12.00; Balcony: ${typeName} £8.00`, { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: `Actions for ${name}` }).click()
+    await page.getByRole('menuitem', { name: 'Make it the theatre\'s usual' }).click()
+    await expect(page.getByText('The theatre\'s usual').first()).toBeVisible()
     await noViolations(page)
   })
 })

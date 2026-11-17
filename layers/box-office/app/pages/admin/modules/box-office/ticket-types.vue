@@ -323,9 +323,12 @@ function describe(type: TicketType): string {
         <UForm
           class="space-y-4"
           :state="form"
+          :validate="() => needs({ name: form.name })"
+          novalidate
           @submit="add"
         >
           <UFormField
+            name="name"
             :label="t('box-office.ticket-types.add.name')"
             required
           >
@@ -379,7 +382,6 @@ function describe(type: TicketType): string {
           <UButton
             type="submit"
             :label="t('box-office.ticket-types.add.button')"
-            :disabled="!form.name.trim()"
           />
         </UForm>
       </PageSection>
@@ -395,10 +397,13 @@ function describe(type: TicketType): string {
           id="box-office-ticket-type"
           class="space-y-4"
           :state="editForm"
+          :validate="() => needs({ name: editForm.name })"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="editRefusal" />
           <UFormField
+            name="name"
             :label="t('box-office.ticket-types.add.name')"
             required
           >
@@ -461,7 +466,6 @@ function describe(type: TicketType): string {
           type="submit"
           form="box-office-ticket-type"
           :label="t('box-office.ticket-types.save')"
-          :disabled="!editForm.name.trim()"
         />
       </template>
     </UModal>

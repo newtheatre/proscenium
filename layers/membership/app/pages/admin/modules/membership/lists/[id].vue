@@ -204,6 +204,7 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
           <UForm
             :state="{ checking }"
             class="flex flex-wrap items-end gap-3"
+            novalidate
             @submit="check"
           >
             <UFormField :label="valueLabel">
@@ -241,6 +242,7 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
             <UForm
               :state="entry"
               class="space-y-4"
+              novalidate
               @submit="addEntry"
             >
               <RefusalNotice :refusal="entryRefusal" />
@@ -284,6 +286,7 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
             <UForm
               :state="{ removing }"
               class="flex flex-wrap items-end gap-3"
+              novalidate
               @submit="removeEntry"
             >
               <UFormField
@@ -314,6 +317,7 @@ const actions = computed(() => [{ label: t('membership.screens.list.delete'), ic
             id="membership-list-details"
             :state="details"
             class="space-y-4"
+            novalidate
             @submit="saveDetails"
           >
             <RefusalNotice :refusal="detailsRefusal" />

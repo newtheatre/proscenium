@@ -111,6 +111,7 @@ onMounted(async () => {
             />
             <form
               class="space-y-3"
+              novalidate
               @submit.prevent="checkApp"
             >
               <UFormField :label="t('core.confirm-its-you.app-code')">
@@ -136,6 +137,7 @@ onMounted(async () => {
           <form
             v-if="codeSent"
             class="space-y-3"
+            novalidate
             @submit.prevent="checkCode"
           >
             <UFormField

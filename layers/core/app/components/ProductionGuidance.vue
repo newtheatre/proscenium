@@ -125,6 +125,7 @@ function saveWarnings() {
         id="production-age"
         :state="age"
         class="grid gap-4 sm:grid-cols-2"
+        novalidate
         @submit="saveAge"
       >
         <UFormField label="Minimum age">
@@ -165,6 +166,7 @@ function saveWarnings() {
         id="production-effects"
         :state="effectsOn"
         class="space-y-3"
+        novalidate
         @submit="saveEffects"
       >
         <div
@@ -213,6 +215,7 @@ function saveWarnings() {
         id="production-warnings"
         :state="picked"
         class="space-y-4"
+        novalidate
         @submit="saveWarnings"
       >
         <div class="flex flex-wrap items-end gap-3">
