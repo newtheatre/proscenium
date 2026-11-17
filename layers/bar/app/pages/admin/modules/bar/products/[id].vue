@@ -409,7 +409,6 @@ function planned(v: Variant, l: List): string | null {
           novalidate
           :state="label"
           class="space-y-4"
-          novalidate
           @submit="saveAllergens"
         >
           <RefusalNotice :refusal="refusal" />
