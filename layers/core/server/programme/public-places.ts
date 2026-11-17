@@ -121,7 +121,7 @@ export interface PublicSeason {
 export async function publicSeason(slug: string, options: { pastVisible?: boolean, now?: number } = {}): Promise<PublicSeason | null> {
   const pastVisible = options.pastVisible ?? true
   const s = await first<{ id: string, slug: string, name: string, starts_on: string, ends_on: string, summary: string | null, state: string }>(
-    `SELECT id, slug, name, starts_on, ends_on, summary, state FROM core_seasons WHERE slug = ? AND state IN ('published', 'archived')`,
+    'SELECT id, slug, name, starts_on, ends_on, summary, state FROM core_seasons WHERE slug = ? AND state IN (\'published\', \'archived\')',
     slug,
   )
   if (!s || (s.state === 'archived' && !pastVisible)) return null
