@@ -19,6 +19,7 @@ const span = (s: Season) => dates.range(s.startsOn, s.endsOn)
 
 // A search that opens from its icon, and archived seasons below the others.
 const search = ref('')
+const searching = ref(false)
 const matching = computed(() => {
   const words = search.value.trim().toLowerCase()
   return (data.value?.rows ?? []).filter(s => !words || s.name.toLowerCase().includes(words))
@@ -94,10 +95,12 @@ const actions = (s: Season) => [[
       <SearchToggle
         v-if="data?.rows.length"
         v-model="search"
+        v-model:open="searching"
         label="Search seasons"
       />
       <UButton
         label="New season"
+        :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
         icon="i-lucide-plus"
         @click="open()"
       />

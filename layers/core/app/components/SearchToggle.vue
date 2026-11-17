@@ -4,7 +4,8 @@
 <script setup lang="ts">
 const props = defineProps<{ label: string }>()
 const query = defineModel<string>({ default: '' })
-const open = ref(!!query.value)
+const open = defineModel<boolean>('open', { default: false })
+if (query.value) open.value = true
 const input = useTemplateRef<{ inputRef?: HTMLInputElement }>('input')
 async function show() {
   open.value = true
@@ -27,7 +28,7 @@ const blur = () => { if (!query.value.trim()) open.value = false }
     icon="i-lucide-search"
     :placeholder="props.label"
     :aria-label="props.label"
-    class="w-48 sm:w-64"
+    class="w-40 sm:w-64"
     @blur="blur"
     @keydown.escape="close"
   />
