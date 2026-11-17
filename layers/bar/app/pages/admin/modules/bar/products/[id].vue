@@ -395,6 +395,7 @@ function planned(v: Variant, l: List): string | null {
         <UForm
           v-if="label"
           id="bar-allergens"
+          novalidate
           :state="label"
           class="space-y-4"
           @submit="saveAllergens"

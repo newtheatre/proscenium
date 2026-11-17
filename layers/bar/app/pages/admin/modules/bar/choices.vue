@@ -227,6 +227,7 @@ async function saveAllergens() {
         <UForm
           v-if="group"
           id="bar-choice"
+          novalidate
           :state="group"
           class="space-y-4"
           @submit="saveGroup"
@@ -317,6 +318,7 @@ async function saveAllergens() {
         <UForm
           v-if="option"
           id="bar-choice-option"
+          novalidate
           :state="option"
           class="space-y-4"
           @submit="saveOption"
@@ -361,6 +363,7 @@ async function saveAllergens() {
         <UForm
           v-if="label"
           id="bar-option-allergens"
+          novalidate
           :state="label"
           class="space-y-4"
           @submit="saveAllergens"
