@@ -124,6 +124,8 @@ export const identityEvents = {
   'core.account.erased': event({ version: 1, payload: account, internal: true }),
   'core.data-request.finished': event({ version: 1, payload: z.object({ requestId: z.string(), kind: z.enum(['export', 'erasure']) }), internal: true }),
   'core.account.merged': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
+  // The two accounts parted again: the last unit of an undo.
+  'core.account.merge-undone': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
   'core.account-email.verified': event({ version: 1, payload: z.object({ accountId: z.string(), emailId: z.string() }), internal: true }),
   'core.grant.created': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string() }), internal: true }),
   'core.grant.ended': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string(), reason: z.enum(['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up']) }), internal: true }),
@@ -141,7 +143,7 @@ export const identityJobs = {
   'core.merge-move': job({
     payload: z.object({
       mergeId: z.string(),
-      stage: z.enum(['start', 'module', 'finish']),
+      stage: z.enum(['start', 'module', 'finish', 'undo-start', 'undo-module', 'undo-finish']),
       module: z.string().optional(),
       step: z.number().int().min(0).optional(),
     }),
@@ -209,17 +211,19 @@ export const identityContributions = {
     label: 'Access needs',
     description: 'The barriers a person can tick when they apply to the access scheme. Barriers, never diagnoses.',
     terms: [
-      { slug: 'standing', label: 'Difficulty standing or queueing' },
-      { slug: 'crowds', label: 'Difficulty with crowds' },
-      { slug: 'level-access', label: 'Level access' },
-      { slug: 'distance', label: 'Difficulty with distance' },
-      { slug: 'urgent-toilet', label: 'Urgent toilet needs' },
-      { slug: 'essential-companion', label: 'An essential companion' },
-      { slug: 'visual-information', label: 'Visual information' },
-      { slug: 'audible-information', label: 'Audible information' },
-      { slug: 'other', label: 'Other (please ask)' },
-      { slug: 'wheelchair-stays', label: 'Uses a wheelchair and stays in it' },
-      { slug: 'wheelchair-transfers', label: 'Uses a wheelchair and transfers to a seat' },
+      { slug: 'standing', label: 'Standing or queueing', description: 'You find it hard to stand for long or wait in a queue.' },
+      { slug: 'crowds', label: 'Crowds and busy spaces', description: 'You find crowds, noise or busy foyers hard to cope with.' },
+      { slug: 'level-access', label: 'Steps and stairs', description: 'You cannot use steps or stairs, so you need a ramp, a lift or a level route.' },
+      { slug: 'distance', label: 'Walking distances', description: 'You can only walk a short way, so a seat near the entrance helps.' },
+      { slug: 'urgent-toilet', label: 'Getting to a toilet quickly', description: 'You may need to leave at short notice, so a seat near the door and a toilet helps.' },
+      { slug: 'visual-information', label: 'Hearing what is said', description: 'You need spoken information shown or written down, for example captions or a written note.' },
+      { slug: 'audible-information', label: 'Seeing or reading information', description: 'You need written or visual information read out or described, for example audio description.' },
+      // Not ticked on the form: set from its companions question and its "anything else" box.
+      { slug: 'essential-companion', label: 'Needs a companion to help', description: 'Set when the person asks for a companion ticket.' },
+      { slug: 'other', label: 'Something else (see their note)', description: 'Set when the person writes something in "anything else".' },
+      // Asked as its own question: "I use a wheelchair", then whether they stay in it or transfer.
+      { slug: 'wheelchair-stays', label: 'Wheelchair user, stays in their wheelchair', description: 'They need a wheelchair space.' },
+      { slug: 'wheelchair-transfers', label: 'Wheelchair user, transfers to a seat', description: 'They move to an ordinary seat, and their wheelchair needs storing.' },
     ],
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
@@ -393,6 +397,21 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Your accounts at {{ theatre }} have been joined',
         body: 'Two accounts at {{ theatre }} that belong to you, including the one for this address, have been joined into one, so your bookings and history are now in one place. You sign in as before, with any of your addresses.\n\nIf you did not expect this, contact the theatre soon: for a while it can be undone.',
+      },
+    },
+  }, {
+    // A merge was undone (part 4, Merge, "Say what could not be put back"), to every verified
+    // address of both accounts. `kept` is one of two fixed sentences: everything came back, or all but what a module's undo kept.
+    id: 'core.merge-undone',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { kept: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your accounts at {{ theatre }} have been separated again',
+        body: 'Two accounts at {{ theatre }} that had been joined, including the one for this address, are separate again. {{ kept }}\n\nIf you did not expect this, contact the theatre.',
       },
     },
   }, {

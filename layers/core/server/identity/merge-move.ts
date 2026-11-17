@@ -11,6 +11,7 @@
 // account and lists a row once, so any step, or the whole job, can run again and do no harm.
 import { NOT_YET, all, first, isEnabled, moveAccountColumn, nowMs, useSetting, type MergeHandler, type MergeRef, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
+import { runMergeUndo } from './merge-undo'
 
 /** The module stage one handles: its tables are the core's own, identity's among them. */
 export const SETTLED_IN_STAGE_ONE = 'core'
@@ -80,7 +81,7 @@ function noneLeft(moves: MoveModule['moves']): string {
 
 interface MergeRow { id: string, survivor_id: string, merged_account_id: string, completed_at: number | null, undone_at: number | null }
 
-export interface MergeMovePayload { mergeId: string, stage: 'start' | 'module' | 'finish', module?: string, step?: number }
+export interface MergeMovePayload { mergeId: string, stage: 'start' | 'module' | 'finish' | 'undo-start' | 'undo-module' | 'undo-finish', module?: string, step?: number }
 
 /** Starts stage two for a merge, in the unit that records it. */
 export function startMergeMove(unit: UnitView, mergeId: string): void {
@@ -88,6 +89,7 @@ export function startMergeMove(unit: UnitView, mergeId: string): void {
 }
 
 export async function runMergeMove(unit: UnitView, payload: MergeMovePayload, job: { id: string, defer: (reason: string) => void }): Promise<void> {
+  if (payload.stage.startsWith('undo')) return runMergeUndo(unit, payload, job)
   const merge = await first<MergeRow>('SELECT id, survivor_id, merged_account_id, completed_at, undone_at FROM core_account_merges WHERE id = ?', payload.mergeId)
   if (!merge || merge.completed_at || merge.undone_at) return
   const ref: MergeRef = { mergeId: merge.id, survivorId: merge.survivor_id, mergedAccountId: merge.merged_account_id }

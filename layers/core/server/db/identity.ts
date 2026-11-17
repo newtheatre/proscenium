@@ -276,8 +276,12 @@ export const accountMerges = defineTable('core_account_merges', {
   // Set by the merge job's last unit once every module's rows have moved (stage two). Until then
   // the merge is "still moving"; readers see no difference, because the account scope covers both.
   completedAt: col.timestamp('completed_at'),
+  // Set when staff start an undo; the alias stands until the job's last unit sets undone_at.
+  undoStartedAt: col.timestamp('undo_started_at'),
   undoneAt: col.timestamp('undone_at'),
   undoneBy: col.account('undone_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  // Set when the undo window passed and the merge's items were cleared away.
+  closedAt: col.timestamp('closed_at'),
 }, {
   id: 'mrg',
   realm: 'operational',
