@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, setting } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, secret, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -57,6 +57,13 @@ export default defineModule({
     'scheme.manage': ability({ on: 'membership.scheme', risk: 'privileged', implies: ['scheme.view'] }),
     'membership.view': ability({ on: 'membership.membership', owner: 'grants', audit: 'read', implies: ['core.account.find'] }),
     'membership.add': ability({ on: 'membership.scheme', implies: ['membership.view'] }),
+    // Asking whether somebody else holds a membership: a seller checking a customer's member price,
+    // a steward at the door. The requirement source's checkAbility.
+    'card.check': ability({ on: 'membership.membership', audit: 'read' }),
+    // Loading, adding to and removing from verification lists (V19). Never shows a list.
+    'verification-list.manage': ability({ on: 'membership.verification-list', risk: 'privileged', implies: ['verification-list.check'] }),
+    // Seeing the name behind a ticket bought by reference, through requirements.holder (V18, V19).
+    'verification-list.check': ability({ on: 'membership.verification-list', audit: 'read' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -68,6 +75,29 @@ export default defineModule({
   }),
 
   tables,
+
+  secrets: {
+    // The key verification lists are hashed with (V10). Lists cannot be used until it is set.
+    MEMBERSHIP_LIST_KEY: secret({ needed: 'when-used' }),
+  },
+
+  tasks: {
+    // Erases names on list entries once they have been kept long enough after their end (V18).
+    'membership.sweep-lists': task({ dailyAt: '03:40' }),
+  },
+
+  contributes: {
+    'core.navigation': [
+      { id: 'membership.schemes', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/schemes', match: '/console/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
+      { id: 'membership.lists', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/lists', match: '/console/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
+      { id: 'membership.mine', menu: 'account', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
+    ],
+    // On the audience side, so anyone can find how to join.
+    'core.requirement': [{ id: 'membership', file: 'membership' }],
+    'core.account-section': [
+      { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
+    ],
+  },
 
   events: {
     announces: {

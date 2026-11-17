@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import { all, first, refuse, useSetting } from '#kit'
 import { endsOnFor } from './dates'
+import { hasListKey, schemeList } from './lists'
 import { JOIN_MODES, LENGTH_RULES, SIDES } from './db/schema'
 
 export interface Scheme {
@@ -19,6 +20,7 @@ export interface Scheme {
   renewalOpensDays: number
   graceDays: number
   verifier: string | null
+  verifierConfig: string | null
   reverifyOnRenewal: boolean
   needsApproval: boolean
   requiresPayment: boolean
@@ -32,7 +34,7 @@ export interface LengthOption { id: string, name: string, count: number, state: 
 
 const COLUMNS = `id, key, name, summary, side, state, join_mode AS joinMode, length_rule AS lengthRule, fixed_end_month AS fixedEndMonth,
   fixed_end_day AS fixedEndDay, rollover_days AS rolloverDays, renewal_opens_days AS renewalOpensDays, grace_days AS graceDays,
-  verifier, reverify_on_renewal AS reverifyOnRenewal, needs_approval AS needsApproval, requires_payment AS requiresPayment,
+  verifier, verifier_config AS verifierConfig, reverify_on_renewal AS reverifyOnRenewal, needs_approval AS needsApproval, requires_payment AS requiresPayment,
   voting, accepts_reference AS acceptsReference, holder_may_end AS holderMayEnd, position`
 const BOOLEANS = ['reverifyOnRenewal', 'needsApproval', 'requiresPayment', 'voting', 'acceptsReference', 'holderMayEnd'] as const
 
@@ -91,6 +93,9 @@ export const schemeFields = z.object({
   voting: z.boolean(),
   acceptsReference: z.boolean(),
   holderMayEnd: z.boolean(),
+  // The verifier and its configuration. The list verifier is the only one so far.
+  verifier: z.enum(['membership.list']).nullable(),
+  listId: z.string().nullable(),
 })
 export type SchemeFields = z.infer<typeof schemeFields>
 
@@ -128,7 +133,8 @@ export async function openChecklist(scheme: Scheme): Promise<ChecklistItem[]> {
   const items: ChecklistItem[] = []
   if (scheme.lengthRule !== 'indefinite') items.push({ code: 'length-option', done: options.length > 0 })
   if (scheme.side === 'members') items.push({ code: 'members-area', done: !!(await useSetting('core.members-area.enabled')) })
-  if (scheme.verifier) items.push({ code: 'verifier', done: false })
+  // The list verifier is the one so far: it needs its list and the key the list is hashed with.
+  if (scheme.verifier) items.push({ code: 'verifier', done: scheme.verifier === 'membership.list' && !!(await schemeList(scheme)) && await hasListKey() })
   if (scheme.needsApproval) items.push({ code: 'application-form', done: false })
   if (scheme.requiresPayment) items.push({ code: 'price', done: false })
   return items
