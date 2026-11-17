@@ -28,6 +28,21 @@ describe('setting a performance up for sale', () => {
     expect((await req('POST', '/api/box-office/ticket-types', { name: 'Sneaky' }, nobody)).status).toBe(403)
   })
 
+  it('renames a band, and removes one only while nothing is priced or sold in it', async () => {
+    const h = await house(10)
+    const bands = `/api/box-office/productions/${h.productionId}/bands`
+    const spare = await req('POST', bands, { name: 'Gallery' })
+    expect(spare.status, JSON.stringify(spare.body)).toBe(200)
+    expect((await req('PATCH', `${bands}/${spare.body.bandId}`, { name: 'Upper circle' })).status).toBe(200)
+    // Two bands may not share a name.
+    expect((await req('PATCH', `${bands}/${spare.body.bandId}`, { name: 'Stalls' })).body.code).toBe('box-office.band.name-taken')
+    expect((await req('GET', bands)).body.bands.map((b: { name: string }) => b.name)).toContain('Upper circle')
+    // Stalls is priced, so it stays; the new band has nothing in it, so it goes.
+    expect((await req('DELETE', `${bands}/${h.bandId}`)).body.code).toBe('box-office.band.in-use')
+    expect((await req('DELETE', `${bands}/${spare.body.bandId}`)).status).toBe(200)
+    expect((await req('GET', bands)).body.bands.map((b: { name: string }) => b.name)).toEqual(['Stalls'])
+  })
+
   it('names what is missing and refuses to go on sale until a band has a price', async () => {
     const h = await house(40, { open: false })
     expect(missing((await sales(h.performanceId)).body)).toEqual(['prices'])

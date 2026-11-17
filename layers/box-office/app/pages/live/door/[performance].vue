@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
 
-interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string }, tickets: number, admitted: number }
+interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string }, tickets: number, admitted: number, unpaid: number }
 interface Scan {
   result: string
   admittedAt?: number
@@ -140,18 +140,9 @@ async function admitAnyway() {
   }
 }
 
-// Typing a code, for a ticket the camera cannot read.
-const typing = ref(false)
-const typed = ref('')
-async function submitTyped() {
-  const code = typed.value.trim()
-  if (!code) return
-  typed.value = ''
-  typing.value = false
-  await scan(code)
-}
-
-// Finding someone by name or reference, for a buyer with nothing to scan.
+// One box for whatever the buyer has instead of a code the camera reads: a ticket's code typed in,
+// a booking reference, or their name. Bookings that match are listed as it is typed; one entered
+// with nothing matching is checked as a ticket code.
 const finding = ref(false)
 const query = ref('')
 const found = ref<Row[] | null>(null)
@@ -170,6 +161,16 @@ const search = useDebounceFn(async () => {
   }
 }, 300) // not-policy: typing pause before searching
 watch(query, () => { void search() })
+async function submitQuery() {
+  const code = query.value.trim()
+  if (!code) return
+  await search()
+  if (found.value?.length) return
+  query.value = ''
+  found.value = null
+  finding.value = false
+  await scan(code)
+}
 
 async function admit(row: Row, count: number) {
   admitting.value = row.id
@@ -206,8 +207,8 @@ async function admit(row: Row, count: number) {
           <div class="flex flex-1 flex-col gap-3 lg:flex-row">
             <div class="flex flex-1 flex-col gap-3">
               <p class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: d.admitted, tickets: d.tickets }) }}</span>
-                <span class="text-muted">{{ t('box-office.live-door.to-come', { count: d.tickets - d.admitted }) }}</span>
+                <span class="text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: d.admitted, tickets: d.tickets + d.unpaid }) }}</span>
+                <span class="text-muted">{{ t('box-office.live-door.to-come', { count: d.tickets + d.unpaid - d.admitted }) }}<template v-if="d.unpaid"> · {{ t('box-office.live-door.unpaid', { count: d.unpaid }) }}</template></span>
               </p>
               <section
                 class="relative flex min-h-[55vh] flex-1 items-center lg:min-h-[70vh] justify-center overflow-hidden rounded-lg bg-black"
@@ -321,16 +322,10 @@ async function admit(row: Row, count: number) {
       </DataBoundary>
 
       <template #footer>
-        <div class="mx-auto grid max-w-4xl grid-cols-3 gap-3">
-          <UButton
-            icon="i-lucide-keyboard"
-            color="neutral"
-            variant="outline"
-            size="xl"
-            class="flex-col justify-center gap-1 text-sm sm:flex-row sm:gap-2 sm:text-base"
-            :label="t('box-office.live-door.type')"
-            @click="typing = true"
-          />
+        <div
+          class="mx-auto grid max-w-4xl gap-3"
+          :class="problem ? 'grid-cols-1' : 'grid-cols-2'"
+        >
           <UButton
             icon="i-lucide-search"
             color="neutral"
@@ -340,7 +335,9 @@ async function admit(row: Row, count: number) {
             :label="t('box-office.live-door.find')"
             @click="finding = true"
           />
+          <!-- With no camera there is nothing to pause. -->
           <UButton
+            v-if="!problem"
             :icon="running ? 'i-lucide-pause' : 'i-lucide-play'"
             color="neutral"
             variant="outline"
@@ -352,37 +349,6 @@ async function admit(row: Row, count: number) {
         </div>
       </template>
     </PageLive>
-
-    <UModal
-      v-model:open="typing"
-      :title="t('box-office.live-door.type')"
-    >
-      <template #body>
-        <UForm
-          class="flex items-end gap-2"
-          :state="{ typed }"
-          @submit="submitTyped"
-        >
-          <UFormField
-            :label="t('core.scan.type-label')"
-            class="grow"
-          >
-            <UInput
-              v-model="typed"
-              size="xl"
-              autocomplete="off"
-              autofocus
-            />
-          </UFormField>
-          <UButton
-            type="submit"
-            size="xl"
-            :label="t('core.scan.type-submit')"
-            :disabled="!typed.trim()"
-          />
-        </UForm>
-      </template>
-    </UModal>
 
     <UModal
       v-model:open="overriding"
@@ -433,14 +399,25 @@ async function admit(row: Row, count: number) {
     >
       <template #body>
         <div class="space-y-4">
-          <UFormField :label="t('box-office.live-door.find-label')">
-            <UInput
-              v-model="query"
-              size="xl"
-              icon="i-lucide-search"
-              autocomplete="off"
-            />
-          </UFormField>
+          <UForm
+            class="flex items-end gap-2"
+            :state="{ query }"
+            @submit="submitQuery"
+          >
+            <UFormField
+              :label="t('box-office.live-door.find-label')"
+              :help="t('box-office.live-door.find-help')"
+              class="grow"
+            >
+              <UInput
+                v-model="query"
+                size="xl"
+                icon="i-lucide-search"
+                autocomplete="off"
+                autofocus
+              />
+            </UFormField>
+          </UForm>
           <p
             v-if="found && !found.length"
             class="text-muted"

@@ -5,17 +5,17 @@
 // waiting for that one payment; when the money arrives the settlement handler confirms it, issues
 // the tickets and, if the buyer is standing there, admits them, in Payments' one batch. A payment
 // that ends without the money puts a reservation back as it was and lets a new sale's seats go.
-import { sql } from 'drizzle-orm'
+import { and, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSetting, type UnitView } from '#kit'
-import { addressFor, canonicalAccount, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
+import { all, can, first, newId, nowMs, refuse, requireAbility, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
+import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle } from './entitlement'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference } from './codes'
-import { cancellations, orderLines } from './db/schema'
+import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
@@ -164,6 +164,9 @@ export interface DeskOrder {
   amountDueMinor: number
   releaseAt: number | null
   keep: boolean
+  /** Who booked, as Identity names them, and for what: so the seller can tell they have the right booking. */
+  buyer: string | null
+  performance: { title: string, startsAt: number } | null
   /** The payment being taken for it, while one is: it can be cancelled, which puts a reservation back as it was. */
   intentId: string | null
   lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }[]
@@ -171,8 +174,8 @@ export interface DeskOrder {
 
 /** One order as the desk shows it. Nothing about the buyer: that is the account's, and Identity's to show. */
 export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
-  const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number, intent_id: string | null }>(
-    'SELECT id, reference, state, channel, currency, total_minor, release_at, keep, intent_id FROM box_office_orders WHERE id = ?', orderId)
+  const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number, intent_id: string | null, account_id: string | null }>(
+    'SELECT id, reference, state, channel, currency, total_minor, release_at, keep, intent_id, account_id FROM box_office_orders WHERE id = ?', orderId)
   if (!order) return null
   const lines = await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, type_name: string, amount_minor: number, admitted_at: number | null }>(
     `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, t.name AS type_name, l.amount_minor, k.admitted_at FROM box_office_order_lines l
@@ -188,13 +191,39 @@ export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
     amountDueMinor: order.state === 'reserved' || order.state === 'awaiting_payment' ? order.total_minor : 0,
     releaseAt: order.release_at,
     keep: !!order.keep,
+    buyer: order.account_id ? await accountLabel(order.account_id) : null,
+    performance: lines[0] ? await showOf(lines[0].performance_id) : null,
     intentId: order.state === 'awaiting_payment' ? order.intent_id : null,
     lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor, admittedAt: l.admitted_at })),
   }
 }
 
-/** Finds an order by what the buyer shows: the booking reference or the desk code, typed or scanned. */
-export async function findOrders(query: string): Promise<DeskOrder[]> {
+async function showOf(performanceId: string): Promise<{ title: string, startsAt: number }> {
+  const performance = await getPerformance(performanceId)
+  return { title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt }
+}
+
+const BY_NAME = 8 // not-policy: enough bookings under one name to pick from at the desk
+const SINCE = 6 * 3_600_000 // not-policy: a performance that began this evening still counts as tonight's
+
+/**
+ * Finds an order by what the buyer shows: the booking reference or the desk code, typed or scanned.
+ * Failing that, someone who may look people up finds bookings by the buyer's name or address: those
+ * for performances still to come or tonight, soonest first.
+ */
+export async function findOrders(query: string, by?: { unit: UnitView, actor: Actor }): Promise<DeskOrder[]> {
+  const exact = await findByCode(query)
+  if (exact.length || !by || !searchWords(query).words.length || !(await can(by.actor, 'core.account.find')).allowed) return exact
+  const buyers = await findAccounts(by.unit, by.actor, query, 'box-office.orders')
+  const showing = sql`(SELECT min(p.starts_at) FROM box_office_order_lines l JOIN core_performances p ON p.id = l.performance_id
+    WHERE l.order_id = ${orders.id} AND l.kind = 'ticket' AND l.state = 'live')`
+  const found = await useDb().select({ id: orders.id }).from(orders)
+    .where(and(inArray(orders.state, ['reserved', 'awaiting_payment', 'confirmed']), sql`${orders.accountId} IN (${buyers})`, sql`${showing} > ${nowMs() - SINCE}`))
+    .orderBy(showing).limit(BY_NAME)
+  return (await Promise.all(found.map(o => deskOrder(o.id)))).filter(o => o !== null)
+}
+
+async function findByCode(query: string): Promise<DeskOrder[]> {
   const typed = query.trim().toUpperCase()
   if (!typed) return []
   const found = await all<{ id: string }>(
