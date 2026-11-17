@@ -50,10 +50,11 @@ const { dateTime, time } = useDates()
 const { data } = await useAPI<Production | { moved: string }>(() => `/api/public-site/productions/${encodeURIComponent(props.slug)}`, { key: `public-site:production:${props.slug}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.production.not-found'), fatal: true })
 // An old slug, or a current show under /shows (or a past one under /whats-on), goes to its address.
+// Both redirects are temporary (C-46): a show moves to /shows when it closes, and back if a date is added.
 const moved = 'moved' in data.value ? data.value.moved : null
 const here = 'moved' in data.value ? null : data.value
 const prefix = here ? (here.past ? 'shows' : 'whats-on') : props.prefix
-if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 301 })
+if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 302 })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
 
 // What it is, in one line: where, how long, and the company for a visiting show.
@@ -115,7 +116,10 @@ useHead(() => {
     ...(f.booking?.link ? { offers: { '@type': 'Offer', 'url': absolute(f.booking.link), 'availability': f.booking.state === 'sold-out' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock' } } : {}),
   }))
   // "<" is escaped so a title can never close the script element.
-  return { script: [{ key: 'public-site-events', type: 'application/ld+json', innerHTML: JSON.stringify(events).replace(/</g, '\\u003c') }] }
+  return {
+    link: [{ key: 'canonical', rel: 'canonical', href: absolute(`/${prefix}/${p.slug}`) }],
+    script: [{ key: 'public-site-events', type: 'application/ld+json', innerHTML: JSON.stringify(events).replace(/</g, '\\u003c') }],
+  }
 })
 </script>
 

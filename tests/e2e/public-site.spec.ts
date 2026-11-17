@@ -114,6 +114,7 @@ test('the production page shows its dates, the booking link, the cancelled date 
   const events = JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent() ?? '[]') as { '@type': string, 'name': string, 'eventStatus': string }[]
   expect(events.map(e => [e['@type'], e.name, e.eventStatus.split('/').pop()])).toEqual([['TheaterEvent', title, 'EventScheduled'], ['TheaterEvent', title, 'EventCancelled']])
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', title)
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', new RegExp(`/whats-on/${slug}$`))
 
   await noViolations(page)
   await page.screenshot({ path: 'test-results/public-production-light.png', fullPage: true })
@@ -123,6 +124,10 @@ test('the production page shows its dates, the booking link, the cancelled date 
 })
 
 test('a current show under /shows goes to /whats-on, and an unknown one is not found', async ({ page }) => {
+  // Temporary, because the show moves to /shows when it closes (C-46).
+  const redirect = await page.request.get(`/shows/${slug}`, { maxRedirects: 0 })
+  expect(redirect.status()).toBe(302)
+  expect(redirect.headers().location).toMatch(new RegExp(`/whats-on/${slug}$`))
   await visit(page, `/shows/${slug}`)
   await expect(page).toHaveURL(new RegExp(`/whats-on/${slug}$`))
   const response = await page.goto('/whats-on/no-such-show-at-all')
