@@ -29,7 +29,7 @@ interface Rota {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -46,7 +46,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function act(path: string, body: Record<string, unknown>, done: string, method: 'POST' | 'PATCH' = 'POST'): Promise<boolean> {
   refusal.value = null
   try {
-    await $api(path, { method, body })
+    await write(path, { method, body })
     toast.add({ title: done, color: 'success' })
     await refresh()
     return true

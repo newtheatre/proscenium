@@ -418,6 +418,24 @@ test.describe('confirming it is you', () => {
     }
     await context.close()
   })
+
+  test('the Email screen draws its settings and saves the footer as any page of settings does (C-59)', async ({ browser }) => {
+    const sender = { ...person('Ena Sender', [grant('core.sender.manage'), grant('core.template.edit')]), assurance: 'strong', reassertedAt: Date.now() }
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(sender) })
+    const page = await context.newPage()
+    await visit(page, '/admin/email')
+    const section = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Email and notices' }) })
+    await expect(section.getByRole('textbox', { name: 'Sending domain' })).toBeVisible()
+    await expect(section.getByRole('textbox', { name: 'Sending label' })).toBeVisible()
+    // The verified domain is the status at the top, so it is not drawn again.
+    await expect(page.getByText('Verified sending domain')).toHaveCount(0)
+    await section.getByRole('textbox', { name: 'Email footer' }).fill(`Registered charity ${Date.now()}`)
+    await section.getByRole('button', { name: 'Save Email and notices settings' }).click()
+    await expect(section.getByRole('button', { name: /^Changed by .*Email footer/ })).toBeVisible()
+    await expect(section.getByRole('button', { name: 'Reset Email footer to its default' })).toBeVisible()
+    await noViolations(page)
+    await context.close()
+  })
 })
 
 test.describe('the access scheme screens', () => {

@@ -200,10 +200,10 @@ describe('Site administration (R-33)', () => {
     expect(advanced.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.units.set-rows-limit', 'core.rate-limits.sign-in', 'core.delivery.stuck-after']))
     expect(new Set(advanced.settings.map(s => s.page))).toEqual(new Set(['core.advanced']))
     const email = await (await settings('screen=/admin/email', person(['core.sender.manage']))).json() as Settings
-    expect(email.settings.map(s => s.key).sort()).toEqual(['core.notifications.sending-domain', 'core.notifications.verified-domain'])
-    // Until the Email screen draws the footer and the sending label, they are on the Theatre page.
-    const theatre = await (await settings('page=core.theatre', person(['core.sender.manage']))).json() as Settings
-    expect(theatre.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.notifications.email-footer', 'core.notifications.sending-label']))
+    expect(email.settings.map(s => s.key).sort()).toEqual(['core.notifications.email-footer', 'core.notifications.sending-domain', 'core.notifications.sending-label', 'core.notifications.verified-domain'])
+    // The Email screen draws all of them (C-59), so none is left on the Theatre page.
+    const theatre = await (await settings('page=core.theatre', person(['core.settings.manage', 'core.sender.manage']))).json() as Settings
+    expect(theatre.settings.map(s => s.key).filter(k => k.startsWith('core.notifications.'))).toEqual([])
     expect(new Set(email.settings.map(s => s.screen))).toEqual(new Set(['/admin/email']))
     // Until an address is recorded, the site's address offers the one the page came on.
     const origin = (await (await settings('page=core.theatre')).json() as { settings: { key: string, suggestion: string | null }[] }).settings.find(s => s.key === 'core.site.origin')

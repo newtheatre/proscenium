@@ -121,7 +121,7 @@ describe('the interface check', () => {
       'const d = new Intl.DateTimeFormat(\'en-GB\')',
     ].join('\n')
     expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 4, 6, 7, 11])
-    expect(interfaceProblems('PageSettings.vue', '<form>')).toEqual([])
+    expect(interfaceProblems('SettingsSections.vue', '<form>')).toEqual([])
     expect(interfaceProblems('RecordList.vue', '<ul class="divide-y rounded-lg border">')).toEqual([])
     expect(interfaceProblems('useDates.ts', 'new Intl.DateTimeFormat(language)')).toEqual([])
     // An icon-only button is IconButton's job; one with a label, or with content of its own, is not.

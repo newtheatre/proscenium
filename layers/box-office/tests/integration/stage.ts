@@ -38,6 +38,7 @@ import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
+import exchangePost from '../../server/api/box-office/orders/[id]/exchange.post'
 import reportsSalesGet from '../../server/api/box-office/reports/sales.get'
 import reportsSalesCsv from '../../server/api/box-office/reports/sales.csv.get'
 import compsGet from '../../server/api/box-office/comps/index.get'
@@ -84,6 +85,7 @@ export const handle = server({
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'POST /api/box-office/orders/:id/exchange': exchangePost,
   'GET /api/box-office/reports/sales': reportsSalesGet,
   'GET /api/box-office/reports/sales.csv': reportsSalesCsv,
   'GET /api/box-office/comps': compsGet,

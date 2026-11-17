@@ -23,7 +23,7 @@ interface Choices {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { dateTime } = useDates()
@@ -57,7 +57,7 @@ function toggle(id: string, on: boolean) {
 async function apply() {
   refusal.value = null
   try {
-    const result = await $api<{ added: unknown[], skipped: unknown[] }>(`/api/front-of-house/rota-templates/${encodeURIComponent(template.value!)}/apply`, { method: 'POST', body: { performanceIds: picked.value } })
+    const result = await write<{ added: unknown[], skipped: unknown[] }>(`/api/front-of-house/rota-templates/${encodeURIComponent(template.value!)}/apply`, { method: 'POST', body: { performanceIds: picked.value } })
     toast.add({ title: t('front-of-house.rota.applied', { count: picked.value.length - result.skipped.length }), color: 'success' })
     await refresh()
   }
@@ -69,7 +69,7 @@ async function publish() {
   refusal.value = null
   try {
     let count = 0
-    for (const id of picked.value) count += (await $api<{ published: number }>(`/api/front-of-house/performances/${encodeURIComponent(id)}/shifts/publish`, { method: 'POST', body: {} })).published
+    for (const id of picked.value) count += (await write<{ published: number }>(`/api/front-of-house/performances/${encodeURIComponent(id)}/shifts/publish`, { method: 'POST', body: {} })).published
     toast.add({ title: t('front-of-house.rota.published', { count }), color: 'success' })
     await refresh()
   }

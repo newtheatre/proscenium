@@ -6,12 +6,20 @@ import { NOT_YET, createUnit, inAccountScope, newId, recordMergeItems, useDb, ty
 import { useRegistry } from '#kit/registry'
 import { sessions } from '../../../../payments/server/db/schema'
 import { Browser, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, signInByEmail, staff, useIdentity } from './helpers'
-import { inContext, rows, sent } from '../../../../../tests/integration/helpers'
+import { inContext, rows, sent, setModule } from '../../../../../tests/integration/helpers'
 import { restartStalledMerges } from '../../../server/identity/merge-move'
 import { closeMerges } from '../../../server/identity/merge-undo'
 
-beforeAll(useIdentity)
-afterAll(leaveIdentity)
+// Front of house brings a real merge handler. A switched-off module's chain waits for it to come
+// back, so it is on here, as it would be on any theatre whose rows it holds.
+beforeAll(async () => {
+  await useIdentity()
+  await setModule('front-of-house', true)
+})
+afterAll(async () => {
+  await setModule('front-of-house', false)
+  leaveIdentity()
+})
 beforeEach(reset)
 
 async function tillSession(accountId: string): Promise<string> {

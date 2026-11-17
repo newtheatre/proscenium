@@ -22,7 +22,7 @@ interface Choices {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -57,8 +57,8 @@ async function save() {
   refusal.value = null
   const body = { name: form.value.name.trim(), venueId: form.value.venueId === ANY ? null : form.value.venueId, isDefault: form.value.isDefault, lines: form.value.lines }
   try {
-    if (editing.value) await $api(`/api/front-of-house/rota-templates/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
-    else await $api('/api/front-of-house/rota-templates', { method: 'POST', body })
+    if (editing.value) await write(`/api/front-of-house/rota-templates/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
+    else await write('/api/front-of-house/rota-templates', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.templates.saved' : 'front-of-house.templates.added', { name: body.name }), color: 'success' })
     stop()
     await refresh()
@@ -72,7 +72,7 @@ async function archive(template: Template) {
   if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.templates.thing', { name: template.name }), consequence: t('front-of-house.templates.archive-consequence'), button: t('front-of-house.archive.button') })) return
   refusal.value = null
   try {
-    await $api(`/api/front-of-house/rota-templates/${encodeURIComponent(template.id)}/archive`, { method: 'POST', body: {} })
+    await write(`/api/front-of-house/rota-templates/${encodeURIComponent(template.id)}/archive`, { method: 'POST', body: {} })
     toast.add({ title: t('front-of-house.templates.archived', { name: template.name }), color: 'success' })
     await refresh()
   }

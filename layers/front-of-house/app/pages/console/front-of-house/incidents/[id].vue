@@ -60,7 +60,7 @@ interface Incident {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { dateTime, day } = useDates()
@@ -75,7 +75,7 @@ const at = (path: string) => `/api/front-of-house/incidents/${encodeURIComponent
 async function act(path: string, body: Record<string, unknown>, done: string): Promise<boolean> {
   refusal.value = null
   try {
-    await $api(at(path), { method: path.endsWith('/index') ? 'PUT' : 'POST', body })
+    await write(at(path), { method: path.endsWith('/index') ? 'PUT' : 'POST', body })
     toast.add({ title: done, color: 'success' })
     await refresh()
     return true
