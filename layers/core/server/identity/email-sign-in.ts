@@ -3,11 +3,11 @@
 // saying so. The link works once; the code works once, only in the browser that asked, and dies
 // after a few wrong tries. Neither can make a session strong.
 import type { H3Event } from 'h3'
-import { first, newId, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
+import { first, newId, nowMs, refuse, useContext, useSetting, siteUrl, type UnitView } from '#kit'
 import { countAgainstRate } from '#kit/ratelimit'
 import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
 import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAddress } from './accounts'
-import { BROWSER_COOKIE, readCookie, relyingParty, setShortCookie } from './web'
+import { BROWSER_COOKIE, readCookie, setShortCookie } from './web'
 import { startSession } from './sessions'
 import { useEnrolmentLink } from './recovery'
 
@@ -67,8 +67,7 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
           VALUES (?, 'sign_in', ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     params: [id, await digest('link', token), await digest('code', `${id}:${code}`), await digest('browser', browser), existing?.account_id ?? null, address, input.next, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  const { origin } = await relyingParty(event)
-  unit.enqueue('core.send-sign-in-link', { tokenId: id, sealed: await sealValue('sign-in-mail', { address, link: `${origin}/sign-in/link#${token}`, code }) })
+  unit.enqueue('core.send-sign-in-link', { tokenId: id, sealed: await sealValue('sign-in-mail', { address, link: await siteUrl(`/sign-in/link#${token}`), code }) })
   return quiet
 }
 

@@ -5,14 +5,13 @@
 // person has switched on, through accessNeedsFor, which audits every read and answers nothing,
 // the same way, whatever the reason.
 import type { H3Event } from 'h3'
-import { all, can, first, isEnabled, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, type Actor, type UnitView } from '#kit'
+import { all, can, first, isEnabled, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { notify } from '../notifications/notify'
 import { notifyAddress } from '../notifications/send'
 import { getTerm, listTerms } from '../vocabularies/service'
 import { accountById, isUsable, normaliseAddress } from './accounts'
 import { digest, randomToken } from './crypto'
 import { findOrCreateAccount } from './guests'
-import { relyingParty } from './web'
 import { holdersOf } from './holders'
 import { hasStanding } from './standings'
 import { z } from 'zod'
@@ -490,7 +489,7 @@ export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor
     params: [id, await digest('link', token), found.accountId, address, actor.accountId ?? null, APPLY_PATH, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
   unit.audit({ action: 'create', ability: 'core.access-scheme.review', record: ['core.account', found.accountId], detail: { accessInvitation: true } })
-  const link = `${(await relyingParty(event)).origin}/sign-in/link#${token}`
+  const link = await siteUrl(`/sign-in/link#${token}`)
   const scheme = await schemeName()
   // Written in this unit and sent after it commits, with the pipeline's retries; the link is sealed.
   await notifyAddress(unit, 'core.access-invitation', { address, variables: { link, scheme }, dedupeKey: id })
