@@ -10,6 +10,7 @@
   "front-of-house.settings-sections.incidents": "Incidents",
   "front-of-house.settings-sections.hours": "Volunteer hours",
   "front-of-house.settings-sections.night-report": "Night reports",
+  "front-of-house.settings-sections.emergency": "Emergency cards",
   "front-of-house.settings-sections.retention": "Keeping records",
 
   "front-of-house.settings.shifts.window-before.label": "Shifts start to count before the call time",
@@ -49,10 +50,18 @@
   "front-of-house.settings.incidents.immediate-severity.options.minor": "Minor",
   "front-of-house.settings.incidents.immediate-severity.options.moderate": "Moderate",
   "front-of-house.settings.incidents.immediate-severity.options.serious": "Serious",
+  "front-of-house.settings.retention.assignments.label": "Keep rota history for",
+  "front-of-house.settings.retention.assignments.help": "How long after a shift ends the record of who was on it is kept. Shortening this deletes older history at the next daily run.",
+  "front-of-house.settings.retention.checklists.label": "Keep completed checklists for",
+  "front-of-house.settings.retention.checklists.help": "How long checklists worked through on the night are kept. Shortening this deletes older ones at the next daily run.",
+  "front-of-house.settings.emergency.review-every.label": "Review each emergency card every",
+  "front-of-house.settings.emergency.review-every.help": "How long a venue's emergency card can go without being reviewed before the health check warns about it.",
   "front-of-house.settings.retention.incidents.label": "Keep incident details for",
   "front-of-house.settings.retention.incidents.help": "How long after an incident is closed the people involved and what was written about it are kept. The incident's number, kind and dates are always kept. Shortening this deletes older details at the next daily run.",
   "front-of-house.settings.retention.incidents-child.label": "Keep incident details involving a child for",
   "front-of-house.settings.retention.incidents-child.help": "The same, when a child was involved. Insurers and safeguarding guidance usually ask for longer. Shortening this deletes older details at the next daily run.",
+  "front-of-house.retain.incident.staff": "This person is named on an incident that is still open. Their erasure runs once the incident is closed.",
+  "front-of-house.retain.incident.person": "You are named on an incident the theatre is still looking into. Your account will be erased once it is closed.",
   "front-of-house.retain.incident": "Kept as the theatre's safety record of an incident, for the period the theatre has set.",
 
   "front-of-house.facts.on-shift.label": "On shift for the performance",
@@ -73,6 +82,7 @@
   "front-of-house.abilities.incident.report.label": "Report incidents and see their own reports",
   "front-of-house.abilities.incident.view.label": "Read incidents, with the people involved and their welfare details",
   "front-of-house.abilities.incident.manage.label": "Review and close incidents",
+  "front-of-house.abilities.incident.redact-person.label": "Find and redact people without an account on incidents, for data requests",
   "front-of-house.abilities.duty.manage.label": "Manage duties",
   "front-of-house.abilities.settings.manage.label": "Change front of house settings"
 }

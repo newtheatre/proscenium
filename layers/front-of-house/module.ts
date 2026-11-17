@@ -41,8 +41,12 @@ export default defineModule({
     // At or above this, managers are told at once; below, in the daily digest.
     'incidents.immediate-severity': setting.choice({ default: 'serious', options: ['minor', 'moderate', 'serious'], change, audience: 'staff' }),
     // Shortening one deletes records at the next sweep, which cannot be undone: so it asks again.
+    'retention.assignments': setting.duration({ default: '2y', min: '6mo', max: '7y', change, audience: 'staff', onChange: 'confirm' }),
+    'retention.checklists': setting.duration({ default: '1y', min: '3mo', max: '7y', change, audience: 'staff', onChange: 'confirm' }),
     'retention.incidents': setting.duration({ default: '3y', min: '1y', max: '10y', change, audience: 'staff', onChange: 'confirm' }),
     'retention.incidents-child': setting.duration({ default: '21y', min: '3y', max: '25y', change, audience: 'staff', onChange: 'confirm' }),
+    // When the health check warns that a venue's emergency card is stale.
+    'emergency.review-every': setting.duration({ default: '1y', min: '1mo', max: '3y', change, audience: 'staff' }),
   }),
 
   records: defineRecords('front-of-house', {
@@ -70,6 +74,8 @@ export default defineModule({
     'incident.report': ability({ on: 'front-of-house.incident', owner: 'grants' }),
     'incident.view': ability({ on: 'front-of-house.incident', risk: 'privileged', audit: 'read' }),
     'incident.manage': ability({ on: 'front-of-house.incident', risk: 'privileged', implies: ['incident.view'] }),
+    // Search for and redact a person with no account, for a data request. Each search is audited.
+    'incident.redact-person': ability({ risk: 'privileged', fresh: true, audit: 'read', implies: ['incident.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -112,6 +118,8 @@ export default defineModule({
     // Completes shifts past their window and opens tonight's draft reports.
     'front-of-house.close-shifts': task({ every: '15m' }),
     'front-of-house.chase-night-reports': task({ dailyAt: '10:00' }),
+    // The retention sweep, once a day.
+    'front-of-house.sweep-retention': task({ dailyAt: '04:20' }),
   },
 
   // Other modules' parts of the board and the night report. Front of house calls none of them.
@@ -150,6 +158,10 @@ export default defineModule({
         { slug: 'other', label: 'Other' },
       ],
     }],
+    'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
+    'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
+    'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
+    'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],
     'core.notification-topic': [
       { id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 },
       { id: 'front-of-house.night-reports', side: 'members' as const, order: 61 },
