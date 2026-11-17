@@ -227,26 +227,3 @@ export async function closeRequest(unit: UnitView, actor: Actor, request: DataRe
   unit.add({ sql: 'UPDATE core_data_requests SET closed_at = ?, closed_by = ? WHERE id = ? AND closed_at IS NULL', params: [nowMs(), actor.accountId!, request.id] })
   unit.audit({ action: 'state', ability: 'core.data-request.manage', record: ['core.data-request', request.id], detail: { closed: true } })
 }
-
-/** The staff queue: every request not yet closed, oldest respond-by first. */
-export async function dataRequestQueue() {
-  const rows = await all<DataRequestRow & { name: string | null }>(
-    'SELECT r.*, coalesce(a.preferred_name, a.name) AS name FROM core_data_requests r JOIN core_accounts a ON a.id = r.account_id WHERE r.closed_at IS NULL ORDER BY r.respond_by',
-  )
-  const at = nowMs()
-  return rows.map(r => ({
-    id: r.id,
-    accountId: r.account_id,
-    name: r.name,
-    kind: r.kind,
-    state: r.state,
-    requestedAt: r.requested_at,
-    requestedBy: r.requested_by,
-    identityCheck: r.identity_check,
-    respondBy: r.respond_by,
-    overdue: r.respond_by < at,
-    notBefore: r.not_before,
-    holds: r.holds ? JSON.parse(r.holds) as string[] : [],
-    finishedAt: r.finished_at,
-  }))
-}

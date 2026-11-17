@@ -244,6 +244,8 @@ export const grants = defineTable('core_grants', {
   extra: t => [
     index('core_grants_account').on(t.accountId),
     index('core_grants_role').on(t.roleId),
+    // Who holds what, soonest to lapse first.
+    index('core_grants_expiry').on(t.expiresAt),
     check('core_grants_scope', sql`(scope = 'site' AND scope_module IS NULL AND scope_type IS NULL AND scope_id IS NULL)
       OR (scope = 'module' AND scope_module IS NOT NULL AND scope_type IS NULL AND scope_id IS NULL)
       OR (scope = 'record' AND scope_module IS NOT NULL AND scope_type IS NOT NULL AND scope_id IS NOT NULL)`),
@@ -349,7 +351,7 @@ export const dataRequests = defineTable('core_data_requests', {
 }, {
   id: 'dreq',
   realm: 'operational',
-  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore)],
+  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore), index('core_data_requests_respond_by').on(t.respondBy)],
 })
 
 /** One line of a request's hand-search checklist: a table that may hold rows linked to no account. */
