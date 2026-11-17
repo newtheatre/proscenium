@@ -1,6 +1,7 @@
 // Creates a scheme as a draft (MEM-01). Renewal window, grace and whether holders may end their own
 // membership start from the settings when they are not given.
-import { defineRoute, newId, nowMs } from '#kit'
+import { defineRoute, newId, nowMs, refuse } from '#kit'
+import { charger } from '../../../charge'
 import { checkLengthRule, schemeDefaults, schemeFields } from '../../../schemes'
 
 const input = schemeFields.omit({ verifier: true, listId: true, domains: true }).partial({ summary: true, joinMode: true, fixedEndMonth: true, fixedEndDay: true, rolloverDays: true, renewalOpensDays: true, graceDays: true, reverifyOnRenewal: true, needsApproval: true, requiresPayment: true, voting: true, acceptsReference: true, holderMayEnd: true })
@@ -8,6 +9,8 @@ const input = schemeFields.omit({ verifier: true, listId: true, domains: true })
 export default defineRoute({ ability: 'membership.scheme.manage', rateLimit: 'write', idempotent: true, input }, async (_event, { input, unit }) => {
   const fields = { ...(await schemeDefaults()), summary: null, joinMode: 'apply' as const, fixedEndMonth: null, fixedEndDay: null, rolloverDays: 0, reverifyOnRenewal: true, needsApproval: false, requiresPayment: false, voting: false, acceptsReference: false, ...input }
   checkLengthRule(fields)
+  if (fields.requiresPayment && !(await charger()))
+    refuse('membership.scheme.fees-off', 'A fee can only be collected while the Membership fees module is on.', { status: 409, remedy: 'Switch Membership fees on in Admin > Modules first.', fields: { requiresPayment: 'membership.scheme.fees-off' } })
   const id = newId('msch')
   const at = nowMs()
   unit.add({
