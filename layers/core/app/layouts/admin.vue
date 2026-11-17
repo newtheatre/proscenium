@@ -1,4 +1,4 @@
-<!-- The Site administration shell (R-33): the console's frame with a strip above the page header
+<!-- The Admin shell (R-33): the console's frame with a strip above the page header
      that says where you are at every width, the theatre's mark where it is in the console and "Back to console" at the foot of the sidebar,
      neutral buttons (no brand colour), and no Tonight or work queue. Below 1024 pixels the sidebar
      is a drawer, opened from the strip. -->

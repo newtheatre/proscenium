@@ -1,6 +1,6 @@
 # 5. Screens
 
-Identity has 33 screens: 9 for getting in, 7 in "My account", 3 in the members' area, 9 in the console and 5 in Site administration. Three are drawn here because they carry the audience and members' separation; workstream 6 owns how every screen finally looks.
+Identity has 33 screens: 9 for getting in, 7 in "My account", 3 in the members' area, 9 in the console and 5 in Admin. Three are drawn here because they carry the audience and members' separation; workstream 6 owns how every screen finally looks.
 
 ## The header is where the two sides meet
 
@@ -80,7 +80,7 @@ Console shell. Each row names the ability that shows it.
 
 Identity draws the left card and the first three sections. The tinted section is the `core.account-section` point, so a module that is switched off leaves nothing behind.
 
-## Site administration
+## Admin
 
 The fourth shell, at `/admin`, holds what is set up once for the whole installation (Matt, 16 November 2026; Interface specifies the shell and its addresses). The console keeps the theatre's daily business with people. Five of identity's screens live here. Granting a role to a person stays in the console under "Who holds what"; defining what a role contains is here.
 
@@ -92,13 +92,13 @@ The fourth shell, at `/admin`, holds what is set up once for the whole installat
 | Sign-in settings | Methods, managed domains, session times, generated from the settings registry | `core.identity-settings.manage` | First |
 | Retention | What each sweep would do today; arm or disarm it (the arm control alone needs `core.retention.arm`, held only by Owners) | `core.identity-settings.manage` | Later |
 
-All five declare menu `admin` and the group `access` (label "Access"), in this order: Roles at `/admin/roles`; Role at `/admin/roles/<role>`, reached from Roles with no menu entry of its own; Facts at `/admin/facts`; Sign-in at `/admin/sign-in`; Retention at `/admin/retention` when it ships. The shell needs no ability of its own: a holder of `core.role.read` or `core.identity-settings.manage` sees Site administration in the account menu and only the entries they may open, and anybody else gets page not found at `/admin`. A role's "who holds this" link crosses to the console's People group.
+All five declare menu `admin` and the group `access` (label "Access"), in this order: Roles at `/admin/roles`; Role at `/admin/roles/<role>`, reached from Roles with no menu entry of its own; Facts at `/admin/facts`; Sign-in at `/admin/sign-in`; Retention at `/admin/retention` when it ships. The shell needs no ability of its own: a holder of `core.role.read` or `core.identity-settings.manage` sees Admin in the account menu and only the entries they may open, and anybody else gets page not found at `/admin`. A role's "who holds this" link crosses to the console's People group.
 
-Sign-in is a generated settings page: it draws the groups `sign-in`, `sessions` and `recovery`. Two more generated pages hold identity's settings and are not counted among its screens: Privacy at `/admin/privacy`, and People settings in the console's People group (grants, the members' area, the access scheme, emergency contacts and merge). Retention is identity's own screen, showing what each sweep would do and holding the arm control; the sweeps' other limits are on Site administration's Advanced page. Part 6 gives the home of every setting.
+Sign-in is a generated settings page: it draws the groups `sign-in`, `sessions` and `recovery`. Two more generated pages hold identity's settings and are not counted among its screens: Privacy at `/admin/privacy`, and People settings in the console's People group (grants, the members' area, the access scheme, emergency contacts and merge). Retention is identity's own screen, showing what each sweep would do and holding the arm control; the sweeps' other limits are on Admin's Advanced page. Part 6 gives the home of every setting.
 
 The Sign-in page's sections run in this order: Signing in, Sessions, Recovery, then Access, which is foundations' group and holds `core.access.fresh-within`. A group is placed once for the whole core module, so a key that foundations or core domain later adds under one of identity's groups appears on that group's page.
 
-With the generated pages counted, the Access group of Site administration reads: Roles, Facts, Sign-in, Privacy, and later Retention.
+With the generated pages counted, the Access group of Admin reads: Roles, Facts, Sign-in, Privacy, and later Retention.
 
 ## Rules for these screens
 
@@ -124,7 +124,7 @@ Interface fixes the prefixes: a person's own sections sit under `/account/` on t
 | Your details | `/account/details` |
 | Email addresses | `/account/email` |
 | Signing in | `/account/sign-in` |
-| Where you are signed in | `/account/sessions` |
+| Where you are signed in | a section of Signing in, `/account/sign-in` (since 2026-11-17) |
 | Access scheme | `/account/access` |
 | Your data | `/account/data` |
 | Member details | `/members/account/details` |
@@ -141,7 +141,7 @@ Interface fixes the prefixes: a person's own sections sit under `/account/` on t
 | Access scheme (queue) | `/console/people/access-scheme` |
 | Application | `/console/people/access-scheme/<account>`, since an application is keyed by its account |
 
-A form that belongs to a screen sits beneath it: the person's application form is `/account/access/apply`, and applying on somebody's behalf is `/console/people/access-scheme/<account>/apply`. The getting-in screens keep the addresses the sign-in flow already uses and are not menu entries. Site administration's addresses are given above.
+A form that belongs to a screen sits beneath it: the person's application form is `/account/access/apply`, and applying on somebody's behalf is `/console/people/access-scheme/<account>/apply`. The getting-in screens keep the addresses the sign-in flow already uses and are not menu entries. Admin's addresses are given above.
 
 ## Navigation entries
 
@@ -151,7 +151,7 @@ A form that belongs to a screen sits beneath it: the person's application form i
 | Members' area | Public, account menu | Any standing |
 | Console | Public and members', account menu | Any ability with a console entry |
 | People: Accounts, Who holds what, Data requests, Access scheme | Console | The abilities above |
-| Roles and facts; Sign-in settings; Retention | Site administration | `core.role.read` for roles and facts; `core.identity-settings.manage` for the other two |
+| Roles and facts; Sign-in settings; Retention | Admin | `core.role.read` for roles and facts; `core.identity-settings.manage` for the other two |
 
 ## Setup steps
 

@@ -60,13 +60,13 @@ This is the answer to the complaint that audiences and members share one muddled
 
 No module draws its own settings screen. It declares each setting with a label, a sentence of help, a type and a default, and its page at `/console/<module>/settings` is built from those declarations, in sections. Changes are collected and saved together from the bar at the bottom, and a changed row says what it was before. A group of settings the module places in site administration, or manages on a screen of its own, is not on this page (integration ruling R-37), and the page says so with a link. Since this was drawn the page has gained search at its top, a "Changed" filter, one "Changed by people who can..." line for each section, a history line under each changed setting and "Reset section" (Page conventions, Settings). The sections and the three settings shown are examples; the real list belongs to the box office workstream.
 
-## W9. Site administration
+## W9. Admin
 
 ![W9 · site administration, laptop width](images/05-4-w9-site-administration.png)
 
 *W9 · site administration, laptop width*
 
-Site administration is the console's frame with three things changed so that nobody mistakes one for the other: a strip that names it at every width, "Back to console" where the theatre's mark would be, and its own sidebar of install-level screens. Its home is not a work queue but a short list of what needs attention and the state of the installation. The groups and addresses are listed in Shells and navigation. The cards and figures drawn are examples.
+Admin is the console's frame with three things changed so that nobody mistakes one for the other: a strip that names it at every width, "Back to console" where the theatre's mark would be, and its own sidebar of install-level screens. Its home is not a work queue but a short list of what needs attention and the state of the installation. The groups and addresses are listed in Shells and navigation. The cards and figures drawn are examples.
 
 ## What the wireframes do not show
 

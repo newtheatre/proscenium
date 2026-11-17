@@ -153,7 +153,7 @@ Loading, empty, refused and error follow the interface conventions. Three are sp
 
 | State | Shown as |
 | --- | --- |
-| Sending domain not verified | A banner on S1, S3 and S5 linking to core's Email screen in Site administration. Send buttons are disabled |
+| Sending domain not verified | A banner on S1, S3 and S5 linking to core's Email screen in Admin. Send buttons are disabled |
 | An audience source's module is off | The source shows as unavailable where it was used, and the campaign cannot leave draft |
 | The module is switched off part-way through a campaign | On return, the campaign is still sending and resumes |
 

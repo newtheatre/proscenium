@@ -198,6 +198,29 @@ test('the Ledger lists the sale with its entries open, and the Refunds view leav
   await expect(page.getByRole('cell', { name: 'Sale' })).toHaveCount(0)
 })
 
+test('Providers takes a Stripe account\'s keys, shows only their last four characters, and removes one', async ({ page, playwright }) => {
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
+  const label = `Stripe keys ${Date.now()}`
+  expect((await api.post('/api/payments/providers', { data: { provider: 'stripe', label, channels: ['online'], mode: 'test' }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
+  await api.dispose()
+  await visit(page, '/console/payments/providers')
+  const card = page.locator('div').filter({ has: page.getByText(label, { exact: true }) }).filter({ has: page.getByRole('button', { name: 'Save keys' }) }).last()
+  await expect(card.getByText('Missing Secret key, Webhook signing secret, Publishable key')).toBeVisible()
+  await card.getByLabel('Secret key').fill('sk_test_e2eabcdefghijklm1234')
+  await card.getByLabel('Webhook signing secret').fill('whsec_e2eabcdefghijklm5678')
+  await card.getByLabel('Publishable key').fill('pk_test_e2eabcdefghijklm9012')
+  await card.getByRole('button', { name: 'Save keys' }).click()
+  await expect(page.getByText('Keys saved', { exact: true }).first()).toBeVisible()
+  await expect(card.getByText('Saved, ending 1234')).toBeVisible()
+  await expect(card.getByText('Missing', { exact: false })).toHaveCount(0)
+  await expect(card.getByLabel('Secret key')).toHaveValue('')
+  await noViolations(page)
+  await card.getByRole('button', { name: 'Remove' }).first().click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove key' }).click()
+  await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
+  await expect(card.getByText('Missing Secret key')).toBeVisible()
+})
+
 test('without cash, My session asks for no float and closes in one step', async ({ page, playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
   // Back to the default, which later files expect too.
