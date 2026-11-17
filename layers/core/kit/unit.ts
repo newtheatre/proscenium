@@ -317,7 +317,10 @@ export class UnitOfWork implements UnitView {
         case 'guard': {
           const index = statements.length
           guards.set(index, item.refusal)
-          statements.push({ sql: 'INSERT INTO core_guard (ok, code) VALUES (CASE WHEN changes() = ? THEN 1 ELSE 0 END, ?)', params: [item.rows, String(index)] })
+          // A read, not a write: a write opens a savepoint, and opening one makes a search index (FTS5)
+          // write out what it holds in memory, which changes changes() before it is read. A failing
+          // guard raises through json_insert's refusal of the path 'guard:<index>', which names it.
+          statements.push({ sql: "SELECT CASE WHEN changes() = ? THEN 1 ELSE json_insert('{}', 'guard:' || ?, 1) END", params: [item.rows, String(index)] })
           break
         }
         case 'audit': {

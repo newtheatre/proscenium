@@ -245,6 +245,68 @@ describe('notification types', () => {
   })
 })
 
+describe('list search words (S3)', () => {
+  it('folds case and accents, and ignores a word under three letters', async () => {
+    const { searchWords, searchQuery } = await import('../../layers/core/kit/search')
+    expect(searchWords('Zoë  Brontë jo')).toEqual({ words: ['zoe', 'bronte'], ignoredWords: ['jo'], searchTooShort: false })
+    expect(searchWords('jo li')).toEqual({ words: [], ignoredWords: ['jo', 'li'], searchTooShort: true })
+    expect(searchWords('  ')).toEqual({ words: [], ignoredWords: [], searchTooShort: false })
+    expect(searchQuery(['zoe', 'say "hi"'], ['name', 'note'])).toBe('{name note} : ("zoe" AND "say ""hi""")')
+  })
+
+  it('names the hidden field that matched a row (S5)', async () => {
+    const { matchedFields } = await import('../../layers/core/kit/search')
+    const fields = [{ key: 'title', hidden: false }, { key: 'season', hidden: true }]
+    expect(matchedFields([{ title: 'Hamlet', season: 'Autumn 2026' }, { title: 'Autumn Fair', season: 'Autumn 2026' }], ['hamlet', 'autumn'], fields)).toEqual(['season', null])
+  })
+})
+
+describe('list sources (S1, S2)', () => {
+  it('refuse a searched column that is special, encrypted or not a column', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    const { defineListSource } = await import('../../layers/core/kit/lists')
+    const { defineList } = await import('../../layers/core/shared/list')
+    const { index } = await import('drizzle-orm/sqlite-core')
+    const table = defineTable('lost_property_items', {
+      id: col.id(),
+      owner: col.account('owner_id', { role: 'subject' }),
+      label: col.public(text('label')),
+      health: col.special('health'),
+      token: col.internal(text('token'), { encrypted: true }),
+    }, { id: 'lpi', realm: 'operational', extra: t => [index('lost_property_items_label').on(t.label, t.id)] })
+    const list = defineList('lost-property.items', {
+      filters: { owner: { kind: 'lookup', label: 'Owner' } },
+      sorts: { label: { label: 'Label', type: 'text' } },
+      columns: { label: { label: 'Label', sort: 'label' } },
+      search: ['notes'],
+    })
+    const bind = (over: Record<string, any> = {}) => defineListSource(list, { table, filters: { owner: { column: 'owner' } }, sorts: { label: { columns: ['label'], index: 'lost_property_items_label' } }, search: { label: 'label', notes: 'label' }, ...over } as any)
+    expect(bind().searchIndex).toBe('lost_property_items_search')
+    expect(bind({ search: { label: 'label', notes: 'label' } }).search).toEqual([{ field: 'label', key: 'label', sql: 'label' }, { field: 'notes', key: 'label', sql: 'label' }])
+    expect(() => bind({ search: { label: 'health', notes: 'label' } })).toThrow(/special data/)
+    expect(() => bind({ search: { label: 'token', notes: 'label' } })).toThrow(/encrypted/)
+    expect(() => bind({ search: { label: 'nothing', notes: 'label' } })).toThrow(/not a column/)
+    expect(() => bind({ search: { label: 'label' } })).toThrow(/search.notes: has no binding/)
+    expect(() => bind({ search: { label: 'label', notes: false } })).toThrow(/searching a child is not yet available/)
+    expect(() => bind({ filters: { owner: { column: 'owner' }, colour: { column: 'label' } } })).toThrow(/not a filter of the list/)
+    expect(() => bind({ filters: { owner: { column: 'token' } } })).toThrow(/encrypted/)
+    // A sort names an index that begins with its columns, or the most rows its scan reads.
+    expect(() => bind({ sorts: { label: { columns: ['label'], index: 'nowhere' } } })).toThrow(/no index named nowhere/)
+    expect(() => bind({ sorts: { label: { columns: ['owner'], index: 'lost_property_items_label' } } })).toThrow(/does not begin with/)
+    expect(() => bind({ sorts: { label: { columns: ['owner'], bounded: 0 } } })).toThrow(/whole number/)
+    expect(() => bind({ sorts: { label: { columns: ['token'], bounded: 10 } } })).toThrow(/encrypted/)
+    expect(bind({ sorts: { label: { columns: ['owner'], bounded: 500 } } }).list.id).toBe('lost-property.items')
+  })
+
+  it('tell the generator which index to make, remake or drop', async () => {
+    const { indexChanges } = await import('../../scripts/lib/lists')
+    const wanted = new Map([['a', ['name']], ['b', ['note', 'title']]])
+    const made = new Map<string, string[] | null>([['a', ['name']], ['b', ['title']], ['c', ['x']], ['d', null]])
+    expect(indexChanges(wanted, made)).toEqual([{ table: 'b', columns: ['note', 'title'] }, { table: 'c', columns: null }])
+  })
+})
+
 describe('format additions of 16 November (fixed retention, erase clear, reserved ids)', () => {
   it('allows a fixed retention only on a table about nobody', async () => {
     const { text } = await import('drizzle-orm/sqlite-core')
