@@ -2,6 +2,8 @@
      account, for a visiting company's settlement. Readable by someone granted the ledger on this
      production only. -->
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
+
 interface Line { accountId: string, code: string, name: string, kind: string, currency: string, salesMinor: number, refundsMinor: number, otherMinor: number, netMinor: number }
 
 const { t } = useT()
@@ -23,6 +25,23 @@ const totals = computed(() => {
   }
   return [...out.values()]
 })
+
+// The totals sit in the table's foot, one line per currency.
+const right = { class: { th: 'text-right', td: 'text-right tabular-nums' } }
+const amount = (key: 'salesMinor' | 'refundsMinor' | 'otherMinor' | 'netMinor', header: string): TableColumn<Line> => ({
+  id: key,
+  header,
+  accessorFn: l => money(l[key], l.currency),
+  footer: () => totals.value.map(total => money(total[key], total.currency)).join(' · '),
+  meta: right,
+})
+const columns = computed<TableColumn<Line>[]>(() => [
+  { id: 'account', header: t('finance.screens.ledger.account'), footer: () => t('finance.screens.statement.total') },
+  amount('salesMinor', t('finance.screens.statement.sales')),
+  amount('refundsMinor', t('finance.screens.statement.refunds')),
+  amount('otherMinor', t('finance.screens.statement.other')),
+  amount('netMinor', t('finance.screens.statement.net')),
+])
 </script>
 
 <template>
@@ -59,97 +78,15 @@ const totals = computed(() => {
           v-else
           class="space-y-4"
         >
-          <div class="overflow-x-auto rounded-lg border border-default">
-            <table class="w-full text-sm">
-              <caption class="sr-only">
-                {{ t('finance.screens.statement.title', { production: loaded.production.title }) }}
-              </caption>
-              <thead class="bg-elevated/50 text-left">
-                <tr>
-                  <th
-                    scope="col"
-                    class="px-3 py-2 font-medium"
-                  >
-                    {{ t('finance.screens.ledger.account') }}
-                  </th>
-                  <th
-                    scope="col"
-                    class="px-3 py-2 text-right font-medium"
-                  >
-                    {{ t('finance.screens.statement.sales') }}
-                  </th>
-                  <th
-                    scope="col"
-                    class="px-3 py-2 text-right font-medium"
-                  >
-                    {{ t('finance.screens.statement.refunds') }}
-                  </th>
-                  <th
-                    scope="col"
-                    class="px-3 py-2 text-right font-medium"
-                  >
-                    {{ t('finance.screens.statement.other') }}
-                  </th>
-                  <th
-                    scope="col"
-                    class="px-3 py-2 text-right font-medium"
-                  >
-                    {{ t('finance.screens.statement.net') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-default">
-                <tr
-                  v-for="l in loaded.lines"
-                  :key="`${l.accountId}:${l.currency}`"
-                >
-                  <th
-                    scope="row"
-                    class="px-3 py-2 text-left font-normal"
-                  >
-                    <span class="text-muted">{{ l.code }}</span> {{ l.name }}
-                  </th>
-                  <td class="px-3 py-2 text-right tabular-nums">
-                    {{ money(l.salesMinor, l.currency) }}
-                  </td>
-                  <td class="px-3 py-2 text-right tabular-nums">
-                    {{ money(l.refundsMinor, l.currency) }}
-                  </td>
-                  <td class="px-3 py-2 text-right tabular-nums">
-                    {{ money(l.otherMinor, l.currency) }}
-                  </td>
-                  <td class="px-3 py-2 text-right font-medium tabular-nums">
-                    {{ money(l.netMinor, l.currency) }}
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot class="border-t border-default">
-                <tr
-                  v-for="total in totals"
-                  :key="total.currency"
-                >
-                  <th
-                    scope="row"
-                    class="px-3 py-2 text-left"
-                  >
-                    {{ t('finance.screens.statement.total') }}
-                  </th>
-                  <td class="px-3 py-2 text-right tabular-nums">
-                    {{ money(total.salesMinor, total.currency) }}
-                  </td>
-                  <td class="px-3 py-2 text-right tabular-nums">
-                    {{ money(total.refundsMinor, total.currency) }}
-                  </td>
-                  <td class="px-3 py-2 text-right tabular-nums">
-                    {{ money(total.otherMinor, total.currency) }}
-                  </td>
-                  <td class="px-3 py-2 text-right font-semibold tabular-nums">
-                    {{ money(total.netMinor, total.currency) }}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <UTable
+            :data="loaded.lines"
+            :columns="columns"
+            :caption="t('finance.screens.statement.title', { production: loaded.production.title })"
+          >
+            <template #account-cell="{ row }">
+              <span class="text-muted">{{ row.original.code }}</span> {{ row.original.name }}
+            </template>
+          </UTable>
           <p class="text-sm text-muted">
             {{ t('finance.screens.statement.how') }}
           </p>

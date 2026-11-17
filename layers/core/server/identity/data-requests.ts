@@ -77,7 +77,7 @@ export async function requestErasure(unit: UnitView, event: H3Event, actor: Acto
   })
   await notify(unit, 'core.erasure-confirm', {
     to: account.id,
-    variables: { link: `${relyingParty(event).origin}/sign-in/confirm-erasure#${token}`, wait: formatDuration(coolingOff) },
+    variables: { link: `${(await relyingParty(event)).origin}/sign-in/confirm-erasure#${token}`, wait: formatDuration(coolingOff) },
     dedupeKey: id,
   })
   unit.audit({ action: 'create', ...(actor.accountId === account.id ? {} : { ability: 'core.data-request.manage' }), record: ['core.data-request', id], detail: { kind: 'erasure', identityCheck: input.identityCheck ?? null } })

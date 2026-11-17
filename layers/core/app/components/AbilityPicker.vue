@@ -99,7 +99,6 @@ function hint(ability: CatalogueAbility): string | undefined {
         <UBadge
           v-if="ability.risk === 'privileged'"
           color="warning"
-          variant="subtle"
           size="sm"
           :label="t('core.roles.editor.full-control')"
           class="shrink-0"

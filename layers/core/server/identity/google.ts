@@ -25,8 +25,8 @@ async function clientId(): Promise<string> {
   return id
 }
 
-function callbackUrl(event: H3Event): string {
-  return `${relyingParty(event).origin}/api/core/sign-in/google/callback`
+async function callbackUrl(event: H3Event): Promise<string> {
+  return `${(await relyingParty(event)).origin}/api/core/sign-in/google/callback`
 }
 
 /** The address to send the browser to, at Google. */
@@ -37,7 +37,7 @@ export async function startGoogle(event: H3Event, input: { next: string | null, 
   const challenge = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(flow.verifier))))
   const domains = await useSetting('core.sign-in.google-domains') as string[]
   const query = new URLSearchParams({
-    client_id: client, redirect_uri: callbackUrl(event), response_type: 'code', scope: 'openid email profile',
+    client_id: client, redirect_uri: await callbackUrl(event), response_type: 'code', scope: 'openid email profile',
     state: flow.state, nonce: flow.nonce, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account',
   })
   if (domains.length === 1) query.set('hd', domains[0]!)
@@ -62,7 +62,7 @@ export async function finishGoogle(event: H3Event, input: { code: string, state:
   const response = await fetch(TOKEN, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ code: input.code, client_id: client, client_secret: secret, redirect_uri: callbackUrl(event), grant_type: 'authorization_code', code_verifier: flow.verifier }),
+    body: new URLSearchParams({ code: input.code, client_id: client, client_secret: secret, redirect_uri: await callbackUrl(event), grant_type: 'authorization_code', code_verifier: flow.verifier }),
   })
   const body = await response.json().catch(() => ({})) as { id_token?: string }
   if (!response.ok || !body.id_token) refuse('core.sign-in.provider-failed', 'Google did not confirm who you are.', { status: 422, remedy: 'Try again.' })
