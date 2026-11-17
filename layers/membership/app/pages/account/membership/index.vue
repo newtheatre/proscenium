@@ -5,8 +5,6 @@
      goes on to the Pay page; an application waiting for its fee offers Pay from here. The card (MEM-33, MEM-51) opens full screen with a code that
      Box office signs each time it is opened; without Box office it shows no code. -->
 <script setup lang="ts">
-import { encode } from 'uqr'
-
 interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Fee { amountMinor: number, currency: string }
 interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null }
@@ -91,26 +89,7 @@ async function renew() {
   }
 }
 // The card: shown full screen, with a code signed by the current key every time it is opened.
-const { viewer } = useViewer()
 const showing = ref<Mine['memberships'][number] | null>(null)
-const doorCode = ref<string | null>(null)
-async function showCard(m: Mine['memberships'][number]) {
-  showing.value = m
-  doorCode.value = null
-  try {
-    doorCode.value = (await $api<{ doorCode: string }>(`/api/box-office/door-codes/mem/${m.id}` as string)).doorCode
-  }
-  catch {
-    // Box office is off, or the card is no longer offered: the card is shown without a code.
-  }
-}
-// The code as an SVG path, one unit square per dark module, with a quiet border of four.
-const qr = computed(() => {
-  if (!doorCode.value) return null
-  const { size, data } = encode(doorCode.value, { border: 4, ecc: 'M' })
-  const path = data.flatMap((row, y) => row.map((dark, x) => dark ? `M${x} ${y}h1v1h-1z` : '')).join('')
-  return { size, path }
-})
 async function withdraw(a: Mine['applications'][number]) {
   if (!(await confirm({ verb: t('membership.screens.mine.verb-withdraw'), thing: a.schemeName, consequence: t('membership.screens.mine.confirm-withdraw'), button: t('membership.screens.mine.withdraw') }))) return
   try {
@@ -151,7 +130,7 @@ async function withdraw(a: Mine['applications'][number]) {
               :description="[m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end'), m.renewed ? t('membership.screens.mine.already-renewed') : m.renewal && !m.renewal.open && m.status !== 'lapsed' ? t('membership.screens.mine.renewal-opens', { date: day(m.renewal.opensOn) }) : ''].filter(Boolean).join(' · ')"
               :muted="m.status === 'lapsed'"
             >
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <StatusBadge
                   :tone="TONE[m.status]"
                   :label="t(`membership.screens.derived.${m.status}`)"
@@ -163,7 +142,7 @@ async function withdraw(a: Mine['applications'][number]) {
                   size="sm"
                   icon="i-lucide-qr-code"
                   :label="t('membership.screens.mine.show-card')"
-                  @click="showCard(m)"
+                  @click="showing = m"
                 />
                 <UButton
                   v-if="m.renewal?.open"
@@ -171,13 +150,9 @@ async function withdraw(a: Mine['applications'][number]) {
                   :label="t('membership.screens.mine.renew')"
                   @click="openRenew(m)"
                 />
-                <UButton
-                  v-if="m.mayEnd && m.status !== 'lapsed'"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  :label="t('membership.screens.mine.end')"
-                  @click="endMine(m)"
+                <RowActions
+                  :items="m.mayEnd && m.status !== 'lapsed' ? [[{ label: t('membership.screens.mine.end'), icon: 'i-lucide-log-out', color: 'error' as const, onSelect: () => endMine(m) }]] : []"
+                  :label="t('membership.screens.mine.actions', { scheme: m.schemeName })"
                 />
               </div>
             </RecordListItem>
@@ -314,47 +289,10 @@ async function withdraw(a: Mine['applications'][number]) {
         />
       </template>
     </UModal>
-    <UModal
-      :open="!!showing"
-      fullscreen
-      :title="showing?.schemeName ?? ''"
-      @update:open="v => { if (!v) showing = null }"
-    >
-      <template #body>
-        <div
-          v-if="showing"
-          class="mx-auto flex max-w-sm flex-col items-center gap-4 text-center"
-        >
-          <p
-            v-if="viewer.name"
-            class="text-2xl font-semibold"
-          >
-            {{ viewer.name }}
-          </p>
-          <FactStrip
-            :facts="[
-              ...(mine.data.value?.number ? [{ label: t('membership.screens.mine.number'), value: mine.data.value.number.label }] : []),
-              { label: t('membership.screens.mine.valid-until'), value: showing.endsOn ? day(showing.endsOn) : t('membership.screens.mine.no-end') },
-            ]"
-          />
-          <svg
-            v-if="qr"
-            :viewBox="`0 0 ${qr.size} ${qr.size}`"
-            class="aspect-square w-72 max-w-full rounded-md bg-white"
-            shape-rendering="crispEdges"
-            role="img"
-            :aria-label="t('membership.screens.mine.card-code')"
-          >
-            <path
-              :d="qr.path"
-              fill="black"
-            />
-          </svg>
-          <p class="text-sm text-muted">
-            {{ t(qr ? 'membership.screens.mine.card-help' : 'membership.screens.mine.card-no-code') }}
-          </p>
-        </div>
-      </template>
-    </UModal>
+    <MembershipCardModal
+      :membership="showing"
+      :number="mine.data.value?.number?.label"
+      @close="showing = null"
+    />
   </PageFrame>
 </template>

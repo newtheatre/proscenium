@@ -1,7 +1,8 @@
 <!-- One row of a RecordList: a name with an optional icon and a line of description, then whatever
      the row ends with (a count, a badge, its actions). The `leading` slot goes before the name, such as
      a drag handle. With `to`, the whole row is a link. What a
-     row needs under it (a short form, a detail) goes in the `below` slot. -->
+     row needs under it (a short form, a detail) goes in the `below` slot. On a narrow screen what the
+     row ends with wraps under the name rather than squeezing it. -->
 <script setup lang="ts">
 import { NuxtLink } from '#components'
 
@@ -14,7 +15,7 @@ const slots = defineSlots<{ default?: () => unknown, leading?: () => unknown, na
     <component
       :is="to ? NuxtLink : 'div'"
       :to="to"
-      class="flex items-center gap-3 px-4 py-3"
+      class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
       :class="[to && 'hover:bg-elevated/50', muted && 'text-muted']"
     >
       <slot name="leading" />
@@ -22,7 +23,7 @@ const slots = defineSlots<{ default?: () => unknown, leading?: () => unknown, na
         :name="name"
         :description="description"
         :avatar="icon ? { icon } : undefined"
-        class="min-w-0 flex-1"
+        class="min-w-0 flex-1 basis-48"
       >
         <template
           v-if="slots.name"

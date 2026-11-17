@@ -35,7 +35,38 @@ const counts = ref<Record<string, number>>({})
 const keyOf = (bandId: string, typeId: string) => `${bandId} ${typeId}`
 const chosen = computed(() => (data.value?.bands ?? []).flatMap(b => b.types.map(type => ({ band: b, type, quantity: counts.value[keyOf(b.bandId, type.ticketTypeId)] ?? 0 }))).filter(c => c.quantity > 0))
 const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0))
-const totalMinor = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity * c.type.amountMinor, 0))
+// A promo code (BO-17), tried before holding so the saving shows; sent with the hold, which applies it again.
+const promoInput = ref('')
+const promo = ref<{ code: string, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] } | null>(null)
+const promoRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const promoBusy = ref(false)
+const promoPrice = (bandId: string, typeId: string) => promo.value?.prices.find(p => p.bandId === bandId && p.ticketTypeId === typeId)?.amountMinor
+async function tryCode() {
+  promoRefusal.value = null
+  promoBusy.value = true
+  try {
+    promo.value = await $api(`/api/box-office/book/performances/${encodeURIComponent(performanceId.value)}/promo`, { query: { code: promoInput.value.trim() } })
+  }
+  catch (e) {
+    promo.value = null
+    promoRefusal.value = toRefusal(e)
+  }
+  finally {
+    promoBusy.value = false
+  }
+}
+function dropCode() {
+  promo.value = null
+  promoInput.value = ''
+  promoRefusal.value = null
+}
+// The saving, as the server will work it out: the dearest eligible tickets first, up to the code's limit for one order.
+const totalMinor = computed(() => {
+  const each = chosen.value.flatMap(c => Array.from({ length: c.quantity }, () => ({ full: c.type.amountMinor, with: promoPrice(c.band.bandId, c.type.ticketTypeId) })))
+  const eligible = each.filter(e => e.with !== undefined).sort((a, b) => b.full - a.full).slice(0, promo.value?.maxPerOrder ?? Infinity)
+  const saving = eligible.reduce((sum, e) => sum + e.full - e.with!, 0)
+  return each.reduce((sum, e) => sum + e.full, 0) - saving
+})
 const currency = computed(() => data.value?.currency ?? undefined)
 const companionAlone = computed(() => chosen.value.length > 0 && chosen.value.every(c => c.type.needsPaidTicket))
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
@@ -61,7 +92,7 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })) },
+      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.fullPath })
@@ -113,7 +144,7 @@ async function hold() {
                 <UFormField
                   v-for="type in band.types"
                   :key="type.ticketTypeId"
-                  :label="t('box-office.book.type', { type: type.name, price: money(type.amountMinor, currency) })"
+                  :label="promoPrice(band.bandId, type.ticketTypeId) !== undefined ? t('box-office.book.type-with-code', { type: type.name, price: money(promoPrice(band.bandId, type.ticketTypeId)!, currency), was: money(type.amountMinor, currency) }) : t('box-office.book.type', { type: type.name, price: money(type.amountMinor, currency) })"
                   :help="typing(type) ? type.reference!.label : (type.unmet ?? type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
                 >
                   <div class="space-y-2">
@@ -141,6 +172,39 @@ async function hold() {
                 </UFormField>
               </template>
             </section>
+            <UFormField
+              :label="t('box-office.book.promo.label')"
+              name="promoCode"
+              :error="promoRefusal?.reason"
+              :help="promo ? t('box-office.book.promo.applied', { code: promo.code }) : undefined"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <UInput
+                  v-model="promoInput"
+                  :disabled="!!promo"
+                  autocomplete="off"
+                  maxlength="40"
+                  class="w-48"
+                  @keydown.enter.prevent="tryCode"
+                />
+                <UButton
+                  v-if="!promo"
+                  :label="t('box-office.book.promo.apply')"
+                  color="neutral"
+                  variant="outline"
+                  :loading="promoBusy"
+                  :disabled="!promoInput.trim()"
+                  @click="tryCode"
+                />
+                <UButton
+                  v-else
+                  :label="t('box-office.book.promo.remove')"
+                  color="neutral"
+                  variant="ghost"
+                  @click="dropCode"
+                />
+              </div>
+            </UFormField>
             <p
               v-if="companionAlone"
               class="text-sm text-error"

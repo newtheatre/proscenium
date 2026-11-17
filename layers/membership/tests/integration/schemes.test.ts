@@ -28,6 +28,13 @@ describe('setting up a scheme', () => {
     expect((await req('POST', '/api/membership/schemes', { key: 'fixed-b', name: 'Fixed', side: 'members', lengthRule: 'fixed', fixedEndMonth: 2, fixedEndDay: 29 })).body.code).toBe('membership.scheme.fixed-end-day')
   })
 
+  it('refuses to ask for a fee while Membership fees is off, and says it is off', async () => {
+    expect((await req('POST', '/api/membership/schemes', { key: `fee-${Date.now()}`, name: 'Fee', side: 'members', lengthRule: 'rolling', requiresPayment: true })).body.code).toBe('membership.scheme.fees-off')
+    const id = await scheme()
+    expect((await req('PATCH', `/api/membership/schemes/${id}`, { requiresPayment: true })).body.code).toBe('membership.scheme.fees-off')
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body).toMatchObject({ feesModuleOn: false, feesOn: false })
+  })
+
   it('refuses to open without a length, or while it asks for a check that does not exist yet (S4)', async () => {
     const bare = await scheme({}, [])
     expect((await req('POST', `/api/membership/schemes/${bare}/state`, { to: 'open' })).body.code).toBe('membership.scheme.needs-length-option')
