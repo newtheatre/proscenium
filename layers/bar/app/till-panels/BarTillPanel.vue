@@ -3,8 +3,10 @@
      paid for and takes one payment; the bar sale is written only when payment starts. With `large`
      (the combined till in live mode) products are big tiles for a phone or tablet; otherwise a
      compact list beside the desk's other panels. The first product that needs an age check asks
-     "Does the customer look under 25?" once for the basket; refusing records the reason and takes the
-     restricted lines out. A refusal can also be recorded for the whole basket, or with no sale. -->
+     "Does the customer look under 25?" once for the basket. Refusing there is one more press: the
+     theatre's reasons are buttons on the same screen, and the one pressed records the refusal, tied to
+     this basket so the register shows the sale the rest of it became, and takes the restricted lines
+     out. A refusal can also be recorded for the whole basket, or with no sale. -->
 <script setup lang="ts">
 interface Item { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number }
 interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, categories: { id: string, name: string, colour: string | null, items: Item[] }[], ageCheck: { enabled: boolean, challengeAge: number, description: boolean } }
@@ -83,10 +85,11 @@ function send() {
 }
 
 // The prompt: opened by the first restricted product added, holding what to add once answered.
-const prompt = ref<{ item: Item, quantity: number } | null>(null)
+const prompt = ref<{ item: Item, quantity: number, refusing: boolean, description: string } | null>(null)
 function needsPrompt(item: Item, quantity: number): boolean {
   if (!menu.value?.ageCheck.enabled || !item.ageRestricted || answer.value || quantity <= 0) return false
-  prompt.value = { item, quantity }
+  prompt.value = { item, quantity, refusing: false, description: '' }
+  promptProblem.value = null
   return true
 }
 function answerPrompt(outcome: 'not_needed' | 'id_checked') {
@@ -100,13 +103,35 @@ function answerPrompt(outcome: 'not_needed' | 'id_checked') {
 const { data: reasons } = await useAPI<{ terms: { id: string, label: string }[] }>('/api/core/vocabularies/bar.refusal-reason/terms', { key: 'bar:refusal-reasons', default: () => ({ terms: [] }) })
 const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ value: r.id, label: r.label })))
 const productItems = computed(() => [...items.value.values()].map(i => ({ value: i.variantId, label: label(i) })))
-const refusing = ref<{ variantId: string | undefined, reasonTermId: string | undefined, description: string, from: 'prompt' | 'basket' | 'none' } | null>(null)
+const refusing = ref<{ variantId: string | undefined, reasonTermId: string | undefined, description: string, from: 'basket' | 'none' } | null>(null)
 const refusalProblem = ref<ReturnType<typeof toRefusal> | null>(null)
+const promptProblem = ref<ReturnType<typeof toRefusal> | null>(null)
 const saving = ref(false)
-function refuseFromPrompt() {
-  refusing.value = { variantId: prompt.value!.item.variantId, reasonTermId: undefined, description: '', from: 'prompt' }
-  prompt.value = null
-  refusalProblem.value = null
+const describe = (text: string) => menu.value?.ageCheck.description && text.trim() ? text.trim() : null
+
+// From the prompt: the reason pressed records the refusal at once, tied to this basket, and the
+// restricted lines go while the rest of the sale carries on.
+async function refuseFromPrompt(reasonTermId: string) {
+  const p = prompt.value
+  if (!p || !menu.value) return
+  saving.value = true
+  promptProblem.value = null
+  try {
+    await $api('/api/bar/age-checks/refusals', {
+      method: 'POST',
+      body: { outletId: menu.value.outletId, variantId: p.item.variantId, reasonTermId, description: describe(p.description), basketKey: clientKey.value },
+    })
+    prompt.value = null
+    basket.value = new Map([...basket.value].filter(([id]) => !items.value.get(id)?.ageRestricted))
+    send()
+    toast.add({ title: t('bar.desk.refusal-recorded'), color: 'success' })
+  }
+  catch (e) {
+    promptProblem.value = toRefusal(e)
+  }
+  finally {
+    saving.value = false
+  }
 }
 function refuseBasket() {
   const first = lines.value.find(l => l.item.ageRestricted) ?? lines.value[0]
@@ -121,16 +146,12 @@ async function saveRefusal() {
   try {
     await $api('/api/bar/age-checks/refusals', {
       method: 'POST',
-      body: { outletId: menu.value.outletId, variantId: r.variantId ?? null, reasonTermId: r.reasonTermId, description: menu.value.ageCheck.description && r.description.trim() ? r.description.trim() : null },
+      body: { outletId: menu.value.outletId, variantId: r.variantId ?? null, reasonTermId: r.reasonTermId, description: describe(r.description) },
     })
-    // From the prompt the restricted lines go and the rest of the sale carries on; refusing the basket empties it.
-    if (r.from === 'prompt') {
-      const next = new Map([...basket.value].filter(([id]) => !items.value.get(id)?.ageRestricted))
-      basket.value = next
-      send()
-    }
-    else if (r.from === 'basket') {
+    // Refusing the whole basket empties it, and the next basket is a new one.
+    if (r.from === 'basket') {
       clear()
+      clientKey.value = crypto.randomUUID()
     }
     refusing.value = null
     toast.add({ title: t('bar.desk.refusal-recorded'), color: 'success' })
@@ -305,12 +326,56 @@ const shown = computed(() => props.large ? menu.value?.categories.filter(c => c.
     <UModal
       :open="!!prompt"
       :title="t('bar.desk.prompt.title', { age: menu?.ageCheck.challengeAge ?? 25 })"
-      :description="prompt ? t('bar.desk.prompt.for', { name: label(prompt.item) }) : undefined"
+      :description="prompt ? t(prompt.refusing ? 'bar.desk.prompt.why' : 'bar.desk.prompt.for', { name: label(prompt.item) }) : undefined"
       fullscreen
       @update:open="v => { if (!v) prompt = null }"
     >
       <template #body>
-        <div class="mx-auto grid max-w-xl gap-3">
+        <div
+          v-if="prompt?.refusing"
+          class="mx-auto grid max-w-xl gap-3"
+        >
+          <RefusalNotice :refusal="promptProblem" />
+          <UFormField
+            v-if="menu?.ageCheck.description"
+            :label="t('bar.desk.refusal.description')"
+            :help="t('bar.desk.refusal.description-help')"
+            name="description"
+          >
+            <UTextarea
+              v-model="prompt.description"
+              :maxlength="120"
+              :rows="2"
+            />
+            <template #hint>
+              {{ prompt.description.length }}/120
+            </template>
+          </UFormField>
+          <UButton
+            v-for="r in reasonItems"
+            :key="r.value"
+            size="xl"
+            block
+            color="error"
+            variant="soft"
+            :loading="saving"
+            :label="r.label"
+            @click="refuseFromPrompt(r.value)"
+          />
+          <UButton
+            size="xl"
+            block
+            color="neutral"
+            variant="ghost"
+            :disabled="saving"
+            :label="t('bar.desk.prompt.back')"
+            @click="prompt.refusing = false"
+          />
+        </div>
+        <div
+          v-else
+          class="mx-auto grid max-w-xl gap-3"
+        >
           <UButton
             size="xl"
             block
@@ -331,7 +396,7 @@ const shown = computed(() => props.large ? menu.value?.categories.filter(c => c.
             color="error"
             variant="soft"
             :label="t('bar.desk.refuse-sale')"
-            @click="refuseFromPrompt()"
+            @click="prompt!.refusing = true"
           />
         </div>
       </template>

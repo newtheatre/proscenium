@@ -13,6 +13,7 @@ import refusalsPost from '../../server/api/bar/age-checks/refusals.post'
 import registerGet from '../../server/api/bar/age-checks/index.get'
 import reviewPost from '../../server/api/bar/age-checks/review.post'
 import erasePost from '../../server/api/bar/age-checks/[id]/erase-description.post'
+import saleGet from '../../server/api/bar/sales/[reference]/index.get'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addProduct } from '../../server/catalogue'
 
@@ -23,9 +24,10 @@ const handle = server({
   'GET /api/bar/age-checks': registerGet,
   'POST /api/bar/age-checks/review': reviewPost,
   'POST /api/bar/age-checks/:id/erase-description': erasePost,
+  'GET /api/bar/sales/:reference': saleGet,
 })
 const seller = person(['payments.session.open', 'bar.sale.sell'], { reassertedAt: NOW })
-const manager = person(['bar.age-check.review'], { reassertedAt: NOW })
+const manager = person(['bar.age-check.review', 'bar.sale.view'], { reassertedAt: NOW })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
   return inContext(async () => {
@@ -139,12 +141,29 @@ describe('refusals', () => {
   })
 })
 
+describe('a refusal from the prompt', () => {
+  it('ties itself to the basket, so the register and the sale show each other', async () => {
+    const key = 'age-5-basket-xxxxxxx'
+    const refused = await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, variantId: stock.wine, reasonTermId: stock.reason, basketKey: key })
+    expect(refused.status, JSON.stringify(refused.body)).toBe(200)
+    // The rest of the basket goes through as a sale with the same key.
+    expect((await till(key, [[stock.crisps, 1]], 120)).status).toBe(200)
+    const reference = (await rows<{ reference: string }>('SELECT reference FROM bar_sales WHERE client_key = ?', key))[0]!.reference
+
+    const listed = await send('GET', '/api/bar/age-checks?outcome=refused', undefined, manager)
+    expect(listed.body.rows.find((r: any) => r.id === refused.body.id)?.sale).toBe(reference)
+    const sale = await send('GET', `/api/bar/sales/${reference}`, undefined, manager)
+    expect(sale.body.ageChecks).toMatchObject([{ outcome: 'refused', reason: 'No ID', product: 'Checks red, 175ml' }])
+    expect(JSON.stringify(sale.body.ageChecks)).not.toContain('description')
+  })
+})
+
 describe('the register', () => {
   it('lists the rows for someone who may read it, and a signature records the refusals it covered', async () => {
     expect((await send('GET', '/api/bar/age-checks', undefined)).status).toBe(403)
     const listed = await send('GET', '/api/bar/age-checks?outcome=refused', undefined, manager)
     expect(listed.status, JSON.stringify(listed.body)).toBe(200)
-    expect(listed.body.rows.length).toBe(3)
+    expect(listed.body.rows.length).toBe(4)
     expect(listed.body.rows.every((r: any) => r.outcome === 'refused' && r.reason === 'No ID' && r.outlet === 'Checks bar')).toBe(true)
     expect(listed.body.canReview).toBe(true)
 
@@ -152,7 +171,7 @@ describe('the register', () => {
     expect((await post('/api/bar/age-checks/review', { fromDay: '2026-11-17', toDay: '2026-11-17' }, seller)).status).toBe(403)
     const signed = await post('/api/bar/age-checks/review', { fromDay: '2026-11-17', toDay: '2026-11-17' }, manager)
     expect(signed.status, JSON.stringify(signed.body)).toBe(200)
-    expect(signed.body.refusals).toBe(3)
-    expect((await send('GET', '/api/bar/age-checks', undefined, manager)).body.reviews).toMatchObject([{ fromDay: '2026-11-17', toDay: '2026-11-17', refusals: 3 }])
+    expect(signed.body.refusals).toBe(4)
+    expect((await send('GET', '/api/bar/age-checks', undefined, manager)).body.reviews).toMatchObject([{ fromDay: '2026-11-17', toDay: '2026-11-17', refusals: 4 }])
   })
 })

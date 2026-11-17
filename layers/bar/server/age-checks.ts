@@ -37,6 +37,8 @@ export const refusalInput = z.object({
   variantId: z.string().min(1).max(64).nullable().optional(), // not-policy: an id's length
   reasonTermId: z.string().min(1).max(64), // not-policy: an id's length
   description: z.string().trim().max(DESCRIPTION_MAX).nullable().optional(),
+  // The basket the refusal was made from, when the rest of it carries on to a sale.
+  basketKey: z.string().min(16).max(64).nullable().optional(), // not-policy: a basket key's length
 }).strict()
 export type RefusalInput = z.infer<typeof refusalInput>
 
@@ -58,8 +60,8 @@ export async function recordRefusal(unit: UnitView, input: RefusalInput, by: str
   const at = nowMs()
   const id = newId('bage')
   await ensureOpening(unit, input.outletId, by, at)
-  unit.add(sql`INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, description, by, at, created_at)
-    SELECT ${id}, o.id, NULL, 'refused', ${input.reasonTermId}, ${input.variantId ?? null}, ${description}, ${by}, ${at}, ${at}
+  unit.add(sql`INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, basket_key, description, by, at, created_at)
+    SELECT ${id}, o.id, NULL, 'refused', ${input.reasonTermId}, ${input.variantId ?? null}, ${input.basketKey ?? null}, ${description}, ${by}, ${at}, ${at}
       FROM bar_openings o WHERE o.outlet_id = ${input.outletId} AND o.state = 'open' AND ${assertTerm(input.reasonTermId, REASONS)}`)
     .expect(1, { code: 'bar.age-check.bad-reason', reason: 'That reason is not on the list.', remedy: 'Choose a reason from the list.' })
   // The audit entry and the event say a refusal was recorded, never what the description says.
@@ -97,7 +99,7 @@ export async function register(filters: z.infer<typeof registerFilters>): Promis
   const rows = await all<Omit<RegisterRow, 'by'> & { byId: string | null }>(
     `SELECT a.id, a.at, t.name AS outlet, a.outcome, term.label AS reason,
             CASE WHEN v.id IS NULL THEN NULL WHEN v.name = 'Each' THEN p.name ELSE p.name || ', ' || v.name END AS product,
-            a.by AS byId, s.reference AS sale, a.description
+            a.by AS byId, coalesce(s.reference, k.reference) AS sale, a.description
        FROM bar_age_checks a
        JOIN bar_openings o ON o.id = a.opening_id
        JOIN bar_outlets t ON t.id = o.outlet_id
@@ -105,6 +107,7 @@ export async function register(filters: z.infer<typeof registerFilters>): Promis
        LEFT JOIN bar_variants v ON v.id = a.variant_id
        LEFT JOIN bar_products p ON p.id = v.product_id
        LEFT JOIN bar_sales s ON s.id = a.sale_id
+       LEFT JOIN bar_sales k ON k.client_key = a.basket_key
       WHERE (? IS NULL OR o.operating_day >= ?) AND (? IS NULL OR o.operating_day <= ?)
         AND (? IS NULL OR o.outlet_id = ?) AND (? IS NULL OR a.outcome = ?)
       ORDER BY a.at DESC, a.id DESC LIMIT ?`,
@@ -117,6 +120,21 @@ export async function register(filters: z.infer<typeof registerFilters>): Promis
 }
 
 export interface Review { id: string, outlet: string | null, fromDay: string, toDay: string, refusals: number, by: string, at: number }
+
+/** A sale's age checks: the answer that let it through and any refusal made from its basket. */
+export async function checksForSale(saleId: string): Promise<{ outcome: RegisterRow['outcome'], reason: string | null, product: string | null, at: number }[]> {
+  return await all(
+    `SELECT a.outcome, term.label AS reason,
+            CASE WHEN v.id IS NULL THEN NULL WHEN v.name = 'Each' THEN p.name ELSE p.name || ', ' || v.name END AS product, a.at
+       FROM bar_age_checks a
+       LEFT JOIN core_terms term ON term.id = a.refusal_term
+       LEFT JOIN bar_variants v ON v.id = a.variant_id
+       LEFT JOIN bar_products p ON p.id = v.product_id
+      WHERE a.sale_id = ? OR a.basket_key = (SELECT client_key FROM bar_sales WHERE id = ?)
+      ORDER BY a.at, a.id`,
+    saleId, saleId,
+  )
+}
 
 /** The signatures, newest first. */
 export async function reviews(limit = 20): Promise<Review[]> { // not-policy: the signatures shown above the register
