@@ -10,12 +10,14 @@
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
-import { all, first, inAccountScope, nowMs, refuse, theatreTimeZone, useContext, useSetting, type UnitView } from '#kit'
-import { findOrCreateAccount, getPerformance, getProduction, notify, notifyAddress } from '#modules/core'
+import { first, inAccountScope, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
+import { findOrCreateAccount, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
+import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
+import { liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
@@ -25,36 +27,6 @@ export async function timingFor(performanceId: string): Promise<PaymentTiming> {
   // A theatre with no online payment provider can only take reservations.
   if (!(await methodsFor('online')).length) return 'reserve'
   return (await salesOf(performanceId))?.paymentTiming ?? await useSetting('box-office.checkout.payment-timing') as PaymentTiming
-}
-
-interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, confirm_email: string | null, confirm_name: string | null }
-interface LineRow { id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, type_name: string }
-
-const ORDER = 'SELECT id, reference, state, account_id, currency, total_minor, expires_at, release_at, confirm_email, confirm_name FROM box_office_orders'
-const RAN_OUT = { code: 'box-office.basket.expired', reason: 'Your basket has run out, and the seats are back on sale.', remedy: 'Choose your tickets again.' }
-
-function liveLines(orderId: string): Promise<LineRow[]> {
-  return all<LineRow>(
-    `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, t.name AS type_name FROM box_office_order_lines l
-      JOIN box_office_ticket_types t ON t.id = l.ticket_type_id WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
-}
-
-// What a message says about an order: the show, when, what is booked and what is owed.
-async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow[], amountMinor: number) {
-  const performance = await getPerformance(lines[0]!.performance_id)
-  const production = await getProduction(performance.productionId)
-  const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
-  const timeZone = await theatreTimeZone()
-  const counts = new Map<string, number>()
-  for (const line of lines) counts.set(line.type_name, (counts.get(line.type_name) ?? 0) + 1)
-  return {
-    show: production.title,
-    when: new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone }).format(performance.startsAt),
-    tickets: [...counts].map(([name, count]) => `${count} × ${name}`).join(', '),
-    amount: new Intl.NumberFormat(locale, { style: 'currency', currency: order.currency }).format(amountMinor / 100), // not-policy: minor units to units; every currency sold here has two decimals
-    timeOf: (at: number) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(at),
-    startsAt: performance.startsAt,
-  }
 }
 
 export interface ReserveInput {
@@ -81,7 +53,7 @@ export interface Reserved {
   releaseAt: number | null
 }
 
-export type ReserveOutcome = Reserved | { state: 'confirm-email', orderId: string, expiresAt: number }
+export type ReserveOutcome = Reserved | Confirmed | { state: 'confirm-email', orderId: string, expiresAt: number }
 
 /**
  * Reserve, pressed on a basket. A signed-in buyer's basket is reserved at once; so is a guest's
@@ -110,7 +82,7 @@ export async function requestReservation(unit: UnitView, input: ReserveInput): P
   const words = await wordsFor(order, lines, order.total_minor)
   await notifyAddress(unit, 'box-office.reservation-confirm', {
     address: input.email,
-    variables: { link: siteUrl(`/book/confirm/${token}`), show: words.show, when: words.when, until: words.timeOf(order.expires_at!) },
+    variables: { link: await siteUrl(`/book/confirm/${token}`), show: words.show, when: words.when, until: words.timeOf(order.expires_at!) },
     record: ['box-office.order', order.id],
   })
   return { state: 'confirm-email', orderId: order.id, expiresAt: order.expires_at! }
@@ -120,7 +92,7 @@ export async function requestReservation(unit: UnitView, input: ReserveInput): P
  * The link in the confirmation message: the address is proved, so its account is found or made and
  * the basket is reserved for it. A wrong, used or lapsed link gets the one answer.
  */
-export async function confirmReservation(unit: UnitView, token: string): Promise<Reserved> {
+export async function confirmReservation(unit: UnitView, token: string): Promise<Reserved | Confirmed> {
   const order = token
     ? await first<OrderRow>(`${ORDER} WHERE confirm_token_hash = ? AND state = 'basket' AND confirm_expires_at > ?`, await hashOf(token), nowMs())
     : null
@@ -143,8 +115,6 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
   }
   if (order.total_minor !== expectedTotalMinor)
     refuse('box-office.order.total-changed', 'The total has changed since you last saw it.', { status: 409, remedy: 'Check the basket and try again.' })
-  // An order with nothing to pay is confirmed and its tickets issued at once, by checkout.
-  if (order.total_minor === 0) refuse('box-office.reservation.nothing-to-pay', 'There is nothing to pay for these tickets, so there is nothing to reserve.', { status: 409, remedy: 'Complete the booking instead.' })
   const most = await useSetting('box-office.reservations.max-tickets-per-order') as number
   if (lines.length > most) refuse('box-office.reservation.too-many', `At most ${most} tickets can be reserved in one booking.`, { status: 422, remedy: 'Reserve fewer, or ask the box office about a group.' })
   return lines
@@ -152,7 +122,9 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
 
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
-async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean): Promise<Reserved> {
+async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean): Promise<Reserved | Confirmed> {
+  // An order with nothing to pay never rests reserved: it is confirmed and its tickets issued at once.
+  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn } })
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
   const releaseBefore = await useSetting('box-office.reservations.release-before') as number | null
@@ -187,7 +159,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
   await notify(unit, 'box-office.order-reserved', {
     to: accountId,
-    variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, amountDue: words.amount, deskCode, link: siteUrl(`/book/order/${token}`) },
+    variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) },
     subject: ['box-office.order', order.id],
     dedupeKey: order.id,
   })

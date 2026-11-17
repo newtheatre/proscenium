@@ -2,7 +2,7 @@
 // component. Each module with something to sell at the desk contributes a panel to
 // payments.desk-basket; the till asks each panel the seller filled in to prepare its part, in the one
 // batch that creates the intent, and then takes one payment for the total.
-import { can, nowMs, Refusal, usePoint, type Actor, type UnitView } from '#kit'
+import { can, nowMs, Refusal, runInContext, useContext, usePoint, type Actor, type UnitView } from '#kit'
 import { createIntent } from './intents'
 import type { DeskBasket } from './points/desk-basket'
 
@@ -11,11 +11,24 @@ const DESK_INTENT_LIFETIME = 30 * 60_000 // not-policy: a backstop for a till le
 
 export interface PanelInput { basket: string, input: unknown }
 
+/**
+ * A panel's code is its owner's, so each of its functions runs as its owner: the request is Payments',
+ * but what a panel signs or reads under its module's name is its own to use. The unit still commits
+ * in Payments' context.
+ */
+function asOwner(module: string, basket: DeskBasket): DeskBasket {
+  const wrapped = Object.entries(basket).map(([name, member]) => [
+    name,
+    typeof member === 'function' ? (...args: unknown[]) => runInContext({ ...useContext(), module }, () => member.apply(basket, args)) : member,
+  ])
+  return Object.fromEntries(wrapped) as DeskBasket
+}
+
 /** The panels the seller may use, in order. */
 export async function panelsFor(actor: Actor): Promise<{ id: string, module: string, value: DeskBasket }[]> {
   const out = []
   for (const c of await usePoint<DeskBasket>('payments.desk-basket')) {
-    if ((await can(actor, c.value.ability as any)).allowed) out.push(c)
+    if ((await can(actor, c.value.ability as any)).allowed) out.push({ ...c, value: asOwner(c.module, c.value) })
   }
   return out.sort((a, b) => (a.value.order ?? 0) - (b.value.order ?? 0))
 }

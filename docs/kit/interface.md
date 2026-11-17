@@ -318,3 +318,7 @@ the console a worded back link sits above the title. A link to a list returns th
 `PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
 `searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`
 (row id to the hidden column that matched, shown under the row's first cell as "Matches Venue: Studio").
+
+A page can say one more line about the answer through the `#note="{ result }"` slot, drawn above the rows with
+`role="status"`. `result` is the whole answer, so any extra field the route sends beside the rows is there: Accounts
+sends `hidden: { unclaimed, anonymised }` and says "4 not yet signed in and 2 erased are not shown".

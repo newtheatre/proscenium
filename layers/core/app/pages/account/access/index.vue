@@ -38,7 +38,6 @@ if (!data.value?.enabled) throw createError({ statusCode: 404, statusMessage: 'P
 
 const name = computed(() => data.value?.name ?? '')
 const application = computed(() => data.value?.application ?? null)
-const labelOf = (id: string) => data.value?.needs?.find(n => n.id === id)?.label ?? t('core.access.retired-need')
 const { dayLong: day } = useDates()
 
 const refusal = ref<RefusalView | null>(null)
@@ -179,18 +178,10 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         >
           {{ application.inForce ? t('core.access.in-force') : t('core.access.asked') }}
         </h2>
-        <ul class="list-disc space-y-1 ps-5">
-          <li
-            v-for="need in (application.inForce ?? application.pending)!.needs"
-            :key="need.term"
-          >
-            {{ labelOf(need.term) }}<span
-              v-if="need.note"
-              class="text-muted"
-            > ({{ need.note }})</span>
-          </li>
-        </ul>
-        <p>{{ t('core.access.companions', { count: (application.inForce ?? application.pending)!.companions }) }}</p>
+        <AccessApplicationSummary
+          :value="(application.inForce ?? application.pending)!"
+          :needs="data?.needs ?? []"
+        />
         <p
           v-if="application.status === 'accepted'"
           class="text-sm text-muted"

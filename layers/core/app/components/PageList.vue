@@ -59,6 +59,8 @@ defineSlots<{
   [subcell: `subcell-${string}`]: (props: { row: Row, parent: Row }) => unknown
   /** A free panel under a row, for a few facts that do not merit a page. */
   expanded?: (props: { row: Row }) => unknown
+  /** A line about the answer, such as "4 not yet signed in are not shown", from any extra field the route sends beside the rows. */
+  note?: (props: { result: ListResult<Row> & Record<string, unknown> }) => unknown
 }>()
 const slots = useSlots()
 
@@ -359,6 +361,16 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
       @retry="refresh()"
     >
       <template #default="{ data: result }">
+        <div
+          v-if="slots.note"
+          class="mb-3 text-sm text-muted"
+          role="status"
+        >
+          <slot
+            name="note"
+            :result="(result as ListResult<Row> & Record<string, unknown>)"
+          />
+        </div>
         <!-- Bulk actions appear only once rows are selected, and say how many they affect. -->
         <UAlert
           v-if="bulkActions && selectedRows.length"
