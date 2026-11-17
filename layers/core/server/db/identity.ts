@@ -86,6 +86,28 @@ export const passkeys = defineTable('core_passkeys', {
   extra: t => [uniqueIndex('core_passkeys_credential').on(t.credentialId), index('core_passkeys_account').on(t.accountId)],
 })
 
+/**
+ * An authenticator app (TOTP, RFC 6238) on an account: a second way to confirm it is you, offered to
+ * people whose roles reach the console. At most one per account. The shared secret is sealed with the
+ * core key. A row with no `confirmed_at` is a set-up waiting for its first code, and counts for nothing.
+ */
+export const authenticators = defineTable('core_authenticators', {
+  id: col.id(),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
+  secretSealed: col.internal(text('secret_sealed').notNull(), { encrypted: true }),
+  // The last 30-second step a code was accepted for, so a code works once.
+  lastStep: col.internal(integer('last_step').notNull().default(0)),
+  confirmedAt: col.timestamp('confirmed_at'),
+  createdAt: col.createdAt(),
+  lastUsedAt: col.personal(integer('last_used_at'), { erase: 'clear' }),
+}, {
+  id: 'aut',
+  random: true,
+  realm: 'operational',
+  onErasure: 'delete-row',
+  extra: t => [uniqueIndex('core_authenticators_account').on(t.accountId)],
+})
+
 /** A link between an account and an identity at an outside provider. Google is the first. */
 export const federatedIdentities = defineTable('core_federated_identities', {
   id: col.id(),
@@ -108,6 +130,11 @@ export const recoveryCodes = defineTable('core_recovery_codes', {
   id: col.id(),
   accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
   codeHash: col.internal(text('code_hash').notNull()),
+  // The code itself, sealed with the core key, so the person can see their set again (used ones
+  // struck through) after confirming it is them. Null for sets made before it was kept.
+  codeSealed: col.internal(text('code_sealed'), { encrypted: true }),
+  // Where the code sits in its set, so it is shown in the order it was first shown.
+  position: col.internal(integer('position')),
   createdAt: col.createdAt(),
   usedAt: col.timestamp('used_at'),
 }, {
@@ -412,6 +439,6 @@ export const accessShares = defineTable('core_access_shares', {
 }, { realm: 'audience', onErasure: 'delete-row', extra: t => [primaryKey({ columns: [t.accountId, t.purpose] })] })
 
 export const identityTables = {
-  accounts, accountEmails, passkeys, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
+  accounts, accountEmails, passkeys, authenticators, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
   roles, roleAbilities, factAbilities, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
 }

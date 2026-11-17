@@ -3,7 +3,7 @@
 // shell is told the page does not exist; someone in the shell who lacks this screen's ability is
 // told why and what would let them through. A hidden link is tidiness; this is enforcement.
 import type { Actor } from '#kit'
-import { resolveEntry, shellOf, SHELL_PREFIXES } from '../../shared/navigation'
+import { moduleTabOf, resolveEntry, shellOf, SHELL_PREFIXES } from '../../shared/navigation'
 import { declaredEntries, holds, mayOpen } from './navigation'
 import { isEntitled, isSignedIn } from './viewer'
 
@@ -11,6 +11,7 @@ export type AccessDecision
   = | { decision: 'allow' }
     | { decision: 'sign-in' }
     | { decision: 'not-found' }
+    | { decision: 'redirect', to: string }
     | { decision: 'refused', refusal: { code: string, reason: string, remedy?: string } }
 
 export async function decideAccess(actor: Actor, path: string): Promise<AccessDecision> {
@@ -27,7 +28,15 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
   const entry = resolveEntry(entries, path)
   if (!entry) return { decision: 'not-found' }
   if (!isSignedIn(actor)) return { decision: 'sign-in' }
-  if (!(await isEntitled(actor, shell))) return { decision: 'not-found' }
+  if (!(await isEntitled(actor, shell))) {
+    // A tab of a module's page in Admin opens for console staff who may use it in the console's
+    // settings window, which draws the same screen; a link or bookmark to it lands there.
+    const module = moduleTabOf(entry)
+    if (module && holds(await mayOpen(actor, entry)) && (await isEntitled(actor, 'console'))) {
+      return { decision: 'redirect', to: `/console?settings=${module}&screen=${encodeURIComponent(path)}` }
+    }
+    return { decision: 'not-found' }
+  }
   const result = await mayOpen(actor, entry)
   // A screen opens for anyone who holds its ability, as the menu shows it to them. Confirming it is
   // you (a recent or a stronger sign-in) is asked by the API when the screen loads or does

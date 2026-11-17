@@ -1,6 +1,6 @@
 // Setup, step 3: one recovery code typed back, then the Owner is written and signed in, strongly.
 import { z } from 'zod'
-import { changeSetting, defineRoute, newId, nowMs, refuse, useSetting } from '#kit'
+import { changeSetting, defineRoute, newId, nowMs, refuse, sealColumn, useSetting } from '#kit'
 import { normaliseOrigin, requestUrl } from '#kit/origin'
 import { clearTicket, readTicket, requireSetupNeeded, writeOwner } from '../../../identity/setup'
 import { digest, normaliseRecoveryCode } from '../../../identity/crypto'
@@ -18,8 +18,8 @@ export default defineRoute({
     refuse('core.setup.code-wrong', 'That is not one of your recovery codes.', { status: 422, remedy: 'Type one of the codes exactly as shown.' })
   const { accountId } = writeOwner(unit, { ...ticket, credential: ticket.credential })
   const params: unknown[] = []
-  for (const code of ticket.codes) params.push(newId('rcc', { random: true }), accountId, await digest('recovery', code), nowMs())
-  unit.add({ sql: `INSERT INTO core_recovery_codes (id, account_id, code_hash, created_at) VALUES ${ticket.codes.map(() => '(?, ?, ?, ?)').join(', ')}`, params })
+  for (const [i, code] of ticket.codes.entries()) params.push(newId('rcc', { random: true }), accountId, await digest('recovery', code), await sealColumn(code), i, nowMs())
+  unit.add({ sql: `INSERT INTO core_recovery_codes (id, account_id, code_hash, code_sealed, position, created_at) VALUES ${ticket.codes.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`, params })
   await startSession(unit, event, { accountId, methods: ['setup', 'passkey'], assurance: 'strong' })
   unit.audit({ action: 'create', record: ['core.account', accountId], detail: { setup: true } })
   // The address setup ran on becomes the site's one origin, unless the Worker names it already.
