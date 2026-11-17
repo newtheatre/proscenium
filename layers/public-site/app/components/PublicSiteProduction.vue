@@ -17,6 +17,7 @@ interface Performance {
   venue: { id: string, slug: string, name: string }
   space: { id: string, name: string }
   access: Note[]
+  effectsOff: string[]
   booking: Booking | null
 }
 interface Production {
@@ -308,6 +309,12 @@ useHead(() => {
                     class="text-sm text-muted"
                   >
                     {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
+                  </p>
+                  <p
+                    v-if="p.effectsOff.length && p.state === 'scheduled'"
+                    class="text-sm"
+                  >
+                    {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
                   </p>
                   <ul
                     v-if="p.access.length"
