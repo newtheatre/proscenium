@@ -41,6 +41,7 @@ interface Production {
   poster: Image | null
   photos: Image[]
   performances: Performance[]
+  price: PriceSummaryView | null
 }
 
 const props = defineProps<{ slug: string, prefix: 'whats-on' | 'shows' }>()
@@ -232,6 +233,12 @@ useHead(() => {
             >
               {{ t('public-site.production.dates') }}
             </h2>
+            <p
+              v-if="production.price"
+              class="mb-2 text-sm"
+            >
+              {{ priceSummary(production.price, t) }}
+            </p>
             <ul class="divide-y divide-default border-y border-default">
               <li
                 v-for="p in dates"

@@ -7,7 +7,8 @@ import { all, first, nowMs, theatreTimeZone, useSetting } from '#kit'
 import { instantOfLocal, localDateOf } from '#kit/clock'
 import { productionBySlug } from './service'
 import { shownCredits, type ShownCredit } from './credits'
-import { bookingActions, type ShownBooking } from './booking'
+import { bookingActions, priceSummaries, type ShownBooking } from './booking'
+import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
 
 export interface PublicTerm { id: string, slug: string, label: string }
@@ -50,6 +51,8 @@ export interface PublicProduction {
   poster: PublicImage | null
   photos: PublicImage[]
   performances: PublicPerformance[]
+  /** What it is sold at, while it has dates to come; null where nothing prices it. */
+  price: PriceSummary | null
 }
 
 export interface PublicProductionOptions {
@@ -147,6 +150,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     credits: await shownCredits(row.id, options.members ?? false),
     ...(await publicImages([row.id])).get(row.id)!,
     performances,
+    price: isPast(row.state, performances, now) ? null : (await priceSummaries([row.id]))[row.id] ?? null,
   }
 }
 
@@ -163,6 +167,8 @@ export interface PublicListing {
   lastEndsAt: number
   venues: string[]
   poster: PublicImage | null
+  /** What it is sold at, from Box office, or null where nothing prices it. */
+  price: PriceSummary | null
 }
 
 export interface WhatsOnOptions {
@@ -225,7 +231,7 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
       ORDER BY next_starts_at, p.id${limit}`,
     ...params,
   )
-  const images = await publicImages(rows.map(r => r.id))
+  const [images, prices] = await Promise.all([publicImages(rows.map(r => r.id)), priceSummaries(rows.map(r => r.id))])
   return rows.map(r => ({
     id: r.id,
     slug: r.slug,
@@ -237,6 +243,7 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
     lastEndsAt: r.last_ends_at,
     venues: (JSON.parse(r.venues) as string[]).sort(),
     poster: images.get(r.id)!.poster,
+    price: prices[r.id] ?? null,
   }))
 }
 
