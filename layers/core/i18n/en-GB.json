@@ -534,5 +534,15 @@
   "core.scan.problem.type-instead": "You can still type the code instead.",
   "core.scan.problem.type-below": "You can still type the code below.",
   "core.scan.type-label": "Or type the code",
-  "core.scan.type-submit": "Check"
+  "core.scan.type-submit": "Check",
+  "core.abilities.webhook.manage.label": "Look after webhooks: add, change, pause and resume them, rotate a secret, send a test and read the delivery log",
+  "core.settings-sections.webhooks": "Webhooks",
+  "core.settings.webhooks.max-attempts.label": "Tries for each webhook delivery",
+  "core.settings.webhooks.max-attempts.help": "How many times a delivery is tried before it fails for good. Each try waits four times as long as the last, from one minute.",
+  "core.settings.webhooks.pause-after.label": "Failures before a webhook is paused",
+  "core.settings.webhooks.pause-after.help": "After this many failed tries in a row, the webhook is paused, its managers are told, and nothing more is sent until someone resumes it.",
+  "core.settings.webhooks.log-retention.label": "Keep the webhook delivery log for",
+  "core.settings.webhooks.log-retention.help": "How long each webhook delivery stays in the log. Shortening it removes older entries at the next clean-up.",
+  "core.settings.webhooks.timeout.label": "Wait for a webhook to answer",
+  "core.settings.webhooks.timeout.help": "How long to wait for the receiving address to answer before the try counts as failed."
 }

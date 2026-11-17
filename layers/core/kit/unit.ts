@@ -294,6 +294,11 @@ export class UnitOfWork implements UnitView {
     const needsModules = this.items.some(i => i.kind === 'event')
     const enabled = needsModules ? await enabledModules() : undefined
     const maxAttempts = await useSetting('core.jobs.attempts')
+    // The webhook sender hears every event that is not internal, but is called only for an event some
+    // active webhook names (or names its module's "<module>.*"), so a theatre without webhooks pays
+    // one read for a unit that announces, not a job and a queue message for every event.
+    const hearsDeliverable = this.items.some(i => i.kind === 'event' && registry.listeners.get(i.name)?.some(l => l.deliverable))
+    const subscribed = hearsDeliverable ? await webhookSubscriptions(context.env.DB) : undefined
 
     const pushJob = (item: Extract<Item, { kind: 'job' }>) => {
       const declared = item.jobKind ? undefined : registry.jobs.get(item.name)
@@ -375,6 +380,7 @@ export class UnitOfWork implements UnitView {
           // later (E5).
           for (const listener of registry.listeners.get(item.name) ?? []) {
             if (!enabled!.has(listener.module)) continue
+            if (listener.deliverable && !subscribed!.has(item.name) && !subscribed!.has(`${item.name.split('.')[0]}.*`)) continue
             const name = `${listener.module}.${listener.listener}`
             if (!item.set) {
               const event = item.events[0]!
@@ -449,6 +455,12 @@ export class UnitOfWork implements UnitView {
     }
     return { unitId: this.id, results: added.map(i => results[i]!), eventIds, jobIds: [...queued.map(j => j.id), ...jobSets.map(j => j.id)] }
   }
+}
+
+/** The event names and "<module>.*" patterns that active webhooks name (core_webhooks; C-50). */
+async function webhookSubscriptions(db: D1Database): Promise<Set<string>> {
+  const { results } = await db.prepare("SELECT DISTINCT e.value AS name FROM core_webhooks w, json_each(w.events) e WHERE w.state = 'active'").all<{ name: string }>()
+  return new Set(results.map(r => r.name))
 }
 
 /** A new unit of work. A route gets one from defineRoute; a job, listener or task from the runner. */

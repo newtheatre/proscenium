@@ -622,4 +622,67 @@ export const emailEventsSetAside = defineTable('core_email_events_set_aside', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+/**
+ * Webhooks (group 6; C-49 to C-51, question 9): an outside address that is sent the theatre's
+ * events. The address and the secret are sealed with the core key and never reach a browser.
+ * `failing` is a pause the system made after too many failures in a row; `paused` is a person's.
+ */
+export const webhooks = defineTable('core_webhooks', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  format: col.internal(text('format').notNull()),
+  url: col.internal(text('url').notNull(), { encrypted: true }),
+  // The address's host, kept apart so the console can show where a webhook goes without opening the seal.
+  urlHint: col.internal(text('url_hint').notNull()),
+  secret: col.internal(text('secret'), { encrypted: true }),
+  events: col.internal(text('events', { mode: 'json' }).notNull().$type<string[]>()),
+  state: col.internal(text('state').notNull().default('active')),
+  consecutiveFailures: col.internal(integer('consecutive_failures').notNull().default(0)),
+  lastSuccessAt: col.timestamp('last_success_at'),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'whk',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_webhooks_name').on(sql`lower(${t.name})`),
+    check('core_webhooks_name_length', sql`length(${t.name}) BETWEEN 1 AND 60`),
+    check('core_webhooks_format', sql`${t.format} IN ('json', 'discord', 'slack')`),
+    check('core_webhooks_secret', sql`${t.format} <> 'json' OR ${t.secret} IS NOT NULL`),
+    check('core_webhooks_state', sql`${t.state} IN ('active', 'paused', 'failing')`),
+  ],
+})
+
+/**
+ * One event sent, or to be sent, to one webhook. The body is not kept: it is rebuilt from the event
+ * at each attempt, so no personal data can rest here. The id goes with each attempt, the same on a
+ * retry, so a receiver can ignore a repeat.
+ */
+export const webhookDeliveries = defineTable('core_webhook_deliveries', {
+  id: col.id(),
+  webhookId: col.internal(text('webhook_id').notNull().references(() => webhooks.id, { onDelete: 'cascade' })),
+  eventId: col.internal(text('event_id').notNull()),
+  eventName: col.internal(text('event_name').notNull()),
+  state: col.internal(text('state').notNull()),
+  attempts: col.internal(integer('attempts').notNull().default(0)),
+  nextAttemptAt: col.timestamp('next_attempt_at'),
+  responseStatus: col.internal(integer('response_status')),
+  lastError: col.internal(text('last_error')),
+  createdAt: col.createdAt(),
+  sentAt: col.timestamp('sent_at'),
+}, {
+  id: 'whd',
+  realm: 'operational',
+  subject: 'none',
+  retention: 'core.webhooks.log-retention',
+  extra: t => [
+    uniqueIndex('core_webhook_deliveries_event').on(t.webhookId, t.eventId),
+    index('core_webhook_deliveries_due').on(t.state, t.nextAttemptAt),
+    index('core_webhook_deliveries_log').on(t.webhookId, t.createdAt),
+    check('core_webhook_deliveries_state', sql`${t.state} IN ('queued', 'sending', 'sent', 'retrying', 'failed')`),
+  ],
+})
+
+export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
