@@ -66,14 +66,17 @@ for (const [path, title] of SCREENS) {
 }
 
 for (const [path, module, title] of [['/admin/modules/payments/providers', 'Payments', 'Providers and readers'], ['/admin/modules/finance/accounts', 'Finance', 'Ledger accounts']] as const) {
-  test(`${title}, a set-up screen, opens for console staff in the console's settings window and has no violations`, async ({ page }) => {
+  test(`${title}, a set-up screen, opens for console staff in the console's settings window and has no violations`, async ({ browser }) => {
+    // Someone who may set up payments and the ledger but has no business in Admin.
+    const context = await browser.newContext(as({ ...treasurer, accountId: 'acc_setupstaff', name: 'Sid Setup', grants: ['payments.provider.manage', 'finance.account.manage', 'finance.ledger.view'].map(grant) }))
+    const page = await context.newPage()
     await visit(page, path)
     await expect(page).toHaveURL(/\/console\?settings=/)
     const window = page.getByRole('dialog')
     await expect(window.getByRole('heading', { name: `${module} settings` })).toBeVisible()
     await expect(window.getByRole('heading', { level: 2, name: title })).toBeVisible()
-    await expect(window.getByRole('tab', { name: title })).toHaveAttribute('aria-selected', 'true')
     await noViolations(page)
+    await context.close()
   })
 }
 

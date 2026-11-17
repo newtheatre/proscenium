@@ -4,7 +4,7 @@
      any console address with ?settings=<module>; ?screen=<address in Admin> names the open tab's
      screen. The screen is the same page Admin draws, rendered here for that address. -->
 <script setup lang="ts">
-import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import { loadRouteLocation, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { resolveEntry } from '../../shared/navigation'
 
 const { t } = useT()
@@ -21,8 +21,13 @@ const screen = computed(() => {
   if (!first) return undefined
   return typeof route.query.setting === 'string' ? `${first}?setting=${encodeURIComponent(route.query.setting)}` : first
 })
-// A resolved address is what NuxtPage draws when it is not the address in the bar.
-const resolved = computed(() => screen.value ? router.resolve(screen.value) as unknown as RouteLocationNormalizedLoaded : undefined)
+// NuxtPage draws an address that is not the one in the bar once its page's code has loaded.
+const resolved = shallowRef<RouteLocationNormalizedLoaded>()
+const load = async (value: string | undefined) => value ? await loadRouteLocation(router.resolve(value)) : undefined
+resolved.value = await load(screen.value)
+watch(screen, async (value) => {
+  resolved.value = await load(value)
+})
 const active = computed(() => resolved.value ? resolveEntry(tabs.value, resolved.value.path)?.to : undefined)
 const items = computed(() => tabs.value.map(tab => ({ label: t(tab.label), value: tab.to, icon: tab.icon })))
 

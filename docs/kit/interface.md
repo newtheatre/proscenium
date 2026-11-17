@@ -62,10 +62,21 @@ contributes: {
   staff stay out of it. `GET /api/core/modules/:id/tabs` lists the tabs the viewer may open.
   `ModuleFrame` draws the page: the list of modules on the left at 1024 pixels and wider, the
   module's toggle, and the tabs, which scroll sideways on a phone.
+- **Set-up screens** (things done once or rarely) are tabs too: a module declares the entry with
+  `menu: 'admin', group: 'modules', to: '/admin/modules/<module>/<screen>'` and puts the page (and
+  its record pages) under `pages/admin/modules/<module>/`. The admin layout draws `ModuleFrame`
+  round any page under `/admin/modules/<module>`, and `PageFrame` inside it draws an embedded
+  screen (`EMBEDDED_FRAME`): a heading row with the way back, status and primary action, no panel.
+  Someone who may open the tab but not Admin is sent by the guard to the console's settings window
+  for that address (`decision: 'redirect'`). Redirect a moved screen's old console address in the
+  layer's `nuxt.config.ts` `routeRules`.
 - **The console's cog.** The console layout works out the module of the current page from its
   navigation entry; when the viewer may change any of that module's settings, `ShellTools` shows a
   cog that adds `?settings=<module>` to the address, and `ModuleSettingsWindow` (in the console
-  layout) draws the module's pages of settings in a window as wide as the settings cards. Settings
+  layout) draws the module's tabs, less About, in a window as wide as the settings cards:
+  `?screen=<address in Admin>` names the open one, and `NuxtPage` draws that address's page with
+  `EmbeddedScreens window` round it. While the window is open, the console layout keeps a link to
+  a module's address in Admin, or a screen changing its own query, inside the window. Settings
   search sends console staff to `/console?settings=<module>` and administrators to the page in Admin.
 - `GET /api/core/settings?page=<id>` gives one page's settings and `?screen=<address>` the ones a
   bespoke screen manages; each item names its `page` or `screen`. The older `?module=x` and
