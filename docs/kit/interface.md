@@ -131,6 +131,11 @@ bordered list of records. Use these two for headings and lists; do not hand-buil
 holds what belongs under it (a short form, a detail). **FactStrip** (`facts: { label, value }[]`) is the
 row of figures on a record's summary and on a screen's totals.
 
+A list the user puts in order is a **SortableList** of **SortableRow** (`id`, `index`, and RecordListItem's props), built on
+`@dnd-kit/vue`. A row's handle is the element with `data-drag-handle` in its `leading` slot; the list emits
+`reorder({ id, from, to })` and the page reorders its own array. Dragging has its own keyboard (Space, arrows, Space), but give
+the row arrow keys on the handle and Move up and Move down in its menu too (see Ticket types).
+
 `bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
 (use `UForm` or `PageForm`), no `w-full` on a form control (controls already fill their field), no
 hand-built bordered list, no native date or time input, no date formatted by hand, no form without

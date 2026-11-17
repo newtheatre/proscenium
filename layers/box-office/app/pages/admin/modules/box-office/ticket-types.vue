@@ -8,8 +8,6 @@
      only online. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { unrefElement } from '@vueuse/core'
-import { insertNodeAt, removeNode, useSortable } from '@vueuse/integrations/useSortable'
 
 type Kind = 'standard' | 'concession' | 'companion' | 'complimentary'
 type Channel = 'all' | 'desk' | 'online'
@@ -133,8 +131,6 @@ const matches = (type: TicketType) => !words.value || type.name.toLowerCase().in
 const matchingRetired = computed(() => retired.value.filter(matches))
 const noMatch = computed(() => !!words.value && !ordered.value.some(matches) && !matchingRetired.value.length)
 watch(words, (w) => { if (w && matchingRetired.value.length) showRetired.value = true })
-// The RecordList component; Sortable works on its <ul>.
-const list = useTemplateRef('list')
 const moved = ref('')
 
 async function saveOrder(type: TicketType) {
@@ -152,22 +148,15 @@ async function saveOrder(type: TicketType) {
   }
 }
 
-useSortable(list, ordered, {
-  watchElement: true,
-  handle: '[data-drag-handle]',
-  animation: 150,
-  onUpdate: (e: { item: HTMLElement, from: HTMLElement, oldIndex?: number, newIndex?: number }) => {
-    if (e.oldIndex === undefined || e.newIndex === undefined || e.oldIndex === e.newIndex) return
-    // Sortable has already moved the row; put it back so Vue draws the new order itself.
-    removeNode(e.item)
-    insertNodeAt(e.from, e.item, e.oldIndex)
-    const next = [...ordered.value]
-    const [type] = next.splice(e.oldIndex, 1)
-    next.splice(e.newIndex, 0, type!)
-    ordered.value = next
-    saveOrder(type!)
-  },
-})
+// The SortableList says what was dragged; the order is drawn from `ordered`, so it is set here.
+function onReorder({ id, from, to }: { id: string, from: number, to: number }) {
+  const next = [...ordered.value]
+  const [type] = next.splice(from, 1)
+  if (!type || type.id !== id) return
+  next.splice(to, 0, type)
+  ordered.value = next
+  saveOrder(type)
+}
 
 function move(type: TicketType, by: -1 | 1) {
   const from = ordered.value.findIndex(x => x.id === type.id)
@@ -186,8 +175,7 @@ async function onHandleKey(event: KeyboardEvent, type: TicketType) {
   move(type, by)
   // The row is drawn again in its new place: keep the keyboard on its handle.
   await nextTick()
-  const ul = unrefElement(list) as HTMLElement | undefined
-  ul?.querySelector<HTMLElement>(`[data-drag-handle="${type.id}"]`)?.focus()
+  document.querySelector<HTMLElement>(`[data-drag-handle="${type.id}"]`)?.focus()
 }
 
 function actions(type: TicketType): DropdownMenuItem[] {
@@ -256,15 +244,17 @@ function describe(type: TicketType): string {
           >
             {{ t('box-office.ticket-types.no-match', { words: search.trim() }) }}
           </p>
-          <RecordList
+          <SortableList
             v-if="ordered.length"
-            ref="list"
             :label="t('box-office.navigation.ticket-types.label')"
+            @reorder="onReorder"
           >
-            <RecordListItem
-              v-for="type in ordered"
+            <SortableRow
+              v-for="(type, position) in ordered"
               v-show="matches(type)"
+              :id="type.id"
               :key="type.id"
+              :index="position"
               :name="type.name"
               :description="describe(type)"
               :icon="type.managedBy ? 'i-lucide-lock' : undefined"
@@ -285,8 +275,8 @@ function describe(type: TicketType): string {
                 :items="actions(type)"
                 :label="t('box-office.ticket-types.actions', { name: type.name })"
               />
-            </RecordListItem>
-          </RecordList>
+            </SortableRow>
+          </SortableList>
           <CollapsibleDivider
             v-model:open="showRetired"
             class="mt-4"
