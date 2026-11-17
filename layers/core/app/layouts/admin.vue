@@ -12,6 +12,8 @@ const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.de
 const { data: navigation } = await useNavigation('admin')
 const open = ref(false)
 provide(DASHBOARD_SHELL, true)
+// A module's page (/admin/modules/<module>/...) frames whichever of its tabs is open.
+const module = computed(() => /^\/admin\/modules\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(route.path)?.[1])
 watch(() => route.fullPath, () => { open.value = false })
 
 // The browser title starts with where you are, and the buttons stay neutral (see main.css).
@@ -89,7 +91,14 @@ const groups = computed<NavigationMenuItem[]>(() => [
         tabindex="-1"
         class="admin-main flex min-w-0 flex-1 outline-none *:min-w-0 *:flex-1"
       >
-        <slot />
+        <ModuleFrame
+          v-if="module"
+          :key="module"
+          :module="module"
+        >
+          <slot />
+        </ModuleFrame>
+        <slot v-else />
       </main>
     </div>
   </UDashboardGroup>

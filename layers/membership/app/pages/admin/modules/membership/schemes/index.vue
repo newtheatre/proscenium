@@ -34,7 +34,7 @@ async function create() {
       body: { name: form.name, key: form.key, side: form.side, lengthRule: form.lengthRule, fixedEndMonth: fixed ? form.fixedEndMonth : null, fixedEndDay: fixed ? form.fixedEndDay : null },
     })
     open.value = false
-    await navigateTo(`/console/membership/schemes/${made.schemeId}`)
+    await navigateTo(`/admin/modules/membership/schemes/${made.schemeId}`)
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -73,7 +73,7 @@ async function create() {
         <RecordListItem
           v-for="s in data.schemes"
           :key="s.id"
-          :to="`/console/membership/schemes/${s.id}`"
+          :to="`/admin/modules/membership/schemes/${s.id}`"
           :name="s.name"
           :description="`${t(`membership.screens.sides.${s.side}`)} · ${t('membership.screens.schemes.holders', { count: s.holders })}`"
           :muted="s.state === 'archived'"

@@ -2,7 +2,8 @@
      tickets and membership cards one after another, and each result shows at once as one large banner
      that can be read at arm's length: green admitted, amber already in or a card to look at, blue not
      paid (a reservation's own QR code: the door takes no money, so they go to the box office or the
-     bar), red anything that does not get in. How many are in stays in view. Typing a code, finding
+     bar), red anything that does not get in, including a ticket whose holder no longer qualifies for
+     its type (such as a lapsed member), who goes to the box office to change it. How many are in stays in view. Typing a code, finding
      someone by name and pausing the camera are the large buttons at the foot. -->
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
@@ -14,6 +15,8 @@ interface Scan {
   card?: { headline: string, line: string, state: 'ok' | 'attention' }
   booking?: { reference: string, ticketType: string, admitted: number, tickets: number }
   reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
+  requirement?: { reason: string | null, ticketType: string }
+  unchecked?: boolean
 }
 interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number }
 type Tone = 'success' | 'warning' | 'info' | 'error'
@@ -61,6 +64,10 @@ function describe(out: Scan): Shown {
   }
   else if (out.result === 'admitted' && out.booking) {
     line = t('box-office.live-door.line.admitted', { type: out.booking.ticketType, admitted: out.booking.admitted, tickets: out.booking.tickets, reference: out.booking.reference })
+    if (out.unchecked) line = `${line}. ${t('box-office.door.scan.unchecked')}`
+  }
+  else if (out.result === 'requirement_not_met' && out.requirement?.reason) {
+    line = t('box-office.live-door.line.requirement_not_met', { type: out.requirement.ticketType, reason: out.requirement.reason })
   }
   else if (out.result === 'already_admitted' && out.booking && out.admittedAt) {
     line = t('box-office.live-door.line.already_admitted', { when: time(out.admittedAt), reference: out.booking.reference })

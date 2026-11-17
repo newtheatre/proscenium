@@ -38,7 +38,7 @@ export async function offSaleAt(sales: { offSaleAt: number | null }, startsAt: n
   return sales.offSaleAt ?? startsAt - (await useSetting('box-office.sales.close-before') as number) * 1000 // not-policy: seconds to milliseconds
 }
 
-export interface PricedLine { bandId: string, ticketTypeId: string, amountMinor: number, requirement: Requirement | null }
+export interface PricedLine { bandId: string, ticketTypeId: string, priceId: string, amountMinor: number, requirement: Requirement | null }
 
 /**
  * Each ticket asked for, one line apiece, at the price in force at `at`, with the pools they come
@@ -59,7 +59,10 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
   }
   if (asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
     refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
-  const each = asked.flatMap(l => Array.from({ length: l.quantity }, () => ({ bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: price.get(`${l.bandId} ${l.ticketTypeId}`)!.amountMinor })))
+  const each = asked.flatMap(l => Array.from({ length: l.quantity }, () => {
+    const p = price.get(`${l.bandId} ${l.ticketTypeId}`)!
+    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor }
+  }))
   const entitled = await entitle(performanceId, each, types, buyer)
   const lines = each.map((l, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
   return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
@@ -100,7 +103,7 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const claimed = (await claimSeats(unit, { holdId, requests: input.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
   guard(unit)
   const lineIds = unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
+    orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
     requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null,
   })))
   unit.expect(lines.length)

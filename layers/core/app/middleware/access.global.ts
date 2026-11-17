@@ -14,7 +14,7 @@ import type { RefusalView } from '../utils/refusal'
 import type { ShellNavigation } from '../composables/useNavigation'
 import type { Viewer } from '../composables/useViewer'
 
-type Answer = { decision: 'allow' | 'sign-in' | 'not-found' } | { decision: 'refused', refusal: Pick<RefusalView, 'code' | 'reason' | 'remedy'> }
+type Answer = { decision: 'allow' | 'sign-in' | 'not-found' } | { decision: 'redirect', to: string } | { decision: 'refused', refusal: Pick<RefusalView, 'code' | 'reason' | 'remedy'> }
 
 const REFRESH_EVERY = 30_000 // not-policy: how often, at most, the menu is fetched again while moving about
 let refreshedAt = 0
@@ -51,13 +51,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
   let answer: Answer
   try {
-    answer = await useRequestFetch()<Answer>('/api/core/access', { query: { path: to.path } })
+    answer = await useRequestFetch()<Answer>('/api/core/access', { query: { path: to.fullPath } })
   }
   catch (error) {
     const status = (error as { statusCode?: number }).statusCode ?? 503
     throw createError({ statusCode: status, statusMessage: 'This page could not be checked', fatal: true })
   }
   if (answer.decision === 'refused') throw createError({ statusCode: 403, statusMessage: 'Not allowed', data: answer.refusal, fatal: true })
+  if (answer.decision === 'redirect') return navigateTo(answer.to, { replace: true })
   if (answer.decision === 'sign-in') return navigateTo({ path: '/sign-in', query: { next: to.fullPath } })
   if (answer.decision === 'not-found') throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 })

@@ -167,5 +167,7 @@ export async function moduleTabs(actor: Actor, module: string): Promise<ModuleTa
     const label = entry.settingsPage === `${module}.admin` ? 'core.modules.tab.settings' : entry.label ?? entryLabelKey(entry.id)
     tabs.push({ id: entry.id, label, to: entry.to, icon: entry.icon, page: entry.settingsPage ?? null, order: entry.order ?? 0 })
   }
-  return tabs.sort((a, b) => a.order - b.order || a.to.length - b.to.length).map(({ order: _, ...tab }) => tab)
+  // Pages of settings first, then set-up screens, then About.
+  const rank = (tab: ModuleTab) => tab.page ? 0 : tab.id.startsWith('core.modules.about.') ? 2 : 1
+  return tabs.sort((a, b) => rank(a) - rank(b) || a.order - b.order || a.to.length - b.to.length).map(({ order: _, ...tab }) => tab)
 }

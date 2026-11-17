@@ -31,7 +31,7 @@ export interface ExchangeTarget {
 }
 
 /** One line's new seats, ticket type and price. */
-interface Move { line: LineRow, bandId: string, ticketTypeId: string, poolId: string, priceMinor: number }
+interface Move { line: LineRow, bandId: string, ticketTypeId: string, poolId: string, priceId: string | null, priceMinor: number }
 
 export interface ExchangeInput extends ExchangeTarget {
   by: string
@@ -55,7 +55,7 @@ export async function exchangeQuote(orderId: string, input: ExchangeTarget): Pro
   return { oldMinor, newMinor, differenceMinor: newMinor - oldMinor, paid: order.state === 'confirmed' }
 }
 
-async function check(orderId: string, input: ExchangeTarget, options: { heldPrices?: Map<string, number> } = {}) {
+async function check(orderId: string, input: ExchangeTarget, options: { heldPrices?: Map<string, { priceId: string | null, priceMinor: number }> } = {}) {
   const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
   if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
   if (order.state !== 'reserved' && order.state !== 'confirmed')
@@ -85,11 +85,11 @@ async function check(orderId: string, input: ExchangeTarget, options: { heldPric
     const { bandId, ticketTypeId } = wanted.get(line.id)!
     const pool = pools.find(p => p.bandId === bandId)
     if (!pool) refuse('box-office.exchange.bad-band', 'Those seats are not sold for that performance.', { status: 422, fields: { bandId: 'invalid' } })
-    if (!prices) return { line, bandId, ticketTypeId, poolId: pool.id, priceMinor: options.heldPrices!.get(line.id) ?? 0 }
+    if (!prices) return { line, bandId, ticketTypeId, poolId: pool.id, priceId: options.heldPrices!.get(line.id)?.priceId ?? null, priceMinor: options.heldPrices!.get(line.id)?.priceMinor ?? 0 }
     const price = prices.find(p => p.bandId === bandId && p.ticketTypeId === ticketTypeId)
     if (!price) refuse('box-office.exchange.no-price', 'That ticket type has no price for those seats.', { status: 422, fields: { ticketTypeId: 'invalid' } })
     if (price.currency !== order.currency) refuse('box-office.exchange.currency', 'That performance is sold in another currency.', { status: 422 })
-    return { line, bandId, ticketTypeId, poolId: pool.id, priceMinor: price.amountMinor }
+    return { line, bandId, ticketTypeId, poolId: pool.id, priceId: price.id, priceMinor: price.amountMinor }
   })
   return { order, chosen, moves }
 }
@@ -157,7 +157,7 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
   }
   const newIds = unit.insertSet(orderLines, moves.map((m, i) => ({
     orderId: order.id, kind: 'ticket', performanceId: input.performanceId, bandId: m.bandId, ticketTypeId: m.ticketTypeId, claimId: claimed[i],
-    listMinor: m.priceMinor, discountMinor: 0, amountMinor: m.priceMinor, replacesLineId: m.line.id, state: 'live',
+    priceId: m.priceId, listMinor: m.priceMinor, discountMinor: 0, amountMinor: m.priceMinor, replacesLineId: m.line.id, state: 'live',
   })))
   unit.expect(chosen.length)
   unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = ${order.state} AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
@@ -258,7 +258,7 @@ export async function prepareExchange(unit: UnitView, orderId: string, input: Ex
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'payment', ${order.id}, ${by}, ${at}, ${at})`)
   await claimSeats(unit, { holdId, requests: requestsFor(moves), expiresAt: at + TILL_HOLD })
   // band_id, ticket_type_id and price_minor keep the first line's, for an exchange read before moves were kept.
-  const kept = JSON.stringify(moves.map(m => ({ lineId: m.line.id, bandId: m.bandId, ticketTypeId: m.ticketTypeId, priceMinor: m.priceMinor })))
+  const kept = JSON.stringify(moves.map(m => ({ lineId: m.line.id, bandId: m.bandId, ticketTypeId: m.ticketTypeId, priceId: m.priceId, priceMinor: m.priceMinor })))
   unit.add(sql`INSERT INTO box_office_exchanges (id, order_id, line_ids, performance_id, band_id, ticket_type_id, price_minor, moves, difference_minor, hold_id, state, by, created_at, updated_at)
     VALUES (${exchangeId}, ${order.id}, ${JSON.stringify(chosen.map(l => l.id))}, ${input.performanceId}, ${moves[0]!.bandId}, ${moves[0]!.ticketTypeId}, ${moves[0]!.priceMinor}, ${kept}, ${differenceMinor}, ${holdId}, 'awaiting_payment', ${by}, ${at}, ${at})`)
   return { exchangeId, differenceMinor }
@@ -276,7 +276,7 @@ export async function settleExchange(unit: UnitView, part: Part): Promise<OwnerE
     throw new Error(`Exchange ${part.record} is not waiting for payment part ${part.id}`)
   const kept = movesOf(exchange)
   const input: ExchangeInput = { performanceId: exchange.performance_id, lines: kept.map(({ lineId, bandId, ticketTypeId }) => ({ lineId, bandId, ticketTypeId })), by: exchange.by }
-  const { order, chosen, moves } = await check(exchange.order_id, input, { heldPrices: new Map(kept.map(m => [m.lineId, m.priceMinor])) })
+  const { order, chosen, moves } = await check(exchange.order_id, input, { heldPrices: new Map(kept.map(m => [m.lineId, { priceId: m.priceId ?? null, priceMinor: m.priceMinor }])) })
   if (order.state !== 'confirmed') refuse('box-office.exchange.not-paid', 'This booking is no longer confirmed.', { status: 409 })
   const held = await all<{ id: string, pool_id: string }>('SELECT id, pool_id FROM box_office_claims WHERE hold_id = ? AND state = \'held\' ORDER BY id', exchange.hold_id)
   if (held.length !== chosen.length) refuse(CHANGED.code, 'The seats held for this exchange have gone.', { status: 409, remedy: CHANGED.remedy })
@@ -291,8 +291,8 @@ export async function settleExchange(unit: UnitView, part: Part): Promise<OwnerE
 }
 
 /** Each line's new seats, ticket type and price; an exchange kept before lines could differ gives every line the same. */
-function movesOf(exchange: ExchangeRow): { lineId: string, bandId: string, ticketTypeId: string, priceMinor: number }[] {
-  if (exchange.moves) return JSON.parse(exchange.moves) as { lineId: string, bandId: string, ticketTypeId: string, priceMinor: number }[]
+function movesOf(exchange: ExchangeRow): { lineId: string, bandId: string, ticketTypeId: string, priceId?: string | null, priceMinor: number }[] {
+  if (exchange.moves) return JSON.parse(exchange.moves) as { lineId: string, bandId: string, ticketTypeId: string, priceId?: string | null, priceMinor: number }[]
   return (JSON.parse(exchange.line_ids) as string[]).map(lineId => ({ lineId, bandId: exchange.band_id, ticketTypeId: exchange.ticket_type_id, priceMinor: exchange.price_minor }))
 }
 

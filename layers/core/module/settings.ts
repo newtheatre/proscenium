@@ -14,8 +14,9 @@ export const settingPages: Record<string, SettingPageDecl> = {
   'branding': { place: 'admin', group: 'theatre', order: 20, icon: 'i-lucide-palette' },
   'sign-in': { place: 'admin', group: 'access', order: 30, icon: 'i-lucide-log-in' },
   'privacy': { place: 'admin', group: 'access', order: 40, icon: 'i-lucide-shield' },
-  'programme': { place: 'console', group: 'programme', order: 100, icon: 'i-lucide-settings-2' },
-  'people': { place: 'console', group: 'people', order: 100, icon: 'i-lucide-settings-2' },
+  // Tabs of Core's page in Admin's Modules; console staff open them from the cog on Programme and People.
+  'programme': { place: 'admin', group: 'modules', order: 10, icon: 'i-lucide-calendar-days', to: '/admin/modules/core' },
+  'people': { place: 'admin', group: 'modules', order: 20, icon: 'i-lucide-users', to: '/admin/modules/core/people' },
 }
 const on = (page: string): SettingGroupDecl => ({ page })
 const advanced: SettingGroupDecl = { advanced: true }
