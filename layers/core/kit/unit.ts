@@ -14,6 +14,7 @@ import { nowMs } from './clock'
 import { useRegistry } from './registry'
 import { dispatch, type JobMessage, type Lane } from './dispatch'
 import { log } from './log'
+import { refuseTokens } from './tokens'
 import { useSetting } from './settings-store'
 import { enabledModules } from './modules-store'
 
@@ -194,6 +195,7 @@ export class UnitOfWork implements UnitView {
     const set = Array.isArray(entry)
     const entries = (set ? [...entry] : [entry]) as AuditEntry[]
     for (const e of entries) if (e.detail) checkDetail(e.detail)
+    refuseTokens(entries, 'An audit row')
     if (entries.length) this.items.push({ kind: 'audit', entries, set })
     return this
   }
@@ -209,6 +211,7 @@ export class UnitOfWork implements UnitView {
     const events = given.map(({ payload, record }) => {
       const parsed = declared.decl.payload.safeParse(payload)
       if (!parsed.success) throw new Error(`The payload of ${name} does not match its declaration: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`)
+      refuseTokens({ payload: parsed.data, record }, `The event ${name}`)
       return { id: newId('evt'), payload: parsed.data as Record<string, unknown>, record }
     })
     if (events.length) this.items.push({ kind: 'event', name, events, set })
@@ -230,6 +233,7 @@ export class UnitOfWork implements UnitView {
     const parsed = declared.decl.payload.safeParse(payload)
     if (!parsed.success) throw new Error(`The payload of ${job} does not match its declaration: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`)
     const id = newId('job')
+    refuseTokens(parsed.data, `The payload of ${job}`)
     this.items.push({ kind: 'job', id, name: job, payload: parsed.data, options: { lane: declared.decl.lane, ...options }, module: declared.module })
     return id
   }

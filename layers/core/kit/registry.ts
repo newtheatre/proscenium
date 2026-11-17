@@ -13,7 +13,8 @@ import { setPersonalFields } from './log'
  * Module ids the design has reserved (Formats tab). `uses` may name one before it is written; a
  * `uses` on an absent module contributes nothing.
  */
-export const RESERVED_MODULE_IDS: readonly string[] = ['public-site', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']
+/** Every settled module id, built or not (Foundations part 4, under the module table). A `uses` naming one with no module present is satisfied as absent; a `requires` is not. */
+export const RESERVED_MODULE_IDS: readonly string[] = ['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications', 'public-site']
 
 export type Owner = 'upstream' | 'site' | 'fixtures'
 
@@ -197,7 +198,11 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         }
         if (c.erase === 'retain' && !r.settings.has(c.until!)) fail(entry, `tables.${key}.${col}`, `retain until "${c.until}", which is not a setting`)
       }
-      if (meta.options.retention && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      if (typeof meta.options.retention === 'string' && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      // An internal column that erasure clears needs rows erasure can find: a subject of its own, or
+      // a chain of parents (subject { via }) that ends at an account or an email.
+      const clears = Object.entries(meta.columns).find(([, c]) => c.meta.class === 'internal' && c.meta.erase === 'clear')
+      if (clears && !reachesPerson(meta, r)) fail(entry, `tables.${key}.${clears[0]}`, `erase: 'clear' needs rows that reach a person, and ${meta.name}'s subject does not lead to an account or an email`)
     }
   }
 
@@ -250,3 +255,19 @@ export function useRegistry(): Registry {
 }
 
 export { snake }
+
+/** Whether a table's rows lead to a person: an account or email subject, through any parents. */
+function reachesPerson(meta: TableMeta, r: Registry, seen = new Set<string>()): boolean {
+  if (seen.has(meta.name)) return false
+  seen.add(meta.name)
+  const subject = meta.options.subject
+  if (subject === 'none') return false
+  if (meta.subjects.length || typeof subject === 'string' || Array.isArray(subject)) return true
+  if (subject && typeof subject === 'object' && ('email' in subject || 'account' in subject)) return true
+  if (subject && typeof subject === 'object' && 'via' in subject) {
+    const via = Object.values(meta.columns).find(c => c.sql === subject.via)
+    const parent = via?.meta.ref ? r.tables.get(via.meta.ref.table)?.meta : undefined
+    return !!parent && reachesPerson(parent, r, seen)
+  }
+  return false
+}

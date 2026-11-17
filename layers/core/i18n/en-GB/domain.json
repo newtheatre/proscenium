@@ -110,5 +110,21 @@
   "core.settings.programme.default-running-time.label": "Running time if not given",
   "core.settings.programme.default-running-time.help": "How long a new performance lasts when its production has no running time and no end is given.",
   "core.abilities.performance.schedule.label": "Add, schedule and change performances",
-  "core.abilities.performance.cancel.label": "Cancel and reinstate performances"
+  "core.abilities.performance.cancel.label": "Cancel and reinstate performances",
+  "core.abilities.production.cancel.label": "Cancel a whole production",
+  "core.settings.programme.team-standing-after.label": "How long a production's team keeps its standing",
+  "core.settings.programme.team-standing-after.help": "People credited on a production reach the members' area until this long after its last performance ends.",
+  "core.navigation.credits.label": "Your credits",
+  "core.me.credits.title": "Your credits",
+  "core.me.credits.intro": "The productions you are credited on. Choose who sees each credit: anyone, members only, or nobody.",
+  "core.me.credits.none": "You are not credited on any production.",
+  "core.me.credits.line": "{name}, {role} ({section})",
+  "core.me.credits.who-sees": "Who sees your credit on {production}",
+  "core.me.credits.saved": "Your credit is updated",
+  "core.me.credits.visibility.public": "Anyone",
+  "core.me.credits.visibility.members": "Members only",
+  "core.me.credits.visibility.hidden": "Hidden",
+  "core.me.credits.summary.one": "You are credited on {count} production.",
+  "core.me.credits.summary.other": "You are credited on {count} productions.",
+  "core.me.credits.open": "Choose who sees them"
 }

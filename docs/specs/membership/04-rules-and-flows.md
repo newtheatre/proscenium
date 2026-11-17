@@ -139,7 +139,7 @@ The journey for a scheme with `join_mode` `apply`. Steps 3 to 5 exist only when 
 
 ## Requirements and activation
 
-- **A1.** A membership becomes `active` in the unit of work that sets its last outstanding requirement timestamp, by one conditional update: `... set state = 'active', starts_on = ?, ends_on = ?, activated_at = ? where id = ? and state = 'pending' and` every needed timestamp is set. The unit expects one row to change.
+- **A1.** A membership becomes `active` in the unit of work that sets its last outstanding requirement timestamp, by one conditional update: `... set state = 'active', starts_on = ?, ends_on = ?, activated_at = ? where id = ? and state = 'pending' and` every needed timestamp is set. The unit goes on only if the kit's guard passed; it never tests a count of changed rows for an exact number.
 - **A2.** The three requirements are independent and may be met in any order, with one exception: payment is not offered until verification and approval are met. Nobody is asked to pay for a membership they may be refused.
 - **A3.** The first activation of any membership for an account writes its `membership_members` row and number in the same unit.
 - **A4.** Activation announces `membership.membership.started` and sends the welcome notification on the side the scheme is on.
@@ -197,7 +197,7 @@ These rules belong to `membership-fees`. With that module off, no scheme can req
 - **P6.** Income is posted in full on the day the charge is paid, to the system account `membership-fees.income`. It is not spread across the membership's months.
 - **P7.** A refund is asked for with `requestRefund` and follows Payments' own approval rule (two people). The handler's `refunded(uow, refund)` adds the reversing posting and updates the charge. A full refund ends the membership with reason `refunded` when `membership-fees.refunds.end-on-full-refund` is on; a part refund leaves it running.
 - **P8.** At the desk, staff with `membership-fees.payment.take` take the fee through the panel the fees module contributes to `payments.desk-basket`, inside the seller's open till session, by any method the desk offers, alone or with tickets in one payment. The panel's prepare returns the owner and amount; letting go of a prepared charge is the settlement handler's release (rule P4), not the panel's. The settle handler is the same; if any part of a shared payment refuses, nothing settles.
-- **P9.** Staff adding a member directly choose one of: take payment now (P8), send the person a link to pay (the membership waits as pending), or mark the fee as waived with a reason. A waiver sets `paid_at`, voids the charge and is audited; it needs `membership-fees.charge.waive`.
+- **P9.** Staff adding a member directly choose one of: take payment now (P8), send the person a link to pay (the membership waits as pending; the link is the address of their own application page, built with the kit's siteUrl, carries no token and asks them to sign in, so nothing in the message can pay, confirm or reveal anything by itself), or mark the fee as waived with a reason. A waiver sets `paid_at`, voids the charge and is audited; it needs `membership-fees.charge.waive`.
 
 ## Renewal
 

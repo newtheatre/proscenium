@@ -18,7 +18,7 @@ Among the seven accepted: core does not know whether a performance is on sale (B
 
 What the design comes to:
 
-- **Two modules.** Core, always on, to which this workstream adds 26 core-domain tables. The public site, which can be switched off and owns no tables.
+- **Two modules.** Core, always on, to which this workstream adds 27 core-domain tables. The public site, which can be switched off and owns no tables.
 - **Five things with a life cycle:** season, production, performance, file, delivery.
 - **Five groups of services every module calls:** programme, vocabularies, files, notifications, and brand and organisation.
 - **Vocabularies are core's**, by the integrating thread's ruling, so the form builder and every module share one way to keep an editable list of options.
@@ -32,7 +32,7 @@ It is aligned with the platform foundations draft: its names, its four ways for 
 ```mermaid
 flowchart LR
     PS["<b>Public site</b><br/>module, can be off<br/><br/>What is on, productions<br/>Seasons, archive, venues<br/>Pages from the fork<br/>Content components<br/><br/>Owns no tables"]
-    CORE["<b>Core</b><br/>always on, 26 tables<br/><br/>Programme: seasons, productions, performances<br/>Places: venues, spaces, closures<br/>Vocabularies<br/>Files<br/>Notifications<br/>Brand and organisation<br/><br/>One D1 database, R2, one queue"]
+    CORE["<b>Core</b><br/>always on, 27 tables<br/><br/>Programme: seasons, productions, performances<br/>Places: venues, spaces, closures<br/>Vocabularies<br/>Files<br/>Notifications<br/>Brand and organisation<br/><br/>One D1 database, R2, one queue"]
     OM["<b>Other modules</b><br/>each can be off<br/><br/>Box office<br/>Front of house<br/>Form builder<br/>Spaces, communications<br/><br/>Core never imports them"]
     PS -->|reads| CORE
     CORE -->|events| PS
@@ -48,7 +48,7 @@ flowchart LR
 | Part | State | Known gaps |
 | --- | --- | --- |
 | 1. Scope | Draft complete | None. Every assumption about another workstream is confirmed or ruled on. |
-| 2. Data model | Draft complete | Rewritten on 16 November 2026 into the foundations table layout: table options, data classes, erasure behaviour and id prefixes for all 26 tables. Templates are split into drafts and published versions, as the ruling requires. The final table list is at the end of the tab. |
+| 2. Data model | Draft complete | Rewritten on 16 November 2026 into the foundations table layout: table options, data classes, erasure behaviour and id prefixes for all 27 tables. Templates are split into drafts and published versions, as the ruling requires. The final table list is at the end of the tab. |
 | 3. States and rules | Draft complete | Bounces are proved on a real sending domain. The complaint event is not yet proved. |
 | 4. Interface to other modules | Draft complete | Service signatures are names and intent, not types. Workstream 2 has named its three services (addressFor, holdersOf, mergeAccounts). |
 | 5. Screens | Inventory complete; three wireframes | The other screens are described, not drawn. Final layouts are workstream 6's. |

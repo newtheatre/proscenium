@@ -26,7 +26,7 @@ describe('matchSettings (UI-15)', () => {
   })
   it('returns nothing for an empty term and links to the setting on its own page', () => {
     expect(matchSettings(index, '  ', t)).toEqual([])
-    expect(matchSettings(index, 'theatre', t)[0]!.to).toBe('/console/system/settings?setting=core.brand.name')
+    expect(matchSettings(index, 'theatre', t)[0]!.to).toBe('/console/core/settings?setting=core.brand.name')
     expect(settingsPageOf('seats')).toBe('/console/seats/settings')
     expect(settingsPageOf('core', 'site')).toBe('/admin/settings')
   })

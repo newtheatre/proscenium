@@ -283,6 +283,13 @@ export interface ListResult<Row> {
   rows: Row[]
   /** All rows that match, not just this page. */
   total: number
+  /** Filter keys the server left out because the viewer may not use them: their chips go. */
+  dropped?: string[]
+  /** Search words too short to search, and whether that left nothing to search for. */
+  ignoredWords?: string[]
+  searchTooShort?: boolean
+  /** For a row whose match was in a column that is not on screen: that column's key, by row id. */
+  matched?: Record<string, string>
 }
 
 /** CSV with the quoting spreadsheets expect, and a guard against formulas in a cell. */

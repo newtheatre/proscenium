@@ -57,7 +57,7 @@ Integration ruling R-33, which replaces R-31. Drawn as W9 in the Wireframes sub-
 - **Home** is Overview at `/admin`: first what needs attention (an update ready to apply, a sending domain not verified, failed jobs, a credential about to lapse), then the state of the installation. Modules contribute its cards through `core.home-card` with `menu: 'admin'`.
 - **Moving between the two:** the account menu's Site administration entry, from anywhere. "Back to console" at the top of the sidebar, shown to a holder of any console ability; anyone else sees "Back to the site". A module's console settings page says "Some of this module's settings are in Site administration" with a link, when it has site-wide settings the viewer may open. The console's sidebar carries no link here. The command palette offers the screens of both to a person entitled to both, each named with its shell.
 - **Narrow layout:** as the console. Below 1024 pixels the sidebar is a drawer and tables are cards; the strip stays and carries the drawer's toggle. Every screen works on a phone; none is designed there first.
-- **A module's site-wide settings:** a module's settings stay in the console by default. A setting may declare `scope: 'site'` (the default is `'module'`), and it is then shown at `/admin/settings`, grouped by module, in place of the module's page at `/console/<module>/settings`. The key and the ability that guards it do not change. `/admin/settings` still searches every setting and links out to a module's page for the module-scoped ones.
+- **Where a setting is shown** (R-37, which withdraws the per-setting `scope` and the `/admin/settings` page). Placement is declared for a group of settings, not for one setting, in the manifest's `settingGroups`, and pages are declared in `settingPages`; the format is foundations' (Settings registry tab). Set once for the install, or touching security or the whole site: site administration. Changed in a normal season by the people running the theatre: the console, beside the work it governs. A module's groups go to its own console page unless it says otherwise. A group managed on a screen of its own (Branding, Senders) is drawn on no generated page. Engineering limits from every module sit together on Advanced. The key and the ability that guards a setting do not change with its place.
 - **Updates and the maintenance state:** foundations' Updates screen is at `/admin/updates`, seen with `core.health.view` and applied with foundations' migrations ability. A newer release shows as a card on Overview that links to it. After a deploy whose database changes are waiting to be applied, only Updates, Health and sign-in answer: every other address, `/admin` and Overview included, shows foundations' plain maintenance page, which links an administrator to `/admin/updates`. **No backups screen:** the platform takes no backups.
 
 Groups and entries, in the platform's fixed order. A group's id is what an entry names; a group with nothing the viewer may open is absent.
@@ -65,18 +65,18 @@ Groups and entries, in the platform's fixed order. A group's id is what an entry
 | Group (id) | Entry | Address | Owner |
 | --- | --- | --- | --- |
 | none | Overview | `/admin` | interface |
-| Theatre (`theatre`) | Organisation | `/admin/organisation` | core domain |
-|  | Branding | `/admin/branding` | core domain |
+| Theatre (`theatre`) | Theatre (generated settings page: the site, the organisation, language and region) | `/admin/theatre` | core domain declares, interface draws |
+|  | Branding (its own screen; its settings are drawn nowhere else) | `/admin/branding` | core domain |
 |  | Vocabularies | `/admin/vocabularies` | core domain |
 |  | Navigation | `/admin/navigation` | interface |
 |  | Site readiness | `/admin/site-readiness` | core domain |
-| Modules and settings (`modules`) | Modules | `/admin/modules` | foundations |
-|  | Settings | `/admin/settings` | foundations |
+| Modules (`modules`) | Modules | `/admin/modules` | foundations |
+|  | A module's own page, when it places a settings group here | `/admin/modules/<module>` | the module declares, interface draws |
 | Access (`access`) | Roles, and one role | `/admin/roles`, `/admin/roles/<role>` | identity |
 |  | Facts | `/admin/facts` | identity |
-|  | Sign-in | `/admin/sign-in` | identity |
-|  | Retention (a later release) | `/admin/retention` | identity |
-| Email (`email`) | Senders | `/admin/email` | core domain |
+|  | Sign-in (generated settings page: sign-in, sessions, recovery, access) | `/admin/sign-in` | identity declares, interface draws |
+|  | Privacy (generated settings page) | `/admin/privacy` | core declares, interface draws |
+| Email (`email`) | Senders (its own screen; holds the sending domain, label and footer) | `/admin/email` | core domain |
 |  | Delivery health | `/admin/email/health` | core domain |
 | Connections (`connections`) | Credentials | `/admin/credentials` | foundations |
 |  | Webhooks | `/admin/webhooks` | core domain |
@@ -84,8 +84,12 @@ Groups and entries, in the platform's fixed order. A group's id is what an entry
 |  | Jobs | `/admin/jobs` | foundations |
 |  | Health | `/admin/health` | foundations |
 |  | Audit log | `/admin/audit` | foundations |
+|  | Settings history | `/admin/settings-history` | interface |
+|  | Advanced (engineering limits from every module, with a warning at the top) | `/admin/advanced` | interface |
 
-Staying in the console: every module's own work and its settings page; core's Programme screens, Files, message types, the template editor and the delivery log; identity's People group (accounts, adding and merging, who holds what, data requests and the access scheme). The old `/console/system/...` addresses redirect to their `/admin` ones. A theatre's own module may add an entry to one of these groups, or declare a group of its own placed `before` or `after` one.
+There is no Settings entry and no page of "core settings": integration ruling R-37 (Matt, 16 November 2026) gives every setting exactly one home. `/admin/settings` and `/console/system/settings` redirect to `/admin`, the Overview. Core's Organisation screen at `/admin/organisation` is gone, replaced by the generated Theatre page (Integration, 16 November 2026). One later entry is not in the table: identity's Retention screen at `/admin/retention`, in Access after Privacy, in a later release. It is the one home of `core.retention.armed`, beside the report of what each sweep would do; only the retention periods are on Advanced. The shell has six groups, in this fixed order: Theatre, Modules, Access, Email, Connections, Upkeep (ids `theatre`, `modules`, `access`, `email`, `connections`, `upkeep`), with Overview above them in no group.
+
+Staying in the console: every module's own work and its settings page; two generated settings pages for core's console-side groups, Programme settings (in Programme's set-up half) and People settings (in People's); core's Programme screens, Files, message types, the template editor and the delivery log; identity's People group (accounts, adding and merging, who holds what, data requests and the access scheme). The old `/console/system/...` addresses redirect to their `/admin` ones. A theatre's own module may add an entry to one of these groups, or declare a group of its own placed `before` or `after` one.
 
 ### Live mode
 

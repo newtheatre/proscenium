@@ -94,6 +94,12 @@ The fourth shell, at `/admin`, holds what is set up once for the whole installat
 
 All five declare menu `admin` and the group `access` (label "Access"), in this order: Roles at `/admin/roles`; Role at `/admin/roles/<role>`, reached from Roles with no menu entry of its own; Facts at `/admin/facts`; Sign-in at `/admin/sign-in`; Retention at `/admin/retention` when it ships. The shell needs no ability of its own: a holder of `core.role.read` or `core.identity-settings.manage` sees Site administration in the account menu and only the entries they may open, and anybody else gets page not found at `/admin`. A role's "who holds this" link crosses to the console's People group.
 
+Sign-in is a generated settings page: it draws the groups `sign-in`, `sessions` and `recovery`. Two more generated pages hold identity's settings and are not counted among its screens: Privacy at `/admin/privacy`, and People settings in the console's People group (grants, the members' area, the access scheme, emergency contacts and merge). Retention is identity's own screen, showing what each sweep would do and holding the arm control; the sweeps' other limits are on Site administration's Advanced page. Part 6 gives the home of every setting.
+
+The Sign-in page's sections run in this order: Signing in, Sessions, Recovery, then Access, which is foundations' group and holds `core.access.fresh-within`. A group is placed once for the whole core module, so a key that foundations or core domain later adds under one of identity's groups appears on that group's page.
+
+With the generated pages counted, the Access group of Site administration reads: Roles, Facts, Sign-in, Privacy, and later Retention.
+
 ## Rules for these screens
 
 1. **The account page in the console is assembled from sections, and each section belongs to a side.** A member of staff sees only the sections their abilities open. The page never shows an empty frame for a section they cannot see.

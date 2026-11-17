@@ -6,10 +6,11 @@
 // re-points every other module's `move` columns and runs their merge handlers in the background.
 import { accountScopeSql } from '#kit/accounts'
 import { all, moveAccountColumn, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
-import { accountById } from './accounts'
+import { accountById, verifiedAddressesOf } from './accounts'
 import { LIVE, guardLastOwner, isOwner } from './grants'
 import { SETTLED_IN_STAGE_ONE, accountColumns, moveModules, startMergeMove } from './merge-move'
 import { endSessionsOf } from './sessions'
+import { queueNotice } from './notices'
 
 /** What a merge does to one account column. `module-handler` is another module's merge handler, run by stage two. */
 export interface MergeStep { module: string, table: string, column: string, action: 'move' | 'move-unless-present' | 'alias' | 'delete' | 'end-sessions' | 'end-duplicate-grants' | 'module-handler' | 'none' }
@@ -143,6 +144,8 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
     .expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
   if ((await isOwner(mergedAccountId)) || (await isOwner(survivorId))) guardLastOwner(unit)
   startMergeMove(unit, mergeId)
+  // Rule 5: every verified address of both accounts is told, read before this unit moves them.
+  await queueNotice(unit, 'core.merge-notice', [...await verifiedAddressesOf(survivorId), ...await verifiedAddressesOf(mergedAccountId)])
   unit.announce('core.account.merged', { survivorId, mergedAccountId, mergeId }, { record: ['core.account', survivorId] })
   unit.audit({ action: 'state', ...(input.startedBy === 'claim' ? {} : { ability: 'core.account.merge' }), record: ['core.account', survivorId], detail: { mergedAccountId, mergeId, grantsReplaced: ended.size, startedBy: input.startedBy ?? 'staff' } })
   return mergeId
