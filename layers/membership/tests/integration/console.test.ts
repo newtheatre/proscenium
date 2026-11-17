@@ -6,6 +6,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, setClock } from '#kit'
 import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 import searchGet from '../../server/api/membership/search.get'
+import accountMemberships from '../../server/api/membership/accounts/[id]/memberships.get'
+import applicationsCount from '../../server/contributions/core.count/applications-waiting'
 import schemeResolver from '../../server/contributions/core.record-resolver/scheme'
 import membershipResolver from '../../server/contributions/core.record-resolver/membership'
 import applicationsWaiting from '../../server/contributions/core.health-check/applications-waiting'
@@ -13,7 +15,7 @@ import openSchemes from '../../server/contributions/core.health-check/open-schem
 import remindersRan from '../../server/contributions/core.health-check/reminders-ran'
 import { NOV_17, applicant, ready, req, scheme } from './stage'
 
-const search = server({ 'GET /api/membership/search': searchGet })
+const search = server({ 'GET /api/membership/search': searchGet, 'GET /api/membership/accounts/:id/memberships': accountMemberships })
 const viewer = person(['membership.membership.view'], { reassertedAt: NOV_17 })
 const find = async (q: string, actor = viewer) => {
   const response = await call(search, 'GET', `/api/membership/search?q=${encodeURIComponent(q)}`, { actor })
@@ -50,6 +52,25 @@ describe('finding members from the palette', () => {
     expect(await inContext(() => schemeResolver.resolve(m.schemeId))).toMatchObject({ title: expect.stringMatching(/^Scheme \d+$/), to: `/admin/modules/membership/schemes/${m.schemeId}` })
     expect((await find('')).body.ids).toEqual([])
     expect((await find('Palette', person([]))).status).toBe(403)
+  })
+})
+
+describe('a person\'s Membership tab and the applications count', () => {
+  it('lists a person\'s memberships with their number, and counts applications waiting for those who may see them', async () => {
+    const m = await joined('Tab Person')
+    const tab = await call(search, 'GET', `/api/membership/accounts/${m.who.accountId}/memberships`, { actor: viewer })
+    const body = await tab.json() as any
+    expect(tab.status, JSON.stringify(body)).toBe(200)
+    expect(body).toMatchObject({ number: expect.stringMatching(/^M-\d+$/), memberships: [{ id: m.membershipId, status: 'current', startsOn: '2026-11-17' }] })
+    expect((await call(search, 'GET', `/api/membership/accounts/${m.who.accountId}/memberships`, { actor: person([]) })).status).toBe(403)
+
+    const id = await scheme()
+    expect((await req('PATCH', `/api/membership/schemes/${id}`, { verifier: 'membership.staff' })).status).toBe(200)
+    expect((await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })).status).toBe(200)
+    const before = await inContext(() => applicationsCount.value(viewer as never))
+    await req('POST', `/api/membership/schemes/${id}/join`, {}, await applicant('Counted Applicant'))
+    expect(await inContext(() => applicationsCount.value(viewer as never))).toBe(before + 1)
+    expect(await inContext(() => applicationsCount.value(person([]) as never))).toBe(0)
   })
 })
 

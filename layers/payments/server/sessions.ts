@@ -5,20 +5,45 @@
 // a session with a difference. A theatre that takes no cash (payments.cash.enabled off, the default)
 // still opens sessions, since desk sales are made in one, but they hold no float and close with
 // nothing to count.
+//
+// Opening the till opens the seller's session (selling proposal, 17 November 2026), at a place: the
+// space the device used last, else payments.sessions.default-space, else unknown. A session with no
+// cash and nothing waiting closes itself after payments.sessions.close-when-quiet; one with cash
+// stops instead and awaits its count, which no longer stops the seller opening the next.
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
+import { getSpace, placeName } from '#modules/core'
 import { postEntries } from '#modules/finance'
 import { labelsOf } from './people'
 
-export interface SessionRow { id: string, point_label: string, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
+export interface SessionRow { id: string, point_label: string, space_id: string | null, closed_how: 'hand' | 'quiet' | null, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
 
 export async function getSession(id: string): Promise<SessionRow | null> {
   return first<SessionRow>('SELECT * FROM payments_sessions WHERE id = ?', id)
 }
 
-/** The person's session not yet closed, if they have one. */
+/** The person's open session, the one their sales go into, if they have one. */
 export async function sessionOf(accountId: string): Promise<SessionRow | null> {
-  return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state <> 'closed' AND opened_by IN (${accountScopeSql('?1')}) ORDER BY opened_at DESC LIMIT 1`, accountId)
+  return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state = 'open' AND opened_by IN (${accountScopeSql('?1')}) ORDER BY opened_at DESC LIMIT 1`, accountId)
+}
+
+/** The person's sessions that have stopped and are waiting for their cash to be counted, oldest first. */
+export async function awaitingCountOf(accountId: string): Promise<SessionRow[]> {
+  return all<SessionRow>(`SELECT * FROM payments_sessions WHERE state = 'counting' AND opened_by IN (${accountScopeSql('?1')}) ORDER BY opened_at`, accountId)
+}
+
+/** Whether any cash has moved in the session: taken, or handed back from it. */
+export async function cashMoved(sessionId: string): Promise<boolean> {
+  return !!(await first(`SELECT 1 FROM payments_attempts a JOIN payments_intents i ON i.id = a.intent_id WHERE i.session_id = ?1 AND a.method = 'cash' AND a.state = 'succeeded'
+    UNION ALL SELECT 1 FROM payments_refunds r WHERE r.session_id = ?1 AND r.state = 'succeeded' LIMIT 1`, sessionId))
+}
+
+/** A space a session may be at: one that exists and is not archived. */
+async function checkSpace(spaceId: string | null | undefined): Promise<string | null> {
+  if (!spaceId) return null
+  const space = await getSpace(spaceId)
+  if (!space || space.archived) throw new Refusal('payments.session.no-such-space', 'There is no such space.', { status: 422, fields: { spaceId: 'payments.session.no-such-space' } })
+  return space.id
 }
 
 /** Expected cash: the float, plus cash taken in the session, less cash handed back from it. */
@@ -29,9 +54,13 @@ export async function expectedCash(session: SessionRow): Promise<number> {
   return session.float_minor + (row?.taken ?? 0) - (row?.back ?? 0)
 }
 
-/** Opens a session for the person. Refused while they have another not yet closed. */
-export async function openSession(unit: UnitView, input: { accountId: string, pointLabel: string, floatMinor?: number }): Promise<string> {
-  if (await sessionOf(input.accountId)) throw new Refusal('payments.session.already-open', 'You already have a till session open.', { status: 409, remedy: 'Cash up that session first.' })
+/**
+ * Opens a session for the person, at a space (none is unknown) with an optional note. Refused while
+ * they have another open; one awaiting its count does not stop it.
+ */
+export async function openSession(unit: UnitView, input: { accountId: string, spaceId?: string | null, pointLabel?: string, floatMinor?: number }): Promise<string> {
+  if (await sessionOf(input.accountId)) throw new Refusal('payments.session.already-open', 'You already have a till session open.', { status: 409, remedy: 'Close that session first.' })
+  const spaceId = await checkSpace(input.spaceId)
   const cash = await useSetting('payments.cash.enabled')
   if (!cash && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' }, remedy: 'Leave the float empty, or turn on taking cash in Payments settings.' })
   const float = input.floatMinor ?? (cash ? await useSetting('payments.sessions.default-float') as number : 0)
@@ -42,13 +71,33 @@ export async function openSession(unit: UnitView, input: { accountId: string, po
   // The partial unique index on opened_by refuses a race the read did not see. It compares stored ids,
   // which is why opened_by moves on a merge.
   unit.add({
-    sql: `INSERT INTO payments_sessions (id, point_label, opened_by, opened_at, state, float_minor, currency, created_at, updated_at)
-      SELECT ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state <> 'closed'
+    sql: `INSERT INTO payments_sessions (id, point_label, space_id, opened_by, opened_at, state, float_minor, currency, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state = 'open'
         AND opened_by = ? -- exact-account: the one-open-session index compares stored ids
       )`,
-    params: [id, input.pointLabel, input.accountId, at, float, currency, at, at, input.accountId],
+    params: [id, input.pointLabel?.trim() ?? '', spaceId, input.accountId, at, float, currency, at, at, input.accountId],
   }).expect(1, { code: 'payments.session.already-open', reason: 'You already have a till session open.' })
   return id
+}
+
+/**
+ * Moves a session to another space or changes its note; while it is open and no cash has moved in
+ * it, also its float. Who may do it is the route's question.
+ */
+export async function placeSession(unit: UnitView, session: SessionRow, input: { spaceId?: string | null, pointLabel?: string, floatMinor?: number }): Promise<void> {
+  const spaceId = input.spaceId === undefined ? session.space_id : await checkSpace(input.spaceId)
+  const note = input.pointLabel === undefined ? session.point_label : input.pointLabel.trim()
+  let float = session.float_minor
+  if (input.floatMinor !== undefined && input.floatMinor !== session.float_minor) {
+    if (!(await useSetting('payments.cash.enabled')) && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' } })
+    if (session.state !== 'open' || await cashMoved(session.id)) throw new Refusal('payments.session.float-fixed', 'The float can only change before the first cash is taken.', { status: 409, fields: { floatMinor: 'payments.session.float-fixed' } })
+    if (!Number.isSafeInteger(input.floatMinor) || input.floatMinor < 0) throw new Refusal('payments.session.bad-float', 'The float is a whole amount, nothing or more.', { status: 422, fields: { floatMinor: 'payments.session.bad-float' } })
+    float = input.floatMinor
+  }
+  unit.add({
+    sql: 'UPDATE payments_sessions SET space_id = ?, point_label = ?, float_minor = ?, updated_at = ? WHERE id = ? AND state = ?',
+    params: [spaceId, note, float, nowMs(), session.id, session.state],
+  }).expect(1, { code: 'payments.session.changed', reason: 'This session changed while you were looking at it.' })
 }
 
 /** Stops new payments and works out the cash expected. Refused while a payment in it has no answer. */
@@ -90,7 +139,7 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
 
   const at = nowMs()
   unit.add({
-    sql: "UPDATE payments_sessions SET state = 'closed', counted_cash_minor = ?, variance_note = ?, closed_by = ?, closed_at = ?, updated_at = ? WHERE id = ? AND state = 'counting'",
+    sql: "UPDATE payments_sessions SET state = 'closed', counted_cash_minor = ?, variance_note = ?, closed_by = ?, closed_at = ?, closed_how = 'hand', updated_at = ? WHERE id = ? AND state = 'counting'",
     params: [input.countedMinor, note, input.by, at, at, session.id],
   }).expect(1, { code: 'payments.session.not-counting', reason: 'This session is no longer being counted.' })
   if (variance !== 0) {
@@ -110,8 +159,11 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
   return { varianceMinor: variance }
 }
 
-/** handlesCash: whether the session has cash to count, because cash is taken or it held a float or cash anyway. */
-export interface SessionSummary { handlesCash: boolean, id: string, pointLabel: string, openedBy: string, openedByName: string, closedBy: string | null, closedByName: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
+/**
+ * handlesCash: whether the session has cash to count, because cash is taken or it held a float or
+ * cash anyway. place: its space as a person reads it, null for unknown; pointLabel is its note.
+ */
+export interface SessionSummary { handlesCash: boolean, id: string, spaceId: string | null, place: string | null, pointLabel: string, closedHow: 'hand' | 'quiet' | null, openedBy: string, openedByName: string, closedBy: string | null, closedByName: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
 export async function summarise(session: SessionRow, names?: Map<string, string>, cashTaken?: boolean): Promise<SessionSummary> {
   const expected = session.expected_cash_minor ?? await expectedCash(session)
@@ -120,7 +172,10 @@ export async function summarise(session: SessionRow, names?: Map<string, string>
   return {
     handlesCash: cash || session.float_minor > 0 || expected !== 0 || (session.counted_cash_minor ?? 0) > 0,
     id: session.id,
+    spaceId: session.space_id,
+    place: session.space_id ? await placeName(session.space_id) : null,
     pointLabel: session.point_label,
+    closedHow: session.closed_how,
     openedBy: session.opened_by,
     openedByName: label.get(session.opened_by) ?? '',
     closedBy: session.closed_by,
@@ -164,4 +219,38 @@ export async function waitingIn(sessionId: string): Promise<WaitingAttempt[]> {
       JOIN payments_intents i ON i.id = a.intent_id JOIN payments_provider_accounts p ON p.id = a.provider_account_id
       WHERE i.session_id = ? AND a.state IN ('started', 'pending', 'unknown') ORDER BY a.started_at`, sessionId)
   return rows.map(r => ({ id: r.id, method: r.method, amountMinor: r.amount_minor, currency: r.currency, state: r.state, provider: r.label, startedAt: r.started_at, unknownAt: r.state === 'unknown' ? null : r.started_at + answerWithin * SECOND }))
+}
+
+/** When a sale was last made in the session, or when it opened if none was. */
+export async function lastSaleIn(session: SessionRow): Promise<number> {
+  const row = await first<{ at: number | null }>('SELECT max(created_at) AS at FROM payments_intents WHERE session_id = ?', session.id)
+  return Math.max(session.opened_at, row?.at ?? 0)
+}
+
+/** When an open session closes itself if nothing more is sold in it. */
+export async function closesAt(session: SessionRow): Promise<number> {
+  const quiet = await useSetting('payments.sessions.close-when-quiet') as number
+  return await lastSaleIn(session) + quiet * SECOND
+}
+
+/**
+ * Ends a session that has been quiet for payments.sessions.close-when-quiet: one with no float, no
+ * cash moved and no payment waiting closes itself; one with cash stops and awaits its count, shown
+ * under Needs attention. A payment still waiting leaves it open until it has its answer.
+ */
+export async function closeIfQuiet(unit: UnitView, session: SessionRow): Promise<'closed' | 'counting' | null> {
+  if (session.state !== 'open' || await closesAt(session) > nowMs()) return null
+  if ((await waitingIn(session.id)).length) return null
+  if (session.float_minor > 0 || await cashMoved(session.id)) {
+    await startCount(unit, session)
+    return 'counting'
+  }
+  const at = nowMs()
+  unit.add({
+    sql: `UPDATE payments_sessions SET state = 'closed', expected_cash_minor = 0, counted_cash_minor = 0, closed_at = ?, closed_how = 'quiet', updated_at = ? WHERE id = ? AND state = 'open'
+      AND NOT EXISTS (SELECT 1 FROM payments_attempts a JOIN payments_intents i ON i.id = a.intent_id WHERE i.session_id = ? AND a.state IN ('started', 'pending', 'unknown'))`,
+    params: [at, at, session.id, session.id],
+  }).expect(1, { code: 'payments.session.not-quiet', reason: 'This session is no longer quiet.' })
+  unit.announce('payments.session.closed', { sessionId: session.id }, { record: ['payments.session', session.id] })
+  return 'closed'
 }

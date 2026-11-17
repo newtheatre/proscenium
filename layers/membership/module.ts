@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, credentialDecl, point, setting, task } from '#kit'
+import { ability, credentialDecl, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -64,6 +64,8 @@ export default defineModule({
     // Correcting a membership's dates (D7, MEM-28). Nobody corrects their own.
     'membership.update': ability({ on: 'membership.membership', owner: 'refuses', implies: ['membership.view'] }),
     // Exporting the members list (MEM-27): a file of people, so privileged.
+    // Importing members from a file (MEM-49): a dry run, then bulk jobs. Privileged: it makes accounts.
+    'membership.import': ability({ on: 'membership.scheme', risk: 'privileged', implies: ['membership.add'] }),
     'membership.export': ability({ risk: 'privileged', implies: ['membership.view'] }),
     // Asking whether somebody else holds a membership: a seller checking a customer's member price,
     // a steward at the door. The requirement source's checkAbility.
@@ -79,6 +81,8 @@ export default defineModule({
   facts: defineFacts('membership', {
     'holder': factDecl({ standing: true }),
     'supporter': factDecl(),
+    // A voting scheme's members, after the qualifying period (MEM-09).
+    'voter': factDecl(),
     'scheme-holder': factDecl({ on: 'membership.scheme' }),
   }),
 
@@ -97,6 +101,20 @@ export default defineModule({
     MEMBERSHIP_LIST_KEY: credentialDecl({ needed: 'when-used', manage: 'membership.verification-list.manage', confirm: true }),
   },
 
+  jobs: {
+    // A share of a members import (MEM-49), on the bulk lane so a large file never holds up the prompt one.
+    'membership.import-members': job({
+      payload: z.object({
+        importId: z.string(),
+        schemeId: z.string(),
+        importedBy: z.string().nullable(),
+        day: z.string(),
+        rows: z.array(z.object({ line: z.number(), address: z.string(), name: z.string().nullable(), startsOn: z.string().nullable(), endsOn: z.string().nullable() })),
+      }),
+      lane: 'bulk',
+    }),
+  },
+
   tasks: {
     // Names on list entries kept long enough after their end (V18), and entries past their list's
     // date or membership.verification.list-keep-for.
@@ -113,7 +131,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'membership.schemes', menu: 'admin', group: 'modules', to: '/admin/modules/membership/schemes', match: '/admin/modules/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
-      { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5 },
+      { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5, count: 'membership.applications-waiting' },
       { id: 'membership.lists', menu: 'admin', group: 'modules', to: '/admin/modules/membership/lists', match: '/admin/modules/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],
@@ -177,6 +195,16 @@ export default defineModule({
       { id: 'membership.membership', file: 'membership' },
       { id: 'membership.verification-list', file: 'verification-list' },
     ],
+    // Setting up membership (MEM-45): the first scheme is required; a list only for a scheme that checks one.
+    'core.setup-step': [
+      { id: 'membership.first-scheme', required: true, to: '/admin/modules/membership/schemes', order: 40 },
+      { id: 'membership.verification-list', required: false, to: '/admin/modules/membership/lists', order: 41 },
+    ],
+    // Applications waiting on staff: beside the Applications entry, and as a card on the console home.
+    'core.count': [{ id: 'membership.applications-waiting', file: 'applications-waiting' }],
+    'core.home-card': [{ id: 'membership.applications', home: 'console', ability: 'membership.membership.view', component: 'MembershipApplicationsCard', urgency: 'today', count: 'membership.applications-waiting' }],
+    // A person's memberships, on their page in the console.
+    'core.record-tab': [{ id: 'membership.account', record: 'core.account', ability: 'membership.membership.view', component: 'MembershipAccountTab', order: 30 }],
     'core.health-check': [
       { id: 'membership.applications-waiting', file: 'applications-waiting' },
       { id: 'membership.open-schemes', file: 'open-schemes' },
@@ -187,6 +215,8 @@ export default defineModule({
     // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.
     // Ends live memberships in the erasure batch (X4); claimed list entries are let go and emptied.
     'core.erasure-handler': [{ id: 'membership', file: 'membership' }],
+    // X2, X3: a duplicate open application is superseded before the memberships move.
+    'core.merge-handler': [{ id: 'membership', file: 'membership' }],
     'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
     // The member price: a ticket type Box office keeps for anyone with a current membership of any
     // scheme, checked when bought and again at the door. The theatre prices it per band.

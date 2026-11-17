@@ -1,0 +1,232 @@
+// The bar (Bar specification, tab 2): the catalogue and its prices. A product has one or more
+// variants, each sold at a price from a price list; Standard always exists. A price is never edited:
+// a new row replaces it from its moment, so a bar sale keeps the price it was rung up at. An outlet is
+// a place that sells, with its default list. None of these tables names a customer.
+import { check, index, integer, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { col, defineTable } from '#kit/db'
+
+export const OUTLET_KINDS = ['bar', 'kiosk', 'desk'] as const
+
+const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
+
+/** A named set of prices. Standard is made with the module and never removed. */
+export const priceLists = defineTable('bar_price_lists', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  systemKey: col.internal(text('system_key')),
+  // Choosing a restricted list at the till needs bar.sale.use-restricted-price-list.
+  restricted: col.internal(integer('restricted', { mode: 'boolean' }).notNull().default(false)),
+  // A variant with no price on this list uses Standard's.
+  fallsBack: col.internal(integer('falls_back', { mode: 'boolean' }).notNull().default(true)),
+  // Set: the list has no prices of its own, and each is Standard's less this percentage.
+  percentOff: col.internal(integer('percent_off')),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bpls',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_price_lists_name').on(sql`lower(${t.name})`),
+    uniqueIndex('bar_price_lists_system_key').on(t.systemKey).where(sql`system_key IS NOT NULL`),
+    check('bar_price_lists_percent', sql`${t.percentOff} IS NULL OR (${t.percentOff} BETWEEN 1 AND 100)`),
+    check('bar_price_lists_standard', sql`${t.systemKey} IS NULL OR (${t.percentOff} IS NULL AND ${t.active} = 1)`),
+  ],
+})
+
+/** A group of products, for the till's grid and for reports. */
+export const categories = defineTable('bar_categories', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  position: col.internal(integer('position').notNull()),
+  // A named colour token, always shown beside the name.
+  colour: col.internal(text('colour')),
+  // A Finance account of the bar's own; null posts to bar.income.
+  incomeAccountId: col.internal(text('income_account_id')),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bcat',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('bar_categories_name').on(sql`lower(${t.name})`)],
+})
+
+/** A thing a customer asks for by name. Retired, never deleted, once it has been sold. */
+export const products = defineTable('bar_products', {
+  id: col.id(),
+  categoryId: col.ref('bar_categories'),
+  name: col.public(text('name').notNull()),
+  // Selling it asks the age check.
+  ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  position: col.internal(integer('position').notNull()),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bprd',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [index('bar_products_category').on(t.categoryId, t.position)],
+})
+
+/** One sellable size of a product. A one-size product has one, named "Each", hidden on the till. */
+export const variants = defineTable('bar_variants', {
+  id: col.id(),
+  productId: col.ref('bar_products'),
+  name: col.public(text('name').notNull()),
+  barcode: col.internal(text('barcode')),
+  position: col.internal(integer('position').notNull()),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bvar',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_variants_name').on(t.productId, sql`lower(${t.name})`),
+    uniqueIndex('bar_variants_barcode').on(t.barcode).where(sql`barcode IS NOT NULL`),
+  ],
+})
+
+/**
+ * A variant's price on a list from a moment. The newest row in force wins; a null amount withdraws
+ * the price, so the variant follows Standard again where the list falls back.
+ */
+export const prices = defineTable('bar_prices', {
+  id: col.id(),
+  variantId: col.ref('bar_variants'),
+  priceListId: col.ref('bar_price_lists'),
+  amountMinor: col.minor('amount_minor'),
+  currency: col.currency('currency').notNull(),
+  effectiveFrom: col.timestamp('effective_from').notNull(),
+  setBy: col.account('set_by', { role: 'actor', onMerge: 'alias' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bprc',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('bar_prices_in_force').on(t.variantId, t.priceListId, t.effectiveFrom),
+    check('bar_prices_amount', sql`${t.amountMinor} IS NULL OR ${t.amountMinor} >= 0`),
+  ],
+})
+
+/** A place that sells. One desk outlet at most: the one the till's bar panel sells from at the box office. */
+export const outlets = defineTable('bar_outlets', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  kind: col.internal(text('kind', { enum: OUTLET_KINDS }).notNull()),
+  priceListId: col.ref('bar_price_lists'),
+  spaceId: col.ref('core_spaces', { nullable: true }),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bout',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_outlets_name').on(sql`lower(${t.name})`).where(sql`active = 1`),
+    uniqueIndex('bar_outlets_one_desk').on(t.kind).where(sql`kind = 'desk' AND active = 1`),
+    check('bar_outlets_kind', sql`${t.kind} IN (${inList(OUTLET_KINDS)})`),
+  ],
+})
+
+export const OPENING_STATES = ['open', 'closed'] as const
+export const SALE_STATES = ['open', 'awaiting_payment', 'paid', 'void'] as const
+export const CHANNELS = ['till', 'desk', 'self'] as const
+
+/** One period of trading at one outlet. An outlet has one open opening; closed is final. */
+export const openings = defineTable('bar_openings', {
+  id: col.id(),
+  outletId: col.ref('bar_outlets'),
+  performanceId: col.ref('core_performances', { nullable: true }),
+  operatingDay: col.localDate('operating_day').notNull(),
+  state: col.internal(text('state', { enum: OPENING_STATES }).notNull()),
+  openedBy: col.account('opened_by', { role: 'actor', onMerge: 'alias' }),
+  closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  openedAt: col.timestamp('opened_at').notNull(),
+  closedAt: col.timestamp('closed_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bopn',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_openings_one_open').on(t.outletId).where(sql`state = 'open'`),
+    index('bar_openings_day').on(t.operatingDay),
+    check('bar_openings_state', sql`${t.state} IN (${inList(OPENING_STATES)})`),
+  ],
+})
+
+/**
+ * One customer's basket and its payment. Anonymous: no account, no name. Its total is kept by a
+ * trigger from its lines; paid and void are final; it leaves open only with a line.
+ */
+export const sales = defineTable('bar_sales', {
+  id: col.id(),
+  reference: col.internal(text('reference').notNull()),
+  openingId: col.ref('bar_openings'),
+  priceListId: col.ref('bar_price_lists'),
+  state: col.internal(text('state', { enum: SALE_STATES }).notNull()),
+  totalMinor: col.minor('total_minor').notNull().default(0),
+  currency: col.currency('currency').notNull(),
+  intentId: col.internal(text('intent_id')),
+  partId: col.internal(text('part_id')),
+  channel: col.internal(text('channel', { enum: CHANNELS }).notNull()),
+  soldBy: col.account('sold_by', { role: 'actor', onMerge: 'alias' }),
+  // Made on the device, so a repeated request makes one sale.
+  clientKey: col.internal(text('client_key').notNull()),
+  paidAt: col.timestamp('paid_at'),
+  voidedAt: col.timestamp('voided_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bsal',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_sales_reference').on(t.reference),
+    uniqueIndex('bar_sales_client_key').on(t.clientKey),
+    index('bar_sales_opening').on(t.openingId, t.state),
+    index('bar_sales_intent').on(t.intentId),
+    check('bar_sales_state', sql`${t.state} IN (${inList(SALE_STATES)})`),
+    check('bar_sales_channel', sql`${t.channel} IN (${inList(CHANNELS)})`),
+    check('bar_sales_total', sql`${t.totalMinor} >= 0`),
+    check('bar_sales_paid', sql`${t.state} <> 'paid' OR ${t.paidAt} IS NOT NULL`),
+  ],
+})
+
+/** One size, a quantity and the price fixed when the line was written. Changed only while its sale is open. */
+export const saleLines = defineTable('bar_sale_lines', {
+  id: col.id(),
+  saleId: col.ref('bar_sales'),
+  variantId: col.ref('bar_variants'),
+  priceId: col.ref('bar_prices'),
+  quantity: col.internal(integer('quantity').notNull()),
+  unitMinor: col.minor('unit_minor').notNull(),
+  discountMinor: col.minor('discount_minor').notNull().default(0),
+  amountMinor: col.minor('amount_minor').notNull(),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bsln',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('bar_sale_lines_sale').on(t.saleId),
+    check('bar_sale_lines_quantity', sql`${t.quantity} >= 1`),
+    check('bar_sale_lines_unit', sql`${t.unitMinor} >= 0`),
+    check('bar_sale_lines_discount', sql`${t.discountMinor} >= 0 AND ${t.discountMinor} <= ${t.unitMinor} * ${t.quantity}`),
+    check('bar_sale_lines_amount', sql`${t.amountMinor} = ${t.unitMinor} * ${t.quantity} - ${t.discountMinor}`),
+  ],
+})
+
+export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines }

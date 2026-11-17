@@ -130,6 +130,29 @@ async function inherit(bandId: string, typeId: string) {
   await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: [{ bandId, ticketTypeId: typeId, performanceId: d.performance.id, amountMinor: null, inherit: true }] } }), t('box-office.setup.prices.reverted'))
 }
 
+// Copying another performance's set-up (BO-02).
+interface Source { id: string, title: string, label: string | null, startsAt: number }
+const { data: sources } = await useAPI<{ performances: Source[] }>(() => `${base.value}/sources`, { key: `box-office:setup:sources:${id.value}`, default: () => ({ performances: [] }) })
+const sourceItems = computed(() => (sources.value?.performances ?? []).map(p => ({ value: p.id, label: [p.title, dateTime(p.startsAt), p.label].filter(Boolean).join(' · ') })))
+const copyFrom = ref<string | undefined>(undefined)
+async function copySetup(confirmOverVenue = false) {
+  const from = sourceItems.value.find(s => s.value === copyFrom.value)
+  if (!from) return
+  if (!confirmOverVenue && !await confirm({ verb: t('box-office.setup.copy.verb'), thing: from.label, consequence: t('box-office.setup.copy.consequence'), button: t('box-office.setup.copy.button') })) return
+  refusal.value = null
+  try {
+    const done = await $api<{ bands: number, pools: number, prices: number }>(`${base.value}/copy`, { method: 'POST', body: { fromPerformanceId: from.value, confirmOverVenue } })
+    toast.add({ title: t('box-office.setup.copy.done'), description: t('box-office.setup.copy.done-detail', done), color: 'success' })
+    copyFrom.value = undefined
+    await refresh()
+  }
+  catch (e) {
+    const r = toRefusal(e)
+    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return copySetup(true)
+    refusal.value = r
+  }
+}
+
 const band = ref({ name: '', kind: 'standard' as 'standard' | 'wheelchair' | 'restricted_view' })
 const bandKinds = computed(() => (['standard', 'wheelchair', 'restricted_view'] as const).map(value => ({ value, label: t(`box-office.setup.bands.kind.${value}`) })))
 async function addBand() {
@@ -212,6 +235,43 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             :title="t('box-office.setup.checklist')"
             :checks="checks"
           />
+
+          <PageSection
+            :title="t('box-office.setup.copy.title')"
+            :description="t('box-office.setup.copy.description')"
+          >
+            <p
+              v-if="!sourceItems.length"
+              class="text-sm text-muted"
+            >
+              {{ t('box-office.setup.copy.none') }}
+            </p>
+            <UForm
+              v-else
+              :state="{ copyFrom }"
+              @submit="copySetup()"
+            >
+              <UFormField :label="t('box-office.setup.copy.from')">
+                <div class="flex flex-wrap gap-2">
+                  <USelectMenu
+                    v-model="copyFrom"
+                    class="min-w-72 flex-1"
+                    :items="sourceItems"
+                    value-key="value"
+                    :placeholder="t('box-office.setup.copy.placeholder')"
+                  />
+                  <UButton
+                    type="submit"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-copy"
+                    :label="t('box-office.setup.copy.button')"
+                    :disabled="!copyFrom"
+                  />
+                </div>
+              </UFormField>
+            </UForm>
+          </PageSection>
 
           <PageSection
             :title="t('box-office.setup.capacity.title')"

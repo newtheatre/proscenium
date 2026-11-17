@@ -2,7 +2,8 @@
 // with nothing added by the test: the app's own fetch gives every write a key, so a screen never
 // fails with "This request needs an Idempotency-Key header". Adding a ticket type was the report;
 // a band and prices on a performance's set-up go through the same kind of route. A price for one
-// performance only shows where it comes from and can be handed back to the production's.
+// performance only shows where it comes from and can be handed back to the production's. A second
+// performance copies the first one's set-up.
 import { test, expect, type Page } from '@playwright/test'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -14,6 +15,7 @@ const base = { baseURL: 'http://localhost:8788' }
 const stamp = Date.now() % 1_000_000
 const typeName = `Writes price ${stamp}`
 let performanceId = ''
+let secondId = ''
 
 test.beforeAll(async ({ playwright }) => {
   const settings = await playwright.request.newContext({ ...base, ...as(owner) })
@@ -32,6 +34,9 @@ test.beforeAll(async ({ playwright }) => {
   const performance = await post(`/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 86_400_000, capacity: 100 })
   await post(`/api/core/performances/${performance.id}/schedule`, {})
   performanceId = performance.id
+  const second = await post(`/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 2 * 86_400_000, capacity: 100 })
+  await post(`/api/core/performances/${second.id}/schedule`, {})
+  secondId = second.id
   await api.dispose()
 })
 test.use(as(manager))
@@ -71,4 +76,21 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
   await expect(page.getByText('This performance now uses the price for all performances').first()).toBeVisible()
   await expect(page.getByText('Same as all performances.')).toBeVisible()
   await expect(page.getByLabel(typeName)).toHaveValue(/12\.00/)
+})
+
+test('Copy one performance\'s set-up onto another', async ({ page }) => {
+  await visit(page, `/console/box-office/performances/${performanceId}`)
+  // A number box commits from its buttons; typing alone does not.
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Increment' }).first().click()
+  await page.getByRole('button', { name: 'Save seats' }).click()
+  await expect(page.getByText('Seats saved').first()).toBeVisible()
+
+  await visit(page, `/console/box-office/performances/${secondId}`)
+  await expect(page.getByText('No other performance has been set up yet.')).toHaveCount(0)
+  await page.getByLabel('Copy from').click()
+  await page.getByRole('option', { name: new RegExp(`The Writes Show ${stamp}`) }).click()
+  await page.getByRole('button', { name: 'Copy set-up' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Copy set-up' }).click()
+  await expect(page.getByText('Set-up copied').first()).toBeVisible()
+  await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
 })

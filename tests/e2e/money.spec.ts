@@ -1,5 +1,5 @@
 // The money screens in a real browser: Payments' and Finance's console pages load for someone who
-// holds their abilities, have no accessibility violations, and a till session opens from My session.
+// holds their abilities, have no accessibility violations, and the till opens a till session by itself.
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
@@ -44,7 +44,6 @@ async function noViolations(page: Page) {
 }
 
 const SCREENS = [
-  ['/console/payments/session', 'My session'],
   ['/console/payments/sessions', 'Till sessions'],
   ['/console/payments/attention', 'Needs attention'],
   ['/console/payments/refunds', 'Refunds'],
@@ -80,7 +79,7 @@ for (const [path, module, title] of [['/admin/modules/payments/providers', 'Paym
   })
 }
 
-for (const [path, title] of [['/console/payments/session', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
+for (const [path, title] of [['/console/payments/sessions', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
   test(`${title} open from the cog on ${path} and have no violations`, async ({ page }) => {
     await visit(page, path)
     await page.getByRole('link', { name: title }).click()
@@ -91,21 +90,21 @@ for (const [path, title] of [['/console/payments/session', 'Payments settings'],
 
 test('the till is a live screen: a tile on Tonight and a link in the Money group', async ({ page }) => {
   await visit(page, '/console/payments/sessions')
-  await expect(page.getByRole('link', { name: 'Open the till' })).toHaveAttribute('href', '/live/till')
+  await expect(page.getByRole('link', { name: 'Open the till' }).first()).toHaveAttribute('href', '/live/till')
   await visit(page, '/live')
   await page.getByRole('link', { name: 'Till' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
   await noViolations(page)
 })
 
-test('My session opens a till with a float and shows the cash expected', async ({ page }) => {
-  await visit(page, '/console/payments/session')
-  await page.getByRole('textbox', { name: /^Till/ }).fill('Box office desk')
-  await page.getByLabel(/^Float/).fill('50')
-  await page.getByRole('button', { name: 'Open session' }).click()
-  await expect(page.getByRole('heading', { name: 'Box office desk' })).toBeVisible()
-  await expect(page.getByText('£50.00').first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Start counting' })).toBeEnabled()
+test('the till opens a session by itself, shown as Your session above Till sessions with the cash expected', async ({ page }) => {
+  await visit(page, '/live/till')
+  await expect(page.getByText(/^Your session since/)).toBeVisible()
+  await visit(page, '/console/payments/sessions')
+  await expect(page.getByRole('heading', { name: 'Your session' })).toBeVisible()
+  await expect(page.getByText('Cash expected now')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Close and count' })).toBeEnabled()
+  await expect(page.getByRole('link', { name: 'My session' })).toHaveCount(0)
   await noViolations(page)
 })
 
@@ -200,8 +199,8 @@ test('the Till picks a sale up again when the SumUp app sends the seller back', 
 
 test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {
   await visit(page, '/console/payments/sessions')
-  // Other browser tests open tills of the same name, so this looks for one and for its state.
-  await expect(page.getByRole('cell', { name: 'Box office desk' }).first()).toBeVisible()
+  // The till opened the treasurer's session at no place; other browser tests open more.
+  await expect(page.getByRole('cell', { name: /^Unknown/ }).first()).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Open', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('searchbox')).toBeVisible()
   await visit(page, '/console/payments/sessions?view=counting')
@@ -241,21 +240,23 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   await expect(card.getByText('Missing Secret key')).toBeVisible()
 })
 
-test('without cash, My session asks for no float and closes in one step', async ({ page, playwright }) => {
+test('without cash, a seller\'s session has no float and closes in one step from Your session', async ({ page, playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
   // Back to the default, which later files expect too.
   expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: false }], confirm: true } })).ok()).toBe(true)
   await api.dispose()
-  const seller = { ...treasurer, accountId: 'acc_nocashseller', name: 'Nora No-Cash', grants: ['payments.session.open', 'payments.session.view'].map(grant) }
+  // A seller who may not see everyone's sessions sees only their own on Sessions.
+  const seller = { ...treasurer, accountId: 'acc_nocashseller', name: 'Nora No-Cash', grants: ['payments.session.open', 'gallery.sample.view'].map(grant) }
   await page.context().setExtraHTTPHeaders(as(seller).extraHTTPHeaders)
-  await visit(page, '/console/payments/session')
-  await expect(page.getByLabel(/^Float/)).toHaveCount(0)
-  await page.getByRole('textbox', { name: /^Till/ }).fill('Card desk')
-  await page.getByRole('button', { name: 'Open session' }).click()
-  await expect(page.getByRole('heading', { name: 'Card desk' })).toBeVisible()
+  await visit(page, '/live/till')
+  await expect(page.getByText(/^Your session since/)).toBeVisible()
+  await visit(page, '/console/payments/sessions')
+  await expect(page.getByRole('heading', { name: 'Your session' })).toBeVisible()
+  await expect(page.getByRole('searchbox')).toHaveCount(0)
   await expect(page.getByText('Cash expected now')).toHaveCount(0)
+  await expect(page.getByText('Closes itself at about')).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Close session' }).click()
   await expect(page.getByText('Session closed', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Open a till session' })).toBeVisible()
+  await expect(page.getByText('You have no session open. The till opens one when you go to it.')).toBeVisible()
 })

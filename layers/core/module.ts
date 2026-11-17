@@ -63,6 +63,7 @@ export default defineModule({
       // Identity's site administration (identity spec part 6): defining roles and facts, and how people sign in.
       { id: 'core.roles', menu: 'admin', group: 'access', to: '/admin/roles', match: '/admin/roles', icon: 'i-lucide-shield-user', ability: 'core.role.read', order: 10 },
       { id: 'core.settings-history', menu: 'admin', group: 'upkeep', to: '/admin/settings-history', icon: 'i-lucide-history', ability: 'core.audit.view', order: 80 },
+      { id: 'core.webhooks', menu: 'admin', group: 'connections', to: '/admin/webhooks', match: '/admin/webhooks', icon: 'i-lucide-webhook', ability: 'core.webhook.manage', order: 20 },
       { id: 'core.facts', menu: 'admin', group: 'access', to: '/admin/facts', icon: 'i-lucide-badge-check', ability: 'core.role.read', order: 20 },
     ],
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
