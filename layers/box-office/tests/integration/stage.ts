@@ -50,6 +50,9 @@ import compsPost from '../../server/api/box-office/comps/index.post'
 import compApprove from '../../server/api/box-office/comps/[id]/approve.post'
 import compDecline from '../../server/api/box-office/comps/[id]/decline.post'
 import compWithdraw from '../../server/api/box-office/comps/[id]/withdraw.post'
+import bookGet from '../../server/api/box-office/book/performances/[id].get'
+import publishProduction from '../../../core/server/api/core/productions/[id]/publish.post'
+import editProduction from '../../../core/server/api/core/productions/[id]/index.patch'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -101,6 +104,9 @@ export const handle = server({
   'POST /api/box-office/comps/:id/approve': compApprove,
   'POST /api/box-office/comps/:id/decline': compDecline,
   'POST /api/box-office/comps/:id/withdraw': compWithdraw,
+  'GET /api/box-office/book/performances/:id': bookGet,
+  'POST /api/core/productions/:id/publish': publishProduction,
+  'PATCH /api/core/productions/:id': editProduction,
   'POST /api/payments/till/sale': tillSalePost,
   'POST /api/payments/till/summary': tillSummaryPost,
 })
