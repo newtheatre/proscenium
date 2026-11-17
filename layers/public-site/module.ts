@@ -15,6 +15,8 @@ export default defineModule({
   settings: defineSettings('public-site', {
     // Off makes every past production answer "not found" (C-47). Current shows are unaffected.
     'archive.public': setting.boolean({ default: true, change, audience: 'public', onChange: 'confirm' }),
+    // The earliest year the archive shows; unset shows everything. A year still to come shows nothing yet.
+    'archive.from-year': setting.integer({ unset: true, min: 1800, max: 9999, change, audience: 'public' }), // not-policy: the bounds of a year
     // Keep a cancelled performance listed, marked as cancelled, until its date passes.
     'listing.cancelled-visible': setting.boolean({ default: true, change, audience: 'public' }),
   }),

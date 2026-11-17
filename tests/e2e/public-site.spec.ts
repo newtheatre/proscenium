@@ -10,11 +10,13 @@ import { png } from './images'
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
 const owner = person('acc_siteowner', 'Site Owner', ['core.settings.manage', 'core.modules.manage', 'core.vocabulary.manage'])
-const manager = person('acc_sitemanager', 'Site Manager', ['core.production.view', 'core.production.create', 'core.production.edit', 'core.production.publish', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage'])
+const manager = person('acc_sitemanager', 'Site Manager', ['core.production.view', 'core.production.create', 'core.production.edit', 'core.production.publish', 'core.production.cancel', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
 const title = `The Public Show ${stamp}`
 let slug = ''
+const pastTitle = `The Cancelled Show ${stamp}`
+let pastSlug = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, method: 'post' | 'patch' = 'post') {
   const response = await api[method](path, { data, headers: { 'idempotency-key': crypto.randomUUID() } })
@@ -61,6 +63,15 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/core/productions/${production.id}/media`, { fileId })
   await post(api, `/api/core/productions/${production.id}/publish`, {})
   slug = (await (await api.get(`/api/core/productions/${production.id}`)).json()).production.slug
+
+  // A cancelled production is past at once, so it is in the archive with no waiting.
+  const past = await post(api, '/api/core/productions', { title: pastTitle, kind: 'visiting' })
+  await post(api, `/api/core/productions/${past.id}`, { summary: 'A visiting show.', categoryTermId: play.id, advisoriesConfirmedNone: true, companyName: `Lantern Company ${stamp}` }, 'patch')
+  const pastDate = await post(api, `/api/core/productions/${past.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: at(2) })
+  await post(api, `/api/core/performances/${pastDate.id}/schedule`, {})
+  await post(api, `/api/core/productions/${past.id}/publish`, {})
+  await post(api, `/api/core/productions/${past.id}/cancel`, { reasonTermId: reason.id })
+  pastSlug = (await (await api.get(`/api/core/productions/${past.id}`)).json()).production.slug
   await api.dispose()
 })
 
@@ -132,4 +143,40 @@ test('a current show under /shows goes to /whats-on, and an unknown one is not f
   await expect(page).toHaveURL(new RegExp(`/whats-on/${slug}$`))
   const response = await page.goto('/whats-on/no-such-show-at-all')
   expect(response?.status()).toBe(404)
+})
+
+test('the archive finds a past show by its company and opens it under /shows', async ({ page }) => {
+  await visit(page, '/shows')
+  await expect(page.getByRole('heading', { name: 'Past shows', level: 1 })).toBeVisible()
+  await page.getByLabel('Find a show, company or person').fill(`Lantern Company ${stamp}`)
+  await page.getByRole('button', { name: 'Search' }).click()
+  await expect(page).toHaveURL(/\/shows\?q=/)
+  await expect(page.getByRole('heading', { name: /^1 show found for/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: new RegExp(pastTitle) })).toHaveAttribute('href', `/shows/${pastSlug}`)
+  await expect(page.getByText('Cancelled', { exact: true })).toBeVisible()
+  // The pointer is still over Search; its hover shade is not what a reader sees at rest.
+  await page.mouse.move(0, 0)
+  await noViolations(page)
+  await page.screenshot({ path: 'test-results/public-archive-light.png', fullPage: true })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await noViolations(page)
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.getByText(pastTitle).click({ force: true })
+  await expect(page).toHaveURL(new RegExp(`/shows/${pastSlug}$`))
+  await expect(page.getByRole('heading', { name: pastTitle, level: 1 })).toBeVisible()
+
+  // Its old address under /whats-on goes to /shows, temporarily.
+  const redirect = await page.request.get(`/whats-on/${pastSlug}`, { maxRedirects: 0 })
+  expect(redirect.status()).toBe(302)
+  expect(redirect.headers().location).toMatch(new RegExp(`/shows/${pastSlug}$`))
+})
+
+test('the archive search works with scripts off', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false })
+  const page = await context.newPage()
+  await page.goto('/shows')
+  await page.getByLabel('Find a show, company or person').fill(pastTitle)
+  await page.getByRole('button', { name: 'Search' }).click()
+  await expect(page.getByRole('link', { name: new RegExp(pastTitle) })).toHaveAttribute('href', `/shows/${pastSlug}`)
+  await context.close()
 })
