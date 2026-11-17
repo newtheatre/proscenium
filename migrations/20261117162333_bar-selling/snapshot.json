@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "32b9ee6e-234e-4903-b7dc-dbb37b5ba92d",
+  "id": "1457236d-0760-4122-80fa-dae4db7c0441",
   "prevIds": [
-    "d6ab5daf-55de-487b-86aa-8bdfe2628447"
+    "04d21c65-a6a8-4ad4-a52b-23aed5443da5"
   ],
   "ddl": [
     {
@@ -12934,6 +12934,16 @@
     },
     {
       "table": "payments_sessions",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
       "name": "opened_by",
       "type": "text",
       "notNull": true,
@@ -13015,6 +13025,16 @@
     {
       "table": "payments_sessions",
       "name": "variance_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "closed_how",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -16300,7 +16320,7 @@
         }
       ],
       "isUnique": true,
-      "where": "state <> 'closed'",
+      "where": "state = 'open'",
       "origin": "manual",
       "entityType": "indexes"
     },
