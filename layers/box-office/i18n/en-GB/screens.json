@@ -446,5 +446,15 @@
   "box-office.live-door.line.already_admitted": "At {when} · {reference}",
   "box-office.live-door.line.not_paid.one": "1 ticket, {amount} to pay, booking {reference}. Send them to the box office or the bar to pay.",
   "box-office.live-door.line.not_paid.other": "{count} tickets, {amount} to pay, booking {reference}. Send them to the box office or the bar to pay.",
-  "box-office.door.open-live": "Open the door scanner"
+  "box-office.door.open-live": "Open the door scanner",
+  "box-office.setup.copy.title": "Copy set-up",
+  "box-office.setup.copy.description": "Start from another performance: its bands, capacities, prices and limits are copied here. Sold tickets and holds are not.",
+  "box-office.setup.copy.from": "Copy from",
+  "box-office.setup.copy.placeholder": "Choose a performance",
+  "box-office.setup.copy.none": "No other performance has been set up yet.",
+  "box-office.setup.copy.button": "Copy set-up",
+  "box-office.setup.copy.verb": "Copy the set-up of",
+  "box-office.setup.copy.consequence": "This performance's capacities and limits are replaced. Prices that differ are set here; other performances keep theirs.",
+  "box-office.setup.copy.done": "Set-up copied",
+  "box-office.setup.copy.done-detail": "{pools} bands with capacity, {prices} prices set, {bands} bands added."
 }
