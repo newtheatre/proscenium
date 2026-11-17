@@ -20,10 +20,13 @@ const props = withDefaults(defineProps<{
   statusColor?: 'success' | 'warning' | 'error' | 'neutral'
   /** A box in the dialog to type a code instead, for a screen with nowhere else to type one. */
   typing?: boolean
-}>(), { label: undefined, continuous: false, disabled: false, status: null, statusColor: 'neutral', typing: false })
+  /** Only the icon, with the words in a hint, to sit beside a field's own button. */
+  iconOnly?: boolean
+}>(), { label: undefined, continuous: false, disabled: false, status: null, statusColor: 'neutral', typing: false, iconOnly: false })
 const emit = defineEmits<{ scanned: [code: string] }>()
 
 const { t } = useT()
+const words = computed(() => props.label ?? t('core.scan.button'))
 const open = ref(false)
 const video = ref<HTMLVideoElement | null>(null)
 const problem = ref<'insecure' | 'no-camera' | 'denied' | 'failed' | null>(null)
@@ -139,18 +142,28 @@ onBeforeUnmount(stop)
 </script>
 
 <template>
+  <IconButton
+    v-if="iconOnly"
+    icon="i-lucide-scan-qr-code"
+    variant="outline"
+    :label="words"
+    :disabled="disabled"
+    @click="open = true"
+  />
+  <UButton
+    v-else
+    icon="i-lucide-scan-qr-code"
+    color="neutral"
+    variant="outline"
+    :label="words"
+    :disabled="disabled"
+    @click="open = true"
+  />
   <UModal
     v-model:open="open"
     :title="t('core.scan.title')"
     :description="t('core.scan.description')"
   >
-    <UButton
-      icon="i-lucide-scan-qr-code"
-      color="neutral"
-      variant="outline"
-      :label="label ?? t('core.scan.button')"
-      :disabled="disabled"
-    />
     <template #body>
       <div class="space-y-3">
         <UAlert
