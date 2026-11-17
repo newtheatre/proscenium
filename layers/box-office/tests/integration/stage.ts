@@ -12,6 +12,7 @@ import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import bandsPost from '../../server/api/box-office/productions/[id]/bands/index.post'
 import bandsGet from '../../server/api/box-office/productions/[id]/bands/index.get'
 import pricesPost from '../../server/api/box-office/productions/[id]/prices.post'
+import pricesCancelScheduled from '../../server/api/box-office/productions/[id]/prices/cancel-scheduled.post'
 import salesPut from '../../server/api/box-office/performances/[id]/sales/index.put'
 import salesGet from '../../server/api/box-office/performances/[id]/sales/index.get'
 import openPost from '../../server/api/box-office/performances/[id]/sales/open.post'
@@ -73,6 +74,7 @@ export const handle = server({
   'POST /api/box-office/productions/:id/bands': bandsPost,
   'GET /api/box-office/productions/:id/bands': bandsGet,
   'POST /api/box-office/productions/:id/prices': pricesPost,
+  'POST /api/box-office/productions/:id/prices/cancel-scheduled': pricesCancelScheduled,
   'PUT /api/box-office/performances/:id/sales': salesPut,
   'GET /api/box-office/performances/:id/sales': salesGet,
   'POST /api/box-office/performances/:id/sales/open': openPost,

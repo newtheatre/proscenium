@@ -76,6 +76,21 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
   await expect(page.getByText('This performance now uses the price for all performances').first()).toBeVisible()
   await expect(page.getByText('Same as all performances.')).toBeVisible()
   await expect(page.getByLabel(typeName)).toHaveValue(/12\.00/)
+
+  // A change set for later waits for its date, is listed meanwhile, and can be cancelled.
+  await page.getByRole('radio', { name: 'From a later date' }).check()
+  await expect(page.getByRole('button', { name: 'Set prices for later' })).toBeDisabled()
+  const setup = await (await page.request.get(`/api/box-office/performances/${performanceId}/sales`)).json()
+  const band = setup.bands.find((b: { name: string }) => b.name === 'Circle')
+  const type = setup.priceLayers.find((l: { bandId: string }) => l.bandId === band.id)
+  const from = Date.now() + 7 * 86_400_000
+  expect((await page.request.post(`/api/box-office/productions/${setup.performance.productionId}/prices`, { data: { prices: [{ bandId: band.id, ticketTypeId: type.ticketTypeId, amountMinor: 1500 }], from }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
+  await visit(page, `/console/box-office/performances/${performanceId}`)
+  await expect(page.getByRole('heading', { name: 'Price changes to come' })).toBeVisible()
+  await expect(page.getByText(new RegExp(`Circle, ${typeName}: £15\\.00 from`))).toBeVisible()
+  await page.getByRole('button', { name: new RegExp(`^Cancel the change to ${typeName}, Circle`) }).click()
+  await expect(page.getByText('Price change cancelled').first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Price changes to come' })).toHaveCount(0)
 })
 
 test('Copy one performance\'s set-up onto another', async ({ page }) => {

@@ -3,7 +3,7 @@
 // there, a price change leaves existing baskets alone, capacity cannot go below what is claimed or
 // above the space without someone who may say so, and a paused performance takes no new baskets.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { setClock } from '#kit'
+import { advanceClock, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { env, person, rows } from '../../../../tests/integration/helpers'
 import { buy, house, manager, NOV_16, ready, req } from './stage'
@@ -254,5 +254,47 @@ describe('copying a set-up from another performance', () => {
     const bare = await req('POST', `/api/core/productions/${h.productionId}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.UTC(2027, 4, 1, 19, 30), capacity: 100 })
     expect(bare.status, JSON.stringify(bare.body)).toBe(200)
     expect((await copy(h.performanceId, bare.body.id)).body).toMatchObject({ code: 'box-office.copy.nothing' })
+  })
+})
+
+describe('price changes set for later', () => {
+  const DAY = 86_400_000 // not-policy: a day in milliseconds
+  const prices = (productionId: string, body: Record<string, unknown>) => req('POST', `/api/box-office/productions/${productionId}/prices`, body)
+
+  it('keeps the current price until the moment set, lists the change meanwhile, and can cancel it', async () => {
+    setClock(NOV_16)
+    const h = await house(10)
+    const later = NOV_16 + 3 * DAY
+    // An early-bird price ends: the full price rises in three days, for every performance.
+    const set = await prices(h.productionId, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 1500 }], from: later })
+    expect(set.status, JSON.stringify(set.body)).toBe(200)
+    const before = (await sales(h.performanceId)).body
+    expect(before.priceLayers.find((l: any) => l.ticketTypeId === h.fullId)).toMatchObject({ production: 1200 })
+    expect(before.scheduledPrices).toEqual([{ bandId: h.bandId, ticketTypeId: h.fullId, performanceId: null, amountMinor: 1500, inherits: false, from: later }])
+    const bought = await buy(h, 1)
+    expect(bought.ok && bought.basket.totalMinor).toBe(1200)
+
+    // A second change, for this performance alone, is cancelled: nothing changes then.
+    const own = NOV_16 + 2 * DAY
+    await prices(h.productionId, { prices: [{ bandId: h.bandId, ticketTypeId: h.concessionId, performanceId: h.performanceId, amountMinor: 500 }], from: own })
+    expect((await sales(h.performanceId)).body.scheduledPrices).toHaveLength(2)
+    const cancelled = await req('POST', `/api/box-office/productions/${h.productionId}/prices/cancel-scheduled`, { bandId: h.bandId, ticketTypeId: h.concessionId, performanceId: h.performanceId, from: own })
+    expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200)
+    expect((await sales(h.performanceId)).body.scheduledPrices.map((s: any) => s.ticketTypeId)).toEqual([h.fullId])
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices/cancel-scheduled`, { bandId: h.bandId, ticketTypeId: h.concessionId, performanceId: h.performanceId, from: own })).body).toMatchObject({ code: 'box-office.price.nothing-scheduled' })
+
+    advanceClock(3 * DAY)
+    const after = (await sales(h.performanceId)).body
+    expect(after.priceLayers.find((l: any) => l.ticketTypeId === h.fullId)).toMatchObject({ production: 1500 })
+    expect(after.priceLayers.find((l: any) => l.ticketTypeId === h.concessionId)).toMatchObject({ production: 800, own: null })
+    expect(after.scheduledPrices).toEqual([])
+    const rebought = await buy(h, 1)
+    expect(rebought.ok && rebought.basket.totalMinor).toBe(1500)
+    setClock(NOV_16)
+  })
+
+  it('refuses a moment that has already passed', async () => {
+    const h = await house(10)
+    expect((await prices(h.productionId, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 900 }], from: NOV_16 - 1 })).body).toMatchObject({ code: 'box-office.price.from-past' })
   })
 })
