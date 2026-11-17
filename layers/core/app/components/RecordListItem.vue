@@ -1,10 +1,11 @@
 <!-- One row of a RecordList: a name with an optional icon and a line of description, then whatever
-     the row ends with (a count, a badge, its actions). With `to`, the whole row is a link. -->
+     the row ends with (a count, a badge, its actions). With `to`, the whole row is a link. What a
+     row needs under it (a short form, a detail) goes in the `below` slot. -->
 <script setup lang="ts">
 import { NuxtLink } from '#components'
 
 defineProps<{ to?: string, icon?: string, name?: string, description?: string, muted?: boolean }>()
-const slots = defineSlots<{ default?: () => unknown, name?: () => unknown, description?: () => unknown }>()
+const slots = defineSlots<{ default?: () => unknown, name?: () => unknown, description?: () => unknown, below?: () => unknown }>()
 </script>
 
 <template>
@@ -41,5 +42,11 @@ const slots = defineSlots<{ default?: () => unknown, name?: () => unknown, descr
         class="size-4 shrink-0 text-muted"
       />
     </component>
+    <div
+      v-if="slots.below"
+      class="px-4 pb-3"
+    >
+      <slot name="below" />
+    </div>
   </li>
 </template>

@@ -113,7 +113,6 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
       </p>
       <UAlert
         color="neutral"
-        variant="subtle"
         icon="i-lucide-eye"
         :title="t('core.access.form.who-reads')"
         :description="t('core.access.form.who-reads-detail')"
@@ -130,16 +129,9 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
       v-else
       class="space-y-8"
     >
-      <section
-        aria-labelledby="access-state"
-        class="space-y-3"
+      <PageSection
+        :title="t('core.access.state')"
       >
-        <h2
-          id="access-state"
-          class="text-lg font-semibold text-highlighted"
-        >
-          {{ t('core.access.state') }}
-        </h2>
         <StatusBadge
           :tone="STATUS[application.status].tone"
           :label="t(STATUS[application.status].key)"
@@ -165,19 +157,12 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         >
           {{ t('core.access.change-waiting') }}
         </p>
-      </section>
+      </PageSection>
 
-      <section
+      <PageSection
         v-if="application.inForce || application.pending"
-        aria-labelledby="access-what"
-        class="space-y-3"
+        :title="application.inForce ? t('core.access.in-force') : t('core.access.asked')"
       >
-        <h2
-          id="access-what"
-          class="text-lg font-semibold text-highlighted"
-        >
-          {{ application.inForce ? t('core.access.in-force') : t('core.access.asked') }}
-        </h2>
         <AccessApplicationSummary
           :value="(application.inForce ?? application.pending)!"
           :needs="data?.needs ?? []"
@@ -188,7 +173,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         >
           {{ application.verified ? t('core.access.verified') : t('core.access.not-verified') }}
         </p>
-      </section>
+      </PageSection>
 
       <div class="flex flex-wrap gap-2">
         <UButton
@@ -227,20 +212,12 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
       </p>
     </div>
 
-    <section
+    <PageSection
       v-if="data?.sharing?.length"
-      aria-labelledby="access-sharing"
-      class="mt-10 space-y-4"
+      class="mt-8"
+      :title="t('core.access.sharing')"
+      :description="t('core.access.sharing-help')"
     >
-      <h2
-        id="access-sharing"
-        class="text-lg font-semibold text-highlighted"
-      >
-        {{ t('core.access.sharing') }}
-      </h2>
-      <p class="text-sm text-muted">
-        {{ t('core.access.sharing-help') }}
-      </p>
       <USwitch
         v-for="purpose in data.sharing"
         :key="purpose.id"
@@ -250,19 +227,13 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         :disabled="purpose.fixed && !!application"
         @update:model-value="share(purpose.id, $event)"
       />
-    </section>
+    </PageSection>
 
-    <section
+    <PageSection
       v-if="application"
-      aria-labelledby="access-reads"
-      class="mt-10 space-y-3"
+      class="mt-8"
+      :title="t('core.access.reads.title')"
     >
-      <h2
-        id="access-reads"
-        class="text-lg font-semibold text-highlighted"
-      >
-        {{ t('core.access.reads.title') }}
-      </h2>
       <p
         v-if="!data?.reads?.length"
         class="text-sm text-muted"
@@ -280,6 +251,6 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
           {{ t('core.access.reads.line', { date: day(read.at), by: purposeLabel(read) }) }}
         </li>
       </ul>
-    </section>
+    </PageSection>
   </PageFrame>
 </template>

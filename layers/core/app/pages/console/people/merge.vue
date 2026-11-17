@@ -24,7 +24,7 @@ const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
 
 const labelOf = (s: Side | null) => s?.preferredName || s?.name || t('core.merges.unnamed')
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 const moving = computed(() => (preview.value?.moves ?? []).reduce((n, m) => n + m.rows, 0))
 
 watch([survivorId, mergedAccountId], async ([keep, merge]) => {

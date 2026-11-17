@@ -260,11 +260,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-for="item in summary"
                 :key="item.name"
               >
-                <a
+                <ULink
                   :href="`#${item.id ?? item.name}`"
                   class="underline"
                   @click.prevent="focusField(item)"
-                >{{ labelOf(item.name) }}</a>: {{ item.message }}
+                >
+                  {{ labelOf(item.name) }}
+                </ULink>: {{ item.message }}
               </li>
             </ul>
           </template>

@@ -164,7 +164,6 @@ async function add() {
               type="email"
               autocomplete="email"
               maxlength="254"
-              class="w-full"
             />
           </UFormField>
           <UButton
