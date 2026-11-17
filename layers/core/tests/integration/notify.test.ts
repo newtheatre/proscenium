@@ -17,7 +17,7 @@ let failWith: { code: string, retryable: boolean } | undefined
 async function setSetting(key: string, value: unknown) {
   await inContext(async () => {
     const unit = createUnit()
-    await changeSetting(unit.view(), key, value, value === null ? { reset: true } : {})
+    await changeSetting(unit.view(), key, value, { reset: value === null, confirm: true })
     await unit.commit()
   })
 }
