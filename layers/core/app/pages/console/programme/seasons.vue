@@ -5,6 +5,7 @@
 type State = 'draft' | 'published' | 'archived'
 interface Season { id: string, name: string, startsOn: string, endsOn: string, summary: string | null, state: State, productions: number }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons', query: { size: 100 } })
 const { toRefusal } = useRefusal()
@@ -12,8 +13,8 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const TONES = { draft: 'neutral', published: 'success', archived: 'info' } as const
-const dates = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
-const span = (s: Season) => (s.startsOn === s.endsOn ? dates.format(new Date(s.startsOn)) : `${dates.format(new Date(s.startsOn))} to ${dates.format(new Date(s.endsOn))}`)
+const dates = useDates()
+const span = (s: Season) => dates.range(s.startsOn, s.endsOn)
 
 async function run(fn: () => Promise<unknown>, done: string) {
   refusal.value = null
@@ -31,15 +32,15 @@ async function run(fn: () => Promise<unknown>, done: string) {
 
 const editing = ref(false)
 const editId = ref<string | null>(null)
-const form = reactive({ name: '', startsOn: '', endsOn: '', summary: '' })
+const form = reactive({ name: '', days: { start: '', end: '' }, summary: '' })
 function open(s?: Season) {
   editId.value = s?.id ?? null
-  Object.assign(form, s ? { name: s.name, startsOn: s.startsOn, endsOn: s.endsOn, summary: s.summary ?? '' } : { name: '', startsOn: '', endsOn: '', summary: '' })
+  Object.assign(form, s ? { name: s.name, days: { start: s.startsOn, end: s.endsOn }, summary: s.summary ?? '' } : { name: '', days: { start: '', end: '' }, summary: '' })
   refusal.value = null
   editing.value = true
 }
 async function save() {
-  const body = { ...form, endsOn: form.endsOn || form.startsOn }
+  const body = { name: form.name, startsOn: form.days.start, endsOn: form.days.end || form.days.start, summary: form.summary }
   const ok = editId.value
     ? await run(() => $api<unknown>(`/api/core/seasons/${editId.value}` as string, { method: 'PATCH', body }), 'Season saved')
     : await run(() => $api<unknown>('/api/core/seasons' as string, { method: 'POST', body }), 'Season added')
@@ -97,21 +98,16 @@ const actions = (s: Season) => [[
             v-for="s in data.rows"
             :key="s.id"
             :name="s.name"
-            :description="`${span(s)} · ${s.productions === 1 ? '1 production' : `${s.productions} productions`}`"
+            :description="`${span(s)} · ${t('core.counts.productions', { count: s.productions })}`"
           >
             <StatusBadge
               :tone="TONES[s.state]"
-              :label="s.state.charAt(0).toUpperCase() + s.state.slice(1)"
+              :label="t(`core.states.${s.state}`)"
             />
-            <UDropdownMenu :items="actions(s)">
-              <UButton
-                icon="i-lucide-ellipsis"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :aria-label="`Actions for ${s.name}`"
-              />
-            </UDropdownMenu>
+            <RowActions
+              :items="actions(s)"
+              :label="`Actions for ${s.name}`"
+            />
           </RecordListItem>
         </RecordList>
       </div>
@@ -138,26 +134,12 @@ const actions = (s: Season) => [[
               maxlength="120"
             />
           </UFormField>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              label="First day"
-              required
-            >
-              <UInput
-                v-model="form.startsOn"
-                type="date"
-              />
-            </UFormField>
-            <UFormField
-              label="Last day"
-              hint="Optional"
-            >
-              <UInput
-                v-model="form.endsOn"
-                type="date"
-              />
-            </UFormField>
-          </div>
+          <UFormField
+            label="First and last day"
+            required
+          >
+            <FieldDateRange v-model="form.days" />
+          </UFormField>
           <UFormField label="Summary">
             <UTextarea
               v-model="form.summary"
@@ -172,7 +154,7 @@ const actions = (s: Season) => [[
           type="submit"
           form="season-form"
           :label="editId ? 'Save season' : 'Add season'"
-          :disabled="!form.name.trim() || !form.startsOn"
+          :disabled="!form.name.trim() || !form.days.start"
         />
       </template>
     </UModal>

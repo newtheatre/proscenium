@@ -1,9 +1,10 @@
 // A fixture panel: holds a snack sale for the amount the seller typed.
-import { newId, type UnitView } from '#kit'
+import { newId, useContext, type UnitView } from '#kit'
 import type { DeskBasket, DeskContext } from '#modules/payments'
 
 export default {
   label: 'snacks.desk.label',
+  panel: 'SnacksTillPanel',
   ability: 'payments.attempt.attest',
   order: 2,
   async prepare(unit: UnitView, context: DeskContext) {
@@ -14,6 +15,7 @@ export default {
   },
   async summary(context: DeskContext) {
     const { amountMinor } = context.input as { amountMinor: number }
-    return { lines: [{ label: 'Snacks', amountMinor }], amountMinor }
+    // ranAs lets the till's test see that a panel runs as its owner.
+    return { lines: [{ label: 'Snacks', amountMinor }], amountMinor, ranAs: useContext().module }
   },
 } satisfies DeskBasket

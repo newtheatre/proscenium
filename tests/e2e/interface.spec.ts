@@ -29,6 +29,10 @@ async function visit(page: Page, url: string) {
 }
 
 async function noViolations(page: Page) {
+  // A dialogue fading in is half transparent, and its contrast is judged on the half (seen in CI).
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
@@ -102,10 +106,12 @@ for (const scheme of ['light', 'dark'] as const) {
     test('sidebar: groups in the fixed order, everyday before set-up, a group nobody may open is absent', async ({ page }) => {
       await visit(page, '/console')
       const nav = page.getByRole('navigation', { name: 'Console' })
+      expect(await nav.innerText()).toContain('Gallery')
+      expect(await nav.innerText()).not.toContain('System') // core's own screens are not theirs to open
+      expect(await nav.innerText()).not.toContain('Everyday') // no headings that split a section
+      await nav.getByRole('button', { name: 'Gallery' }).click() // a group is a collapsible section
       const text = await nav.innerText()
-      expect(text.indexOf('Gallery')).toBeGreaterThan(-1)
-      expect(text).not.toContain('System') // core's own screens are not theirs to open
-      expect(text.indexOf('Everyday')).toBeLessThan(text.indexOf('Set up'))
+      expect(text.indexOf('Sample list')).toBeLessThan(text.indexOf('Sample steps')) // everyday before set-up
       expect(text).not.toContain('Administration') // the entry they cannot open is not greyed, it is absent
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
       await noViolations(page)
@@ -252,12 +258,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('button', { name: 'Set up my theatre' })).toHaveCount(0)
     })
 
-    test('core\'s own settings page shows wording for every setting, never a catalogue key', async ({ browser }) => {
+    test('the site\'s settings page shows wording for every setting, never a catalogue key, and the old console address redirects', async ({ browser }) => {
       const owner = { ...person('Olive Owner', ['core.settings.manage', 'core.identity-settings.manage', 'core.organisation.edit', 'core.branding.edit', 'core.sender.manage', 'core.template.edit'].map(grant)), assurance: 'strong', reassertedAt: Date.now() }
       const context = await browser.newContext(as(owner))
       const page = await context.newPage()
       await visit(page, '/console/system/settings')
-      await expect(page.getByRole('heading', { level: 1, name: 'Core settings' })).toBeVisible()
+      await expect(page).toHaveURL(/\/admin\/theatre$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Theatre' })).toBeVisible()
       await expect(page.getByText('Short name', { exact: true }).first()).toBeVisible()
       // A part of the catalogue that is not loaded shows as its key, such as core.settings.x.label.
       expect((await page.locator('main').innerText()).match(/\b[a-z][a-z0-9-]*\.[a-z0-9.-]+\.(label|help)\b/g) ?? []).toEqual([])
@@ -281,6 +288,36 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+    })
+
+    test('a length of time is a number and a unit, and a whole number has steppers', async ({ page }) => {
+      await visit(page, '/console/gallery/settings')
+      const amount = page.getByRole('spinbutton', { name: 'How long seats are held: How many' })
+      await expect(amount).toHaveValue('15')
+      await expect(page.getByRole('combobox', { name: 'How long seats are held: Unit of time' })).toContainText('minutes')
+      await amount.fill('20')
+      await amount.blur()
+      await expect(page.getByText('1 change')).toBeVisible()
+      await page.getByRole('button', { name: 'Save Sample show settings' }).click()
+      await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+      await visit(page, '/console/gallery/settings')
+      await expect(page.getByRole('spinbutton', { name: 'How long seats are held: How many' })).toHaveValue('20')
+      await expect(page.getByText('Default: 15 minutes.')).toBeVisible()
+      await noViolations(page)
+      await page.getByRole('button', { name: /Reset How long seats are held to its default/ }).click()
+      await page.getByRole('button', { name: 'Save Sample show settings' }).click()
+      await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+    })
+
+    test('a chart has a name, a sentence that says what it shows, and no violations', async ({ page }) => {
+      await visit(page, '/console/gallery/drafts')
+      const chart = page.getByRole('figure', { name: 'Drafts written and sent' })
+      await expect(chart).toBeVisible()
+      // Said once to a screen reader, by the chart, and shown once beneath it.
+      await expect(chart.locator('p[aria-hidden="true"]')).toHaveText('Thirteen drafts written and ten sent over three weeks.')
+      await expect(chart.getByRole('img', { name: 'Drafts written and sent' }).or(chart.locator('[aria-label="Drafts written and sent"]')).first()).toBeVisible()
+      await expect(chart.locator('svg').first()).toBeVisible()
+      await noViolations(page)
     })
 
     test('the account menu marks the current shell and offers the console', async ({ page }) => {
@@ -356,10 +393,11 @@ test.describe('confirming it is you', () => {
     const page = await context.newPage()
     await visit(page, '/console')
     const at = page.url()
-    // Sent and not awaited: the request waits on the dialogue, as a save button's would.
+    // Sent and not awaited: the request waits on the dialogue, as a save button's would. Only a
+    // setting with onChange asks for a fresh sign-in (Foundations' settings rulings), so this is one.
     await page.evaluate(() => {
       void (globalThis as unknown as { useNuxtApp: () => { $api: (url: string, options: object) => Promise<unknown> } })
-        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
+        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.locale.day-start', value: '05:00' }] } }).catch(() => null)
     })
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)
@@ -379,18 +417,31 @@ test.describe('the access scheme screens', () => {
     await noViolations(page)
     await page.getByRole('link', { name: 'Apply' }).click()
     await expect(page).toHaveURL(/\/account\/access\/apply$/)
-    await expect(page.getByRole('radio', { name: 'None' })).toBeVisible()
+    // Needs are square ticks; the wheelchair question asks its follow-up only once ticked.
+    await expect(page.getByRole('checkbox', { name: 'Steps and stairs' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Move to a seat' })).toHaveCount(0)
+    await page.getByRole('checkbox', { name: 'I use a wheelchair' }).click()
+    await expect(page.getByRole('radio', { name: 'Stay in my wheelchair' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Move to a seat' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'No' })).toBeVisible()
     await noViolations(page)
+    if (process.env.PROSCENIUM_SHOTS) await page.screenshot({ path: `${process.env.PROSCENIUM_SHOTS}/form.png`, fullPage: true })
     await context.close()
   })
 
-  test('the reviewers\' queue lists what is waiting and offers "Invite to apply"', async ({ browser }) => {
+  test('the reviewers\' queue lists what is waiting and offers "Apply for someone" and "Invite to apply"', async ({ browser }) => {
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(reviewerActor) })
     const page = await context.newPage()
     await visit(page, '/console/people/access-scheme')
     await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    if (process.env.PROSCENIUM_SHOTS) await page.screenshot({ path: `${process.env.PROSCENIUM_SHOTS}/queue.png` })
     await page.getByRole('button', { name: 'Invite to apply' }).first().click()
     await expect(page.getByRole('dialog', { name: 'Invite to apply' })).toBeVisible()
+    await noViolations(page)
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Apply for someone' }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Apply for someone' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Continue to the form' })).toBeVisible()
     await noViolations(page)
     await context.close()
   })

@@ -3,7 +3,7 @@
 // person or the system. When an answer makes the intent whole, every part's owner settles in the same
 // batch and Payments writes one sealed posting: the money received, plus each owner's entries. If an
 // owner refuses after the money was taken, nothing settles and the intent becomes unfulfilled.
-import { all, createUnit, first, isRefusal, newId, nowMs, Refusal, useContext, type UnitView } from '#kit'
+import { all, createUnit, first, isRefusal, log, newId, nowMs, Refusal, useContext, type UnitView } from '#kit'
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, ownersOf, partsOf, releaseParts, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor } from './providers'
@@ -234,6 +234,15 @@ export async function recordAnswer(attemptId: string, answer: Answer, source: So
     if (answer.state !== 'succeeded') throw error
     const parts = await partsOf(attempt.intent_id)
     if (!ownerRefused(error, parts)) throw error
+    // Nothing else keeps why the owner refused, and the payment is refunded in full because of it.
+    const cause = error instanceof SettlementRefused ? error.cause : error
+    log.warn('payments.settlement-refused', {
+      intentId: attempt.intent_id,
+      attemptId: attempt.id,
+      module: error instanceof SettlementRefused ? error.module : (error as Refusal).code.split('.')[0],
+      code: isRefusal(cause) ? cause.code : undefined,
+      reason: String((cause as Error)?.message ?? cause),
+    })
     await unfulfil(attempt, answer, source)
     return { changed: true, settled: false, unfulfilled: true }
   }

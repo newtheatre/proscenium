@@ -60,7 +60,8 @@ export async function runJob(jobId: string): Promise<JobOutcome> {
   if (row.module_id && !(await isEnabled(row.module_id))) return 'waiting'
 
   const claim = await env.DB.prepare("UPDATE core_jobs SET state = 'running', attempts = attempts + 1, started_at = ? WHERE id = ? AND state = 'queued'").bind(at, jobId).run()
-  if (claim.meta.changes !== 1) return 'skipped'
+  // The claim's own condition (still queued) makes it at most one row; triggers could only add to the count.
+  if (!(claim.meta.changes > 0)) return 'skipped'
   const attempts = row.attempts + 1
   const payload = JSON.parse(row.payload)
   if (row.kind === 'task') await env.DB.prepare('UPDATE core_task_runs SET started_at = ?, job_id = ? WHERE task = ? AND due_at = ?').bind(at, jobId, row.name, payload.dueAt).run()
@@ -108,9 +109,21 @@ export async function runJob(jobId: string): Promise<JobOutcome> {
     return 'done'
   }
   catch (error) {
+    // Work that needs the site's address waits until it is recorded, without spending an attempt.
+    if (isRefusal(error) && error.code === 'core.site.origin-unset') return deferWhole(env, row, error.reason)
     const message = isRefusal(error) ? `${error.code}: ${error.reason}` : String((error as Error)?.message ?? error)
     return fail(env, row, attempts, message)
   }
+}
+
+/** Puts a job back unrun: nothing it did is kept, the attempt is given back, and it waits longer each time. */
+async function deferWhole(env: KitEnv, row: JobRow, reason: string): Promise<JobOutcome> {
+  const base = await useSetting('core.jobs.backoff') as number
+  const delay = Math.min(base * 2 ** (row.deferrals ?? 0), 43_200) // not-policy: the longest delay a queue accepts
+  await env.DB.prepare("UPDATE core_jobs SET state = 'queued', attempts = attempts - 1, deferrals = deferrals + 1, run_after = ?, last_error = ? WHERE id = ? AND state = 'running'").bind(nowMs() + delay * 1000, `deferred: ${reason.slice(0, 200)}`, row.id).run() // not-policy: seconds to milliseconds; keeps the row small
+  await dispatch([{ jobId: row.id, lane: row.lane, delaySeconds: delay }])
+  log.info('core.jobs.deferred', { jobId: row.id, job: row.name, deferrals: (row.deferrals ?? 0) + 1, delay, reason })
+  return 'deferred'
 }
 
 async function fail(env: KitEnv, row: JobRow, attempts: number, message: string): Promise<JobOutcome> {

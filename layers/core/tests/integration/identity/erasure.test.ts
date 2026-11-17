@@ -7,6 +7,7 @@ import { Browser, deliver, env, goStale, grantDirectly, leaveIdentity, reassert,
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { eraseAccount, erasurePlan } from '../../../server/identity/erasure'
+import { exportPlan } from '../../../server/identity/export'
 import review from '../../../server/tasks/review-data-requests'
 
 const sent: OutgoingEmail[] = []
@@ -157,6 +158,21 @@ describe('asking for erasure (ID-16)', () => {
       [survivor, merged].sort().map(id => ({ id, anonymised: 1 })))
   })
 
+  it('clears an internal column declared erase: \'clear\' with the row\'s personal columns, and leaves it out of a download', async () => {
+    const accountId = await unclaimedAccount()
+    const [show] = await rows<{ id: string }>('SELECT id FROM seats_performances LIMIT 1')
+    const performanceId = show?.id ?? 'sp_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    if (!show) await env.DB.prepare('INSERT INTO seats_performances (id, title, capacity) VALUES (?, \'Hamlet\', 5)').bind(performanceId).run()
+    await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, link_hash, created_at) VALUES (?, ?, 1, ?, \'Pat Person\', \'h4sh\', ?)').bind('sl_aaaaaaaaaaaaaaaaaaaaaaaaab', performanceId, accountId, Date.now()).run()
+    expect(exportPlan().find(t => t.table === 'seats_ledger')?.columns).not.toContain('link_hash')
+    await inContext(async () => {
+      const unit = createUnit()
+      await eraseAccount(unit, accountId)
+      await unit.commit()
+    })
+    expect(await rows('SELECT buyer_name, link_hash FROM seats_ledger WHERE id = ?', 'sl_aaaaaaaaaaaaaaaaaaaaaaaaab')).toEqual([{ buyer_name: 'Former member', link_hash: null }])
+  })
+
   it('ends live grants, keeping them as history', async () => {
     const { browser, accountId, mine } = await person()
     const { grantId } = await grantDirectly(accountId, ['core.account.search'])
@@ -192,7 +208,7 @@ describe('the erasure plan', () => {
   it('reaches every table that holds something personal about a person', () => {
     const planned = new Set(erasurePlan().map(s => s.table))
     for (const [name, { meta }] of useRegistry().tables as Map<string, { meta: TableMeta }>) {
-      const personal = Object.values(meta.columns).some(c => ['clear', 'anonymise', 'redact'].includes(c.meta.erase) && c.meta.class !== 'internal')
+      const personal = Object.values(meta.columns).some(c => ['clear', 'anonymise', 'redact'].includes(c.meta.erase))
       if (!personal || meta.options.subject === 'none') continue
       expect(planned, `${name} holds personal columns but erasure does not reach it`).toContain(name)
     }
@@ -211,10 +227,24 @@ describe('the staff queue (ID-35)', () => {
     const desk = await staff()
     expect((await desk.browser.get('/api/core/data-requests')).status).toBe(403)
     await grantDirectly(desk.accountId, ['core.data-request.manage'])
-    const queue = (await desk.browser.get('/api/core/data-requests')).body.requests
+    const queue = (await desk.browser.get('/api/core/data-requests')).body.rows
     const row = queue.find((r: any) => r.id === id)
-    expect(row).toMatchObject({ kind: 'erasure', state: 'confirmed', overdue: false, name: 'Erin Erased' })
+    expect(row).toMatchObject({ kind: 'erasure', state: 'confirmed', overdue: false, closed: false, person: 'Erin Erased' })
     expect(row.respondBy - Date.now()).toBeGreaterThan(29 * 86400_000)
+  })
+
+  it('finds requests by the person\'s name, and shows those past their respond-by date as overdue', async () => {
+    const { browser, mine } = await person()
+    const id = await askAndConfirm(browser, mine)
+    const desk = await staff()
+    await grantDirectly(desk.accountId, ['core.data-request.manage'])
+    expect((await desk.browser.get('/api/core/data-requests?q=Erin')).body.rows.map((r: any) => r.id)).toContain(id)
+    expect((await desk.browser.get('/api/core/data-requests?q=Nobodyknown')).body.rows.map((r: any) => r.id)).not.toContain(id)
+    expect((await desk.browser.get('/api/core/data-requests?view=overdue')).body.rows.map((r: any) => r.id)).not.toContain(id)
+    await env.DB.prepare('UPDATE core_data_requests SET respond_by = 1 WHERE id = ?').bind(id).run()
+    const overdue = (await desk.browser.get('/api/core/data-requests?view=overdue')).body.rows
+    expect(overdue.find((r: any) => r.id === id)).toMatchObject({ overdue: true })
+    expect((await desk.browser.get('/api/core/data-requests?kind=export')).body.rows.map((r: any) => r.id)).not.toContain(id)
   })
 
   it('staff start a request for somebody, recording how they checked who it was', async () => {
@@ -238,12 +268,15 @@ describe('the staff queue (ID-35)', () => {
     expect((await desk.browser.post(`/api/core/data-requests/${id}/close`)).body.code).toBe('core.data-request.not-finished')
     await env.DB.prepare('UPDATE core_data_requests SET not_before = 1 WHERE id = ?').bind(id).run()
     await runReview()
-    const { checklist } = (await desk.browser.get(`/api/core/data-requests/${id}`)).body
+    const { checklist, actions } = (await desk.browser.get(`/api/core/data-requests/${id}`)).body
+    expect(actions).toEqual({ cancel: false, tick: true, close: false })
     expect(checklist.map((l: any) => l.table)).toEqual(expect.arrayContaining(['core_account_tokens', 'core_files']))
     expect((await desk.browser.post(`/api/core/data-requests/${id}/close`)).body.code).toBe('core.data-request.checklist-open')
     for (const line of checklist) expect((await desk.browser.put(`/api/core/data-requests/${id}/checks`, { table: line.table, outcome: 'nothing-found' })).status).toBe(200)
     expect((await desk.browser.put(`/api/core/data-requests/${id}/checks`, { table: 'core_accounts', outcome: 'handled' })).body.code).toBe('core.data-request.no-such-line')
+    expect((await desk.browser.get(`/api/core/data-requests/${id}`)).body.actions.close).toBe(true)
     expect((await desk.browser.post(`/api/core/data-requests/${id}/close`)).status).toBe(200)
-    expect((await desk.browser.get('/api/core/data-requests')).body.requests.some((r: any) => r.id === id)).toBe(false)
+    expect((await desk.browser.get('/api/core/data-requests')).body.rows.some((r: any) => r.id === id)).toBe(false)
+    expect((await desk.browser.get('/api/core/data-requests?view=closed')).body.rows.map((r: any) => r.id)).toContain(id)
   })
 })

@@ -152,3 +152,5 @@ Every status badge carries a word, and colour is never the only signal.
 ## Help and setup
 
 Every screen's help link opens `docs/members/training-*.md` or `docs/console/training-*.md`, one page per screen. The setup step "Add your first course" is a Steps page of three steps: name it and say how long it lasts; add its steps; say who can train it.
+
+Where a list of training records, sign-offs, places or evidence is found by a person's name or email, Training calls Identity's service `findAccounts(text, list)`, exported from core's services, and never searches accounts itself. The service answers a subquery of account ids, which Training passes to the kit's account scope (`inAccountScope`), so a merged person's rows are found under either account. The service is guarded by `core.account.find`, which the Training abilities that offer such a search imply (part 6), so the search box appears for exactly the people who may use the screen. Identity writes one audit `read` entry per call, which never holds the text typed; Training writes none of its own for the search.

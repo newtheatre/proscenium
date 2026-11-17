@@ -80,6 +80,7 @@ export interface ListState {
   pageSize: number
 }
 
+/** The page size when the site has not chosen one (core.lists.page-size, whose default this is). */
 export const DEFAULT_PAGE_SIZE = 25 // not-policy: the specification's page size
 export const PAGE_SIZES = [25, 50, 100] as const
 
@@ -95,7 +96,7 @@ export function listDefaults(list: Pick<ListDeclaration, 'defaultView' | 'defaul
   return { view: list.defaultView, sort: sort?.key, order: sort?.order ?? 'asc' }
 }
 
-export function parseList(query: Query, list: Pick<ListDeclaration, 'filters' | 'defaultView' | 'defaultSort' | 'views' | 'sorts'>): ListState {
+export function parseList(query: Query, list: Pick<ListDeclaration, 'filters' | 'defaultView' | 'defaultSort' | 'views' | 'sorts'>, defaultSize: number = DEFAULT_PAGE_SIZE): ListState {
   const named = one(query.view)
   const defaults = listDefaults(list, named && list.views?.[named] ? named : undefined)
   const filters: Record<string, string> = {}
@@ -114,12 +115,12 @@ export function parseList(query: Query, list: Pick<ListDeclaration, 'filters' | 
     sort: sort && sort in list.sorts ? sort : defaults.sort,
     order: one(query.order) === 'desc' ? 'desc' : one(query.order) === 'asc' ? 'asc' : defaults.order ?? 'asc',
     page: Number.isFinite(page) && page > 0 ? page : 1,
-    pageSize: (PAGE_SIZES as readonly number[]).includes(size) ? size : DEFAULT_PAGE_SIZE,
+    pageSize: (PAGE_SIZES as readonly number[]).includes(size) ? size : defaultSize,
   }
 }
 
 /** The address query for a state, leaving out whatever is the default so links stay short. */
-export function serialiseList(state: ListState, list: Pick<ListDeclaration, 'defaultView' | 'defaultSort' | 'views' | 'sorts'>): Record<string, string> {
+export function serialiseList(state: ListState, list: Pick<ListDeclaration, 'defaultView' | 'defaultSort' | 'views' | 'sorts'>, defaultSize: number = DEFAULT_PAGE_SIZE): Record<string, string> {
   const defaults = listDefaults(list, state.view)
   const out: Record<string, string> = {}
   if (state.search) out.q = state.search
@@ -128,7 +129,7 @@ export function serialiseList(state: ListState, list: Pick<ListDeclaration, 'def
   if (state.sort && state.sort !== defaults.sort) out.sort = state.sort
   if (state.sort && state.order !== (defaults.order ?? 'asc')) out.order = state.order
   if (state.page > 1) out.page = String(state.page)
-  if (state.pageSize !== DEFAULT_PAGE_SIZE) out.size = String(state.pageSize)
+  if (state.pageSize !== defaultSize) out.size = String(state.pageSize)
   return out
 }
 
@@ -160,7 +161,7 @@ export type ListDecl<F extends Record<string, FilterDef> = Record<string, Filter
  * `{ ok: false, key }` naming it; the server turns that into core.list.unknown. `can` says whether the
  * viewer holds an ability. `today` is the theatre's day, for date presets.
  */
-export function decodeList<L extends ListDeclaration>(query: Query, list: L, options: { can?: (ability: string) => boolean, today: string }): ListDecoding<L> {
+export function decodeList<L extends ListDeclaration>(query: Query, list: L, options: { can?: (ability: string) => boolean, today: string, defaultSize?: number }): ListDecoding<L> {
   const bad = (key: string, reason: string): ListRefusal => ({ ok: false, key, reason })
   const known = new Set<string>([...RESERVED_KEYS, ...Object.keys(list.filters)])
   for (const key of Object.keys(query)) if (!known.has(key)) return bad(key, 'This list has no such filter.')
@@ -179,7 +180,7 @@ export function decodeList<L extends ListDeclaration>(query: Query, list: L, opt
 
   const page = one(query.page) === undefined ? 1 : Number(one(query.page))
   if (!Number.isInteger(page) || page < 1) return bad('page', 'Page is a whole number from 1.')
-  const size = one(query.size) === undefined ? DEFAULT_PAGE_SIZE : Number(one(query.size))
+  const size = one(query.size) === undefined ? options.defaultSize ?? DEFAULT_PAGE_SIZE : Number(one(query.size))
   if (!(PAGE_SIZES as readonly number[]).includes(size)) return bad('size', `Size is ${PAGE_SIZES.join(', ')}.`)
 
   const raw: Record<string, string> = { ...(viewDef?.filters ?? {}) }
@@ -283,6 +284,13 @@ export interface ListResult<Row> {
   rows: Row[]
   /** All rows that match, not just this page. */
   total: number
+  /** Filter keys the server left out because the viewer may not use them: their chips go. */
+  dropped?: string[]
+  /** Search words too short to search, and whether that left nothing to search for. */
+  ignoredWords?: string[]
+  searchTooShort?: boolean
+  /** For a row whose match was in a column that is not on screen: that column's key, by row id. */
+  matched?: Record<string, string>
 }
 
 /** CSV with the quoting spreadsheets expect, and a guard against formulas in a cell. */

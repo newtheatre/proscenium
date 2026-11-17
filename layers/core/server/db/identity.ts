@@ -47,6 +47,8 @@ export const accounts = defineTable('core_accounts', {
     check('core_accounts_preferred_name_length', sql`preferred_name IS NULL OR length(preferred_name) <= 60`),
     check('core_accounts_pronouns_length', sql`pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40`),
     index('core_accounts_merged_into').on(t.mergedIntoId),
+    // The accounts list's sort by name.
+    index('core_accounts_name').on(t.name),
   ],
 })
 
@@ -242,6 +244,8 @@ export const grants = defineTable('core_grants', {
   extra: t => [
     index('core_grants_account').on(t.accountId),
     index('core_grants_role').on(t.roleId),
+    // Who holds what, soonest to lapse first.
+    index('core_grants_expiry').on(t.expiresAt),
     check('core_grants_scope', sql`(scope = 'site' AND scope_module IS NULL AND scope_type IS NULL AND scope_id IS NULL)
       OR (scope = 'module' AND scope_module IS NOT NULL AND scope_type IS NULL AND scope_id IS NULL)
       OR (scope = 'record' AND scope_module IS NOT NULL AND scope_type IS NOT NULL AND scope_id IS NOT NULL)`),
@@ -274,8 +278,12 @@ export const accountMerges = defineTable('core_account_merges', {
   // Set by the merge job's last unit once every module's rows have moved (stage two). Until then
   // the merge is "still moving"; readers see no difference, because the account scope covers both.
   completedAt: col.timestamp('completed_at'),
+  // Set when staff start an undo; the alias stands until the job's last unit sets undone_at.
+  undoStartedAt: col.timestamp('undo_started_at'),
   undoneAt: col.timestamp('undone_at'),
   undoneBy: col.account('undone_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  // Set when the undo window passed and the merge's items were cleared away.
+  closedAt: col.timestamp('closed_at'),
 }, {
   id: 'mrg',
   realm: 'operational',
@@ -343,7 +351,7 @@ export const dataRequests = defineTable('core_data_requests', {
 }, {
   id: 'dreq',
   realm: 'operational',
-  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore)],
+  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore), index('core_data_requests_respond_by').on(t.respondBy)],
 })
 
 /** One line of a request's hand-search checklist: a table that may hold rows linked to no account. */

@@ -4,13 +4,12 @@
 // account in; a claimed account's verified address cannot, and the refusal says only how to ask for
 // a merge.
 import type { H3Event } from 'h3'
-import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, refuse, useSetting, siteUrl, type UnitView } from '#kit'
 import { countAgainstRate } from '#kit/ratelimit'
 import { accountById, addressRow, isUsable, normaliseAddress, type AccountRow, type AddressRow } from './accounts'
 import { digest, randomToken } from './crypto'
 import { mergeAccounts } from './merge'
 import { queueNotice } from './notices'
-import { relyingParty } from './web'
 
 export interface MyAddress { id: string, address: string, verified: boolean, audience: boolean, members: boolean }
 
@@ -72,7 +71,7 @@ export async function addAddress(unit: UnitView, event: H3Event, accountId: stri
           VALUES (?, 'verify_address', ?, ?, ?, 0, ?, ?)`,
     params: [newId('tok', { random: true }), await digest('link', token), accountId, address, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  await queueNotice(unit, 'core.address-verify', [address], { link: `${relyingParty(event).origin}/sign-in/verify-address#${token}` })
+  await queueNotice(unit, 'core.address-verify', [address], { link: await siteUrl(`/sign-in/verify-address#${token}`) })
   return { id }
 }
 

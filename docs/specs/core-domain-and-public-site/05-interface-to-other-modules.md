@@ -57,6 +57,24 @@ Three more services read closures, added on 16 November 2026 at the Spaces modul
 
 A closure of a venue covers spaces added to that venue later, because the scope is worked out when asked and is not stored.
 
+Spaces are read through three services, written down on 16 November 2026 with integration ruling R-36, which put `managed` on the space:
+
+| Service | Returns or does |
+| --- | --- |
+| `getSpace(id)` | One space with its venue, capacity, kind, `managed` and its finding-it note. |
+| `listSpaces({ venueId, managed, performable })` | Active spaces, in venue then space order. A module that only works in spaces the theatre runs passes `managed: true`. |
+| `placeName(spaceId)` | The place as people are told it, "space, venue", in the reader's language. Where a space has the same name as its venue, the usual case for a theatre with one room, it answers the venue's name alone, so nobody reads "Studio, Studio". Every module's messages and screens use it, so a place is named one way. |
+
+`getPerformance` and `listPerformances` carry the space's `managed` with the space. No service returns a venue-level answer; a caller that wants "does this venue have a space we run" asks `listSpaces({ venueId, managed: true })`.
+
+Agreed with the Spaces module the same day, for a module whose records depend on a space being run by the theatre:
+
+| Item | What is specified |
+| --- | --- |
+| `assertSpaceManaged(spaceId)` | A statement predicate like `assertSpaceFree`: a condition the caller places on its own write, true while the space is active and managed. The caller may use its opposite. |
+| Event `core.space.managed-changed` | Announced when a space's `managed` changes, with `spaceId`, `venueId` and the new `managed`. It names no person and may leave in a webhook. |
+| `core.change-impact` | Changing `managed` on a space is offered to this point as the change `space.managed`, with the space id and the new value, before it is saved. The confirmation shows each module's line, such as how many room bookings are affected. Core does not offer it to `core.change-guard`: a module may warn about this change but not refuse it, because whether the theatre runs a room is a fact, not a request. |
+
 **Capacity has one owner for each level.** Core owns the house capacity of a performance, the `capacity` column, changed with `core.performance.schedule`. Box office owns how that house is divided into pools and seats. The total Box office puts on sale may not exceed `capacityOf()` unless its own override allows. Lowering the house capacity goes through `core.change-guard`, where Box office refuses a figure below what is held or sold, and it announces `core.performance.capacity-changed`.
 
 ### Vocabularies
@@ -419,7 +437,11 @@ The build ran the bounce half on a real sending domain on 16 November 2026 (repo
 | After a hard bounce, `send()` to the same address did not throw. Two resends succeeded and bounced again, and Cloudflare's suppression list was still empty four and a half minutes later. | Core's own suppression is what stops repeats, checked before every send. `E_RECIPIENT_SUPPRESSED` is handled if it comes and never relied on. |
 | For about two minutes after the sending domain was onboarded, `send()` threw `E_EMAIL_SENDING_NOT_READY`, even with the DNS status ready, and once more after the first success. | The sender setup step and its verify treat that code as "try again shortly" and keep checking, not as a failed domain. A send job that meets it retries on the usual back-off and does not count it towards a Failed delivery's limit during the first hour after onboarding. |
 
-The complaint half is not yet proved. Cloudflare offers no way to simulate a complaint, so it needs a real mailbox at a provider that reports them. Until it is run, that a complained event carries the same message id is taken from the documentation and from the bounce result.
+The complaint half will not be run. Matt decided on 16 November 2026 to trust Cloudflare's documentation, because Cloudflare offers no way to simulate a complaint and proving one needs a real mailbox at a provider that reports them. So the bounce half is proved, and the complaint half is built to the documentation and unproved: that a complained event carries the same message id is taken from the documentation and from the bounce result.
+
+Because one event shape is untested, the consumer does not assume it. An event whose shape it does not recognise, or whose message id matches no delivery after the retries the section above allows, goes to the dead-letter path and raises a line on the health screen. It is never dropped silently and never guessed at. The named case "The hard bounce" keeps its complaint run against a payload made to the documented shape.
+
+How the consumer does that. It never acknowledges an event it could not read or match: it asks the queue to retry, and after the queue's last attempt the message is moved to the dead-letter queue by Cloudflare. On that last attempt the consumer writes one row to `core_email_events_set_aside` (part 2), with no address in it. A suppression the event carried is still applied where the address could be read, since stopping mail to a bad address does not depend on finding the delivery. A contribution to `core.health-check`, named core.email-events-set-aside, reads the table and warns: "N email outcomes could not be read or matched in the last 7 days".
 
 ## Access needs and access features are two lists
 
@@ -445,6 +467,8 @@ Identity has confirmed the component's name and behaviour. It shows "Apply" to a
 
 Identity's nineteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks. The nineteenth, `core.grants-expiring`, was added on 16 November 2026: members' side, transactional, sent once per sweep to those who can renew. Its key clashes with none of core's own types, and a transactional type on the members' side is one the format already allows.
 
+Box office told this workstream of three types on 16 November 2026, and the format holds all three. `box-office.reservation-confirm` goes to a buyer who is not signed in and carries the link that turns a basket into a reservation. No account exists until that link is pressed (the foundations rule on link tokens), so it is sent with notifyAddress, the case that service is for. It is transactional, email only, and its link is a sealed variable, which is what makes it email only. `box-office.order-reserved` is email only because it carries the desk code and the order's link, both sealed. `box-office.order-cancelled` goes to email and the inbox and carries nothing sealed. A transactional type has no preference switch, so none of the three can be turned off by the person.
+
 ## Fan-out: many rows in one unit of work
 
 The kit refuses a unit of work with more statements than `core.units.statement-limit`, which defaults to 50. The integrating thread has ruled that the limit stands. So nothing in core writes one statement per row when it tells many people or makes many records at once.
@@ -457,7 +481,7 @@ The rules are the kit's, in the foundations specification's part 3 (U7 to U9), a
 | Events and audit entries take a set (U8) | `unit.announce()` and `unit.audit()` each take one row or a set, and a set of any size is one statement. The caller passes the set it read before building the unit. The guards on the change make that set true or roll everything back. Each event is still delivered as its own event, at least once and unordered. |
 | The most one unit may carry (U9) | The kit setting `core.units.set-rows-limit`, 500 as shipped and provisional until measured on real D1. Over it the unit is refused with `core.unit.too-large`, and the work becomes a job in chunks, each its own unit and safe to repeat. Core states no figure of its own. |
 | `notify()` | Four statements for any number of recipients up to that limit: notifications, email deliveries, inbox deliveries and inbox items, plus the caller's audit entry. A repeat with the same dedupe keys writes nothing at all. It never chunks silently, because a chunked send is no longer all or nothing and the caller must know that. |
-| Still one unit | The statements join the caller's unit, so a unit whose expectation fails leaves no notification behind, as before. |
+| Still one unit | The statements join the caller's unit, so a unit whose guard does not pass leaves no notification behind, as before. |
 | After the unit commits | Email deliveries are put on the queue in calls of 100, the most one `sendBatch` takes. The sweep in part 3 covers any that are lost. |
 
 What has been measured: the build's proof ran fifty recipients on local D1 (five statements and 4 ms set-wise, against 201 statements and 10 ms row by row). Nothing larger has been run, and nothing on real D1.
@@ -466,8 +490,8 @@ Core's fan-outs under these rules:
 
 | Fan-out | How it is written |
 | --- | --- |
-| A run of performances (C-04) | The performances travel as one JSON parameter. A run within the limit is saved whole or not at all: the clash and closure guards are predicates on the insert, with an expectation that the number inserted is the number asked for, and one announce of the set. A longer run is a chunked job, as C-04 says. |
-| Cancelling a production | The scheduled performances are read first. Then one conditional `UPDATE` with an expectation of that number, one announce of that many events and one audit set. If a performance changed in between, the expectation fails and nothing is written. |
+| A run of performances (C-04) | The performances travel as one JSON parameter. A run within the limit is saved whole or not at all: the clash and closure guards are predicates on the insert, and the kit's guard, a read statement in the same batch, confirms that every performance asked for is there, with one announce of the set. Nothing relies on the database's count of changed rows, which also counts rows written by triggers and search indexes; code may test that it is above nought and no more. A longer run is a chunked job, as C-04 says. |
+| Cancelling a production | The scheduled performances are read first. Then one conditional `UPDATE`, then the kit's guard, a read statement confirming that every one of those performances is now in the new state, one announce of that many events and one audit set. If a performance changed in between, the guard does not pass and nothing is written. |
 | `notifyHolders` and a notification to a production team | The recipients are resolved first, then passed to `notify()` as one set. |
 | Webhook deliveries | One set-wise insert for the webhooks subscribed to the event. |
 | Recalculating operating days | One `UPDATE` over every performance not completed. |

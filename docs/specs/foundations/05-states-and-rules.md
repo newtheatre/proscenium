@@ -137,3 +137,22 @@ stateDiagram-v2
 - **R5. Settings are site-wide.** Anything that varies by venue, production or performance is a field on that record whose default comes from a setting (question 1 for Matt).
 - **R6. Idempotent routes**: a route declared `idempotent` requires a key from the client and replays the stored response for a repeat within 48 hours.
 - **R7. Every date a rule depends on is a local date in the site's time zone**, stored with `col.localDate`, never derived from a UTC timestamp in a query.
+
+**Counting changes once tables have triggers (found by the kit build with list search, 16 November 2026).** Two facts about D1 bear on every unit. First, D1's `meta.changes` counts the rows written by triggers and by a search index as well as the statement's own, so one insert may report 3. Code may test that a count is above nought; code that tests for an exact count is wrong, and the conformance check refuses a comparison of `meta.changes` with a number other than nought. A unit that must know exactly how many rows its statement changed uses the kit's guard, never the count. Second, a search index holds its pending writes and flushes them when the next write statement begins, so a guard written as a write read a stale `changes()` after a searched write. The kit's guard is therefore a read statement that raises the same `guard:N` error; nothing changes for a module that uses the kit's guard, and no module writes a guard of its own.
+
+**Branching on whether a conditional write won: the claim stamp (ruled 16 November 2026, raised by the box office build's door scan).** A unit sometimes needs a later statement of the same batch to know whether an earlier conditional write changed its row: a scan row that records admitted or already admitted. Module SQL does not use `changes()` for this. SQLite's `changes()` does leave out a trigger's own writes, but when it is read inside a write statement that follows a write to a table with a search index it can be stale, which is the fault the kit found in its own guard; a module that reads it would be right only for as long as nobody adds a searched column or a trigger to that table. The pattern instead: the conditional write stamps the row with an id the unit already holds (the scan's own id, made before the batch), with its condition on the statement as always, and the later statement reads the stamp back.
+
+```sql
+UPDATE box_office_tickets SET admitted_at = ?1, admitted_scan_id = ?2
+ WHERE id = ?3 AND admitted_at IS NULL;
+
+INSERT INTO box_office_scans (id, ticket_id, outcome, scanned_at)
+SELECT ?2, ?3,
+       CASE WHEN (SELECT admitted_scan_id FROM box_office_tickets WHERE id = ?3) = ?2
+            THEN 'admitted' ELSE 'already_admitted' END,
+       ?1;
+```
+
+The answer comes from data, so it is the same whatever triggers or indexes the table gains, it is safe to run again, and the row says for good which scan admitted the ticket. The conformance check refuses `changes()` in a module's SQL; the kit's own guard is the one place it is read, as a read statement. A unit that only needs to fail when a write did not land uses the guard (`unit.expect`), not a stamp.
+
+As built (kit pull request 101): the check refuses `changes()` in SQL text and sql templates in every module, the kit's guard exempt, and there is no helper for the stamp, which is one term in a condition. The precise hazard, from the kit build: a search index is written only by its triggers, so the earlier statement makes `changes()` unreliable when it inserts a row into a searched table, deletes one, or updates a searched column; an update of unsearched columns alone does not. The insert case was proved on real data and the update case is reasoned from the trigger. The rule stays the cautious one, because which columns are searched changes over time.

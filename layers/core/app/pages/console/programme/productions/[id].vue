@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// One production (C-02, C-03): its details, performances, advisories and web address, with publish,
-// withdraw and delete. Publishing names what is still missing. Credits and media arrive with their slices.
+// One production (C-02, C-03, C-09): its details, performances, credits, advisories and web address, with publish,
+// withdraw, cancel (and bring back) and delete. Publishing names what is still missing. Media arrive
+// with their slice.
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -27,8 +28,9 @@ interface Production {
   publishedAt: number | null
   advisories: { termId: string, detail: string | null }[]
 }
-interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: Option[], seasons: { id: string, name: string }[] } }
+interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: Option[], reasons: Option[], seasons: { id: string, name: string }[] } }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/productions/${String(route.params.id)}`)
@@ -109,6 +111,11 @@ async function withdraw() {
   if (!await confirm({ verb: 'Withdraw', thing: production.value!.title, consequence: 'It leaves the public site, with its dates, until you publish it again.', button: 'Withdraw' })) return
   await run(() => api('/withdraw', 'POST'), 'Production withdrawn')
 }
+const cancelling = ref(false)
+async function restore() {
+  if (!await confirm({ verb: 'Bring back', thing: production.value!.title, consequence: 'It becomes withdrawn, so you can publish it again. Its performances stay cancelled until you reinstate each one.', button: 'Bring back' })) return
+  await run(() => api('/restore', 'POST'), 'Production brought back')
+}
 async function remove() {
   if (!await confirm({ verb: 'Delete', thing: production.value!.title, consequence: 'The draft is removed for good.', button: 'Delete production' })) return
   if (await run(() => api('', 'DELETE'))) await navigateTo('/console/programme/productions')
@@ -125,7 +132,7 @@ async function remove() {
       <StatusBadge
         v-if="production"
         :tone="TONES[production.state]"
-        :label="production.state.charAt(0).toUpperCase() + production.state.slice(1)"
+        :label="t(`core.states.${production.state}`)"
       />
     </template>
     <template #primary>
@@ -145,6 +152,22 @@ async function remove() {
           color="neutral"
           variant="outline"
           @click="withdraw"
+        />
+        <UButton
+          v-if="production.state === 'published' || production.state === 'withdrawn'"
+          label="Cancel production"
+          color="error"
+          variant="outline"
+          icon="i-lucide-calendar-x"
+          @click="cancelling = true"
+        />
+        <UButton
+          v-if="production.state === 'cancelled'"
+          label="Bring back"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-undo-2"
+          @click="restore"
         />
         <UButton
           v-if="production.state === 'draft' && !production.publishedAt"
@@ -227,15 +250,17 @@ async function remove() {
                 label="Category"
                 help="Needed to publish."
               >
-                <USelect
+                <USelectMenu
                   v-model="details.categoryTermId"
+                  value-key="value"
                   :items="categories"
                   placeholder="Choose a category"
                 />
               </UFormField>
               <UFormField label="Season">
-                <USelect
+                <USelectMenu
                   v-model="details.seasonId"
+                  value-key="value"
                   :items="seasons"
                 />
               </UFormField>
@@ -316,6 +341,11 @@ async function remove() {
           @changed="refresh()"
         />
 
+        <ProductionCredits
+          :production-id="production!.id"
+          :credits-public="production!.creditsPublic"
+        />
+
         <PageSection
           title="Advisories"
           description="List what people may want to know before they come, or confirm there is nothing. Publishing needs one or the other, so silence is never taken for &quot;nothing to warn about&quot;."
@@ -364,5 +394,13 @@ async function remove() {
         </PageSection>
       </div>
     </DataBoundary>
+    <ProductionCancelDialog
+      v-if="production"
+      v-model:open="cancelling"
+      :production-id="production.id"
+      :title="production.title"
+      :reasons="data?.options.reasons ?? []"
+      @cancelled="refresh()"
+    />
   </PageFrame>
 </template>

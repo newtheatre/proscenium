@@ -12,8 +12,18 @@ export interface AbilityDecl {
   on?: string
   risk?: 'normal' | 'privileged'
   owner?: 'ignored' | 'grants' | 'refuses'
-  /** Other abilities of the same module, by short name, that come with this one. */
+  /**
+   * Abilities that come with this one: the module's own by short name (`order.view`), or another
+   * module's by full id (`core.account.find`). Another module's must be impliable, of risk normal,
+   * and owned by core or a module this one lists under `requires`; the registry checks.
+   */
   implies?: string[]
+  /**
+   * Another module's ability may imply this one. Whoever holds an ability that implies it, at any
+   * reach (site, module, record or fact), then holds it too, with no record. Only an ability of risk
+   * normal with no record type may say so.
+   */
+  impliable?: boolean
   /** true: using it writes an audit entry. 'read': reads under it are audited too. */
   audit?: boolean | 'read'
   assurance?: 'basic' | 'strong'
@@ -41,6 +51,11 @@ export function ability(d: AbilityDecl = {}): Required<Pick<AbilityDecl, 'risk' 
 
 export const fact = (d: FactDecl = {}): FactDecl => d
 
+/** The full id of an `implies` entry: a short name is the module's own, a full id (two dots) another module's. */
+export function impliedAbility(module: string, entry: string): string {
+  return entry.split('.').length > 2 ? entry : `${module}.${entry}`
+}
+
 function prefixed<M extends string, T>(module: M, kind: string, pattern: RegExp, entries: Record<string, T>): Record<string, T> {
   const out: Record<string, T> = {}
   for (const [short, value] of Object.entries(entries)) {
@@ -60,8 +75,15 @@ export function defineAbilities<const M extends string, const A extends Record<s
   const out = prefixed(module, 'abilities', new RegExp(`^${KEBAB}\\.${KEBAB}$`), abilities)
   for (const [key, decl] of Object.entries(out)) {
     for (const implied of decl.implies ?? []) {
-      if (!(implied in abilities)) throw new DeclarationError(`abilities.${key}.implies`, `"${implied}" is not an ability of ${module}`)
+      const full = impliedAbility(module, implied)
+      if (full.startsWith(`${module}.`) && full !== `${module}.${implied}`) throw new DeclarationError(`abilities.${key}.implies`, `name ${module}'s own "${implied}" by its short name`)
+      // Another module's ability is checked by the registry, which knows every module.
+      if (full === `${module}.${implied}` && !(implied in abilities)) throw new DeclarationError(`abilities.${key}.implies`, `"${implied}" is not an ability of ${module}`)
     }
+    // An impliable ability comes with its implier at any reach, with no record, so it may neither be
+    // privileged nor guard sight of a record.
+    if (decl.impliable && decl.risk === 'privileged') throw new DeclarationError(`abilities.${key}.impliable`, 'only an ability of risk normal may be implied by another module')
+    if (decl.impliable && decl.on) throw new DeclarationError(`abilities.${key}.impliable`, 'an ability on a record type cannot be impliable')
     // A privileged ability may skip freshness only when it reads and its reads are audited; one that
     // changes anything always needs a fresh sign-in.
     if (decl.risk === 'privileged' && decl.fresh === false && decl.audit !== 'read') throw new DeclarationError(`abilities.${key}.fresh`, "a privileged ability needs a fresh sign-in, unless it only reads and says audit: 'read'")

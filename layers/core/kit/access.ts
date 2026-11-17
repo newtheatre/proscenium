@@ -2,6 +2,7 @@
 // declarative refusal is owner: 'refuses'. Where grants come from is identity's business: it
 // installs an access provider. Until then the provider reads grants from the actor itself.
 import { useRegistry } from './registry'
+import { impliedAbility } from './abilities'
 import { isEnabled } from './modules-store'
 import { useSetting } from './settings-store'
 import { nowMs } from './clock'
@@ -52,7 +53,7 @@ function grantingAbilities(ability: string): Set<string> {
     grew = false
     for (const [name, { module, decl }] of registry.abilities) {
       if (out.has(name)) continue
-      if ((decl.implies ?? []).some(short => out.has(`${module}.${short}`))) {
+      if ((decl.implies ?? []).some(entry => out.has(impliedAbility(module, entry)))) {
         out.add(name)
         grew = true
       }
@@ -91,7 +92,16 @@ const refuse = (code: string, reason: string, status: number, remedy?: string): 
  * May this actor use this ability, on this record if one is given? Returns what allowed it, for
  * the audit row, or the refusal to show. 'signed-in' means any signed-in person.
  */
-export async function can(actor: Actor, ability: AbilityName | 'signed-in', recordIn?: Ref | readonly [string, string]): Promise<Decision> {
+export interface CanOptions {
+  /**
+   * Overrides the ability's own freshness: true asks for a sign-in re-asserted within
+   * core.access.fresh-within, false asks for none. Only settings saves use it (Matt, 16 November:
+   * re-authentication only for a setting that asks for confirmation or a reason).
+   */
+  fresh?: boolean
+}
+
+export async function can(actor: Actor, ability: AbilityName | 'signed-in', recordIn?: Ref | readonly [string, string], options: CanOptions = {}): Promise<Decision> {
   const record = Array.isArray(recordIn) ? { type: recordIn[0], id: recordIn[1] } : recordIn as Ref | undefined
   const signedIn = actor.kind === 'person' || actor.kind === 'setup'
   if (actor.kind === 'system' || actor.kind === 'job') return { allowed: true, by: actor.kind }
@@ -113,10 +123,20 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
 
   const granting = grantingAbilities(ability)
   const levels = decl.grantAt ?? ['site', 'module', 'record']
+  // An impliable ability comes with any ability that implies it, at whatever reach that one is held,
+  // with no record: the grant or fact of the implying ability is what allowed it.
+  const implying = new Set<string>()
+  if (decl.impliable) {
+    for (const name of granting) if (name !== ability && (await isEnabled(registry.abilities.get(name)!.module))) implying.add(name)
+  }
   if (!by) {
     const grants = await provider.grants!(actor)
     const chain = record ? await lineage(record) : []
     for (const grant of grants) {
+      if (grant.ability ? implying.has(grant.ability) : [...implying].some(name => registry.abilities.get(name)!.module === grant.module)) {
+        by = grant.via
+        break
+      }
       const level = grant.record ? 'record' : grant.module ? 'module' : 'site'
       if (!levels.includes(level as any)) continue
       const covers = grant.module ? grant.module === module : !!grant.ability && granting.has(grant.ability)
@@ -132,7 +152,9 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
       if (!abilities.some(a => granting.has(a))) continue
       const fact = registry.facts.get(factName)
       if (!fact || !(await isEnabled(fact.module))) continue
-      if (await holdsFact(factName, actor, record)) {
+      // Through an implying ability, a fact held on any record will do; it is found from its holders.
+      const anyRecord = !record && fact.decl.on && abilities.some(a => implying.has(a))
+      if ((await holdsFact(factName, actor, record)) || (anyRecord && actor.accountId && (await factHolders(factName))?.includes(actor.accountId))) {
         by = `fact:${factName}`
         break
       }
@@ -141,8 +163,9 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
   if (!by) return refuse('core.access.denied', 'You do not have permission to do this.', 403, 'Ask an administrator for this permission.')
 
   if (decl.assurance === 'strong' && actor.assurance !== 'strong') return refuse('core.access.needs-strong-sign-in', 'This needs a stronger sign-in.', 403, 'Sign in with a passkey or a second factor, then try again.')
-  if (decl.fresh) {
-    const within = typeof decl.fresh === 'string' ? parseDuration(decl.fresh) : await useSetting('core.access.fresh-within')
+  const fresh = options.fresh ?? decl.fresh
+  if (fresh) {
+    const within = typeof fresh === 'string' ? parseDuration(fresh) : await useSetting('core.access.fresh-within')
     if (!actor.reassertedAt || nowMs() - actor.reassertedAt > (within as number) * 1000) // not-policy: seconds to milliseconds
       return refuse('core.access.not-fresh', 'For your safety, confirm it is you before doing this.', 403, 'Confirm your sign-in, then try again.')
   }
@@ -185,8 +208,8 @@ async function holdsFact(name: string, actor: Actor, record?: Ref): Promise<bool
 }
 
 /** Throws the refusal when the check fails; returns what allowed it when it passes. */
-export async function requireAbility(actor: Actor, ability: AbilityName | 'signed-in', record?: Ref | readonly [string, string]): Promise<string> {
-  const decision = await can(actor, ability, record)
+export async function requireAbility(actor: Actor, ability: AbilityName | 'signed-in', record?: Ref | readonly [string, string], options?: CanOptions): Promise<string> {
+  const decision = await can(actor, ability, record, options)
   if (!decision.allowed) throw new Refusal(decision.code, decision.reason, { status: decision.status, remedy: decision.remedy })
   return decision.by
 }

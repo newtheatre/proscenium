@@ -4,8 +4,8 @@
 // payments.cash-variance. Above payments.sessions.variance-needs-second-person, a second person closes
 // a session with a difference.
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { postEntries } from '#modules/finance'
-import { exactAccount, inAccountScope } from './account-scope'
 import { labelsOf } from './people'
 
 export interface SessionRow { id: string, point_label: string, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
@@ -16,8 +16,7 @@ export async function getSession(id: string): Promise<SessionRow | null> {
 
 /** The person's session not yet closed, if they have one. */
 export async function sessionOf(accountId: string): Promise<SessionRow | null> {
-  const mine = inAccountScope('opened_by', accountId)
-  return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state <> 'closed' AND ${mine.sql} ORDER BY opened_at DESC LIMIT 1`, ...mine.params)
+  return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state <> 'closed' AND opened_by IN (${accountScopeSql('?1')}) ORDER BY opened_at DESC LIMIT 1`, accountId)
 }
 
 /** Expected cash: the float, plus cash taken in the session, less cash handed back from it. */
@@ -38,11 +37,12 @@ export async function openSession(unit: UnitView, input: { accountId: string, po
   const currency = await useSetting('core.locale.currency') as string
   // The partial unique index on opened_by refuses a race the read did not see. It compares stored ids,
   // which is why opened_by moves on a merge.
-  const own = exactAccount('opened_by', input.accountId) // exact-account: the one-open-session index compares stored ids
   unit.add({
     sql: `INSERT INTO payments_sessions (id, point_label, opened_by, opened_at, state, float_minor, currency, created_at, updated_at)
-      SELECT ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state <> 'closed' AND ${own.sql})`,
-    params: [id, input.pointLabel, input.accountId, at, float, currency, at, at, ...own.params],
+      SELECT ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state <> 'closed'
+        AND opened_by = ? -- exact-account: the one-open-session index compares stored ids
+      )`,
+    params: [id, input.pointLabel, input.accountId, at, float, currency, at, at, input.accountId],
   }).expect(1, { code: 'payments.session.already-open', reason: 'You already have a till session open.' })
   return id
 }
@@ -79,8 +79,7 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
   const variance = input.countedMinor - expected
   const note = input.varianceNote?.trim() || null
   if (variance !== 0 && !note) throw new Refusal('payments.session.reason-needed', 'Say why the cash counted differs from what was expected.', { status: 422, fields: { varianceNote: 'payments.session.reason-needed' } })
-  const scope = inAccountScope('opened_by', input.by)
-  const own = !!(await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE id = ? AND ${scope.sql}`, session.id, ...scope.params))
+  const own = !!(await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE id = ?1 AND opened_by IN (${accountScopeSql('?2')})`, session.id, input.by))
   if (!own && !input.canCloseAny) throw new Refusal('core.access.denied', 'Only the person who opened this session, or someone allowed to close any, may close it.', { status: 403 })
   const limit = await useSetting('payments.sessions.variance-needs-second-person') as number
   if (own && Math.abs(variance) > limit) throw new Refusal('payments.session.second-person-needed', 'The difference is above the limit, so someone else must close this session.', { status: 409, remedy: 'Ask someone allowed to close any session to close it.' })

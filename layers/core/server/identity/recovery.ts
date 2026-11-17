@@ -2,13 +2,12 @@
 // enrolment link a member of staff issues, opens a session good for one thing: enrolling a new
 // passkey. Every recovery tells all the account's verified addresses.
 import type { H3Event } from 'h3'
-import { first, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
+import { first, newId, nowMs, refuse, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { countAgainstRate } from '#kit/ratelimit'
 import { addressRow, accountById, isUsable, normaliseAddress } from './accounts'
 import { digest, normaliseRecoveryCode, randomToken } from './crypto'
 import { credentialNotice } from './notices'
 import { startSession } from './sessions'
-import { relyingParty } from './web'
 
 /** Where a recovery session goes: the page that enrols a passkey. */
 export const ENROL_PATH = '/account/passkey'
@@ -57,7 +56,7 @@ export async function issueEnrolmentLink(unit: UnitView, event: H3Event, actor: 
   })
   unit.audit({ action: 'create', ability: 'core.account.recover', record: ['core.account', accountId] })
   await credentialNotice(unit, accountId, 'enrolment-link')
-  return { link: `${relyingParty(event).origin}/sign-in/link#${token}`, expiresAt }
+  return { link: await siteUrl(`/sign-in/link#${token}`), expiresAt }
 }
 
 /** Uses an enrolment link: a recovery session for the account it names, spent once. */

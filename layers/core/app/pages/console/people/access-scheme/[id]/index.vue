@@ -1,11 +1,12 @@
-<!-- One application to the access scheme (ID-40 to ID-42; identity spec part 6): what the person
-     asked for, what is in force, what has happened to it, and the reviewer's actions: accept, reject,
-     ask for more, verify, and a way to apply on their behalf (the form is [id]/apply). Opening it is recorded; nobody opens their own. -->
+<!-- One application to the access scheme (ID-40 to ID-42; identity spec part 6). It opens with where
+     the application stands and what the reviewer should do next, then what the person is asking for
+     and what is accepted now, the decision, verifying in person and the history. Filling the form in
+     for them (the form is [id]/apply) is offered only when nothing is waiting for a decision: a
+     first application for somebody new starts from the list. Opening it is recorded; nobody opens
+     their own. -->
 <script setup lang="ts">
 import type { AccessApplicationValue } from '../../../../../composables/useAccessApplicationForm'
 import type { RefusalView } from '../../../../../utils/refusal'
-
-definePageMeta({ layout: 'console' })
 
 interface Opened {
   name: string
@@ -23,7 +24,7 @@ interface Opened {
     reviewDue: number | null
   } | null
   history: { at: number, by: string | null, event: string }[]
-  needs: { id: string, label: string, retired: boolean }[]
+  needs: { id: string, key: string, label: string, retired: boolean }[]
   allowNote: boolean
 }
 
@@ -39,15 +40,25 @@ const { data, status, error, refresh } = await useAPI<Opened>(base, { key: `core
 const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
 const app = computed(() => data.value?.application ?? null)
-const labelOf = (term: string) => data.value?.needs.find(n => n.id === term)?.label ?? t('core.access.retired-need')
-const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
+const { dayLong: day } = useDates()
 
 const STATUS = {
   'submitted': { tone: 'info', key: 'core.access.review.status.submitted' },
   'more-info': { tone: 'warning', key: 'core.access.review.status.more-info' },
   'accepted': { tone: 'success', key: 'core.access.review.status.accepted' },
+  'change': { tone: 'info', key: 'core.access.review.status.change' },
   'rejected': { tone: 'danger', key: 'core.access.review.status.rejected' },
 } as const
+/** Where it stands, with a change to an accepted application as a state of its own. */
+const stage = computed(() => app.value?.status === 'accepted' && app.value.pending ? 'change' : app.value?.status)
+/** Something is waiting for a reviewer's decision. */
+const waiting = computed(() => !!app.value?.pending && app.value.status !== 'more-info')
+/** Filling the form in for them, when nothing is waiting: what the section is called. */
+const behalf = computed(() => {
+  if (waiting.value) return null
+  if (!app.value) return 'apply'
+  return ({ 'more-info': 'answer', 'accepted': 'change', 'rejected': 'apply-again', 'submitted': null } as const)[app.value.status]
+})
 
 /** Sends one action to the application's routes, then reloads it. The path is built at run time. */
 async function act(path: string, method: 'POST' | 'PUT', body: object, done: string): Promise<boolean> {
@@ -71,12 +82,13 @@ async function act(path: string, method: 'POST' | 'PUT', body: object, done: str
 // Deciding.
 const decision = reactive<{ action: 'accept' | 'ask' | 'reject', companions: number, message: string }>({ action: 'accept', companions: 0, message: '' })
 watch(() => app.value?.pending?.companions, (asked) => { decision.companions = asked ?? 0 }, { immediate: true })
-const actions = computed(() => [
-  { value: 'accept', label: t('core.access.review.accept') },
-  { value: 'ask', label: t('core.access.review.ask') },
-  { value: 'reject', label: t('core.access.review.reject') },
-])
+const actions = computed(() => (['accept', 'ask', 'reject'] as const).map(a => ({
+  value: a,
+  label: t(`core.access.review.${a}`),
+  description: t(`core.access.review.${a}-help`),
+})))
 const companionChoices = computed(() => Array.from({ length: (app.value?.pending?.companions ?? 0) + 1 }, (_, n) => ({ value: n, label: t(`core.access.form.companions-${n}`) })))
+const messageLabel = computed(() => t(`core.access.review.message-for.${decision.action}`))
 async function decide() {
   const body = decision.action === 'accept'
     ? { action: 'accept', companions: decision.companions, ...(decision.message.trim() ? { message: decision.message } : {}) }
@@ -120,13 +132,8 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
             </h2>
             <div class="flex flex-wrap items-center gap-2">
               <StatusBadge
-                :tone="STATUS[app.status].tone"
-                :label="t(STATUS[app.status].key)"
-              />
-              <StatusBadge
-                v-if="app.status === 'accepted' && app.pending"
-                tone="info"
-                :label="t('core.access.review.change-waiting')"
+                :tone="STATUS[stage!].tone"
+                :label="t(STATUS[stage!].key)"
               />
               <StatusBadge
                 v-if="app.flagged"
@@ -139,80 +146,52 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
                 :label="t('core.access.review.verified', { method: t(`core.access.review.method.${app.verifiedMethod ?? 'known'}`) })"
               />
             </div>
+            <p>{{ t(`${STATUS[stage!].key}.next`) }}</p>
             <p class="text-sm text-muted">
               {{ t(app.submittedVia === 'staff' ? 'core.access.review.sent-by-staff' : 'core.access.review.sent', { date: day(app.submittedAt) }) }}
             </p>
           </section>
 
-          <section
+          <PageSection
             v-for="part in (['pending', 'inForce'] as const)"
             v-show="app[part]"
             :key="part"
-            :aria-labelledby="`application-${part}`"
-            class="space-y-2"
+            :title="part === 'inForce' ? t('core.access.review.in-force') : app.status === 'accepted' ? t('core.access.review.asked-change') : t('core.access.review.asked')"
           >
-            <h2
-              :id="`application-${part}`"
-              class="text-lg font-semibold text-highlighted"
-            >
-              {{ part === 'pending' ? t('core.access.asked') : t('core.access.in-force') }}
-            </h2>
-            <template v-if="app[part]">
-              <ul class="list-disc space-y-1 ps-5">
-                <li
-                  v-for="need in app[part]!.needs"
-                  :key="need.term"
-                >
-                  {{ labelOf(need.term) }}<span
-                    v-if="need.note"
-                    class="text-muted"
-                  > ({{ need.note }})</span>
-                </li>
-              </ul>
-              <p>{{ t('core.access.companions', { count: app[part]!.companions }) }}</p>
-              <p
-                v-if="app[part]!.other"
-                class="whitespace-pre-line"
-              >
-                {{ app[part]!.other }}
-              </p>
-            </template>
-          </section>
+            <AccessApplicationSummary
+              v-if="app[part]"
+              :value="app[part]!"
+              :needs="data?.needs ?? []"
+            />
+          </PageSection>
 
           <UAlert
             v-if="app.message"
             color="neutral"
             variant="outline"
             icon="i-lucide-message-square"
-            :title="t('core.access.review.last-message')"
+            :title="app.status === 'more-info' ? t('core.access.review.question-sent') : t('core.access.review.last-message')"
             :description="app.message"
           />
 
           <!-- Decide, when something is waiting. -->
-          <section
-            v-if="app.pending && app.status !== 'more-info'"
-            aria-labelledby="application-decide"
-            class="space-y-4"
+          <PageSection
+            v-if="waiting"
+            :title="t('core.access.review.decide')"
           >
-            <h2
-              id="application-decide"
-              class="text-lg font-semibold text-highlighted"
-            >
-              {{ t('core.access.review.decide') }}
-            </h2>
-            <form
+            <UForm
               class="space-y-4"
-              @submit.prevent="decide"
+              :state="decision"
+              @submit="decide"
             >
               <URadioGroup
                 v-model="decision.action"
                 :legend="t('core.access.review.decision')"
                 :items="actions"
-                orientation="horizontal"
               />
               <UFormField
                 v-if="decision.action === 'accept'"
-                :label="t('core.access.form.companions')"
+                :label="t('core.access.review.companions')"
                 :help="t('core.access.review.companions-help')"
               >
                 <USelect
@@ -221,7 +200,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
                 />
               </UFormField>
               <UFormField
-                :label="decision.action === 'ask' ? t('core.access.review.question') : t('core.access.review.message')"
+                :label="messageLabel"
                 :hint="decision.action === 'accept' && decision.companions >= (app.pending?.companions ?? 0) ? t('core.access.form.optional') : undefined"
                 :help="t('core.access.review.message-help')"
                 :error="refusal?.fields?.message"
@@ -230,7 +209,6 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
                   v-model="decision.message"
                   :rows="3"
                   :maxlength="1000"
-                  class="w-full"
                 />
               </UFormField>
               <UButton
@@ -238,24 +216,15 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
                 :loading="busy"
                 :label="t(`core.access.review.do.${decision.action}`)"
               />
-            </form>
-          </section>
+            </UForm>
+          </PageSection>
 
           <!-- Verify an accepted application in person. -->
-          <section
+          <PageSection
             v-if="app.status === 'accepted'"
-            aria-labelledby="application-verify"
-            class="space-y-3"
+            :title="t('core.access.review.verify')"
+            :description="t('core.access.review.verify-help')"
           >
-            <h2
-              id="application-verify"
-              class="text-lg font-semibold text-highlighted"
-            >
-              {{ t('core.access.review.verify') }}
-            </h2>
-            <p class="text-sm text-muted">
-              {{ t('core.access.review.verify-help') }}
-            </p>
             <div
               v-if="!app.verifiedAt"
               class="flex flex-wrap items-end gap-2"
@@ -281,23 +250,15 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
               :label="t('core.access.review.remove-mark')"
               @click="act('/verified', 'PUT', { method: null }, t('core.access.review.unmarked'))"
             />
-          </section>
+          </PageSection>
         </template>
 
-        <!-- Apply, or answer, on their behalf. -->
-        <section
-          aria-labelledby="application-behalf"
-          class="space-y-3"
+        <!-- Fill the form in for them: only when nothing is waiting for a decision. -->
+        <PageSection
+          v-if="behalf"
+          :title="t(`core.access.review.behalf.${behalf}`)"
+          :description="t('core.access.review.behalf-help')"
         >
-          <h2
-            id="application-behalf"
-            class="text-lg font-semibold text-highlighted"
-          >
-            {{ t('core.access.review.behalf') }}
-          </h2>
-          <p class="text-sm text-muted">
-            {{ t('core.access.review.behalf-help') }}
-          </p>
           <UButton
             color="neutral"
             variant="outline"
@@ -305,18 +266,12 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
             :label="t('core.access.review.start-behalf')"
             :to="`/console/people/access-scheme/${encodeURIComponent(id)}/apply`"
           />
-        </section>
+        </PageSection>
 
-        <section
-          aria-labelledby="application-history"
-          class="space-y-2"
+        <PageSection
+          v-if="data?.history?.length"
+          :title="t('core.access.review.history')"
         >
-          <h2
-            id="application-history"
-            class="text-lg font-semibold text-highlighted"
-          >
-            {{ t('core.access.review.history') }}
-          </h2>
           <ul class="space-y-1 text-sm">
             <li
               v-for="(entry, i) in data?.history ?? []"
@@ -325,7 +280,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
               {{ t('core.access.review.history-line', { date: day(entry.at), what: t(`core.access.review.event.${entry.event}`), by: entry.by ?? t('core.access.review.someone') }) }}
             </li>
           </ul>
-        </section>
+        </PageSection>
       </div>
     </DataBoundary>
   </PageFrame>

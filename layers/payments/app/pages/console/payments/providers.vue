@@ -9,7 +9,7 @@ type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secr
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { currency, money, toMinor } = await useMoney()
+const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ providers: Provider[], accounts: Account[] }>('/api/payments/providers', { key: 'payments:providers' })
@@ -85,10 +85,10 @@ async function checkTest(a: Account) {
 
 // A payout entered by hand.
 const paying = ref(false)
-const payout = reactive({ providerAccountId: '', paid: undefined as number | undefined, fees: 0 as number | undefined, paidOn: '', reference: '', key: '' })
+const payout = reactive({ providerAccountId: '', paidMinor: null as number | null, feesMinor: 0 as number | null, paidOn: '', reference: '', key: '' })
 const payoutRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function openPayout() {
-  Object.assign(payout, { providerAccountId: data.value?.accounts.find(a => a.active && a.mode === 'live')?.id ?? '', paid: undefined, fees: 0, paidOn: '', reference: '', key: crypto.randomUUID() })
+  Object.assign(payout, { providerAccountId: data.value?.accounts.find(a => a.active && a.mode === 'live')?.id ?? '', paidMinor: null, feesMinor: 0, paidOn: '', reference: '', key: crypto.randomUUID() })
   payoutRefusal.value = null
   paying.value = true
 }
@@ -96,9 +96,9 @@ async function recordPayout() {
   busy.value = true
   payoutRefusal.value = null
   try {
-    await $api('/api/payments/payouts', { method: 'POST', body: { providerAccountId: payout.providerAccountId, paidMinor: toMinor(payout.paid ?? 0), feesMinor: toMinor(payout.fees ?? 0), paidOn: payout.paidOn, reference: payout.reference }, headers: { 'idempotency-key': payout.key } })
+    await $api('/api/payments/payouts', { method: 'POST', body: { providerAccountId: payout.providerAccountId, paidMinor: payout.paidMinor ?? 0, feesMinor: payout.feesMinor ?? 0, paidOn: payout.paidOn, reference: payout.reference }, headers: { 'idempotency-key': payout.key } })
     paying.value = false
-    toast.add({ title: t('payments.screens.payouts.recorded', { amount: money(toMinor(payout.paid ?? 0)) }), color: 'success' })
+    toast.add({ title: t('payments.screens.payouts.recorded', { amount: money(payout.paidMinor ?? 0) }), color: 'success' })
   }
   catch (e) {
     payoutRefusal.value = toRefusal(e)
@@ -192,7 +192,6 @@ async function recordPayout() {
                   <UAlert
                     v-if="providerOf(a)?.missingSecrets.length"
                     color="error"
-                    variant="subtle"
                     icon="i-lucide-key-round"
                     :title="t('payments.screens.providers.missing', { secrets: providerOf(a)!.missingSecrets.join(', ') })"
                     :description="t('payments.screens.providers.missing-help')"
@@ -279,20 +278,13 @@ async function recordPayout() {
             :title="t('payments.screens.providers.available-title')"
             :description="t('payments.screens.providers.available-help')"
           >
-            <ul class="divide-y divide-default rounded-lg border border-default">
-              <li
+            <RecordList :label="t('payments.screens.providers.available-title')">
+              <RecordListItem
                 v-for="p in loaded.providers"
                 :key="p.id"
-                class="flex flex-wrap items-center gap-3 px-3 py-2"
+                :name="providerName(p.id)"
+                :description="t(`payments.screens.providers.about.${p.id}`)"
               >
-                <div class="min-w-0 flex-1">
-                  <p class="font-medium">
-                    {{ providerName(p.id) }}
-                  </p>
-                  <p class="text-sm text-muted">
-                    {{ t(`payments.screens.providers.about.${p.id}`) }}
-                  </p>
-                </div>
                 <StatusBadge
                   v-if="p.missingSecrets.length"
                   tone="warning"
@@ -303,8 +295,8 @@ async function recordPayout() {
                   tone="success"
                   :label="t('payments.screens.providers.ready')"
                 />
-              </li>
-            </ul>
+              </RecordListItem>
+            </RecordList>
           </PageSection>
         </div>
       </template>
@@ -315,10 +307,11 @@ async function recordPayout() {
       :title="t('payments.screens.providers.add')"
     >
       <template #body>
-        <form
+        <UForm
           id="add-provider"
           class="space-y-4"
-          @submit.prevent="add"
+          :state="form"
+          @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -328,7 +321,6 @@ async function recordPayout() {
             <USelect
               v-model="form.provider"
               :items="(data?.providers ?? []).map(p => ({ value: p.id, label: providerName(p.id) }))"
-              class="w-full"
             />
           </UFormField>
           <p
@@ -345,7 +337,6 @@ async function recordPayout() {
             <UInput
               v-model="form.label"
               maxlength="80"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -375,10 +366,9 @@ async function recordPayout() {
             <UInput
               v-model="form.externalRef"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -397,10 +387,11 @@ async function recordPayout() {
       :description="t('payments.screens.payouts.help')"
     >
       <template #body>
-        <form
+        <UForm
           id="record-payout"
           class="space-y-4"
-          @submit.prevent="recordPayout"
+          :state="payout"
+          @submit="recordPayout"
         >
           <RefusalNotice :refusal="payoutRefusal" />
           <UFormField
@@ -410,7 +401,6 @@ async function recordPayout() {
             <USelect
               v-model="payout.providerAccountId"
               :items="(data?.accounts ?? []).filter(a => a.mode === 'live').map(a => ({ value: a.id, label: a.label }))"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -419,25 +409,13 @@ async function recordPayout() {
               :help="t('payments.screens.payouts.paid-help')"
               required
             >
-              <UInputNumber
-                v-model="payout.paid"
-                :min="0"
-                :step="0.01"
-                :format-options="{ style: 'currency', currency }"
-                class="w-full"
-              />
+              <FieldMoney v-model="payout.paidMinor" />
             </UFormField>
             <UFormField
               :label="t('payments.screens.payouts.fees')"
               :help="t('payments.screens.payouts.fees-help')"
             >
-              <UInputNumber
-                v-model="payout.fees"
-                :min="0"
-                :step="0.01"
-                :format-options="{ style: 'currency', currency }"
-                class="w-full"
-              />
+              <FieldMoney v-model="payout.feesMinor" />
             </UFormField>
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -445,11 +423,7 @@ async function recordPayout() {
               :label="t('payments.screens.payouts.paid-on')"
               required
             >
-              <UInput
-                v-model="payout.paidOn"
-                type="date"
-                class="w-full"
-              />
+              <FieldDate v-model="payout.paidOn" />
             </UFormField>
             <UFormField
               :label="t('payments.screens.payouts.reference')"
@@ -459,18 +433,17 @@ async function recordPayout() {
               <UInput
                 v-model="payout.reference"
                 maxlength="120"
-                class="w-full"
               />
             </UFormField>
           </div>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
           type="submit"
           form="record-payout"
           :loading="busy"
-          :disabled="!payout.providerAccountId || payout.paid === undefined || !payout.paidOn || !payout.reference.trim()"
+          :disabled="!payout.providerAccountId || payout.paidMinor === null || !payout.paidOn || !payout.reference.trim()"
           :label="t('payments.screens.payouts.record-button')"
         />
       </template>

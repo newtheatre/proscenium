@@ -53,7 +53,9 @@ describe('sign in with Google (ID-04)', () => {
     delete mutableEnv.CORE_GOOGLE_CLIENT_SECRET
     const admin = await staff()
     await grantDirectly(admin.accountId, ['core.identity-settings.manage'])
-    const turnOn = () => admin.browser.put('/api/core/settings/core.sign-in.google', { value: true })
+    // Turning Google on is declared onChange: 'confirm' (part 6): it asks again first.
+    expect((await admin.browser.put('/api/core/settings/core.sign-in.google', { value: true })).body.fields).toEqual({ confirm: 'required' })
+    const turnOn = () => admin.browser.put('/api/core/settings/core.sign-in.google', { value: true, confirm: true })
     expect((await turnOn()).body.fields).toEqual({ value: 'core.settings.rules.google-needs-client-id' })
     expect((await admin.browser.put('/api/core/settings/core.sign-in.google-client-id', { value: CLIENT })).status).toBe(200)
     expect((await turnOn()).body.fields).toEqual({ value: 'core.settings.rules.google-needs-client-secret' })

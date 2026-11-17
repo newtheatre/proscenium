@@ -4,8 +4,9 @@
 // credits and cancelling a whole production arrive in later slices.
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, useSetting } from '#kit'
-import type { UnitView } from '#kit'
+import type { Actor, UnitView } from '#kit'
 import { assertTerm } from '../vocabularies/service'
+import { changeImpact, firstRefusal, syncProductionDates } from './performances'
 
 // ---------------------------------------------------------------------------------------------
 // Slugs
@@ -13,8 +14,6 @@ import { assertTerm } from '../vocabularies/service'
 export function slugFrom(text: string, fallback: string): string {
   return text.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || fallback // not-policy: a slug's pattern and length
 }
-
-export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/ // not-policy: a slug's pattern
 
 async function freeSlug(base: string, taken: (candidate: string) => Promise<boolean>): Promise<string> {
   let slug = base
@@ -349,6 +348,60 @@ export async function withdrawProduction(unit: UnitView, id: string): Promise<vo
   unit.add(sql`UPDATE core_productions SET state = 'withdrawn' WHERE id = ${id} AND state = 'published'`)
     .expect(1, { code: 'core.production.not-published', reason: 'Only a published production can be withdrawn.' })
   unit.audit({ action: 'state', record: ['core.production', id], detail: { from: row.state, to: 'withdrawn' } })
+  unit.announce('core.production.withdrawn', { productionId: id }, { record: ['core.production', id] })
+}
+
+/** The scheduled performances of a production that have not started, which a cancel takes with it. */
+async function performancesToCancel(id: string): Promise<{ id: string }[]> {
+  return all<{ id: string }>("SELECT id FROM core_performances WHERE production_id = ? AND state = 'scheduled' AND starts_at > ? ORDER BY starts_at, id", id, nowMs())
+}
+
+/** What cancelling the production would touch: its own performances first, then every module's lines. */
+export async function productionCancelImpact(id: string, actor: Actor): Promise<{ lines: string[], refusal: { code: string, reason: string, link: string | null } | null }> {
+  await productionRow(id)
+  const change = { record: { type: 'core.production', id }, kind: 'cancel' as const }
+  const count = (await performancesToCancel(id)).length
+  const own = count ? [`${count} scheduled performance${count === 1 ? '' : 's'} still to come will be cancelled with the same reason.`] : []
+  const refused = await firstRefusal(change, actor)
+  return { lines: [...own, ...await changeImpact(change, actor)], refusal: refused ? { code: refused.code, reason: refused.reason, link: refused.link ?? null } : null }
+}
+
+/**
+ * Published or withdrawn to cancelled, with a reason (part 3). Every scheduled performance that has
+ * not started is cancelled in the same batch with the same reason; drafts stay drafts. Any module
+ * may refuse through the change guard.
+ */
+export async function cancelProduction(unit: UnitView, id: string, input: { reasonTermId: string, note?: string | null }, actor: Actor): Promise<{ performances: number }> {
+  const row = await productionRow(id)
+  if (row.state !== 'published' && row.state !== 'withdrawn') refuse('core.production.not-cancellable', 'Only a published or withdrawn production can be cancelled.', { status: 409, remedy: row.state === 'draft' ? 'Delete the draft instead.' : undefined })
+  const reason = await first<{ slug: string }>('SELECT slug FROM core_terms WHERE id = ? AND vocabulary_key = \'core.cancel-reason\' AND retired_at IS NULL', input.reasonTermId)
+  if (!reason) refuse('core.production.reason-unknown', 'Choose a reason from the list.', { status: 422, fields: { reasonTermId: 'Choose a reason from the list.' } })
+  const refused = await firstRefusal({ record: { type: 'core.production', id }, kind: 'cancel' }, actor)
+  if (refused) refuse(refused.code, refused.reason, { status: 409, ...(refused.link ? { remedy: refused.link } : {}) })
+
+  const at = nowMs()
+  const changed = { code: 'core.production.changed', reason: 'Someone else changed this production or its dates just now.', remedy: 'Refresh and try again.' }
+  unit.add(sql`UPDATE core_productions SET state = 'cancelled', cancel_reason_term_id = ${input.reasonTermId}
+    WHERE id = ${id} AND state = ${row.state} AND ${assertTerm(input.reasonTermId, 'core.cancel-reason')}`).expect(1, changed)
+  const cancelled = await performancesToCancel(id)
+  if (cancelled.length) {
+    unit.add(sql`UPDATE core_performances SET state = 'cancelled', cancelled_at = ${at}, cancel_reason_term_id = ${input.reasonTermId}, cancel_note = ${input.note ?? null}
+      WHERE production_id = ${id} AND state = 'scheduled' AND id IN (SELECT value FROM json_each(${JSON.stringify(cancelled.map(p => p.id))}))`).expect(cancelled.length, changed)
+    unit.announce('core.performance.cancelled', cancelled.map(p => ({ payload: { performanceId: p.id, productionId: id, reason: reason.slug }, record: ['core.performance', p.id] as ['core.performance', string] })))
+    syncProductionDates(unit, id)
+  }
+  unit.audit({ action: 'state', record: ['core.production', id], detail: { from: row.state, to: 'cancelled', reason: reason.slug, performances: cancelled.length } })
+  unit.announce('core.production.cancelled', { productionId: id, reason: reason.slug }, { record: ['core.production', id] })
+  return { performances: cancelled.length }
+}
+
+/** Cancelled back to withdrawn (part 3). Its performances stay cancelled and are reinstated one by one. */
+export async function restoreProduction(unit: UnitView, id: string): Promise<void> {
+  const row = await productionRow(id)
+  if (row.state !== 'cancelled') refuse('core.production.not-cancelled', 'Only a cancelled production can be brought back.', { status: 409 })
+  unit.add(sql`UPDATE core_productions SET state = 'withdrawn', cancel_reason_term_id = NULL WHERE id = ${id} AND state = 'cancelled'`)
+    .expect(1, { code: 'core.production.changed', reason: 'Someone else changed this production just now.', remedy: 'Refresh and try again.' })
+  unit.audit({ action: 'state', record: ['core.production', id], detail: { from: 'cancelled', to: 'withdrawn' } })
   unit.announce('core.production.withdrawn', { productionId: id }, { record: ['core.production', id] })
 }
 
