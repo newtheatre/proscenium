@@ -94,11 +94,14 @@ async function create() {
         <UForm
           id="membership-new-scheme"
           :state="form"
+          :validate="() => needs({ name: form.name, key: form.key })"
           class="space-y-4"
+          novalidate
           @submit="create"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="name"
             :label="t('membership.screens.scheme.name')"
             :help="t('membership.screens.scheme.name-help')"
             required
@@ -109,6 +112,7 @@ async function create() {
             />
           </UFormField>
           <UFormField
+            name="key"
             :label="t('membership.screens.scheme.key')"
             :help="t('membership.screens.scheme.key-help')"
             required
@@ -143,7 +147,6 @@ async function create() {
           type="submit"
           form="membership-new-scheme"
           loading-auto
-          :disabled="!form.name.trim() || !form.key.trim()"
           :label="t('membership.screens.schemes.create')"
         />
       </template>

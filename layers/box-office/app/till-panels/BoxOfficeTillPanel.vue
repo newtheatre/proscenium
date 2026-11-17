@@ -273,6 +273,7 @@ function clear() {
     <template v-else>
       <UForm
         :state="{ query }"
+        novalidate
         @submit="find()"
       >
         <!-- The buttons sit on the box's own row, so the help line under it cannot push them out of line. -->

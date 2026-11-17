@@ -217,11 +217,14 @@ async function reopen() {
         <UForm
           id="reopen-period"
           :state="{ reason }"
+          :validate="() => needs({ reason })"
           class="space-y-4"
+          novalidate
           @submit="reopen"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="reason"
             :label="t('finance.screens.period.reason')"
             required
           >
@@ -237,7 +240,6 @@ async function reopen() {
           type="submit"
           form="reopen-period"
           :loading="busy"
-          :disabled="!reason"
           :label="t('finance.screens.period.reopen-button')"
         />
       </template>

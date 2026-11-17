@@ -160,6 +160,7 @@ const actions = (term: Term) => [[
         <UForm
           v-if="!locked"
           :state="addingHeading"
+          novalidate
           @submit="addHeading"
         >
           <UFieldGroup class="flex">
@@ -192,6 +193,7 @@ const actions = (term: Term) => [[
             >
               <UForm
                 :state="editHeading"
+                novalidate
                 @submit="saveHeading(h)"
               >
                 <UFieldGroup class="flex">
@@ -248,6 +250,7 @@ const actions = (term: Term) => [[
         <UForm
           v-if="!locked"
           :state="adding"
+          novalidate
           @submit="add"
         >
           <UFieldGroup class="flex">
@@ -299,6 +302,7 @@ const actions = (term: Term) => [[
               >
                 <UForm
                   :state="edit"
+                  novalidate
                   @submit="saveEdit(term)"
                 >
                   <UFieldGroup class="flex">

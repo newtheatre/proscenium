@@ -121,7 +121,9 @@ const actions = (p: Preset) => [[
         <UForm
           id="run-preset-form"
           :state="form"
+          :validate="() => needs({ name: form.name, slots: slots.length > 0 })"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
@@ -150,7 +152,6 @@ const actions = (p: Preset) => [[
           type="submit"
           form="run-preset-form"
           :label="editId ? 'Save preset' : 'Add preset'"
-          :disabled="!form.name.trim() || !slots.length"
         />
       </template>
     </UModal>

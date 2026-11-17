@@ -284,6 +284,7 @@ function planned(v: Variant, l: List): string | null {
           id="bar-product-edit"
           :state="editing"
           class="space-y-4"
+          novalidate
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
@@ -348,6 +349,7 @@ function planned(v: Variant, l: List): string | null {
           id="bar-size"
           :state="size"
           class="space-y-4"
+          novalidate
           @submit="saveSize"
         >
           <RefusalNotice :refusal="refusal" />
@@ -451,6 +453,7 @@ function planned(v: Variant, l: List): string | null {
           id="bar-price"
           :state="pricing"
           class="space-y-4"
+          novalidate
           @submit="savePrice"
         >
           <RefusalNotice :refusal="refusal" />

@@ -264,6 +264,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
         class="flex flex-wrap items-center gap-1.5"
         role="search"
         :aria-label="t('core.list.filter-bar', { title })"
+        novalidate
         @submit.prevent="set({ search })"
       >
         <UInput

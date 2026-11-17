@@ -359,9 +359,12 @@ async function admit(row: Row, count: number) {
         <UForm
           class="space-y-4"
           :state="{ reasonId }"
+          :validate="() => needs({ reasonId })"
+          novalidate
           @submit="admitAnyway"
         >
           <UFormField
+            name="reasonId"
             :label="t('box-office.live-door.override.reason')"
             required
           >
@@ -385,7 +388,6 @@ async function admit(row: Row, count: number) {
               type="submit"
               size="xl"
               :loading="overrideBusy"
-              :disabled="!reasonId"
               :label="t('box-office.live-door.override.confirm')"
             />
           </div>
@@ -402,6 +404,7 @@ async function admit(row: Row, count: number) {
           <UForm
             class="flex items-end gap-2"
             :state="{ query }"
+            novalidate
             @submit="submitQuery"
           >
             <UFormField

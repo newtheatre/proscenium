@@ -152,6 +152,7 @@ async function add() {
           :schema="schema"
           :state="adding"
           class="space-y-4"
+          novalidate
           @submit="add"
         >
           <RefusalNotice :refusal="addRefusal" />

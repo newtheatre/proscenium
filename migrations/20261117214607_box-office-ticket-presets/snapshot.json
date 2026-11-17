@@ -1,21 +1,13 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "d092bf0b-973f-44ea-8ebf-be33b871c95f",
+  "id": "270c5348-96c9-4119-b57c-b83c14b106da",
   "prevIds": [
-    "7350bd5c-03eb-4f04-9bc3-83e05d438c30"
+    "34214ffc-264d-4f84-bb3c-2db39857d187"
   ],
   "ddl": [
     {
       "name": "bar_age_checks",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_allergen_checks",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_allergen_entries",
       "entityType": "tables"
     },
     {
@@ -32,10 +24,6 @@
     },
     {
       "name": "bar_openings",
-      "entityType": "tables"
-    },
-    {
-      "name": "bar_outlet_favourites",
       "entityType": "tables"
     },
     {
@@ -128,6 +116,14 @@
     },
     {
       "name": "box_office_scans",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_space_ticket_presets",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_ticket_presets",
       "entityType": "tables"
     },
     {
@@ -693,156 +689,6 @@
       "entityType": "columns"
     },
     {
-      "table": "bar_allergen_checks",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "product_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "option_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "source",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "contains",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "may_contain",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "product_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "option_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "allergen",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "level",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "bar_categories",
       "name": "id",
       "type": "text",
@@ -875,16 +721,6 @@
     {
       "table": "bar_categories",
       "name": "colour",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_categories",
-      "name": "parent_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -1243,56 +1079,6 @@
       "entityType": "columns"
     },
     {
-      "table": "bar_outlet_favourites",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "outlet_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "variant_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "position",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "bar_outlets",
       "name": "id",
       "type": "text",
@@ -1339,16 +1125,6 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "bar_outlets",
-      "name": "till_layout",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'chips'",
       "generated": null,
       "entityType": "columns"
     },
@@ -2359,6 +2135,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "2",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "seats",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -3919,6 +3705,106 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "space_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "preset_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "sections",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -14545,78 +14431,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "bar_allergen_checks",
-      "name": "bar_allergen_checks_product",
-      "columns": [
-        {
-          "value": "product_id",
-          "isExpression": false
-        },
-        {
-          "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "bar_allergen_checks_option",
-      "columns": [
-        {
-          "value": "option_id",
-          "isExpression": false
-        },
-        {
-          "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "bar_allergen_entries_product",
-      "columns": [
-        {
-          "value": "product_id",
-          "isExpression": false
-        },
-        {
-          "value": "allergen",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "product_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "bar_allergen_entries_option",
-      "columns": [
-        {
-          "value": "option_id",
-          "isExpression": false
-        },
-        {
-          "value": "allergen",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "option_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "bar_categories",
       "name": "bar_categories_name",
       "columns": [
@@ -14626,20 +14440,6 @@
         }
       ],
       "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_categories",
-      "name": "bar_categories_parent",
-      "columns": [
-        {
-          "value": "parent_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -14700,24 +14500,6 @@
         }
       ],
       "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "bar_outlet_favourites_pair",
-      "columns": [
-        {
-          "value": "outlet_id",
-          "isExpression": false
-        },
-        {
-          "value": "variant_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -15482,6 +15264,34 @@
         }
       ],
       "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "box_office_space_ticket_presets_space",
+      "columns": [
+        {
+          "value": "space_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "box_office_ticket_presets_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -18129,81 +17939,6 @@
       "entityType": "fks"
     },
     {
-      "table": "bar_allergen_checks",
-      "name": "fk_bar_allergen_checks_product_id_bar_products_id_fk",
-      "columns": [
-        "product_id"
-      ],
-      "tableTo": "bar_products",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "fk_bar_allergen_checks_option_id_bar_choice_options_id_fk",
-      "columns": [
-        "option_id"
-      ],
-      "tableTo": "bar_choice_options",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "fk_bar_allergen_entries_product_id_bar_products_id_fk",
-      "columns": [
-        "product_id"
-      ],
-      "tableTo": "bar_products",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "fk_bar_allergen_entries_option_id_bar_choice_options_id_fk",
-      "columns": [
-        "option_id"
-      ],
-      "tableTo": "bar_choice_options",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_categories",
-      "name": "fk_bar_categories_parent_id_bar_categories_id_fk",
-      "columns": [
-        "parent_id"
-      ],
-      "tableTo": "bar_categories",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "bar_choice_options",
       "name": "fk_bar_choice_options_group_id_bar_choice_groups_id_fk",
       "columns": [
@@ -18240,36 +17975,6 @@
         "performance_id"
       ],
       "tableTo": "core_performances",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "fk_bar_outlet_favourites_outlet_id_bar_outlets_id_fk",
-      "columns": [
-        "outlet_id"
-      ],
-      "tableTo": "bar_outlets",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "fk_bar_outlet_favourites_variant_id_bar_variants_id_fk",
-      "columns": [
-        "variant_id"
-      ],
-      "tableTo": "bar_variants",
       "columnsTo": [
         "id"
       ],
@@ -19035,6 +18740,21 @@
         "reason_term_id"
       ],
       "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "fk_box_office_space_ticket_presets_preset_id_box_office_ticket_presets_id_fk",
+      "columns": [
+        "preset_id"
+      ],
+      "tableTo": "box_office_ticket_presets",
       "columnsTo": [
         "id"
       ],
@@ -20588,24 +20308,6 @@
       "entityType": "pks"
     },
     {
-      "table": "bar_allergen_checks",
-      "name": "bar_allergen_checks_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "bar_allergen_entries_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "bar_categories",
       "name": "bar_categories_pk",
       "columns": [
@@ -20635,15 +20337,6 @@
     {
       "table": "bar_openings",
       "name": "bar_openings_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "bar_outlet_favourites",
-      "name": "bar_outlet_favourites_pk",
       "columns": [
         "id"
       ],
@@ -20851,6 +20544,24 @@
     {
       "table": "box_office_scans",
       "name": "box_office_scans_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "box_office_space_ticket_presets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "box_office_ticket_presets_pk",
       "columns": [
         "id"
       ],
@@ -21695,36 +21406,6 @@
       "entityType": "checks"
     },
     {
-      "table": "bar_allergen_checks",
-      "name": "bar_allergen_checks_one",
-      "value": "(\"product_id\" IS NULL) <> (\"option_id\" IS NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_allergen_checks",
-      "name": "bar_allergen_checks_source",
-      "value": "\"source\" IN ('label', 'supplier', 'other')",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "bar_allergen_entries_one",
-      "value": "(\"product_id\" IS NULL) <> (\"option_id\" IS NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "bar_allergen_entries_allergen",
-      "value": "\"allergen\" IN ('gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs')",
-      "entityType": "checks"
-    },
-    {
-      "table": "bar_allergen_entries",
-      "name": "bar_allergen_entries_level",
-      "value": "\"level\" IN ('contains', 'may_contain')",
-      "entityType": "checks"
-    },
-    {
       "table": "bar_choice_groups",
       "name": "bar_choice_groups_source",
       "value": "\"source\" IN ('options', 'mixers')",
@@ -22118,6 +21799,12 @@
       "table": "box_office_scans",
       "name": "box_office_scans_reason",
       "value": "\"result\" NOT IN ('reversed', 'admitted_by_override') OR \"reason_term_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "box_office_ticket_presets_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
       "entityType": "checks"
     },
     {

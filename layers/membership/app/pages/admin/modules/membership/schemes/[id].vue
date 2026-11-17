@@ -2,6 +2,8 @@
      lengths it can be held for with the dates a membership taken today would run to, and adding a
      member directly. -->
 <script setup lang="ts">
+import { z } from 'zod'
+
 interface Scheme {
   id: string
   key: string
@@ -30,7 +32,7 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const { day } = useDates()
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -163,6 +165,15 @@ const member = reactive({ name: '', address: '', lengthOptionId: undefined as st
 const asksFee = computed(() => !!data.value?.feesOn)
 const byLink = computed(() => asksFee.value && member.fee === 'link')
 const memberRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const memberForm = useTemplateRef('memberForm')
+// What the add route checks, beside each field; a waived fee needs its reason.
+const memberSchema = z.object({
+  address: z.string().trim().email().max(254), // not-policy: the longest address there is
+  name: z.string().trim().max(120), // not-policy: shape bound
+  note: z.string().trim().max(1000), // not-policy: shape bound
+}).passthrough().superRefine((value, ctx) => {
+  if (asksFee.value && member.fee === 'waive' && !value.note) ctx.addIssue({ code: 'custom', path: ['note'], message: t('core.form.invalid.required') })
+})
 function openAdd() {
   Object.assign(member, { name: '', address: '', lengthOptionId: data.value?.options.find(o => o.state === 'offered')?.id, startsOn: '', endsOn: '', note: '', fee: 'link', idempotency: crypto.randomUUID() })
   memberRefusal.value = null
@@ -194,6 +205,7 @@ async function addMember() {
   }
   catch (e) {
     memberRefusal.value = toRefusal(e)
+    memberForm.value?.setErrors(fieldErrors(memberRefusal.value))
   }
 }
 </script>
@@ -300,10 +312,13 @@ async function addMember() {
           <template #footer>
             <UForm
               :state="option"
+              :validate="() => needs({ name: option.name })"
               class="flex flex-wrap items-end gap-3"
+              novalidate
               @submit="addOption"
             >
               <UFormField
+                name="name"
                 :label="t('membership.screens.lengths.name')"
                 :error="optionRefusal?.reason"
               >
@@ -326,7 +341,6 @@ async function addMember() {
                 color="neutral"
                 variant="outline"
                 loading-auto
-                :disabled="!option.name.trim()"
                 :label="t('membership.screens.lengths.add')"
               />
             </UForm>
@@ -345,6 +359,7 @@ async function addMember() {
             id="membership-scheme-details"
             :state="details"
             class="space-y-4"
+            novalidate
             @submit="saveDetails"
           >
             <RefusalNotice :refusal="detailsRefusal" />
@@ -510,12 +525,16 @@ async function addMember() {
       <template #body>
         <UForm
           id="membership-add-member"
+          ref="memberForm"
+          :schema="memberSchema"
           :state="member"
           class="space-y-4"
+          novalidate
           @submit="addMember"
         >
           <RefusalNotice :refusal="memberRefusal" />
           <UFormField
+            name="address"
             :label="t('membership.screens.add-member.address')"
             required
           >
@@ -526,6 +545,7 @@ async function addMember() {
             />
           </UFormField>
           <UFormField
+            name="name"
             :label="t('membership.screens.add-member.name')"
             :help="t('membership.screens.add-member.name-help')"
           >
@@ -537,6 +557,7 @@ async function addMember() {
           </UFormField>
           <UFormField
             v-if="data && data.options.length > 1"
+            name="lengthOptionId"
             :label="t('membership.screens.lengths.title')"
           >
             <USelect
@@ -546,6 +567,7 @@ async function addMember() {
           </UFormField>
           <UFormField
             v-if="asksFee"
+            name="fee"
             :label="t('membership.screens.add-member.fee')"
           >
             <URadioGroup
@@ -558,12 +580,14 @@ async function addMember() {
             class="grid gap-4 sm:grid-cols-2"
           >
             <UFormField
+              name="startsOn"
               :label="t('membership.screens.add-member.starts')"
               :help="t('membership.screens.add-member.starts-help')"
             >
               <FieldDate v-model="member.startsOn" />
             </UFormField>
             <UFormField
+              name="endsOn"
               :label="t('membership.screens.add-member.ends')"
               :help="t('membership.screens.add-member.ends-help')"
             >
@@ -574,6 +598,7 @@ async function addMember() {
             </UFormField>
           </div>
           <UFormField
+            name="note"
             :label="t('membership.screens.add-member.note')"
             :help="asksFee && member.fee === 'waive' ? t('membership.screens.add-member.waive-note-help') : t('membership.screens.add-member.note-help')"
             :required="asksFee && member.fee === 'waive'"
@@ -591,7 +616,6 @@ async function addMember() {
           type="submit"
           form="membership-add-member"
           loading-auto
-          :disabled="!member.address.trim() || (asksFee && member.fee === 'waive' && !member.note.trim())"
           :label="t('membership.screens.add-member.submit')"
         />
       </template>

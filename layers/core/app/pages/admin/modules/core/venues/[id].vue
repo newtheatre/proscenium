@@ -151,6 +151,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             :schema="venuePatch"
             :state="details"
             class="space-y-4"
+            novalidate
             @submit="saveDetails"
           >
             <UFormField
@@ -306,6 +307,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             id="venue-access"
             :state="chosen"
             class="space-y-3"
+            novalidate
             @submit="saveAccess"
           >
             <UFormField
@@ -361,6 +363,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           :schema="spaceInput"
           :state="space"
           class="space-y-4"
+          novalidate
           @submit="saveSpace"
         >
           <RefusalNotice :refusal="refusal" />

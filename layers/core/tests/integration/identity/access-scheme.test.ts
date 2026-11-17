@@ -280,6 +280,26 @@ describe('the wheelchair question and the entries the form sets (ID-38)', () => 
     expect(needs.find(n => n.key === 'level-access')).toMatchObject({ label: 'Steps and stairs', description: expect.stringMatching(/ramp, a lift or a level route/) })
     expect(needs.every(n => n.description)).toBe(true)
   })
+
+  it('makes a wheelchair user a holder of core.access-scheme:wheelchair, flagged as pending until the application is decided', async () => {
+    const { browser, accountId, need } = await applicant()
+    const wheelchair = () => inContext(() => requirements.check({ accounts: [accountId], refs: ['core.access-scheme:wheelchair'], whenUnavailable: 'not-met' }), { kind: 'person', accountId, assurance: 'strong' })
+    expect((await wheelchair())[0]).toMatchObject({ verdict: 'not-met', help: '/account/access' })
+    await browser.post('/api/core/me/access', { needs: [{ term: need['wheelchair-stays'] }], companions: 0 })
+    expect((await wheelchair())[0]).toMatchObject({ verdict: 'met', evidence: 'pending' })
+    const desk = await reviewer()
+    expect((await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })).status).toBe(200)
+    const accepted = (await wheelchair())[0]!
+    expect(accepted.verdict).toBe('met')
+    expect(accepted.evidence).toBeUndefined()
+  })
+
+  it('does not count someone who transfers out of their wheelchair', async () => {
+    const { browser, accountId, need } = await applicant()
+    await browser.post('/api/core/me/access', { needs: [{ term: need['wheelchair-transfers'] }], companions: 0 })
+    const [answer] = await inContext(() => requirements.check({ accounts: [accountId], refs: ['core.access-scheme:wheelchair'], whenUnavailable: 'not-met' }), { kind: 'person', accountId, assurance: 'strong' })
+    expect(answer!.verdict).toBe('not-met')
+  })
 })
 
 describe('apply for someone from the list (ID-42)', () => {

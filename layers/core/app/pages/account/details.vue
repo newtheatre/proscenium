@@ -61,6 +61,7 @@ async function save() {
         :schema="schema"
         :state="form"
         class="space-y-6"
+        novalidate
         @submit="save"
       >
         <RefusalNotice :refusal="refusal" />

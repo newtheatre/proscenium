@@ -3,6 +3,8 @@
      one is opened, and opening one is recorded. The two ways to bring somebody in start here: email
      them a link to apply, or fill the form in with them now. -->
 <script setup lang="ts">
+import { accessPersonInput } from '../../../../../shared/access-scheme'
+
 interface Row { accountId: string, name: string | null, change: boolean, submittedVia: 'self' | 'staff', waitingFor: number, overdue: boolean }
 
 const { t } = useT()
@@ -14,7 +16,8 @@ const columns = [
   { key: 'change', label: t('core.access.queue.kind'), card: true },
   { key: 'waitingFor', label: t('core.access.queue.waited'), card: true },
 ]
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
+const personForm = useTemplateRef('personForm')
 const toast = useToast()
 // One dialogue for both ways in: 'invite' emails a link, 'apply' opens the form to fill in with them.
 const mode = ref<'invite' | 'apply' | null>(null)
@@ -50,6 +53,7 @@ async function go() {
   }
   catch (error) {
     refusal.value = toRefusal(error)
+    personForm.value?.setErrors(fieldErrors(refusal.value))
   }
   finally {
     busy.value = false
@@ -119,12 +123,16 @@ const filters = [{
       <template #body>
         <UForm
           id="access-person"
+          ref="personForm"
+          :schema="accessPersonInput"
           class="space-y-4"
           :state="person"
+          novalidate
           @submit="go"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="name"
             :label="t('core.access.invite.name')"
             required
           >
@@ -134,9 +142,9 @@ const filters = [{
             />
           </UFormField>
           <UFormField
+            name="address"
             :label="t('core.access.invite.address')"
             required
-            :error="refusal?.fields?.address ? refusal.reason : undefined"
           >
             <UInput
               v-model="person.address"
@@ -152,7 +160,6 @@ const filters = [{
           form="access-person"
           :loading="busy"
           :label="mode === 'apply' ? t('core.access.apply-for.continue') : t('core.access.invite.send')"
-          :disabled="!person.name.trim() || !person.address.trim()"
         />
       </template>
     </UModal>
