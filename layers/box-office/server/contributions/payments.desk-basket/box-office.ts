@@ -10,6 +10,8 @@ export default {
   ability: 'box-office.order.view',
   order: 0,
   panel: 'BoxOfficeTillPanel',
+  // Its tab in the combined till keeps the label ("Tickets").
+  icon: 'i-lucide-ticket',
   prepare: deskPrepare,
   attach: deskAttach,
   summary: deskSummary,
