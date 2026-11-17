@@ -157,6 +157,22 @@ test('Sell takes the difference on an exchange for a dearer ticket', async ({ pa
   await officeContext.close()
 })
 
+test('the till in live mode shows each panel as a tab over one basket', async ({ browser }) => {
+  // The gallery's sample panel stands in for the bar, so this seller has two panels.
+  const context = await browser.newContext(as({ ...seller, grants: [...seller.grants, grant('gallery.sample.view')] }))
+  const page = await context.newPage()
+  await visit(page, '/live/till')
+  await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Tickets' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Gallery programmes' }).click()
+  await page.getByLabel('Programmes sold').fill('2')
+  await page.getByLabel('Programmes sold').blur()
+  await expect(page.getByRole('button', { name: 'Take payment of £6.00' })).toBeEnabled()
+  await expect(page.getByRole('tab', { name: /^Gallery programmes/ })).toContainText('1')
+  await noViolations(page)
+  await context.close()
+})
+
 test.describe('the box office console', () => {
   test.use(as(office))
 

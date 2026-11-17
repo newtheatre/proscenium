@@ -98,7 +98,10 @@ describe('the hand-off', () => {
     expect((await call(handle, 'GET', `/api/payments/handoff/${out.attemptId}/${keyId}.${signature}.${elsewhere}?smp-status=success`)).status).toBe(403)
     expect((await call(handle, 'GET', `/api/payments/handoff/${out.attemptId}/${keyId}.${signature}?smp-status=success`)).status).toBe(403)
     expect(await state('payments_attempts', out.attemptId)).toBe('pending')
-    // A screen that is not a plain console path is not signed in at all; the seller goes to their session.
+    // The combined till in live mode is a screen a hand-off returns to as well.
+    const live = await handedOff(1250, '/live/till')
+    expect((await returnTo(live.back, { 'smp-status': 'success' })).headers.get('location')).toBe(`/live/till?attempt=${live.out.attemptId}&intent=${live.intentId}&result=succeeded`)
+    // A screen that is not a plain console or live path is not signed in at all; the seller goes to their session.
     const offsite = await handedOff(1300, 'https://elsewhere.example/console')
     expect(offsite.back.pathname).toMatch(new RegExp(`^/api/payments/handoff/${offsite.out.attemptId}/[^/.]+\\.[^/.]+$`))
   })
