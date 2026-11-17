@@ -204,3 +204,55 @@ describe('availability', () => {
     expect(unsold.body).toMatchObject({ state: 'none', bands: [] })
   })
 })
+
+describe('copying a set-up from another performance', () => {
+  const copy = (to: string, from: string, body: Record<string, unknown> = {}) => req('POST', `/api/box-office/performances/${to}/sales/copy`, { fromPerformanceId: from, ...body })
+  const layers = async (performanceId: string) => (await sales(performanceId)).body.priceLayers as { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }[]
+
+  it('from another production: matches bands by name, adds the rest, and copies capacities, prices and limits but no sales', async () => {
+    const source = await house(10)
+    const circle = await req('POST', `/api/box-office/productions/${source.productionId}/bands`, { name: 'Circle', sort: 1 })
+    await req('PUT', `/api/box-office/performances/${source.performanceId}/sales`, { pools: [{ bandId: circle.body.bandId, capacity: 6 }], maxPerOrder: 4 })
+    await req('POST', `/api/box-office/productions/${source.productionId}/prices`, { prices: [{ bandId: circle.body.bandId, ticketTypeId: source.fullId, amountMinor: 900 }] })
+    expect((await buy(source, 2)).ok).toBe(true)
+    const target = await house(5, { open: false })
+
+    expect((await req('GET', `/api/box-office/performances/${target.performanceId}/sales/sources`)).body.performances.map((p: { id: string }) => p.id)).toContain(source.performanceId)
+    const done = await copy(target.performanceId, source.performanceId)
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toEqual({ bands: 1, pools: 2, prices: 3 })
+
+    const after = (await sales(target.performanceId)).body
+    expect(after.pools.map((p: any) => [p.bandName, p.capacity, p.claimed])).toEqual([['Stalls', 10, 0], ['Circle', 6, 0]])
+    expect(after.sales).toMatchObject({ maxPerOrder: 4 })
+    // The production had no prices, so the copied ones are the production's.
+    const circleHere = after.bands.find((b: any) => b.name === 'Circle').id
+    expect(await layers(target.performanceId)).toEqual(expect.arrayContaining([
+      { bandId: target.bandId, ticketTypeId: target.fullId, production: 1200, own: null },
+      { bandId: target.bandId, ticketTypeId: target.concessionId, production: 800, own: null },
+      { bandId: circleHere, ticketTypeId: target.fullId, production: 900, own: null },
+    ]))
+    expect(missing(after)).toEqual([])
+  })
+
+  it('within a production: a price that differs becomes this performance\'s own, and the others keep theirs', async () => {
+    const source = await house(8)
+    const venue = await req('POST', '/api/core/venues', { name: 'Copy venue' })
+    const second = await req('POST', `/api/core/productions/${source.productionId}/performances`, { venueId: venue.body.venueId, spaceId: venue.body.spaceId, startsAt: Date.UTC(2027, 3, 1, 19, 30), capacity: 500 })
+    await req('POST', `/api/core/performances/${second.body.id}/schedule`, {})
+    setClock(NOV_16 + 1000)
+    await req('POST', `/api/box-office/productions/${source.productionId}/prices`, { prices: [{ bandId: source.bandId, ticketTypeId: source.fullId, performanceId: source.performanceId, amountMinor: 700 }] })
+    expect((await copy(second.body.id, source.performanceId)).body).toEqual({ bands: 0, pools: 1, prices: 1 })
+    expect((await layers(second.body.id)).find(l => l.ticketTypeId === source.fullId)).toMatchObject({ production: 1200, own: { amountMinor: 700 } })
+    setClock(NOV_16)
+  })
+
+  it('refuses itself, and a performance with nothing set up', async () => {
+    const h = await house(4, { open: false })
+    expect((await copy(h.performanceId, h.performanceId)).body).toMatchObject({ code: 'box-office.copy.same' })
+    const venue = (await req('POST', '/api/core/venues', { name: 'Bare venue' })).body
+    const bare = await req('POST', `/api/core/productions/${h.productionId}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.UTC(2027, 4, 1, 19, 30), capacity: 100 })
+    expect(bare.status, JSON.stringify(bare.body)).toBe(200)
+    expect((await copy(h.performanceId, bare.body.id)).body).toMatchObject({ code: 'box-office.copy.nothing' })
+  })
+})

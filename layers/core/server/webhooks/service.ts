@@ -2,21 +2,14 @@
 // the delivery log and retry a failed delivery. The address and the secret are sealed with the core
 // key; the console sees the address's host only, and the secret once, when it is made.
 import { sql } from 'drizzle-orm'
-import { z } from 'zod'
+import type { z } from 'zod'
 import { all, first, newId, nowMs, openColumn, refuse, sealColumn } from '#kit'
 import type { UnitView } from '#kit'
 import { addressHint, refusedAddress } from './address'
+import type { webhookInput, webhookPatch } from './inputs'
 import { deliverableEvents, newSecret, sendTest, type PostResult, type WebhookFormat } from './deliver'
 
-export const FORMATS = ['json', 'discord', 'slack'] as const
-
-export const webhookInput = z.object({
-  name: z.string().trim().min(1).max(60), // not-policy: the table's bounds on a name
-  url: z.string().trim().min(1).max(2000), // not-policy: a sane bound on an address
-  format: z.enum(FORMATS),
-  events: z.array(z.string().min(1).max(120)).min(1).max(500), // not-policy: bounds on the event list
-})
-export const webhookPatch = webhookInput.partial()
+export { FORMATS, webhookInput, webhookPatch } from './inputs'
 
 export interface Webhook {
   id: string

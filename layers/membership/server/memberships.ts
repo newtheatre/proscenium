@@ -55,6 +55,49 @@ export async function holdsSide(accountId: string, side: 'members' | 'audience')
   ))
 }
 
+/**
+ * A voting member's memberships: current ones of a voting scheme, with how long each has run without a
+ * break, counted from the first activation in its chain of renewals, so renewing never resets the
+ * qualifying period while lapsing and coming back does.
+ */
+const VOTING_SINCE = `WITH RECURSIVE chain(start_id, id, renews_id, activated_at) AS (
+    SELECT m.id, m.id, m.renews_id, m.activated_at FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id
+     WHERE s.voting = 1 AND ${CURRENT} AND m.account_id IN (SCOPE)
+    UNION ALL
+    SELECT c.start_id, p.id, p.renews_id, p.activated_at FROM chain c JOIN membership_memberships p ON p.id = c.renews_id WHERE p.activated_at IS NOT NULL
+  )`
+
+/** membership.voter: a current membership of a voting scheme, held without a break for the qualifying period. */
+export async function votes(accountId: string): Promise<boolean> {
+  const day = await todayOrNull()
+  if (!day) return false
+  const period = Number(await useSetting('membership.voting.qualifying-period') ?? 0) * 1000 // not-policy: seconds to milliseconds
+  const row = await first<{ since: number | null }>(
+    `${VOTING_SINCE.replace('SCOPE', accountScopeSql('?1'))} SELECT min(since) AS since FROM (SELECT start_id, min(activated_at) AS since FROM chain GROUP BY start_id)`,
+    accountId, day,
+  )
+  return row?.since != null && row.since <= nowMs() - period
+}
+
+/** Everybody membership.voter holds for now, as survivors. */
+export async function voters(): Promise<string[]> {
+  const day = await todayOrNull()
+  if (!day) return []
+  const period = Number(await useSetting('membership.voting.qualifying-period') ?? 0) * 1000 // not-policy: seconds to milliseconds
+  const rows = await all<{ id: string }>(
+    `WITH RECURSIVE chain(account_id, start_id, id, renews_id, activated_at) AS (
+        SELECT coalesce(a.merged_into_id, a.id), m.id, m.id, m.renews_id, m.activated_at FROM membership_memberships m
+          JOIN membership_schemes s ON s.id = m.scheme_id JOIN core_accounts a ON a.id = m.account_id
+         WHERE s.voting = 1 AND ${CURRENT}
+        UNION ALL
+        SELECT c.account_id, c.start_id, p.id, p.renews_id, p.activated_at FROM chain c JOIN membership_memberships p ON p.id = c.renews_id WHERE p.activated_at IS NOT NULL
+      )
+      SELECT DISTINCT account_id AS id FROM (SELECT account_id, start_id, min(activated_at) AS since FROM chain GROUP BY account_id, start_id) WHERE since <= ?1 ORDER BY 1`,
+    nowMs() - period, day,
+  )
+  return rows.map(r => r.id)
+}
+
 /** Rule D4 for one scheme. */
 export async function holdsScheme(accountId: string, schemeId: string, on?: string): Promise<boolean> {
   const day = on ?? await todayOrNull()
