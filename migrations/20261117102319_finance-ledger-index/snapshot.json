@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "03f2c62f-2e01-4281-8a8a-be752fcf98be",
+  "id": "342f32f6-7c1b-4ee7-ad72-0262820bea71",
   "prevIds": [
-    "23d78430-bdb4-4f74-b070-922629269ced",
-    "cf948161-8110-4fcd-9408-3f2fc340efe5"
+    "c7bce119-6f63-47ad-8276-5ececc5c019f"
   ],
   "ddl": [
     {
@@ -17,6 +16,10 @@
     },
     {
       "name": "box_office_claims",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_comp_requests",
       "entityType": "tables"
     },
     {
@@ -678,6 +681,136 @@
     {
       "table": "box_office_claims",
       "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "band_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "for_account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "reason_term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'requested'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "order_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "updated_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -10162,6 +10295,42 @@
       "entityType": "indexes"
     },
     {
+      "table": "box_office_comp_requests",
+      "name": "box_office_comp_requests_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "box_office_comp_requests_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_order",
       "columns": [
@@ -12655,6 +12824,51 @@
       "entityType": "fks"
     },
     {
+      "table": "box_office_comp_requests",
+      "name": "fk_box_office_comp_requests_band_id_box_office_bands_id_fk",
+      "columns": [
+        "band_id"
+      ],
+      "tableTo": "box_office_bands",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "fk_box_office_comp_requests_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "fk_box_office_comp_requests_order_id_box_office_orders_id_fk",
+      "columns": [
+        "order_id"
+      ],
+      "tableTo": "box_office_orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_holds",
       "name": "fk_box_office_holds_order_id_box_office_orders_id_fk",
       "columns": [
@@ -14046,6 +14260,15 @@
       "entityType": "pks"
     },
     {
+      "table": "box_office_comp_requests",
+      "name": "box_office_comp_requests_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_pk",
       "columns": [
@@ -14808,6 +15031,24 @@
       "table": "box_office_claims",
       "name": "box_office_claims_confirmed",
       "value": "\"state\" <> 'confirmed' OR \"expires_at\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "box_office_comp_requests_quantity",
+      "value": "\"quantity\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "box_office_comp_requests_state",
+      "value": "\"state\" IN ('requested', 'approved', 'declined', 'issued', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_comp_requests",
+      "name": "box_office_comp_requests_not_own",
+      "value": "\"decided_by\" IS NULL OR \"decided_by\" <> \"requested_by\"",
       "entityType": "checks"
     },
     {
