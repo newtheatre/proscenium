@@ -13,7 +13,7 @@ export default defineRoute({
   input: z.object({
     lineIds: z.array(z.string()).min(1).max(50).optional(), // not-policy: more lines than any order holds
     refund: z.enum(['full', 'less-fee', 'none']),
-    reasonTermId: z.string(),
+    reasonTermId: z.string().optional(),
     note: z.string().trim().max(200).optional(), // not-policy: the column's own limit
   }).strict(),
 }, async (_event, { input, record, actor, unit }) => {

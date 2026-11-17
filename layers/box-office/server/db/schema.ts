@@ -178,6 +178,8 @@ export const orders = defineTable('box_office_orders', {
   keep: col.internal(integer('keep', { mode: 'boolean' }).notNull().default(false)),
   // Set by the desk when the buyer is standing there: the tickets are admitted as they are issued.
   admitOnPayment: col.internal(integer('admit_on_payment', { mode: 'boolean' }).notNull().default(false)),
+  // Set by the reserve batch and by nothing else: a change of ticket type is priced as of then.
+  reservedAt: col.timestamp('reserved_at'),
   confirmedAt: col.timestamp('confirmed_at'),
   cancelledAt: col.timestamp('cancelled_at'),
   createdAt: col.createdAt(),

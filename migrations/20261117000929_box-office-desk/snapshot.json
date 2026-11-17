@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "636a6df0-66fe-46c8-9234-9324af32caf7",
+  "id": "34eb3707-a1f3-4845-9c5e-5158ba1864b8",
   "prevIds": [
     "374aff49-9a75-401d-ad06-1f2e360761f7"
   ],
@@ -1111,6 +1111,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "reserved_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },

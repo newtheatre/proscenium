@@ -46,6 +46,8 @@ async function reservation(orderId: string): Promise<{ order: OrderRow, lines: L
 async function deskSale(input: SaleInput, at: number) {
   const sales = await salesOf(input.performanceId)
   if (!sales || sales.state === 'draft') refuse('box-office.sales.none', 'This performance is not set up for sale.', { status: 404 })
+  // Paused stops new sales at the desk as it does online. Closed is only online sales having ended.
+  if (sales.state === 'paused') refuse('box-office.sales.paused', 'Sales are paused for this performance.', { status: 409 })
   const performance = await getPerformance(input.performanceId)
   const until = performance.startsAt + (await useSetting('box-office.sales.desk-until-after') as number) * 1000 // not-policy: seconds to milliseconds
   if (performance.state !== 'scheduled' || at >= until) refuse('box-office.sales.closed', 'Sales have closed for this performance.', { status: 409 })
@@ -167,7 +169,7 @@ export interface AmendInput {
   remove?: string[]
   /** Tickets to add, at the price in force now. */
   add?: BasketLineInput[]
-  /** Lines to change to another ticket type, at that type's price in force now. */
+  /** Lines to change to another ticket type, at that type's price when the order was reserved. */
   retype?: { lineId: string, ticketTypeId: string }[]
 }
 
@@ -187,7 +189,9 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   if (touched.some(id => !byId.has(id)) || new Set(touched).size !== touched.length) refuse(CHANGED.code, 'Those tickets are not on this reservation any more.', { status: 409, remedy: CHANGED.remedy })
   if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
   const performanceId = lines[0]!.performance_id
-  const prices = new Map((await pricesFor(performanceId, at)).map(p => [`${p.bandId} ${p.ticketTypeId}`, p.amountMinor]))
+  // A change of type is priced as of when the order was reserved, so a later price rise is not charged for a swap.
+  const reservedAt = (await first<{ reserved_at: number | null }>('SELECT reserved_at FROM box_office_orders WHERE id = ?', order.id))?.reserved_at ?? at
+  const prices = new Map((await pricesFor(performanceId, reservedAt)).map(p => [`${p.bandId} ${p.ticketTypeId}`, p.amountMinor]))
 
   const kept: { typeId: string, amountMinor: number }[] = []
   for (const l of lines) {
