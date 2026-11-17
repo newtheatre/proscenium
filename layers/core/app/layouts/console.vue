@@ -13,10 +13,10 @@ const open = ref(false)
 provide(DASHBOARD_SHELL, true)
 watch(() => route.fullPath, () => { open.value = false })
 
-// The module the page belongs to: the cog at the end of its navbar opens that module's settings.
-const current = computed(() => resolveEntry((navigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup]), route.path)?.module)
-const { tabs: settingsTabs } = useModuleSettings(() => current.value)
-provide(CONSOLE_SETTINGS, computed(() => settingsTabs.value.length ? current.value : undefined))
+// The page's navigation entry: the cog at the end of its navbar opens the settings that belong there.
+const current = computed(() => resolveEntry((navigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup]), route.path)?.id)
+const { tabs: settingsTabs, name: settingsName } = useModuleSettings(() => current.value)
+provide(CONSOLE_SETTINGS, computed(() => settingsTabs.value.length && current.value ? { scope: current.value, name: settingsName.value } : undefined))
 
 // From the console, a module's screens in Admin open in the settings window, and a screen in the
 // window that changes its own address (a list's filters) changes the window's ?screen instead.
@@ -28,7 +28,8 @@ const windowless = (query: Record<string, unknown>) => {
 const stop = router.beforeEach((to, from) => {
   if (shellOf(from.path) !== 'console') return
   const module = moduleTabOf({ menu: 'admin', to: to.path })
-  if (module) return { path: from.path, query: { ...windowless(from.query), settings: module, screen: to.fullPath } }
+  // A screen opened from inside the window keeps the window's tabs; one opened from a page brings its module's.
+  if (module) return { path: from.path, query: { ...windowless(from.query), settings: typeof from.query.settings === 'string' ? from.query.settings : module, screen: to.fullPath } }
   const settings = from.query.settings
   if (typeof settings !== 'string' || to.path !== from.path || to.query.settings !== undefined || isClosingModuleWindow()) return
   const base = (typeof from.query.screen === 'string' ? from.query.screen : '').split('?')[0]

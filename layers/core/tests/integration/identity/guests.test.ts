@@ -3,7 +3,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createUnit } from '#kit/unit'
 import { Authenticator } from './authenticator'
-import { Browser, address, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, setSetting, clearSetting, setUpOwner, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
+import { Browser, address, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, setSetting, clearSetting, setUpOwner, signInByEmail, staff, tokenOf, unclaimedAccount, useIdentity } from './helpers'
+import { claimLink } from '../../../server/identity/claim'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { findOrCreateAccount, type FindOrCreateInput } from '../../../server/identity/guests'
 
@@ -231,5 +232,30 @@ describe('finding a person (ID-30)', () => {
     const { accountId } = await checkout({ address: address(), name: 'Gail Guest' })
     expect((await owner.browser.get(`/api/core/accounts/${accountId}`)).status).toBe(200)
     expect(await rows('SELECT count(*) AS n FROM core_audit WHERE action = \'read\' AND record_type = \'core.account\' AND record_id = ?', accountId)).toEqual([{ n: 1 }])
+  })
+})
+
+describe('the claim link a guest is sent (sign-in review, item 2)', () => {
+  it('opens the unclaimed account once, and stops working once the account has been signed in to', async () => {
+    const to = address()
+    const accountId = await unclaimedAccount(to)
+    const links: string[] = []
+    await inContext(async () => {
+      for (let i = 0; i < 2; i++) {
+        const unit = createUnit()
+        links.push((await claimLink(unit, accountId))!)
+        await unit.commit()
+      }
+    })
+    const browser = new Browser()
+    const used = await browser.post('/api/core/sign-in/link', { token: links[0]!.split('#')[1] })
+    expect(used.status).toBe(200)
+    expect(used.body.next).toBe('/account')
+    expect((await browser.get('/api/core/me')).body.account.id).toBe(accountId)
+    const second = await new Browser().post('/api/core/sign-in/link', { token: links[1]!.split('#')[1] })
+    expect(second.body.code).toBe('core.sign-in.claim-spent')
+    await inContext(async () => {
+      expect(await claimLink(createUnit(), accountId)).toBeNull()
+    })
   })
 })

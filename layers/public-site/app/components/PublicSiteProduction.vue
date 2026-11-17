@@ -17,6 +17,7 @@ interface Performance {
   venue: { id: string, slug: string, name: string }
   space: { id: string, name: string }
   access: Note[]
+  effectsOff: string[]
   booking: Booking | null
 }
 interface Production {
@@ -30,7 +31,10 @@ interface Production {
   season: { name: string } | null
   companyName: string | null
   ageGuidance: string | null
-  advisories: Note[]
+  ageRestricted: boolean
+  effects: { termId: string, label: string, description: string | null, icon: string | null, detail: string | null }[]
+  effectsConfirmedNone: boolean
+  advisories: { termId: string, label: string, heading: string | null, level: 'mentioned' | 'discussed' | 'depicted' | null, detail: string | null }[]
   advisoriesConfirmedNone: boolean
   contentNote: string | null
   runningMinutes: number | null
@@ -41,6 +45,7 @@ interface Production {
   poster: Image | null
   photos: Image[]
   performances: Performance[]
+  price: PriceSummaryView | null
 }
 
 const props = defineProps<{ slug: string, prefix: 'whats-on' | 'shows' }>()
@@ -58,6 +63,8 @@ if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? pr
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
 
 // What it is, in one line: where, how long, and the company for a visiting show.
+const tell = useTellMeAbout()
+const asked = computed(() => (production.value?.advisories ?? []).filter(a => tell.has(a.termId)))
 const venues = computed(() => [...new Set((production.value?.performances ?? []).map(p => p.venue.name))])
 const length = computed(() => {
   const p = production.value
@@ -185,6 +192,50 @@ useHead(() => {
             />
           </header>
 
+          <section
+            v-if="production.effects.length"
+            aria-labelledby="effects-heading"
+            class="space-y-2"
+          >
+            <h2
+              id="effects-heading"
+              class="text-lg font-semibold text-highlighted"
+            >
+              {{ t('public-site.production.effects') }}
+            </h2>
+            <ul class="space-y-1">
+              <li
+                v-for="e in production.effects"
+                :key="e.termId"
+                class="flex items-start gap-2"
+              >
+                <UIcon
+                  :name="e.icon ?? 'i-lucide-triangle-alert'"
+                  class="mt-1 size-4 shrink-0 text-muted"
+                />
+                <span><span class="font-medium">{{ e.label }}</span><span v-if="e.detail">: {{ e.detail }}</span></span>
+              </li>
+            </ul>
+          </section>
+
+          <section
+            v-if="asked.length"
+            class="space-y-1 rounded-lg border border-default bg-elevated/50 px-4 py-3"
+            :aria-label="t('public-site.production.asked-heading')"
+          >
+            <h2 class="text-sm font-semibold text-highlighted">
+              {{ t('public-site.production.asked-heading') }}
+            </h2>
+            <ul class="space-y-1">
+              <li
+                v-for="a in asked"
+                :key="a.termId"
+              >
+                <span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span><span v-if="a.detail">: {{ a.detail }}</span>
+              </li>
+            </ul>
+          </section>
+
           <UCollapsible
             v-if="production.advisories.length || production.contentNote"
             class="rounded-lg border border-default"
@@ -199,14 +250,49 @@ useHead(() => {
             />
             <template #content>
               <div class="space-y-2 px-4 pb-4">
-                <ul class="space-y-1">
+                <ul class="space-y-2">
                   <li
                     v-for="a in production.advisories"
                     :key="a.termId"
                   >
-                    <span class="font-medium">{{ a.label }}</span><span v-if="a.detail">: {{ a.detail }}</span>
+                    <div class="flex items-start justify-between gap-2">
+                      <details
+                        v-if="a.detail"
+                        class="min-w-0"
+                      >
+                        <summary class="cursor-pointer">
+                          <span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span>
+                        </summary>
+                        <p class="mt-1 text-sm text-muted">
+                          {{ a.detail }}
+                        </p>
+                      </details>
+                      <span
+                        v-else
+                        class="min-w-0"
+                      ><span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span></span>
+                      <IconButton
+                        :icon="tell.has(a.termId) ? 'i-lucide-bell-ring' : 'i-lucide-bell'"
+                        :label="t(tell.has(a.termId) ? 'public-site.production.tell-remove' : 'public-site.production.tell-add', { label: a.label })"
+                        :aria-pressed="tell.has(a.termId)"
+                        :variant="tell.has(a.termId) ? 'soft' : 'ghost'"
+                        size="xs"
+                        @click="tell.toggle(a.termId)"
+                      />
+                    </div>
                   </li>
                 </ul>
+                <p class="text-xs text-muted">
+                  {{ t('public-site.production.tell-note') }}
+                  <UButton
+                    v-if="tell.ids.value.length"
+                    :label="t('public-site.production.tell-clear')"
+                    color="neutral"
+                    variant="link"
+                    size="xs"
+                    @click="tell.clear()"
+                  />
+                </p>
                 <MarkdownText
                   v-if="production.contentNote"
                   :text="production.contentNote"
@@ -216,11 +302,25 @@ useHead(() => {
             </template>
           </UCollapsible>
           <p
-            v-else-if="production.advisoriesConfirmedNone"
+            v-if="!production.effects.length && production.effectsConfirmedNone && !production.advisories.length && production.advisoriesConfirmedNone"
             class="text-sm text-muted"
           >
             {{ t('public-site.production.no-advisories') }}
           </p>
+          <template v-else>
+            <p
+              v-if="!production.effects.length && production.effectsConfirmedNone"
+              class="text-sm text-muted"
+            >
+              {{ t('public-site.production.no-effects') }}
+            </p>
+            <p
+              v-if="!production.advisories.length && production.advisoriesConfirmedNone"
+              class="text-sm text-muted"
+            >
+              {{ t('public-site.production.no-warnings') }}
+            </p>
+          </template>
 
           <section
             v-if="dates.length"
@@ -232,6 +332,12 @@ useHead(() => {
             >
               {{ t('public-site.production.dates') }}
             </h2>
+            <p
+              v-if="production.price"
+              class="mb-2 text-sm"
+            >
+              {{ priceSummary(production.price, t) }}
+            </p>
             <ul class="divide-y divide-default border-y border-default">
               <li
                 v-for="p in dates"
@@ -248,6 +354,12 @@ useHead(() => {
                     class="text-sm text-muted"
                   >
                     {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
+                  </p>
+                  <p
+                    v-if="p.effectsOff.length && p.state === 'scheduled'"
+                    class="text-sm"
+                  >
+                    {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
                   </p>
                   <ul
                     v-if="p.access.length"

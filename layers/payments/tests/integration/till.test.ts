@@ -82,7 +82,7 @@ beforeAll(async () => {
 describe('opening a session', () => {
   it('opens one session per person with a float, and shows it', async () => {
     const me = seller()
-    expect((await get('/api/payments/session', me)).body).toEqual({ mayOpen: true, mayViewAll: false, cashTaken: true, session: null, waiting: [], awaiting: [] })
+    expect((await get('/api/payments/session', me)).body).toEqual({ mayOpen: true, mayViewAll: false, cashTaken: true, session: null, waiting: [], awaiting: [], unfinished: null })
     const opened = await post('/api/payments/sessions', me, { pointLabel: 'Bar', floatMinor: 5000 }, true)
     expect(opened.body.session).toMatchObject({ state: 'open', floatMinor: 5000, expectedCashMinor: 5000, currency: 'GBP' })
     const again = await post('/api/payments/sessions', me, { pointLabel: 'Bar' }, true)
@@ -90,8 +90,12 @@ describe('opening a session', () => {
     expect((await get('/api/payments/session', me)).body.session.id).toBe(opened.body.session.id)
   })
 
-  it('refuses a sale before a session is open', async () => {
-    const sale = await post('/api/payments/till/sale', seller(), { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] }, true)
+  it('refuses a sale before a session is open, but sums the panels, so coming to the till opens nothing', async () => {
+    const me = seller()
+    const summary = await post('/api/payments/till/summary', me, { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] })
+    expect(summary.body).toMatchObject({ amountMinor: 100 })
+    expect((await get('/api/payments/session', me)).body.session).toBeNull()
+    const sale = await post('/api/payments/till/sale', me, { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] }, true)
     expect(sale).toMatchObject({ status: 409, body: { code: 'payments.session.none' } })
   })
 })
@@ -166,7 +170,7 @@ describe('a theatre that takes no cash', () => {
     await cashTaken(false)
     try {
       const me = seller()
-      expect((await get('/api/payments/session', me)).body).toEqual({ mayOpen: true, mayViewAll: false, cashTaken: false, session: null, waiting: [], awaiting: [] })
+      expect((await get('/api/payments/session', me)).body).toEqual({ mayOpen: true, mayViewAll: false, cashTaken: false, session: null, waiting: [], awaiting: [], unfinished: null })
       expect(await post('/api/payments/sessions', me, { pointLabel: 'Desk', floatMinor: 2000 }, true)).toMatchObject({ status: 422, body: { code: 'payments.session.no-cash' } })
       const opened = await post('/api/payments/sessions', me, { pointLabel: 'Desk' }, true)
       expect(opened.body.session).toMatchObject({ state: 'open', floatMinor: 0, expectedCashMinor: 0, handlesCash: false })
@@ -229,7 +233,7 @@ describe('cashing up (PAY-03)', () => {
     expect(closed.body).toMatchObject({ varianceMinor: 0, session: { state: 'closed', countedCashMinor: 3500, openedByName: 'Sam Seller', closedByName: 'Sam Seller' } })
     expect(await rows("SELECT id FROM finance_postings WHERE source_type = 'payments.session' AND source_id = ?", sessionId)).toEqual([])
     expect(await rows("SELECT payload FROM core_events WHERE name = 'payments.session.closed' AND payload LIKE ?", `%${sessionId}%`)).toHaveLength(1)
-    expect((await get('/api/payments/session', me)).body).toEqual({ mayOpen: true, mayViewAll: false, cashTaken: true, session: null, waiting: [], awaiting: [] })
+    expect((await get('/api/payments/session', me)).body).toEqual({ mayOpen: true, mayViewAll: false, cashTaken: true, session: null, waiting: [], awaiting: [], unfinished: null })
   })
 
   it('needs a reason for a difference, and posts it to cash over and short', async () => {

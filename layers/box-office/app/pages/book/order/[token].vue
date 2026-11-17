@@ -5,7 +5,7 @@
      cut-off has not passed, and the price less the fee goes back to the card; otherwise the box
      office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page. -->
 <script setup lang="ts">
-interface Order { orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, amountMinor: number }[], buyerCancel: { feeMinor: number, until: number } | null }
+interface Order { accountUnclaimed?: boolean, orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, amountMinor: number }[], buyerCancel: { feeMinor: number, until: number } | null }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string } }
 
 definePageMeta({ key: 'box-office-manage-booking' })
@@ -16,6 +16,7 @@ const { confirm } = useConfirm()
 const { dateTime } = useDates()
 const { money } = await useMoney()
 const route = useRoute()
+const { viewer } = useViewer()
 const token = computed(() => String(route.params.token))
 useSeoMeta({ title: () => t('box-office.manage.title'), robots: 'noindex' })
 
@@ -108,6 +109,10 @@ async function cancel(all: boolean) {
               role="status"
               :title="t('box-office.manage.cancelled', { count: cancelled })"
               :description="refunded ? t('box-office.manage.refunded', { amount: money(refunded, order.currency) }) : undefined"
+            />
+            <BoxOfficeAccountCard
+              v-if="order.accountUnclaimed && !viewer.signedIn"
+              :order-token="token"
             />
             <section class="space-y-2">
               <h2

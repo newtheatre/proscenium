@@ -278,6 +278,9 @@ export const ageChecks = defineTable('bar_age_checks', {
   outcome: col.internal(text('outcome', { enum: AGE_CHECK_OUTCOMES }).notNull()),
   refusalTerm: col.ref('core_terms', { nullable: true }),
   variantId: col.ref('bar_variants', { nullable: true }),
+  // A refusal made while a basket carried on: that basket's key, which its sale takes when payment
+  // starts, so the register can show the sale the rest of the basket became.
+  basketKey: col.internal(text('basket_key')),
   // What the person looked like, never who they are; only where the theatre has switched it on.
   description: col.freeText(text('description'), { erase: 'clear' }),
   by: col.account('by', { role: 'actor', onMerge: 'alias' }),
@@ -292,6 +295,7 @@ export const ageChecks = defineTable('bar_age_checks', {
   extra: t => [
     index('bar_age_checks_at').on(t.at),
     index('bar_age_checks_sale').on(t.saleId),
+    index('bar_age_checks_basket').on(t.basketKey),
     check('bar_age_checks_outcome', sql`${t.outcome} IN (${inList(AGE_CHECK_OUTCOMES)})`),
     check('bar_age_checks_reason', sql`(${t.outcome} = 'refused') = (${t.refusalTerm} IS NOT NULL)`),
     check('bar_age_checks_description', sql`${t.description} IS NULL OR (${t.outcome} = 'refused' AND length(${t.description}) <= ${sql.raw(String(DESCRIPTION_MAX))})`),

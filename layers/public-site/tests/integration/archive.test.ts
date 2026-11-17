@@ -16,6 +16,9 @@ import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'POST /api/core/productions': createProduction,
   'PATCH /api/core/productions/:id': patchProduction,
@@ -47,7 +50,7 @@ let venue: { venueId: string, spaceId: string }
 async function show(title: string, options: { listed?: boolean, company?: string, publish?: boolean } = {}): Promise<string> {
   const { body } = await req('POST', '/api/core/productions', { title, kind: options.company ? 'visiting' : 'own' })
   await req('PATCH', `/api/core/productions/${body.id}`, {
-    summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true,
+    summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING,
     listed: options.listed ?? true, companyName: options.company ?? null,
   })
   if (options.publish ?? true) expect((await req('POST', `/api/core/productions/${body.id}/publish`, {})).status).toBe(200)

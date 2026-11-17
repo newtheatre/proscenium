@@ -3,7 +3,8 @@
 const route = useRoute()
 const { data: page } = await useAsyncData(`page:${route.path}`, () => queryCollection('pages').path(route.path).first())
 if (!page.value) throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
-useSeoMeta({ title: page.value.title, description: page.value.description })
+// A page still holding starter text, or one marked noindex, is kept from search engines (C-42).
+useSeoMeta({ title: page.value.title, description: page.value.description, robots: page.value.placeholder || page.value.noindex ? 'noindex' : undefined })
 // A page that opens with its own heading keeps it; one that does not gets its title as the heading.
 const ownHeading = computed(() => (page.value?.body?.value ?? []).some(node => Array.isArray(node) && node[0] === 'h1'))
 </script>

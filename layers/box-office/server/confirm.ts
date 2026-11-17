@@ -6,7 +6,7 @@
 // asserted, not changed.
 import { sql } from 'drizzle-orm'
 import { nowMs, type UnitView } from '#kit'
-import { notify } from '#modules/core'
+import { claimLink, notify } from '#modules/core'
 import { hashOf, randomToken } from './codes'
 import { siteUrl } from './links'
 import { RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
@@ -60,9 +60,12 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
   // An anonymous desk sale has nobody to write to: the seller hands over the tickets.
   if (accountId) {
     const words = await wordsFor(order, lines, order.total_minor)
-    await notify(unit, 'box-office.order-confirmed', {
+    const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, paid: words.amount, codes: doorCodes.join('\n\n'), link: await siteUrl(`/book/order/${token}`) }
+    // A buyer who has never signed in also gets the link that opens their account (core's claim link).
+    const account = await claimLink(unit, accountId)
+    await notify(unit, account ? 'box-office.order-confirmed-guest' : 'box-office.order-confirmed', {
       to: accountId,
-      variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, paid: words.amount, codes: doorCodes.join('\n\n'), link: await siteUrl(`/book/order/${token}`) },
+      variables: account ? { ...variables, account } : variables,
       subject: ['box-office.order', order.id],
       dedupeKey: `confirmed:${order.id}`,
     })

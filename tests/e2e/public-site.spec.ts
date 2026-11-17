@@ -9,7 +9,7 @@ import { png } from './images'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
-const owner = person('acc_siteowner', 'Site Owner', ['core.settings.manage', 'core.modules.manage', 'core.vocabulary.manage'])
+const owner = person('acc_siteowner', 'Site Owner', ['core.settings.manage', 'core.modules.manage', 'core.vocabulary.manage', 'public-site.site.configure'])
 const manager = person('acc_sitemanager', 'Site Manager', ['core.production.view', 'core.production.create', 'core.production.edit', 'core.production.publish', 'core.production.cancel', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.season.manage'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
@@ -44,7 +44,7 @@ test.beforeAll(async ({ playwright }) => {
   const api = await playwright.request.newContext({ ...base, ...as(manager) })
   const production = await post(api, '/api/core/productions', { title, kind: 'own' })
   await post(api, `/api/core/productions/${production.id}`, {
-    summary: 'A play about a theatre that opens its doors.', categoryTermId: play.id, advisoriesConfirmedNone: true,
+    summary: 'A play about a theatre that opens its doors.', categoryTermId: play.id, effectsConfirmedNone: true, advisoriesConfirmedNone: true,
     runningMinutes: 135, intervalCount: 1, externalBookingUrl: 'https://tickets.example/public-show',
     description: 'Our **first** show of the year.\n\n- A new play\n- Live music\n\n[Read the programme](https://example.org/programme)\n\n<script>window.typedScript = true</script>',
   }, 'patch')
@@ -75,7 +75,7 @@ test.beforeAll(async ({ playwright }) => {
 
   // A cancelled production is past at once, so it is in the archive with no waiting.
   const past = await post(api, '/api/core/productions', { title: pastTitle, kind: 'visiting' })
-  await post(api, `/api/core/productions/${past.id}`, { summary: 'A visiting show.', categoryTermId: play.id, advisoriesConfirmedNone: true, companyName: `Lantern Company ${stamp}` }, 'patch')
+  await post(api, `/api/core/productions/${past.id}`, { summary: 'A visiting show.', categoryTermId: play.id, effectsConfirmedNone: true, advisoriesConfirmedNone: true, companyName: `Lantern Company ${stamp}` }, 'patch')
   const pastDate = await post(api, `/api/core/productions/${past.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: at(2) })
   await post(api, `/api/core/performances/${pastDate.id}/schedule`, {})
   await post(api, `/api/core/productions/${past.id}/publish`, {})
@@ -127,6 +127,30 @@ test('the home page lists what is on through ::whats-on', async ({ page }) => {
   await noViolations(page)
 })
 
+test('the header leads to what is on and to past shows', async ({ page }) => {
+  await visit(page, '/')
+  const header = page.getByRole('banner')
+  await expect(header.getByRole('link', { name: 'What\'s on' }).first()).toHaveAttribute('href', '/whats-on')
+  await expect(header.getByRole('link', { name: 'Past shows' }).first()).toHaveAttribute('href', '/shows')
+})
+
+test('the sitemap lists the shows, the venue and the season but not a starter page; robots.txt points to it once search engines are let in', async ({ playwright, request }) => {
+  const settings = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
+  expect((await settings.put('/api/core/settings', { data: { changes: [{ key: 'public-site.search.hidden', value: false }], confirm: true } })).ok()).toBe(true)
+  await settings.dispose()
+  const sitemap = await request.get('/sitemap.xml')
+  expect(sitemap.status()).toBe(200)
+  expect(sitemap.headers()['content-type']).toContain('application/xml')
+  const xml = await sitemap.text()
+  for (const path of ['/whats-on', '/shows', `/whats-on/${slug}`, `/shows/${pastSlug}`, `/venues/${venueSlug}`, `/seasons/${seasonSlug}`])
+    expect(xml).toContain(`<loc>http://localhost:8788${path}</loc>`)
+  // The starter home page is still marked placeholder, so it is kept from search engines.
+  expect(xml).not.toContain('<loc>http://localhost:8788/</loc>')
+  const robots = await (await request.get('/robots.txt')).text()
+  expect(robots).toContain('Disallow: /console')
+  expect(robots).toContain('Sitemap: http://localhost:8788/sitemap.xml')
+})
+
 test('what\'s on works with scripts off', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false })
   const page = await context.newPage()
@@ -141,7 +165,7 @@ test('the production page shows its dates, the booking link, the cancelled date 
   await expect(page.getByText(/2 hours 15 minutes, with an interval/)).toBeVisible()
   await expect(page.getByRole('img', { name: 'A red stage curtain' })).toBeVisible()
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/files\//)
-  await expect(page.getByText('This production has no content advisories.')).toBeVisible()
+  await expect(page.getByText('This production has no staging effects or content warnings.')).toBeVisible()
   const dates = page.getByRole('region', { name: 'Dates' })
   const book = dates.getByRole('link', { name: /^Book for / })
   await expect(book).toHaveCount(1)

@@ -174,15 +174,35 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await expect(page.getByRole('dialog')).toBeHidden()
 
     // A member whose membership has lapsed is sent to the box office with the members list's own words.
-    await page.route('**/scan', route => route.fulfill({ json: { result: 'requirement_not_met', scanId: 'scan_x', requirement: { reason: 'Membership not current.', ticketType: 'Member' } } }))
+    await page.route('**/scan', route => route.fulfill({ json: { result: 'requirement_not_met', scanId: 'scan_x', ticketId: 'tkt_x', overridable: true, requirement: { reason: 'Membership not current.', ticketType: 'Member' } } }))
     await page.getByRole('button', { name: 'Type a code' }).click()
     await page.getByRole('dialog').getByLabel('Or type the code').fill('t.k.lapsed.member')
     await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
     const lapsed = page.getByRole('status').filter({ hasText: 'Does not qualify' })
     await expect(lapsed).toContainText('Member: Membership not current. Send them to the box office to change the ticket.')
+    // The dialogue fades as it closes; checked mid-fade, its title fails contrast.
+    await expect(page.getByRole('dialog')).toBeHidden()
     await page.unroute('**/scan')
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
+
+    // A holder of the override may admit them anyway, with a reason from the list.
+    let sent: Record<string, unknown> | null = null
+    await page.route('**/door/override', async (route) => {
+      sent = route.request().postDataJSON()
+      await route.fulfill({ json: { result: 'admitted', scanId: 'scan_y', ticketId: 'tkt_x' } })
+    })
+    await page.getByRole('button', { name: 'Admit anyway' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Member: Membership not current. Admit them only if you have checked for yourself.')
+    await expect(dialog.getByRole('button', { name: 'Admit anyway' })).toBeDisabled()
+    await dialog.getByRole('combobox').click()
+    await page.getByRole('option', { name: 'Membership shown in person' }).click()
+    await dialog.getByRole('button', { name: 'Admit anyway' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Admitted anyway' })).toContainText('Member · Membership shown in person')
+    expect(sent).toMatchObject({ ticketId: 'tkt_x' })
+    await expect(page.getByRole('button', { name: 'Admit anyway' })).toHaveCount(0)
+    await page.unroute('**/door/override')
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.getByRole('button', { name: 'Resume camera' }).click()

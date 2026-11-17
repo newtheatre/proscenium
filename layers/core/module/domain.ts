@@ -39,6 +39,17 @@ export const settings = defineSettings('core', {
   'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public', onChange: 'confirm' }),
   'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
   'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
+  // A performance's defaults (run presets concept, Matt 2026-11-17). Each is the theatre's; a space or
+  // a production may set its own, and one performance may change it. Running time includes intervals.
+  'programme.intervals': setting.integer({ default: 1, min: 0, max: 10, change: programmeConfigure }),
+  'programme.interval-length': setting.duration({ default: '20m', min: '0m', max: '2h', change: programmeConfigure, audience: 'public' }),
+  // The turnaround: a performance that starts sooner than this after another in the same exclusive
+  // space ends counts as a clash. None by default.
+  'programme.turnaround': setting.duration({ default: '0m', min: '0m', max: '12h', change: programmeConfigure }),
+  // Whether the Add a run window starts with "Schedule them now" ticked.
+  'programme.schedule-runs': setting.boolean({ default: true, change: programmeConfigure }),
+  // The run preset the Add a run window starts from in a space without its own (core_run_presets).
+  'programme.run-preset': setting.custom({ schema: z.string().regex(/^rps_[2-7a-z]{26}$/), unset: true, change: programmeConfigure }),
   // How long a production's team keeps its standing after the last performance ends (core.production-team).
   'programme.team-standing-after': setting.duration({ default: '30d', min: '0d', max: '365d', change: programmeConfigure }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
@@ -93,17 +104,18 @@ export const settingRules: SettingRule[] = [
 ]
 
 export const records = defineRecords('core', {
-  file: record({ table: 'core_files' }),
-  sender: record({ table: 'core_sender_identities' }),
-  vocabulary: record({ table: 'core_vocabularies' }),
-  season: record({ table: 'core_seasons' }),
-  production: record({ table: 'core_productions' }),
+  'file': record({ table: 'core_files' }),
+  'sender': record({ table: 'core_sender_identities' }),
+  'vocabulary': record({ table: 'core_vocabularies' }),
+  'season': record({ table: 'core_seasons' }),
+  'production': record({ table: 'core_productions' }),
   // A grant on a production covers its performances.
-  performance: record({ table: 'core_performances', parent: 'core.production' }),
-  venue: record({ table: 'core_venues' }),
-  space: record({ table: 'core_spaces', parent: 'core.venue' }),
-  closure: record({ table: 'core_closures' }),
-  webhook: record({ table: 'core_webhooks' }),
+  'performance': record({ table: 'core_performances', parent: 'core.production' }),
+  'venue': record({ table: 'core_venues' }),
+  'space': record({ table: 'core_spaces', parent: 'core.venue' }),
+  'closure': record({ table: 'core_closures' }),
+  'run-preset': record({ table: 'core_run_presets' }),
+  'webhook': record({ table: 'core_webhooks' }),
 })
 
 export const abilities = defineAbilities('core', {
@@ -232,11 +244,14 @@ export const points = {
       ordering: z.enum(['manual', 'alphabetical']).optional(),
       locked: z.boolean().optional(),
       termClass: z.enum(['public', 'internal']).optional(),
+      // Headings, in order, for a grouped vocabulary: every term then names the heading it sits under.
+      groups: z.array(z.string().min(1).max(80)).optional(), // not-policy: the label's bounds
       terms: z.array(z.object({
         slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
         label: z.string().min(1).max(80), // not-policy: the label's bounds
         description: z.string().max(300).optional(), // not-policy: the description's bound
         icon: z.string().optional(),
+        group: z.string().optional(),
       }).strict()),
     }).strict(),
   }),
@@ -307,22 +322,94 @@ export const contributes = {
     },
   }],
   // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
-  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }],
+  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }, { id: 'core.inbox-unread-members', file: 'inbox-unread-members' }],
   'core.account-section': [
     { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
   ],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }, { id: 'core.guidance', file: 'guidance' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
   // The production page's "Ready to publish?" checklist (R-35).
-  'core.record-check': ['summary', 'category', 'advisories', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),
+  'core.record-check': ['summary', 'category', 'effects', 'advisories', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),
   'core.operating-day': [{ id: 'core.performances', table: 'core_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
     { id: 'core.production-category', label: 'Production categories', terms: terms(['play', 'Play'], ['musical', 'Musical'], ['comedy', 'Comedy'], ['dance', 'Dance'], ['music', 'Music'], ['workshop', 'Workshop'], ['social', 'Social'], ['other', 'Other']) },
     { id: 'core.credit-section', label: 'Credit sections', terms: terms(['cast', 'Cast'], ['creative-team', 'Creative team'], ['production-team', 'Production team'], ['crew', 'Crew'], ['band', 'Band']) },
-    { id: 'core.advisory', label: 'Advisories', description: 'Content and technical warnings shown on a production\'s page.', terms: terms(['strobe', 'Strobe lighting', 'i-lucide-zap'], ['haze', 'Haze or smoke', 'i-lucide-cloud-fog'], ['loud-noise', 'Loud noises', 'i-lucide-volume-2'], ['gunshots', 'Gunshots'], ['strong-language', 'Strong language'], ['violence', 'Violence'], ['sexual-content', 'Sexual content'], ['drug-use', 'Drug use'], ['self-harm', 'Self-harm'], ['suicide', 'Suicide']) },
+    { id: 'core.advisory', label: 'Content warnings', description: 'What a story is about that someone may want to know first: shown on a production\'s page behind a "show" control.', groups: ['Violence and harm', 'Sexual content and abuse', 'Death and loss', 'Mental health', 'Discrimination and hate', 'Language and substances', 'Crime, war and conflict', 'Family and relationships', 'Medical and bodily'], terms: [
+      { slug: 'violence', label: 'Violence', description: 'Physical fights, assault or brutality.', group: 'Violence and harm' },
+      { slug: 'blood-gore', label: 'Blood and gore', description: 'Wounds, blood or graphic injury.', group: 'Violence and harm' },
+      { slug: 'weapons', label: 'Weapons', description: 'Knives, guns or other weapons carried or used.', group: 'Violence and harm' },
+      { slug: 'torture', label: 'Torture', description: 'Deliberate infliction of pain on a person.', group: 'Violence and harm' },
+      { slug: 'animal-harm', label: 'Harm to animals', description: 'Animals hurt or killed, or their death described.', group: 'Violence and harm' },
+      { slug: 'child-harm', label: 'Harm to children', description: 'Children shown or described being hurt.', group: 'Violence and harm' },
+      { slug: 'sexual-content', label: 'Sexual content', description: 'Sex shown, simulated or described, or nudity.', group: 'Sexual content and abuse' },
+      { slug: 'nudity', label: 'Nudity', description: 'Performers undressed on stage.', group: 'Sexual content and abuse' },
+      { slug: 'sexual-violence', label: 'Sexual violence', description: 'Rape or sexual assault, shown or described.', group: 'Sexual content and abuse' },
+      { slug: 'sexual-harassment', label: 'Sexual harassment', description: 'Unwanted sexual attention or comments.', group: 'Sexual content and abuse' },
+      { slug: 'child-abuse', label: 'Child abuse', description: 'Abuse of a child, shown or described.', group: 'Sexual content and abuse' },
+      { slug: 'grooming', label: 'Grooming', description: 'An adult building trust with a child to abuse them.', group: 'Sexual content and abuse' },
+      { slug: 'death', label: 'Death', description: 'A character dies or a death is discussed.', group: 'Death and loss' },
+      { slug: 'grief', label: 'Grief and bereavement', description: 'Mourning, funerals or the loss of someone close.', group: 'Death and loss' },
+      { slug: 'child-death', label: 'Death of a child', description: 'The death of a child or baby.', group: 'Death and loss' },
+      { slug: 'terminal-illness', label: 'Terminal illness', description: 'A character is dying of illness.', group: 'Death and loss' },
+      { slug: 'pregnancy-loss', label: 'Pregnancy loss', description: 'Miscarriage or stillbirth.', group: 'Death and loss' },
+      { slug: 'murder', label: 'Murder', description: 'A killing, planned or carried out.', group: 'Death and loss' },
+      { slug: 'self-harm', label: 'Self-harm', description: 'Deliberate injury to oneself.', group: 'Mental health' },
+      { slug: 'suicide', label: 'Suicide', description: 'Suicide, attempted or completed, or suicidal thoughts.', group: 'Mental health' },
+      { slug: 'eating-disorders', label: 'Eating disorders', description: 'Disordered eating or body image.', group: 'Mental health' },
+      { slug: 'depression', label: 'Depression', description: 'Persistent low mood and its effects.', group: 'Mental health' },
+      { slug: 'anxiety', label: 'Anxiety and panic', description: 'Anxiety, panic attacks or phobias.', group: 'Mental health' },
+      { slug: 'psychosis', label: 'Psychosis', description: 'Delusions, hallucinations or a break with reality.', group: 'Mental health' },
+      { slug: 'ptsd', label: 'Trauma and PTSD', description: 'Flashbacks or the lasting effects of trauma.', group: 'Mental health' },
+      { slug: 'racism', label: 'Racism', description: 'Racist language, attitudes or acts.', group: 'Discrimination and hate' },
+      { slug: 'homophobia', label: 'Homophobia and transphobia', description: 'Hostility to gay, lesbian, bi or trans people.', group: 'Discrimination and hate' },
+      { slug: 'sexism', label: 'Sexism and misogyny', description: 'Contempt for or mistreatment of women.', group: 'Discrimination and hate' },
+      { slug: 'ableism', label: 'Ableism', description: 'Prejudice against disabled people.', group: 'Discrimination and hate' },
+      { slug: 'antisemitism', label: 'Antisemitism', description: 'Hostility to Jewish people.', group: 'Discrimination and hate' },
+      { slug: 'islamophobia', label: 'Islamophobia', description: 'Hostility to Muslims.', group: 'Discrimination and hate' },
+      { slug: 'slurs', label: 'Slurs', description: 'Offensive terms for a group of people.', group: 'Discrimination and hate' },
+      { slug: 'strong-language', label: 'Strong language', description: 'Swearing, including strong swear words.', group: 'Language and substances' },
+      { slug: 'drug-use', label: 'Drug use', description: 'Illegal or recreational drugs used or discussed.', group: 'Language and substances' },
+      { slug: 'alcohol', label: 'Alcohol misuse', description: 'Heavy drinking or alcoholism.', group: 'Language and substances' },
+      { slug: 'smoking', label: 'Smoking', description: 'Cigarettes or vaping on stage.', group: 'Language and substances' },
+      { slug: 'addiction', label: 'Addiction', description: 'Dependence on a substance or behaviour.', group: 'Language and substances' },
+      { slug: 'gambling', label: 'Gambling', description: 'Betting or gambling addiction.', group: 'Language and substances' },
+      { slug: 'war', label: 'War', description: 'Armed conflict and its effects.', group: 'Crime, war and conflict' },
+      { slug: 'terrorism', label: 'Terrorism', description: 'Terrorist acts or their aftermath.', group: 'Crime, war and conflict' },
+      { slug: 'genocide', label: 'Genocide', description: 'Mass killing of a people.', group: 'Crime, war and conflict' },
+      { slug: 'kidnap', label: 'Kidnap and imprisonment', description: 'Someone held against their will.', group: 'Crime, war and conflict' },
+      { slug: 'police-violence', label: 'Police violence', description: 'Force used by police or officials.', group: 'Crime, war and conflict' },
+      { slug: 'theft', label: 'Theft and robbery', description: 'Stealing, burglary or armed robbery.', group: 'Crime, war and conflict' },
+      { slug: 'human-trafficking', label: 'Human trafficking', description: 'People bought, sold or forced to work.', group: 'Crime, war and conflict' },
+      { slug: 'domestic-abuse', label: 'Domestic abuse', description: 'Violence or control within a home.', group: 'Family and relationships' },
+      { slug: 'coercive-control', label: 'Coercive control', description: 'One person dominating another person\'s life.', group: 'Family and relationships' },
+      { slug: 'infidelity', label: 'Infidelity', description: 'Cheating on a partner.', group: 'Family and relationships' },
+      { slug: 'divorce', label: 'Divorce and separation', description: 'The end of a marriage or partnership.', group: 'Family and relationships' },
+      { slug: 'neglect', label: 'Neglect', description: 'A person left without care they need.', group: 'Family and relationships' },
+      { slug: 'bullying', label: 'Bullying', description: 'Repeated cruelty to a person.', group: 'Family and relationships' },
+      { slug: 'medical-procedures', label: 'Medical procedures', description: 'Operations, injections or hospital scenes.', group: 'Medical and bodily' },
+      { slug: 'needles', label: 'Needles', description: 'Needles or injections shown.', group: 'Medical and bodily' },
+      { slug: 'childbirth', label: 'Childbirth', description: 'Labour or birth shown or described.', group: 'Medical and bodily' },
+      { slug: 'abortion', label: 'Abortion', description: 'A termination, shown or discussed.', group: 'Medical and bodily' },
+      { slug: 'dementia', label: 'Dementia', description: 'Memory loss and confusion in later life.', group: 'Medical and bodily' },
+      { slug: 'bodily-fluids', label: 'Bodily fluids', description: 'Vomit, urine or similar on stage.', group: 'Medical and bodily' },
+      { slug: 'religious-abuse', label: 'Religious abuse', description: 'Harm done in the name of religion.', group: 'Medical and bodily' },
+    ] },
+    { id: 'core.staging-effect', label: 'Staging effects', description: 'What the room does to the audience: always shown on a production\'s page, because it is safety information.', terms: [
+      { slug: 'strobe', label: 'Strobe lighting', description: 'Rapid flashing lights.', icon: 'i-lucide-zap' },
+      { slug: 'haze', label: 'Haze or smoke', description: 'Haze, fog or smoke machines.', icon: 'i-lucide-cloud-fog' },
+      { slug: 'loud-noise', label: 'Loud noises', description: 'Sudden or sustained loud sound.', icon: 'i-lucide-volume-2' },
+      { slug: 'gunshots', label: 'Gunshots', description: 'Gunfire or similar bangs, including blanks.', icon: 'i-lucide-target' },
+      { slug: 'pyrotechnics', label: 'Pyrotechnics', description: 'Flame, sparks or smoke from fireworks.', icon: 'i-lucide-flame' },
+      { slug: 'naked-flame', label: 'Naked flame', description: 'Candles, lighters or open fire.', icon: 'i-lucide-flame-kindling' },
+      { slug: 'flashing-lights', label: 'Flashing lights', description: 'Camera flashes or repeated bright bursts.', icon: 'i-lucide-lightbulb' },
+      { slug: 'darkness', label: 'Blackouts and darkness', description: 'Moments of complete or near darkness.', icon: 'i-lucide-moon' },
+      { slug: 'audience-participation', label: 'Audience participation', description: 'The audience may be spoken to or involved.', icon: 'i-lucide-users' },
+      { slug: 'moving-seats', label: 'Moving audience', description: 'The audience is asked to move or stand.', icon: 'i-lucide-footprints' },
+      { slug: 'loose-materials', label: 'Dust, powder or liquids', description: 'Powder, water or other material may reach the front rows.', icon: 'i-lucide-droplets' },
+    ] },
     { id: 'core.access-feature', label: 'Access at performances', description: 'What a performance offers, such as captioning.', terms: terms(['captioned', 'Captioned'], ['sign-language', 'Sign-language interpreted'], ['audio-described', 'Audio described'], ['relaxed', 'Relaxed'], ['touch-tour', 'Touch tour']) },
     { id: 'core.space-kind', label: 'Kinds of space', terms: terms(['auditorium', 'Auditorium'], ['studio', 'Studio'], ['rehearsal-room', 'Rehearsal room'], ['front-of-house', 'Front of house'], ['workshop', 'Workshop'], ['store', 'Store'], ['other', 'Other']) },
     { id: 'core.place-access', label: 'Access at venues', description: 'What a building offers, such as step-free access.', terms: terms(['step-free', 'Step-free access', 'i-lucide-accessibility'], ['wheelchair-spaces', 'Wheelchair spaces', 'i-lucide-armchair'], ['lift', 'Lift', 'i-lucide-arrow-up-down'], ['accessible-toilet', 'Accessible toilet', 'i-lucide-toilet'], ['changing-places', 'Changing Places toilet', 'i-lucide-bath'], ['hearing-loop', 'Hearing loop', 'i-lucide-ear'], ['accessible-parking', 'Accessible parking', 'i-lucide-circle-parking'], ['assistance-dogs', 'Assistance dogs welcome', 'i-lucide-dog'], ['quiet-space', 'Quiet space', 'i-lucide-leaf'], ['baby-changing', 'Baby changing', 'i-lucide-baby']) },
@@ -335,14 +422,19 @@ function terms(...list: [slug: string, label: string, icon?: string][]) {
 }
 
 /** The public fields of a production, as core.production.updated names them. */
-export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageGuidance', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories', 'credits'] as const
+export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageMin', 'ageRestricted', 'effectsConfirmedNone', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories', 'effects', 'credits'] as const
 
 export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
   'core.season.published': event({ version: 1, payload: z.object({ seasonId: z.string() }), internal: false }),
   'core.season.archived': event({ version: 1, payload: z.object({ seasonId: z.string() }), internal: false }),
   'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
-  'core.production.updated': event({ version: 1, payload: z.object({ productionId: z.string(), fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)) }), internal: false }),
+  'core.production.updated': event({ version: 1, payload: z.object({
+    productionId: z.string(),
+    fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)),
+    // What a change to the guidance added: term ids only, never people, so it may leave in a webhook.
+    guidanceAdded: z.object({ effectTermIds: z.array(z.string()), warnings: z.array(z.object({ termId: z.string(), level: z.enum(['mentioned', 'discussed', 'depicted']) })) }).optional(),
+  }), internal: false }),
   'core.production.withdrawn': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.production.cancelled': event({ version: 1, payload: z.object({ productionId: z.string(), reason: code() }), internal: false }),
   'core.performance.scheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), reinstated: z.boolean() }), internal: false }),

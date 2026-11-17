@@ -74,7 +74,7 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
 }
 
 /** The panel's lines, for the till to show. Reads only. */
-export async function deskSummary(context: DeskContext): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
   const { lines, totalMinor } = await priced(parse(context.input))
   return { lines: lines.map(l => ({ label: l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label, amountMinor: l.amountMinor })), amountMinor: totalMinor }
 }

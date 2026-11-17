@@ -3,15 +3,16 @@
      a module keeps (Companion, Complimentary, Member) shows which module, and only its name, order
      and whether it is sold can be changed; its rules are the module's. The order is set by dragging a
      row's handle, or from the keyboard with the arrow keys on the handle or Move up and Move down. A type a person made may ask
-     for requirements, such as a membership, chosen from what the switched-on modules provide. -->
+     for requirements, such as a membership, chosen from what the switched-on modules provide. Any
+     type can be sold everywhere, only at the box office (an industry rate, a price on the door) or
+     only online. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { unrefElement } from '@vueuse/core'
 import { insertNodeAt, removeNode, useSortable } from '@vueuse/integrations/useSortable'
 
-definePageMeta({ layout: 'console' })
-
 type Kind = 'standard' | 'concession' | 'companion' | 'complimentary'
+type Channel = 'all' | 'desk' | 'online'
 interface TicketType {
   id: string
   name: string
@@ -22,6 +23,7 @@ interface TicketType {
   proofNote: string | null
   needsPaidTicket: boolean
   active: boolean
+  channel: Channel
   sort: number
   managedBy: string | null
   available: boolean
@@ -33,37 +35,54 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
-const toast = useToast()
+const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<Listing>('/api/box-office/ticket-types', { key: 'box-office:ticket-types' })
 
 const kinds = computed(() => (['standard', 'concession'] as const).map(value => ({ value, label: t(`box-office.ticket-types.kind.${value}`) })))
+const channels = computed(() => (['all', 'desk', 'online'] as const).map(value => ({ value, label: t(`box-office.ticket-types.channel.${value}`) })))
 const options = computed(() => data.value?.requirementOptions ?? [])
 const labelOf = (ref: string) => data.value?.requirementLabels[ref] ?? ref
 // `box-office.companion` is kept by box-office: the module's own name for it.
 const moduleName = (managedBy: string) => t(`${managedBy.slice(0, managedBy.lastIndexOf('.'))}.module.name`)
 
-interface FormState { name: string, kind: 'standard' | 'concession', proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
-const blank = (): FormState => ({ name: '', kind: 'standard', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
+interface FormState { name: string, kind: 'standard' | 'concession', channel: Channel, proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
+const blank = (): FormState => ({ name: '', kind: 'standard', channel: 'all', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
 const form = ref<FormState>(blank())
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 function body(f: FormState, managed: boolean) {
-  const common = { name: f.name.trim(), proofNote: f.proofNote.trim() || null }
+  const common = { name: f.name.trim(), channel: f.channel, proofNote: f.proofNote.trim() || null }
   if (managed) return common
   return { ...common, kind: f.kind, requirementRefs: f.requirementRefs, ...(f.requirementRefs.length ? { maxPerHolder: f.maxPerHolder } : {}) }
 }
 
-async function add() {
-  refusal.value = null
+const url = (id: string) => `/api/box-office/ticket-types/${encodeURIComponent(id)}`
+const patch = (id: string, b: Record<string, unknown>) => $api(url(id), { method: 'PATCH', body: b })
+const create = (b: Record<string, unknown>) => $api<{ ticketTypeId: string }>('/api/box-office/ticket-types', { method: 'POST', body: b })
+// The form as it stood for a type, so a change can be put back.
+const asForm = (type: TicketType): FormState => ({ name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', channel: type.channel, proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active })
+
+// Does the act, then says so with an Undo that does its reverse.
+async function run<T>(fn: () => Promise<T>, done: string, undo?: (result: T) => Promise<unknown>, onRefusal = refusal) {
+  onRefusal.value = null
   try {
-    await $api('/api/box-office/ticket-types', { method: 'POST', body: body(form.value, false) })
-    toast.add({ title: t('box-office.ticket-types.added', { name: form.value.name.trim() }), color: 'success' })
-    form.value = blank()
+    const result = await fn()
     await refresh()
+    offer(done, undo && (async () => {
+      await undo(result)
+      await refresh()
+    }))
+    return true
   }
   catch (e) {
-    refusal.value = toRefusal(e)
+    onRefusal.value = toRefusal(e)
+    return false
   }
+}
+
+async function add() {
+  const name = form.value.name.trim()
+  if (await run(() => create(body(form.value, false)), t('box-office.ticket-types.added', { name }), ({ ticketTypeId }) => $api(url(ticketTypeId), { method: 'DELETE' }))) form.value = blank()
 }
 
 // Editing one type, in a dialog.
@@ -74,53 +93,46 @@ const editOpen = computed({ get: () => !!editing.value, set: (v) => { if (!v) ed
 
 function startEdit(type: TicketType) {
   editRefusal.value = null
-  editForm.value = { name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active }
+  editForm.value = asForm(type)
   editing.value = type
 }
 
 async function save() {
   const type = editing.value
   if (!type) return
-  editRefusal.value = null
-  try {
-    await $api(`/api/box-office/ticket-types/${encodeURIComponent(type.id)}`, { method: 'PATCH', body: body(editForm.value, !!type.managedBy) })
-    toast.add({ title: t('box-office.ticket-types.saved', { name: editForm.value.name.trim() }), color: 'success' })
-    editing.value = null
-    await refresh()
-  }
-  catch (e) {
-    editRefusal.value = toRefusal(e)
-  }
+  const managed = !!type.managedBy
+  const before = body(asForm(type), managed)
+  if (await run(() => patch(type.id, body(editForm.value, managed)), t('box-office.ticket-types.saved', { name: editForm.value.name.trim() }), () => patch(type.id, before), editRefusal)) editing.value = null
 }
 
 async function setActive(type: TicketType, active: boolean) {
-  refusal.value = null
-  try {
-    await $api(`/api/box-office/ticket-types/${encodeURIComponent(type.id)}`, { method: 'PATCH', body: { active } })
-    toast.add({ title: t(active ? 'box-office.ticket-types.restored' : 'box-office.ticket-types.retired', { name: type.name }), color: 'success' })
-    await refresh()
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-  }
+  await run(() => patch(type.id, { active }), t(active ? 'box-office.ticket-types.restored' : 'box-office.ticket-types.retired', { name: type.name }), () => patch(type.id, { active: !active }))
 }
 
 async function remove(type: TicketType) {
   if (!await confirm({ verb: t('box-office.ticket-types.delete.verb'), thing: type.name, consequence: t('box-office.ticket-types.delete.consequence') })) return
-  refusal.value = null
-  try {
-    await $api(`/api/box-office/ticket-types/${encodeURIComponent(type.id)}`, { method: 'DELETE' })
-    toast.add({ title: t('box-office.ticket-types.deleted', { name: type.name }), color: 'success' })
-    await refresh()
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-  }
+  // Only a type nothing has used can be deleted, so undoing it makes the same type again, in its old place.
+  await run(() => $api(url(type.id), { method: 'DELETE' }), t('box-office.ticket-types.deleted', { name: type.name }), async () => {
+    const { ticketTypeId } = await create({ ...body(asForm(type), false), recheckAtEntry: type.recheckAtEntry, sort: type.sort })
+    if (!type.active) await patch(ticketTypeId, { active: false })
+  })
 }
 
-// The order, as shown: dragged rows move here first and are then saved as a whole.
+// The order, as shown: dragged rows move here first and are then saved as a whole. Retired types
+// fold away under a divider below and keep their places after the others.
 const ordered = ref<TicketType[]>([])
-watch(() => data.value?.ticketTypes, (types) => { ordered.value = [...(types ?? [])] }, { immediate: true })
+const retired = computed(() => (data.value?.ticketTypes ?? []).filter(x => !x.active))
+watch(() => data.value?.ticketTypes, (types) => { ordered.value = (types ?? []).filter(x => x.active) }, { immediate: true })
+const showRetired = ref(false)
+
+// A search that opens from its icon. Rows that do not match are hidden rather than left out, so
+// dragging still counts every row.
+const search = ref('')
+const words = computed(() => search.value.trim().toLowerCase())
+const matches = (type: TicketType) => !words.value || type.name.toLowerCase().includes(words.value)
+const matchingRetired = computed(() => retired.value.filter(matches))
+const noMatch = computed(() => !!words.value && !ordered.value.some(matches) && !matchingRetired.value.length)
+watch(words, (w) => { if (w && matchingRetired.value.length) showRetired.value = true })
 // The RecordList component; Sortable works on its <ul>.
 const list = useTemplateRef('list')
 const moved = ref('')
@@ -130,13 +142,13 @@ async function saveOrder(type: TicketType) {
   moved.value = t('box-office.ticket-types.order.moved', { name: type.name, position: at + 1, count: ordered.value.length })
   refusal.value = null
   try {
-    await $api('/api/box-office/ticket-types/order', { method: 'PUT', body: { ticketTypeIds: ordered.value.map(x => x.id) } })
+    await $api('/api/box-office/ticket-types/order', { method: 'PUT', body: { ticketTypeIds: [...ordered.value, ...retired.value].map(x => x.id) } })
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
     await refresh()
-    ordered.value = [...(data.value?.ticketTypes ?? [])]
+    ordered.value = (data.value?.ticketTypes ?? []).filter(x => x.active)
   }
 }
 
@@ -180,11 +192,13 @@ async function onHandleKey(event: KeyboardEvent, type: TicketType) {
 
 function actions(type: TicketType): DropdownMenuItem[] {
   const at = ordered.value.findIndex(x => x.id === type.id)
-  const items: DropdownMenuItem[] = [
-    { label: t('box-office.ticket-types.edit'), icon: 'i-lucide-pencil', onSelect: () => startEdit(type) },
-    { label: t('box-office.ticket-types.order.up'), icon: 'i-lucide-arrow-up', disabled: at <= 0, onSelect: () => move(type, -1) },
-    { label: t('box-office.ticket-types.order.down'), icon: 'i-lucide-arrow-down', disabled: at >= ordered.value.length - 1, onSelect: () => move(type, 1) },
-  ]
+  const items: DropdownMenuItem[] = [{ label: t('box-office.ticket-types.edit'), icon: 'i-lucide-pencil', onSelect: () => startEdit(type) }]
+  if (type.active) {
+    items.push(
+      { label: t('box-office.ticket-types.order.up'), icon: 'i-lucide-arrow-up', disabled: at <= 0, onSelect: () => move(type, -1) },
+      { label: t('box-office.ticket-types.order.down'), icon: 'i-lucide-arrow-down', disabled: at >= ordered.value.length - 1, onSelect: () => move(type, 1) },
+    )
+  }
   items.push(type.active
     ? { label: t('box-office.ticket-types.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(type, false) }
     : { label: t('box-office.ticket-types.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(type, true) })
@@ -195,10 +209,10 @@ function actions(type: TicketType): DropdownMenuItem[] {
 function describe(type: TicketType): string {
   const parts: string[] = [t(`box-office.ticket-types.kind.${type.kind}`)]
   if (type.requirementRefs.length) parts.push(t('box-office.ticket-types.for', { who: type.requirementRefs.map(labelOf).join(t('box-office.ticket-types.or')) }))
+  if (type.channel !== 'all') parts.push(t(`box-office.ticket-types.channel.note.${type.channel}`))
   if (type.proofNote) parts.push(type.proofNote)
   if (type.managedBy) parts.push(t('box-office.ticket-types.kept-by', { module: moduleName(type.managedBy) }))
   if (!type.available) parts.push(t('box-office.ticket-types.module-off'))
-  else if (!type.active) parts.push(t('box-office.ticket-types.retired-note'))
   return parts.join(' · ')
 }
 </script>
@@ -208,6 +222,13 @@ function describe(type: TicketType): string {
     :title="t('box-office.navigation.ticket-types.label')"
     :description="t('box-office.ticket-types.description')"
   >
+    <template #primary>
+      <SearchToggle
+        v-if="(data?.ticketTypes.length ?? 0) > 1"
+        v-model="search"
+        :label="t('box-office.ticket-types.search')"
+      />
+    </template>
     <div class="space-y-8">
       <RefusalNotice :refusal="refusal" />
       <DataBoundary
@@ -224,18 +245,25 @@ function describe(type: TicketType): string {
             icon="i-lucide-tags"
           />
           <p
-            v-if="d.ticketTypes.length > 1"
+            v-if="ordered.length > 1"
             class="mb-2 text-sm text-muted"
           >
             {{ t('box-office.ticket-types.order.help') }}
           </p>
+          <p
+            v-if="noMatch"
+            class="mb-2 text-sm text-muted"
+          >
+            {{ t('box-office.ticket-types.no-match', { words: search.trim() }) }}
+          </p>
           <RecordList
-            v-if="d.ticketTypes.length"
+            v-if="ordered.length"
             ref="list"
             :label="t('box-office.navigation.ticket-types.label')"
           >
             <RecordListItem
               v-for="type in ordered"
+              v-show="matches(type)"
               :key="type.id"
               :name="type.name"
               :description="describe(type)"
@@ -259,6 +287,27 @@ function describe(type: TicketType): string {
               />
             </RecordListItem>
           </RecordList>
+          <CollapsibleDivider
+            v-model:open="showRetired"
+            class="mt-4"
+            :label="t('box-office.ticket-types.retired-note')"
+            :count="matchingRetired.length"
+          >
+            <RecordList :label="t('box-office.ticket-types.retired-note')">
+              <RecordListItem
+                v-for="type in matchingRetired"
+                :key="type.id"
+                :name="type.name"
+                :description="describe(type)"
+                :icon="type.managedBy ? 'i-lucide-lock' : undefined"
+              >
+                <RowActions
+                  :items="actions(type)"
+                  :label="t('box-office.ticket-types.actions', { name: type.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+          </CollapsibleDivider>
           <span
             id="ticket-types-order-help"
             class="sr-only"
@@ -289,6 +338,12 @@ function describe(type: TicketType): string {
             <USelect
               v-model="form.kind"
               :items="kinds"
+            />
+          </UFormField>
+          <UFormField :label="t('box-office.ticket-types.channel.label')">
+            <USelect
+              v-model="form.channel"
+              :items="channels"
             />
           </UFormField>
           <UFormField
@@ -359,6 +414,12 @@ function describe(type: TicketType): string {
             <USelect
               v-model="editForm.kind"
               :items="kinds"
+            />
+          </UFormField>
+          <UFormField :label="t('box-office.ticket-types.channel.label')">
+            <USelect
+              v-model="editForm.channel"
+              :items="channels"
             />
           </UFormField>
           <UFormField

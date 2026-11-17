@@ -33,6 +33,8 @@ export interface SpaceInput {
   accessInfo?: string | null
   managed?: boolean
   findingIt?: string | null
+  doorsBeforeMinutes?: number | null
+  runPresetId?: string | null
 }
 
 export interface Space {
@@ -50,6 +52,10 @@ export interface Space {
   managed: boolean
   /** A short public note for finding the space, shown under the venue's directions. */
   findingIt: string | null
+  /** Minutes before a start the doors open here, over the theatre's setting (null: the setting's). */
+  doorsBeforeMinutes: number | null
+  /** The run preset the Add a run window starts from here (null: the theatre's usual one). */
+  runPresetId: string | null
   archived: boolean
   sort: number
 }
@@ -73,7 +79,7 @@ export interface Venue {
 export interface PlaceFeature { termId: string, note: string | null }
 
 interface VenueRow { id: string, slug: string, name: string, address_lines: string | null, locality: string | null, postcode: string | null, country: string | null, latitude: number | null, longitude: number | null, description: string | null, access_info: string | null, getting_here: string | null, state: string }
-interface SpaceRow { id: string, venue_id: string, slug: string, name: string, kind_term_id: string, default_capacity: number | null, performable: number, exclusive: number, description: string | null, access_info: string | null, managed: number, finding_it: string | null, state: string, sort: number }
+interface SpaceRow { id: string, venue_id: string, slug: string, name: string, kind_term_id: string, default_capacity: number | null, performable: number, exclusive: number, description: string | null, access_info: string | null, managed: number, finding_it: string | null, doors_before_minutes: number | null, run_preset_id: string | null, state: string, sort: number }
 
 const toVenue = (r: VenueRow): Venue => ({
   id: r.id, slug: r.slug, name: r.name, addressLines: r.address_lines, locality: r.locality, postcode: r.postcode,
@@ -82,8 +88,14 @@ const toVenue = (r: VenueRow): Venue => ({
 const toSpace = (r: SpaceRow): Space => ({
   id: r.id, venueId: r.venue_id, slug: r.slug, name: r.name, kindTermId: r.kind_term_id, defaultCapacity: r.default_capacity,
   performable: !!r.performable, exclusive: !!r.exclusive, description: r.description, accessInfo: r.access_info, managed: !!r.managed, findingIt: r.finding_it,
-  archived: r.state === 'archived', sort: r.sort,
+  doorsBeforeMinutes: r.doors_before_minutes, runPresetId: r.run_preset_id, archived: r.state === 'archived', sort: r.sort,
 })
+
+/** A statement predicate: no preset named, or one that exists. */
+const presetExists = (id: string | null) => id ? sql`EXISTS (SELECT 1 FROM core_run_presets WHERE id = ${id})` : sql`1`
+async function refuseUnknownPreset(id: string | null | undefined) {
+  if (id && !await first('SELECT 1 FROM core_run_presets WHERE id = ?', id)) refuse('core.space.preset-unknown', 'Choose a run preset from the list.', { status: 422 })
+}
 
 const VENUE_NAME_TAKEN = { code: 'core.venue.name-taken', reason: 'Another venue has that name.', remedy: 'Choose a different name.' }
 const SPACE_NAME_TAKEN = { code: 'core.space.name-taken', reason: 'Another space in this venue has that name.', remedy: 'Choose a different name.' }
@@ -200,12 +212,13 @@ export async function setVenueArchived(unit: UnitView, id: string, archived: boo
 export async function addSpace(unit: UnitView, venueId: string, input: SpaceInput): Promise<string> {
   await venueRow(venueId)
   if (await first('SELECT 1 FROM core_spaces WHERE venue_id = ? AND lower(name) = lower(?)', venueId, input.name)) refuse(SPACE_NAME_TAKEN.code, SPACE_NAME_TAKEN.reason, { remedy: SPACE_NAME_TAKEN.remedy })
+  await refuseUnknownPreset(input.runPresetId)
   const id = newId('spc')
   const next = await first<{ sort: number }>('SELECT coalesce(max(sort), -1) + 1 AS sort FROM core_spaces WHERE venue_id = ?', venueId)
-  unit.add(sql`INSERT INTO core_spaces (id, venue_id, slug, name, kind_term_id, default_capacity, performable, exclusive, description, access_info, managed, finding_it, state, sort, created_at)
+  unit.add(sql`INSERT INTO core_spaces (id, venue_id, slug, name, kind_term_id, default_capacity, performable, exclusive, description, access_info, managed, finding_it, doors_before_minutes, run_preset_id, state, sort, created_at)
     SELECT ${id}, ${venueId}, ${await spaceSlug(venueId, input.name)}, ${input.name}, ${input.kindTermId}, ${input.defaultCapacity ?? null}, ${input.performable === false ? 0 : 1}, ${input.exclusive === false ? 0 : 1},
-      ${input.description ?? null}, ${input.accessInfo ?? null}, ${input.managed === false ? 0 : 1}, ${input.findingIt ?? null}, 'active', ${next?.sort ?? 0}, ${nowMs()}
-    WHERE ${assertTerm(input.kindTermId, 'core.space-kind')}`).expect(1, KIND_REFUSED)
+      ${input.description ?? null}, ${input.accessInfo ?? null}, ${input.managed === false ? 0 : 1}, ${input.findingIt ?? null}, ${input.doorsBeforeMinutes ?? null}, ${input.runPresetId ?? null}, 'active', ${next?.sort ?? 0}, ${nowMs()}
+    WHERE ${assertTerm(input.kindTermId, 'core.space-kind')} AND ${presetExists(input.runPresetId ?? null)}`).expect(1, KIND_REFUSED)
   unit.audit({ action: 'create', record: ['core.space', id], detail: { venueId } })
   return id
 }
@@ -217,12 +230,14 @@ export async function updateSpace(unit: UnitView, venueId: string, id: string, i
   const pick = <T>(value: T | undefined, current: T) => (value === undefined ? current : value)
   if (await first('SELECT 1 FROM core_spaces WHERE venue_id = ? AND lower(name) = lower(?) AND id != ?', venueId, name, id)) refuse(SPACE_NAME_TAKEN.code, SPACE_NAME_TAKEN.reason, { remedy: SPACE_NAME_TAKEN.remedy })
   // A changed kind must be a live term; an unchanged one may since have been retired.
+  await refuseUnknownPreset(input.runPresetId)
   const kindGuard = kind === row.kind_term_id ? sql`1` : assertTerm(kind, 'core.space-kind')
   unit.add(sql`UPDATE core_spaces SET name = ${name}, kind_term_id = ${kind}, default_capacity = ${pick(input.defaultCapacity, row.default_capacity)},
     performable = ${pick(input.performable, !!row.performable) ? 1 : 0}, exclusive = ${pick(input.exclusive, !!row.exclusive) ? 1 : 0},
     description = ${pick(input.description, row.description)}, access_info = ${pick(input.accessInfo, row.access_info)},
-    managed = ${pick(input.managed, !!row.managed) ? 1 : 0}, finding_it = ${pick(input.findingIt, row.finding_it)}
-    WHERE id = ${id} AND ${kindGuard}`).expect(1, KIND_REFUSED)
+    managed = ${pick(input.managed, !!row.managed) ? 1 : 0}, finding_it = ${pick(input.findingIt, row.finding_it)},
+    doors_before_minutes = ${pick(input.doorsBeforeMinutes, row.doors_before_minutes)}, run_preset_id = ${pick(input.runPresetId, row.run_preset_id)}
+    WHERE id = ${id} AND ${kindGuard} AND ${presetExists(input.runPresetId ?? null)}`).expect(1, KIND_REFUSED)
   unit.audit({ action: 'update', record: ['core.space', id], detail: { venueId } })
   // Other modules may care who runs a space (a bar, a hire), so a change is announced (R-36).
   if (input.managed !== undefined && input.managed !== !!row.managed)

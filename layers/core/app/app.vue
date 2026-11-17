@@ -6,6 +6,9 @@ const site = computed(() => brand.value?.name ?? t('core.public.default-name'))
 // Nuxt UI's own words and its date and time controls follow the theatre's language.
 const locale = useUiLocale()
 useHead({ titleTemplate: title => title && title !== site.value ? `${title} · ${site.value}` : site.value })
+// Until the theatre says its site is ready, every page asks search engines to stay away (C-42).
+const { data: settings } = await usePublicSettings()
+useSeoMeta({ robots: () => settings.value?.['public-site.search.hidden']?.value === true ? 'noindex' : undefined })
 </script>
 
 <template>

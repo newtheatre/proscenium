@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // One production (C-02, C-03, C-09, C-23, C-24) as a record page (UI-12): tabs for its overview,
-// details, dates, credits, media and advisories, a facts strip, and a side panel that stays beside
+// details, dates, credits, media and guidance (age, effects, content warnings), a facts strip, and a side panel that stays beside
 // every tab with the poster, managed in place, and what publishing still needs.
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -17,19 +17,25 @@ interface Production {
   categoryTermId: string | null
   seasonId: string | null
   companyName: string | null
-  ageGuidance: string | null
+  ageMin: number | null
+  ageRestricted: boolean
+  effectsConfirmedNone: boolean
   advisoriesConfirmedNone: boolean
   contentNote: string | null
   runningMinutes: number | null
   intervalCount: number
+  intervalMinutes: number | null
+  doorsBeforeMinutes: number | null
+  capacity: number | null
   externalBookingUrl: string | null
   creditsPublic: boolean
   listed: boolean
   state: State
   publishedAt: number | null
-  advisories: { termId: string, detail: string | null }[]
+  advisories: { termId: string, level: 'mentioned' | 'discussed' | 'depicted', levelAssumed: boolean, detail: string | null }[]
+  effects: { termId: string, detail: string | null }[]
 }
-interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: Option[], reasons: Option[], seasons: { id: string, name: string }[] } }
+interface Answer { production: Production, needs: string[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[] } }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -72,43 +78,28 @@ const seasons = computed(() => [{ value: NONE, label: 'No season' }, ...(data.va
 // Details
 const details = reactive({
   title: '', slug: '', subtitle: '', summary: '', description: '', kind: 'own' as Production['kind'], categoryTermId: '', seasonId: NONE, companyName: '',
-  ageGuidance: '', contentNote: '', runningMinutes: null as number | null, intervalCount: 0, externalBookingUrl: '', creditsPublic: true, listed: true,
+  contentNote: '', runningMinutes: null as number | null, intervalCount: 0, intervalMinutes: null as number | null, doorsBeforeMinutes: null as number | null,
+  capacity: null as number | null, bookedElsewhere: false, externalBookingUrl: '', creditsPublic: true, listed: true,
 })
+// With nothing here selling tickets, every production is booked elsewhere (Matt, 2026-11-17).
+const sellsHere = computed(() => data.value?.sellsHere ?? true)
+const elsewhere = computed(() => !sellsHere.value || details.bookedElsewhere)
 watch(production, (p) => {
   if (!p) return
   Object.assign(details, {
     title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
-    seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', ageGuidance: p.ageGuidance ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
-    intervalCount: p.intervalCount, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
+    seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
+    intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
+    bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
   })
 }, { immediate: true })
 const saveDetails = () => run(() => api('', 'PATCH', {
-  ...details,
+  ...(({ bookedElsewhere: _, ...rest }) => rest)(details),
   categoryTermId: details.categoryTermId || null,
   seasonId: details.seasonId === NONE ? null : details.seasonId,
-  externalBookingUrl: details.externalBookingUrl.trim() || null,
+  externalBookingUrl: elsewhere.value ? details.externalBookingUrl.trim() || null : null,
   runningMinutes: details.runningMinutes || null,
 }), 'Production saved')
-
-// Advisories
-const chosen = reactive<Record<string, { on: boolean, detail: string }>>({})
-const confirmedNone = ref(false)
-watch(data, (d) => {
-  if (!d) return
-  for (const a of d.options.advisories) {
-    const row = d.production.advisories.find(x => x.termId === a.id)
-    chosen[a.id] = { on: !!row, detail: row?.detail ?? '' }
-  }
-  confirmedNone.value = d.production.advisoriesConfirmedNone
-}, { immediate: true })
-const shownAdvisories = computed(() => (data.value?.options.advisories ?? []).filter(a => !a.retired || chosen[a.id]?.on))
-const anyChosen = computed(() => shownAdvisories.value.some(a => chosen[a.id]?.on))
-async function saveAdvisories() {
-  const list = shownAdvisories.value.filter(a => chosen[a.id]?.on).map(a => ({ termId: a.id, detail: chosen[a.id]!.detail.trim() || null }))
-  if (!list.length && confirmedNone.value !== production.value?.advisoriesConfirmedNone)
-    return run(() => api('', 'PATCH', { advisoriesConfirmedNone: confirmedNone.value }), 'Advisories saved')
-  return run(() => api('/advisories', 'PUT', { advisories: list }), 'Advisories saved')
-}
 
 // Moves
 const publish = () => run(() => api('/publish', 'POST'), 'Production published')
@@ -177,7 +168,7 @@ const tabs = [
   { id: 'dates', label: 'Dates' },
   { id: 'credits', label: 'Credits' },
   { id: 'media', label: 'Media' },
-  { id: 'advisories', label: 'Advisories and access' },
+  { id: 'advisories', label: 'Age, effects and warnings' },
 ]
 const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, { replace: true })
 </script>
@@ -340,13 +331,33 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                     maxlength="200"
                   />
                 </UFormField>
-                <UFormField label="Running time in minutes">
-                  <UInputNumber
+                <UFormField
+                  label="Running time"
+                  help="Including the intervals."
+                  name="runningMinutes"
+                >
+                  <MinutesInput
                     v-model="details.runningMinutes"
+                    :placeholder="data?.theatre.runningMinutes"
                     :min="1"
+                    label="Running time"
                   />
                 </UFormField>
-                <UFormField label="Intervals">
+                <UFormField
+                  label="Doors open before"
+                  name="doorsBeforeMinutes"
+                >
+                  <MinutesInput
+                    v-model="details.doorsBeforeMinutes"
+                    :placeholder="data?.theatre.doorsBeforeMinutes"
+                    :max="180"
+                    label="Doors open before"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Intervals"
+                  name="intervalCount"
+                >
                   <UInputNumber
                     v-model="details.intervalCount"
                     :min="0"
@@ -354,14 +365,33 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   />
                 </UFormField>
                 <UFormField
-                  label="Age guidance"
-                  help="Such as 12+."
+                  label="Each interval"
+                  name="intervalMinutes"
                 >
-                  <UInput
-                    v-model="details.ageGuidance"
-                    maxlength="40"
+                  <MinutesInput
+                    v-model="details.intervalMinutes"
+                    :placeholder="data?.theatre.intervalMinutes"
+                    :max="120"
+                    label="Each interval"
                   />
                 </UFormField>
+                <UFormField
+                  label="Capacity"
+                  name="capacity"
+                >
+                  <UInputNumber
+                    v-model="details.capacity"
+                    placeholder="Each space's own"
+                    :min="1"
+                  />
+                </UFormField>
+                <UCheckbox
+                  :model-value="elsewhere"
+                  :disabled="!sellsHere"
+                  label="Booked elsewhere"
+                  :description="sellsHere ? 'Tickets are sold on another website, not here.' : 'Nothing here sells tickets, so every production is booked on another website.'"
+                  @update:model-value="details.bookedElsewhere = !!$event"
+                />
                 <UFormField
                   label="Web address"
                   help="An old address keeps working once the production has been public."
@@ -373,12 +403,15 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 </UFormField>
               </div>
               <UFormField
+                v-if="elsewhere"
                 label="Booking link"
-                help="Used when no booking module sells this production. Must start https://."
+                name="externalBookingUrl"
+                required
               >
                 <UInput
                   v-model="details.externalBookingUrl"
                   type="url"
+                  placeholder="https://"
                 />
               </UFormField>
               <UCheckbox
@@ -409,7 +442,6 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
           <ProductionPerformances
             :production-id="production!.id"
             :title="production!.title"
-            :interval-count="production!.intervalCount"
             @changed="reload()"
           />
         </div>
@@ -427,55 +459,12 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       </template>
 
       <template #tab-advisories>
-        <div class="space-y-4">
-          <RefusalNotice :refusal="refusal" />
-          <PageSection
-            title="Advisories"
-            description="List what people may want to know before they come, or confirm there is nothing. Publishing needs one or the other, so silence is never taken for &quot;nothing to warn about&quot;."
-          >
-            <UForm
-              id="production-advisories"
-              :state="chosen"
-              class="space-y-3"
-              @submit="saveAdvisories"
-            >
-              <div
-                v-for="a in shownAdvisories"
-                :key="a.id"
-                class="flex flex-wrap items-center gap-3"
-              >
-                <UCheckbox
-                  v-model="chosen[a.id]!.on"
-                  :label="a.label"
-                  class="w-56"
-                />
-                <UInput
-                  v-if="chosen[a.id]!.on"
-                  v-model="chosen[a.id]!.detail"
-                  placeholder="Detail, such as when it happens"
-                  :aria-label="`Detail for ${a.label}`"
-                  maxlength="300"
-                  size="sm"
-                  class="flex-1"
-                />
-              </div>
-              <UCheckbox
-                v-if="!anyChosen"
-                v-model="confirmedNone"
-                label="This production has no advisories"
-              />
-            </UForm>
-            <template #footer>
-              <UButton
-                type="submit"
-                form="production-advisories"
-                label="Save advisories"
-                color="neutral"
-                variant="outline"
-              />
-            </template>
-          </PageSection>
-        </div>
+        <ProductionGuidance
+          :production-id="production!.id"
+          :production="production!"
+          :options="data!.options"
+          @changed="reload()"
+        />
       </template>
     </PageRecord>
     <ProductionCancelDialog

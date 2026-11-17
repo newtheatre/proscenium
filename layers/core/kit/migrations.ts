@@ -64,10 +64,35 @@ export async function applyMigrations(db = useContext().env.DB): Promise<string[
   return done
 }
 
-/** Where auto-migration is on, applies pending migrations once per database per isolate. */
+/** How long after a failed migration before the runner tries again. */
+const RETRY_AFTER_MS = 60_000 // not-policy: a retry interval
+
+export interface MigrationFailure { at: number, message: string }
+const failures = new WeakMap<object, MigrationFailure>()
+
+/** The last migration failure in this isolate, if the runner has not since succeeded. */
+export function migrationFailure(db = useContext().env.DB): MigrationFailure | null {
+  return failures.get(db as object) ?? null
+}
+
+/**
+ * Where auto-migration is on, applies pending migrations once per database per isolate. A migration
+ * that fails leaves the database as it was (each is one atomic batch), so the site keeps serving:
+ * pages that do not need the new schema work, the failure is logged and shown on the health check,
+ * and the runner tries again at most once a minute rather than on every request.
+ */
 export async function ensureMigrated(): Promise<void> {
   const { env } = useContext()
   if (env.PROSCENIUM_AUTO_MIGRATE !== '1' || checked.has(env.DB as object)) return
-  await applyMigrations(env.DB)
-  checked.add(env.DB as object)
+  const failed = failures.get(env.DB as object)
+  if (failed && nowMs() - failed.at < RETRY_AFTER_MS) return
+  try {
+    await applyMigrations(env.DB)
+    failures.delete(env.DB as object)
+    checked.add(env.DB as object)
+  }
+  catch (error) {
+    failures.set(env.DB as object, { at: nowMs(), message: (error as Error).message })
+    log.error('core.migrations.failed', { error: (error as Error).message })
+  }
 }

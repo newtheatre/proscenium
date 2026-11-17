@@ -18,8 +18,12 @@ import seasonState from '../../../core/server/api/core/seasons/[id]/state.post'
 import readVenue from '../../server/api/public-site/venues/[slug].get'
 import readSeason from '../../server/api/public-site/seasons/[slug].get'
 import { changeSetting, createUnit } from '#kit'
+import { publicProgrammePaths } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
+
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
 
 const handle = server({
   'POST /api/core/productions': createProduction,
@@ -59,7 +63,7 @@ async function ok(method: string, path: string, body: object) {
 }
 async function show(title: string, seasonId: string | null = null): Promise<string> {
   const { id } = await ok('POST', '/api/core/productions', { title, kind: 'own' })
-  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true, seasonId })
+  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING, seasonId })
   await ok('POST', `/api/core/productions/${id}/publish`, {})
   return id
 }
@@ -67,6 +71,23 @@ async function date(productionId: string, at: { venueId: string, spaceId: string
   const { id } = await ok('POST', `/api/core/productions/${productionId}/performances`, { venueId: at.venueId, spaceId: at.spaceId, startsAt: Date.parse(startsAt) })
   await ok('POST', `/api/core/performances/${id}/schedule`, {})
   return id
+}
+
+async function seasonWithShows() {
+  const at = await ok('POST', '/api/core/venues', { name: `Season House ${Math.random()}` })
+  const { id } = await ok('POST', '/api/core/seasons', { name: `Season ${Math.random()}`, startsOn: '2030-01-01', endsOn: '2030-12-31' })
+  await ok('POST', `/api/core/seasons/${id}/state`, { to: 'published' })
+  const later = await show('The Later One', id)
+  await date(later, at, '2030-09-01T18:30:00Z')
+  const sooner = await show('The Sooner One', id)
+  await date(sooner, at, '2030-03-01T19:30:00Z')
+  const undated = await show('The Undated One', id)
+  const past = await show('The Past One', id)
+  const done = await date(past, at, '2099-01-01T19:30:00Z')
+  await env.DB.prepare('UPDATE core_performances SET starts_at = ?, doors_at = NULL, ends_at = ?, state = \'completed\', completed_at = ? WHERE id = ?')
+    .bind(Date.parse('2026-01-01T19:30:00Z'), Date.parse('2026-01-01T21:30:00Z'), Date.now(), done).run()
+  await env.DB.prepare('UPDATE core_productions SET first_starts_at = ?, last_ends_at = ? WHERE id = ?').bind(Date.parse('2026-01-01T19:30:00Z'), Date.parse('2026-01-01T21:30:00Z'), past).run()
+  return { id, slug: await slugOf('core_seasons', id), later, sooner, undated, past }
 }
 
 beforeEach(async () => {
@@ -119,23 +140,6 @@ describe('a venue\'s public page', () => {
 })
 
 describe('a season\'s public page', () => {
-  async function seasonWithShows() {
-    const at = await ok('POST', '/api/core/venues', { name: `Season House ${Math.random()}` })
-    const { id } = await ok('POST', '/api/core/seasons', { name: `Season ${Math.random()}`, startsOn: '2030-01-01', endsOn: '2030-12-31' })
-    await ok('POST', `/api/core/seasons/${id}/state`, { to: 'published' })
-    const later = await show('The Later One', id)
-    await date(later, at, '2030-09-01T18:30:00Z')
-    const sooner = await show('The Sooner One', id)
-    await date(sooner, at, '2030-03-01T19:30:00Z')
-    const undated = await show('The Undated One', id)
-    const past = await show('The Past One', id)
-    const done = await date(past, at, '2099-01-01T19:30:00Z')
-    await env.DB.prepare('UPDATE core_performances SET starts_at = ?, doors_at = NULL, ends_at = ?, state = \'completed\', completed_at = ? WHERE id = ?')
-      .bind(Date.parse('2026-01-01T19:30:00Z'), Date.parse('2026-01-01T21:30:00Z'), Date.now(), done).run()
-    await env.DB.prepare('UPDATE core_productions SET first_starts_at = ?, last_ends_at = ? WHERE id = ?').bind(Date.parse('2026-01-01T19:30:00Z'), Date.parse('2026-01-01T21:30:00Z'), past).run()
-    return { id, slug: await slugOf('core_seasons', id), later, sooner, undated, past }
-  }
-
   it('lists the productions in the order they open, the undated last, each marked past or current', async () => {
     const s = await seasonWithShows()
     const { status, body } = await visit(`/api/public-site/seasons/${s.slug}`)
@@ -158,5 +162,32 @@ describe('a season\'s public page', () => {
     expect((await visit(`/api/public-site/seasons/${s.slug}`)).status).toBe(404)
     await setting('public-site.archive.public', true)
     expect((await visit(`/api/public-site/seasons/${s.slug}`)).body).toMatchObject({ archived: true })
+  })
+})
+
+describe('the sitemap\'s programme addresses (C-47)', () => {
+  const paths = (pastVisible: boolean) => inContext(() => publicProgrammePaths({ pastVisible }))
+
+  it('lists each public production where its page lives, venues and seasons, and nothing private', async () => {
+    const s = await seasonWithShows()
+    const slug = (id: string) => slugOf('core_productions', id)
+    const unlisted = await show('The Unlisted One')
+    await ok('PATCH', `/api/core/productions/${unlisted}`, { listed: false })
+    const draft = (await ok('POST', '/api/core/productions', { title: 'The Draft One', kind: 'own' })).id
+    const hall = await ok('POST', '/api/core/venues', { name: `Closed Hall ${Math.random()}` })
+    await ok('POST', `/api/core/venues/${hall.venueId}/archive`, {})
+
+    const open = await paths(true)
+    expect(open).toEqual(expect.arrayContaining([`/whats-on/${await slug(s.sooner)}`, `/whats-on/${await slug(s.later)}`, `/shows/${await slug(s.past)}`, `/seasons/${s.slug}`]))
+    // A production with no dates has nothing to show yet; drafts, unlisted shows and closed venues never appear.
+    for (const hidden of [`/whats-on/${await slug(s.undated)}`, `/whats-on/${await slug(unlisted)}`, `/whats-on/${await slug(draft)}`, `/venues/${await slugOf('core_venues', hall.venueId)}`])
+      expect(open).not.toContain(hidden)
+
+    await ok('POST', `/api/core/seasons/${s.id}/state`, { to: 'archived' })
+    const closed = await paths(false)
+    expect(closed).toContain(`/whats-on/${await slug(s.sooner)}`)
+    expect(closed).not.toContain(`/shows/${await slug(s.past)}`)
+    expect(closed).not.toContain(`/seasons/${s.slug}`)
+    expect(await paths(true)).toContain(`/seasons/${s.slug}`)
   })
 })

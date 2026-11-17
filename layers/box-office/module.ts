@@ -25,6 +25,8 @@ export default defineModule({
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     // How long after curtain the desk may still sell, for latecomers.
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
+    // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com").
+    'sales.desk-email-domains': setting.list({ default: ['gmail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'icloud.com', 'yahoo.com', 'yahoo.co.uk', 'live.co.uk', 'btinternet.com'], of: 'text', maxLength: 253, change, audience: 'staff' }),
     // Show "N seats left" only at or under this many; 0 never shows it.
     'availability.show-remaining-under': setting.integer({ default: 20, min: 0, max: 1000, change, audience: 'public' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
@@ -131,6 +133,7 @@ export default defineModule({
       'core.performance.cancelled': 'follow-cancel',
       'core.performance.rescheduled': 'follow-reschedule',
       'core.performance.moved': 'follow-move',
+      'core.production.updated': 'follow-guidance',
     },
   },
 
@@ -158,6 +161,8 @@ export default defineModule({
     ],
     // Box office owns its part of a payment: it makes the sale real when the money arrives.
     'payments.settlement': [{ id: 'box-office' }],
+    // Box office's part of the night report, when Front of house is on.
+    'front-of-house.report-section': [{ id: 'box-office.attendance', file: 'attendance' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.
@@ -173,7 +178,7 @@ export default defineModule({
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
-      { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
+      { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40, settingsIn: ['box-office.performances'] },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
@@ -192,6 +197,15 @@ export default defineModule({
         { slug: 'press', label: 'Press' },
         { slug: 'reviewer', label: 'Reviewer' },
         { slug: 'sponsor', label: 'Sponsor' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
+      id: 'box-office.override-reason',
+      label: 'Reasons for admitting anyway',
+      terms: [
+        { slug: 'membership-shown', label: 'Membership shown in person' },
+        { slug: 'proof-shown', label: 'Proof shown in person' },
+        { slug: 'manager-decision', label: 'Manager\'s decision' },
         { slug: 'other', label: 'Other' },
       ],
     }, {
@@ -264,6 +278,20 @@ export default defineModule({
         },
       },
     }, {
+      id: 'box-office.order-confirmed-guest',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      lane: 'prompt' as const,
+      // The confirmation for a buyer who has never signed in: the same, with core's link that opens their account.
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, paid: 'text' as const, codes: 'sealed' as const, link: 'sealed' as const, account: 'sealed' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your tickets: {{ show }}, {{ when }}',
+          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nPaid: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
+        },
+      },
+    }, {
       id: 'box-office.order-exchanged',
       category: 'transactional' as const,
       side: 'audience' as const,
@@ -315,6 +343,20 @@ export default defineModule({
         'en-GB': {
           subject: 'A change to {{ show }}',
           body: '**{{ show }}** {{ what }}.\n\n{{ now }}\n\n{{ next }}\n\nBooking reference: **{{ reference }}**',
+        },
+      },
+    }, {
+      // Staging effects, or a depicted content warning, added to a show someone has already booked (C-57).
+      id: 'box-office.guidance-added',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'prompt' as const,
+      variables: { reference: 'text' as const, show: 'text' as const, what: 'text' as const, pageUrl: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Something to know before you see {{ show }}',
+          body: 'We have added information about **{{ show }}** that you may want to read before you come.\n\n{{ what }}\n\nYou can read it all on the show\'s page: {{ pageUrl }}\n\nNothing is needed from you. If you cannot come now, contact the box office to exchange your tickets or to have them refunded.\n\nBooking reference: **{{ reference }}**',
         },
       },
     }],

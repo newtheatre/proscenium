@@ -29,6 +29,20 @@ export interface BookingAnswer {
   label?: string
 }
 
+/**
+ * What a production costs, for "From £6 · Member £4" on a listing. Facts, not sentences: the public
+ * pages word and format it. Amounts are in the currency's minor unit.
+ */
+export interface PriceSummary {
+  currency: string
+  /** The lowest price anyone may book at, or null when every price needs something (such as a membership). */
+  fromMinor: number | null
+  /** Lower prices for people who qualify, each by its ticket type's own name, lowest first. */
+  others: { label: string, amountMinor: number }[]
+}
+
 export interface BookingAction {
   actions: (performances: BookingSubject[]) => Promise<Record<string, BookingAnswer>>
+  /** What each production is sold at, for listings. Optional; a production left out shows no price. */
+  prices?: (productionIds: string[]) => Promise<Record<string, PriceSummary>>
 }

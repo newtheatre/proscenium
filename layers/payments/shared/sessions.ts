@@ -24,4 +24,6 @@ export interface YourSession {
   session: YourSessionSummary | null
   waiting: WaitingPayment[]
   awaiting: YourSessionSummary[]
+  /** A sale in the open session that was started and neither paid nor cancelled, such as one left by a reload. */
+  unfinished?: { intentId: string, amountMinor: number } | null
 }
