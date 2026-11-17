@@ -25,6 +25,13 @@ export default defineModule({
     listing: { place: 'admin' },
   },
 
+  contributes: {
+    // ::whats-on in a theatre's own page, such as the starter home page.
+    'core.public-component': [
+      { id: 'whats-on', component: 'PublicSiteWhatsOn', alias: 'whats-on', description: 'What is on: every production with a date to come, or the soonest few (limit), narrowed by category, season or venue (slugs), as a grid or a list (layout).' },
+    ],
+  },
+
   abilities: defineAbilities('public-site', {
     'site.configure': ability(),
   }),

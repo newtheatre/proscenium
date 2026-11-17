@@ -129,43 +129,15 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
               v-for="p in data.productions"
               :key="p.id"
             >
-              <UPageCard
+              <PublicSiteShowCard
                 :to="`/shows/${p.slug}`"
                 :title="p.title"
                 :description="p.subtitle ?? (p.companyName ? t('public-site.production.presented-by', { company: p.companyName }) : undefined)"
-                variant="outline"
-                class="h-full"
-              >
-                <template
-                  v-if="p.poster"
-                  #header
-                >
-                  <img
-                    :src="p.poster.url"
-                    :alt="p.poster.alt"
-                    :width="p.poster.width ?? undefined"
-                    :height="p.poster.height ?? undefined"
-                    loading="lazy"
-                    class="aspect-[2/3] w-full rounded-md object-cover"
-                  >
-                </template>
-                <template #footer>
-                  <p class="text-sm font-medium">
-                    {{ range(p.openedAt, p.closedAt) }}
-                    <UBadge
-                      v-if="p.cancelled"
-                      :label="t('public-site.production.cancelled')"
-                      color="neutral"
-                      variant="subtle"
-                      size="sm"
-                      class="ms-1"
-                    />
-                  </p>
-                  <p class="text-sm text-muted">
-                    {{ [p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ') }}
-                  </p>
-                </template>
-              </UPageCard>
+                :poster="p.poster"
+                :when="range(p.openedAt, p.closedAt)"
+                :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
+                :cancelled="p.cancelled"
+              />
             </li>
           </ul>
         </section>
