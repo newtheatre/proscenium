@@ -1,9 +1,10 @@
 <!-- My membership (MEM-10, MEM-11, MEM-33): what the person holds and until when, their member
      number, and the schemes they can join. A free scheme with nothing to check is joined here in one
-     step; other schemes say how to join until applications are built. -->
+     step, as is one that checks a list (a student ID, or a verified address); other schemes say how to
+     join until applications are built. -->
 <script setup lang="ts">
 interface Mine { number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
-interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string }[] }
+interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string }[], asksFor: string | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -17,10 +18,11 @@ const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 
 const held = computed(() => new Set((mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId)))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
 const chosen = reactive<Record<string, string | undefined>>({})
+const references = reactive<Record<string, string>>({})
 
 async function join(s: Offered) {
   try {
-    await $api(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: chosen[s.id] ?? (s.options.length === 1 ? s.options[0]!.id : null) } })
+    await $api(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: chosen[s.id] ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? references[s.id]?.trim() : undefined } })
     toast.add({ title: t('membership.screens.mine.joined', { scheme: s.name }), color: 'success' })
     // A members' scheme opens the members' area from this response on: reload so the header shows it.
     reloadNuxtApp()
@@ -99,9 +101,17 @@ async function join(s: Offered) {
                   :placeholder="t('membership.screens.mine.choose-length')"
                   :aria-label="t('membership.screens.mine.length-for', { scheme: s.name })"
                 />
+                <UInput
+                  v-if="s.asksFor"
+                  v-model="references[s.id]"
+                  :placeholder="s.asksFor"
+                  :aria-label="s.asksFor"
+                  autocomplete="off"
+                  maxlength="254"
+                />
                 <UButton
                   :label="t('membership.screens.mine.join')"
-                  :disabled="s.options.length > 1 && !chosen[s.id]"
+                  :disabled="(s.options.length > 1 && !chosen[s.id]) || (!!s.asksFor && !references[s.id]?.trim())"
                   loading-auto
                   @click="join(s)"
                 />

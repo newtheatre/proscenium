@@ -16,6 +16,15 @@ import optionPatch from '../../server/api/membership/schemes/[id]/options/[optio
 import membersPost from '../../server/api/membership/schemes/[id]/members.post'
 import joinPost from '../../server/api/membership/schemes/[id]/join.post'
 import mineGet from '../../server/api/membership/mine.get'
+import listsGet from '../../server/api/membership/lists/index.get'
+import listsPost from '../../server/api/membership/lists/index.post'
+import listGet from '../../server/api/membership/lists/[id].get'
+import listPatch from '../../server/api/membership/lists/[id].patch'
+import listDelete from '../../server/api/membership/lists/[id].delete'
+import listImport from '../../server/api/membership/lists/[id]/import.post'
+import entriesPost from '../../server/api/membership/lists/[id]/entries/index.post'
+import entriesRemove from '../../server/api/membership/lists/[id]/entries/remove.post'
+import listCheck from '../../server/api/membership/lists/[id]/check.post'
 
 export const handle = server({
   'GET /api/membership/schemes': schemesGet,
@@ -30,10 +39,19 @@ export const handle = server({
   'POST /api/membership/schemes/:id/members': membersPost,
   'POST /api/membership/schemes/:id/join': joinPost,
   'GET /api/membership/mine': mineGet,
+  'GET /api/membership/lists': listsGet,
+  'POST /api/membership/lists': listsPost,
+  'GET /api/membership/lists/:id': listGet,
+  'PATCH /api/membership/lists/:id': listPatch,
+  'DELETE /api/membership/lists/:id': listDelete,
+  'POST /api/membership/lists/:id/import': listImport,
+  'POST /api/membership/lists/:id/entries': entriesPost,
+  'POST /api/membership/lists/:id/entries/remove': entriesRemove,
+  'POST /api/membership/lists/:id/check': listCheck,
 })
 
 export const NOV_17 = Date.UTC(2026, 10, 17, 12)
-export const officer = person(['membership.scheme.manage', 'membership.membership.add'], { reassertedAt: NOV_17 })
+export const officer = person(['membership.scheme.manage', 'membership.membership.add', 'membership.verification-list.manage'], { reassertedAt: NOV_17 })
 
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = officer): Promise<{ status: number, body: T }> {
   const headers = method === 'POST' ? { 'idempotency-key': newId('req') } : {}
