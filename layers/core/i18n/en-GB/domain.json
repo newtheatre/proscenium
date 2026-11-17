@@ -8,7 +8,7 @@
   "core.settings.organisation.week-start.options.sunday": "Sunday",
   "core.settings.organisation.week-start.options.saturday": "Saturday",
   "core.settings.organisation.country.label": "Country",
-  "core.settings.organisation.country.help": "The two-letter code of the country the theatre is in, such as GB. Public holidays are taken from it.",
+  "core.settings.organisation.country.help": "The country the theatre is in. Public holidays are taken from it.",
   "core.settings.organisation.contact-email.label": "Contact email",
   "core.settings.organisation.contact-email.help": "A public address for the theatre, such as boxoffice@example.org. Use a shared address, not a person's own. Test emails are sent here.",
   "core.settings.organisation.contact-phone.label": "Contact phone",

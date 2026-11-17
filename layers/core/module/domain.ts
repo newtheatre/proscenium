@@ -18,7 +18,7 @@ export const settings = defineSettings('core', {
   // (core.site.name, core.locale.*); the operating day (C-37) reads core.locale.day-start.
   'organisation.short-name': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
   'organisation.week-start': setting.choice({ default: 'monday', options: ['monday', 'sunday', 'saturday'], change: organisation, audience: 'public' }),
-  'organisation.country': setting.text({ default: 'GB', maxLength: 2, change: organisation }),
+  'organisation.country': setting.choice({ default: 'GB', catalogue: 'country', change: organisation }),
   'organisation.contact-email': setting.text({ unset: true, maxLength: 254, change: organisation, audience: 'public', quotable: true }),
   'organisation.contact-phone': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
   'organisation.address': setting.text({ unset: true, maxLength: 300, change: organisation, audience: 'public', quotable: true }),
