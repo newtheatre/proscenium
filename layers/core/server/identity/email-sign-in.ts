@@ -11,6 +11,7 @@ import { BROWSER_COOKIE, readCookie, setShortCookie } from './web'
 import { startSession } from './sessions'
 import { useEnrolmentLink } from './recovery'
 import { checkClaimable } from './claim'
+import { managedDomainProvider } from './providers'
 import { holdsPrivileged } from './me'
 
 export interface TokenRow {
@@ -27,7 +28,7 @@ export interface TokenRow {
   used_at: number | null
 }
 
-export type RequestOutcome = { sent: true } | { provider: 'google', to: string }
+export type RequestOutcome = { sent: true } | { provider: string, to: string }
 
 /** Is this address's domain one whose people sign in only through the provider? */
 export async function isManaged(address: string): Promise<boolean> {
@@ -44,7 +45,8 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
   const address = normaliseAddress(input.address)
   if (await isManaged(address)) {
     const query = new URLSearchParams({ login_hint: address, ...(input.next ? { next: input.next } : {}) })
-    return { provider: 'google', to: `/api/core/sign-in/google?${query}` }
+    const provider = managedDomainProvider()
+    return { provider: provider.id, to: `/api/core/sign-in/${provider.id}?${query}` }
   }
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
