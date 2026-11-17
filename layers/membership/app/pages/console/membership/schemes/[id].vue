@@ -19,7 +19,7 @@ interface Scheme {
   voting: boolean
   holderMayEnd: boolean
   acceptsReference: boolean
-  verifier: 'membership.list' | null
+  verifier: 'membership.staff' | 'membership.email-domain' | 'membership.list' | null
   verifierConfig: string | null
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
@@ -41,22 +41,23 @@ const missing = computed(() => (data.value?.checklist ?? []).filter(i => !i.done
 const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRule === 'fixed' ? 'years' : 'months'}`))
 
 // Details: one form, saved as a whole.
-const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, acceptsReference: false, checks: false, listId: undefined as string | undefined })
+const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(scheme, (s) => {
   if (!s) return
-  const listId = s.verifierConfig ? (JSON.parse(s.verifierConfig) as { listId?: string }).listId : undefined
+  const config = s.verifierConfig ? JSON.parse(s.verifierConfig) as { listId?: string, domains?: string[] } : {}
   const { verifier: _verifier, verifierConfig: _config, ...fields } = s
-  Object.assign(details, { ...fields, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31, checks: s.verifier === 'membership.list', listId })
+  Object.assign(details, { ...fields, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31, checks: s.verifier ?? 'none', listId: config.listId, domains: (config.domains ?? []).join(', ') })
 }, { immediate: true })
 async function saveDetails() {
   detailsRefusal.value = null
   const fixed = details.lengthRule === 'fixed'
-  const { checks, listId, ...fields } = details
+  const { checks, listId, domains, ...fields } = details
+  const verifier = checks === 'none' ? null : checks
   try {
     await $api(`/api/membership/schemes/${id.value}` as string, {
       method: 'PATCH',
-      body: { ...fields, summary: details.summary.trim() || null, fixedEndMonth: fixed ? details.fixedEndMonth : null, fixedEndDay: fixed ? details.fixedEndDay : null, verifier: checks ? 'membership.list' : null, listId: checks ? listId ?? null : null },
+      body: { ...fields, summary: details.summary.trim() || null, fixedEndMonth: fixed ? details.fixedEndMonth : null, fixedEndDay: fixed ? details.fixedEndDay : null, verifier, ...(verifier === 'membership.list' ? { listId: listId ?? null } : {}), ...(verifier === 'membership.email-domain' ? { domains: domains.split(/[\s,]+/).filter(Boolean) } : {}) },
     })
     toast.add({ title: t('membership.screens.scheme.saved'), color: 'success' })
     await refresh()
@@ -394,13 +395,27 @@ async function addMember() {
               :label="t('membership.screens.scheme.accepts-reference')"
               :description="t('membership.screens.scheme.accepts-reference-help')"
             />
-            <USwitch
-              v-model="details.checks"
-              :label="t('membership.screens.scheme.checks')"
-              :description="t('membership.screens.scheme.checks-help')"
-            />
             <UFormField
-              v-if="details.checks"
+              :label="t('membership.screens.scheme.checks')"
+              :help="t('membership.screens.scheme.checks-help')"
+            >
+              <URadioGroup
+                v-model="details.checks"
+                :items="(['none', 'membership.staff', 'membership.email-domain', 'membership.list'] as const).map(v => ({ value: v, label: t(`membership.screens.verifiers.${v}`), description: t(`membership.screens.verifiers.${v}-help`) }))"
+              />
+            </UFormField>
+            <UFormField
+              v-if="details.checks === 'membership.email-domain'"
+              :label="t('membership.screens.scheme.domains')"
+              :help="t('membership.screens.scheme.domains-help')"
+            >
+              <UInput
+                v-model="details.domains"
+                placeholder="nottingham.ac.uk"
+              />
+            </UFormField>
+            <UFormField
+              v-if="details.checks === 'membership.list'"
               :label="t('membership.screens.scheme.list')"
               :error="detailsRefusal?.fields?.listId ? detailsRefusal.reason : undefined"
             >
