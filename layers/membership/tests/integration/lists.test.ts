@@ -82,7 +82,9 @@ describe('joining against a list', () => {
       joined.body.membershipId,
     ))
     expect(row).toEqual({ length_option_id: null, used: joined.body.membershipId, outcome: 'passed' })
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, person([]))).body.code).toBe('membership.join.entry-already-used')
+    // V4: a second account typing the same ID waits for staff, who see the list's name for it.
+    const other = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, person([]))
+    expect(other.body).toMatchObject({ pending: true, waiting: 'entry-already-used' })
   })
 
   it('cannot open until the scheme has a list', async () => {
