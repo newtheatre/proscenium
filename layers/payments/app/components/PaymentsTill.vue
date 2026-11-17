@@ -93,10 +93,13 @@ const { data: loaded, status, error, refresh } = await useAPI<{ panels: Panel[] 
 watch(usable, (now) => { if (now && !loaded.value) refresh() })
 
 // A panel component no layer supplies is left out rather than breaking the till.
+// Panel components are registered globally, so they are looked up on the app: resolveComponent only
+// works while the component is being set up, and the panels are worked out again after a refresh.
+const { vueApp } = useNuxtApp()
 const panels = computed(() => (loaded.value?.panels ?? []).flatMap((p) => {
   if (props.modules && !props.modules.includes(p.module)) return []
-  const component = resolveComponent((props.live && p.livePanel) || p.panel)
-  return typeof component === 'string' ? [] : [{ ...p, component }]
+  const component = vueApp.component((props.live && p.livePanel) || p.panel)
+  return component ? [{ ...p, component }] : []
 }))
 
 const inputs = reactive<Record<string, unknown>>({})
@@ -458,6 +461,7 @@ async function giveBack() {
       out.unconfirmed ? t('payments.screens.till.given-back-unconfirmed') : '',
     ].filter(Boolean).join(' ')
     reset()
+    afterSale()
     for (const p of panels.value) inputs[p.id] = null
     toast.add({ title: t('payments.screens.till.given-back'), description: said || undefined, color: 'success' })
   }
@@ -482,21 +486,29 @@ function reset() {
   part.value = undefined
   saleKey.value = crypto.randomUUID()
 }
+// What the panels show, such as how many tickets are left, and the session strip are asked again
+// once a sale has ended, however it ended.
+function afterSale() {
+  void refreshNuxtData()
+}
 function done() {
   const finished = sale.value!
   const change = changeMinor.value
   reset()
+  afterSale()
   for (const p of panels.value) inputs[p.id] = null
   toast.add({ title: t('payments.screens.till.paid', { amount: money(finished.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
   emit('settled', { intentId: finished.intentId, amountMinor: finished.amountMinor })
 }
 function undone() {
   reset()
+  afterSale()
   for (const p of panels.value) inputs[p.id] = null
   toast.add({ title: t('payments.screens.till.unfulfilled'), description: t('payments.screens.till.unfulfilled-help'), color: 'error' })
 }
 function ended() {
   reset()
+  afterSale()
   toast.add({ title: t('payments.screens.till.cancelled'), color: 'neutral' })
   sum()
 }
@@ -884,7 +896,7 @@ function ended() {
           </DefineReceipt>
 
           <div
-            class="grid gap-6"
+            class="grid grid-cols-1 gap-6"
             :class="live ? 'md:grid-cols-[minmax(0,1fr)_24rem]' : 'lg:grid-cols-[minmax(0,1fr)_22rem]'"
           >
             <!-- Every panel stays mounted, so a tab keeps what was put in it while another is shown. -->

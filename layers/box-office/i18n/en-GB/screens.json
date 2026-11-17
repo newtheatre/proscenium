@@ -1,7 +1,6 @@
 {
   "box-office.navigation.sell.label": "Sell",
   "box-office.screens.sell.description": "Sell tickets, or find a reservation and take payment for it.",
-  "box-office.screens.sell.sold": "Paid: {amount}",
   "box-office.screens.panel.mode": "What are you doing?",
   "box-office.screens.panel.sell": "Sell tickets",
   "box-office.screens.panel.collect": "Collect a reservation",
