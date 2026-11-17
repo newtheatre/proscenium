@@ -7,6 +7,8 @@ import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
 
 export const OUTLET_KINDS = ['bar', 'kiosk', 'desk'] as const
+// How an outlet's till shows its categories: a row of chips, folders to open, or a list down the side.
+export const TILL_LAYOUTS = ['chips', 'folders', 'rail'] as const
 
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 
@@ -43,6 +45,8 @@ export const categories = defineTable('bar_categories', {
   position: col.internal(integer('position').notNull()),
   // A named colour token, always shown beside the name.
   colour: col.internal(text('colour')),
+  // The category this one sits under. One level only: a parent never has a parent itself.
+  parentId: col.ref('bar_categories', { nullable: true }),
   // A Finance account of the bar's own; null posts to bar.income.
   incomeAccountId: col.internal(text('income_account_id')),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
@@ -52,7 +56,7 @@ export const categories = defineTable('bar_categories', {
   id: 'bcat',
   realm: 'operational',
   subject: 'none',
-  extra: t => [uniqueIndex('bar_categories_name').on(sql`lower(${t.name})`)],
+  extra: t => [uniqueIndex('bar_categories_name').on(sql`lower(${t.name})`), index('bar_categories_parent').on(t.parentId)],
 })
 
 /** A thing a customer asks for by name. Retired, never deleted, once it has been sold. */
@@ -198,6 +202,8 @@ export const outlets = defineTable('bar_outlets', {
   kind: col.internal(text('kind', { enum: OUTLET_KINDS }).notNull()),
   priceListId: col.ref('bar_price_lists'),
   spaceId: col.ref('core_spaces', { nullable: true }),
+  // Checked by the input, not a CHECK, so adding it does not rebuild a table sales point at.
+  tillLayout: col.internal(text('till_layout', { enum: TILL_LAYOUTS }).notNull().default('chips')),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
@@ -210,6 +216,20 @@ export const outlets = defineTable('bar_outlets', {
     uniqueIndex('bar_outlets_one_desk').on(t.kind).where(sql`kind = 'desk' AND active = 1`),
     check('bar_outlets_kind', sql`${t.kind} IN (${inList(OUTLET_KINDS)})`),
   ],
+})
+
+/** A size pinned to the front of an outlet's till, in order. */
+export const outletFavourites = defineTable('bar_outlet_favourites', {
+  id: col.id(),
+  outletId: col.ref('bar_outlets'),
+  variantId: col.ref('bar_variants'),
+  position: col.internal(integer('position').notNull()),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bofv',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('bar_outlet_favourites_pair').on(t.outletId, t.variantId)],
 })
 
 export const OPENING_STATES = ['open', 'closed'] as const
@@ -428,4 +448,4 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews }
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews }

@@ -3,7 +3,7 @@
 // record that has gone are refused by the statement itself, never by a read first.
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { priceOn, nextChange, type ListRule, type PriceRow } from './pricing'
-import type { OUTLET_KINDS } from './db/schema'
+import type { OUTLET_KINDS, TILL_LAYOUTS } from './db/schema'
 import { choiceGroups, groupsByProduct, priceGroups, type ChoiceGroup } from './choices'
 
 export const STANDARD = 'standard'
@@ -34,7 +34,7 @@ export interface PriceList { id: string, name: string, standard: boolean, restri
 export interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
 export interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, position: number, active: boolean, prices: VariantPrice[] }
 export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, position: number, active: boolean, groupIds: string[], variants: Variant[] }
-export interface Category { id: string, name: string, position: number, colour: string | null, active: boolean, products: Product[] }
+export interface Category { id: string, name: string, position: number, colour: string | null, parentId: string | null, active: boolean, products: Product[] }
 
 interface ListRow { id: string, name: string, system_key: string | null, restricted: number, falls_back: number, percent_off: number | null, active: number }
 
@@ -56,7 +56,7 @@ const rule = (l: PriceList): ListRule => ({ id: l.id, percentOff: l.percentOff, 
 /** The whole catalogue, with each variant's price in force on every list and any change planned. */
 export async function catalogue(options: { activeOnly?: boolean } = {}): Promise<{ categories: Category[], lists: PriceList[], currency: string }> {
   const active = options.activeOnly ? 'WHERE active = 1' : ''
-  const cats = await all<{ id: string, name: string, position: number, colour: string | null, active: number }>(`SELECT id, name, position, colour, active FROM bar_categories ${active} ORDER BY position, lower(name), id`)
+  const cats = await all<{ id: string, name: string, position: number, colour: string | null, parent_id: string | null, active: number }>(`SELECT id, name, position, colour, parent_id, active FROM bar_categories ${active} ORDER BY position, lower(name), id`)
   const prods = await all<{ id: string, category_id: string, name: string, age_restricted: number, position: number, active: number }>(`SELECT id, category_id, name, age_restricted, position, active FROM bar_products ${active} ORDER BY position, lower(name), id`)
   const vars = await all<{ id: string, product_id: string, name: string, barcode: string | null, mixer_measure: number, position: number, active: number }>(`SELECT id, product_id, name, barcode, mixer_measure, position, active FROM bar_variants ${active} ORDER BY position, id`)
   const attached = await groupsByProduct()
@@ -82,21 +82,33 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
     productsOf.set(p.category_id, list)
   }
   return {
-    categories: cats.map(c => ({ id: c.id, name: c.name, position: c.position, colour: c.colour, active: !!c.active, products: productsOf.get(c.id) ?? [] })),
+    categories: cats.map(c => ({ id: c.id, name: c.name, position: c.position, colour: c.colour, parentId: c.parent_id, active: !!c.active, products: productsOf.get(c.id) ?? [] })),
     lists,
     currency: await currency(),
   }
 }
 
 export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string, groupIds: string[], baseMinor: number }
-export interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, percentOff: number | null, currency: string, categories: { id: string, name: string, colour: string | null, items: MenuItem[] }[], groups: ChoiceGroup[] }
+export interface Menu {
+  outletId: string
+  outlet: string
+  // How this outlet's till shows its categories, and the sizes pinned to its front, in order.
+  tillLayout: TillLayout
+  favourites: string[]
+  priceListId: string
+  priceList: string
+  percentOff: number | null
+  currency: string
+  categories: { id: string, name: string, colour: string | null, parentId: string | null, items: MenuItem[] }[]
+  groups: ChoiceGroup[]
+}
 
 /**
  * What an outlet sells, at a list's prices (the outlet's own when none is named): every active
  * variant of every active product that has a price on that list. A variant with no price is left out.
  */
 export async function menu(outletId: string, priceListId?: string): Promise<Menu> {
-  const outlet = await first<{ id: string, name: string, price_list_id: string, active: number }>('SELECT id, name, price_list_id, active FROM bar_outlets WHERE id = ?', outletId)
+  const outlet = await first<{ id: string, name: string, price_list_id: string, till_layout: TillLayout, active: number }>('SELECT id, name, price_list_id, till_layout, active FROM bar_outlets WHERE id = ?', outletId)
   if (!outlet || !outlet.active) refuse('bar.outlet.unknown', 'That outlet is not selling.', { status: 404 })
   const lists = await priceLists()
   const list = lists.find(l => l.id === (priceListId ?? outlet!.price_list_id) && l.active)
@@ -110,14 +122,17 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
   return {
     outletId: outlet!.id,
     outlet: outlet!.name,
+    tillLayout: outlet!.till_layout,
+    favourites: (await all<{ variant_id: string }>('SELECT variant_id FROM bar_outlet_favourites WHERE outlet_id = ? ORDER BY position', outlet!.id)).map(f => f.variant_id),
     priceListId: list!.id,
     priceList: list!.name,
     percentOff: list!.standard ? null : list!.percentOff,
     currency: await currency(),
-    categories: categories.map(c => ({
+    categories: kept(categories.map(c => ({
       id: c.id,
       name: c.name,
       colour: c.colour,
+      parentId: c.parentId,
       // A mixer measure is never on the grid: the Mixer choice offers it.
       items: c.products.flatMap(p => p.variants.filter(v => !v.mixerMeasure).flatMap((v) => {
         const priced = priceOn(rows, v.id, rule(list!), std, at)
@@ -126,7 +141,7 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
         const base = percent ? priceOn(rows, v.id, rule(standardList!), std, at)?.amountMinor ?? priced.amountMinor : priced.amountMinor
         return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base }]
       })),
-    })).filter(c => c.items.length),
+    }))),
     // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
     // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
     groups: priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
@@ -134,6 +149,12 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
       return priced ? priced.amountMinor : null
     }),
   }
+}
+
+/** The categories with something to sell, and every parent of one, so a sub-category is never orphaned. */
+function kept<C extends { id: string, parentId: string | null, items: unknown[] }>(categories: C[]): C[] {
+  const parents = new Set(categories.filter(c => c.items.length && c.parentId).map(c => c.parentId))
+  return categories.filter(c => c.items.length || parents.has(c.id))
 }
 
 /** The price of each variant on a list now, for ringing up lines. Variants with no price are absent. */
@@ -154,29 +175,47 @@ export async function pricesFor(variantIds: string[], priceListId: string): Prom
 
 // ---- Categories, products and variants --------------------------------------------------------------
 
-export interface CategoryInput { name: string, colour?: string | null, active?: boolean }
+export interface CategoryInput { name: string, colour?: string | null, parentId?: string | null, active?: boolean }
 
+const PARENT_REFUSED = { code: 'bar.category.parent', reason: 'A sub-category sits under a top-level category, and a category with sub-categories cannot go under another.', remedy: 'Pick a top-level category, or none.' }
+// The parent, when one is named, is a top-level category in use other than this one.
+const PARENT_OK = '(? IS NULL OR EXISTS (SELECT 1 FROM bar_categories p WHERE p.id = ? AND p.parent_id IS NULL AND p.active = 1 AND p.id <> ?))'
+
+/** Refuses a parent that is not a top-level category in use, or a move under one for a category that has sub-categories. */
+export async function checkParent(id: string | null, parentId: string | null): Promise<void> {
+  if (parentId === null) return
+  const parent = await first<{ parent_id: string | null, active: number }>('SELECT parent_id, active FROM bar_categories WHERE id = ?', parentId)
+  const hasChildren = id ? await first('SELECT 1 FROM bar_categories WHERE parent_id = ?', id) : null
+  if (!parent || parent.parent_id !== null || !parent.active || parentId === id || hasChildren) refuse(PARENT_REFUSED.code, PARENT_REFUSED.reason, { remedy: PARENT_REFUSED.remedy })
+}
+
+/** A category. With a parent, call checkParent first for a clear refusal; the insert still guards it. */
 export function addCategory(unit: UnitView, input: CategoryInput): string {
   const id = newId('bcat')
   const at = nowMs()
+  const parentId = input.parentId ?? null
   unit.add({
-    sql: `INSERT INTO bar_categories (id, name, position, colour, active, created_at, updated_at)
-          SELECT ?, ?, coalesce((SELECT max(position) + 1 FROM bar_categories), 0), ?, 1, ?, ?
-          WHERE NOT EXISTS (SELECT 1 FROM bar_categories WHERE lower(name) = lower(?))`,
-    params: [id, input.name, input.colour ?? null, at, at, input.name],
+    sql: `INSERT INTO bar_categories (id, name, position, colour, parent_id, active, created_at, updated_at)
+          SELECT ?, ?, coalesce((SELECT max(position) + 1 FROM bar_categories), 0), ?, ?, 1, ?, ?
+          WHERE NOT EXISTS (SELECT 1 FROM bar_categories WHERE lower(name) = lower(?)) AND ${PARENT_OK}`,
+    params: [id, input.name, input.colour ?? null, parentId, at, at, input.name, parentId, parentId, id],
   }).expect(1, NAME_TAKEN('a category'))
   unit.audit({ action: 'create', record: ['bar.category', id] })
   return id
 }
 
 export async function updateCategory(unit: UnitView, id: string, input: Partial<CategoryInput>): Promise<void> {
-  const row = await first<{ name: string, colour: string | null, active: number }>('SELECT name, colour, active FROM bar_categories WHERE id = ?', id)
+  const row = await first<{ name: string, colour: string | null, parent_id: string | null, active: number }>('SELECT name, colour, parent_id, active FROM bar_categories WHERE id = ?', id)
   if (!row) refuse(GONE('category').code, GONE('category').reason, { status: 404 })
   const name = input.name ?? row!.name
+  const parentId = input.parentId === undefined ? row!.parent_id : input.parentId
+  if (parentId !== row!.parent_id) await checkParent(id, parentId)
+  const moved = parentId !== row!.parent_id
   unit.add({
-    sql: `UPDATE bar_categories SET name = ?, colour = ?, active = ?, updated_at = ?
-          WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bar_categories WHERE lower(name) = lower(?) AND id <> ?)`,
-    params: [name, input.colour === undefined ? row!.colour : input.colour, input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, name, id],
+    sql: `UPDATE bar_categories SET name = ?, colour = ?, parent_id = ?, active = ?, updated_at = ?
+          WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bar_categories WHERE lower(name) = lower(?) AND id <> ?)
+          AND (? = 0 OR (${PARENT_OK} AND NOT EXISTS (SELECT 1 FROM bar_categories c WHERE c.parent_id = ?)))`,
+    params: [name, input.colour === undefined ? row!.colour : input.colour, parentId, input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, name, id, moved ? 1 : 0, parentId, parentId, id, id],
   }).expect(1, NAME_TAKEN('a category'))
   unit.audit({ action: 'update', record: ['bar.category', id] })
 }
@@ -332,14 +371,19 @@ export async function updatePriceList(unit: UnitView, id: string, input: Partial
 // ---- Outlets ---------------------------------------------------------------------------------------
 
 export type OutletKind = typeof OUTLET_KINDS[number]
-export interface Outlet { id: string, name: string, kind: OutletKind, priceListId: string, priceList: string, spaceId: string | null, active: boolean }
-export interface OutletInput { name: string, kind: OutletKind, priceListId?: string | null, spaceId?: string | null, active?: boolean }
+export type TillLayout = typeof TILL_LAYOUTS[number]
+export interface Outlet { id: string, name: string, kind: OutletKind, priceListId: string, priceList: string, spaceId: string | null, tillLayout: TillLayout, favourites: string[], active: boolean }
+export interface OutletInput { name: string, kind: OutletKind, priceListId?: string | null, spaceId?: string | null, tillLayout?: TillLayout, active?: boolean }
 
 export async function outlets(): Promise<Outlet[]> {
-  const rows = await all<{ id: string, name: string, kind: OutletKind, price_list_id: string, list: string, space_id: string | null, active: number }>(
-    'SELECT o.id, o.name, o.kind, o.price_list_id, l.name AS list, o.space_id, o.active FROM bar_outlets o JOIN bar_price_lists l ON l.id = o.price_list_id ORDER BY o.active DESC, lower(o.name), o.id',
+  const rows = await all<{ id: string, name: string, kind: OutletKind, price_list_id: string, list: string, space_id: string | null, till_layout: TillLayout, active: number }>(
+    'SELECT o.id, o.name, o.kind, o.price_list_id, l.name AS list, o.space_id, o.till_layout, o.active FROM bar_outlets o JOIN bar_price_lists l ON l.id = o.price_list_id ORDER BY o.active DESC, lower(o.name), o.id',
   )
-  return rows.map(r => ({ id: r.id, name: r.name, kind: r.kind, priceListId: r.price_list_id, priceList: r.list, spaceId: r.space_id, active: !!r.active }))
+  const favourites = new Map<string, string[]>()
+  for (const f of await all<{ outlet_id: string, variant_id: string }>('SELECT outlet_id, variant_id FROM bar_outlet_favourites ORDER BY outlet_id, position')) {
+    favourites.set(f.outlet_id, [...favourites.get(f.outlet_id) ?? [], f.variant_id])
+  }
+  return rows.map(r => ({ id: r.id, name: r.name, kind: r.kind, priceListId: r.price_list_id, priceList: r.list, spaceId: r.space_id, tillLayout: r.till_layout, favourites: favourites.get(r.id) ?? [], active: !!r.active }))
 }
 
 const OUTLET_REFUSED = { code: 'bar.outlet.refused', reason: 'Another outlet in use has that name, the box office desk already has an outlet, or the price list is not in use.', remedy: 'Check the name, the kind and the list.' }
@@ -350,29 +394,43 @@ export function addOutlet(unit: UnitView, input: OutletInput): string {
   const at = nowMs()
   const list = input.priceListId ? '?' : "(SELECT id FROM bar_price_lists WHERE system_key = 'standard')"
   unit.add({
-    sql: `INSERT INTO bar_outlets (id, name, kind, price_list_id, space_id, active, created_at, updated_at)
-          SELECT ?, ?, ?, l.id, ?, 1, ?, ? FROM bar_price_lists l WHERE l.id = ${list} AND l.active = 1
+    sql: `INSERT INTO bar_outlets (id, name, kind, price_list_id, space_id, till_layout, active, created_at, updated_at)
+          SELECT ?, ?, ?, l.id, ?, ?, 1, ?, ? FROM bar_price_lists l WHERE l.id = ${list} AND l.active = 1
           AND NOT EXISTS (SELECT 1 FROM bar_outlets WHERE active = 1 AND (lower(name) = lower(?) OR (kind = 'desk' AND ? = 'desk')))`,
-    params: [id, input.name, input.kind, input.spaceId ?? null, at, at, ...(input.priceListId ? [input.priceListId] : []), input.name, input.kind],
+    params: [id, input.name, input.kind, input.spaceId ?? null, input.tillLayout ?? 'chips', at, at, ...(input.priceListId ? [input.priceListId] : []), input.name, input.kind],
   }).expect(1, OUTLET_REFUSED)
   unit.audit({ action: 'create', record: ['bar.outlet', id] })
   return id
 }
 
 export async function updateOutlet(unit: UnitView, id: string, input: Partial<OutletInput>): Promise<void> {
-  const row = await first<{ name: string, kind: OutletKind, price_list_id: string, space_id: string | null, active: number }>('SELECT name, kind, price_list_id, space_id, active FROM bar_outlets WHERE id = ?', id)
+  const row = await first<{ name: string, kind: OutletKind, price_list_id: string, space_id: string | null, till_layout: TillLayout, active: number }>('SELECT name, kind, price_list_id, space_id, till_layout, active FROM bar_outlets WHERE id = ?', id)
   if (!row) refuse(GONE('outlet').code, GONE('outlet').reason, { status: 404 })
   const name = input.name ?? row!.name
   const kind = input.kind ?? row!.kind
   const active = input.active === undefined ? !!row!.active : input.active
   const listId = input.priceListId ?? row!.price_list_id
   unit.add({
-    sql: `UPDATE bar_outlets SET name = ?, kind = ?, price_list_id = ?, space_id = ?, active = ?, updated_at = ?
+    sql: `UPDATE bar_outlets SET name = ?, kind = ?, price_list_id = ?, space_id = ?, till_layout = ?, active = ?, updated_at = ?
           WHERE id = ? AND EXISTS (SELECT 1 FROM bar_price_lists WHERE id = ? AND active = 1)
           AND (? = 0 OR NOT EXISTS (SELECT 1 FROM bar_outlets WHERE active = 1 AND id <> ? AND (lower(name) = lower(?) OR (kind = 'desk' AND ? = 'desk'))))`,
-    params: [name, kind, listId, input.spaceId === undefined ? row!.space_id : input.spaceId, active ? 1 : 0, nowMs(), id, listId, active ? 1 : 0, id, name, kind],
+    params: [name, kind, listId, input.spaceId === undefined ? row!.space_id : input.spaceId, input.tillLayout ?? row!.till_layout, active ? 1 : 0, nowMs(), id, listId, active ? 1 : 0, id, name, kind],
   }).expect(1, OUTLET_REFUSED)
   unit.audit({ action: 'update', record: ['bar.outlet', id] })
+}
+
+/** Pins sizes to the front of an outlet's till, in order, replacing what was pinned. A mixer measure is never pinned. */
+export function setFavourites(unit: UnitView, outletId: string, variantIds: string[]): void {
+  const at = nowMs()
+  unit.add({ sql: 'DELETE FROM bar_outlet_favourites WHERE outlet_id = ?', params: [outletId] })
+  ;[...new Set(variantIds)].forEach((variantId, position) => {
+    unit.add({
+      sql: `INSERT INTO bar_outlet_favourites (id, outlet_id, variant_id, position, created_at)
+            SELECT ?, ?, v.id, ?, ? FROM bar_variants v WHERE v.id = ? AND v.active = 1 AND v.mixer_measure = 0`,
+      params: [newId('bofv'), outletId, position, at, variantId],
+    }).expect(1, { code: 'bar.favourite.unknown', reason: 'One of those sizes is not on sale.', remedy: 'Pick sizes that are on sale.' })
+  })
+  unit.audit({ action: 'update', record: ['bar.outlet', outletId], detail: { favourites: [...new Set(variantIds)] } })
 }
 
 export interface RaiseInput { categoryIds?: string[], percent?: number, amountMinor?: number, effectiveFrom?: number }
