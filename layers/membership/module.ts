@@ -69,6 +69,17 @@ export default defineModule({
 
   tables,
 
+  contributes: {
+    'core.navigation': [
+      { id: 'membership.schemes', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/schemes', match: '/console/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
+      { id: 'membership.mine', menu: 'account', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
+    ],
+    // On the audience side, so anyone can find how to join.
+    'core.account-section': [
+      { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
+    ],
+  },
+
   events: {
     announces: {
       // A scheme has no subject, so its events may leave the system.

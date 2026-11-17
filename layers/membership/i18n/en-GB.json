@@ -46,7 +46,6 @@
   "membership.settings.help.link.help": "A page on this site, a web address or an email address. Used in \"Have a membership? Contact us\". Leave it empty to show the sentence without a link.",
   "membership.settings.rules.reminders-in-order": "The last renewal reminder must come after the first, so it must be a shorter time before the end.",
 
-  "membership.navigation.groups.membership.label": "Membership",
 
   "membership.abilities.scheme.view.label": "See membership schemes, including drafts and closed ones",
   "membership.abilities.scheme.manage.label": "Create, change, open, close and archive membership schemes",
