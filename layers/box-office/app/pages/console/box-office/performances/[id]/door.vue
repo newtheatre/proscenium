@@ -8,7 +8,7 @@ import { doorList } from '../../../../../../shared/lists'
 
 definePageMeta({ layout: 'console' })
 
-interface Row { id: string, reference: string, buyer: string | null, channel?: string, at?: number, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
+interface Row { id: string, reference: string, buyer: string | null, channel?: string, at?: number, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string }, released?: true }
 
 const { t } = useT()
 const route = useRoute()
@@ -46,6 +46,35 @@ async function admit(row: Row, count: number) {
   }
 }
 
+// Release unpaid no-shows (Matt, 2026-11-18): every reservation still unpaid, and not marked to
+// keep, lets its seats go now. Undo seats them again, where the seats are still free.
+const { confirm } = useConfirm()
+const { offer } = useUndo()
+const releasing = ref(false)
+async function releaseUnpaid() {
+  if (!await confirm({ verb: t('box-office.door.release.verb'), thing: t('box-office.door.release.thing'), consequence: t('box-office.door.release.consequence'), button: t('box-office.door.release.button') })) return
+  releasing.value = true
+  try {
+    const { released } = await $api<{ released: string[] }>(`${listRoute.value}/release-unpaid`, { method: 'POST', body: {} })
+    await refreshNuxtData(`core:list:${listRoute.value}`)
+    if (!released.length) {
+      toast.add({ title: t('box-office.door.release.none'), color: 'neutral' })
+      return
+    }
+    offer(t('box-office.door.release.done', { count: released.length }), async () => {
+      for (const orderId of released) await $api(`/api/box-office/orders/${encodeURIComponent(orderId)}/reinstate`, { method: 'POST', body: {} })
+      await refreshNuxtData(`core:list:${listRoute.value}`)
+    })
+  }
+  catch (error) {
+    const refusal = toRefusal(error)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+  finally {
+    releasing.value = false
+  }
+}
+
 const trail = computed(() => [
   { label: t('box-office.navigation.performances.label'), to: '/console/box-office/performances' },
   { label: t('box-office.door.set-up'), to: `/console/box-office/performances/${encodeURIComponent(id.value)}` },
@@ -75,6 +104,14 @@ const trail = computed(() => [
         variant="outline"
         :label="t('box-office.live-door.print')"
       />
+      <UButton
+        icon="i-lucide-clock-alert"
+        color="neutral"
+        variant="outline"
+        :loading="releasing"
+        :label="t('box-office.door.release.button')"
+        @click="releaseUnpaid"
+      />
     </template>
     <template #cell-buyer="{ row }">
       {{ nameOf(row) }}
@@ -89,8 +126,8 @@ const trail = computed(() => [
         class="inline-flex flex-wrap items-center gap-2"
       >
         <StatusBadge
-          tone="info"
-          :label="t('box-office.live-door.result.not_paid')"
+          :tone="row.released ? 'warning' : 'info'"
+          :label="row.released ? t('box-office.door.released') : t('box-office.live-door.result.not_paid')"
         />
         <span class="text-muted">{{ money(row.unpaid.amountDueMinor, row.unpaid.currency) }}</span>
       </span>

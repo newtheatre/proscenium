@@ -71,7 +71,7 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     expect(confirm.link).toMatch(/^http:\/\/test\/book\/confirm\//)
     const done = await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(confirm.link!) }, null)
     expect(done.status, JSON.stringify(done.body)).toBe(200)
-    expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId, reference: b.reference, amountDueMinor: b.totalMinor, releaseAt: null })
+    expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId, reference: b.reference, amountDueMinor: b.totalMinor, releaseAt: expect.any(Number) }) // released ten minutes before the start, by default
 
     const o = await order(b.orderId)
     expect(o).toMatchObject({ state: 'reserved', signed_in: 0, expires_at: null, intent_id: null, total_minor: b.totalMinor, confirm_token_hash: null, confirm_email: null, confirm_name: null, confirm_expires_at: null })
@@ -194,7 +194,7 @@ describe('reserving with no confirmation asked for', () => {
     const [performance] = await rows<{ starts_at: number }>('SELECT starts_at FROM core_performances WHERE id = ?', h.performanceId)
     expect(done.body.releaseAt).toBe(performance!.starts_at - 1800 * 1000)
     expect((await order(done.body.orderId)).release_at).toBe(done.body.releaseAt)
-    await set('box-office.reservations.release-before', null)
+    await set('box-office.reservations.release-before', 600) // the default, ten minutes
   })
 
   it('keeps to the most tickets in one reservation', async () => {
