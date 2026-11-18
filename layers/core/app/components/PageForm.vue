@@ -356,7 +356,7 @@ useLeaveGuard(() => dirty.value && !saved.value)
                 :name="g.name"
                 :label="ownsLabel(g) ? undefined : g.label"
                 :hint="!ownsLabel(g) && g.optional ? t('core.form.optional') : undefined"
-                :help="g.kind === 'checkbox' ? undefined : g.help"
+                :help="g.kind === 'checkbox' || (g.kind === 'ticks' && g.heading) ? undefined : g.help"
                 :class="g.showIf && 'ms-7'"
               >
                 <UTextarea
@@ -399,6 +399,10 @@ useLeaveGuard(() => dirty.value && !saved.value)
                     <h2 :class="headingClass">
                       {{ g.label }}
                     </h2>
+                    <span
+                      v-if="g.help"
+                      class="mt-1 block text-sm font-normal text-muted"
+                    >{{ g.help }}</span>
                   </template>
                 </UCheckboxGroup>
                 <fieldset
@@ -412,6 +416,10 @@ useLeaveGuard(() => dirty.value && !saved.value)
                     <h2 :class="headingClass">
                       {{ g.label }}
                     </h2>
+                    <span
+                      v-if="g.help"
+                      class="mt-1 block text-sm font-normal text-muted"
+                    >{{ g.help }}</span>
                   </legend>
                   <legend
                     v-else

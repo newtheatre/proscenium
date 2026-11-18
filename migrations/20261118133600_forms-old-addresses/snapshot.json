@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "4de5caeb-cc87-46bb-9851-f9adfde926d3",
+  "id": "a5a3220b-d8d3-4b7e-a1ad-855ddd2ac3a3",
   "prevIds": [
-    "29b068d0-a6c4-43c3-ad25-45422af351e7"
+    "a34461f8-1072-466d-9029-bb62669f4a14"
   ],
   "ddl": [
     {
@@ -548,6 +548,10 @@
     },
     {
       "name": "front_of_house_assignments",
+      "entityType": "tables"
+    },
+    {
+      "name": "front_of_house_calendar_feeds",
       "entityType": "tables"
     },
     {
@@ -12628,26 +12632,6 @@
     },
     {
       "table": "forms_action_runs",
-      "name": "record_type",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_action_runs",
-      "name": "record_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_action_runs",
       "name": "job_id",
       "type": "text",
       "notNull": false,
@@ -14188,6 +14172,16 @@
     },
     {
       "table": "front_of_house_assignments",
+      "name": "moved_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_assignments",
       "name": "freed_by_merge",
       "type": "text",
       "notNull": false,
@@ -14209,6 +14203,46 @@
     {
       "table": "front_of_house_assignments",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "generation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -21447,6 +21481,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "front_of_house_calendar_feeds",
+      "name": "front_of_house_calendar_feeds_token",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "front_of_house_checklist_entries",
       "name": "front_of_house_checklist_entries_item",
       "columns": [
@@ -25605,6 +25653,15 @@
       "name": "forms_response_drafts_pk",
       "columns": [
         "response_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "front_of_house_calendar_feeds_pk",
+      "columns": [
+        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"

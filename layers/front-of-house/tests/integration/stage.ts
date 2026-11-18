@@ -40,6 +40,10 @@ import keepPost from '../../server/api/front-of-house/assignments/[id]/keep.post
 import coverPost from '../../server/api/front-of-house/assignments/[id]/cover.post'
 import openShiftsGet from '../../server/api/front-of-house/open-shifts.get'
 import myShiftsGet from '../../server/api/front-of-house/me/shifts.get'
+import calendarGet from '../../server/api/front-of-house/assignments/[id]/calendar.ics.get'
+import feedGet from '../../server/api/front-of-house/calendar/[token].get'
+import feedPost from '../../server/api/front-of-house/me/calendar/index.post'
+import feedReset from '../../server/api/front-of-house/me/calendar/reset.post'
 import checkInPost from '../../server/api/front-of-house/assignments/[id]/check-in.post'
 import timingsPost from '../../server/api/front-of-house/performances/[id]/timings.post'
 import timingDelete from '../../server/api/front-of-house/performances/[id]/timings/[kind].delete'
@@ -120,6 +124,10 @@ export const handle = server({
   'POST /api/front-of-house/assignments/:id/release': releasePost,
   'POST /api/front-of-house/assignments/:id/keep': keepPost,
   'POST /api/front-of-house/assignments/:id/cover': coverPost,
+  'GET /api/front-of-house/assignments/:id/calendar.ics': calendarGet,
+  'GET /api/front-of-house/calendar/:token': feedGet,
+  'POST /api/front-of-house/me/calendar': feedPost,
+  'POST /api/front-of-house/me/calendar/reset': feedReset,
   'GET /api/front-of-house/open-shifts': openShiftsGet,
   'GET /api/front-of-house/me/shifts': myShiftsGet,
   'POST /api/front-of-house/assignments/:id/check-in': checkInPost,
@@ -195,6 +203,7 @@ export async function ready(): Promise<void> {
   ;(env as any).CORE_TURNSTILE_SECRET_KEY = ''
   await setModule('front-of-house', true)
   await setting('core.locale.time-zone', 'Europe/London')
+  await setting('core.site.origin', 'https://theatre.example')
 }
 
 export interface Made { id: string, startsAt: number, endsAt: number, venueId: string, spaceId: string }

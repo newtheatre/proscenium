@@ -40,6 +40,13 @@ const name = computed(() => data.value?.name ?? '')
 const application = computed(() => data.value?.application ?? null)
 const { dayLong: day } = useDates()
 
+/** "My details are still right" is offered from this long before the review date, and after it. */
+const CONFIRM_WITHIN = 30 * 24 * 60 * 60 * 1000 // not-policy: a month's notice, in milliseconds
+const confirmable = computed(() => !!application.value?.reviewDue && application.value.reviewDue - Date.now() <= CONFIRM_WITHIN)
+/** Companions were asked for or are in place, so there is evidence to show in person. */
+const showEvidence = computed(() => application.value?.status !== 'rejected' && !application.value?.verified
+  && ((application.value?.pending?.companions ?? 0) > 0 || (application.value?.inForce?.companions ?? 0) > 0))
+
 const refusal = ref<RefusalView | null>(null)
 const APPLY = '/account/access/apply'
 
@@ -173,6 +180,12 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         >
           {{ application.verified ? t('core.access.verified') : t('core.access.not-verified') }}
         </p>
+        <p
+          v-if="showEvidence"
+          class="text-sm"
+        >
+          {{ t('core.access.evidence') }}
+        </p>
       </PageSection>
 
       <div class="flex flex-wrap gap-2">
@@ -189,7 +202,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
           :to="APPLY"
         />
         <UButton
-          v-if="application.status === 'accepted'"
+          v-if="application.status === 'accepted' && confirmable"
           color="neutral"
           variant="outline"
           icon="i-lucide-check"
@@ -213,7 +226,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
     </div>
 
     <PageSection
-      v-if="data?.sharing?.length"
+      v-if="application && data?.sharing?.length"
       class="mt-8"
       :title="t('core.access.sharing')"
       :description="t('core.access.sharing-help')"
@@ -224,7 +237,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         :model-value="purpose.on"
         :label="purpose.label"
         :description="purpose.explanation"
-        :disabled="purpose.fixed && !!application"
+        :disabled="purpose.fixed"
         @update:model-value="share(purpose.id, $event)"
       />
     </PageSection>
