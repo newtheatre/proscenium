@@ -1,0 +1,1 @@
+ALTER TABLE `awards_awards` ADD `awarded_precision` text DEFAULT 'day' NOT NULL;

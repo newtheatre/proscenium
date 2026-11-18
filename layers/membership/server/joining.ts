@@ -9,7 +9,7 @@ import type { ChargeQuote } from './points/charge'
 import { lengthOptions, type LengthOption, type Scheme } from './schemes'
 
 /** The length a membership is for: the one chosen, or the only one offered. Null for an indefinite scheme. */
-export async function chooseLength(scheme: Scheme, lengthOptionId: string | null | undefined, allowWithdrawn = false): Promise<LengthOption | null> {
+export async function chooseLength(scheme: Scheme, lengthOptionId: string | null | undefined, allowWithdrawn = false, firstIfNone = false): Promise<LengthOption | null> {
   if (scheme.lengthRule === 'indefinite') return null
   const options = (await lengthOptions([scheme.id])).get(scheme.id)!.filter(o => allowWithdrawn || o.state === 'offered')
   if (lengthOptionId) {
@@ -18,6 +18,8 @@ export async function chooseLength(scheme: Scheme, lengthOptionId: string | null
     return option!
   }
   if (options.length === 1) return options[0]!
+  // A scheme whose list sets the end date asks for no length (D9); an entry without one takes the first.
+  if (firstIfNone && options.length) return options[0]!
   refuse('membership.option.choose', 'Choose how long the membership is for.', { status: 422, fields: { lengthOptionId: 'membership.option.choose' } })
 }
 

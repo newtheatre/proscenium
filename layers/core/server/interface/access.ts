@@ -14,6 +14,14 @@ export type AccessDecision
     | { decision: 'redirect', to: string }
     | { decision: 'refused', refusal: { code: string, reason: string, remedy?: string } }
 
+/**
+ * Someone whose only work is in live mode, such as a steward who may only admit, who comes to the
+ * console is sent to the Tonight hub rather than told it does not exist (D6, box office review).
+ */
+async function toTonight(actor: Actor, shell: string): Promise<AccessDecision | null> {
+  return shell === 'console' && (await isEntitled(actor, 'live')) ? { decision: 'redirect', to: SHELL_PREFIXES.live } : null
+}
+
 export async function decideAccess(actor: Actor, path: string): Promise<AccessDecision> {
   const shell = shellOf(path)
   if (!shell) return { decision: 'allow' }
@@ -22,7 +30,8 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
   if (isHome) {
     // A shell's home belongs to the shell: whoever is entitled to it may open it.
     if (!isSignedIn(actor)) return { decision: 'sign-in' }
-    return (await isEntitled(actor, shell)) ? { decision: 'allow' } : { decision: 'not-found' }
+    if (await isEntitled(actor, shell)) return { decision: 'allow' }
+    return (await toTonight(actor, shell)) ?? { decision: 'not-found' }
   }
   const entries = (await declaredEntries()).filter(e => e.menu === shell)
   const entry = resolveEntry(entries, path)
@@ -35,7 +44,7 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
     if (module && holds(await mayOpen(actor, entry)) && (await isEntitled(actor, 'console'))) {
       return { decision: 'redirect', to: `/console?settings=${module}&screen=${encodeURIComponent(path)}` }
     }
-    return { decision: 'not-found' }
+    return (await toTonight(actor, shell)) ?? { decision: 'not-found' }
   }
   const result = await mayOpen(actor, entry)
   // A screen opens for anyone who holds its ability, as the menu shows it to them. Confirming it is

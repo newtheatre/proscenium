@@ -3,6 +3,7 @@
      member directly. -->
 <script setup lang="ts">
 import { z } from 'zod'
+import { convertCount, endsOnFor } from '../../../../../../shared/dates'
 import type { MembershipSchemeChoice } from '../../../../../../shared/scheme-choice'
 
 interface Scheme {
@@ -27,14 +28,14 @@ interface Scheme {
   requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, endsByList: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
-const { day } = useDates()
+const { day, toLocal } = useDates()
 const toast = useToast()
 const { confirm } = useConfirm()
 const { offer } = useUndo()
@@ -47,6 +48,15 @@ const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRu
 
 // Details: one form, saved as a whole.
 const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, requiresPayment: false, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
+// The windows are stored as days and edited as a number and a unit, like the module's settings.
+const SECONDS_IN_DAY = 86400 // not-policy: seconds in a day
+const asDuration = (field: 'rolloverDays' | 'renewalOpensDays' | 'graceDays') => computed<number | null>({
+  get: () => details[field] * SECONDS_IN_DAY,
+  set: (seconds) => { details[field] = Math.round((seconds ?? 0) / SECONDS_IN_DAY) },
+})
+const rolloverWindow = asDuration('rolloverDays')
+const renewalWindow = asDuration('renewalOpensDays')
+const graceWindow = asDuration('graceDays')
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(scheme, (s) => {
   if (!s) return
@@ -54,8 +64,29 @@ watch(scheme, (s) => {
   const { verifier: _verifier, verifierConfig: _config, ...fields } = s
   Object.assign(details, { ...fields, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31, checks: s.verifier ?? 'none', listId: config.listId, domains: (config.domains ?? []).join(', ') })
 }, { immediate: true })
+// Lengths are a bare count in the rule's unit, so changing the rule restates them; the officer sees the new dates first.
+async function confirmLengthRule(): Promise<boolean> {
+  const s = scheme.value!
+  const options = data.value?.options ?? []
+  if (details.lengthRule === s.lengthRule || !options.length) return true
+  const rule = { lengthRule: details.lengthRule, fixedEndMonth: details.fixedEndMonth, fixedEndDay: details.fixedEndDay, rolloverDays: details.rolloverDays }
+  const unitName = t(`membership.screens.units.${details.lengthRule === 'fixed' ? 'years' : 'months'}`).toLocaleLowerCase()
+  const today = toLocal(Date.now()).slice(0, 10) // not-policy: the date part of a local date and time
+  const lines = options.filter(o => o.state === 'offered').map((o) => {
+    const count = convertCount(s.lengthRule, details.lengthRule, o.count)
+    const ends = count === null ? null : endsOnFor(rule, today, count)
+    return count === null || !ends ? o.name : t('membership.screens.scheme.confirm-length-line', { name: o.name, count, unit: unitName, ends: day(ends) })
+  })
+  return await confirm({
+    verb: t('membership.screens.scheme.verb-length-rule'),
+    thing: t('membership.screens.scheme.thing-length-rule', { scheme: s.name }),
+    consequence: t('membership.screens.scheme.confirm-length-rule', { unit: unitName, lines: lines.join('; ') }),
+    button: t('membership.screens.scheme.change-length-rule'),
+  })
+}
 async function saveDetails() {
   detailsRefusal.value = null
+  if (!(await confirmLengthRule())) return
   const fixed = details.lengthRule === 'fixed'
   const { checks, listId, domains, requiresPayment, ...rest } = details
   // While Membership fees is off the switch is locked, so the stored value is left as it is.
@@ -105,6 +136,25 @@ const actions = computed(() => {
   if (s.state === 'draft') out.push({ label: t('membership.screens.scheme.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove })
   return out
 })
+
+// The join page (MEM-10): its address to copy, and a poster with a QR code of it to print.
+const { data: brand } = await useBrand()
+const joinLink = computed(() => scheme.value ? `${useRequestURL().origin}/join/${scheme.value.key}` : '')
+const copiedLink = ref(false)
+async function copyJoinLink() {
+  await navigator.clipboard.writeText(joinLink.value)
+  copiedLink.value = true
+  setTimeout(() => { copiedLink.value = false }, 2000) // not-policy: how long the button says it copied
+}
+async function downloadPoster() {
+  const s = scheme.value!
+  try {
+    await downloadMembershipPoster(membershipPosterSvg({ theatre: brand.value?.name ?? t('core.public.default-name'), title: t('membership.join.title', { scheme: s.name }), summary: s.summary, url: joinLink.value, scan: t('membership.join.poster-scan') }), `${s.key}-join-poster.png`)
+  }
+  catch (e) {
+    toast.add({ title: t('membership.join.poster-failed'), description: (e as Error).message, color: 'error' })
+  }
+}
 
 // Adding and importing members: the windows are shared with Console > Members, and offered the schemes this viewer may use.
 const { data: choices, refresh: refreshChoices } = await useAPI<{ schemes: MembershipSchemeChoice[] }>('/api/membership/members/schemes', { key: 'membership:members:schemes', default: () => ({ schemes: [] }) })
@@ -277,7 +327,7 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 v-for="o in offeredOptions"
                 :key="o.id"
                 :name="o.name"
-                :description="exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
+                :description="data?.endsByList ? t('membership.screens.lengths.ends-by-list') : exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
               >
                 <RowActions
                   :items="optionActions(o)"
@@ -312,6 +362,39 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
           :title="t('membership.screens.lengths.title')"
           :description="t('membership.screens.lengths.indefinite')"
         />
+
+        <PageSection
+          v-if="scheme.joinMode === 'apply' && scheme.state !== 'archived'"
+          :title="t('membership.join.admin-title')"
+          :description="t(scheme.state === 'open' ? 'membership.join.admin-help' : 'membership.join.admin-help-not-open')"
+        >
+          <UFormField :label="t('membership.join.admin-link')">
+            <UFieldGroup class="flex">
+              <UInput
+                :model-value="joinLink"
+                readonly
+                class="min-w-0 flex-1 font-mono"
+              />
+              <UButton
+                color="neutral"
+                variant="outline"
+                :icon="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'"
+                :label="copiedLink ? t('membership.join.copied') : t('membership.join.copy')"
+                @click="copyJoinLink"
+              />
+            </UFieldGroup>
+          </UFormField>
+          <template #actions>
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-qr-code"
+              :label="t('membership.join.poster')"
+              loading-auto
+              @click="downloadPoster"
+            />
+          </template>
+        </PageSection>
 
         <PageSection
           :title="t('membership.screens.scheme.details')"
@@ -386,10 +469,12 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 :label="t('membership.screens.scheme.rollover')"
                 :help="t('membership.screens.scheme.rollover-help')"
               >
-                <UInputNumber
-                  v-model="details.rolloverDays"
-                  :min="0"
-                  :max="180"
+                <DurationInput
+                  v-model="rolloverWindow"
+                  block
+                  :label="t('membership.screens.scheme.rollover')"
+                  min="0d"
+                  max="180d"
                 />
               </UFormField>
             </div>
@@ -398,20 +483,24 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 :label="t('membership.screens.scheme.renewal-opens')"
                 :help="t('membership.screens.scheme.renewal-opens-help')"
               >
-                <UInputNumber
-                  v-model="details.renewalOpensDays"
-                  :min="0"
-                  :max="180"
+                <DurationInput
+                  v-model="renewalWindow"
+                  block
+                  :label="t('membership.screens.scheme.renewal-opens')"
+                  min="0d"
+                  max="180d"
                 />
               </UFormField>
               <UFormField
                 :label="t('membership.screens.scheme.grace')"
                 :help="t('membership.screens.scheme.grace-help')"
               >
-                <UInputNumber
-                  v-model="details.graceDays"
-                  :min="0"
-                  :max="90"
+                <DurationInput
+                  v-model="graceWindow"
+                  block
+                  :label="t('membership.screens.scheme.grace')"
+                  min="0d"
+                  max="90d"
                 />
               </UFormField>
             </div>

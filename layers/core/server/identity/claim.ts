@@ -18,14 +18,26 @@ export async function isUnclaimed(accountId: string): Promise<boolean> {
 }
 
 /**
- * A new claim link for an unclaimed account, written in the caller's unit; null when the account is
+ * Whether claimLink would give a link for this account now: it is unclaimed, has an address to
+ * prove and the site's address is recorded. A page uses it to say a link was sent only when one was.
+ */
+export async function canSendClaimLink(accountId: string): Promise<boolean> {
+  const id = await canonicalAccount(accountId)
+  return await isUnclaimed(id) && !!(await addressFor(id, 'audience')) && !!(await configuredOrigin())
+}
+
+/**
+ * A new claim link for an unclaimed account, written in the caller's unit (pass `madeWith` from
+ * findOrCreateAccount for one made in that unit); null when the account is
  * claimed, has no address to prove, or the site's address is not recorded yet. The caller puts it in a sealed variable of an email to that
  * address and nowhere else.
  */
-export async function claimLink(unit: UnitView, accountId: string): Promise<string | null> {
-  const id = await canonicalAccount(accountId)
-  if (!(await isUnclaimed(id))) return null
-  const address = await addressFor(id, 'audience')
+export async function claimLink(unit: UnitView, accountId: string, madeWith?: { address: string } | null): Promise<string | null> {
+  // An account findOrCreateAccount made in this same unit is not in the database yet: it is
+  // unclaimed, and its address is the one it was made with.
+  const id = madeWith ? accountId : await canonicalAccount(accountId)
+  if (!madeWith && !(await isUnclaimed(id))) return null
+  const address = madeWith ? madeWith.address : await addressFor(id, 'audience')
   // Before the site's address is recorded there is nowhere for the link to point, and an order's
   // confirmation must still go: it goes without one.
   if (!address || !(await configuredOrigin())) return null
@@ -41,15 +53,19 @@ export async function claimLink(unit: UnitView, accountId: string): Promise<stri
 }
 
 /**
- * Sends a fresh claim link on its own, for "Send me the link again". Says nothing about the outcome:
- * a claimed account, or one over the limit, gets no email and the same answer.
+ * Sends a fresh claim link on its own, for "Send me the link again". `outcome` says what happened, for
+ * a caller whose user may know it (whoever holds a booking's link already sees whether its account
+ * is open): sent, already claimed, over the limit, or no link can be made (no address, or the
+ * site's address is not recorded). Callers that must not
+ * say keep answering `sent` alone.
  */
-export async function sendClaimLink(unit: UnitView, accountId: string): Promise<{ sent: true }> {
+export async function sendClaimLink(unit: UnitView, accountId: string): Promise<{ sent: true, outcome: 'sent' | 'claimed' | 'limited' | 'unavailable' }> {
   const id = await canonicalAccount(accountId)
-  if (!(await countAgainstRate('sign-in', `claim:${id}`)).allowed) return { sent: true }
+  if (!(await isUnclaimed(id))) return { sent: true, outcome: 'claimed' }
+  if (!(await countAgainstRate('sign-in', `claim:${id}`)).allowed) return { sent: true, outcome: 'limited' }
   const link = await claimLink(unit, id)
   if (link) await notify(unit, 'core.account-claim', { to: id, variables: { link }, dedupeKey: `claim:${id}:${nowMs()}` })
-  return { sent: true }
+  return { sent: true, outcome: link ? 'sent' : 'unavailable' }
 }
 
 /** Refuses a claim link whose account has been signed in to since it was sent. */

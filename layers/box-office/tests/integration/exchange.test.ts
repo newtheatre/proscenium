@@ -36,9 +36,12 @@ function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Pro
   })
 }
 
+/** The door codes the buyer sees on the page the newest message of a type links to. */
 async function codesSent(orderId: string, type: string): Promise<string[]> {
-  const found = await rows<{ sealed_variables: string }>('SELECT sealed_variables FROM core_notifications WHERE type_key IN (?, ? || \'-guest\') AND subject_id = ? ORDER BY created_at DESC', type, type, orderId)
-  return (JSON.parse((await inContext(() => openSpecial(found[0]!.sealed_variables)))!).codes as string).split('\n\n')
+  const found = await rows<{ sealed_variables: string }>('SELECT sealed_variables FROM core_notifications WHERE type_key IN (?, ? || \'-guest\') AND subject_id = ? ORDER BY created_at DESC, id DESC', type, type, orderId)
+  const link = JSON.parse((await inContext(() => openSpecial(found[0]!.sealed_variables)))!).link as string
+  const page = await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': link.slice(link.lastIndexOf('/') + 1) })
+  return page.body.tickets.map((t: { doorCode: string }) => t.doorCode)
 }
 
 /** An order paid online by card. */
@@ -94,7 +97,9 @@ describe('exchanging tickets', () => {
     expect(await balance(DEFERRED, to.performanceId)).toBe(-2400)
     expect((await scan(from, o.codes[0]!)).body).toMatchObject({ result: 'void', voidReason: 'exchanged' })
     const fresh = await codesSent(o.orderId, 'box-office.order-exchanged')
-    expect(fresh).toEqual(done.body.doorCodes)
+    // The page signs each code afresh: the same tickets, by their code part.
+    const part = (codes: string[]) => codes.map(c => c.split('.')[2]).sort()
+    expect(part(fresh)).toEqual(part(done.body.doorCodes))
     expect((await scan(to, fresh[0]!)).body.result).toBe('admitted')
     expect(await rows("SELECT id FROM box_office_cancellations WHERE order_id = ? AND kind = 'exchange'", o.orderId)).toHaveLength(1)
   })

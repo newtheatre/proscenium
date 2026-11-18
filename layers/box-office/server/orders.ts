@@ -46,6 +46,9 @@ export async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow
     show: production.title,
     when: new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone }).format(performance.startsAt),
     tickets: [...counts].map(([name, count]) => `${count} × ${name}`).join(', '),
+    /** The tickets, with the age every holder must be where the production is age-restricted, for the messages that carry the tickets. */
+    ticketsWithAge: [...counts].map(([name, count]) => `${count} × ${name}`).join(', ')
+      + (production.ageRestricted && production.ageMin !== null ? `. Everyone using these tickets must be ${production.ageMin} or over; ID may be checked.` : ''),
     amount: new Intl.NumberFormat(locale, { style: 'currency', currency: order.currency }).format(amountMinor / 100), // not-policy: minor units to units; every currency sold here has two decimals
     timeOf: (at: number) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(at),
     startsAt: performance.startsAt,
