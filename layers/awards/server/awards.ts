@@ -3,8 +3,8 @@
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import type { SOURCES } from './db/schema'
-import { PRECISIONS, VISIBILITIES } from './db/schema'
+import type { PRECISIONS, SOURCES } from './db/schema'
+import { VISIBILITIES } from './db/schema'
 import type { AwardType } from './types'
 
 export interface Award {
