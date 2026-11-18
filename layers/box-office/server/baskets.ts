@@ -175,8 +175,8 @@ export interface OrderPlan {
  * the others are lines of their own at no charge, last. A pass bought here gives its first entry here
  * too, after those of the passes typed, unless it is bought on its own. Reads only.
  */
-export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { performanceId: string }, buyer: Buyer, at: number): Promise<OrderPlan> {
-  const performance = await getPerformance(input.performanceId)
+export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { performanceId: string }, buyer: Buyer, at: number, known?: { productionId: string }): Promise<OrderPlan> {
+  const performance = known ?? await getPerformance(input.performanceId)
   const typed = input.passes ?? []
   const used = await judgePasses(typed, input.performanceId, buyer, at)
   const planned = await planPassBuys(input.buy ?? [], input.performanceId, buyer, at)
@@ -244,7 +244,7 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
 
   const account = useContext().actor.accountId ?? null
   // Online, a pass is always bought with a booking, and gives its first entry there.
-  const plan = await planOrder({ ...input, buy: (input.buy ?? []).map(({ entry: _, accountId: __, ...b }) => b) }, { channel: 'online', account }, at)
+  const plan = await planOrder({ ...input, buy: (input.buy ?? []).map(({ entry: _, accountId: __, ...b }) => b) }, { channel: 'online', account }, at, performance)
 
   unit.add({ sql: "UPDATE box_office_performance_sales SET updated_at = updated_at WHERE id = ? AND state = 'on_sale' AND (off_sale_at IS NULL OR off_sale_at > ?)", params: [sales.id, at] })
     .expect(1, NOT_ON_SALE.paused)
