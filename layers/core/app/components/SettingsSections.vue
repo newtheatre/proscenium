@@ -8,7 +8,7 @@
 import type { Component } from 'vue'
 import { parseTime } from '@internationalized/date'
 import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
-import { durationParts } from '../../kit/duration'
+import { durationParts, type DurationUnit } from '../../kit/duration'
 import { catalogueLabel, searchable, type CatalogueName } from '../../shared/choices'
 import { inSentence } from '../utils/sentence'
 
@@ -21,6 +21,7 @@ interface SettingView {
   labelKey: string
   helpKey: string
   unitKey?: string
+  units?: DurationUnit[]
   value: unknown
   default: unknown
   overridden: boolean
@@ -355,6 +356,7 @@ onMounted(() => {
                   :model-value="draft[s.key]"
                   :min="durationLimit(s, 'min')"
                   :max="durationLimit(s, 'max')"
+                  :units="s.units"
                   :disabled="!s.canChange"
                   :label="t(s.labelKey)"
                   @update:model-value="onEdit(s, $event ?? null)"

@@ -60,11 +60,15 @@ export const groupInput = z.object({
   maxPicks: z.number().int().min(1).max(MAX_PICKS).optional(),
   mixerPricing: z.enum(MIXER_PRICING).nullable().optional(),
   mixerFixedMinor: amount.nullable().optional(),
+  // The usual pick, chosen as the group is made: a mixer, since a list by hand has no options yet.
+  defaultKey: id.nullable().optional(),
 }).strict()
-export const groupPatch = groupInput.omit({ source: true }).partial().extend({ defaultKey: id.nullable().optional(), active: z.boolean().optional() }).strict()
+export const groupPatch = groupInput.omit({ source: true, defaultKey: true }).partial().extend({ defaultKey: id.nullable().optional(), active: z.boolean().optional() }).strict()
 // The stock item a recipe's slot for this group takes when this option is picked; none for "No mixer".
 export const optionInput = z.object({ name, deltaMinor: amount.optional(), ageRestricted: z.boolean().optional(), stockItemId: id.nullable().optional() }).strict()
 export const optionPatch = optionInput.partial().extend({ active: z.boolean().optional() }).strict()
+// A hand-listed group's options in their new order: every option in use, each once.
+export const optionOrderInput = z.object({ optionIds: z.array(id).min(1).max(100) }).strict() // not-policy: more options than a till shows
 
 // ---- Presets and Add a product -------------------------------------------------------------------
 
