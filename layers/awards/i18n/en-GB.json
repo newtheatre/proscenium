@@ -122,6 +122,7 @@
   "awards.screens.award.source": "How it was recorded",
   "awards.screens.award.holder": "Holder",
   "awards.screens.award.open-person": "Open their record",
+  "awards.screens.award.open-nomination": "Open nomination {reference}",
   "awards.screens.award.not-linked": "No account is linked to this award",
   "awards.screens.award.not-linked-help": "It is listed by name only, and carries no ticket price.",
   "awards.screens.award.correct": "Correct",

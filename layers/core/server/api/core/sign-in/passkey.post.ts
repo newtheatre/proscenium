@@ -8,7 +8,7 @@ import { safeNext } from '../../../identity/web'
 
 export default defineRoute({
   public: true,
-  rateLimit: 'sign-in',
+  rateLimit: 'sign-in-network',
   input: z.object({ challengeId: z.string().max(40), response: z.looseObject({ id: z.string() }), next: z.string().max(512).optional() }), // not-policy: an id and a return path are short
 }, async (event, { input, unit }) => {
   const { accountId } = await verifyAuthentication(unit, event, { challengeId: input.challengeId, purpose: 'sign_in', response: input.response as any })
