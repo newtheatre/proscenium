@@ -36,6 +36,7 @@ test.describe('My account', () => {
       ['Your details', '/account/details'],
       ['Email addresses', '/account/email'],
       ['Signing in', '/account/sign-in'],
+      ['Notifications', '/account/notifications'],
       ['Your data', '/account/data'],
     ]) await expect(page.getByRole('link', { name }).first()).toHaveAttribute('href', href)
   })
@@ -44,6 +45,7 @@ test.describe('My account', () => {
     ['/account/details', 'Your details'],
     ['/account/email', 'Email addresses'],
     ['/account/sign-in', 'Signing in'],
+    ['/account/notifications', 'Notifications'],
     ['/account/data', 'Your data'],
   ]) {
     test(`${path} renders under My account and has no violations`, async ({ page }) => {
