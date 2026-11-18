@@ -8,7 +8,7 @@
 import { and, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
+import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -87,6 +87,23 @@ async function deskSale(input: SaleInput, at: number) {
 async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], at: number): Promise<(Discounted | null)[]> {
   if (!input.promoCode) return lines.map(() => null)
   return applyCode(await judgeCode(input.promoCode, input.performanceId, at), input.performanceId, lines)
+}
+
+/**
+ * Where the panel's sale happens, for a till session it opens: the space of the performance it is
+ * for, when that performance is today (tonight's show); otherwise it says nothing. Reads only.
+ */
+export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<string | null> {
+  const input = panelInput(context.input)
+  const performanceId = 'sale' in input
+    ? input.sale.performanceId
+    : 'reservation' in input
+      ? (await first<{ performance_id: string }>('SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND performance_id IS NOT NULL LIMIT 1', input.reservation.orderId))?.performance_id
+      : input.exchange.performanceId
+  if (!performanceId) return null
+  const performance = await getPerformance(performanceId).catch(() => null)
+  if (!performance?.spaceId) return null
+  return await operatingDayOf(performance.startsAt) === await operatingDayOf(nowMs()) ? performance.spaceId : null
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
