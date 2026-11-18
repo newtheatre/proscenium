@@ -9,6 +9,7 @@ import { resetRateLimits } from '#kit/ratelimit'
 import { listTerms } from '#modules/core'
 import { addAttempt } from '../../../payments/server/answers'
 import { approveRefund, recordAnswer } from '../../../payments/server/services'
+import { describeRefunds } from '../../../payments/server/refunds'
 import { world } from '../../../../tests/fixtures/modules/cardco/server/contributions/payments.provider/cardco'
 import { deliver, env, inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import recogniseIncome from '../../server/tasks/recognise-income'
@@ -156,6 +157,10 @@ describe('cancelling tickets on a paid order', () => {
     expect(await claimed(h)).toBe(1)
     await deliver()
     expect(await rows('SELECT state FROM payments_refunds WHERE id = ?', done.body.refund.id)).toEqual([{ state: 'requested' }])
+    // Refunds names the order it is for, with its reference and a link to it.
+    const [reference] = await rows<{ reference: string }>('SELECT reference FROM box_office_orders WHERE id = ?', o.orderId)
+    const [summary] = await inContext(() => describeRefunds([done.body.refund.id]))
+    expect(summary!.owner).toMatchObject({ module: 'box-office', record: o.orderId, reference: reference!.reference, to: `/console/box-office/orders/${o.orderId}` })
     await expect(commit(unit => approveRefund(unit.view(), done.body.refund.id, boxOfficeManager.accountId!))).rejects.toMatchObject({ code: 'payments.refund.own' })
     await commit(unit => approveRefund(unit.view(), done.body.refund.id, newId('acc')))
     await deliver()

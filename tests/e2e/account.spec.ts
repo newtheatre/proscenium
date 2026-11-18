@@ -67,11 +67,10 @@ test.describe('My account', () => {
     await noViolations(page)
   })
 
-  test('the overview lists the account\'s own pages on a laptop too', async ({ page }) => {
+  test('on a laptop the overview leaves the account\'s own pages to the menu', async ({ page }) => {
     await visit(page, '/account')
-    const list = page.getByRole('list', { name: 'Your account' })
-    await expect(list).toBeVisible()
-    await expect(list.getByRole('link', { name: /Signing in/ })).toHaveAttribute('href', '/account/sign-in')
+    await expect(page.getByRole('list', { name: 'Your account' })).toBeHidden()
+    await expect(page.getByRole('navigation', { name: 'My account' }).getByRole('link', { name: 'Signing in' })).toHaveAttribute('href', '/account/sign-in')
   })
 
   test('Signing in shows where the person is signed in', async ({ page }) => {
