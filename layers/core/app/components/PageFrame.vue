@@ -18,7 +18,9 @@ const props = withDefaults(defineProps<{
   description?: string
   /** The parents of this page, nearest last: where it sits below a navigation entry. Drawn here and nowhere else. */
   trail?: { label: string, to: string }[]
-}>(), { width: 'standard', description: undefined, trail: undefined })
+  /** A record's own name, which can be long: on a phone in the console it takes a line of its own under the bar, where the bar's actions cannot squeeze it. */
+  longTitle?: boolean
+}>(), { width: 'standard', description: undefined, trail: undefined, longTitle: false })
 
 defineSlots<{
   default?: () => unknown
@@ -107,7 +109,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
     <template #header>
       <UDashboardNavbar
         :title="title"
-        :ui="navbarUi"
+        :ui="longTitle ? { ...navbarUi, title: 'max-sm:sr-only' } : navbarUi"
       >
         <template #leading>
           <UDashboardSidebarCollapse />
@@ -151,6 +153,14 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
         class="space-y-4"
         :class="widths[width]"
       >
+        <!-- The heading stays in the bar for assistive technology; this line is what a phone shows. -->
+        <p
+          v-if="longTitle"
+          class="text-lg font-semibold text-pretty text-highlighted sm:hidden"
+          aria-hidden="true"
+        >
+          {{ title }}
+        </p>
         <p
           v-if="description"
           class="text-sm text-muted"

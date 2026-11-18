@@ -66,13 +66,15 @@ export async function runAction(unit: UnitView, runId: string, at: number): Prom
     if (place?.slotKey !== action.slot) return void finish(unit, run.id, 'skipped', 'slot', at)
   }
   const def = JSON.parse((await getVersion(response.versionId))!.definition) as Definition
-  await action.run(unit, {
+  const result = await action.run(unit, {
     runId: run.id,
     input: await inputsOf(def, run),
     response: { id: response.id, reference: response.reference, formId: response.formId, personId: response.personId, subjectType: response.subjectType, subjectId: response.subjectId, decidedAt: response.decidedAt, decisionReason: response.decisionReason },
     actorId: run.actorId,
     at: run.createdAt,
   })
+  // An action that can never do what was asked says why, and the run ends there as not done.
+  if (result && result.skipped) return void finish(unit, run.id, 'skipped', result.skipped.slice(0, 500), at) // not-policy: the bound on the reason
   finish(unit, run.id, 'done', null, at)
   unit.audit({ action: 'update', record: ['forms.response', response.id], detail: { formId: response.formId, ran: run.actionKey } })
 }

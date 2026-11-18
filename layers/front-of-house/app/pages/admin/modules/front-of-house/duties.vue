@@ -23,7 +23,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ duties: Duty[] }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
 
-const blank = () => ({ name: '', description: '', isLead: false, callBeforeMinutes: 60, stayAfterMinutes: 30 }) // not-policy: a new duty's starting values
+const blank = () => ({ name: '', description: '', isLead: false, callBeforeMinutes: 60 as number | null, stayAfterMinutes: 30 as number | null }) // not-policy: a new duty's starting values
 const form = ref(blank())
 const editing = ref<Duty | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -39,7 +39,7 @@ function stop() {
 
 async function save() {
   refusal.value = null
-  const body = { ...form.value, name: form.value.name.trim(), description: form.value.description.trim() || null, ...(editing.value ? { requirements: editing.value.requirements } : {}) }
+  const body = { ...form.value, callBeforeMinutes: form.value.callBeforeMinutes ?? 0, stayAfterMinutes: form.value.stayAfterMinutes ?? 0, name: form.value.name.trim(), description: form.value.description.trim() || null, ...(editing.value ? { requirements: editing.value.requirements } : {}) }
   try {
     if (editing.value) await write(`/api/front-of-house/duties/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/duties', { method: 'POST', body })
@@ -141,22 +141,20 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
               :label="t('front-of-house.duties.call-before')"
               :help="t('front-of-house.duties.call-before-help')"
             >
-              <UInputNumber
+              <MinutesInput
                 v-model="form.callBeforeMinutes"
                 :min="0"
                 :max="480"
-                :step="5"
               />
             </UFormField>
             <UFormField
               :label="t('front-of-house.duties.stay-after')"
               :help="t('front-of-house.duties.stay-after-help')"
             >
-              <UInputNumber
+              <MinutesInput
                 v-model="form.stayAfterMinutes"
                 :min="0"
                 :max="480"
-                :step="5"
               />
             </UFormField>
           </div>
