@@ -175,6 +175,18 @@ export default defineModule({
     'payments.settlement': [{ id: 'box-office' }],
     // Box office's part of the night report, when Front of house is on.
     'front-of-house.report-section': [{ id: 'box-office.attendance', file: 'attendance' }],
+    // Who is coming to a performance needing help, for the duty manager's Needs tonight panel.
+    'front-of-house.tonight-needs': [{ id: 'box-office.access', file: 'access' }],
+    // Applying to the access scheme agrees to it, as it does to the box office seeing the arrangements:
+    // only the kinds of help and the seat, never a note, and only to whoever is leading that night.
+    'core.access-purpose': [{
+      id: 'box-office.on-the-night',
+      side: 'audience' as const,
+      label: 'Front of house on the night',
+      explanation: 'On the night of a performance you have tickets for, the duty manager can see what kind of help you need and where you are sitting, so the team can look after you. They never see your notes.',
+      uses: 'all' as const,
+      agreedOnApplying: true,
+    }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.
