@@ -14,6 +14,7 @@
      with nothing in the sale. -->
 <script setup lang="ts">
 import { createReusableTemplate } from '@vueuse/core'
+import { answerVerdict, itemVerdict, type AllergenFacts, type Verdict } from '../../shared/allergen-verdict'
 
 // The choice fields (`groupIds`, `baseMinor`, the menu's `groups` and `percentOff`) are absent from a
 // server without choices, and then every product is as it was: sizes only.
@@ -380,20 +381,19 @@ const barred = (tile: Tile) => !!refused.value && tile.items.every(i => i.ageRes
 // The choice window. The usual choice is picked already, so the common order is one more press.
 const SHORT = 6 // not-policy: how many options a group shows before "More"
 const choosing = ref<{ tile: Tile, item: Item, picks: Choice[], open: Record<string, boolean>, search: Record<string, string> } | null>(null)
-/** What an option is recorded to hold of what the customer avoids. */
-const avoidedIn = (a: Allergens | undefined) => (a?.checked ? [...new Set([...a.contains, ...a.mayContain])].filter(k => avoid.value.includes(k)) : [])
 /**
- * The usual choice of each group, picked already. One that holds something the customer avoids is
- * never picked for them: a required group starts on the first option recorded free of it, or on
- * nothing, so the seller picks; an optional one starts on nothing.
+ * The usual choice of each group, picked already. While the customer's allergens are recorded, one
+ * that contains, may contain or was never checked for something they avoid is never picked for them
+ * (the shared verdict, as the public chart judges it): a required group starts on the first option
+ * with none of it listed, or on nothing, so the seller picks; an optional one starts on nothing.
  */
 const defaults = (i: Item): Choice[] => groupsOf(i).flatMap((g) => {
   const usual = g.options.find(o => o.key === g.defaultKey)
   if (!usual) return []
   // Nor is anything age-restricted picked while a refusal stands.
-  const fits = (o: Option) => !avoidedIn(o.allergens).length && !(refused.value && o.ageRestricted)
+  const fits = (o: Option) => (!avoid.value.length || answerVerdict(avoid.value, facts(o.allergens)).kind === 'none-listed') && !(refused.value && o.ageRestricted)
   if (fits(usual)) return [{ groupId: g.id, key: usual.key }]
-  const instead = g.required ? g.options.find(o => fits(o) && (!avoid.value.length || !!o.allergens?.checked)) : undefined
+  const instead = g.required ? g.options.find(fits) : undefined
   return instead ? [{ groupId: g.id, key: instead.key }] : []
 })
 function press(tile: Tile) {
@@ -549,25 +549,39 @@ const allergenRows = computed(() => {
   const inView = layout.value === 'folders' ? (subFolder.value ? [subFolder.value] : folder.value ? [folder.value, ...subsOf(folder.value)] : null) : current.value ? [current.value, ...subsOf(current.value)] : null
   return (inView ?? cats.value).flatMap(c => tiles(c)).map(tile => ({ key: tile.key, name: tile.name, ...verdict(tile.items.map(i => i.allergens)) }))
 })
+/** An answer as the shared verdict takes it: none recorded is not checked. */
+const facts = (a: Allergens | undefined): AllergenFacts => a ?? { contains: [], mayContain: [], checked: false }
+// Worst first, to judge a product on every one of its sizes.
+const WORST: Verdict['kind'][] = ['contains', 'not-checked', 'may-contain', 'depends', 'none-listed']
 /**
  * While the customer's allergens are recorded, a tile says what it holds of them, so the sheet need
- * not stay open: red for one that contains something they avoid, amber for one that may, depends on
- * what is picked, or was never checked. Nothing is said of a tile with none of it recorded.
+ * not stay open. Each size is judged by the shared verdict (the public chart's), with what can be
+ * picked on it, and the tile takes the worst: red for contains, amber for may contain, depends on
+ * what is picked, or never checked. Nothing is said of a tile with none of it listed.
  */
 function mark(tile: Tile): { tone: Tone, text: string, icon: string } | null {
   if (!avoid.value.length || !hasAllergens.value) return null
-  const v = verdict(tile.items.map(i => i.allergens))
-  return v.tone === 'success' ? null : { tone: v.tone, text: v.short, icon: TONE_ICONS[v.tone] }
+  const verdicts = tile.items.flatMap(i => itemVerdict(avoid.value, { ...facts(i.allergens), dependsOnChoice: i.allergens?.dependsOnChoice }, groupsOf(i).map(g => ({ group: g.name, options: g.options.map(o => ({ label: o.label, allergens: facts(o.allergens) })) }))) ?? [])
+  const kind = WORST.find(k => verdicts.some(v => v.kind === k))
+  if (!kind || kind === 'none-listed') return null
+  const hit = [...new Set(verdicts.filter(v => v.kind === kind).flatMap(v => v.hit))]
+  const tone: Tone = kind === 'contains' ? 'error' : 'warning'
+  const text = kind === 'contains'
+    ? t('bar.desk.allergens.contains', { names: names(hit) })
+    : kind === 'may-contain'
+      ? t('bar.desk.allergens.may-contain', { names: names(hit) })
+      : kind === 'depends' ? t('bar.desk.allergens.tile-depends') : t('bar.desk.allergens.tile-not-checked')
+  return { tone, text, icon: kind === 'not-checked' ? TONE_ICONS.neutral : TONE_ICONS[tone] }
 }
 const RINGS: Record<Tone, string> = { error: 'ring-2 ring-error', warning: 'ring-2 ring-warning', neutral: 'ring-2 ring-warning', success: '' }
 const MARK_TEXT: Record<Tone, string> = { error: 'text-error', warning: 'text-warning', neutral: 'text-warning', success: '' }
 /** In the choice window: an option that holds something the customer avoids, or was never checked, says so. */
 function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
   if (!avoid.value.length || !hasAllergens.value) return null
-  if (!o.allergens?.checked) return { tone: 'warning', text: t('bar.desk.allergens.tile-not-checked') }
-  const contains = o.allergens.contains.filter(avoids)
-  const may = o.allergens.mayContain.filter(avoids)
-  return contains.length ? { tone: 'error', text: t('bar.desk.allergens.contains', { names: names(contains) }) } : may.length ? { tone: 'warning', text: t('bar.desk.allergens.may-contain', { names: names(may) }) } : null
+  const v = answerVerdict(avoid.value, facts(o.allergens))
+  if (v.kind === 'contains') return { tone: 'error', text: t('bar.desk.allergens.contains', { names: names(v.hit) }) }
+  if (v.kind === 'may-contain') return { tone: 'warning', text: t('bar.desk.allergens.may-contain', { names: names(v.hit) }) }
+  return v.kind === 'not-checked' ? { tone: 'warning', text: t('bar.desk.allergens.tile-not-checked') } : null
 }
 // What the customer avoids and any refusal are kept with the basket, for a reload.
 watch([avoid, refused], keep, { deep: true })
