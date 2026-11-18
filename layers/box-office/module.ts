@@ -186,8 +186,9 @@ export default defineModule({
     'front-of-house.report-section': [{ id: 'box-office.attendance', file: 'attendance' }],
     // Who is coming to a performance needing help, for the duty manager's Needs tonight panel.
     'front-of-house.tonight-needs': [{ id: 'box-office.access', file: 'access' }],
-    // Applying to the access scheme agrees to it, as it does to the box office seeing the arrangements:
-    // only the kinds of help and the seat, never a note, and only to whoever is leading that night.
+    // Applying to the access scheme agrees to it: only the kinds of help and the seat, never a note,
+    // and only to whoever is leading that night. The person can switch it off in My account. People
+    // already on the scheme when it shipped have it switched on once and are told (Matt, 18 November 2026).
     'core.access-purpose': [{
       id: 'box-office.on-the-night',
       side: 'audience' as const,
@@ -195,6 +196,7 @@ export default defineModule({
       explanation: 'On the night of a performance you have tickets for, the duty manager can see what kind of help you need and where you are sitting, so the team can look after you. They never see your notes.',
       uses: 'all' as const,
       agreedOnApplying: true,
+      onForExisting: 'box-office.on-the-night-switched-on',
     }],
     'core.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.in', file: 'in' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
@@ -277,6 +279,23 @@ export default defineModule({
     ],
     // Messages to buyers. Each is about a booking the person made, so none can be switched off.
     'core.notification-type': [{
+      // Once, to each person already on the access scheme when on-the-night sharing was switched on
+      // for them. A notice about their own data, so nobody can unsubscribe from it.
+      id: 'box-office.on-the-night-switched-on',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      variables: {},
+      link: '/account/access',
+      wording: {
+        'en-GB': {
+          subject: 'The duty manager can now see the help you need',
+          body: 'On the night of a performance you have tickets for, {{ theatre }} now shows the duty manager which kinds of help you have asked for on the access scheme, and where you are sitting, so the team can be ready for you. They never see your notes.\n\nWe have switched this on for you. You can switch it off at any time in your account.',
+          action: 'Open my account',
+        },
+      },
+    }, {
       // Not in the specification's list: the step that proves the address before seats are kept.
       id: 'box-office.reservation-confirm',
       category: 'transactional' as const,

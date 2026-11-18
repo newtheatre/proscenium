@@ -4,12 +4,15 @@
 // whose key exists, archived or not, is left alone. Each default is offered once: core_module_defaults
 // records it, so a role or mapping the theatre removes is not made again. The hourly task
 // core.module-defaults offers what modules already on have not been offered, which is how a site
-// that switched a module on before its defaults shipped gets them after a deploy.
+// that switched a module on before its defaults shipped gets them after a deploy. An access purpose
+// may ask to be switched on for the people already on the scheme (onForExisting); that is offered
+// once the same way.
 import { all, createUnit, first, newId, nowMs, usePoint, useSetting } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import { OWNER, withImplied } from './grants'
 import { yearEndIsSet } from './year-end'
+import { switchOnForExisting, type Purpose } from './access-scheme'
 
 export interface RolePreset { id: string, key: string, name: string, description?: string, abilities: string[], opensMembersArea?: boolean }
 
@@ -90,6 +93,14 @@ export async function ensureModuleDefaults(moduleId: string, by?: string): Promi
   }
 
   if (unit.size) await unit.commit()
+
+  // An access purpose switched on for the people already on the scheme (onForExisting), each in their
+  // own unit. It is recorded as offered only once nobody is left to reach, so a long list takes a few runs.
+  const switching = (await usePoint<Purpose>('core.access-purpose')).filter(p => p.module === moduleId && p.value.onForExisting && !offered.has(`purpose:${p.value.id}`))
+  for (const { value: purpose } of switching) {
+    if ((await switchOnForExisting(purpose.id)).done)
+      await createUnit().add({ sql: OFFER, params: ['purpose', purpose.id, moduleId, nowMs()] }).commit()
+  }
   return { facts, roles }
 }
 

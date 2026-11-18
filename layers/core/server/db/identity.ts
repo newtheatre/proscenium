@@ -249,12 +249,13 @@ export const factAbilities = defineTable('core_fact_abilities', {
 }, { realm: 'operational', extra: t => [primaryKey({ columns: [t.fact, t.ability, t.pinnedRecord] })] })
 
 /**
- * The defaults a module brings (a fact's default abilities, a preset role) that have been offered
+ * The defaults a module brings (a fact's default abilities, a preset role, an access purpose switched
+ * on for the people already on the scheme) that have been offered
  * to this site, one row each, so each is offered once: a role or mapping the theatre later removes
  * is not made again when the module is switched back on or the defaults are checked after a deploy.
  */
 export const moduleDefaults = defineTable('core_module_defaults', {
-  kind: col.internal(text('kind', { enum: ['fact', 'role'] }).notNull()),
+  kind: col.internal(text('kind', { enum: ['fact', 'role', 'purpose'] }).notNull()),
   key: col.internal(text('key').notNull()),
   moduleId: col.internal(text('module_id').notNull()),
   offeredAt: col.timestamp('offered_at').notNull(),

@@ -219,8 +219,13 @@ export const identityPoints = {
       uses: z.union([z.literal('all'), z.array(z.string()).min(1)]),
       note: z.boolean().optional(),
       on: z.string().optional(),
-      // Applying to the scheme agrees to this purpose, and it cannot be switched off while on it.
+      // Applying to the scheme agrees to this purpose: it starts switched on.
       agreedOnApplying: z.boolean().optional(),
+      // It cannot be switched off while the person is on the scheme; leaving the scheme stops it.
+      fixed: z.boolean().optional(),
+      // Switched on once for everyone already accepted on the scheme who has made no choice about
+      // it, each told by this message type (the hourly core.module-defaults does it after a deploy).
+      onForExisting: z.string().optional(),
     }).strict(),
   }),
 }
