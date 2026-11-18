@@ -185,6 +185,8 @@
   "awards.forms.issue-award.preview.archived": "This award is archived. Nothing is issued until it is restored.",
   "awards.forms.issue-award.preview.wording": "The wording goes on the award as it is written here, where others can read it. You can correct it afterwards from Awards.",
   "awards.forms.issue-award.citation": "Citation",
+  "awards.forms.nomination-template.name": "Nomination for an award",
+  "awards.forms.nomination-template.description": "Asks who is nominated, what for and why. Giving the award issues it to the person named.",
 
   "awards.roll.title": "Roll of honour",
   "awards.roll.nominate": "Nominate somebody",

@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "d865ef95-a516-4c5d-826b-5b3344ee7f9d",
+  "id": "521dbb6b-ceae-495e-9f6a-2f51b304d45c",
   "prevIds": [
-    "48520eb5-e034-4d5b-8cc9-96ffddb2a6e3"
+    "b66571b7-cc11-4896-95ec-309ff217178a"
   ],
   "ddl": [
     {
@@ -12579,6 +12579,26 @@
     {
       "table": "forms_action_runs",
       "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_action_runs",
+      "name": "record_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_action_runs",
+      "name": "record_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,

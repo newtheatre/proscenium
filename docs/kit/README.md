@@ -392,6 +392,10 @@ the person confirmed; the save or action asks. A setting that a table's
 registry makes it `onChange: 'confirm'` unless it asks for a reason. A section is reset by saving it with
 `reset: true` on each of its settings.
 
+`whenModule: 'membership-fees'` says a setting only applies while that other module is on: the settings
+screens and their search leave it out while the module is off (the value is kept, and `useSetting`
+still reads it). Use it for a setting a feature of the other module needs, not to hide a module's own.
+
 Durations may also be written `6mo` or `7y`; a month is 30 days and a year 365. `formatDuration`
 and the `DurationInput` component (a number and a unit, `v-model` in seconds, `min` and `max` as
 seconds or written durations) show a value in the largest unit that divides it exactly, and the
