@@ -8,6 +8,7 @@ import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, refuse, today } from '#kit'
 import { requireCharger } from '../../../../charge'
+import { listSetsEnd, schemeList } from '../../../../lists'
 import { chooseLength, pendingOf, writePaying } from '../../../../joining'
 import { holdsScheme, writeActive, writePending } from '../../../../memberships'
 import { requireScheme } from '../../../../schemes'
@@ -38,9 +39,11 @@ export default defineRoute({
   if (await holdsScheme(accountId, scheme.id)) refuse('membership.join.already-held', 'You already hold this membership.', { status: 409 })
   const day = await today()
   const checked = await runVerifier(scheme, accountId, input.reference, day)
+  // D9: where the list sets the end date, no length is asked for.
+  const endsByList = await listSetsEnd(await schemeList(scheme))
   // V2: waiting for staff is an application, pending until they pass or decline it.
   if (checked?.outcome === 'needs-staff') {
-    const option = await chooseLength(scheme, input.lengthOptionId)
+    const option = await chooseLength(scheme, input.lengthOptionId, false, endsByList)
     const membershipId = scheme.requiresPayment
       ? (await writePaying(unit, { scheme, accountId, lengthOptionId: option?.id ?? null, verified: false, day })).membershipId
       : writePending(unit, { scheme, accountId, lengthOptionId: option?.id ?? null })
@@ -50,7 +53,7 @@ export default defineRoute({
   }
   const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null } : null
   // D9: an entry's own end date wins, and the membership then has no length option.
-  const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId)
+  const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId, false, endsByList)
   if (scheme.requiresPayment) {
     const { membershipId, quote } = await writePaying(unit, { scheme, accountId, lengthOptionId: option?.id ?? null, verified: true, day })
     if (pass) recordPass(unit, membershipId, accountId, pass)

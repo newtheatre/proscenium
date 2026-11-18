@@ -16,6 +16,6 @@ export default defineRoute({ ability: 'membership.membership.export', rateLimit:
   unit.audit({ action: 'export', ability: 'membership.membership.export', detail: { rows: rows.length, total, limit: EXPORT_LIMIT } })
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
   setResponseHeader(event, 'content-disposition', 'attachment; filename="members.csv"')
-  const lines = [['Name', 'Member number', 'Scheme', 'Status', 'Until', 'Joined'], ...rows.map(r => [r.name, r.number, r.scheme, r.status, r.until, r.joined ? new Date(r.joined).toISOString().slice(0, 10) : null])] // not-policy: the date part of an ISO time
+  const lines = [['Name', 'Member number', 'Scheme', 'Status', 'Until', 'Joined'], ...rows.map(r => [r.name, r.number, r.scheme, r.status, r.until, r.joined])]
   return lines.map(l => l.map(cell).join(',')).join('\n') + '\n'
 })

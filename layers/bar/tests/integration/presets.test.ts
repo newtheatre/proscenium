@@ -10,6 +10,7 @@ import setupPost from '../../server/api/bar/products/setup.post'
 import presetsGet from '../../server/api/bar/presets/index.get'
 import presetsPost from '../../server/api/bar/presets/index.post'
 import presetDelete from '../../server/api/bar/presets/[id].delete'
+import presetPatch from '../../server/api/bar/presets/[id].patch'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addOutlet } from '../../server/catalogue'
 import { addGroup, addOption } from '../../server/choices'
@@ -24,6 +25,7 @@ const handle = server({
   'GET /api/bar/presets': presetsGet,
   'POST /api/bar/presets': presetsPost,
   'DELETE /api/bar/presets/:id': presetDelete,
+  'PATCH /api/bar/presets/:id': presetPatch,
 })
 const manager = person(['bar.sale.sell', 'bar.product.manage'], { reassertedAt: NOW })
 
@@ -79,8 +81,10 @@ describe('adding a product from the window', () => {
     expect(await rows('SELECT name FROM bar_variants WHERE product_id = ? AND mixer_measure = 1', s.product)).toEqual([{ name: 'Mixer measure' }])
   })
 
-  it('refuses two sizes with one name', async () => {
-    expect((await send('POST', '/api/bar/products/setup', { categoryId: s.soft, name: 'Presets twice', sizes: [{ name: 'Each' }, { name: 'each' }] })).status).toBe(422)
+  it('refuses two sizes with one name, on the row that repeats it', async () => {
+    const twice = await send('POST', '/api/bar/products/setup', { categoryId: s.soft, name: 'Presets twice', sizes: [{ name: 'Each' }, { name: 'each' }] })
+    expect(twice.status).toBe(422)
+    expect(twice.body.fields).toEqual({ 'sizes.1.name': 'bar.screens.add-product.size-taken' })
   })
 })
 
@@ -110,5 +114,27 @@ describe('presets', () => {
     expect((await send('DELETE', `/api/bar/presets/${saved.body.presetId}`)).status).toBe(200)
     expect(await rows('SELECT usual_preset FROM bar_categories WHERE id = ?', s.wine)).toEqual([{ usual_preset: null }])
     expect((await send('GET', '/api/bar/presets')).body.presets.some((p: any) => p.id === saved.body.presetId)).toBe(false)
+  })
+
+  it('refuses a preset with two sizes of one name', async () => {
+    const twice = await send('POST', '/api/bar/presets', { name: 'Presets twice', sizes: [{ name: '125ml' }, { name: '125ml' }] })
+    expect(twice.status).toBe(422)
+    expect(Object.keys(twice.body.fields)).toEqual(['sizes.1.name'])
+  })
+
+  it('renames one of the theatre\'s own, and brings a deleted one back', async () => {
+    const id = (await send('POST', '/api/bar/presets', { name: 'Presets bottled', sizes: [{ name: 'Each' }] })).body.presetId
+    await send('POST', '/api/bar/presets', { name: 'Presets taken', sizes: [{ name: 'Each' }] })
+    const taken = await send('PATCH', `/api/bar/presets/${id}`, { name: 'Presets taken' })
+    expect(taken.body.code, JSON.stringify(taken.body)).toBe('bar.preset.name-taken')
+    expect((await send('PATCH', `/api/bar/presets/${id}`, { name: 'Presets bottle' })).status).toBe(200)
+    await send('DELETE', `/api/bar/presets/${id}`)
+    expect((await send('PATCH', `/api/bar/presets/${id}`, { active: true })).status).toBe(200)
+    expect((await send('GET', '/api/bar/presets')).body.presets.find((p: any) => p.id === id)).toMatchObject({ name: 'Presets bottle' })
+  })
+
+  it('has draught, wine and spirits need the age check', async () => {
+    const listed = (await send('GET', '/api/bar/presets')).body.presets
+    expect(listed.filter((p: any) => p.ageRestricted).map((p: any) => p.id)).toEqual(['builtin:draught', 'builtin:wine', 'builtin:spirit'])
   })
 })

@@ -17,9 +17,9 @@ async function makeList(file = FILE) {
   expect((await req('POST', `/api/membership/lists/${id}/import`, { file })).status).toBe(200)
   return id
 }
-async function listScheme(fields: Record<string, unknown> = {}) {
+async function listScheme(fields: Record<string, unknown> = {}, lengths?: number[]) {
   const listId = await makeList()
-  const id = await scheme(fields)
+  const id = await scheme(fields, lengths)
   expect((await req('PATCH', `/api/membership/schemes/${id}`, { verifier: 'membership.list', listId })).status).toBe(200)
   const opened = await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
   expect(opened.status, JSON.stringify(opened.body)).toBe(200)
@@ -99,6 +99,30 @@ describe('joining against a list', () => {
     // V4: a second account typing the same ID waits for staff, who see the list's name for it.
     const other = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, person([]))
     expect(other.body).toMatchObject({ pending: true, waiting: 'entry-already-used' })
+  })
+
+  it('asks for no length where the list sets the end date (D9)', async () => {
+    const { id } = await listScheme({}, [12, 36])
+    const offered = (await req('GET', '/api/membership/schemes', undefined, person([]))).body.schemes.find((s: { id: string }) => s.id === id)
+    expect(offered.endsByList).toBe(true)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.endsByList).toBe(true)
+    const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20654321' }, person([]))
+    expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ endsOn: '2027-07-31', pending: false })
+  })
+
+  it('lets staff add a member with a student ID, checking and claiming the entry', async () => {
+    const { id } = await listScheme()
+    const add = (body: Record<string, unknown>) => req('POST', `/api/membership/schemes/${id}/members`, { address: `ada${Math.random().toString(36).slice(2)}@example.org`, ...body })
+    expect((await add({ reference: '123' })).body.code).toBe('membership.join.not-well-formed')
+    expect((await add({ reference: '20000000' })).body.code).toBe('membership.join.not-on-list')
+    const added = await add({ reference: '20123456' })
+    expect(added.body, JSON.stringify(added.body)).toMatchObject({ endsOn: '2027-07-31' })
+    const row = await inContext(() => first<{ used: string | null, outcome: string }>(
+      'SELECT e.used_by AS used, v.outcome FROM membership_verifications v JOIN membership_verification_entries e ON e.id = v.entry_id WHERE v.membership_id = ?', added.body.membershipId))
+    expect(row).toEqual({ used: added.body.membershipId, outcome: 'passed' })
+    expect((await add({ reference: '20123456' })).body.code).toBe('membership.join.entry-already-used')
+    // Without a reference nothing is checked, as before.
+    expect((await add({})).status).toBe(200)
   })
 
   it('cannot open until the scheme has a list', async () => {
