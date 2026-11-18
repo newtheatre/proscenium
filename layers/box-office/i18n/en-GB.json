@@ -1,4 +1,6 @@
 {
+  "box-office.upcoming.tickets.one": "{count} ticket",
+  "box-office.upcoming.tickets.other": "{count} tickets",
   "box-office.module.name": "Box office",
   "box-office.records.order": "Order",
   "box-office.figures.sold": "Sold",
@@ -82,5 +84,7 @@
   "box-office.navigation.comps.label": "Complimentary tickets",
   "box-office.settings.availability.show-remaining-under.label": "Show seats left at or under",
   "box-office.settings.availability.show-remaining-under.help": "The booking button says how many seats are left only when there are this many or fewer. 0 never says.",
-  "box-office.settings-sections.availability": "Availability on the public pages"
+  "box-office.settings-sections.availability": "Availability on the public pages",
+  "box-office.visit.access": "Access: {notes}",
+  "box-office.visit.ask": "If anything would make your visit easier, tell the box office before you come."
 }

@@ -127,6 +127,8 @@ export default defineModule({
   points: {
     'front-of-house.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
     'front-of-house.report-section': point({ kind: 'code', contract: 'report-section' }),
+    // Who is coming tonight needing help, for the lead's Needs tonight panel (AC-1).
+    'front-of-house.tonight-needs': point({ kind: 'code', contract: 'tonight-needs' }),
   },
 
   contributes: {
@@ -174,8 +176,12 @@ export default defineModule({
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
-    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
-    'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
+    // and the members' home card: the person's next shift and the open ones (AC-7).
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.members-home', file: 'members-home' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
+    'core.home-card': [
+      { id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' },
+      { id: 'front-of-house.shifts', home: 'members', ability: 'front-of-house.shift.sign-up', component: 'FrontOfHouseShiftsCard', urgency: 'info', count: 'front-of-house.members-home' },
+    ],
     // Experience on the rota, for a duty's requirements (FH-5).
     'core.requirement': [{ id: 'front-of-house', file: 'front-of-house' }],
     // The roles part 7 suggests, made when the module is first switched on (FH-4).
@@ -184,12 +190,14 @@ export default defineModule({
       { id: 'front-of-house.manager', key: 'front-of-house-manager', name: 'Front of house manager', description: 'Runs the rota, duties and checklists, reviews incidents and reads night reports and hours.', abilities: ['front-of-house.shift.manage', 'front-of-house.checklist.manage', 'front-of-house.duty.manage', 'front-of-house.incident.manage', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view', 'front-of-house.hours.view', 'front-of-house.emergency-card.view'], opensMembersArea: true },
     ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
+    'core.upcoming': [{ id: 'front-of-house.shifts', file: 'shifts' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
     'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],
     'core.notification-topic': [
       { id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 },
       { id: 'front-of-house.night-reports', side: 'members' as const, order: 61 },
+      { id: 'front-of-house.rota-published', side: 'members' as const, order: 59 },
     ],
     // Messages to people on the rota about their own shifts, so none can be switched off.
     'core.notification-type': [{
@@ -198,11 +206,11 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const, details: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Your shift has a new time: {{ show }}',
-          body: 'Your {{ duty }} shift for **{{ show }}** has moved. Please now arrive by **{{ when }}**.\n\nIf you can no longer do it, you can give it up without the usual notice.',
+          subject: 'Your shift has a new time: {{ show }}, {{ date }}',
+          body: 'Your {{ duty }} shift for **{{ show }}** has moved. Please now arrive by **{{ when }}**.\n\n{{ details }}\n\nIf you can no longer do it, you can give it up at any time without the usual notice.',
           action: 'See my shifts',
         },
       },
@@ -212,11 +220,11 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, where: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const, where: 'text' as const, details: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Your shift has moved: {{ show }}',
-          body: 'The performance of **{{ show }}** you are on as {{ duty }} has moved to **{{ where }}**. Please arrive there by {{ when }}.\n\nIf you can no longer do it, you can give it up without the usual notice.',
+          subject: 'Your shift has moved: {{ show }}, {{ date }}',
+          body: 'The performance of **{{ show }}** you are on as {{ duty }} has moved to **{{ where }}**. Please arrive there by {{ when }}.\n\n{{ details }}\n\nIf you can no longer do it, you can give it up at any time without the usual notice.',
           action: 'See my shifts',
         },
       },
@@ -226,10 +234,10 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { show: 'text' as const, when: 'text' as const },
+      variables: { show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Shift cancelled: {{ show }}',
+          subject: 'Shift cancelled: {{ show }}, {{ date }}',
           body: 'Your shift for **{{ show }}** on {{ when }} has been cancelled, so you are no longer needed. Thank you for signing up.',
           action: 'See my shifts',
         },
@@ -240,11 +248,54 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const, details: 'text' as const, calendar: 'url' as const },
       wording: {
         'en-GB': {
-          subject: 'You are on the rota: {{ show }}',
-          body: 'Thank you. You are confirmed as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\nIf you find you cannot do it, give it up as early as you can from your shifts, so someone else can take it.',
+          subject: 'You are on the rota: {{ show }}, {{ date }}',
+          body: 'Thank you. You are confirmed as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\n{{ details }}\n\n[Add to calendar]({{ calendar }})\n\nIf you find you cannot do it, give it up as early as you can from your shifts, so someone else can take it.',
+          action: 'See my shifts',
+        },
+      },
+    }, {
+      // A manager put them on the shift, so they did not volunteer and are not thanked.
+      id: 'front-of-house.shift-assigned',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const, details: 'text' as const, calendar: 'url' as const, by: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You have been put on the rota: {{ show }}, {{ date }}',
+          body: '{{ by }} has put you on the rota as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\n{{ details }}\n\n[Add to calendar]({{ calendar }})\n\nIf you cannot do it, you can give it up from your shifts, or tell {{ by }}.',
+          action: 'See my shifts',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-released',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house/open',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You have given up your shift: {{ show }}, {{ date }}',
+          body: 'You have given up the {{ duty }} shift for **{{ show }}** on {{ when }}, and the place is free for someone else. Nothing more is needed.\n\nIf that was a mistake, find the shift in Open shifts and sign up again while places are free.',
+          action: 'See open shifts',
+        },
+      },
+    }, {
+      id: 'front-of-house.shift-cover-asked',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/front-of-house',
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You have asked for cover: {{ show }}, {{ date }}',
+          body: 'You have asked to give up the {{ duty }} shift for **{{ show }}** on {{ when }}. It is close, so the place stays yours until someone else takes it, and the front-of-house manager has been told.\n\nIf you find you can do it after all, choose Keep my place on the shift.',
           action: 'See my shifts',
         },
       },
@@ -254,10 +305,10 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Reminder: your shift for {{ show }}',
+          subject: 'Reminder: your shift for {{ show }}, {{ date }}',
           body: 'A reminder that you are on as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.',
           action: 'See my shifts',
         },
@@ -268,10 +319,10 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'You are no longer on a shift: {{ show }}',
+          subject: 'You are no longer on a shift: {{ show }}, {{ date }}',
           body: 'You have been taken off the {{ duty }} shift for **{{ show }}** on {{ when }}, so you are not needed then. If you were not expecting this, ask the front-of-house manager.',
           action: 'See my shifts',
         },
@@ -282,10 +333,10 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       link: '/members/front-of-house',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Your shift is covered: {{ show }}',
+          subject: 'Your shift is covered: {{ show }}, {{ date }}',
           body: 'Someone has taken your {{ duty }} shift for **{{ show }}** on {{ when }}, so you are no longer needed then.',
           action: 'See my shifts',
         },
@@ -298,12 +349,28 @@ export default defineModule({
       channels: ['email' as const, 'inbox' as const],
       topic: 'front-of-house.cover-needed',
       link: '/members/front-of-house/open',
-      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const },
+      variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Cover needed: {{ duty }}, {{ show }}',
+          subject: 'Cover needed: {{ duty }}, {{ show }}, {{ date }}',
           body: 'Someone on the {{ duty }} shift for **{{ show }}** on {{ when }} has asked to give up their place. It stays theirs until someone takes it.',
           action: 'See open shifts',
+        },
+      },
+    }, {
+      // To volunteers when shifts go on the rota: one message for the whole publish.
+      id: 'front-of-house.rota-published',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'bulk' as const,
+      topic: 'front-of-house.rota-published',
+      link: '/members/front-of-house/open',
+      variables: { count: 'text' as const, shifts: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'New shifts on the rota: {{ count }}',
+          body: 'These shifts have just gone on the rota and are open for sign-up:\n\n{{ shifts }}\n\nChoose the ones that suit you from Open shifts. Places go to whoever signs up first.',
         },
       },
     }, {

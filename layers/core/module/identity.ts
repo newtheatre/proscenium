@@ -178,6 +178,9 @@ export const identityTasks = {
   // Runs confirmed erasures whose cooling-off is over, and re-checks held ones (ID-16, ID-35).
   // Hourly rather than the specification's daily, so an erasure runs within the hour it falls due.
   'core.review-data-requests': task({ every: '1h' }),
+  // Offers modules already on the default roles and fact mappings they have not offered yet (FH-4),
+  // so a site that switched a module on before its defaults shipped gets them within the hour.
+  'core.module-defaults': task({ every: '1h' }),
 }
 
 // CORE_SESSION_KEY protects every session, and CORE_OWNER_RECOVERY is for when no Owner can sign
@@ -339,6 +342,22 @@ export const identityContributions = {
       },
     },
   }, {
+    // Sent instead of the one above when the person answers a reviewer's question.
+    id: 'core.access-answer-received',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { scheme: 'text' as const },
+    link: '/account',
+    wording: {
+      'en-GB': {
+        subject: 'Thanks, we\'ve got your answer',
+        body: 'Thank you for answering. {{ theatre }} has your answer about your application to the {{ scheme }}, and the people who run it will read it and let you know.\n\nYou can see where it is in your account.',
+        action: 'See my application',
+      },
+    },
+  }, {
     // To the reviewers, once, when an application has waited longer than reply-within (ID-40).
     id: 'core.access-application-waiting',
     category: 'transactional' as const,
@@ -349,8 +368,8 @@ export const identityContributions = {
     link: '/console/people/access-scheme',
     wording: {
       'en-GB': {
-        subject: 'Applications to the {{ scheme }} are waiting',
-        body: 'Applications waiting longer than {{ theatre }} aims to answer: {{ count }}. The queue shows which.',
+        subject: 'Access scheme applications are waiting for review',
+        body: 'Applications to the {{ scheme }} waiting for review for longer than {{ theatre }} aims to take to answer: {{ count }}. The queue shows which.',
         action: 'Open the queue',
       },
     },

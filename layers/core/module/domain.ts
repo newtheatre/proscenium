@@ -323,8 +323,9 @@ export const contributes = {
     },
   }],
   // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
-  'core.count': [{ id: 'core.health-attention', file: 'health-attention' }, { id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }],
+  'core.count': [{ id: 'core.upcoming', file: 'upcoming' }, { id: 'core.health-attention', file: 'health-attention' }, { id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }],
   'core.account-section': [
+    { id: 'core.upcoming', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreUpcoming', order: 5, icon: 'i-lucide-calendar-days', count: 'core.upcoming', hideEmpty: true },
     { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
   ],
   // The Admin overview's health card: every check that is not ok (AC-12).

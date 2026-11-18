@@ -80,7 +80,8 @@ async function act(path: string, method: 'POST' | 'PUT', body: object, done: str
 }
 
 // Deciding.
-const decision = reactive<{ action: 'accept' | 'ask' | 'reject', companions: number, message: string }>({ action: 'accept', companions: 0, message: '' })
+// No choice is made for the reviewer: one click must not accept.
+const decision = reactive<{ action: 'accept' | 'ask' | 'reject' | undefined, companions: number, message: string }>({ action: undefined, companions: 0, message: '' })
 watch(() => app.value?.pending?.companions, (asked) => { decision.companions = asked ?? 0 }, { immediate: true })
 const actions = computed(() => (['accept', 'ask', 'reject'] as const).map(a => ({
   value: a,
@@ -88,12 +89,17 @@ const actions = computed(() => (['accept', 'ask', 'reject'] as const).map(a => (
   description: t(`core.access.review.${a}-help`),
 })))
 const companionChoices = computed(() => Array.from({ length: (app.value?.pending?.companions ?? 0) + 1 }, (_, n) => ({ value: n, label: t(`core.access.form.companions-${n}`) })))
-const messageLabel = computed(() => t(`core.access.review.message-for.${decision.action}`))
+const messageLabel = computed(() => decision.action ? t(`core.access.review.message-for.${decision.action}`) : '')
 async function decide() {
+  if (!decision.action) return
   const body = decision.action === 'accept'
     ? { action: 'accept', companions: decision.companions, ...(decision.message.trim() ? { message: decision.message } : {}) }
     : { action: decision.action, message: decision.message }
-  if (await act('/decision', 'POST', body, t('core.access.review.decided'))) decision.message = ''
+  const done = t(`core.access.review.decided.${decision.action}`, { name: data.value?.name ?? t('core.access.queue.unnamed') })
+  if (await act('/decision', 'POST', body, done)) {
+    decision.message = ''
+    decision.action = undefined
+  }
 }
 
 // Verifying.
@@ -166,6 +172,15 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
           </PageSection>
 
           <UAlert
+            v-if="app.pending?.answer && waiting"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-message-square-reply"
+            :title="t('core.access.review.their-answer')"
+            :description="app.pending.answer"
+          />
+
+          <UAlert
             v-if="app.message"
             color="neutral"
             variant="outline"
@@ -201,6 +216,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
                 />
               </UFormField>
               <UFormField
+                v-if="decision.action"
                 :label="messageLabel"
                 :hint="decision.action === 'accept' && decision.companions >= (app.pending?.companions ?? 0) ? t('core.access.form.optional') : undefined"
                 :help="t('core.access.review.message-help')"
@@ -215,7 +231,8 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
               <UButton
                 type="submit"
                 :loading="busy"
-                :label="t(`core.access.review.do.${decision.action}`)"
+                :disabled="!decision.action"
+                :label="decision.action ? t(`core.access.review.do.${decision.action}`) : t('core.access.review.do.choose')"
               />
             </UForm>
           </PageSection>

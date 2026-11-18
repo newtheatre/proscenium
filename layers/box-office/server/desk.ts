@@ -8,7 +8,7 @@
 import { and, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
+import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -17,7 +17,7 @@ import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
-import { DOOR_CODE_PURPOSE, signedPart } from './tickets'
+import { DOOR_CODE_PURPOSE, doorCodesForOrder, signedPart, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
@@ -87,6 +87,23 @@ async function deskSale(input: SaleInput, at: number) {
 async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], at: number): Promise<(Discounted | null)[]> {
   if (!input.promoCode) return lines.map(() => null)
   return applyCode(await judgeCode(input.promoCode, input.performanceId, at), input.performanceId, lines)
+}
+
+/**
+ * Where the panel's sale happens, for a till session it opens: the space of the performance it is
+ * for, when that performance is today (tonight's show); otherwise it says nothing. Reads only.
+ */
+export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<string | null> {
+  const input = panelInput(context.input)
+  const performanceId = 'sale' in input
+    ? input.sale.performanceId
+    : 'reservation' in input
+      ? (await first<{ performance_id: string }>('SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND performance_id IS NOT NULL LIMIT 1', input.reservation.orderId))?.performance_id
+      : input.exchange.performanceId
+  if (!performanceId) return null
+  const performance = await getPerformance(performanceId).catch(() => null)
+  if (!performance?.spaceId) return null
+  return await operatingDayOf(performance.startsAt) === await operatingDayOf(nowMs()) ? performance.spaceId : null
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
@@ -505,6 +522,60 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
   await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}` })
   unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
   return { buyer: await accountLabel(accountId) }
+}
+
+export interface PrintedTicket {
+  lineId: string
+  /** The short number a person reads off it, `K7MPQ2XR-1`. */
+  number: string
+  production: string
+  startsAt: number
+  venue: string
+  /** The part of the house, where the show has more than one. */
+  band: string | null
+  ticketType: string
+  /** Who it was named for, for a ticket of a type with requirements. */
+  holder: string | null
+  /** What the door scans; null for a ticket issued before codes were kept. */
+  doorCode: string | null
+  admitted: boolean
+}
+
+/**
+ * A paid booking's tickets to print at the till (T3, "print"): each with its show, seats, type,
+ * holder, number and the door code to scan. Asks the sell ability of the booking's performance, as
+ * emailing them does, since the printout is the tickets themselves.
+ */
+export async function deskPrintable(orderId: string): Promise<{ reference: string, tickets: PrintedTicket[] }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (order.state !== 'confirmed') refuse('box-office.desk.not-sold', 'These tickets are not paid for yet.', { status: 409 })
+  const lines = await all<{ id: string, performance_id: string, band_name: string | null, type_name: string, requirement_account_id: string | null }>(
+    `SELECT l.id, l.performance_id, CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name,
+        t.name AS type_name, l.requirement_account_id
+      FROM box_office_order_lines l JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
+      WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, order.id)
+  if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  for (const performanceId of new Set(lines.map(l => l.performance_id)))
+    await requireAbility(useContext().actor, 'box-office.order.sell', ['core.performance', performanceId])
+  const codes = new Map((await doorCodesForOrder(order.id)).map(k => [k.lineId, k]))
+  const numbers = await ticketNumbers(order, lines.map(l => l.id))
+  const shows = new Map<string, { production: string, startsAt: number, venue: string }>()
+  for (const performanceId of new Set(lines.map(l => l.performance_id))) {
+    const performance = await getPerformance(performanceId)
+    shows.set(performanceId, { production: performance.productionTitle, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}` })
+  }
+  const tickets = await Promise.all(lines.map(async (l, i) => ({
+    lineId: l.id,
+    number: numbers[i]!,
+    ...shows.get(l.performance_id)!,
+    band: l.band_name,
+    ticketType: l.type_name,
+    holder: l.requirement_account_id ? await accountLabel(l.requirement_account_id) : null,
+    doorCode: codes.get(l.id)?.doorCode ?? null,
+    admitted: codes.get(l.id)?.admitted ?? false,
+  })))
+  return { reference: order.reference, tickets }
 }
 
 export interface DeskHolder {

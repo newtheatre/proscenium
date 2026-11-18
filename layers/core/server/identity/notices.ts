@@ -3,10 +3,13 @@
 // addresses (every verified one, the old one, the new one) rather than to a side, so each address
 // gets its own notifyAddress, written in the change's unit and sent once it commits. The verifying
 // link is a sealed variable: kept encrypted, sent by email only and cleared once sent.
-import { first, isRefusal, newId, nowMs, theatreTimeZone, useSetting, type UnitView } from '#kit'
+import { first, isRefusal, newId, nowMs, theatreTimeZone, useSetting, wordsFrom, type UnitView } from '#kit'
+import roleWords from '../../i18n/en-GB/roles.json'
 import { notifyAddress } from '../notifications/send'
 import { notify } from '../notifications/notify'
 import { verifiedAddressesOf } from './accounts'
+
+const say = wordsFrom(roleWords)
 
 export type NoticeType = 'core.credential-added' | 'core.address-changed' | 'core.members-address-changed' | 'core.address-verify' | 'core.merge-notice' | 'core.merge-undone'
 
@@ -65,7 +68,7 @@ export async function roleNotice(unit: UnitView, accountId: string, roleId: stri
   const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
   // An end is the first moment of the day after the last one the role counts.
   const until = change.expiresAt
-    ? `It lasts until ${new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: await zone() }).format(change.expiresAt - 1)}.`
-    : 'It has no end date.'
+    ? say('core.roles.notice.until', { date: new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: await zone() }).format(change.expiresAt - 1) })
+    : say('core.roles.notice.no-end')
   await notify(unit, 'core.role-given', { to: accountId, variables: { role: role.name, until } })
 }

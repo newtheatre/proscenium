@@ -186,6 +186,10 @@ describe('a member price', () => {
     const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
     expect(page.status, JSON.stringify(page.body)).toBe(200)
     expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.' })
+    // General prices come first, then those for people who qualify.
+    const restricted = page.body.bands[0].types.map((t: { unmet?: string }) => !!t.unmet) as boolean[]
+    expect(restricted).toContain(false)
+    expect(restricted).toEqual([...restricted].sort((a, b) => Number(a) - Number(b)))
     const mine = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, await member())
     expect(mine.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ most: 1 })
     // Only the Wheelchair space, which every show offers, is out of a member's reach here.

@@ -45,6 +45,7 @@ function setType(type: QuestionType) {
     if (type !== 'record') {
       Reflect.deleteProperty(q, 'source')
       Reflect.deleteProperty(q, 'peopleInvolved')
+      Reflect.deleteProperty(q, 'openSearch')
     }
     if (type === 'rating') q.scale = { max: q.scale?.max ?? 5 } // not-policy: five stars to start from
     else if (type === 'scale') q.scale = { min: q.scale?.min ?? 1, max: q.scale?.max ?? 5 } // not-policy: one to five to start from
@@ -111,6 +112,15 @@ function editEnding(fn: (e: Ending) => void, field: string) {
   builder.apply(next, `${id}:${field}`)
 }
 const sources = computed(() => builder.sources.value.map(s => ({ value: s.key, label: t(s.label) })))
+/** Choosing people as the source makes the answers personal, unless the author has already said they are more than that. */
+function setSource(key: string) {
+  edit<Question>((q) => {
+    q.source = key
+    const people = builder.sources.value.find(s => s.key === key)?.people
+    if (people && (q.dataClass === 'public' || q.dataClass === 'internal')) q.dataClass = 'personal'
+    if (!people) Reflect.deleteProperty(q, 'peopleInvolved')
+  })
+}
 const ofPeople = computed(() => builder.sources.value.find(s => s.key === question.value?.source)?.people ?? false)
 const condition = (c: Condition | undefined) => c ? formsConditionSentence(c, def.value) : ''
 const text = (v: unknown) => String(v ?? '')
@@ -194,7 +204,7 @@ const text = (v: unknown) => String(v ?? '')
           :items="sources"
           :placeholder="t('forms.screens.details.source-choose')"
 
-          @update:model-value="setQ('source', $event as string)"
+          @update:model-value="setSource($event as string)"
         />
       </UFormField>
       <USwitch
@@ -203,6 +213,13 @@ const text = (v: unknown) => String(v ?? '')
         :label="t('forms.screens.details.people-involved')"
         :description="t('forms.screens.details.people-involved-help')"
         @update:model-value="setQ('peopleInvolved', $event || undefined)"
+      />
+      <USwitch
+        v-if="question.type === 'record' && question.source"
+        :model-value="!!question.openSearch"
+        :label="t('forms.screens.details.open-search')"
+        :description="t('forms.screens.details.open-search-help')"
+        @update:model-value="setQ('openSearch', $event || undefined)"
       />
       <div
         v-if="question.type === 'rating' || question.type === 'scale'"

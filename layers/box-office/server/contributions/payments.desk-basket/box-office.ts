@@ -2,7 +2,7 @@
 // owners"): a reservation to take payment for, or tickets to sell to somebody at the desk. What it
 // prepares is undone by the settlement handler's release.
 import type { DeskBasket } from '#modules/payments'
-import { deskAttach, deskPrepare, deskSummary } from '../../desk'
+import { deskAttach, deskPrepare, deskSpace, deskSummary } from '../../desk'
 
 export default {
   label: 'box-office.desk.label',
@@ -15,4 +15,5 @@ export default {
   prepare: deskPrepare,
   attach: deskAttach,
   summary: deskSummary,
+  space: deskSpace,
 } satisfies DeskBasket

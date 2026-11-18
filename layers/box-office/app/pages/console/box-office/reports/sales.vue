@@ -39,10 +39,13 @@ const productionItems = computed(() => (data.value?.productions ?? []).map(p => 
 const right = { class: { th: 'text-right', td: 'text-right tabular-nums' } }
 const totals = computed(() => data.value?.report.totals)
 const currency = computed(() => data.value?.report.currency ?? 'GBP')
+// Every footer cell says something: an empty string is drawn as nothing on the server but as an
+// empty text node in the browser, which Vue reports as a hydration mismatch. Capacity totals too.
+const capacity = computed(() => (data.value?.report.performances ?? []).reduce((sum, p) => sum + p.capacity, 0))
 const count = (key: 'capacity' | 'sold' | 'reserved' | 'complimentary' | 'admitted', header: string): TableColumn<PerformanceRow> => ({
   accessorKey: key,
   header,
-  footer: () => key === 'capacity' ? '' : String(totals.value?.[key] ?? 0),
+  footer: () => String(key === 'capacity' ? capacity.value : totals.value?.[key] ?? 0),
   meta: right,
 })
 const performanceColumns = computed<TableColumn<PerformanceRow>[]>(() => [
