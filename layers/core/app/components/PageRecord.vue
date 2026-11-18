@@ -14,8 +14,8 @@ const props = withDefaults(defineProps<{
   title: string
   /** Always a word, never colour alone. */
   status?: { label: string, tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }
-  /** The most likely next step in this state. */
-  primary?: { label: string, to?: string, icon?: string }
+  /** The most likely next step in this state; `hint` says why it is not ready yet, and it then shows quieter. */
+  primary?: { label: string, to?: string, icon?: string, hint?: string }
   /** Everything else, destructive actions last. */
   actions?: DropdownMenuItem[][]
   /** Four to six facts. */
@@ -29,7 +29,9 @@ const props = withDefaults(defineProps<{
   trail?: { label: string, to: string }[]
   /** What the readiness checklist is called, when other modules or the owner contribute checks. */
   checklistTitle?: string
-}>(), { trail: undefined, checklistTitle: undefined, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
+  /** False once the checklist has nothing left to say, such as on a published production. */
+  checklist?: boolean
+}>(), { trail: undefined, checklistTitle: undefined, checklist: true, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
 const emit = defineEmits<{ (e: 'primary'): void }>()
 defineSlots<{
   /** A side panel that stays put beside the tabs on a laptop (a poster); above them on a phone. */
@@ -65,8 +67,8 @@ const facts = computed(() => (factList.value?.facts ?? []).flatMap((f) => {
   const component = resolveComponent(f.component)
   return typeof component === 'string' ? [] : [{ ...f, component }]
 }))
-const { data: checkList } = await useAPI<{ checks: { id: string, done: boolean, sentence: string, link?: string }[] }>('/api/core/record-checks', { query: { record: props.recordType, id: props.recordId }, key: `core:record-checks:${props.recordType}:${props.recordId}`, default: () => ({ checks: [] }) })
-const checks = computed(() => checkList.value?.checks ?? [])
+const { data: checkList } = await useAPI<{ checks: { id: string, done: boolean, sentence: string, link?: string, needed?: boolean }[] }>('/api/core/record-checks', { query: { record: props.recordType, id: props.recordId }, key: `core:record-checks:${props.recordType}:${props.recordId}`, default: () => ({ checks: [] }) })
+const checks = computed(() => props.checklist ? checkList.value?.checks ?? [] : [])
 const checksDone = computed(() => checks.value.filter(c => c.done).length)
 const hasAside = computed(() => !!slots.aside || checks.value.length > 0)
 const slots = useSlots()
@@ -112,13 +114,20 @@ const { te } = useT()
       />
     </template>
     <template #primary>
-      <UButton
+      <UTooltip
         v-if="primary"
-        :label="primary.label"
-        :icon="primary.icon"
-        :to="primary.to"
-        @click="!primary.to && emit('primary')"
-      />
+        :text="primary.hint"
+        :disabled="!primary.hint"
+      >
+        <UButton
+          :label="primary.label"
+          :icon="primary.icon"
+          :to="primary.to"
+          :variant="primary.hint ? 'outline' : 'solid'"
+          :aria-description="primary.hint"
+          @click="!primary.to && emit('primary')"
+        />
+      </UTooltip>
       <UButton
         icon="i-lucide-history"
         color="neutral"
