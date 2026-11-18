@@ -4,12 +4,13 @@
 // personal answers become a fixed marker, free text is removed, and public and internal answers
 // stay. Unsent working copies go altogether. A response keyed to an address is found by that
 // address when it is one of the person's own.
+import { nowMs } from '#kit'
 import { ERASED } from '#kit/db'
 import { accountScopeSql } from '#kit/accounts'
-import type { ErasureHandler } from '../../../../core/server/points/erasure-handler'
+import type { UnitView } from '#kit'
 
 export default {
-  async erase(unit, subject) {
+  async erase(unit: UnitView, subject: { accountId?: string, emails: string[] }) {
     const emails = JSON.stringify(subject.emails)
     const theirs = `SELECT id FROM forms_responses WHERE ${subject.accountId ? `person_id IN (${accountScopeSql('?1')}) OR ` : ''}(person_id IS NULL AND respondent_email IN (SELECT value FROM json_each(?2)))`
     const params = [subject.accountId ?? null, emails]
@@ -19,6 +20,6 @@ export default {
     unit.add({ sql: `UPDATE forms_answers SET value_cipher = NULL WHERE value_cipher IS NOT NULL AND response_id IN (${theirs})`, params })
     unit.add({ sql: `DELETE FROM forms_response_drafts WHERE response_id IN (${theirs})`, params })
     // A response keyed to an address has no account for the registry to find it by.
-    unit.add({ sql: `UPDATE forms_responses SET respondent_email = NULL, unique_key = NULL, calculated = NULL, anonymised_at = ?3 WHERE person_id IS NULL AND respondent_email IN (SELECT value FROM json_each(?2))`, params: [...params, Date.now()] })
+    unit.add({ sql: 'UPDATE forms_responses SET respondent_email = NULL, unique_key = NULL, calculated = NULL, anonymised_at = ?3 WHERE person_id IS NULL AND respondent_email IN (SELECT value FROM json_each(?2))', params: [...params, nowMs()] })
   },
-} satisfies ErasureHandler
+}

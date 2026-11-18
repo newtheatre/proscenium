@@ -21,5 +21,12 @@
   "forms.abilities.form.create.label": "Start a new form",
   "forms.abilities.form.edit.label": "Build and edit a form",
   "forms.abilities.form.publish.label": "Publish a form",
-  "forms.abilities.settings.manage.label": "Change the forms settings"
+  "forms.abilities.settings.manage.label": "Change the forms settings",
+  "forms.settings.limits.response-size.label": "Largest response, in kilobytes",
+  "forms.settings.limits.response-size.help": "The most one person's answers may come to, whether sent or kept as a working copy.",
+  "forms.settings.limits.export-rows.label": "Responses in one export",
+  "forms.settings.limits.export-rows.help": "The most responses one CSV export holds. A larger set is exported in parts, by date.",
+  "forms.abilities.response.read.label": "Read a form's responses, except restricted answers",
+  "forms.abilities.response.export.label": "Export a form's responses",
+  "forms.abilities.response.read-special.label": "Open restricted answers"
 }

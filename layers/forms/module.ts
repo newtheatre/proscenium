@@ -63,6 +63,7 @@ export default defineModule({
 
   contributes: {
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }],
+    'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
     'core.navigation': [
       { id: 'forms.forms', menu: 'console', group: 'forms', section: 'everyday', to: '/console/forms', match: '/console/forms', icon: 'i-lucide-file-text', ability: ['forms.form.create', 'forms.form.edit'], order: 1 },
     ],

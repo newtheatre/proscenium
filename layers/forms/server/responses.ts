@@ -243,16 +243,14 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const taken = 'EXISTS (SELECT 1 FROM forms_responses WHERE placement_id = ?2 AND unique_key = ?3 AND id <> ?1)'
   if (s.draft) {
     unit.add({
-      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = 'received', stage_kind = 'closed', current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7
-            WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`,
+      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = 'received', stage_kind = 'closed', current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7 WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`, // not-policy: numbered parameters
       params: [s.responseId, s.link.id, uniqueKey, s.version.id, calculated, s.at, retentionDue],
     }).expect(1, once)
     unit.add({ sql: 'DELETE FROM forms_response_drafts WHERE response_id = ?', params: [s.responseId] })
   }
   else {
     unit.add({
-      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at)
-            SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', 'received', 'closed', 1, ?9, 0, ?10, ?10, ?10, ?11 WHERE NOT ${taken}`,
+      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', 'received', 'closed', 1, ?9, 0, ?10, ?10, ?10, ?11 WHERE NOT ${taken}`, // not-policy: numbered parameters
       params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue],
     }).expect(1, once)
   }

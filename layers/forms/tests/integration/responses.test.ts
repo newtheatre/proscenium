@@ -2,8 +2,9 @@
 // answered by the people the link allows, within its dates and its cap; sending stores everything
 // together and once; special-category answers are held sealed and opened only on purpose.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { advanceClock, newId } from '#kit'
-import { person, rows } from '../../../../tests/integration/helpers'
+import { advanceClock, createUnit, newId } from '#kit'
+import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { eraseAccount } from '../../../core/server/identity/erasure'
 import { NOV_17, account, definition, offered, question, raw, ready, req, send } from './stage'
 import type { Definition } from '../../shared/engine'
 
@@ -248,5 +249,48 @@ describe('the responses table', () => {
     expect(full.text.trim().split('\r\n')).toHaveLength(2)
     expect(full.text).toContain('Quiet room')
     expect((await rows('SELECT 1 FROM core_audit WHERE action = ? AND record_id = ?', 'export', formId)).length).toBe(2)
+  })
+})
+
+describe('erasing a person', () => {
+  it('treats each answer by its class, unlinks the response and removes working copies', async () => {
+    const gone = person([], { name: 'Gil Gone' })
+    await account(gone)
+    const def = definition(
+      question('name', { dataClass: 'personal' }),
+      question('about', { type: 'text.long', dataClass: 'free-text' }),
+      question('needs', { type: 'text.long', dataClass: 'special' }),
+      question('size', { type: 'choice.single', dataClass: 'internal', options: [{ id: 'm', label: 'Medium' }] }),
+    )
+    const sent = await offered(def, { onePerPerson: true })
+    const kept = await offered(def)
+    const response = await send(sent.slug, { name: 'Gil', about: 'I once played Hamlet', needs: 'A hearing loop', size: 'm' }, gone)
+    const draftId = newId('fres')
+    await req('PUT', `/api/forms/open/${kept.slug}/draft`, { responseId: draftId, answers: { name: 'Gil' }, pageId: null }, gone)
+    const bystander = await send(sent.slug, { name: 'Mo', about: 'Stays as it is' }, member)
+
+    await inContext(async () => {
+      const unit = createUnit()
+      await eraseAccount(unit.view(), gone.accountId!)
+      await unit.commit()
+    })
+
+    const answers = Object.fromEntries((await rows<any>('SELECT question_id, value_text, value_cipher, label_snapshot FROM forms_answers WHERE response_id = ?', response.body.responseId)).map(a => [a.question_id, a]))
+    expect(answers.name.value_text).toBe('Former member')
+    expect(answers.about.value_text).toBe('[removed]')
+    expect(answers.needs.value_cipher).toBeNull()
+    expect(answers.size).toMatchObject({ value_text: 'm', label_snapshot: 'Medium' })
+    // The response stays, as a row about nobody: its account is now a tombstone with no name.
+    expect((await rows<any>('SELECT unique_key, calculated, state FROM forms_responses WHERE id = ?', response.body.responseId))[0]).toEqual({ unique_key: null, calculated: null, state: 'submitted' })
+    expect(await rows('SELECT 1 FROM forms_response_drafts WHERE response_id = ?', draftId)).toHaveLength(0)
+    // Nobody else's answers are touched.
+    expect((await rows<any>('SELECT value_text FROM forms_answers WHERE response_id = ? AND question_id = ?', bystander.body.responseId, 'about'))[0].value_text).toBe('Stays as it is')
+  })
+
+  it('still refuses any other change to an answer, and any delete', async () => {
+    const { slug } = await offered(simple())
+    const sent = await send(slug, { name: 'Mo' }, member)
+    await expect(rows('UPDATE forms_answers SET value_text = ? WHERE response_id = ? RETURNING 1', 'Changed', sent.body.responseId)).rejects.toThrow(/append-only/)
+    await expect(rows('DELETE FROM forms_answers WHERE response_id = ? RETURNING 1', sent.body.responseId)).rejects.toThrow(/append-only/)
   })
 })
