@@ -54,7 +54,6 @@ onMounted(() => {
 
 function toTheatre() {
   refusal.value = null
-  if (!theatre.contactEmail) theatre.contactEmail = owner.address
   step.value = 'theatre'
 }
 
@@ -187,7 +186,7 @@ const description = computed(() => {
       <UFormField
         label="Contact email address"
         name="contactEmail"
-        help="Where the public can write to the theatre. Leave it empty to add it later."
+        help="A shared address the public can write to, such as boxoffice@example.org, not your own. Leave it empty to add it later."
       >
         <UInput
           v-model="theatre.contactEmail"

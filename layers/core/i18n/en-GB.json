@@ -592,6 +592,7 @@
   "core.getting-ready.done": "(done)",
   "core.getting-ready.items.name": "Give the theatre its name",
   "core.getting-ready.items.time-zone": "Set the time zone",
+  "core.getting-ready.items.contact": "Add a shared contact email address",
   "core.getting-ready.items.email": "Verify a domain to send email from",
   "core.getting-ready.items.branding": "Add a logo and colours",
   "core.getting-ready.items.venue": "Add a venue",
