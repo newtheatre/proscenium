@@ -9,6 +9,7 @@ import { assertTerm } from '../vocabularies/service'
 import { orderWarnings, type WarningLevel } from './guidance'
 import { changeImpact, firstRefusal, syncProductionDates } from './performances'
 import { sellsHere } from './booking'
+import { missingToPublish, type PublishingNeed } from './readiness'
 
 // ---------------------------------------------------------------------------------------------
 // Slugs
@@ -243,10 +244,10 @@ export async function getProduction(id: string): Promise<Production & { advisori
   return { ...production, advisories, effects }
 }
 
-export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next', order?: 'asc' | 'desc' }
+export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next' | 'dates', order?: 'asc' | 'desc' }
 
 /** The console's list: newest first by default, or by title, or by when the run starts. */
-export async function listProductions(query: ProductionQuery): Promise<{ rows: Production[], total: number }> {
+export async function listProductions(query: ProductionQuery): Promise<{ rows: (Production & { next: { startsAt: number, space: string } | null, space: string | null })[], total: number }> {
   const where: string[] = []
   const params: unknown[] = []
   // To be replaced: search moves behind the kit's readList (Foundations part 4), and no module keeps
@@ -263,10 +264,31 @@ export async function listProductions(query: ProductionQuery): Promise<{ rows: P
   }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const direction = query.order === 'asc' ? 'ASC' : 'DESC'
-  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' ? `first_starts_at IS NULL, first_starts_at ${direction}` : 'created_at DESC'
+  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' || query.sort === 'dates' ? `first_starts_at IS NULL, first_starts_at ${direction}` : 'created_at DESC'
   const total = (await first<{ n: number }>(`SELECT count(*) AS n FROM core_productions ${clause}`, ...params))!.n
   const rows = await all<ProductionRow>(`SELECT * FROM core_productions ${clause} ORDER BY ${order}, id LIMIT ? OFFSET ?`, ...params, query.size, (query.page - 1) * query.size)
-  return { rows: rows.map(toProduction), total }
+  const placed = await whereAndWhen(rows.map(r => r.id))
+  return { rows: rows.map(r => ({ ...toProduction(r), ...(placed.get(r.id) ?? { next: null, space: null }) })), total }
+}
+
+/**
+ * For the list, each production's next scheduled performance and the space it is in, or, with none
+ * to come, the space of its latest date. Cancelled and draft dates are left out.
+ */
+async function whereAndWhen(ids: string[]): Promise<Map<string, { next: { startsAt: number, space: string } | null, space: string | null }>> {
+  const out = new Map<string, { next: { startsAt: number, space: string } | null, space: string | null }>()
+  if (!ids.length) return out
+  const list = JSON.stringify(ids)
+  // SQLite gives the other columns of the row that holds the min() or max().
+  const next = await all<{ production_id: string, starts_at: number, space: string }>(`SELECT p.production_id, min(p.starts_at) AS starts_at, s.name AS space
+    FROM core_performances p JOIN core_spaces s ON s.id = p.space_id
+    WHERE p.production_id IN (SELECT value FROM json_each(?)) AND p.state = 'scheduled' AND p.ends_at > ? GROUP BY p.production_id`, list, nowMs())
+  const last = await all<{ production_id: string, starts_at: number, space: string }>(`SELECT p.production_id, max(p.starts_at) AS starts_at, s.name AS space
+    FROM core_performances p JOIN core_spaces s ON s.id = p.space_id
+    WHERE p.production_id IN (SELECT value FROM json_each(?)) AND p.state IN ('scheduled', 'completed') GROUP BY p.production_id`, list)
+  for (const r of last) out.set(r.production_id, { next: null, space: r.space })
+  for (const r of next) out.set(r.production_id, { next: { startsAt: r.starts_at, space: r.space }, space: r.space })
+  return out
 }
 
 /** The production a slug names now, or named once: an old slug redirects for ever. */
@@ -295,6 +317,29 @@ export async function createProduction(unit: UnitView, input: ProductionInput, a
     WHERE ${input.categoryTermId ? assertTerm(input.categoryTermId, 'core.production-category') : sql`1`}`).expect(1, CATEGORY_REFUSED)
   unit.audit({ action: 'create', record: ['core.production', id] })
   return id
+}
+
+/**
+ * A new draft from an existing production (C-01), a quick start on a revival or next year's show:
+ * its details, defaults, staging effects and content warnings come across; its season, dates,
+ * credits, poster and photos do not, nor its state.
+ */
+export async function duplicateProduction(unit: UnitView, id: string, actorId: string | null): Promise<string> {
+  const row = await productionRow(id)
+  const copy = newId('prd')
+  const title = `${row.title} (copy)`.slice(0, 200) // not-policy: the table's bound on a title
+  const slug = await freeSlug(slugFrom(title, 'production'), s => productionSlugTaken(s))
+  unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_min, age_restricted,
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, state, listed, created_by, created_at)
+    SELECT ${copy}, ${slug}, ${title}, subtitle, summary, description, kind, category_term_id, NULL, company_name, age_min, age_restricted,
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, 'draft', listed, ${actorId}, ${nowMs()}
+    FROM core_productions WHERE id = ${id}`).expect(1, { code: 'core.production.changed', reason: 'Someone else changed this production just now.', remedy: 'Refresh and try again.' })
+  unit.add(sql`INSERT INTO core_production_advisories (production_id, term_id, level, level_assumed, detail)
+    SELECT ${copy}, term_id, level, level_assumed, detail FROM core_production_advisories WHERE production_id = ${id}`)
+  unit.add(sql`INSERT INTO core_production_effects (production_id, term_id, detail)
+    SELECT ${copy}, term_id, detail FROM core_production_effects WHERE production_id = ${id}`)
+  unit.audit({ action: 'create', record: ['core.production', copy], detail: { from: id } })
+  return copy
 }
 
 /**
@@ -383,17 +428,10 @@ export async function setEffects(unit: UnitView, id: string, effects: Effect[]):
   if (row.state === 'published') unit.announce('core.production.updated', { productionId: id, fields: ['effects'], ...(added.length ? { guidanceAdded: { effectTermIds: added, warnings: [] } } : {}) }, { record: ['core.production', id] })
 }
 
-/** What publishing still needs, in the words the person sees. Empty when it can be published. */
-export async function publishingNeeds(id: string): Promise<string[]> {
-  const row = await productionRow(id)
-  const needs: string[] = []
-  if (!row.summary) needs.push('a summary')
-  if (!row.category_term_id) needs.push('a category')
-  if (!row.effects_confirmed_none && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id)) needs.push('its staging effects, or confirmation that it has none')
-  if (!row.advisories_confirmed_none && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id)) needs.push('its content warnings, or confirmation that it has none')
-  // With no booking module switched on, the public can only book through the production's own link.
-  if (!row.external_booking_url && !await sellsHere()) needs.push('a booking link, as nothing here sells tickets')
-  return needs
+/** What publishing still needs, as the page's "Ready to publish?" lines that stop it. Empty when it can be published. */
+export async function publishingNeeds(id: string): Promise<PublishingNeed[]> {
+  await productionRow(id)
+  return missingToPublish(id)
 }
 
 /** Draft or withdrawn to published (part 3). Does not publish its dates. */
@@ -402,7 +440,7 @@ export async function publishProduction(unit: UnitView, id: string): Promise<voi
   if (row.state === 'published') return
   if (row.state === 'cancelled') refuse('core.production.cancelled', 'A cancelled production cannot be published.', { status: 409, remedy: 'Undo the cancellation first.' })
   const needs = await publishingNeeds(id)
-  if (needs.length) refuse('core.production.not-ready', `To publish, the production needs ${needs.join(', ')}.`, { status: 422 })
+  if (needs.length) refuse('core.production.not-ready', needs.length === 1 ? 'This production needs 1 more thing before it can be published.' : `This production needs ${needs.length} more things before it can be published.`, { status: 422, remedy: `Still to do: ${needs.map(n => n.sentence.charAt(0).toLowerCase() + n.sentence.slice(1)).join('; ')}.` })
   unit.add(sql`UPDATE core_productions SET state = 'published', published_at = coalesce(published_at, ${nowMs()})
     WHERE id = ${id} AND state = ${row.state} AND summary IS NOT NULL AND category_term_id IS NOT NULL
       AND (effects_confirmed_none = 1 OR EXISTS (SELECT 1 FROM core_production_effects WHERE production_id = ${id}))

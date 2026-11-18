@@ -6,7 +6,9 @@
      Worker secret in Cloudflare), and Replace opens it to type a new one. Saving
      asks the person to confirm it is them. A credential declared confirm: true (replacing it breaks
      what the old value made) asks before it is replaced or removed. Keys the viewer may not manage
-     are left out, and with none left the card is not drawn. -->
+     are left out, and with none left the card is not drawn. A record with keys of its own (a payment
+     provider account) passes them as `keys` with the route that saves them as `saveTo`, so its keys
+     look and behave exactly like the site's. -->
 <script setup lang="ts">
 interface Key {
   name: string
@@ -18,13 +20,30 @@ interface Key {
   confirm: boolean
 }
 
+/** A record's own key, as the record's route lists it, already labelled. */
+interface RecordKey {
+  name: string
+  source: Key['source']
+  hint: string | null
+  start?: string | null
+  label: string
+  help: string
+  generate?: boolean
+}
+
 const props = defineProps<{
   /** The credentials this page manages, by name (`CORE_TURNSTILE_SECRET_KEY`). */
-  names: string[]
+  names?: string[]
+  /** Or a record's own keys, which its own route saves (`saveTo`, taking `{ keys }`). */
+  keys?: RecordKey[]
+  /** The route a record's keys are saved through. */
+  saveTo?: string
   /** The card's heading; "Keys" when left out. */
   title?: string
   /** A line under the heading saying where the keys come from. */
   description?: string
+  /** Names among `names` that get a Generate button, for a key that is only ever a long random string. */
+  generate?: string[]
 }>()
 /** After keys are saved or removed, with their names, so the page can refresh what depends on them. */
 const emit = defineEmits<{ saved: [names: string[]] }>()
@@ -34,13 +53,15 @@ const { $api } = useNuxtApp()
 const toast = useToast()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
-const { data, refresh } = await useAPI<{ keys: Key[] }>('/api/core/credentials', {
-  query: { names: props.names.join(',') },
-  key: `core:credentials:${props.names.join(',')}`,
-})
+const site = props.keys
+  ? null
+  : await useAPI<{ keys: Key[] }>('/api/core/credentials', {
+      query: { names: (props.names ?? []).join(',') },
+      key: `core:credentials:${(props.names ?? []).join(',')}`,
+    })
 
-const keys = computed(() => data.value?.keys ?? [])
-const items = computed(() => keys.value.map(k => ({ ...k, label: t(k.labelKey), help: t(k.helpKey) })))
+const siteKeys = computed(() => site?.data.value?.keys ?? [])
+const items = computed(() => props.keys ?? siteKeys.value.map(k => ({ ...k, label: t(k.labelKey), help: t(k.helpKey), generate: props.generate?.includes(k.name) })))
 const typed = ref<Record<string, string>>({})
 const saving = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -51,10 +72,10 @@ async function send(body: Record<string, string | null>, done: string) {
   saving.value = true
   refusal.value = null
   try {
-    await $api('/api/core/credentials', { method: 'POST', body: { keys: body } })
+    await $api(props.saveTo ?? '/api/core/credentials', { method: 'POST', body: { keys: body } })
     typed.value = {}
     toast.add({ title: t(done), color: 'success', icon: 'i-lucide-circle-check' })
-    await refresh()
+    await site?.refresh()
     emit('saved', Object.keys(body))
   }
   catch (e) {
@@ -67,7 +88,7 @@ async function send(body: Record<string, string | null>, done: string) {
 
 /** Asks first for a key whose replacement breaks what the old one made, when one is in use now. */
 async function sure(names: string[], removing: boolean): Promise<boolean> {
-  const risky = keys.value.filter(k => names.includes(k.name) && k.confirm && k.source)
+  const risky = siteKeys.value.filter(k => names.includes(k.name) && k.confirm && k.source)
   if (!risky.length) return true
   return await confirm({
     verb: removing ? t('core.credentials.remove-verb') : t('core.credentials.replace-verb'),
@@ -84,13 +105,14 @@ async function save() {
 }
 
 async function remove(name: string) {
-  const key = keys.value.find(k => k.name === name)
-  if (!key) return
-  const asked = key.confirm
+  const item = items.value.find(k => k.name === name)
+  if (!item) return
+  const key = siteKeys.value.find(k => k.name === name)
+  const asked = key?.confirm
     ? await sure([name], true)
     : await confirm({
         verb: t('core.credentials.remove-verb'),
-        thing: t(key.labelKey),
+        thing: item.label,
         consequence: t('core.credentials.remove-body'),
         button: t('core.credentials.remove-button'),
       })
@@ -100,7 +122,7 @@ async function remove(name: string) {
 
 <template>
   <UForm
-    v-if="keys.length"
+    v-if="items.length"
     :state="typed"
     novalidate
     @submit="save"

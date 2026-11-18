@@ -8,7 +8,7 @@ export default defineRoute({ ability: 'awards.award.view', rateLimit: 'default' 
   const state = query.state === 'current' || query.state === 'revoked' ? query.state : undefined
   const awards = await listAwards({ typeId: query.type ? String(query.type) : undefined, state, q: query.q ? String(query.q).slice(0, 100) : undefined }) // not-policy: shape bound
   return {
-    awards: awards.map(a => ({ id: a.id, typeId: a.typeId, typeName: a.typeName, recipientName: a.recipientName, awardedOn: a.awardedOn, awardedFor: a.awardedFor, state: a.state, visibility: a.visibility, linked: !!a.accountId })),
+    awards: awards.map(a => ({ id: a.id, typeId: a.typeId, typeName: a.typeName, recipientName: a.recipientName, awardedOn: a.awardedOn, awardedPrecision: a.awardedPrecision, awardedFor: a.awardedFor, state: a.state, visibility: a.visibility, linked: !!a.accountId })),
     canIssue: (await can(actor, 'awards.award.issue')).allowed,
   }
 })

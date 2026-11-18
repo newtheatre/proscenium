@@ -1,7 +1,7 @@
 // Console forms that write through routes requiring an Idempotency-Key, submitted in a real browser
 // with nothing added by the test: the app's own fetch gives every write a key, so a screen never
 // fails with "This request needs an Idempotency-Key header". Adding a ticket type was the report;
-// a band and prices on a performance's set-up go through the same kind of route. A price for one
+// a section and prices on a performance's set-up go through the same kind of route. A price for one
 // performance only shows where it comes from and can be handed back to the production's. A second
 // performance copies the first one's set-up.
 import { test, expect, type Page } from '@playwright/test'
@@ -34,8 +34,8 @@ test.beforeAll(async ({ playwright }) => {
   const performance = await post(`/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 86_400_000, capacity: 100 })
   await post(`/api/core/performances/${performance.id}/schedule`, {})
   performanceId = performance.id
+  // Left a draft: a scheduled date would take the run's set-up by itself, leaving nothing to copy.
   const second = await post(`/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 2 * 86_400_000, capacity: 100 })
-  await post(`/api/core/performances/${second.id}/schedule`, {})
   secondId = second.id
   await api.dispose()
 })
@@ -55,27 +55,29 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
 
   await visit(page, `/console/box-office/performances/${performanceId}`)
   await page.getByRole('textbox', { name: /^Name/ }).fill('Circle')
-  await page.getByRole('button', { name: 'Add band' }).click()
-  await expect(page.getByText('Band added').first()).toBeVisible()
-  await page.getByLabel(typeName).fill('12.00')
+  await page.getByRole('button', { name: 'Add section' }).click()
+  await expect(page.getByText('Section added').first()).toBeVisible()
+  // The theatre's usual ticket preset may have given the show sections of its own already.
+  const circle = page.getByRole('group', { name: 'Circle', exact: true })
+  await circle.getByLabel(typeName).fill('12.00')
   await page.getByRole('button', { name: 'Save prices' }).click()
   await expect(page.getByText('Prices saved').first()).toBeVisible()
   await expect(page.getByText('This request needs an Idempotency-Key header.')).toHaveCount(0)
 
   // This performance alone gets its own price, which shows on both views and can be handed back.
   await page.getByRole('radio', { name: 'This performance only' }).check()
-  await expect(page.getByText('Same as all performances.')).toBeVisible()
-  await page.getByLabel(typeName).fill('8.00')
+  await expect(circle.getByText('Same as all performances.')).toBeVisible()
+  await circle.getByLabel(typeName).fill('8.00')
   await page.getByRole('button', { name: 'Save prices' }).click()
-  await expect(page.getByText('This performance only. All performances: £12.00.')).toBeVisible()
+  await expect(circle.getByText('This performance only. All performances: £12.00.')).toBeVisible()
   await page.getByRole('radio', { name: 'All performances' }).check()
-  await expect(page.getByLabel(typeName)).toHaveValue(/12\.00/)
-  await expect(page.getByText('This performance has its own price: £8.00.')).toBeVisible()
+  await expect(circle.getByLabel(typeName)).toHaveValue(/12\.00/)
+  await expect(circle.getByText('This performance has its own price: £8.00.')).toBeVisible()
   await page.getByRole('radio', { name: 'This performance only' }).check()
-  await page.getByRole('button', { name: 'Use the price for all performances' }).click()
+  await circle.getByRole('button', { name: 'Use the price for all performances' }).click()
   await expect(page.getByText('This performance now uses the price for all performances').first()).toBeVisible()
-  await expect(page.getByText('Same as all performances.')).toBeVisible()
-  await expect(page.getByLabel(typeName)).toHaveValue(/12\.00/)
+  await expect(circle.getByText('Same as all performances.')).toBeVisible()
+  await expect(circle.getByLabel(typeName)).toHaveValue(/12\.00/)
 
   // A change set for later waits for its date, is listed meanwhile, and can be cancelled.
   await page.getByRole('radio', { name: 'From a later date' }).check()
@@ -100,13 +102,17 @@ test('Copy one performance\'s set-up onto another', async ({ page }) => {
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Increment' }).first().click()
   await page.getByRole('button', { name: 'Save seats' }).click()
   await expect(page.getByText('Seats saved').first()).toBeVisible()
+  const saved = await (await page.request.get(`/api/box-office/performances/${performanceId}/sales`)).json()
+  const first = String(saved.pools[0].capacity)
 
   await visit(page, `/console/box-office/performances/${secondId}`)
   await expect(page.getByText('No other performance has been set up yet.')).toHaveCount(0)
   await page.getByLabel('Copy from').click()
-  await page.getByRole('option', { name: new RegExp(`The Writes Show ${stamp}`) }).click()
+  // This production's performances come first, under its title.
+  await expect(page.getByRole('listbox').getByText(`The Writes Show ${stamp}`).first()).toBeVisible()
+  await page.getByRole('option').first().click()
+  // Nothing is set up here yet, so nothing is replaced and there is no confirming.
   await page.getByRole('button', { name: 'Copy set-up' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Copy set-up' }).click()
   await expect(page.getByText('Set-up copied').first()).toBeVisible()
-  await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
+  await expect(page.getByRole('spinbutton').first()).toHaveValue(first)
 })

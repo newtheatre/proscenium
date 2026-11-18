@@ -5,5 +5,5 @@ import { awardsOf } from '../../../../awards'
 
 export default defineRoute({ ability: 'awards.award.view', rateLimit: 'default' }, async (event) => {
   const awards = await awardsOf(getRouterParam(event, 'id')!)
-  return { awards: awards.map(a => ({ id: a.id, typeName: a.typeName, awardedOn: a.awardedOn, awardedFor: a.awardedFor, state: a.state })) }
+  return { awards: awards.map(a => ({ id: a.id, typeName: a.typeName, awardedOn: a.awardedOn, awardedPrecision: a.awardedPrecision, awardedFor: a.awardedFor, state: a.state })) }
 })

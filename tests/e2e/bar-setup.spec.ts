@@ -54,7 +54,7 @@ test('Choices lists each group with its options and has no violations', async ({
   await visit(page, '/admin/modules/bar/choices')
   await expect(page.getByRole('tab', { name: 'Choices', selected: true })).toBeVisible()
   await expect(page.getByText(`Irish cream ${stamp}`)).toBeVisible()
-  await expect(page.getByText('Adds £2.00 · Age check · Not checked yet')).toBeVisible()
+  await expect(page.getByText('Adds £2.00 · Age check · Allergens: not checked yet')).toBeVisible()
   await noViolations(page)
 })
 
@@ -66,7 +66,7 @@ test('a sub-category shows under its parent on Products', async ({ page }) => {
 
 test('a product records its allergens from the label', async ({ page }) => {
   await visit(page, `/admin/modules/bar/products/${s.product}`)
-  await expect(page.getByText('Not checked yet')).toBeVisible()
+  await expect(page.getByText('Allergens: not checked yet')).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Check the label' }).click()
   const dialog = page.getByRole('dialog')
@@ -81,7 +81,7 @@ test('a product records its allergens from the label', async ({ page }) => {
 
 test('an outlet takes a till layout', async ({ page }) => {
   await visit(page, '/admin/modules/bar/outlets')
-  await page.getByRole('button', { name: 'New outlet' }).click()
+  await page.getByRole('button', { name: 'New outlet' }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Name').fill(`Foyer ${stamp}`)
   await expect(dialog.getByText('Till layout')).toBeVisible()
@@ -130,21 +130,35 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   await expect(page.getByText(`20 ml of Cocoa ${stamp}`)).toBeVisible()
 })
 
-test('Add a product starts from a preset, fills a row per size, and opens the new product', async ({ page }) => {
+test('Add a product starts from a preset, fills a row per size, and stays on the list', async ({ page }) => {
   await visit(page, '/admin/modules/bar/products')
   await page.getByRole('button', { name: 'New product' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('button', { name: /Wine/ })).toBeVisible()
   await noViolations(page)
   await dialog.getByRole('button', { name: /Wine/ }).click()
+  await dialog.getByRole('button', { name: 'Add product' }).click()
+  await expect(dialog.getByText('This is needed.').first()).toBeVisible()
   await dialog.getByLabel('Name', { exact: true }).fill(`House red ${stamp}`)
+  await dialog.getByLabel('Category').click()
+  await page.getByRole('option', { name: `Snacks ${stamp}`, exact: true }).click()
   await expect(dialog.getByLabel('Size 4 name')).toHaveValue('Bottle')
+  await dialog.getByLabel('Size 2 name').fill('125ml')
+  await dialog.getByRole('button', { name: 'Add product' }).click()
+  await expect(dialog.getByText('Another size already has this name.')).toBeVisible()
+  await dialog.getByLabel('Size 2 name').fill('175ml')
   await dialog.getByLabel('Size 1 Standard price').fill('3.50')
   await dialog.getByLabel('Size 4 Standard price').fill('16.00')
   await noViolations(page)
   if (process.env.BAR_SHOTS) await page.screenshot({ path: `${process.env.BAR_SHOTS}/add-product.png`, fullPage: true })
   await dialog.getByRole('button', { name: 'Add product' }).click()
-  await expect(page).toHaveURL(/\/admin\/modules\/bar\/products\/bprd_/)
+  await expect(dialog.getByText('175ml has no price on Standard, so it can\'t be sold yet.')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add without prices' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/\/admin\/modules\/bar\/products$/)
+  const row = page.getByRole('listitem').filter({ hasText: `House red ${stamp}` })
+  await expect(row.getByText('Needs a price')).toBeVisible()
+  await page.getByRole('link', { name: 'Open' }).first().click()
   await expect(page.getByRole('heading', { name: '250ml' })).toBeVisible()
 })
 

@@ -1,18 +1,20 @@
 <!-- The card that tells a guest buyer they can open an account (the sign-in review, item 2). The
-     account was made when they booked; their confirmation email carries a link that opens it. With a
-     booking link, "Send me the link again" asks for a fresh one; the answer never says whether
-     anything was sent. Shown only to somebody who is not signed in. -->
+     account was made when they booked; their booking email carries a link that opens it. With a
+     booking link, "Send me the link again" asks for a fresh one and says what happened: sent, the
+     account is open already, or too many asked for. Shown only to somebody who is not signed in,
+     and only where the email could carry the link. -->
 <script setup lang="ts">
+type Outcome = 'sent' | 'claimed' | 'limited' | 'unavailable' | 'failed'
 const props = defineProps<{ orderToken?: string }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
 const dismissed = ref(false)
-const sent = ref(false)
+const sent = ref<Outcome | null>(null)
 
 async function sendAgain() {
   if (!props.orderToken) return
-  await $api('/api/box-office/orders/link/account' as string, { method: 'POST', body: {}, headers: { 'x-order-token': props.orderToken } }).catch(() => undefined)
-  sent.value = true
+  const answer = await $api<{ outcome?: Outcome }>('/api/box-office/orders/link/account' as string, { method: 'POST', body: {}, headers: { 'x-order-token': props.orderToken } }).catch(() => null)
+  sent.value = !answer?.outcome || answer.outcome === 'unavailable' ? 'failed' : answer.outcome
 }
 </script>
 
@@ -33,11 +35,18 @@ async function sendAgain() {
         role="status"
         class="text-sm"
       >
-        {{ t('box-office.account-card.sent') }}
+        {{ t(`box-office.account-card.outcome.${sent}`) }}
+        <ULink
+          v-if="sent === 'claimed'"
+          to="/sign-in"
+          class="font-medium text-primary"
+        >
+          {{ t('box-office.account-card.sign-in') }}
+        </ULink>
       </p>
       <div class="flex flex-wrap gap-2 pt-1">
         <UButton
-          v-if="orderToken && !sent"
+          v-if="orderToken && (!sent || sent === 'failed')"
           loading-auto
           :label="t('box-office.account-card.send')"
           @click="sendAgain()"

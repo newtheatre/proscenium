@@ -36,6 +36,11 @@ const toast = useToast()
 type Answer = { contains: string[], mayContain: string[], checked: boolean, checkedAt: number | null }
 const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: Location[], currency: string, categories: { id: string, name: string }[], venues: Venue[], canAllergens: boolean, allergens: Record<string, Answer> }>('/api/bar/stock', { key: 'bar:stock' })
 
+// The home card for labels not checked opens this page with ?allergens=unchecked.
+const route = useRoute()
+const uncheckedOnly = computed(() => route.query.allergens === 'unchecked' && !!data.value?.canAllergens)
+const shownItems = computed(() => (data.value?.items ?? []).filter(i => !uncheckedOnly.value || !data.value?.allergens[i.id]?.checked))
+
 const unitItems = computed(() => (['each', 'ml', 'g'] as const).map(u => ({ value: u, label: t(`bar.screens.stock.units.${u}`) })))
 const categoryItems = computed(() => [{ value: 'none', label: t('bar.screens.stock.no-category') }, ...(data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name }))])
 // A location sits at a venue, or in one of its spaces.
@@ -185,6 +190,15 @@ async function setActive(path: string, active: boolean) {
           :title="t('bar.screens.stock.items')"
           :description="t('bar.screens.stock.items-help')"
         >
+          <UAlert
+            v-if="uncheckedOnly"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-filter"
+            :title="t('bar.screens.stock.unchecked-only')"
+            :actions="[{ label: t('bar.screens.stock.show-all'), to: '/admin/modules/bar/stock', color: 'neutral', variant: 'outline' }]"
+            class="mb-3"
+          />
           <EmptyState
             v-if="!data.items.length"
             icon="i-lucide-package"
@@ -196,7 +210,7 @@ async function setActive(path: string, active: boolean) {
             :label="t('bar.screens.stock.items')"
           >
             <RecordListItem
-              v-for="i in data.items"
+              v-for="i in shownItems"
               :key="i.id"
               :name="i.active ? i.name : t('bar.screens.products.retired-name', { name: i.name })"
               :description="describeItem(i)"

@@ -160,6 +160,16 @@ describe('a member price', () => {
     expect(first.ok, JSON.stringify(first)).toBe(true)
     const [line] = await rows<{ requirement_ref: string, requirement_account_id: string }>('SELECT requirement_ref, requirement_account_id FROM box_office_order_lines WHERE order_id = ?', (first as { orderId: string }).orderId)
     expect(line).toEqual({ requirement_ref: 'membership:any', requirement_account_id: holder.accountId })
+    // Starting again in another browser lets the first basket go rather than counting it (B18).
+    const again = await buy(h, type.id, 1, holder)
+    expect(again.ok, JSON.stringify(again)).toBe(true)
+    const firstId = (first as { orderId: string }).orderId
+    expect(await rows('SELECT state FROM box_office_orders WHERE id = ?', firstId)).toEqual([{ state: 'expired' }])
+    expect(await rows('SELECT DISTINCT c.state, c.release_reason FROM box_office_claims c JOIN box_office_holds k ON k.id = c.hold_id WHERE k.order_id = ?', firstId)).toEqual([{ state: 'released', release_reason: 'abandoned' }])
+    // A ticket the member has beyond a basket still counts.
+    const kept = (again as { orderId: string }).orderId
+    await rows("UPDATE box_office_claims SET state = 'confirmed', expires_at = NULL WHERE hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ?)", kept)
+    await rows("UPDATE box_office_orders SET state = 'reserved', expires_at = NULL, account_id = ? WHERE id = ?", holder.accountId, kept)
     expect(await buy(h, type.id, 1, holder)).toMatchObject({ ok: false, code: 'box-office.requirement.limit' })
     expect(await buy(h, type.id, 2, await member())).toMatchObject({ ok: false, code: 'box-office.requirement.limit' })
   })
@@ -260,7 +270,7 @@ describe('a member price by reference', () => {
     await referenced()
     await publish(h)
     const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
-    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.', reference: { label: expect.stringMatching(/: type your (member number|membership reference) to get this price$/), field: expect.stringMatching(/^(Member number|Membership reference)$/) } })
+    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.', reference: { label: expect.stringMatching(/: type your (member number|membership reference or member number) to get this price$/), field: expect.stringMatching(/^(Member number|Membership reference)$/) } })
   })
 })
 

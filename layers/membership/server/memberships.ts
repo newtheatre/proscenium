@@ -2,6 +2,7 @@
 // is current is read from its state and dates at each request and never stored, so the members'
 // area cannot outlive it and nothing has to run when it lapses.
 import { all, first, newId, nowMs, useSetting, type UnitView } from '#kit'
+import { notify } from '#modules/core'
 import { accountScopeSql } from '#kit/accounts'
 import { Refusal } from '#kit/refusal'
 import { today as theatreToday } from '#kit'
@@ -137,6 +138,27 @@ export interface ActiveInput {
   note?: string | null
   /** The membership this renews (R1). */
   renewsId?: string | null
+  /** False to send no welcome email, as for members brought in by an import. */
+  welcome?: boolean
+}
+
+/**
+ * The welcome email for a new membership (not a renewal): what the scheme gives, how long it runs,
+ * and the way to the membership card in the person's account.
+ */
+async function welcome(unit: UnitView, scheme: Scheme, accountId: string, membershipId: string, endsOn: string | null): Promise<void> {
+  const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
+  const ends = endsOn ? new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${endsOn}T00:00:00Z`)) : null
+  await notify(unit, 'membership.welcome', {
+    to: accountId,
+    variables: {
+      scheme: scheme.name,
+      gives: scheme.summary?.trim() || 'Your account shows what your membership includes.',
+      until: ends ? `It runs until ${ends}.` : 'It has no end date.',
+    },
+    subject: ['membership.membership', membershipId],
+    dedupeKey: `welcome:${membershipId}`,
+  })
 }
 
 /**
@@ -156,6 +178,7 @@ export async function writeActive(unit: UnitView, input: ActiveInput): Promise<{
   }).expect(1)
   writeNumber(unit, input.accountId, input.startsOn, at)
   unit.announce('membership.membership.started', { membershipId: id, schemeId: input.scheme.id, accountId: input.accountId }, { record: ['membership.membership', id] })
+  if (input.welcome !== false && input.origin !== 'renewed' && !input.renewsId) await welcome(unit, input.scheme, input.accountId, id, endsOn)
   return { membershipId: id, startsOn: input.startsOn, endsOn }
 }
 
@@ -191,7 +214,7 @@ export function writePending(unit: UnitView, input: { scheme: Scheme, accountId:
  * Activates a pending application whose last requirement has just been met (A1): its dates are set
  * now, from the day it activates. The check constraint refuses it while anything is outstanding.
  */
-export function activatePending(unit: UnitView, input: { id: string, scheme: Scheme, accountId: string, count: number, startsOn: string, endsOn?: string | null, paid?: boolean }): { startsOn: string, endsOn: string | null } {
+export async function activatePending(unit: UnitView, input: { id: string, scheme: Scheme, accountId: string, count: number, startsOn: string, endsOn?: string | null, paid?: boolean }): Promise<{ startsOn: string, endsOn: string | null }> {
   const at = nowMs()
   const endsOn = input.endsOn !== undefined ? input.endsOn : endsOnFor(input.scheme, input.startsOn, input.count)
   unit.add({
@@ -201,14 +224,17 @@ export function activatePending(unit: UnitView, input: { id: string, scheme: Sch
   }).expect(1, { code: 'membership.application.changed', reason: 'This application has already been dealt with.', remedy: 'Reload the page.' })
   writeNumber(unit, input.accountId, input.startsOn, at)
   unit.announce('membership.membership.started', { membershipId: input.id, schemeId: input.scheme.id, accountId: input.accountId }, { record: ['membership.membership', input.id] })
+  const renewal = await first<{ renews_id: string | null }>('SELECT renews_id FROM membership_memberships WHERE id = ?', input.id)
+  if (!renewal?.renews_id) await welcome(unit, input.scheme, input.accountId, input.id, endsOn)
   return { startsOn: input.startsOn, endsOn }
 }
 
 /** The person's member number, shown with the theatre's prefix. Null before their first membership. */
 export async function memberNumber(accountId: string): Promise<{ number: number, label: string, since: string } | null> {
   // After a merge both accounts' rows may be in scope (rule X2): the lower number and the earlier date count.
+  // Member since follows the earliest start date, so a corrected or back-dated membership is reflected (first_joined_on is the fallback).
   const row = await first<{ number: number | null, first_joined_on: string }>(
-    `SELECT min(number) AS number, min(first_joined_on) AS first_joined_on FROM membership_members WHERE account_id IN (${accountScopeSql('?1')})`,
+    `SELECT min(number) AS number, coalesce((SELECT min(starts_on) FROM membership_memberships WHERE state IN ('active', 'ended') AND account_id IN (${accountScopeSql('?1')})), min(first_joined_on)) AS first_joined_on FROM membership_members WHERE account_id IN (${accountScopeSql('?1')})`,
     accountId,
   )
   if (!row?.number) return null

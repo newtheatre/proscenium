@@ -1,15 +1,14 @@
 <!-- The door list for one performance (BO-40): who is coming, found by name or booking reference,
      with how many of their tickets are used. Those still to arrive are the default view. Each row
-     opens the order. A buyer with no ticket to scan is admitted from their row, one or all.
-     Tickets and membership cards are scanned with the device's camera, one after another, or their
-     code typed in the same dialog; the result shows at once there and as a message. The door itself
-     is the scanner in live mode, one button away. -->
+     opens the order. A buyer with no ticket to scan is admitted from their row, one or all. A sale at
+     the desk with no name given reads "Desk sale, 3 tickets, 19:02" (D9). Scanning is the door itself,
+     in live mode, one button away; this page has no second scanner (D9, box office review). -->
 <script setup lang="ts">
 import { doorList } from '../../../../../../shared/lists'
 
 definePageMeta({ layout: 'console' })
 
-interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
+interface Row { id: string, reference: string, buyer: string | null, channel?: string, at?: number, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
 
 const { t } = useT()
 const route = useRoute()
@@ -28,36 +27,8 @@ const toast = useToast()
 const { toRefusal } = useRefusal()
 const admitting = ref<string | null>(null)
 
-interface Scan { result: string, ticketPerformance?: DoorElsewhere, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
-const { time } = useDates()
 const { money } = await useMoney()
-const elsewhere = useDoorElsewhere()
-const { data: summary } = await useAPI<{ performance: { startsAt: number } }>(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/door/summary`, { key: `box-office:door:summary:${id.value}` })
-const lastScan = ref<{ text: string, color: 'success' | 'warning' | 'error' } | null>(null)
-const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'warning', reference: 'warning', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
-
-async function scan(code: string) {
-  if (!code.trim()) return
-  try {
-    const out = await $api<Scan>(`/api/box-office/performances/${encodeURIComponent(id.value)}/scan`, { method: 'POST', body: { code: code.trim() } })
-    const said = out.result === 'card' && out.card
-      ? `${out.card.headline}. ${out.card.line}`
-      : out.result === 'wrong_performance'
-        ? elsewhere(out.ticketPerformance, summary.value?.performance.startsAt)
-        : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
-    // The source's own words for why not, and a note when nobody could check.
-    const text = [out.requirement?.reason, said, out.unchecked ? t('box-office.door.scan.unchecked') : null].filter(Boolean).join(' ')
-    const color = out.result === 'card' && out.card?.state === 'attention' ? 'warning' : COLOUR[out.result] ?? 'error'
-    lastScan.value = { text, color }
-    toast.add({ title: text, color })
-    if (out.result === 'admitted') await refreshNuxtData(`core:list:${listRoute.value}`)
-  }
-  catch (error) {
-    const refusal = toRefusal(error)
-    lastScan.value = { text: refusal.reason, color: 'error' }
-    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
-  }
-}
+const nameOf = useDoorName()
 
 async function admit(row: Row, count: number) {
   admitting.value = row.id
@@ -97,17 +68,16 @@ const trail = computed(() => [
         icon="i-lucide-maximize"
         :label="t('box-office.door.open-live')"
       />
-      <CodeScanButton
-        continuous
-        typing
-        :label="t('box-office.door.scan.button')"
-        :status="lastScan?.text"
-        :status-color="lastScan?.color"
-        @scanned="scan"
+      <UButton
+        :to="`/live/door/${encodeURIComponent(id)}/print`"
+        icon="i-lucide-printer"
+        color="neutral"
+        variant="outline"
+        :label="t('box-office.live-door.print')"
       />
     </template>
     <template #cell-buyer="{ row }">
-      {{ row.buyer ?? t('box-office.orders.no-buyer') }}
+      {{ nameOf(row) }}
     </template>
     <template #cell-reference="{ row }">
       <span class="font-mono">{{ row.reference }}</span>

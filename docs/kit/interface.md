@@ -157,6 +157,12 @@ app's words, and says what the server would say for the same value.
 - **Show what the server refuses beside the field.** On a failed save,
   `form.value?.setErrors(fieldErrors(refusal))` (`useRefusal()`); `RefusalNotice` keeps the summary.
   `PageForm` does all of this itself.
+- **Field errors always; a summary only on a long form.** Every problem shows beside its field. A
+  form long enough to be a page adds a "Please check" summary at the top that links to each; a short
+  form in a panel or a dialogue shows the field errors alone.
+- **Submit verbs.** A record with a page of its own is made with "Create <thing>" (Create production,
+  Create venue, Create role); something added to a list is "Add <thing>" (Add season, Add space, Add
+  closure). Its toast says "<Thing> added", with Undo where the act can be reversed.
 - **Do not disable the save button until the form is valid.** Let it be pressed and say what is
   missing. A form with no schema of its own names what it needs with `needs()`:
   `:validate="() => needs({ name: form.name, note: paid ? form.note : true })"`, each key the
@@ -389,7 +395,8 @@ anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the 
 "Admin" mark at the start of every page's navbar that says where you are at every width (PageFrame
 draws it when the layout provides `ADMIN_SHELL`; there is no second bar, and below 1024 pixels the
 navbar's own menu button opens the drawer), a "Back to console" (or "Back to the site") row where the theatre's mark is,
-neutral buttons (the `admin-shell` class on `body` swaps the brand colour out), and a browser title
+the same primary colour as the console, so a control looks the same in either shell and in the
+console's settings window (the `admin-shell` class on `body` is kept as a hook), and a browser title
 that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
 
 - **Overview** at `/admin`: `PageHome` with `home="admin"`, cards from `core.home-card` with `home: 'admin'`.
@@ -411,6 +418,12 @@ a layout, not a shell, and it has no navigation of its own.
   screens under its address, exactly as in the other shells. An ability held through a fact (such as
   being on shift) counts. Whoever holds the ability of at least one live entry gets the `live` side in
   the viewer and "Tonight" first in the account menu; for anyone else `/live` does not exist.
+- **The Tonight hub** (`/live`) lists the performances of the theatre's operating day (so a show
+  that runs past midnight stays until `core.locale.day-start`), each with its start time and the
+  figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
+  `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
+  minor units): Box office gives sold and in, Payments what the tills have taken. The screens'
+  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.
@@ -437,9 +450,17 @@ a layout, not a shell, and it has no navigation of its own.
   `payments.sessions.default-space`, else unknown), which the strip above the till can change before
   or after; the seller's own session is the "Your session" card at the top of Money › Sessions, not a
   page of its own.
-- **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
-  the device is offline the strip says that changes cannot be sent; a live screen should disable its
-  writes then rather than lose them.
+- **Offline.** A live screen that must keep working without a connection reads through
+  `useLiveData(key, url, { every? })`: online it fetches and keeps a copy in browser storage, offline it
+  answers from that copy (with `at`, when it was made), and `update()` changes the copy for what was
+  done offline. Copies older than a day are dropped. Writes go through `useLiveQueue(key, send)`:
+  `add(item)` keeps the item on the device and `send(items)` is called with everything waiting when
+  online, oldest first; a batch whose answer was lost is sent again unchanged, so give each item an
+  id the server recognises (the door's scans carry ids made on the device). The strip shows how many
+  writes are waiting on every queue. The door (`useOfflineDoor`) is the first user: it checks signed
+  door codes against the public keys on the device. A screen without them still cannot send changes
+  offline and should disable its writes rather than lose them. Pages are not cached for offline
+  loading, so a screen must be open before the connection goes.
 
 ## Seams for Identity
 

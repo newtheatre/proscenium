@@ -17,13 +17,21 @@ const PATIENCE = 120 // not-policy: polls before the page stops waiting (about a
 
 /** Provides uploads for the form at `slug`, into the response `responseId`. */
 export function provideFormsUploads(slug: Ref<string>, responseId: Ref<string>, place?: Ref<string>): FormsUploads {
+  return provideUploadsAt(() => `/api/forms/open/${encodeURIComponent(slug.value)}/files`, () => ({ response: responseId.value, ...(place?.value ? { place: place.value } : {}) }))
+}
+
+/** Provides uploads through an emailed changes link (R-19): the link names the response. */
+export function provideChangeLinkUploads(token: Ref<string>): FormsUploads {
+  return provideUploadsAt(() => `/api/forms/changes/${encodeURIComponent(token.value)}/files`, () => ({}))
+}
+
+function provideUploadsAt(base: () => string, where: () => Record<string, string>): FormsUploads {
   const { $api } = useNuxtApp()
-  const base = () => `/api/forms/open/${encodeURIComponent(slug.value)}/files`
   const uploads: FormsUploads = {
     async upload(question, file) {
       const sent = await $api<FileRef>(base() as string, {
         method: 'POST',
-        query: { response: responseId.value, question: question.id, name: file.name, type: file.type || 'application/octet-stream', ...(place?.value ? { place: place.value } : {}) },
+        query: { ...where(), question: question.id, name: file.name, type: file.type || 'application/octet-stream' },
         body: file,
         headers: { 'content-type': file.type || 'application/octet-stream' },
       })
@@ -31,7 +39,7 @@ export function provideFormsUploads(slug: Ref<string>, responseId: Ref<string>, 
     },
     async settle(id) {
       for (let i = 0; i < PATIENCE; i++) {
-        const now = await $api<{ state: string, reason: string | null }>(`${base()}/${encodeURIComponent(id)}` as string, { query: { response: responseId.value } })
+        const now = await $api<{ state: string, reason: string | null }>(`${base()}/${encodeURIComponent(id)}` as string, { query: where() })
         if (now.state === 'ready') return { state: 'ready' }
         if (now.state !== 'pending') return { state: 'rejected', reason: now.reason }
         await new Promise(resolve => setTimeout(resolve, POLL))

@@ -81,6 +81,28 @@ describe('holding a scheme', () => {
     const mine = (await req('GET', '/api/membership/mine', undefined, student)).body
     expect(mine.number.label).toMatch(/^M-\d+$/)
     expect(mine.memberships).toMatchObject([{ schemeName: 'Student member', length: '36 months', status: 'current' }])
+    // A welcome, once, with how long it runs and the way to the card (EM-12).
+    const welcomes = await rows<{ payload: string }>("SELECT payload FROM core_notifications WHERE type_key = 'membership.welcome' AND account_id = ?", student.accountId)
+    expect(welcomes).toHaveLength(1)
+    expect(JSON.parse(welcomes[0]!.payload)).toMatchObject({ scheme: 'Student member', until: 'It runs until 16 November 2029.' })
+  })
+
+  it('restates the lengths when the rule changes between months and scheme years, and refuses what cannot be', async () => {
+    const id = await scheme({}, [12, 36])
+    const fixed = await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'fixed', fixedEndMonth: 7, fixedEndDay: 31 })
+    expect(fixed.status, JSON.stringify(fixed.body)).toBe(200)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.options.map((o: any) => o.count)).toEqual([1, 3])
+    const back = await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'rolling', fixedEndMonth: null, fixedEndDay: null })
+    expect(back.status, JSON.stringify(back.body)).toBe(200)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.options.map((o: any) => o.count)).toEqual([12, 36])
+
+    // 6 months is not a whole number of scheme years; nothing is changed.
+    const odd = await scheme({}, [6])
+    const refused = await req('PATCH', `/api/membership/schemes/${odd}`, { lengthRule: 'fixed', fixedEndMonth: 7, fixedEndDay: 31 })
+    expect(refused.body.code).toBe('membership.scheme.lengths-fixed')
+    expect((await req('GET', `/api/membership/schemes/${odd}`)).body.scheme.lengthRule).toBe('rolling')
+    // Indefinite has no unit to restate them in.
+    expect((await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'indefinite' })).body.code).toBe('membership.scheme.lengths-fixed')
   })
 
   it('gives a supporters\' scheme its benefits and never the members\' area (MEM-07)', async () => {
