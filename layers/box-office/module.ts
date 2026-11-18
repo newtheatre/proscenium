@@ -72,6 +72,7 @@ export default defineModule({
     'seating-layout': { table: 'box_office_seating_layouts' },
     'promo-code': { table: 'box_office_promo_codes' },
     'pass-type': { table: 'box_office_pass_types' },
+    'pass': { table: 'box_office_passes', owner: 'account_id' },
     // The requester owns the request; a grant on a performance or its production reaches it.
     'comp-request': { table: 'box_office_comp_requests', parent: 'core.performance', owner: 'requested_by' },
   }),
@@ -195,6 +196,10 @@ export default defineModule({
     'box-office.ticket-type': [
       { id: 'companion', name: 'Companion', kind: 'companion', requirementRefs: ['core.access-scheme:companions'], needsPaidTicket: true, recheckAtEntry: false, sort: 90 },
       { id: 'complimentary', name: 'Complimentary', kind: 'complimentary', sort: 99 },
+      // The type a pass entry's line carries (pass-entries.ts), so the ticket scans, cancels and counts as
+      // any other. A pass is not a ticket type: this one is never listed, priced or sold, and a line of
+      // it is shown under its pass's name.
+      { id: 'pass-entry', name: 'Pass', kind: 'complimentary', sort: 98 },
       // A wheelchair space for someone on the access scheme who stays in their wheelchair (Matt,
       // 2026-11-17). It has no price of its own: it costs the lowest price the buyer can have in its
       // band (prices.ts), and an application not yet decided is enough, with the booking flagged.

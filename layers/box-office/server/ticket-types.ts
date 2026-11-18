@@ -8,6 +8,9 @@
 import { sql } from 'drizzle-orm'
 import { all, createUnit, first, idSchema, newId, nowMs, refuse, requirements, usePoint, type UnitView } from '#kit'
 
+/** The type a pass entry's line carries (pass-entries.ts): kept out of every list of types. */
+export const HIDDEN_TYPE = 'box-office.pass-entry'
+
 export const KINDS = ['standard', 'concession', 'companion', 'complimentary'] as const
 /** Where a type is sold: everywhere, only at the desk, or only online. */
 export const CHANNELS = ['all', 'desk', 'online'] as const
@@ -169,7 +172,8 @@ function toType(r: Row, declared: Map<string, unknown>, used: Set<string>): Tick
 /** Every type, in the order the theatre set. */
 export async function listTicketTypes(): Promise<TicketType[]> {
   const [rows, declared, used] = await Promise.all([
-    all<Row>('SELECT * FROM box_office_ticket_types ORDER BY sort, name COLLATE NOCASE'),
+    // A pass entry's own type is Box office's bookkeeping, not something to rename, price or retire.
+    all<Row>(`SELECT * FROM box_office_ticket_types WHERE managed_by IS NOT '${HIDDEN_TYPE}' ORDER BY sort, name COLLATE NOCASE`),
     declaredTypes(),
     all<{ id: string }>('SELECT DISTINCT ticket_type_id AS id FROM box_office_order_lines WHERE ticket_type_id IS NOT NULL UNION SELECT DISTINCT ticket_type_id FROM box_office_prices'),
   ])

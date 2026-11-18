@@ -8,6 +8,8 @@ export interface RememberedBasket {
   /** What was chosen, so Change tickets can fill Choose tickets in again. */
   choices?: { bandId: string, ticketTypeId: string, quantity: number }[]
   promoCode?: string
+  /** The passes added, by their codes (BO-64). */
+  passes?: { code: string, name: string, priceName: string, owedMinor: number, wheelchair: boolean, own: boolean }[]
 }
 
 const KEY = 'box-office:basket'

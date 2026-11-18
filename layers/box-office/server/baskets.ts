@@ -14,6 +14,8 @@ import { poolsOf, salesOf } from './setup'
 import { entitle, type Buyer, type Requirement } from './entitlement'
 import { applyCode, judgeCode, redeem } from './promo-codes'
 import { sellableTypes, soldOn } from './ticket-types'
+import { judgePasses, letGoBaskets, passEntryTypeId, redeemPasses, type JudgedPass, type PassAsk } from './pass-entries'
+import { WHEELCHAIR_TYPE } from './prices'
 
 /**
  * `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs
@@ -21,8 +23,8 @@ import { sellableTypes, soldOn } from './ticket-types'
  * their card or by name, for a type with requirements.
  */
 export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[], holders?: string[] }
-/** `promoCode`, as the buyer typed it (BO-17). */
-export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string }
+/** `promoCode`, as the buyer typed it (BO-17). `passes`: each gives one entry at no charge (BO-64). */
+export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string, passes?: PassAsk[] }
 
 export interface Basket {
   orderId: string
@@ -53,7 +55,7 @@ export interface PricedLine { bandId: string, ticketTypeId: string, priceId: str
  * from. Complimentary tickets are never sold: they come only from an approved request. A type with
  * requirements is checked for `buyer` (see entitlement.ts); `guard` adds its limits to the unit.
  */
-export async function pricedLines(performanceId: string, asked: BasketLineInput[], at: number, buyer: Buyer): Promise<{ pool: Map<string, { id: string }>, lines: PricedLine[], currency: string, guard: (unit: UnitView) => void }> {
+export async function pricedLines(performanceId: string, asked: BasketLineInput[], at: number, buyer: Buyer, beside = 0): Promise<{ pool: Map<string, { id: string }>, lines: PricedLine[], currency: string, guard: (unit: UnitView) => void }> {
   const [pools, prices, types] = await Promise.all([poolsOf(performanceId), pricesFor(performanceId, at), sellableTypes()])
   const pool = new Map(pools.map(p => [p.bandId, p]))
   const price = new Map(prices.map(p => [`${p.bandId} ${p.ticketTypeId}`, p]))
@@ -65,7 +67,8 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
     if (!soldOn(type.channel, buyer.channel))
       refuse('box-office.ticket-type.wrong-channel', buyer.channel === 'online' ? 'One of these tickets is sold only at the box office.' : 'One of these tickets is sold only online.', { status: 422, remedy: 'Reload to see what is on sale.' })
   }
-  if (asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
+  // A pass entry beside it (`beside`) is a ticket a companion may accompany, as a paid one is.
+  if (!beside && asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
     refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
   const lowered = await lowestFor(performanceId, asked, prices, types, buyer)
   const each = asked.flatMap(l => Array.from({ length: l.quantity }, (_, n) => {
@@ -76,7 +79,42 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
   }))
   const entitled = await entitle(performanceId, each, types, buyer)
   const lines = each.map(({ reference: _typed, holder: _named, ...l }, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
-  return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
+  return { pool, lines, currency: prices[0]?.currency ?? await useSetting('core.locale.currency') as string, guard: entitled.guard }
+}
+
+export interface PassLines {
+  /** Entries that use a wheelchair space: asked for as Wheelchair space tickets, whose price the pass then covers. */
+  asks: BasketLineInput[]
+  /** For each pass in turn: the band its entry is in, and whether it is one of `asks`. */
+  entries: { pass: JudgedPass, bandId: string, wheelchair: boolean }[]
+}
+
+/**
+ * Where each pass's entry goes. An ordinary entry takes the part of the house asked for, or the
+ * first seating section with room. An entry in a wheelchair space is sold as a Wheelchair space
+ * ticket is, with the same check that the holder may have one and the same room taken.
+ */
+export async function passLines(performanceId: string, asks: readonly PassAsk[], judged: readonly JudgedPass[], at: number): Promise<PassLines> {
+  if (!asks.length) return { asks: [], entries: [] }
+  const pools = await poolsOf(performanceId)
+  const seating = pools.filter(p => p.bandKind !== 'wheelchair')
+  const prices = asks.some(a => a.wheelchair) ? await pricesFor(performanceId, at) : []
+  const wheelchairType = asks.some(a => a.wheelchair) ? [...(await sellableTypes()).values()].find(t => t.managedBy === WHEELCHAIR_TYPE) : undefined
+  const out: PassLines = { asks: [], entries: [] }
+  asks.forEach((ask, i) => {
+    if (ask.wheelchair) {
+      const spaces = prices.filter(p => p.ticketTypeId === wheelchairType?.id)
+      const price = spaces.find(p => p.bandId === ask.bandId) ?? spaces.find(p => pools.find(o => o.bandId === p.bandId)?.bandKind === 'wheelchair') ?? spaces[0]
+      if (!price) refuse('box-office.pass.no-wheelchair', 'There are no wheelchair spaces to book for this performance.', { status: 422, remedy: 'Ask the box office.', fields: { pass: 'no-wheelchair' } })
+      out.asks.push({ bandId: price.bandId, ticketTypeId: price.ticketTypeId, quantity: 1 })
+      out.entries.push({ pass: judged[i]!, bandId: price.bandId, wheelchair: true })
+      return
+    }
+    const pool = ask.bandId ? seating.find(p => p.bandId === ask.bandId) : seating.find(p => p.capacity - p.claimed > 0) ?? seating[0]
+    if (!pool) refuse('box-office.price.none', 'One of these tickets is not on sale for this performance.', { status: 422, remedy: 'Reload to see what is on sale.' })
+    out.entries.push({ pass: judged[i]!, bandId: pool.bandId, wheelchair: false })
+  })
+  return out
 }
 
 /**
@@ -116,15 +154,26 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   if (performance.state !== 'scheduled' || at >= closes) refuse(NOT_ON_SALE.closed!.code, NOT_ON_SALE.closed!.reason)
   if (sales.state !== 'on_sale') refuse(NOT_ON_SALE[sales.state]!.code, NOT_ON_SALE[sales.state]!.reason)
 
-  const quantity = input.lines.reduce((sum, l) => sum + l.quantity, 0)
+  const asks = input.passes ?? []
+  const quantity = input.lines.reduce((sum, l) => sum + l.quantity, 0) + asks.length
   const cap = sales.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number
   if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one order.`, { status: 422, remedy: 'For a larger group, ask the box office.' })
 
   const account = useContext().actor.accountId ?? null
-  const { pool, lines, currency, guard } = await pricedLines(input.performanceId, input.lines, at, { channel: 'online', account })
+  // Each pass gives one entry. Those in a wheelchair space are priced and checked as Wheelchair space
+  // tickets, after the tickets asked for; the others are lines of their own at no charge, last.
+  const passes = await passLines(input.performanceId, asks, await judgePasses(asks, input.performanceId, { channel: 'online', account }, at), at)
+  const priced = await pricedLines(input.performanceId, [...input.lines, ...passes.asks], at, { channel: 'online', account }, asks.length)
+  const { pool, currency, guard } = priced
+  const bought = priced.lines.length - passes.asks.length
   const typedCode = input.promoCode?.trim()
-  const discounted = typedCode ? await applyCode(await judgeCode(typedCode, input.performanceId, at), input.performanceId, lines) : lines.map(() => null)
-  const charged = lines.map((l, i) => l.amountMinor - (discounted[i]?.discountMinor ?? 0))
+  const discounted = [...(typedCode ? await applyCode(await judgeCode(typedCode, input.performanceId, at), input.performanceId, priced.lines.slice(0, bought)) : priced.lines.slice(0, bought).map(() => null)), ...asks.map(() => null)]
+  const ordinary = passes.entries.filter(e => !e.wheelchair)
+  const entryTypeId = ordinary.length ? await passEntryTypeId() : ''
+  const lines: (Omit<PricedLine, 'priceId'> & { priceId: string | null })[] = [...priced.lines, ...ordinary.map(e => ({ bandId: e.bandId, ticketTypeId: entryTypeId, priceId: null, amountMinor: 0, requirement: null }))]
+  // The pass each line is an entry of, in the lines' order: wheelchair entries first, as they were asked.
+  const entryOf: (JudgedPass | null)[] = [...priced.lines.slice(0, bought).map(() => null), ...passes.entries.filter(e => e.wheelchair).map(e => e.pass), ...ordinary.map(e => e.pass)]
+  const charged = lines.map((l, i) => entryOf[i] ? 0 : l.amountMinor - (discounted[i]?.discountMinor ?? 0))
 
   unit.add({ sql: "UPDATE box_office_performance_sales SET updated_at = updated_at WHERE id = ? AND state = 'on_sale' AND (off_sale_at IS NULL OR off_sale_at > ?)", params: [sales.id, at] })
     .expect(1, NOT_ON_SALE.paused)
@@ -145,12 +194,19 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   // The buyer's own basket in another browser, holding tickets of a type with a limit for each
   // holder, would count against this one until it lapses: starting again here lets it go (B18).
   if (account) await letGoOtherBaskets(unit, account, input.performanceId, lines.filter(l => l.requirement?.accountId === account).map(l => l.ticketTypeId), at)
-  const claimed = (await claimSeats(unit, { holdId, requests: input.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
+  // So would a basket left holding an entry of one of these passes.
+  await letGoBaskets(unit, passes.entries.map(e => e.pass), input.performanceId, performance.productionId, at)
+  const requests = [...[...input.lines, ...passes.asks].map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), ...ordinary.map(e => ({ poolId: pool.get(e.bandId)!.id, quantity: 1 }))]
+  const claimed = (await claimSeats(unit, { holdId, requests, expiresAt })).flat()
   guard(unit)
-  const redemptions = redeem(unit, orderId, discounted, claimed)
+  const redemptions = redeem(unit, orderId, discounted.slice(0, bought), claimed)
+  const entries = redeemPasses(unit, orderId, input.performanceId, performance.productionId, entryOf.flatMap((pass, i) => pass ? [{ pass, claimId: claimed[i]! }] : []))
+  let entry = 0
   const lineIds = unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: discounted[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
-    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null,
+    orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor,
+    // A pass covers the whole of its ticket's price, which is nothing except for a wheelchair space's.
+    discountMinor: entryOf[i] ? l.amountMinor : discounted[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
+    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null, passRedemptionId: entryOf[i] ? entries[entry++]! : null,
   })))
   unit.expect(lines.length)
   return { orderId, reference, token, expiresAt, currency, totalMinor, lines: lines.map((l, i) => ({ id: lineIds[i]!, bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: charged[i]! })) }
@@ -164,7 +220,7 @@ export interface BasketView {
   currency: string
   totalMinor: number
   /** `listMinor` is the price before any promo code; `amountMinor` what is charged. */
-  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor: number }[]
+  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor: number, /** The pass this ticket is an entry of, by its name (the passes ruling). */ pass?: string }[]
   /** The promo code the basket was held with and what it takes off, or null (BO-17). */
   promo: { code: string, savingMinor: number } | null
 }
@@ -177,9 +233,10 @@ export async function basketByToken(orderId: string, token: string): Promise<Bas
   const lapsed = order.state === 'basket' && order.expires_at !== null && order.expires_at <= nowMs()
   const lines = lapsed
     ? []
-    : await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, list_minor: number, discount_minor: number, code: string | null }>(
-        `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, l.list_minor, l.discount_minor, c.code FROM box_office_order_lines l
+    : await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, list_minor: number, discount_minor: number, code: string | null, pass: string | null }>(
+        `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, l.list_minor, CASE WHEN l.pass_redemption_id IS NULL THEN l.discount_minor ELSE 0 END AS discount_minor, c.code, y.name AS pass FROM box_office_order_lines l
           LEFT JOIN box_office_promo_redemptions r ON r.id = l.promo_redemption_id LEFT JOIN box_office_promo_codes c ON c.id = r.promo_code_id
+          LEFT JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id LEFT JOIN box_office_passes p ON p.id = d.pass_id LEFT JOIN box_office_pass_types y ON y.id = p.pass_type_id
           WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
   const saving = lines.reduce((sum, l) => sum + l.discount_minor, 0)
   const code = lines.find(l => l.code)?.code
@@ -190,7 +247,7 @@ export async function basketByToken(orderId: string, token: string): Promise<Bas
     expiresAt: order.expires_at,
     currency: order.currency,
     totalMinor: lapsed ? 0 : order.total_minor,
-    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, amountMinor: l.amount_minor, listMinor: l.list_minor })),
+    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, amountMinor: l.amount_minor, listMinor: l.list_minor, ...(l.pass ? { pass: l.pass } : {}) })),
     promo: code && saving > 0 ? { code, savingMinor: saving } : null,
   }
 }

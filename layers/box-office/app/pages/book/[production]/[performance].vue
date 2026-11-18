@@ -6,6 +6,7 @@
      box for each ticket, worded by Membership, shown only on that ticket type. -->
 <script setup lang="ts">
 import type { ButtonProps } from '@nuxt/ui'
+import type { ChosenPass } from '~~/layers/box-office/app/components/BoxOfficePassBox.vue'
 
 interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
 interface Page {
@@ -16,6 +17,7 @@ interface Page {
   currency: string | null
   maxPerOrder: number
   bands: { bandId: string, name: string, soldOut: boolean, types: TicketType[] }[]
+  passes: { accepted: boolean, wheelchair: boolean, mine: { code: string, name: string, priceName: string, owedMinor: number, left: number | null, unusable: string | null }[] }
 }
 
 const { t } = useT()
@@ -43,7 +45,9 @@ const remedyOf = (type: TicketType) => type.remedy ?? (type.unmet && !type.unmet
 // A price limited per person says so once the limit is reached.
 const atMost = (bandId: string, type: TicketType) => type.most !== undefined && type.most < (data.value?.maxPerOrder ?? Infinity) && (counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0) >= type.most
 const chosen = computed(() => (data.value?.bands ?? []).flatMap(b => b.types.map(type => ({ band: b, type, quantity: counts.value[keyOf(b.bandId, type.ticketTypeId)] ?? 0 }))).filter(c => c.quantity > 0))
-const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0))
+// Passes added by their codes (BO-64): one entry each, at no charge. A signed-in holder's own pass is there already.
+const passes = ref<ChosenPass[]>((data.value?.passes.mine ?? []).filter(m => !m.unusable).slice(0, 1).map(m => ({ code: m.code, name: m.name, priceName: m.priceName, owedMinor: m.owedMinor, wheelchair: false, own: true })))
+const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length)
 // A promo code (BO-17), tried before holding so the saving shows; sent with the hold, which applies it again.
 const promoInput = ref('')
 const promo = ref<{ code: string, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] } | null>(null)
@@ -77,7 +81,8 @@ const totalMinor = computed(() => {
   return each.reduce((sum, e) => sum + e.full, 0) - saving
 })
 const currency = computed(() => data.value?.currency ?? undefined)
-const companionAlone = computed(() => chosen.value.length > 0 && chosen.value.every(c => c.type.needsPaidTicket))
+// A pass entry is a ticket a companion may come with, as a paid one is.
+const companionAlone = computed(() => chosen.value.length > 0 && !passes.value.length && chosen.value.every(c => c.type.needsPaidTicket))
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
 const atLimit = computed(() => !!data.value && quantity.value >= data.value.maxPerOrder)
 // The most of one type the steppers allow: what the visitor may have, and what is left of the order's limit.
@@ -127,6 +132,8 @@ const ready = computed(() => quantity.value > 0 && !companionAlone.value && !too
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // A refused reference is said beside the references typed; the notice at the top is for the rest.
 const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
+// So is a refused pass, beside the passes.
+const passRefusal = computed(() => refusal.value?.code.startsWith('box-office.pass.') ? refusal.value : null)
 const busy = ref(false)
 
 // Tickets already held in this tab for this performance: a banner with the time left, and with
@@ -145,6 +152,7 @@ onMounted(async () => {
   }, 1000)
   if (route.query.change && remembered.choices) {
     counts.value = Object.fromEntries(remembered.choices.map(c => [keyOf(c.bandId, c.ticketTypeId), c.quantity]))
+    if (remembered.passes) passes.value = remembered.passes
     if (remembered.promoCode) {
       promoInput.value = remembered.promoCode
       await tryCode()
@@ -161,14 +169,14 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code },
+      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     // Changing tickets: the new ones are held, so the old basket is let go.
     const before = recallBasket()
     if (before && before.orderId !== basket.orderId)
       void $api(`/api/box-office/baskets/${encodeURIComponent(before.orderId)}/release`, { method: 'POST', body: {}, headers: { 'x-basket-token': before.token } }).catch(() => undefined)
-    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code })
+    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code, passes: passes.value })
     await navigateTo('/book/basket')
   }
   catch (e) {
@@ -233,7 +241,21 @@ async function hold() {
             />
           </template>
           <template v-else>
-            <RefusalNotice :refusal="referenceRefusal ? null : refusal" />
+            <RefusalNotice :refusal="referenceRefusal || passRefusal ? null : refusal" />
+            <BoxOfficePassBox
+              v-if="data.passes.accepted"
+              v-model="passes"
+              :performance-id="performanceId"
+              :mine="data.passes.mine"
+              :wheelchair="data.passes.wheelchair"
+              :refusal="passRefusal"
+            />
+            <p
+              v-if="passes.length"
+              class="text-sm font-medium text-muted"
+            >
+              {{ t('box-office.book.pass.more-tickets') }}
+            </p>
             <section
               v-for="band in data.bands"
               :key="band.bandId"

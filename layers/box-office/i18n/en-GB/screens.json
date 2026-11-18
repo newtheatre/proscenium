@@ -1094,5 +1094,22 @@
   "box-office.passes.field.sale-from": "On sale from",
   "box-office.passes.field.sale-until": "On sale until",
   "box-office.passes.field.sale-help": "Blank for as long as it is on sale.",
-  "box-office.passes.more": "More options"
+  "box-office.passes.more": "More options",
+  "box-office.book.pass.have-one": "Have a pass?",
+  "box-office.book.pass.title": "Passes",
+  "box-office.book.pass.entry": "1 entry · {name}",
+  "box-office.book.pass.yours": "Your pass · {price}",
+  "box-office.book.pass.your-pass": "Your {name} · {price}",
+  "box-office.book.pass.owed": "{amount} still to pay for the pass",
+  "box-office.book.pass.use": "Use it",
+  "box-office.book.pass.remove": "Remove",
+  "box-office.book.pass.remove-named": "Remove pass {code}",
+  "box-office.book.pass.wheelchair": "I will be using a wheelchair space",
+  "box-office.book.pass.wheelchair-help": "Still one entry on your pass.",
+  "box-office.book.pass.add": "Add a pass",
+  "box-office.book.pass.another": "Someone with you has a pass too?",
+  "box-office.book.pass.help": "Each pass covers one entry. The code is on the pass and in its email.",
+  "box-office.book.pass.apply": "Add",
+  "box-office.book.pass.repeated": "That pass is already added. Each pass gives one entry.",
+  "box-office.book.pass.more-tickets": "More tickets"
 }

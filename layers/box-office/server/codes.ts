@@ -2,7 +2,7 @@
 // Each is random, handed out once and stored only as its hash (Box office specification, part 2;
 // Foundations part 4, "Link tokens"). randomToken and hashOf give way to the kit's linkTokens when
 // the kit has it.
-const REFERENCE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // not-policy: no 0, O, 1, I or L, which are misread aloud
+export const REFERENCE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // not-policy: no 0, O, 1, I or L, which are misread aloud
 const REFERENCE_LENGTH = 8 // not-policy: short enough to read out, long enough not to collide
 const DESK_CODE_LENGTH = 10 // not-policy: long enough that guessing one is hopeless, short enough to type
 const TOKEN_BYTES = 32 // not-policy: 256 random bits, as the kit's link tokens will be
