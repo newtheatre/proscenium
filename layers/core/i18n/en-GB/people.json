@@ -65,6 +65,7 @@
   "core.person.disable.reasons.conduct": "Their conduct",
   "core.person.disable.reasons.requested": "They asked",
   "core.person.disable.reasons.duplicate": "A duplicate account",
+  "core.person.disable.reasons.erasing": "Their account is being erased",
   "core.person.disable.button": "Disable account",
   "core.person.disable.done": "{name} is disabled",
   "core.person.enable.verb": "Enable",

@@ -3,6 +3,7 @@
 // list can link to it. Checks that need more than the definition (retention, who may answer, which
 // modules are on) are added by the platform to the same list.
 import { OTHER, PATTERNS } from './types'
+import { unreached } from './reach'
 import type { Comparison, Condition, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
 import { calculationsRead } from './calculations'
 import { conditionsOf, questionsOf } from './definition'
@@ -15,6 +16,8 @@ export type ProblemCode
     | 'wrong-comparison' | 'incomplete-comparison'
     | 'unknown-target' | 'route-back' | 'circular'
     | 'wrong-rule' | 'unsafe-pattern' | 'not-a-number'
+    | 'never-reached' | 'never-shown' | 'required-never-shown'
+    | 'empty-condition' | 'no-questions'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
@@ -28,7 +31,7 @@ export interface CheckOptions {
 }
 
 const CHOICES = ['choice.single', 'choice.multiple', 'choice.dropdown', 'choice.ranking']
-const RULES_FOR: Record<RuleName, string[]> = {
+export const RULES_FOR: Record<RuleName, string[]> = {
   minLength: ['text.short', 'text.long'], maxLength: ['text.short', 'text.long'],
   min: ['number', 'money', 'rating', 'scale'], max: ['number', 'money', 'rating', 'scale'], whole: ['number'],
   minDate: ['date', 'datetime'], maxDate: ['date', 'datetime'],
@@ -46,9 +49,11 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
 
   // ---- wording, options, sources, rules ----
   def.pages.forEach((page) => {
-    if (!page.title.trim()) error('no-label', page.id)
+    // A form of one page goes by the form's own title; pages need names once there are several.
+    if (def.pages.length > 1 && !page.title.trim()) error('no-label', page.id)
     for (const it of page.items) {
       if (it.kind === 'group' && !it.label.trim()) error('no-label', it.id)
+      if (it.kind === 'group' && !it.items.length) error('no-questions', it.id)
       if (it.kind === 'content' && !it.text.trim()) error('no-label', it.id)
     }
   })
@@ -90,6 +95,12 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
     const ownerPage = pageOfOwner(owner) ?? contentPage.get(owner) ?? null // null: a calculation, which may read any page
     const ownerGroup = index.questions.get(owner)?.group?.id
     walk(condition, c => checkComparison(c, owner, ownerPage, ownerGroup))
+    if (hollow(condition)) error('empty-condition', owner)
+  }
+  /** Whether a condition has a group with nothing in it, which says nothing an author can have meant. */
+  function hollow(c: Condition): boolean {
+    const parts = 'all' in c ? c.all : 'any' in c ? c.any : 'none' in c ? c.none : null
+    return parts !== null && (!parts.length || parts.some(hollow))
   }
   function walk(c: Condition, each: (c: Comparison) => void): void {
     if ('all' in c) return c.all.forEach(x => walk(x, each))
@@ -193,6 +204,9 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
   }
   for (const id of reads.keys()) visit(id, [])
   for (const id of circular) error('circular', id)
+
+  // ---- what can never be reached or shown (warnings: they do not stop a publish) ----
+  for (const u of unreached(def)) problems.push({ level: 'warning', code: u.why === 'route' ? 'never-reached' : u.required ? 'required-never-shown' : 'never-shown', at: u.at })
 
   return problems
 }

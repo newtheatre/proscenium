@@ -32,6 +32,13 @@ export async function getForm(id: string | undefined): Promise<FormRow | null> {
   return row ? { ...row, anonymous: !!row.anonymous } : null
 }
 
+/** The form at a public address, such as the `spring-auditions` of /forms/spring-auditions. */
+export async function getFormBySlug(slug: string | undefined): Promise<FormRow | null> {
+  if (!slug) return null
+  const row = await first<FormRow>(`SELECT ${FORM} FROM forms_forms WHERE slug = ?`, slug)
+  return row ? { ...row, anonymous: !!row.anonymous } : null
+}
+
 export async function requireForm(id: string | undefined): Promise<FormRow> {
   return await getForm(id) ?? refuse('forms.form.not-found', 'There is no form here.', { status: 404 })
 }

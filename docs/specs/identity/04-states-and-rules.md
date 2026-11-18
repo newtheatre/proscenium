@@ -259,7 +259,7 @@ title: An erasure waits, can be held, and then runs once
 flowchart LR
   R["Requested"] -->|"emailed link used"| C["Confirmed"]
   C -->|"cooling-off over"| N["Running"]
-  N -->|"one batch clears all"| D["Done"]
+  N -->|"stages clear all"| D["Done"]
   R -->|"cancels"| X["Cancelled"]
   C -->|"module hold"| H["Held"]
   H -->|"hold cleared"| C
@@ -282,15 +282,16 @@ An export request uses the same row and the same path without the cooling-off or
 | Erasure requested | The same | State requested; a confirmation link goes to the audience address |
 | Confirmed | The link was used | Cooling-off starts; `not_before` set; the person can still cancel from their account or from the email |
 | Held | A module raised a hold | State held, with the hold codes shown to staff and a plain explanation to the person |
-| Run | Cooling-off over; no holds | One batch: every reference handled as declared; addresses, sign-in methods, sessions, tokens, contacts, access needs and sharing choices deleted; grants ended; `anonymised_at` set |
-| Cancelled | Before the batch runs | State cancelled; nothing else changes |
+| Run | Cooling-off over; no holds | A chain of stages, each one unit of work inside the statement limit: first the account is locked (disabled, sessions and live grants ended); then each module's erasure handler; then every reference handled as declared, a share at a time; last, addresses deleted and `anonymised_at` set |
+| Cancelled | Before the run starts | State cancelled; nothing else changes |
 
 - **Holds are declared by modules, never improvised.** Examples other workstreams are expected to register: money still owed either way, a ticket for a performance not yet over, an open incident the person is named in, the last usable Owner.
 - **A hold delays, it does not refuse.** The request stays open, staff see why, and it runs when the hold clears. `respond_by` is shown on the queue so a held request cannot be forgotten.
 - **Erasure is anonymisation.** Sales, attendance and safety records stay as rows about nobody.
 - **Free text about the person in other people's records** is each module's to declare. Identity's own tables hold none.
-- **The batch asserts its own completeness**, as merge does: its last statement checks that no Personal column of the account is still set.
-- **A second run is harmless.** Erasing a tombstone succeeds and changes nothing, so a retried job never fails for having worked.
+- **Erasure runs in stages, and is all or nothing to the person.** One batch would grow with every module that holds personal data, and a unit of work has a fixed statement limit, so the run is a chain of jobs, each one unit. The first stage locks the account, so the person is out from that moment and cannot sign in; the last makes the tombstone and takes the lock off. Rows still reached by the plan when the last stage starts (written while the run went on) send the run round again, up to three passes. A run whose job died part-way is started again by the hourly review. Staff cannot enable or merge an account while it is being erased.
+- **The run asserts its own completeness**, as merge does: each share checks its own tables, and the last stage's last statement checks that nothing the plan reaches is still set.
+- **A second run is harmless.** Every stage only touches what is still there to erase, and erasing a tombstone succeeds and changes nothing, so a retried job never fails for having worked.
 - **Earlier states of the database.** The platform takes no backups of its own (decided by Matt, 16 November 2026). Cloudflare keeps its own history of the database, which holds earlier states for up to 30 days and then ages out. If a theatre ever restores its database from that history, every erasure completed after the restore point must be run again. This is a known limit: the erasure record in `core_data_requests` holds no personal data but lives in the same database, so a restore also loses the record of those erasures. Before restoring, the theatre must note the account ids of erasures completed since the restore point from the data-request queue, and run them again afterwards. The privacy page says this.
 
 ## Emergency contacts

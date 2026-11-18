@@ -1,8 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "e11a1cab-5bca-42e9-8dd4-c3cd46ab28fb",
+  "id": "25104b33-79ae-4644-b6dd-a65344440aae",
   "prevIds": [
+    "bf585f8b-07b7-4857-a04d-69f78b89cd42",
     "f16694ca-f01c-498a-b295-4710fcc8a010"
   ],
   "ddl": [
@@ -487,6 +488,10 @@
       "entityType": "tables"
     },
     {
+      "name": "forms_answers",
+      "entityType": "tables"
+    },
+    {
       "name": "forms_drafts",
       "entityType": "tables"
     },
@@ -496,6 +501,18 @@
     },
     {
       "name": "forms_forms",
+      "entityType": "tables"
+    },
+    {
+      "name": "forms_placements",
+      "entityType": "tables"
+    },
+    {
+      "name": "forms_response_drafts",
+      "entityType": "tables"
+    },
+    {
+      "name": "forms_responses",
       "entityType": "tables"
     },
     {
@@ -12333,6 +12350,116 @@
       "entityType": "columns"
     },
     {
+      "table": "forms_answers",
+      "name": "response_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "revision",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "question_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "repeat_index",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "data_class",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "value_text",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "value_number",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "value_json",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "other_text",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "value_cipher",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_answers",
+      "name": "label_snapshot",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "forms_drafts",
       "name": "form_id",
       "type": "text",
@@ -12595,6 +12722,446 @@
     {
       "table": "forms_forms",
       "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "form_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "slot_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "subject_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "subject_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "audience",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'anyone'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "audience_role",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "opens_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "closes_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "response_cap",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "response_count",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "one_per_person",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "edit_after_submit",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'never'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "created_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_placements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_response_drafts",
+      "name": "response_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_response_drafts",
+      "name": "answers_cipher",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_response_drafts",
+      "name": "page_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_response_drafts",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "reference",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "form_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "version_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "placement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "subject_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "subject_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "realm",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "person_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "respondent_email",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "entered_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "stage_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "stage_kind",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "current_revision",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "unique_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "calculated",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "is_test",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "submitted_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "retention_due_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "anonymised_at",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -19629,6 +20196,42 @@
       "entityType": "indexes"
     },
     {
+      "table": "forms_answers",
+      "name": "forms_answers_text",
+      "columns": [
+        {
+          "value": "question_id",
+          "isExpression": false
+        },
+        {
+          "value": "value_text",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_answers",
+      "name": "forms_answers_number",
+      "columns": [
+        {
+          "value": "question_id",
+          "isExpression": false
+        },
+        {
+          "value": "value_number",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "forms_fields",
       "name": "forms_fields_key",
       "columns": [
@@ -19670,6 +20273,128 @@
         }
       ],
       "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_place",
+      "columns": [
+        {
+          "value": "slot_key",
+          "isExpression": false
+        },
+        {
+          "value": "subject_type",
+          "isExpression": false
+        },
+        {
+          "value": "subject_id",
+          "isExpression": false
+        },
+        {
+          "value": "form_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_form",
+      "columns": [
+        {
+          "value": "form_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_reference",
+      "columns": [
+        {
+          "value": "reference",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_unique",
+      "columns": [
+        {
+          "value": "placement_id",
+          "isExpression": false
+        },
+        {
+          "value": "unique_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_form",
+      "columns": [
+        {
+          "value": "form_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "submitted_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_person",
+      "columns": [
+        {
+          "value": "person_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_retention",
+      "columns": [
+        {
+          "value": "retention_due_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -22734,6 +23459,21 @@
       "entityType": "fks"
     },
     {
+      "table": "forms_answers",
+      "name": "fk_forms_answers_response_id_forms_responses_id_fk",
+      "columns": [
+        "response_id"
+      ],
+      "tableTo": "forms_responses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "forms_drafts",
       "name": "fk_forms_drafts_form_id_forms_forms_id_fk",
       "columns": [
@@ -22770,6 +23510,81 @@
         "live_version_id"
       ],
       "tableTo": "forms_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "fk_forms_placements_form_id_forms_forms_id_fk",
+      "columns": [
+        "form_id"
+      ],
+      "tableTo": "forms_forms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "forms_response_drafts",
+      "name": "fk_forms_response_drafts_response_id_forms_responses_id_fk",
+      "columns": [
+        "response_id"
+      ],
+      "tableTo": "forms_responses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "fk_forms_responses_form_id_forms_forms_id_fk",
+      "columns": [
+        "form_id"
+      ],
+      "tableTo": "forms_forms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "fk_forms_responses_version_id_forms_versions_id_fk",
+      "columns": [
+        "version_id"
+      ],
+      "tableTo": "forms_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "fk_forms_responses_placement_id_forms_placements_id_fk",
+      "columns": [
+        "placement_id"
+      ],
+      "tableTo": "forms_placements",
       "columnsTo": [
         "id"
       ],
@@ -23573,6 +24388,18 @@
       "entityType": "pks"
     },
     {
+      "table": "forms_answers",
+      "name": "forms_answers_pk",
+      "columns": [
+        "response_id",
+        "revision",
+        "question_id",
+        "repeat_index"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "forms_drafts",
       "name": "forms_drafts_pk",
       "columns": [
@@ -23587,6 +24414,15 @@
       "columns": [
         "form_id",
         "question_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "forms_response_drafts",
+      "name": "forms_response_drafts_pk",
+      "columns": [
+        "response_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -24513,6 +25349,24 @@
     {
       "table": "forms_forms",
       "name": "forms_forms_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_pk",
       "columns": [
         "id"
       ],
@@ -26029,6 +26883,12 @@
       "entityType": "checks"
     },
     {
+      "table": "forms_answers",
+      "name": "forms_answers_class",
+      "value": "\"data_class\" IN ('public', 'internal', 'personal', 'free-text', 'special')",
+      "entityType": "checks"
+    },
+    {
       "table": "forms_fields",
       "name": "forms_fields_class",
       "value": "\"data_class\" IN ('public', 'internal', 'personal', 'free-text', 'special')",
@@ -26044,6 +26904,54 @@
       "table": "forms_forms",
       "name": "forms_forms_status",
       "value": "\"status\" IN ('draft', 'live', 'paused', 'closed', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_audience",
+      "value": "\"audience\" IN ('anyone', 'signed_in', 'members', 'role', 'invited')",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_edit",
+      "value": "\"edit_after_submit\" IN ('never', 'until_close', 'when_returned')",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_status",
+      "value": "\"status\" IN ('active', 'paused', 'ended')",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_cap",
+      "value": "\"response_cap\" IS NULL OR \"response_count\" <= \"response_cap\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_placements",
+      "name": "forms_placements_count",
+      "value": "\"response_count\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_state",
+      "value": "\"state\" IN ('draft', 'awaiting_payment', 'submitted', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_stage",
+      "value": "\"stage_kind\" IS NULL OR \"stage_kind\" IN ('pending', 'in_review', 'returned', 'approved', 'declined', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_realm",
+      "value": "\"realm\" IN ('audience', 'members')",
       "entityType": "checks"
     },
     {

@@ -20,9 +20,7 @@ const run = (task: (unit: any, context: any) => Promise<void>) => inContext(asyn
   await unit.commit()
 }, { kind: 'job' } as never)
 const erase = (accountId: string) => inContext(async () => {
-  const unit = createUnit()
-  await eraseAccount(unit.view(), accountId)
-  await unit.commit()
+  await eraseAccount(accountId)
 })
 
 async function listScheme(file: string) {

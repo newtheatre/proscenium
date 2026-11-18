@@ -175,7 +175,7 @@ Payloads carry ids only. An event is written in the same batch as the change and
 | `core.account.enabled` | Staff enabled it | Account id |
 | `core.account.merged` | A merge committed | Survivor id, merged-away account id, merge id |
 | `core.account.unmerged` | A merge was undone | Survivor id, merged-away account id, merge id |
-| `core.account.erased` | The erasure batch committed | Account id |
+| `core.account.erased` | The erasure's last stage committed | Account id |
 | `core.account-email.verified` | An address was proved | Account id, address id |
 | `core.account-email.removed` | An address was removed | Account id, address id |
 | `core.grant.created` | A grant was written | Grant id, account id, role id |
@@ -245,7 +245,7 @@ Identity has no record a grant can be scoped to. The record types that can scope
 | --- | --- | --- |
 | `core.send-sign-in-link` | Job | Hands the link and code to notifications, so a slow mail provider never slows the sign-in screen |
 | `core.build-export` | Job | Gathers a person's data into one file |
-| `core.run-erasure` | Job | Runs the erasure batch for a confirmed request whose cooling-off is over and which has no holds |
+| `core.run-erasure` | Job | Runs one stage of the erasure for a confirmed request whose cooling-off is over and which has no holds, then queues the next |
 | `core.sweep-identity` | Task, hourly | Deletes spent tokens, challenges and long-ended sessions; closes merge undo windows; removes unverified addresses |
 | `core.warn-grants` | Task, daily | Announces `core.grant.expiring`; lists pending grants nobody claimed |
 | `core.review-data-requests` | Task, daily | Re-checks held erasures; warns staff of any request nearing its respond-by date |
