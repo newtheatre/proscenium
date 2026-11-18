@@ -11,6 +11,7 @@ import { shownCredits, type ShownCredit } from './credits'
 import { bookingActions, priceSummaries, type ShownBooking } from './booking'
 import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
+import { publicVenues, type PublicVenueSummary } from './public-places'
 
 export interface PublicTerm { id: string, slug: string, label: string }
 export interface PublicNote { termId: string, label: string, detail: string | null }
@@ -64,6 +65,8 @@ export interface PublicProduction {
   poster: PublicImage | null
   photos: PublicImage[]
   performances: PublicPerformance[]
+  /** The venues its dates are at, in brief: for "Getting here" and a link to each venue's page. */
+  venues: PublicVenueSummary[]
   /** What it is sold at, while it has dates to come; null where nothing prices it. */
   price: PriceSummary | null
 }
@@ -166,6 +169,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     credits: await shownCredits(row.id, options.members ?? false),
     ...(await publicImages([row.id])).get(row.id)!,
     performances,
+    venues: await publicVenues([...new Set(performances.map(p => p.venue.id))]),
     price: isPast(row.state, performances, now) ? null : (await priceSummaries([row.id]))[row.id] ?? null,
   }
 }
