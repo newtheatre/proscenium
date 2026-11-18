@@ -22,6 +22,8 @@
   "finance.screens.ledger.empty": "Nothing posted yet",
   "finance.screens.ledger.empty-help": "Every sale, refund, fee and payout is posted here as it happens. If you filtered or searched, try clearing it.",
   "finance.screens.ledger.reversal": "Reversal",
+  "finance.screens.ledger.performance": "{title}, {when}",
+  "finance.screens.ledger.posted-by": "By {person}",
   "finance.screens.ledger.reverse-verb": "Reverse",
   "finance.screens.ledger.reverse-button": "Reverse",
   "finance.screens.ledger.reverse-thing": "the {kind} of {day}",

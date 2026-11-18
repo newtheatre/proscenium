@@ -157,6 +157,14 @@ export default defineModule({
       // The combined till's tile on the Tonight hub.
       { id: 'payments.live-till', menu: 'live', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 20 },
     ],
+    // Titles and addresses for Payments' records, so the ledger can name where a posting came from.
+    'core.record-resolver': [
+      { id: 'payments.intent', file: 'intent' },
+      { id: 'payments.attempt', file: 'attempt' },
+      { id: 'payments.refund', file: 'refund' },
+      { id: 'payments.session', file: 'session' },
+      { id: 'payments.provider-account', file: 'provider-account' },
+    ],
     'core.count': [
       { id: 'payments.attention', file: 'attention' },
       { id: 'payments.refunds-waiting', file: 'refunds-waiting' },
