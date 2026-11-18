@@ -21,6 +21,7 @@ const publishing = ref(false)
 const json = ref(false)
 const settings = ref(false)
 const sharing = ref(false)
+const stages = ref(false)
 
 // Beside the canvas on a laptop; a panel that slides over it on anything narrower.
 const wide = useMediaQuery('(min-width: 1280px)')
@@ -36,6 +37,9 @@ const selectedName = computed(() => {
 
 const errors = computed(() => builder.problems.value.filter(p => p.level === 'error').length)
 const problemName = (at: string) => {
+  const flow = builder.definition.value.workflow
+  if (at.startsWith('stage:')) return flow?.stages.find(s => s.key === at.slice(6))?.name.trim() || t('forms.screens.stages.a-stage') // not-policy: the length of "stage:"
+  if (at.startsWith('move:')) return flow?.transitions.find(m => m.key === at.slice(5))?.label.trim() || t('forms.screens.stages.a-move') // not-policy: the length of "move:"
   const found = find(builder.definition.value, at)
   if (!found) return builder.definition.value.calculations?.find(c => c.id === at)?.key ?? at
   if (found.kind === 'page') return found.page.title.trim() || t('forms.screens.builder.page-n', { n: found.pageIndex + 1 })
@@ -44,6 +48,7 @@ const problemName = (at: string) => {
 }
 function goTo(at: string) {
   view.value = 'build'
+  if (at.startsWith('stage:') || at.startsWith('move:')) return void (stages.value = true)
   builder.select(at)
 }
 
@@ -62,6 +67,7 @@ const more = computed(() => [[
   { label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` },
 ], [
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
+  { label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } },
   { label: t('forms.screens.json.title'), icon: 'i-lucide-braces', onSelect: () => { json.value = true } },
 ]])
 function published(number: number) {
@@ -282,6 +288,7 @@ const reload = () => window.location.reload()
       :form-id="form.id"
       :anonymous="form.anonymous"
     />
+    <FormsStagesDialog v-model:open="stages" />
     <FormsSettingsDialog
       v-model:open="settings"
       :form="form"

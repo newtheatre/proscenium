@@ -4,7 +4,7 @@
 <script setup lang="ts">
 interface Mine {
   drafts: { responseId: string, title: string, slug: string, open: boolean, updatedAt: number }[]
-  sent: { responseId: string, reference: string, title: string, slug: string, submittedAt: number }[]
+  sent: { responseId: string, reference: string, title: string, slug: string, submittedAt: number, progress: { status: string, kind: string, canChange: boolean } | null }[]
 }
 const { t } = useT()
 const { dateTime } = useDates()
@@ -69,7 +69,13 @@ const { data, status, error, refresh } = await useAPI<Mine>('/api/forms/mine', {
               :to="`/account/forms/${s.responseId}`"
               :name="s.title"
               :description="t('forms.screens.mine.sent-on', { when: dateTime(s.submittedAt), reference: s.reference })"
-            />
+            >
+              <StatusBadge
+                v-if="s.progress"
+                :tone="formsStageTone(s.progress.kind)"
+                :label="s.progress.status"
+              />
+            </RecordListItem>
           </RecordList>
         </section>
       </div>

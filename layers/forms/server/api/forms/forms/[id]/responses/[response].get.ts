@@ -3,13 +3,14 @@
 // are opened is recorded.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { defineRoute, refuse, requireAbility } from '#kit'
+import { can, defineRoute, refuse, requireAbility } from '#kit'
 import { getVersion, requireForm } from '../../../../../forms'
 import { getResponse, readAnswers } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
-import { questionsOf } from '../../../../../../shared/engine'
+import { hasStages, questionsOf, stageOf } from '../../../../../../shared/engine'
+import { changedIn, historyOf, movesFor, stageIn } from '../../../../../stages'
 
-const input = z.object({ reveal: z.enum(['1']).optional() })
+const input = z.object({ reveal: z.enum(['1']).optional(), revision: z.coerce.number().int().min(1).optional() })
 
 export default defineRoute({ ability: 'forms.response.read', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default', input }, async (event, { input, record, actor, unit }) => {
   const form = await requireForm(record!.id)
@@ -23,11 +24,23 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
     unit.audit({ action: 'read', ability: 'forms.response.read-special', record: ['forms.response', response.id], detail: { formId: form.id } })
   }
   const types = new Map(questionsOf(definition).map(({ question }) => [question.id, question.type]))
-  const answers = (await readAnswers([response.id], types, open)).get(response.id)!
+  // An earlier revision is read by its number; the latest is shown otherwise (FB-404).
+  const revision = Math.min(input.revision ?? response.currentRevision, response.currentRevision)
+  const answers = (await readAnswers([response.id], types, open, revision)).get(response.id)!
+  const staged = hasStages(definition)
+  const stage = stageIn(definition, response)
+  const mayMove = staged && (await can(actor, 'forms.response.move', ['forms.form', form.id])).allowed
   return {
     response: { id: response.id, reference: response.reference, version: version.number, submittedAt: response.submittedAt, personId: response.personId, respondentEmail: response.respondentEmail },
     definition,
     answers,
     restricted: answers.some(a => a.restricted),
+    revision,
+    revisions: response.currentRevision,
+    // The questions whose answers differ from the revision before this one.
+    changed: await changedIn(response.id, revision),
+    stage: staged ? { key: stage.key, name: stage.name, kind: stage.kind, note: response.stageNote } : null,
+    moves: mayMove ? (await movesFor(definition, response, actor)).map(t => ({ key: t.key, label: t.label, to: stageOf(definition, t.to)?.name ?? t.to, toKind: stageOf(definition, t.to)?.kind ?? 'closed' })) : [],
+    history: staged ? await historyOf(definition, response.id) : [],
   }
 })

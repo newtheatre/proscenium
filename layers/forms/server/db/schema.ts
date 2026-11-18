@@ -170,6 +170,8 @@ export const responses = defineTable('forms_responses', {
   stageKey: col.internal(text('stage_key')),
   stageKind: col.internal(text('stage_kind', { enum: STAGE_KINDS })),
   currentRevision: col.internal(integer('current_revision').notNull().default(0)),
+  // What staff wrote to the person with the latest move, such as what to change; gone when they send again.
+  stageNote: col.freeText(text('stage_note'), { erase: 'clear' }),
   // The account id, or a keyed hash of the address, where the placement allows one response each.
   uniqueKey: col.personal(text('unique_key'), { erase: 'clear' }),
   // What the form's calculations came to when it was sent.
@@ -248,4 +250,32 @@ export const answers = defineTable('forms_answers', {
   ],
 })
 
-export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers }
+/**
+ * Every move of a response between stages (FB-403), the first being its arrival. Append-only. It
+ * holds no words of anybody's: what staff write to the person with a move is on the response.
+ */
+export const stageHistory = defineTable('forms_stage_history', {
+  id: col.id(),
+  responseId: col.ref('forms_responses'),
+  // Null on arrival.
+  fromStage: col.internal(text('from_stage')),
+  toStage: col.internal(text('to_stage').notNull()),
+  toKind: col.internal(text('to_kind', { enum: STAGE_KINDS }).notNull()),
+  transitionKey: col.internal(text('transition_key').notNull()),
+  // The revision of the answers as the move was made.
+  revision: col.internal(integer('revision').notNull()),
+  // Null when the person who sent it was not signed in, or the system made the move.
+  actorId: col.account('actor_id', { role: 'actor', nullable: true }),
+  at: col.timestamp('at').notNull(),
+}, {
+  id: 'fstg',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('forms_stage_history_response').on(t.responseId, t.at),
+    check('forms_stage_history_kind', sql`${t.toKind} IN (${inList(STAGE_KINDS)})`),
+  ],
+})
+
+export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory }

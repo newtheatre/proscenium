@@ -4,6 +4,7 @@
 // modules are on) are added by the platform to the same list.
 import { OTHER, PATTERNS } from './types'
 import { unreached } from './reach'
+import { isFinal } from './workflow'
 import type { Comparison, Condition, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
 import { calculationsRead } from './calculations'
 import { conditionsOf, questionsOf } from './definition'
@@ -18,6 +19,8 @@ export type ProblemCode
     | 'wrong-rule' | 'unsafe-pattern' | 'not-a-number'
     | 'never-reached' | 'never-shown' | 'required-never-shown'
     | 'empty-condition' | 'no-questions'
+    | 'stage-no-name' | 'stage-duplicate' | 'move-no-label' | 'move-duplicate' | 'move-unknown-stage' | 'move-nowhere'
+    | 'returned-no-way-back' | 'stage-unreachable' | 'stage-dead-end'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
@@ -204,6 +207,38 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
   }
   for (const id of reads.keys()) visit(id, [])
   for (const id of circular) error('circular', id)
+
+  // ---- stages: each problem is at `stage:<key>` or `move:<key>` ----
+  if (def.workflow?.stages.length) {
+    const { stages, transitions } = def.workflow
+    const seen = new Set<string>()
+    for (const stage of stages) {
+      if (seen.has(stage.key)) error('stage-duplicate', `stage:${stage.key}`)
+      seen.add(stage.key)
+      if (!stage.name.trim()) error('stage-no-name', `stage:${stage.key}`)
+    }
+    const moves = new Set<string>()
+    for (const move of transitions) {
+      const at = `move:${move.key}`
+      if (moves.has(move.key)) error('move-duplicate', at)
+      moves.add(move.key)
+      if (!move.label.trim()) error('move-no-label', at)
+      if (!seen.has(move.from) || !seen.has(move.to)) error('move-unknown-stage', at)
+      else if (move.from === move.to) error('move-nowhere', at)
+    }
+    // Somebody sent back must be able to send their changes in again.
+    for (const stage of stages) if (stage.kind === 'returned' && !transitions.some(t => t.from === stage.key && t.who === 'submitter' && seen.has(t.to))) error('returned-no-way-back', `stage:${stage.key}`)
+    const reached = new Set([stages[0]!.key])
+    for (let grew = true; grew;) {
+      grew = false
+      for (const t of transitions) if (reached.has(t.from) && seen.has(t.to) && !reached.has(t.to)) grew = !!reached.add(t.to)
+    }
+    for (const stage of stages) {
+      const at = `stage:${stage.key}`
+      if (!reached.has(stage.key)) problems.push({ level: 'warning', code: 'stage-unreachable', at })
+      else if (!isFinal(stage.kind) && stage.kind !== 'returned' && !transitions.some(t => t.from === stage.key)) problems.push({ level: 'warning', code: 'stage-dead-end', at })
+    }
+  }
 
   // ---- what can never be reached or shown (warnings: they do not stop a publish) ----
   for (const u of unreached(def)) problems.push({ level: 'warning', code: u.why === 'route' ? 'never-reached' : u.required ? 'required-never-shown' : 'never-shown', at: u.at })
