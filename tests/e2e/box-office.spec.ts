@@ -183,7 +183,7 @@ test('Sell books a pass\'s entry from the find box without the till, and sells a
   await page.getByRole('textbox', { name: 'Booking reference, desk code, name or pass' }).fill(passCode.toLowerCase())
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText(`${passName} · No holder named`)).toBeVisible()
-  await expect(page.getByText('Added 1 entry for tonight on the pass.')).toBeVisible()
+  await expect(page.getByText('One entry for tonight is in the sale.')).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Book the entry' }).click()
   await expect(page.getByText(/^Booked as /)).toBeVisible()
