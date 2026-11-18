@@ -81,7 +81,7 @@ test('a product records its allergens from the label', async ({ page }) => {
 
 test('an outlet takes a till layout', async ({ page }) => {
   await visit(page, '/admin/modules/bar/outlets')
-  await page.getByRole('button', { name: 'New outlet' }).click()
+  await page.getByRole('button', { name: 'New outlet' }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Name').fill(`Foyer ${stamp}`)
   await expect(dialog.getByText('Till layout')).toBeVisible()
@@ -124,7 +124,7 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   await expect(page.getByText(`20 ml · Cocoa ${stamp}`)).toBeVisible()
 })
 
-test('Add a product starts from a preset, fills a row per size, and opens the new product', async ({ page }) => {
+test('Add a product starts from a preset, fills a row per size, and stays on the list', async ({ page }) => {
   await visit(page, '/admin/modules/bar/products')
   await page.getByRole('button', { name: 'New product' }).click()
   const dialog = page.getByRole('dialog')
@@ -148,7 +148,11 @@ test('Add a product starts from a preset, fills a row per size, and opens the ne
   await dialog.getByRole('button', { name: 'Add product' }).click()
   await expect(dialog.getByText('175ml has no price on Standard, so it can\'t be sold yet.')).toBeVisible()
   await dialog.getByRole('button', { name: 'Add without prices' }).click()
-  await expect(page).toHaveURL(/\/admin\/modules\/bar\/products\/bprd_/)
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/\/admin\/modules\/bar\/products$/)
+  const row = page.getByRole('listitem').filter({ hasText: `House red ${stamp}` })
+  await expect(row.getByText('Needs a price')).toBeVisible()
+  await page.getByRole('link', { name: 'Open' }).first().click()
   await expect(page.getByRole('heading', { name: '250ml' })).toBeVisible()
 })
 
