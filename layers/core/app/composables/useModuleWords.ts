@@ -5,7 +5,8 @@ import type { ModuleView } from '../utils/modules'
 
 export function useModuleWords() {
   const { t, te } = useT()
-  const nameOf = (id: string) => te(`${id}.module.name`) ? t(`${id}.module.name`) : id
+  // A name a module lists that is a part of the platform rather than a module, such as Communications, is named as its menu group is.
+  const nameOf = (id: string) => te(`${id}.module.name`) ? t(`${id}.module.name`) : te(`core.navigation.groups.${id}.label`) ? t(`core.navigation.groups.${id}.label`) : id
   const descriptionOf = (id: string) => te(`${id}.module.description`) ? t(`${id}.module.description`) : undefined
   const listOf = (items: string[]) => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(items)
   const screensOf = (m: Pick<ModuleView, 'screens'>) => (m.screens ?? [])

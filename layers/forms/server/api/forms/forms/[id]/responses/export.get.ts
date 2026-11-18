@@ -3,7 +3,7 @@
 // may read them and asks for them.
 import { getRouterParam, setResponseHeader } from 'h3'
 import { z } from 'zod'
-import { defineRoute, refuse, requireAbility, useSetting } from '#kit'
+import { defineRoute, refuse, requireAbility, siteUrl, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
 import { cells, columnsOf, figureColumns, listResponses, readAnswers, storedFigures, toCsv } from '../../../../../responses'
 import { figureCell } from '../../../../../../shared/figures'
@@ -36,13 +36,16 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   const most = await useSetting('forms.limits.export-rows') as number
 
   const lines: string[][] = []
+  // Files are named with the address that opens them, for somebody who may read the responses.
+  const files = await siteUrl('/files/')
+  const fileLink = (id: string) => `${files}${id}`
   const types = new Map(columns.map(c => [c.questionId, c.type]))
   for (let offset = 0; ; offset += CHUNK) {
     const { rows, total } = await listResponses(form.id, filter, CHUNK, offset)
     if (total > most) return refuse('forms.export.too-many', `This would export ${total} responses, and one export holds ${most}.`, { status: 422, remedy: 'Narrow the dates and export in parts.' })
     const answers = await readAnswers(rows.map(r => r.id), types, special)
     for (const r of rows) {
-      const row = cells(answers.get(r.id)!, columns)
+      const row = cells(answers.get(r.id)!, columns, fileLink)
       const worked = figures.length ? storedFigures(liveDef!, r.calculated, true) ?? {} : {}
       lines.push([r.reference, new Date(r.submittedAt).toISOString(), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? ''), ...figures.map(c => figureCell(c.type, worked[c.id]))])
     }

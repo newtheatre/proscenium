@@ -4,7 +4,7 @@
      when it was sent follow the answers of the page they were shown on; those shown nowhere come last,
      for staff only. -->
 <script setup lang="ts">
-import type { DataClass, Definition, Question, Value } from '../../shared/engine'
+import type { DataClass, Definition, FileRef, Question, Value } from '../../shared/engine'
 import type { Figure } from '../../shared/figures'
 
 export interface ShownAnswer { questionId: string, repeatIndex: number, dataClass: DataClass, restricted: boolean, value: Value, other: string | null, label: string | null }
@@ -49,6 +49,8 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
       restricted: a.restricted,
       changed: !!props.changed?.includes(q.id),
       text: a.restricted ? '' : words(q, a),
+      // A file answer reads as links to the files, which open for whoever may read the response.
+      files: !a.restricted && q.type === 'file' && Array.isArray(a.value) ? a.value as FileRef[] : null,
     })))
   }),
   figures: figures(id => id === page.id),
@@ -93,6 +95,11 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
               v-if="row.restricted"
               tone="neutral"
               :label="t('forms.screens.answers.restricted')"
+            />
+            <FormsFileList
+              v-else-if="row.files"
+              :files="row.files"
+              linked
             />
             <template v-else>
               {{ row.text }}
