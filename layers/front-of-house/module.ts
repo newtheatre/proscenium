@@ -161,6 +161,8 @@ export default defineModule({
     }],
     'core.navigation': [
       { id: 'front-of-house.shifts', menu: 'members', to: '/members/front-of-house', icon: 'i-lucide-calendar-clock', ability: 'front-of-house.shift.sign-up', order: 30 },
+      // The reporter's own incidents (FH-8): shown once they have reported one.
+      { id: 'front-of-house.my-reports', menu: 'members', to: '/members/front-of-house/reports', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.report', order: 31, count: 'front-of-house.my-reports', hideEmpty: true },
       { id: 'front-of-house.tonight', menu: 'live', to: '/live/front-of-house', icon: 'i-lucide-drama', ability: ['front-of-house.shift.view', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], order: 10 },
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
@@ -172,7 +174,7 @@ export default defineModule({
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
-    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
     'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
     // The roles part 7 suggests, made when the module is first switched on (FH-4).
     'core.role-preset': [
