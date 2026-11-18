@@ -147,6 +147,7 @@ export default defineModule({
     // The tills on a performance's operating day, for Front of house's board and night report.
     'front-of-house.tonight-figure': [{ id: 'payments.tills', file: 'tills' }],
     'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],
+    'core.tonight-figure': [{ id: 'payments.takings', file: 'takings' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },

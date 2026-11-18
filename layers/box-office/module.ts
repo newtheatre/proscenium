@@ -176,6 +176,7 @@ export default defineModule({
     'payments.settlement': [{ id: 'box-office' }],
     // Box office's part of the night report, when Front of house is on.
     'front-of-house.report-section': [{ id: 'box-office.attendance', file: 'attendance' }],
+    'core.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.in', file: 'in' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.
