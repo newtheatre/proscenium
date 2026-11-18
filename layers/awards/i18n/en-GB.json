@@ -147,8 +147,9 @@
   "awards.screens.import.title": "Import past awards",
   "awards.screens.import.help": "Records awards already given, from a file. Nobody is told.",
   "awards.screens.import.file": "Choose a CSV file",
-  "awards.screens.import.file-help": "One award a row: name, date or year awarded, what it was for, citation, email address. Only the name and the date are needed. A year alone is kept as 1 January.",
+  "awards.screens.import.file-help": "One award a row: name, date or year awarded, what it was for, citation, email address. Only the name and the date are needed. A year alone stays a year, and is shown as one.",
   "awards.screens.import.would-import": "{count} would be imported",
+  "awards.screens.import.would-import.one": "1 would be imported",
   "awards.screens.import.refused": "{count} would be left out:",
   "awards.screens.import.refused-line": "Line {line}: {reason}",
   "awards.screens.import.reasons.no-name": "no name",
@@ -160,6 +161,7 @@
   "awards.screens.import.reasons.already-recorded": "already recorded",
   "awards.screens.import.submit": "Import",
   "awards.screens.import.queued": "{count} awards are being imported",
+  "awards.screens.import.queued.one": "1 award is being imported",
   "awards.screens.import.queued-help": "They appear in the list over the next minute or so.",
 
   "awards.screens.link.title": "Link an account",

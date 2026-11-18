@@ -263,6 +263,7 @@
   "core.list.page-of": "Page {page} of {pages}, {total} in all",
   "core.list.paging": "Pages",
   "core.list.export": "Export {total} rows as CSV",
+  "core.list.export.one": "Export 1 row as CSV",
   "core.list.export-all": "The export holds every row.",
   "core.list.export-filtered": "The export holds only what is shown: {filters}.",
   "core.list.export-too-many": "{total} rows is more than one export can hold ({ceiling}). Narrow the list with a filter, then export.",

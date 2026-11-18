@@ -4,12 +4,12 @@
 <script setup lang="ts">
 import { encode } from 'uqr'
 
-interface Mine { id: string, card: boolean, recipientName: string, typeName: string, awardedOn: string, awardedFor: string | null, citation: string | null, visibility: 'public' | 'members' | 'hidden' }
+interface Mine { id: string, card: boolean, recipientName: string, typeName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, visibility: 'public' | 'members' | 'hidden' }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
-const { day } = useDates()
+const awardDate = useAwardDate()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ awards: Mine[] }>('/api/awards/mine', { key: 'awards:mine' })
 const visibilities = computed(() => (['public', 'members', 'hidden'] as const).map(v => ({ value: v, label: t(`awards.screens.visibility.${v}`) })))
@@ -72,7 +72,7 @@ const qr = computed(() => {
           v-for="award in data.awards"
           :key="award.id"
           :title="award.typeName"
-          :description="[day(award.awardedOn), award.awardedFor].filter(Boolean).join(' · ')"
+          :description="[awardDate(award), award.awardedFor].filter(Boolean).join(' · ')"
         >
           <p
             v-if="award.citation"
@@ -116,7 +116,7 @@ const qr = computed(() => {
           <p class="text-2xl font-semibold">
             {{ showing.recipientName }}
           </p>
-          <FactStrip :facts="[{ label: t('awards.screens.award.awarded-on'), value: day(showing.awardedOn) }]" />
+          <FactStrip :facts="[{ label: t('awards.screens.award.awarded-on'), value: awardDate(showing) }]" />
           <svg
             v-if="qr"
             :viewBox="`0 0 ${qr.size} ${qr.size}`"

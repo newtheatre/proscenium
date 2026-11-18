@@ -110,7 +110,7 @@ export default defineModule({
         importId: z.string(),
         typeId: z.string(),
         importedBy: z.string().nullable(),
-        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
+        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedPrecision: z.enum(['day', 'year']).optional(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
       }),
       lane: 'bulk',
     }),

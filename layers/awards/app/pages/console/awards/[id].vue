@@ -2,7 +2,7 @@
      Correcting changes its wording, date and where it is listed; revoking takes it back with a
      reason, which leaves the roll and stops its ticket price. -->
 <script setup lang="ts">
-interface Award { id: string, typeId: string, typeName: string, accountId: string | null, recipientName: string, awardedOn: string, awardedFor: string | null, citation: string | null, productionId: string | null, productionTitle: string | null, decidedOn: string | null, decisionNote: string | null, source: string, visibility: 'public' | 'members' | 'hidden', state: 'current' | 'revoked', revokedAt: number | null, revokeReason: string | null }
+interface Award { id: string, typeId: string, typeName: string, accountId: string | null, recipientName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, productionId: string | null, productionTitle: string | null, decidedOn: string | null, decisionNote: string | null, source: string, visibility: 'public' | 'members' | 'hidden', state: 'current' | 'revoked', revokedAt: number | null, revokeReason: string | null }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -10,6 +10,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const { day, dateTime } = useDates()
+const awardDate = useAwardDate()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ award: Award, canUpdate: boolean, canRevoke: boolean }>(() => `/api/awards/awards/${id.value}`, { key: `awards:award:${id.value}` })
 const a = computed(() => data.value?.award)
@@ -19,7 +20,7 @@ const facts = computed(() => {
   if (!x) return []
   return [
     { label: t('awards.screens.award.type'), value: x.typeName },
-    { label: t('awards.screens.award.awarded-on'), value: day(x.awardedOn) },
+    { label: t('awards.screens.award.awarded-on'), value: awardDate(x) },
     ...(x.awardedFor ? [{ label: t('awards.screens.award.awarded-for'), value: x.awardedFor }] : []),
     ...(x.productionTitle ? [{ label: t('awards.screens.award.production'), value: x.productionTitle }] : []),
     { label: t('awards.screens.award.listed'), value: t(`awards.screens.visibility.${x.visibility}`) },
