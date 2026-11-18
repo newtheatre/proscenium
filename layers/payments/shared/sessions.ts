@@ -34,4 +34,5 @@ export interface YourSession {
   sales?: YourSale[]
 }
 
-export interface YourSale { intentId: string, at: number, amountMinor: number, currency: string, state: string, methods: string[], notes: string[] }
+/** One of the session's sales; `owners` names what it was for, such as a booking's reference and where it opens. */
+export interface YourSale { intentId: string, at: number, amountMinor: number, currency: string, state: string, methods: string[], notes: string[], owners: { module: string, reference: string | null, to: string | null }[] }
