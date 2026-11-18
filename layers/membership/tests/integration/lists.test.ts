@@ -17,9 +17,9 @@ async function makeList(file = FILE) {
   expect((await req('POST', `/api/membership/lists/${id}/import`, { file })).status).toBe(200)
   return id
 }
-async function listScheme(fields: Record<string, unknown> = {}) {
+async function listScheme(fields: Record<string, unknown> = {}, lengths?: number[]) {
   const listId = await makeList()
-  const id = await scheme(fields)
+  const id = await scheme(fields, lengths)
   expect((await req('PATCH', `/api/membership/schemes/${id}`, { verifier: 'membership.list', listId })).status).toBe(200)
   const opened = await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
   expect(opened.status, JSON.stringify(opened.body)).toBe(200)
@@ -85,6 +85,15 @@ describe('joining against a list', () => {
     // V4: a second account typing the same ID waits for staff, who see the list's name for it.
     const other = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, person([]))
     expect(other.body).toMatchObject({ pending: true, waiting: 'entry-already-used' })
+  })
+
+  it('asks for no length where the list sets the end date (D9)', async () => {
+    const { id } = await listScheme({}, [12, 36])
+    const offered = (await req('GET', '/api/membership/schemes', undefined, person([]))).body.schemes.find((s: { id: string }) => s.id === id)
+    expect(offered.endsByList).toBe(true)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.endsByList).toBe(true)
+    const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20654321' }, person([]))
+    expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ endsOn: '2027-07-31', pending: false })
   })
 
   it('cannot open until the scheme has a list', async () => {

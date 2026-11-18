@@ -162,6 +162,15 @@ export async function findEntry(list: ListRow, value: string, day: string): Prom
   )
 }
 
+/**
+ * D9: whether a list's entries carry their own end dates, which then decide when a membership
+ * verified against it ends. A length chosen alongside would be ignored, so none is asked for.
+ */
+export async function listSetsEnd(list: ListRow | null): Promise<boolean> {
+  if (!list) return false
+  return !!(await first<{ x: number }>('SELECT 1 AS x FROM membership_verification_entries WHERE list_id = ? AND ends_on IS NOT NULL LIMIT 1', list.id))
+}
+
 /** The scheme's reference list, from its verifier configuration, when it checks against one. */
 export async function schemeList(scheme: { verifier: string | null, verifierConfig?: string | null }): Promise<ListRow | null> {
   if (scheme.verifier !== 'membership.list' || !scheme.verifierConfig) return null

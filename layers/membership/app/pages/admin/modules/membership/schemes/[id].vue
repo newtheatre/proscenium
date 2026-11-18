@@ -26,7 +26,7 @@ interface Scheme {
   requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, endsByList: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -346,7 +346,7 @@ async function addMember() {
                 v-for="o in offeredOptions"
                 :key="o.id"
                 :name="o.name"
-                :description="exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
+                :description="data?.endsByList ? t('membership.screens.lengths.ends-by-list') : exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
               >
                 <RowActions
                   :items="optionActions(o)"
