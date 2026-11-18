@@ -12,6 +12,6 @@ export default defineRoute({
 }, async (_event, { input, unit }) => {
   const shifts = (await Promise.all(input.shiftIds.map(id => getShift(id)))).filter((s): s is Shift => !!s)
   if (shifts.length !== input.shiftIds.length) refuse('core.not-found', 'One of these shifts does not exist.', { status: 404 })
-  publishShifts(unit.view(), shifts)
+  await publishShifts(unit.view(), shifts)
   return { published: shifts.length }
 })
