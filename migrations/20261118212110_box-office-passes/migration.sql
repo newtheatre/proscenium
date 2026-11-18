@@ -81,6 +81,7 @@ CREATE TABLE `box_office_passes` (
 	`once` integer DEFAULT true NOT NULL,
 	`amount_minor` integer NOT NULL,
 	`currency` text NOT NULL,
+	`issued_at` integer,
 	`paid_at` integer,
 	`state` text DEFAULT 'active' NOT NULL,
 	`issued_by` text,

@@ -425,6 +425,9 @@ export const passes = defineTable('box_office_passes', {
   once: col.internal(integer('once', { mode: 'boolean' }).notNull().default(true)),
   amountMinor: col.minor('amount_minor').notNull(),
   currency: col.currency('currency').notNull(),
+  // When it became somebody's: its order was reserved or confirmed, or staff issued it. Null while it
+  // is only in a basket, where it works for that basket's own tickets and nothing else.
+  issuedAt: col.timestamp('issued_at'),
   // Null while it is reserved and not yet paid for.
   paidAt: col.timestamp('paid_at'),
   state: col.internal(text('state', { enum: ['active', 'void'] }).notNull().default('active')),

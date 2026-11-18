@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "d5b77d2e-d175-4844-b6fd-0983c8880e6a",
+  "id": "c7d1a421-4d16-41cd-8474-7138c7399085",
   "prevIds": [
     "5023dabb-0cd6-4f04-8ffa-24722f0fc76f"
   ],
@@ -5665,6 +5665,16 @@
       "name": "currency",
       "type": "text",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_passes",
+      "name": "issued_at",
+      "type": "integer",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
