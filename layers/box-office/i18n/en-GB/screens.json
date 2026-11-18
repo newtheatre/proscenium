@@ -834,5 +834,20 @@
   "box-office.production-tickets.empty.description": "Add dates on the Dates tab, then set each one up for sale.",
   "box-office.setup.unpublished.title": "The production is not published",
   "box-office.setup.unpublished.description": "Its booking pages open once it is published, so buyers cannot book online yet, even while this performance is on sale.",
-  "box-office.setup.unpublished.link": "Open the production"
+  "box-office.setup.unpublished.link": "Open the production",
+  "box-office.setup.run.title": "The whole run",
+  "box-office.setup.run.description": "Set up and sell every performance of this production at once. New dates take the run's set-up when they are scheduled.",
+  "box-office.setup.run.copy.one": "Copy this set-up to 1 performance not set up yet",
+  "box-office.setup.run.copy.other": "Copy this set-up to {count} performances not set up yet",
+  "box-office.setup.run.open.one": "Put 1 performance on sale",
+  "box-office.setup.run.open.other": "Put {count} performances on sale",
+  "box-office.setup.run.all-done": "Every performance of this production is set up and on sale.",
+  "box-office.setup.run.copied.one": "1 performance set up",
+  "box-office.setup.run.copied.other": "{count} performances set up",
+  "box-office.setup.run.copy-skipped.one": "1 was left alone: its space holds fewer seats than this set-up.",
+  "box-office.setup.run.copy-skipped.other": "{count} were left alone: their spaces hold fewer seats than this set-up.",
+  "box-office.setup.run.opened.one": "1 performance put on sale",
+  "box-office.setup.run.opened.other": "{count} performances put on sale",
+  "box-office.setup.run.open-skipped.one": "1 is not ready: open it to see what is missing.",
+  "box-office.setup.run.open-skipped.other": "{count} are not ready: open each to see what is missing."
 }

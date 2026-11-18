@@ -234,6 +234,42 @@ async function addBand() {
   if (await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`, { method: 'POST', body: { name: band.value.name.trim(), kind: band.value.kind, sort: d.bands.length } }), t('box-office.setup.bands.added'))) band.value = { name: '', kind: 'standard' }
 }
 
+// The whole run at once (S2): this set-up copied to every performance of the production with nothing
+// set up yet, and every performance that is ready put on sale.
+const { data: run, refresh: refreshRun } = await useProductionTickets(() => data.value?.performance.productionId ?? '')
+const others = computed(() => (run.value?.performances ?? []).filter(p => p.id !== id.value && !p.past))
+const othersBare = computed(() => others.value.filter(p => p.scheduled && !p.capacity).length)
+const runNotOnSale = computed(() => (run.value?.performances ?? []).filter(p => p.scheduled && p.sales !== 'on_sale' && p.sales !== 'closed').length)
+interface RunResult { done: number, skipped: { performanceId: string, reason: string }[] }
+function ranRun(result: RunResult, done: string, skipped: string) {
+  toast.add({ title: t(done, { count: result.done }), description: result.skipped.length ? t(skipped, { count: result.skipped.length }) : undefined, color: result.skipped.length ? 'warning' : 'success' })
+}
+async function copyToRun(confirmOverVenue = false) {
+  refusal.value = null
+  try {
+    const result = await $api<RunResult>(`${base.value}/copy-to-run`, { method: 'POST', body: { confirmOverVenue } })
+    ranRun(result, 'box-office.setup.run.copied', 'box-office.setup.run.copy-skipped')
+    await Promise.all([refresh(), refreshRun()])
+  }
+  catch (e) {
+    const r = toRefusal(e)
+    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return copyToRun(true)
+    refusal.value = r
+  }
+}
+async function openRun() {
+  const d = data.value!
+  refusal.value = null
+  try {
+    const result = await $api<RunResult>(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/sales/open`, { method: 'POST', body: {} })
+    ranRun(result, 'box-office.setup.run.opened', 'box-office.setup.run.open-skipped')
+    await Promise.all([refresh(), refreshRun()])
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
 // The production's bands: renamed in a dialogue, removed while nothing is priced or sold in them.
 const bandsUrl = (d: Setup) => `/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`
 const renaming = ref<Band | null>(null)
@@ -414,6 +450,37 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
               </UFormField>
             </UForm>
+          </PageSection>
+
+          <PageSection
+            v-if="others.length"
+            :title="t('box-office.setup.run.title')"
+            :description="t('box-office.setup.run.description')"
+          >
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-if="d.pools.length && othersBare"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-copy"
+                :label="t('box-office.setup.run.copy', { count: othersBare })"
+                @click="copyToRun()"
+              />
+              <UButton
+                v-if="runNotOnSale"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-play"
+                :label="t('box-office.setup.run.open', { count: runNotOnSale })"
+                @click="openRun"
+              />
+              <p
+                v-if="!(d.pools.length && othersBare) && !runNotOnSale"
+                class="text-sm text-muted"
+              >
+                {{ t('box-office.setup.run.all-done') }}
+              </p>
+            </div>
           </PageSection>
 
           <PageSection

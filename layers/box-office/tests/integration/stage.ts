@@ -76,6 +76,8 @@ import publishProduction from '../../../core/server/api/core/productions/[id]/pu
 import setProductionEffects from '../../../core/server/api/core/productions/[id]/effects.put'
 import setProductionAdvisories from '../../../core/server/api/core/productions/[id]/advisories.put'
 import editProduction from '../../../core/server/api/core/productions/[id]/index.patch'
+import copyToRunPost from '../../server/api/box-office/performances/[id]/sales/copy-to-run.post'
+import openRunPost from '../../server/api/box-office/productions/[id]/sales/open.post'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -118,6 +120,8 @@ export const handle = server({
   'POST /api/box-office/performances/:id/door/offline': doorOfflinePost,
   'POST /api/box-office/performances/:id/door/override': doorOverride,
   'POST /api/box-office/performances/:id/sales/copy': copyPost,
+  'POST /api/box-office/performances/:id/sales/copy-to-run': copyToRunPost,
+  'POST /api/box-office/productions/:id/sales/open': openRunPost,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
   'GET /api/box-office/door/tonight': doorTonight,
