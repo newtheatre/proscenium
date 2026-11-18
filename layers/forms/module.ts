@@ -1,7 +1,8 @@
 // The form builder (form builder specification): a theatre's own questions anywhere in the platform,
 // with logic, versions and, where a form wants one, a workflow. Always on, as the specification
 // decides. This file grows with the build; it declares only what the code so far uses.
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, setting } from '#kit'
+import { z } from 'zod'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'forms.settings.manage'
@@ -20,6 +21,10 @@ export default defineModule({
     'limits.definition-size': setting.integer({ default: 256, min: 32, max: 1024, change, audience: 'staff' }),
     'limits.repeat-entries': setting.integer({ default: 20, min: 1, max: 100, change, audience: 'staff' }),
     'limits.condition-depth': setting.integer({ default: 3, min: 1, max: 5, change, audience: 'staff' }),
+    // Kilobytes. The most one person's answers may come to, sent or kept as a working copy.
+    'limits.response-size': setting.integer({ default: 256, min: 16, max: 1024, change, audience: 'staff' }),
+    // The most responses one export holds.
+    'limits.export-rows': setting.integer({ default: 5000, min: 100, max: 20000, change, audience: 'staff' }),
     // Whether authors may write their own validation patterns (regular expressions).
     'builder.free-patterns': setting.boolean({ default: false, change, audience: 'staff' }),
     // Whether a form holding personal answers must say how long they are kept before it is published.
@@ -31,6 +36,7 @@ export default defineModule({
 
   records: defineRecords('forms', {
     form: { table: 'forms_forms', owner: 'created_by' },
+    response: { table: 'forms_responses', owner: 'person_id' },
   }),
   abilities: defineAbilities('forms', {
     'form.create': ability(),
@@ -38,13 +44,25 @@ export default defineModule({
     // the form's own fields is, and so is every publish.
     'form.edit': ability({ on: 'forms.form', owner: 'grants', audit: false }),
     'form.publish': ability({ on: 'forms.form', implies: ['form.edit'] }),
+    // Responses are read form by form: these are granted on the form, never on one response.
+    'response.read': ability({ on: 'forms.form', owner: 'grants', audit: false }),
+    'response.export': ability({ on: 'forms.form', risk: 'privileged', implies: ['response.read'] }),
+    // Opening special-category answers. Every reveal is recorded.
+    'response.read-special': ability({ on: 'forms.form', risk: 'privileged', audit: 'read', implies: ['response.read'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
   tables,
 
+  events: {
+    announces: {
+      // Ids only: what was answered stays inside, and a listener reads it through forms.
+      'forms.response.submitted': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string() }), internal: true }),
+    },
+  },
+
   contributes: {
-    'core.record-resolver': [{ id: 'forms.form', file: 'form' }],
+    'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }],
     'core.navigation': [
       { id: 'forms.forms', menu: 'console', group: 'forms', section: 'everyday', to: '/console/forms', match: '/console/forms', icon: 'i-lucide-file-text', ability: ['forms.form.create', 'forms.form.edit'], order: 1 },
     ],

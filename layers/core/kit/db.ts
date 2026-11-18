@@ -280,13 +280,16 @@ function erasedValue(erase: Erasure): string | undefined {
 
 /**
  * The triggers that make a table append-only: no delete, and no update except setting an erasable
- * column to its erased value with every other column unchanged.
+ * column to its erased value with every other column unchanged. A column classed row by row
+ * (`col.perRow`) may be emptied or set to either erased marker, since its class is the row's.
  */
 export function appendOnlyTriggers(meta: TableMeta): { name: string, sql: string }[] {
   const t = meta.name
   const conditions = Object.values(meta.columns).map(({ sql, meta: m }) => {
     const erased = erasedValue(m.erase)
     const same = `NEW.${quote(sql)} IS OLD.${quote(sql)}`
+    // A column classed row by row is erased as its row's class says: emptied, or replaced by a marker.
+    if (m.class === 'perRow') return `(${same} OR NEW.${quote(sql)} IS NULL OR NEW.${quote(sql)} IN ('${ERASED.anonymise}', '${ERASED.redact}'))`
     return erased ? `(${same} OR NEW.${quote(sql)} IS ${erased})` : same
   })
   return [
