@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "9409fb88-90e4-4151-a4b8-9a83fb4337fb",
+  "id": "41219acd-45f2-4789-a08d-867b368a1fb4",
   "prevIds": [
-    "d319c8c0-e65d-4ef5-931a-fa439efaa5c4"
+    "c95cc8e2-5c37-460a-8d91-6fbbb54abf6e"
   ],
   "ddl": [
     {
@@ -5209,6 +5209,16 @@
     {
       "table": "box_office_performance_sales",
       "name": "hold_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "release_minutes",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
