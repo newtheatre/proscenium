@@ -183,6 +183,16 @@ describe('posting-splits-by-part', () => {
     expect(await rows('SELECT a.system_key, a.scope FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id WHERE e.posting_id = ? AND e.amount_minor > 0', posting!.id)).toEqual([{ system_key: 'payments.card-clearing', scope: machine }])
   })
 
+  it('keeps what an "other" payment was, and no note on any other way', async () => {
+    const { intentId } = await prepare({ amount: 500 })
+    const machine = newId('ppa')
+    await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'attested-card', 'Card machine', '[\"desk\"]', 'live', 1, ?, ?)").bind(machine, NOV_16, NOV_16).run()
+    const card = await inContext(() => attest({ intentId, providerAccountId: machine, method: 'card_attested', amountMinor: 200, note: 'ignored' }))
+    const other = await inContext(() => attest({ intentId, providerAccountId: machine, method: 'other_attested', note: '  Voucher 1234 ' }))
+    expect(other.settled).toBe(true)
+    expect(await rows('SELECT id, note FROM payments_attempts WHERE intent_id = ? ORDER BY started_at, id', intentId)).toEqual(expect.arrayContaining([{ id: card.attemptId, note: null }, { id: other.attemptId, note: 'Voucher 1234' }]))
+  })
+
   it('keeps money taken some other way out of card clearing on a split sale', async () => {
     const { intentId } = await prepare({ amount: 5400 })
     const machine = newId('ppa')
@@ -193,16 +203,6 @@ describe('posting-splits-by-part', () => {
     const [posting] = await postings(intentId)
     expect(await rows('SELECT a.system_key, a.scope, e.amount_minor FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id WHERE e.posting_id = ? AND e.amount_minor > 0 ORDER BY e.amount_minor', posting!.id))
       .toEqual([{ system_key: 'payments.card-clearing', scope: machine, amount_minor: 2000 }, { system_key: 'payments.other', scope: null, amount_minor: 3400 }])
-  })
-
-  it('keeps what an "other" payment was, and no note on any other way', async () => {
-    const { intentId } = await prepare({ amount: 500 })
-    const machine = newId('ppa')
-    await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'attested-card', 'Card machine', '[\"desk\"]', 'live', 1, ?, ?)").bind(machine, NOV_16, NOV_16).run()
-    const card = await inContext(() => attest({ intentId, providerAccountId: machine, method: 'card_attested', amountMinor: 200, note: 'ignored' }))
-    const other = await inContext(() => attest({ intentId, providerAccountId: machine, method: 'other_attested', note: '  Voucher 1234 ' }))
-    expect(other.settled).toBe(true)
-    expect(await rows('SELECT id, note FROM payments_attempts WHERE intent_id = ? ORDER BY started_at, id', intentId)).toEqual(expect.arrayContaining([{ id: card.attemptId, note: null }, { id: other.attemptId, note: 'Voucher 1234' }]))
   })
 })
 
