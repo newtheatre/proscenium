@@ -35,10 +35,16 @@ watch(role, (r) => {
 // A role cannot end at a year end the theatre has not set, nor never when roles must end; an
 // existing role keeps showing the choice it has.
 const expiryOptions = computed(() => [
-  { value: 'year_end', label: t('core.roles.ends.year-end'), description: data.value?.yearEndSet === false ? t('core.roles.ends.year-end-unset') : undefined, disabled: data.value?.yearEndSet === false && form.expiryRule !== 'year_end' },
+  { value: 'year_end', label: t('core.roles.ends.year-end'), disabled: data.value?.yearEndSet === false && form.expiryRule !== 'year_end' },
   { value: 'days', label: t('core.roles.ends.after-days') },
-  { value: 'none', label: t('core.roles.ends.none'), description: data.value?.allowNoExpiry === false ? t('core.roles.ends.none-not-allowed') : undefined, disabled: data.value?.allowNoExpiry === false && form.expiryRule !== 'none' },
+  { value: 'none', label: t('core.roles.ends.none'), disabled: data.value?.allowNoExpiry === false && form.expiryRule !== 'none' },
 ])
+// Why a choice cannot be made goes under the field, not on the dimmed choice, so it stays legible.
+const expiryHelp = computed(() => [
+  t('core.roles.ends.help'),
+  data.value?.yearEndSet === false ? t('core.roles.ends.year-end-unset') : '',
+  data.value?.allowNoExpiry === false ? t('core.roles.ends.none-not-allowed') : '',
+].filter(Boolean).join(' '))
 watch(() => form.expiryRule, (rule) => { if (rule === 'days' && !form.expiryDays) form.expiryDays = A_YEAR })
 
 // Starting points for a new role. Choosing one fills the form with what the editor may give.
@@ -70,8 +76,10 @@ const top = useTemplateRef<HTMLElement>('top')
 
 /** Takes the person to the first problem: the field, or the refusal at the top of the form. */
 function onError(event: FormErrorEvent) {
-  const first = event.errors.find(e => e.id && document.getElementById(e.id))
-  const field = first?.id ? document.getElementById(first.id) : null
+  // The first problem on the page, in reading order, not the order the schema lists its fields.
+  const fields = event.errors.map(e => e.id ? document.getElementById(e.id) : null).filter((el): el is HTMLElement => !!el)
+  fields.sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
+  const field = fields[0]
   if (!field) return
   field.scrollIntoView({ block: 'center', behavior: 'smooth' })
   field.focus({ preventScroll: true })
@@ -219,7 +227,7 @@ async function archive() {
           <UFormField
             name="expiryRule"
             :label="t('core.roles.ends.label')"
-            :help="t('core.roles.ends.help')"
+            :help="expiryHelp"
           >
             <URadioGroup
               v-model="form.expiryRule"
