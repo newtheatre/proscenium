@@ -73,6 +73,16 @@ describe('grants (ID-23)', () => {
     expect(history.map((g: any) => g.state)).toEqual(['ended'])
   })
 
+  it('tells the person when they are given a role and when it is ended (EM-13)', async () => {
+    const roleId = await makeRole(['core.role.read'])
+    const holder = await staff()
+    const given = await owner.browser.post('/api/core/grants', { accountId: holder.accountId, roleId })
+    const told = async () => rows<{ type_key: string }>('SELECT type_key FROM core_notifications WHERE account_id = ? AND type_key LIKE \'core.role-%\' ORDER BY created_at, type_key', holder.accountId)
+    expect(await told()).toEqual([{ type_key: 'core.role-given' }])
+    await owner.browser.post(`/api/core/grants/${given.body.id}/end`)
+    expect((await told()).map(r => r.type_key).sort()).toEqual(['core.role-ended', 'core.role-given'])
+  })
+
   it('changing a grant ends it and writes a new one; the history shows both', async () => {
     const roleId = await makeRole(['core.role.read'])
     const holder = await staff()

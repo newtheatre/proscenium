@@ -9,7 +9,7 @@ interface Line { id: string, bandId: string | null, band: string | null, ticketT
 interface Offer { performanceId: string, title: string, startsAt: number, currency: string | null, rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }[] }
 interface Quote { oldMinor: number, newMinor: number, differenceMinor: number, paid: boolean }
 
-const props = defineProps<{ orderId: string, reference: string, currency: string, lines: Line[] }>()
+const props = defineProps<{ orderId: string, reference: string, currency: string, lines: Line[], performance: { id: string, title: string, startsAt: number } | null }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ exchanged: [] }>()
 
@@ -24,11 +24,19 @@ const quote = ref<Quote | null>(null)
 const form = ref({ lineIds: [] as string[], performanceId: '', options: {} as Record<string, string> })
 
 const { data: offers } = await useAPI<{ performances: Offer[] }>('/api/box-office/desk/performances', { key: 'box-office:exchange-performances', default: () => ({ performances: [] }) })
-const performanceItems = computed(() => (offers.value?.performances ?? []).map(p => ({ value: p.performanceId, label: `${p.title}, ${dateTime(p.startsAt)}` })))
+// Performances of the same show, this one first and named as such (for other seats or another
+// ticket type at the same performance), then the others in date order.
+const performanceItems = computed(() => {
+  const here = props.performance
+  const same = (offers.value?.performances ?? []).filter(p => !here || p.title === here.title)
+  return [...same].sort((a, b) => Number(b.performanceId === here?.id) - Number(a.performanceId === here?.id))
+    .map(p => ({ value: p.performanceId, label: p.performanceId === here?.id ? t('box-office.order.exchange.this-performance', { when: dateTime(p.startsAt) }) : t('box-office.order.exchange.performance-option', { title: p.title, when: dateTime(p.startsAt) }) }))
+})
 const rows = computed(() => offers.value?.performances.find(p => p.performanceId === form.value.performanceId)?.rows ?? [])
 const optionItems = computed(() => rows.value
   .map(r => ({ value: `${r.bandId}|${r.ticketTypeId}`, label: t('box-office.order.exchange.option', { band: r.band, type: r.ticketType, price: money(r.amountMinor, props.currency), free: r.free }), disabled: r.free < 1 })))
-const describe = (l: Line) => [l.band, l.ticketType, money(l.amountMinor, props.currency)].filter(Boolean).join(' · ')
+// Each ticket is named by its place on the order as well, so three alike tickets read apart.
+const describe = (l: Line) => t('box-office.order.exchange.line', { number: props.lines.indexOf(l) + 1, band: l.band ?? '', type: l.ticketType ?? '', price: money(l.amountMinor, props.currency) })
 const lineItems = computed(() => props.lines.map(l => ({ value: l.id, label: describe(l) })))
 const chosen = computed(() => props.lines.filter(l => form.value.lineIds.includes(l.id)))
 const body = computed(() => ({

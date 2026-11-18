@@ -81,6 +81,10 @@ describe('holding a scheme', () => {
     const mine = (await req('GET', '/api/membership/mine', undefined, student)).body
     expect(mine.number.label).toMatch(/^M-\d+$/)
     expect(mine.memberships).toMatchObject([{ schemeName: 'Student member', length: '36 months', status: 'current' }])
+    // A welcome, once, with how long it runs and the way to the card (EM-12).
+    const welcomes = await rows<{ payload: string }>("SELECT payload FROM core_notifications WHERE type_key = 'membership.welcome' AND account_id = ?", student.accountId)
+    expect(welcomes).toHaveLength(1)
+    expect(JSON.parse(welcomes[0]!.payload)).toMatchObject({ scheme: 'Student member', until: 'It runs until 16 November 2029.' })
   })
 
   it('restates the lengths when the rule changes between months and scheme years, and refuses what cannot be', async () => {

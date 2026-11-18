@@ -160,6 +160,11 @@ describe('cancelling tickets on a paid order', () => {
     expect(await claimed(h)).toBe(1)
     await deliver()
     expect(await rows('SELECT state FROM payments_refunds WHERE id = ?', done.body.refund.id)).toEqual([{ state: 'requested' }])
+    // The order's page shows what was paid and the refund waiting, from Payments.
+    const page = await req('GET', `/api/box-office/orders/${o.orderId}`, undefined, boxOfficeManager)
+    expect(page.body.payments).toEqual([expect.objectContaining({ amountMinor: 2400, refundedMinor: 0, methods: ['card_online'], takenBy: null })])
+    expect(page.body.refunds).toEqual([expect.objectContaining({ id: done.body.refund.id, amountMinor: 1200, state: 'requested', method: 'card_online', handBack: false })])
+    expect(page.body.buyer.email).toMatch(/^refund\d+@example\.org$/)
     // Refunds names the order it is for, with its reference and a link to it.
     const [reference] = await rows<{ reference: string }>('SELECT reference FROM box_office_orders WHERE id = ?', o.orderId)
     const [summary] = await inContext(() => describeRefunds([done.body.refund.id]))

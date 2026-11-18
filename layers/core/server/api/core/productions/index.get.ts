@@ -11,7 +11,7 @@ export default defineRoute({
     state: z.enum(['draft', 'published', 'withdrawn', 'cancelled']).optional(),
     seasonId: z.string().optional(),
     categoryTermId: z.string().optional(),
-    sort: z.enum(['title', 'next']).optional(),
+    sort: z.enum(['title', 'next', 'dates']).optional(),
     order: z.enum(['asc', 'desc']).optional(),
     page: z.coerce.number().int().min(1).default(1),
     size: z.coerce.number().int().min(1).max(100).default(25), // not-policy: the console list's page sizes
