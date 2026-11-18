@@ -23,6 +23,8 @@ const offered = await useAPI<{ schemes: Offered[] }>('/api/membership/schemes', 
 const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 'lapsed': 'neutral' } as const
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
+/** A refusal about one field, shown under it; anything else shows above the form. */
+const fieldRefusal = (refusal: ReturnType<typeof toRefusal> | null | undefined, field: string) => refusal?.fields?.[field] ? refusal : null
 /** Why an application waits on the theatre, in the applicant's words. */
 const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
 // One card: a membership that follows on from one held now is not shown as a second card.
