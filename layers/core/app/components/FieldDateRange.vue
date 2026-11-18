@@ -39,15 +39,14 @@ function pick(v: unknown) {
 </script>
 
 <template>
-  <UInputDate
-    :model-value="(value as any)"
-    range
+  <FieldDateRangeParts
+    :model-value="value"
     :min-value="minValue"
     :max-value="maxValue"
     :is-date-unavailable="isUnavailable"
     :disabled="disabled"
     :aria-labelledby="labelledBy"
-    @update:model-value="value = ($event as Picked | null)"
+    @update:model-value="value = $event"
   >
     <template #trailing>
       <UPopover v-model:open="open">
@@ -74,5 +73,5 @@ function pick(v: unknown) {
         </template>
       </UPopover>
     </template>
-  </UInputDate>
+  </FieldDateRangeParts>
 </template>

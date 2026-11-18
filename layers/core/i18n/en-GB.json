@@ -295,6 +295,8 @@
   "core.dates.range": "{from} to {to}",
   "core.dates.pick": "Choose from a calendar",
   "core.dates.pick-range": "Choose the days from a calendar",
+  "core.dates.part-start": "start {part}",
+  "core.dates.part-end": "end {part}",
   "core.states.draft": "Draft",
   "core.states.published": "Published",
   "core.states.archived": "Archived",
