@@ -34,8 +34,8 @@ let guests = 0
 const address = () => `guest${++guests}@example.org`
 
 /** Presses Reserve as a guest. */
-function reserve(b: { orderId: string, token: string, totalMinor: number }, email: string | undefined, actor: ReturnType<typeof person> | null = null, total = b.totalMinor) {
-  return req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: total, ...(email ? { email, name: 'Guest Buyer' } : {}) }, actor, { 'x-basket-token': b.token })
+function reserve(b: { orderId: string, token: string, totalMinor: number }, email: string | undefined, actor: ReturnType<typeof person> | null = null, total = b.totalMinor, more: Record<string, unknown> = {}) {
+  return req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: total, ...(email ? { email, name: 'Guest Buyer' } : {}), ...more }, actor, { 'x-basket-token': b.token })
 }
 
 /** The sealed variables of the newest message of a type about an order, as the buyer's email shows them. */
@@ -282,7 +282,8 @@ describe('the link that opens a guest\'s account', () => {
     // An age-restricted production says so with the tickets.
     await rows('UPDATE core_productions SET age_min = 18, age_restricted = 1 WHERE id = ?', h.productionId)
     const b = await basket(h, 1)
-    const done = await reserve(b, address())
+    // The buyer says everyone using the tickets is old enough, as the booking page asks.
+    const done = await reserve(b, address(), null, b.totalMinor, { ageConfirmed: true })
     expect(done.body).toMatchObject({ state: 'reserved', accountLinkSent: true })
     const told = await mail('box-office.order-reserved', b.orderId)
     expect(told.account).toMatch(/^https:\/\/theatre\.example\/sign-in\/link#/)
