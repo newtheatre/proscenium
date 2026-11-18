@@ -11,10 +11,13 @@ const locale = useUiLocale()
 
 const refused = computed(() => props.error.statusCode === 403 && props.error.data?.reason)
 const missing = computed(() => props.error.statusCode === 404)
-const title = computed(() => refused.value ? t('core.refused.title') : missing.value ? t('core.not-found.title') : t('core.failed.title'))
+const limited = computed(() => props.error.statusCode === 429)
+const title = computed(() => refused.value ? t('core.refused.title') : missing.value ? t('core.not-found.title') : limited.value ? t('core.rate-limited.title') : t('core.failed.title'))
 useHead({ title })
 const home = () => clearError({ redirect: '/' })
-const description = computed(() => refused.value ? undefined : missing.value ? t('core.not-found.description') : t('core.failed.reason'))
+const description = computed(() => refused.value ? undefined : missing.value ? t('core.not-found.description') : limited.value ? t('core.rate-limited.description') : t('core.failed.reason'))
+// After a pause the same address usually opens, so a rate limit offers to try it again.
+const retry = () => clearError({ redirect: route.fullPath })
 </script>
 
 <template>
@@ -31,6 +34,11 @@ const description = computed(() => refused.value ? undefined : missing.value ? t
             v-if="refused"
             :refusal="{ reason: phrase(props.error.data?.reason) ?? '', remedy: phrase(props.error.data?.remedy), code: props.error.data?.code }"
             :sign-in-to="`/sign-in?next=${encodeURIComponent(route.fullPath)}`"
+          />
+          <UButton
+            v-if="limited"
+            :label="t('core.failed.retry')"
+            @click="retry"
           />
           <UButton
             :label="t('core.error.home')"

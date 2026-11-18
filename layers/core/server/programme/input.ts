@@ -35,6 +35,7 @@ const productionFields = z.object({
   intervalMinutes: z.number().int().min(0).max(120).nullable(), // not-policy: a sane ceiling on one interval
   doorsBeforeMinutes: z.number().int().min(0).max(180).nullable(), // not-policy: the doors setting's ceiling
   capacity: z.number().int().min(1).max(100_000).nullable(), // not-policy: a sane ceiling on a house
+  usualSpaceId: z.string().min(1).nullable(),
   externalBookingUrl: z.string().trim().url().startsWith('https://').max(2000).nullable(), // not-policy: an address's bound
   creditsPublic: z.boolean(),
   listed: z.boolean(),

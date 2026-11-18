@@ -138,6 +138,7 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
   // The sale opened the session, shown as Your session above Till sessions with the cash expected.
   await expect(page.getByText(/^Your session since/)).toBeVisible()
