@@ -8,6 +8,9 @@
 import { sql } from 'drizzle-orm'
 import { all, createUnit, first, idSchema, newId, nowMs, refuse, requirements, usePoint, type UnitView } from '#kit'
 
+/** The type a pass entry's line carries (pass-entries.ts): kept out of every list of types. */
+export const HIDDEN_TYPE = 'box-office.pass-entry'
+
 export const KINDS = ['standard', 'concession', 'companion', 'complimentary'] as const
 /** Where a type is sold: everywhere, only at the desk, or only online. */
 export const CHANNELS = ['all', 'desk', 'online'] as const
@@ -169,7 +172,8 @@ function toType(r: Row, declared: Map<string, unknown>, used: Set<string>): Tick
 /** Every type, in the order the theatre set. */
 export async function listTicketTypes(): Promise<TicketType[]> {
   const [rows, declared, used] = await Promise.all([
-    all<Row>('SELECT * FROM box_office_ticket_types ORDER BY sort, name COLLATE NOCASE'),
+    // A pass entry's own type is Box office's bookkeeping, not something to rename, price or retire.
+    all<Row>(`SELECT * FROM box_office_ticket_types WHERE managed_by IS NOT '${HIDDEN_TYPE}' ORDER BY sort, name COLLATE NOCASE`),
     declaredTypes(),
     all<{ id: string }>('SELECT DISTINCT ticket_type_id AS id FROM box_office_order_lines WHERE ticket_type_id IS NOT NULL UNION SELECT DISTINCT ticket_type_id FROM box_office_prices'),
   ])
@@ -269,14 +273,14 @@ export async function updateTicketType(unit: UnitView, id: string, change: Ticke
 /**
  * Puts every ticket type in the order given, as dragged on the Ticket types screen: the first is
  * shown first on the console, the performance grid and the booking page. The list must name every
- * type once, so an order made from a stale screen (someone added a type meanwhile) is refused.
+ * type once (but for the one kept for pass entries, which no list shows), so an order made from a stale screen (someone added a type meanwhile) is refused.
  */
 export function reorderTicketTypes(unit: UnitView, ids: string[]): void {
   const stale = { code: 'box-office.ticket-type.order-stale', reason: 'The ticket types changed while you were ordering them.', remedy: 'Reload the page and try again.' }
   if (new Set(ids).size !== ids.length) refuse(stale.code, stale.reason, { status: 409, remedy: stale.remedy })
   const list = JSON.stringify(ids)
   unit.add(sql`UPDATE box_office_ticket_types SET sort = (SELECT key FROM json_each(${list}) WHERE value = box_office_ticket_types.id), updated_at = ${nowMs()}
-    WHERE id IN (SELECT value FROM json_each(${list})) AND (SELECT count(*) FROM box_office_ticket_types) = ${ids.length}`)
+    WHERE id IN (SELECT value FROM json_each(${list})) AND (SELECT count(*) FROM box_office_ticket_types WHERE managed_by IS NOT ${HIDDEN_TYPE}) = ${ids.length}`)
     .expect(ids.length, stale)
   unit.audit({ action: 'update', ability: 'box-office.pricing.manage', detail: { ticketTypesOrdered: ids.length } })
 }

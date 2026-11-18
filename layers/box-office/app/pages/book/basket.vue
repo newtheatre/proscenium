@@ -8,7 +8,7 @@ import { z } from 'zod'
 import type { BookingDoneOutcome } from '../../utils/booking'
 
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
-interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number }[], promo?: { code: string, savingMinor: number } | null }
+interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number, pass?: string }[], promo?: { code: string, savingMinor: number } | null }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string, ageMin: number | null, ageRestricted: boolean }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string, unmet?: string }[] }[] }
 type Outcome
   = | (BookingDoneOutcome & { state: 'confirmed', totalMinor: number })
@@ -125,10 +125,12 @@ const lines = computed(() => {
   const grouped = new Map<string, { label: string, count: number, amountMinor: number }>()
   for (const l of basket.value?.lines ?? []) {
     const key = `${l.bandId} ${l.ticketTypeId}`
-    const row = grouped.get(key) ?? { label: names.value.get(key) ?? '', count: 0, amountMinor: 0 }
+    // A pass's entry goes by the pass's name, with the kind of space when it is a wheelchair space (BO-64).
+    const kind = names.value.get(key)
+    const row = grouped.get(l.pass ? `pass ${l.pass} ${key}` : key) ?? { label: l.pass ? (kind ? `${l.pass}, ${kind}` : l.pass) : kind ?? '', count: 0, amountMinor: 0 }
     row.count++
-    row.amountMinor += basket.value?.promo ? (l.listMinor ?? l.amountMinor) : l.amountMinor
-    grouped.set(key, row)
+    row.amountMinor += basket.value?.promo && !l.pass ? (l.listMinor ?? l.amountMinor) : l.amountMinor
+    grouped.set(l.pass ? `pass ${l.pass} ${key}` : key, row)
   }
   return [...grouped.values()]
 })

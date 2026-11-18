@@ -4,6 +4,7 @@ import { all, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
 import { getPerformance, getProduction, getVenue, placeOf } from '#modules/core'
 import { lineKey, unnamedLines } from './line-names'
 import catalogue from '../i18n/en-GB.json'
+import { HIDDEN_TYPE } from './ticket-types'
 
 const say = wordsFrom(catalogue)
 
@@ -29,9 +30,13 @@ export async function assertAgeConfirmed(lines: { performance_id: string }[], co
 
 export function liveLines(orderId: string): Promise<LineRow[]> {
   return all<LineRow>(
-    `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, t.name AS type_name, t.kind AS type_kind,
+    // A pass entry is named by its pass, and a wheelchair space on a pass by both.
+    `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor,
+        CASE WHEN y.name IS NULL THEN t.name WHEN t.managed_by = '${HIDDEN_TYPE}' THEN y.name ELSE y.name || ', ' || t.name END AS type_name, t.kind AS type_kind,
         CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name FROM box_office_order_lines l
-      JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
+      JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
+      LEFT JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id LEFT JOIN box_office_passes p ON p.id = d.pass_id LEFT JOIN box_office_pass_types y ON y.id = p.pass_type_id
+      WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
 }
 
 // What a message says about an order: the show, when, what is booked and what is owed.

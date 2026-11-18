@@ -12,7 +12,7 @@ export default {
   order: 10, // not-policy: its place among the other modules' parts
   async compile(performanceId: string) {
     const counts = await first<{ tickets: number, admitted: number | null, comps: number | null }>(
-      `SELECT count(*) AS tickets, sum(CASE WHEN t.admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted, sum(CASE WHEN y.kind = 'complimentary' THEN 1 ELSE 0 END) AS comps
+      `SELECT count(*) AS tickets, sum(CASE WHEN t.admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted, sum(CASE WHEN y.kind = 'complimentary' AND l.pass_redemption_id IS NULL THEN 1 ELSE 0 END) AS comps
         FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id JOIN box_office_ticket_types y ON y.id = l.ticket_type_id
         WHERE t.performance_id = ? AND t.state = 'valid'`, performanceId)
     // Only the scan that let each ticket in counts, so a ticket scanned again later is listed once.

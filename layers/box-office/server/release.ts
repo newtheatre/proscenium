@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { getPerformance, notify } from '#modules/core'
 import { claimSeats } from './capacity'
+import { carryPassEntries } from './pass-entries'
 import { hashOf } from './codes'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
 
@@ -131,6 +132,8 @@ export async function reinstateReservation(unit: UnitView, orderId: string, by: 
       SELECT ${newId('orl')}, order_id, kind, performance_id, band_id, ticket_type_id, ${claimed[i]}, price_id, list_minor, discount_minor, amount_minor, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, 'live', ${at}, ${at}
         FROM box_office_order_lines WHERE id = ${line.id}`).expect(1, NOT_RELEASED)
   })
+  // A pass's entry went back with the seat too; it is taken again, unless the pass has since been used for the show.
+  await carryPassEntries(unit, orderId, lines.map((line, i) => ({ lineId: line.id, claimId: claimed[i]! })))
   unit.audit({ action: 'update', record: ['box-office.order', orderId], detail: { reinstated: lines.length, by } })
   return { orderId, reference: order.reference }
 }

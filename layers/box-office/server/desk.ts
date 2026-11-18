@@ -15,6 +15,7 @@ import { entitle, holderVerdict } from './entitlement'
 import { signing } from '#kit/signing'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
+import { carryPassEntries } from './pass-entries'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
 import { siteUrl } from './links'
@@ -442,6 +443,7 @@ export async function splitReservation(unit: UnitView, orderId: string, lineIds:
       SELECT ${newId('orl')}, ${newOrderId}, kind, performance_id, band_id, ticket_type_id, ${claimed[i]}, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, 'live', ${at}, ${at}
         FROM box_office_order_lines WHERE id = ${id}`).expect(1, CHANGED)
   })
+  await carryPassEntries(unit, newOrderId, lineIds.map((lineId, i) => ({ lineId, claimId: claimed[i]! })))
   unit.add(sql`UPDATE box_office_orders SET total_minor = ${remainingMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
   unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { splitTo: newOrderId, tickets: lineIds.length } })
   return { orderId: newOrderId, reference, totalMinor: movingMinor, remainingMinor }

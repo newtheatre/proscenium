@@ -8,6 +8,8 @@ import { availability } from './availability'
 import { timingFor, type PaymentTiming } from './reservations'
 import { salesOf } from './setup'
 import { sellableTypes } from './ticket-types'
+import { passesFor, type OfferedPass } from './pass-entries'
+import { WHEELCHAIR_TYPE } from './prices'
 
 export interface BookingPage {
   performance: { id: string, startsAt: number, venue: string, state: string }
@@ -19,6 +21,8 @@ export interface BookingPage {
   /** The most tickets one order may hold. */
   maxPerOrder: number
   timing: PaymentTiming
+  /** Whether a pass covers this performance, and the signed-in visitor's own passes that do (BO-64). */
+  passes: { accepted: boolean, /** Whether the visitor may put a pass's entry in a wheelchair space here. */ wheelchair: boolean, mine: OfferedPass[] }
   bands: {
     bandId: string
     name: string
@@ -74,6 +78,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     currency: found.currency,
     maxPerOrder: sales?.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number,
     timing: await timingFor(performanceId),
+    passes: { ...await passesFor(performanceId, account), wheelchair: [...types.values()].some(type => type.managedBy === WHEELCHAIR_TYPE && judged.get(type.id)?.most !== undefined && found.bands.some(b => b.free > 0 && b.prices.some(p => p.ticketTypeId === type.id))) },
     bands: found.bands.map(b => ({
       bandId: b.bandId,
       name: b.name,
