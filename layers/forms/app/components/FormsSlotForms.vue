@@ -1,6 +1,7 @@
 <!-- The forms attached to one record in a slot (forms.slot): a module that declares a slot places
      this on its record's page. It lists what is attached, with the address people answer at and
-     where the responses are, and lets somebody who may attach a published form or take one away.
+     where the responses are, and lets somebody who may attach a published form or take one away, or
+     start a new one, from a template that suits the slot when a module ships one.
      The props are part of forms' interface to other modules. -->
 <script setup lang="ts">
 interface Attached { anonymous: boolean, id: string, formId: string, title: string, address: string, responseCount: number, status: 'active' | 'paused', opensAt: number | null, closesAt: number | null, formStatus: string }
@@ -44,20 +45,8 @@ async function attachFields(formId: string) {
   }
   await saved()
 }
-// A new set of fields starts as an empty form in record mode, named after the slot, and opens in the builder.
-const making = ref(false)
-async function newFields() {
-  refusal.value = null
-  making.value = true
-  try {
-    const made = await $api<{ formId: string }>('/api/forms/forms', { method: 'POST', body: { title: t(data.value!.slot.label), mode: 'record' } })
-    await navigateTo(`/console/forms/${made.formId}`)
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-  }
-  making.value = false
-}
+// A new form or set of fields opens in the builder, from a template that suits the slot when there is one.
+const starting = ref(false)
 // Choosing a form opens its terms; it is attached when they are saved.
 watch(adding, (id) => {
   const form = data.value?.forms.find(f => f.id === id)
@@ -163,22 +152,28 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
         />
       </UFormField>
       <div
-        v-if="room && fields"
+        v-if="room"
         class="space-y-1"
       >
         <UButton
-          :label="t('forms.screens.fields.new')"
+          :label="t(fields ? 'forms.screens.fields.new' : 'forms.screens.slot.new')"
           icon="i-lucide-plus"
           color="neutral"
           variant="subtle"
-          :loading="making"
-          @click="newFields"
+          @click="starting = true"
         />
         <p class="text-sm text-muted">
-          {{ t('forms.screens.fields.new-help') }}
+          {{ t(fields ? 'forms.screens.fields.new-help' : 'forms.screens.slot.new-help') }}
         </p>
       </div>
     </template>
+    <FormsSlotNew
+      v-if="data"
+      v-model:open="starting"
+      :slot-id="slotId"
+      :slot-label="data.slot.label"
+      :mode="data.slot.mode"
+    />
     <FormsLinkDialog
       v-if="editing"
       v-model:open="open"
