@@ -47,11 +47,14 @@ async function paid(h: House, quantity: number) {
   const attemptId = await commit(async unit => addAttempt(unit.view(), { intentId: started.body.intentId, providerAccountId: card, method: 'card_online', amountMinor: b.totalMinor }).id)
   expect(await inContext(() => recordAnswer(attemptId, { state: 'succeeded', providerRef: `cc_${attemptId}` }, { kind: 'poll' }))).toMatchObject({ settled: true })
   const [row] = await rows<{ sealed_variables: string, payload: string }>("SELECT sealed_variables, payload FROM core_notifications WHERE type_key IN ('box-office.order-confirmed', 'box-office.order-confirmed-guest') AND subject_id = ?", b.orderId)
-  const codes = (JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!).codes as string).split('\n\n')
   const told = JSON.parse(row!.payload) as { link?: string }
   const sealed = JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!) as { link?: string }
   const link = (told.link ?? sealed.link)!
-  return { orderId: b.orderId, lines: await lineIds(b.orderId), codes, token: link.slice(link.lastIndexOf('/') + 1) }
+  const token = link.slice(link.lastIndexOf('/') + 1)
+  // The codes are on the page the message links to.
+  const page = await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': token })
+  const codes = page.body.tickets.map((t: { doorCode: string }) => t.doorCode) as string[]
+  return { orderId: b.orderId, lines: await lineIds(b.orderId), codes, token }
 }
 
 const cancel = (orderId: string, body: Record<string, unknown>, actor = boxOfficeManager) => req('POST', `/api/box-office/orders/${orderId}/cancel`, { reasonTermId: reason, ...body }, actor)

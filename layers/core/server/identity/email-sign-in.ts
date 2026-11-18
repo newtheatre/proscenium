@@ -3,7 +3,7 @@
 // saying so. The link works once; the code works once, only in the browser that asked, and dies
 // after a few wrong tries. Neither can make a session strong.
 import type { H3Event } from 'h3'
-import { first, newId, nowMs, refuse, useContext, useSetting, siteUrl, type UnitView } from '#kit'
+import { all, first, newId, nowMs, refuse, useContext, useSetting, siteUrl, type UnitView } from '#kit'
 import { countAgainstRate, waitRemedy } from '#kit/ratelimit'
 import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
 import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAddress } from './accounts'
@@ -13,6 +13,7 @@ import { useEnrolmentLink } from './recovery'
 import { checkClaimable } from './claim'
 import { managedDomainProvider } from './providers'
 import { holdsPrivileged } from './me'
+import { LIVE } from './grants'
 
 export interface TokenRow {
   id: string
@@ -89,6 +90,20 @@ export interface SignedIn {
   created: boolean
   /** The account has no name yet, so the welcome step asks for one. */
   welcome: boolean
+  /** For an invitation's link: who invited the person, and to which roles, for the landing to say. */
+  invitation?: { by: string | null, roles: string[] }
+}
+
+/** Who sent an invitation and the roles waiting on the account it claims (AC-9). */
+async function invitationOf(row: TokenRow & { issued_by?: string | null }, accountId: string): Promise<{ by: string | null, roles: string[] }> {
+  const issuer = row.issued_by ? await accountById(row.issued_by) : null
+  const at = nowMs()
+  const roles = await all<{ name: string }>(
+    // exact-account: the account the invitation was written for, just claimed by this sign-in
+    `SELECT DISTINCT r.name FROM core_grants g JOIN core_roles r ON r.id = g.role_id WHERE g.account_id = ? AND ${LIVE} ORDER BY r.name`,
+    accountId, at, at,
+  )
+  return { by: issuer?.preferred_name || issuer?.name || null, roles: roles.map(r => r.name) }
 }
 
 /** Set by "Not now" on the passkey offer; read here so the offer is skipped while it lasts. */
@@ -121,7 +136,8 @@ async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'li
   await startSession(unit, event, { accountId, methods: [method], assurance: 'basic' })
   unit.audit({ action: 'sign-in', record: ['core.account', accountId], detail: { method } })
   const account = await accountById(accountId)
-  return { accountId, next: row.next_path, offerPasskey: await shouldOfferPasskey(event, accountId), created, welcome: !account?.name }
+  const invitation = row.purpose === 'invite' ? await invitationOf(row, accountId) : undefined
+  return { accountId, next: row.next_path, offerPasskey: await shouldOfferPasskey(event, accountId), created, welcome: !account?.name, ...(invitation ? { invitation } : {}) }
 }
 
 /** Uses an emailed link. A second use, even a moment later in a race, signs nobody in. */

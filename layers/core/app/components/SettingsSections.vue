@@ -134,7 +134,13 @@ async function save(sectionId: string, settings: SettingView[]) {
     const confirmed = await confirm({
       verb: t('core.settings-page.confirm-verb'),
       thing: asking.map(s => t(s.labelKey)).join(', '),
-      consequence: asking.map(s => t('core.settings-page.confirm-change', { setting: t(s.labelKey), from: controlText(s.kind, toControl(s), words()), to: shown(s) })).join(' '),
+      // A setting with no value yet is set, not changed from nothing (AC-11).
+      consequence: asking.map((s) => {
+        const from = controlText(s.kind, toControl(s), words())
+        return from.trim() && from !== 'null' && from !== 'undefined'
+          ? t('core.settings-page.confirm-change', { setting: t(s.labelKey), from, to: shown(s) })
+          : t('core.settings-page.confirm-set', { setting: t(s.labelKey), to: shown(s) })
+      }).join(' '),
       button: t('core.settings-page.confirm-button'),
     })
     if (!confirmed) return

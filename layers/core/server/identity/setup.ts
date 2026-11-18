@@ -14,6 +14,9 @@ export const SETUP_LIFETIME = 30 * 60 // not-policy: seconds a person has to fin
 export interface SetupTicket {
   name: string
   address: string
+  /** The theatre's name and time zone, asked at setup (AC-11) and saved with the Owner. */
+  theatre?: string
+  timeZone?: string
   userId: string
   challengeId: string
   credential?: NewCredential

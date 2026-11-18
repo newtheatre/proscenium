@@ -9,7 +9,7 @@ export function useModuleSwitch(modules: () => ModuleView[]) {
   const { toRefusal } = useRefusal()
   const toast = useToast()
   const overlay = useOverlay()
-  const { nameOf, listOf } = useModuleWords()
+  const { nameOf, listOf, dependantsOf } = useModuleWords()
   const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
   const busy = ref<string | null>(null)
 
@@ -21,15 +21,28 @@ export function useModuleSwitch(modules: () => ModuleView[]) {
     refusal.value = null
     busy.value = m.id
     try {
-      const result = await $api<{ switched: string[] }>(`/api/core/modules/${encodeURIComponent(m.id)}` as '/api/core/modules/:id', { method: 'PUT', body: { on, withRequired: on && m.alsoOn.length > 0 } })
+      const put = (id: string, body: { on: boolean, withRequired?: boolean }) => $api<{ switched: string[] }>(`/api/core/modules/${encodeURIComponent(id)}` as '/api/core/modules/:id', { method: 'PUT', body })
+      // Switching off a module others need switches those off first, the ones nothing needs before the ones that do.
+      const dependants = on ? [] : dependantsOf(m, modules())
+      for (const id of dependants) await put(id, { on: false })
+      const result = await put(m.id, { on, withRequired: on && m.alsoOn.length > 0 })
       const others = result.switched.filter(id => id !== m.id).map(nameOf)
       toast.add({
         title: on
           ? (others.length ? t('core.modules.switched-on-with', { module: nameOf(m.id), others: listOf(others) }) : t('core.modules.switched-on', { module: nameOf(m.id) }))
-          : t('core.modules.switched-off', { module: nameOf(m.id) }),
+          : (dependants.length ? t('core.modules.switched-off-with', { module: nameOf(m.id), others: listOf(dependants.map(nameOf)) }) : t('core.modules.switched-off', { module: nameOf(m.id) })),
         color: 'success',
       })
       await refreshNuxtData()
+      const next = on ? modules().find(o => o.id === m.id)?.open : null
+      if (next) {
+        toast.add({
+          title: t('core.modules.set-up-title', { module: nameOf(m.id) }),
+          description: t('core.modules.set-up-help'),
+          color: 'neutral',
+          actions: [{ label: t('core.modules.set-up', { module: nameOf(m.id) }), color: 'neutral', variant: 'outline', onClick: () => { void navigateTo(next) } }],
+        })
+      }
     }
     catch (e) {
       refusal.value = toRefusal(e)
