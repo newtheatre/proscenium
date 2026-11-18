@@ -148,7 +148,7 @@ const columns = computed(() => [
   { accessorKey: 'state', header: t('core.webhooks.log-state') },
   { accessorKey: 'attempts', header: t('core.webhooks.log-tries') },
   { id: 'answer', header: t('core.webhooks.log-answer') },
-  { id: 'actions', header: '' },
+  { id: 'actions' },
 ])
 function answer(d: WebhookDelivery): string {
   if (d.lastError && d.lastError !== 'status') return t(`core.webhooks.error.${d.lastError}`)

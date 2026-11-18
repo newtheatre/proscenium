@@ -173,7 +173,7 @@ const columns = computed(() => [
   { id: 'loose', header: t('bar.screens.deliveries.loose') },
   { id: 'cost', header: t('bar.screens.deliveries.pack-cost') },
   { id: 'arriving', header: t('bar.screens.deliveries.arriving') },
-  { id: 'remove', header: '' },
+  { id: 'remove' },
 ])
 const title = computed(() => isNew.value
   ? t('bar.screens.deliveries.new')

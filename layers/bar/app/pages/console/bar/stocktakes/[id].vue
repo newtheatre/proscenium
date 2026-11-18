@@ -207,7 +207,7 @@ const countColumns = computed(() => [
   { id: 'count', header: t('bar.screens.stocktakes.count') },
   ...(anyWeighable.value ? [{ id: 'weighed', header: t('bar.screens.stocktakes.weighed') }] : []),
   { id: 'total', header: t('bar.screens.stocktakes.total') },
-  { id: 'remove', header: '' },
+  { id: 'remove' },
 ])
 const reviewColumns = computed(() => [
   { accessorKey: 'name', header: t('bar.screens.stocktakes.item') },
