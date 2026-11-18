@@ -7,7 +7,7 @@
 <script setup lang="ts">
 interface Fee { amountMinor: number, currency: string }
 interface RenewAsks { options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, asksFor: string | null, endsByList: boolean, online: boolean }
-interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', reason: string | null, charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null, endsByList: boolean }
 
 const { t } = useT()
@@ -21,7 +21,18 @@ const offered = await useAPI<{ schemes: Offered[] }>('/api/membership/schemes', 
 const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 'lapsed': 'neutral' } as const
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
-const chosen = reactive<Record<string, string | undefined>>({})
+// Each scheme's join form: its length and reference, and the server's refusal, shown beside its field.
+const joinForms = reactive<Record<string, { lengthOptionId: string | undefined, reference: string }>>({})
+const formOf = (s: Offered) => (joinForms[s.id] ??= { lengthOptionId: undefined, reference: '' })
+const joinRefusals = reactive<Record<string, ReturnType<typeof toRefusal> | null>>({})
+const asksLength = (s: Offered) => !s.endsByList && s.options.length > 1
+const hasFields = (s: Offered) => asksLength(s) || !!s.asksFor
+/** A refusal about one field, shown under it; anything else shows above the form. */
+const fieldRefusal = (refusal: ReturnType<typeof toRefusal> | null | undefined, field: string) => refusal?.fields?.[field] ? refusal : null
+/** Whether a refusal shows under one of the join form's fields rather than above it. */
+const onField = (s: Offered, refusal: ReturnType<typeof toRefusal> | null | undefined) => (!!s.asksFor && !!fieldRefusal(refusal, 'reference')) || (asksLength(s) && !!fieldRefusal(refusal, 'lengthOptionId'))
+/** Why an application waits on the theatre, in the applicant's words. */
+const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
 // One card: a membership that follows on from one held now is not shown as a second card.
 const cardFor = (m: Mine['memberships'][number]) => m.status === 'current' || m.status === 'in-grace' || (m.status === 'upcoming' && !(mine.data.value?.memberships ?? []).some(o => o.schemeId === m.schemeId && (o.status === 'current' || o.status === 'in-grace')))
 /** A held membership's line: when it starts if it has not yet, until when, and its renewal. */
@@ -39,14 +50,14 @@ function feeLine(s: Offered): string | undefined {
   if (!priced.length) return undefined
   return priced.length === 1 ? t('membership.screens.mine.fee', { amount: money(priced[0]!.fee!) }) : priced.map(o => `${o.name}: ${money(o.fee!)}`).join(' · ')
 }
-const references = reactive<Record<string, string>>({})
-
 async function join(s: Offered) {
+  joinRefusals[s.id] = null
+  const form = formOf(s)
   try {
-    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: s.endsByList ? null : chosen[s.id] ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? references[s.id]?.trim() : undefined } })
+    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: s.endsByList ? null : form.lengthOptionId ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? form.reference.trim() : undefined } })
     if (joined.waiting === 'payment') return navigateTo(`/account/membership/${joined.membershipId}/pay`)
     if (joined.pending) {
-      toast.add({ title: t('membership.screens.mine.applied', { scheme: s.name }), description: t('membership.screens.mine.waiting-staff'), color: 'success' })
+      toast.add({ title: t('membership.screens.mine.applied', { scheme: s.name }), description: waitingText(joined.waiting), color: 'success' })
       await mine.refresh()
       return
     }
@@ -55,8 +66,7 @@ async function join(s: Offered) {
     reloadNuxtApp()
   }
   catch (e) {
-    const refusal = toRefusal(e)
-    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+    joinRefusals[s.id] = toRefusal(e)
   }
 }
 const { confirm } = useConfirm()
@@ -179,7 +189,7 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="a in mine.data.value.applications"
               :key="a.id"
               :name="a.schemeName"
-              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : t('membership.screens.mine.waiting-staff')"
+              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : waitingText(a.reason)"
             >
               <UButton
                 v-if="a.waiting === 'payment' && a.charge"
@@ -225,32 +235,74 @@ async function withdraw(a: Mine['applications'][number]) {
                 v-else-if="!s.online"
                 class="text-sm text-muted"
               >{{ t('membership.screens.mine.not-online') }}</span>
-              <template v-else>
-                <span
-                  v-if="s.endsByList"
-                  class="text-sm text-muted"
-                >{{ t('membership.screens.mine.ends-by-list') }}</span>
-                <USelect
-                  v-else-if="s.options.length > 1"
-                  v-model="chosen[s.id]"
-                  :items="s.options.map(o => ({ value: o.id, label: optionLabel(o) }))"
-                  :placeholder="t('membership.screens.mine.choose-length')"
-                  :aria-label="t('membership.screens.mine.length-for', { scheme: s.name })"
-                />
-                <UInput
-                  v-if="s.asksFor"
-                  v-model="references[s.id]"
-                  :placeholder="s.asksFor"
-                  :aria-label="s.asksFor"
-                  autocomplete="off"
-                  maxlength="254"
-                />
-                <UButton
-                  :label="t('membership.screens.mine.join')"
-                  :disabled="(!s.endsByList && s.options.length > 1 && !chosen[s.id]) || (!!s.asksFor && !references[s.id]?.trim())"
-                  loading-auto
-                  @click="join(s)"
-                />
+              <UButton
+                v-else-if="!hasFields(s)"
+                :label="t('membership.screens.mine.join')"
+                loading-auto
+                @click="join(s)"
+              />
+              <template
+                v-if="s.joinMode !== 'staff-only' && s.online && (hasFields(s) || joinRefusals[s.id])"
+                #below
+              >
+                <UForm
+                  :state="formOf(s)"
+                  :validate="() => needs({ ...(asksLength(s) ? { lengthOptionId: formOf(s).lengthOptionId } : {}), ...(s.asksFor ? { reference: formOf(s).reference } : {}) })"
+                  class="space-y-3"
+                  novalidate
+                  @submit="join(s)"
+                >
+                  <RefusalNotice
+                    v-if="joinRefusals[s.id] && !onField(s, joinRefusals[s.id])"
+                    :refusal="joinRefusals[s.id]!"
+                  />
+                  <p
+                    v-if="s.endsByList"
+                    class="text-sm text-muted"
+                  >
+                    {{ t('membership.screens.mine.ends-by-list') }}
+                  </p>
+                  <UFormField
+                    v-if="asksLength(s)"
+                    name="lengthOptionId"
+                    :label="t('membership.screens.mine.choose-length')"
+                    :error="fieldRefusal(joinRefusals[s.id], 'lengthOptionId')?.reason"
+                    required
+                  >
+                    <USelect
+                      v-model="formOf(s).lengthOptionId"
+                      :items="s.options.map(o => ({ value: o.id, label: optionLabel(o) }))"
+                    />
+                  </UFormField>
+                  <UFormField
+                    v-if="s.asksFor"
+                    name="reference"
+                    :label="s.asksFor"
+                    :error="fieldRefusal(joinRefusals[s.id], 'reference')?.reason"
+                    required
+                  >
+                    <UInput
+                      v-model="formOf(s).reference"
+                      autocomplete="off"
+                      maxlength="254"
+                    />
+                    <template
+                      v-if="fieldRefusal(joinRefusals[s.id], 'reference')"
+                      #error
+                    >
+                      <MembershipRefusalText
+                        :reason="joinRefusals[s.id]!.reason"
+                        :remedy="joinRefusals[s.id]!.remedy"
+                      />
+                    </template>
+                  </UFormField>
+                  <UButton
+                    v-if="hasFields(s)"
+                    type="submit"
+                    :label="t('membership.screens.mine.join')"
+                    loading-auto
+                  />
+                </UForm>
               </template>
             </RecordListItem>
           </RecordList>
@@ -266,16 +318,21 @@ async function withdraw(a: Mine['applications'][number]) {
         <UForm
           id="membership-renew"
           :state="renewChoice"
+          :validate="() => needs({ ...(!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1 ? { lengthOptionId: renewChoice.lengthOptionId } : {}), ...(renewScheme?.asksFor ? { reference: renewChoice.reference } : {}) })"
           class="space-y-4"
           novalidate
           @submit="renew"
         >
-          <RefusalNotice :refusal="renewRefusal" />
+          <RefusalNotice
+            v-if="renewRefusal && !(renewScheme?.asksFor && fieldRefusal(renewRefusal, 'reference')) && !(!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1 && fieldRefusal(renewRefusal, 'lengthOptionId'))"
+            :refusal="renewRefusal"
+          />
           <UFormField
             v-if="!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1"
             name="lengthOptionId"
             :label="t('membership.screens.mine.choose-length')"
-            :error="renewRefusal?.fields?.lengthOptionId ? renewRefusal.reason : undefined"
+            :error="fieldRefusal(renewRefusal, 'lengthOptionId')?.reason"
+            required
           >
             <USelect
               v-model="renewChoice.lengthOptionId"
@@ -290,13 +347,25 @@ async function withdraw(a: Mine['applications'][number]) {
           </p>
           <UFormField
             v-if="renewScheme?.asksFor"
+            name="reference"
             :label="renewScheme.asksFor"
+            :error="fieldRefusal(renewRefusal, 'reference')?.reason"
+            required
           >
             <UInput
               v-model="renewChoice.reference"
               autocomplete="off"
               maxlength="254"
             />
+            <template
+              v-if="fieldRefusal(renewRefusal, 'reference')"
+              #error
+            >
+              <MembershipRefusalText
+                :reason="renewRefusal!.reason"
+                :remedy="renewRefusal!.remedy"
+              />
+            </template>
           </UFormField>
           <p class="text-sm text-muted">
             {{ t(renewScheme?.endsByList ? 'membership.screens.mine.renew-help-list' : 'membership.screens.mine.renew-help') }}

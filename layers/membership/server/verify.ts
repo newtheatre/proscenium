@@ -3,13 +3,13 @@
 // address at one of the scheme's domains; `membership.list` checks the scheme's list. An email list
 // is matched only against addresses the account has verified (V4); a reference list against the
 // reference they type, and each entry may be claimed by one person only: a second claim waits for
-// staff. A failure refuses the request, so nothing is written and the person can try again.
-import { all, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+// staff, as does a first claim whose name on the list differs from the account's. A failure refuses the request, so nothing is written and the person can try again.
+import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { findEntry, normalise, nounOf, schemeList, wellFormed, type ListRow, type Shape } from './lists'
+import { endedOn, findEntry, namesAgree, normalise, nounOf, schemeList, wellFormed, type ListRow, type Shape } from './lists'
 import { verifierConfig, type Scheme } from './schemes'
 
-export interface ListPass { entryId: string, endsOn: string | null }
+export interface ListPass { entryId: string, endsOn: string | null, holderName?: string | null, claimed?: boolean }
 
 export type Outcome
   = | { outcome: 'passed', verifier: string, entryId?: string, endsOn?: string | null }
@@ -29,6 +29,12 @@ export async function runVerifier(scheme: Scheme, accountId: string, reference: 
   if (!list) refuse('membership.join.not-online', 'This scheme cannot be joined online yet.', { status: 409, remedy: 'Contact the theatre to join.' })
   try {
     const pass = await passList(list!, accountId, reference, day)
+    // Somebody else's unclaimed ID: the list's name for it is compared with the account's, loosely,
+    // and a mismatch waits for staff rather than claiming the entry.
+    if (!pass.claimed && pass.holderName) {
+      const account = await first<{ name: string | null }>('SELECT name FROM core_accounts WHERE id = ?', accountId)
+      if (!namesAgree(pass.holderName, account?.name ?? null)) return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'name-differs', entryId: pass.entryId }
+    }
     return { outcome: 'passed', verifier: 'membership.list', entryId: pass.entryId, endsOn: pass.endsOn }
   }
   catch (error) {
@@ -62,6 +68,9 @@ export function shapeText(noun: string, shape: Shape | null): string {
   return `Your ${noun} should be ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
 }
 
+/** "1 Oct 2025": a date as a refusal says it. */
+const longDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`))
+
 /** The entry that lets this account join, or a refusal saying why not. */
 export async function passList(list: ListRow, accountId: string, reference: string | null | undefined, day: string): Promise<ListPass> {
   const help = String(await useSetting('membership.help.link') ?? '') || undefined
@@ -79,6 +88,9 @@ export async function passList(list: ListRow, accountId: string, reference: stri
     if (!wellFormed(list.referenceShape, normalise('reference', reference!)))
       refuse('membership.join.not-well-formed', shapeText(noun, list.referenceShape), { status: 422, fields: { reference: 'membership.join.not-well-formed' } })
     entry = await findEntry(list, reference!, day)
+    // An entry past its end is not a typing mistake: say when it ended and what to do.
+    const ended = entry ? null : await endedOn(list, reference!, day)
+    if (ended) refuse('membership.join.entry-ended', `The membership for that ${noun} ended on ${longDate(ended)}. Renew it with whoever issued it, then try again.`, { status: 422, fields: { reference: 'membership.join.entry-ended' } })
     // V15: the miss speaks of the membership, not the ID.
     if (!entry) refuse('membership.join.not-on-list', `We could not find a current membership with that ${noun}. Have a membership? Contact us.`, { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
   }
@@ -87,7 +99,7 @@ export async function passList(list: ListRow, accountId: string, reference: stri
     // V4: somebody else claimed it. Staff settle that; the application queue is a later slice.
     if (!ours.length) refuse('membership.join.entry-already-used', `That ${noun} has already been used to join. Contact us and we will sort it out.`, { status: 409, remedy: help })
   }
-  return { entryId: entry!.id, endsOn: entry!.endsOn }
+  return { entryId: entry!.id, endsOn: entry!.endsOn, holderName: entry!.holderName, claimed: !!entry!.usedBy }
 }
 
 /** Claims the entry for the new membership and records the check. In the joining unit. */

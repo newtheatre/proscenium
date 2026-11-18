@@ -157,13 +157,32 @@ export function parseFile(kind: ListRow['keyKind'], shape: Shape | null, text: s
 }
 
 /** An entry that matches a value on a day: on the list, not past its end, and the list still valid. */
-export async function findEntry(list: ListRow, value: string, day: string): Promise<{ id: string, endsOn: string | null, usedBy: string | null } | null> {
+export async function findEntry(list: ListRow, value: string, day: string): Promise<{ id: string, endsOn: string | null, usedBy: string | null, holderName: string | null } | null> {
   if (list.validUntil && list.validUntil < day) return null
   const hash = await hashValue(list.keyKind, value)
-  return first<{ id: string, endsOn: string | null, usedBy: string | null }>(
-    'SELECT id, ends_on AS endsOn, used_by AS usedBy FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND (ends_on IS NULL OR ends_on >= ?3)',
+  return first<{ id: string, endsOn: string | null, usedBy: string | null, holderName: string | null }>(
+    'SELECT id, ends_on AS endsOn, used_by AS usedBy, holder_name AS holderName FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND (ends_on IS NULL OR ends_on >= ?3)',
     list.id, hash, day,
   )
+}
+
+/** The date an entry for a value ended, when it is on the list but past its end: told apart from a miss. */
+export async function endedOn(list: ListRow, value: string, day: string): Promise<string | null> {
+  const hash = await hashValue(list.keyKind, value)
+  return (await first<{ endsOn: string }>('SELECT ends_on AS endsOn FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND ends_on < ?3', list.id, hash, day))?.endsOn ?? null
+}
+
+/**
+ * Whether the name on a list and the name on an account could be the same person, loosely: the
+ * surname of one appears in the other, ignoring case, accents and punctuation. An empty name on
+ * either side is not held against anybody.
+ */
+export function namesAgree(listName: string | null, accountName: string | null): boolean {
+  const words = (name: string) => name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 1)
+  const a = words(listName ?? '')
+  const b = words(accountName ?? '')
+  if (!a.length || !b.length) return true
+  return b.includes(a.at(-1)!) || a.includes(b.at(-1)!)
 }
 
 /**

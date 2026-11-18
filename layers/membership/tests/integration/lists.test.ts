@@ -1,12 +1,16 @@
 // Verification lists (MEM-20, MEM-57, MEM-58; V4, V10, V11, V15, V18, V19, D9): a students' union's
 // file of student IDs, end dates and names. Loaded without keeping the IDs, checked one at a time,
 // joined against at once, and typed at the checkout for the member price.
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { first, requirements } from '#kit'
+import { resetRateLimits } from '#kit/ratelimit'
 import { inContext, person } from '../../../../tests/integration/helpers'
-import { ready, req, scheme } from './stage'
+import { namesAgree } from '../../server/lists'
+import { applicant, ready, req, scheme } from './stage'
 
 beforeAll(ready)
+// Each test makes its own lists, more than the write limit allows one officer in a minute.
+beforeEach(() => resetRateLimits())
 
 const FILE = 'Student ID,Ends,Name\n20123456,31/07/2027,Ada Lovelace\n20654321,2027-07-31,Alan Turing\n123,2027-07-31,Too Short\n20123456,2027-07-31,Twice\n20999999,soon,Bad Date\n'
 
@@ -105,6 +109,49 @@ describe('joining against a list', () => {
     expect((await req('GET', `/api/membership/schemes/${id}`)).body.endsByList).toBe(true)
     const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20654321' }, person([]))
     expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ endsOn: '2027-07-31', pending: false })
+  })
+
+  it('says when an entry ended, rather than that it is not on the list', async () => {
+    const { id, listId } = await listScheme()
+    expect((await req('POST', `/api/membership/lists/${listId}/entries`, { value: '20111111', endsOn: '2025-10-01', name: 'Larry Lamb' })).status).toBe(200)
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20111111' }, person([]))).body).toMatchObject({
+      code: 'membership.join.entry-ended',
+      reason: 'The membership for that student ID ended on 1 Oct 2025. Renew it with whoever issued it, then try again.',
+      fields: { reference: 'membership.join.entry-ended' },
+    })
+  })
+
+  it('sends an unclaimed ID whose name on the list differs to staff, and claims it when passed', async () => {
+    const { id, listId } = await listScheme()
+    const larry = await applicant('Larry Lamb')
+    const applied = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20654321' }, larry)
+    expect(applied.body, JSON.stringify(applied.body)).toMatchObject({ pending: true, waiting: 'name-differs' })
+    expect((await req('GET', '/api/membership/mine', undefined, larry)).body.applications).toMatchObject([{ id: applied.body.membershipId, waiting: 'staff', reason: 'name-differs' }])
+    const unclaimed = await inContext(() => first<{ used_by: string | null }>('SELECT used_by FROM membership_verification_entries WHERE list_id = ? AND holder_name = ?', listId, 'Alan Turing'))
+    expect(unclaimed!.used_by).toBeNull()
+    expect((await req('POST', `/api/membership/applications/${applied.body.membershipId}/decide`, { outcome: 'pass' })).body.state).toBe('active')
+    const claimed = await inContext(() => first<{ used_by: string | null }>('SELECT used_by FROM membership_verification_entries WHERE list_id = ? AND holder_name = ?', listId, 'Alan Turing'))
+    expect(claimed!.used_by).toBe(applied.body.membershipId)
+    // The same surname joins at once.
+    expect((await req('POST', `/api/membership/lists/${listId}/entries`, { value: '20222222', name: 'Grace Hopper' })).status).toBe(200)
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20222222' }, await applicant('Grace M. Hopper'))).body).toMatchObject({ pending: false })
+
+    // Somebody else's claimed ID waits for staff, who see who used it.
+    const ada = await applicant('Ada Lovelace')
+    const adaJoined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, ada)
+    expect(adaJoined.body.pending).toBe(false)
+    const second = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, await applicant('Priya Lovelace'))
+    expect(second.body).toMatchObject({ pending: true, waiting: 'entry-already-used' })
+    const queue = (await req('GET', '/api/membership/applications', undefined, person(['membership.membership.view']))).body.applications
+    expect(queue.find((a: { id: string }) => a.id === second.body.membershipId)).toMatchObject({ reason: 'entry-already-used', claimedBy: { membershipId: adaJoined.body.membershipId, name: 'Ada Lovelace' } })
+  })
+
+  it('compares names loosely, by surname', () => {
+    expect(namesAgree('Priya Patel', 'Larry Lamb')).toBe(false)
+    expect(namesAgree('Priya Patel', 'priya PATEL')).toBe(true)
+    expect(namesAgree('Zoë Brontë', 'Zoe Bronte')).toBe(true)
+    expect(namesAgree('Priya Patel', 'P. Patel-Smith')).toBe(true)
+    expect(namesAgree(null, 'Larry Lamb')).toBe(true)
   })
 
   it('lets staff add a member with a student ID, checking and claiming the entry', async () => {
