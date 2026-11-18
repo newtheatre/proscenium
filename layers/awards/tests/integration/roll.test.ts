@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
 import * as standings from '../../../core/server/identity/standings'
-import { inContext, person } from '../../../../tests/integration/helpers'
+import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { awardType, holder, issue, NOV_17, ready, req } from './stage'
 
 beforeAll(ready)
@@ -67,7 +67,14 @@ describe('linking an account', () => {
     expect((await req('POST', `/api/awards/awards/${past}/link`, { accountId: (await holder('Another')).accountId })).body.code).toBe('awards.award.not-linkable')
 
     const second = await issue(type, { recipientName: 'S. Thorndike', awardedOn: '1991-06-01' })
-    expect((await req('POST', `/api/awards/awards/${second}/link`, { accountId: sybil.accountId })).body.code).toBe('awards.award.already-held')
+    const refused = (await req('POST', `/api/awards/awards/${second}/link`, { accountId: sybil.accountId })).body
+    expect(refused).toMatchObject({ code: 'awards.award.already-held', detail: { awardId: past } })
+    const earlier = await issue(type, { recipientName: 'Sybil T.', awardedOn: '1985-01-01', awardedFor: 'Saint Joan' })
+    expect((await req('POST', `/api/awards/awards/${earlier}/link`, { accountId: sybil.accountId, merge: true })).body).toMatchObject({ awardId: past, merged: earlier })
+    expect(await rows('SELECT id, state, awarded_on AS awardedOn, awarded_for AS awardedFor FROM awards_awards WHERE id IN (?, ?) ORDER BY state DESC', earlier, past)).toEqual([
+      { id: earlier, state: 'revoked', awardedOn: '1985-01-01', awardedFor: 'Saint Joan' },
+      { id: past, state: 'current', awardedOn: '1985-01-01', awardedFor: 'Saint Joan' },
+    ])
     const byAddress = await req('POST', `/api/awards/awards/${second}/link`, { address: 'thorndike@example.org' })
     expect(byAddress.body.accountId, JSON.stringify(byAddress.body)).toBeTruthy()
   })

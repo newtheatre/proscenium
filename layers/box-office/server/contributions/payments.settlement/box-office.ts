@@ -6,6 +6,7 @@
 // reservation being paid at the desk goes back to reserved with its seats intact.
 import { sql } from 'drizzle-orm'
 import { first, nowMs, type UnitView } from '#kit'
+import { accountLabel } from '#modules/core'
 import type { Part, Settlement } from '#modules/payments'
 import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
@@ -50,5 +51,13 @@ export default {
         AND EXISTS (SELECT 1 FROM box_office_orders WHERE ${waiting})`)
     unit.add(sql`UPDATE box_office_orders SET state = 'expired', expires_at = NULL, updated_at = ${at} WHERE ${waiting}`)
     unit.announce('box-office.order.expired', { orderId: order.id }, { record: ['box-office.order', order.id] })
+  },
+
+  // The order behind a part (an exchange's own order), by its reference and buyer, for money screens.
+  async describe(record: string) {
+    const orderId = isExchangeRecord(record) ? await exchangeOrder(record) : record
+    const order = await first<{ id: string, reference: string, account_id: string | null }>('SELECT id, reference, account_id FROM box_office_orders WHERE id = ?', orderId)
+    if (!order) return null
+    return { reference: order.reference, buyer: order.account_id ? await accountLabel(order.account_id) : null, to: `/console/box-office/orders/${order.id}` }
   },
 } satisfies Settlement

@@ -138,6 +138,9 @@ function focusField(item: { id?: string, name: string }) {
 
 const dirty = computed(() => JSON.stringify(state) !== JSON.stringify(base.value))
 const labelOf = (name: string) => props.fields.find(f => f.name === name)?.label ?? name
+// In the summary a label is followed by ": message", so a label that ends in its own colon (a
+// question such as "would you rather:") loses it rather than reading "rather:: Choose…".
+const summaryLabelOf = (name: string) => labelOf(name).replace(/\s*:\s*$/, '')
 const show = (value: unknown) => value === undefined || value === null || value === '' ? t('core.form.empty-value') : String(value)
 
 // A long form keeps a draft on the device and offers to restore it.
@@ -266,7 +269,7 @@ useLeaveGuard(() => dirty.value && !saved.value)
                   class="underline"
                   @click.prevent="focusField(item)"
                 >
-                  {{ labelOf(item.name) }}
+                  {{ summaryLabelOf(item.name) }}
                 </ULink>: {{ item.message }}
               </li>
             </ul>

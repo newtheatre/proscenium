@@ -88,6 +88,21 @@ describe('with no online payment provider', () => {
     expect(await count('SELECT count(*) AS n FROM payments_intent_parts WHERE owner_record = ?', b.orderId)).toBe(0)
   })
 
+  it('books a production only for people over an age once the buyer says everyone is', async () => {
+    const f = await house(4)
+    await free(f)
+    await rows('UPDATE core_productions SET age_min = 18, age_restricted = 1 WHERE id = ?', f.productionId)
+    const b = await basket(f, 1)
+    const refused = await checkout(b)
+    expect(refused.status).toBe(422)
+    expect(refused.body).toMatchObject({ code: 'box-office.order.age-not-confirmed', fields: { ageConfirmed: 'box-office.order.age-not-confirmed' } })
+    const reserving = await req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: 0, email: address() }, null, { 'x-basket-token': b.token })
+    expect(reserving.body).toMatchObject({ code: 'box-office.order.age-not-confirmed' })
+    const done = await req('POST', `/api/box-office/baskets/${b.orderId}/checkout`, { expectedTotalMinor: 0, email: address(), ageConfirmed: true }, null, { 'x-basket-token': b.token })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body.state).toBe('confirmed')
+  })
+
   it('never lets an order with nothing to pay rest reserved', async () => {
     const f = await house(4)
     await free(f)

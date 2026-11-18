@@ -1,7 +1,7 @@
 // Console forms that write through routes requiring an Idempotency-Key, submitted in a real browser
 // with nothing added by the test: the app's own fetch gives every write a key, so a screen never
 // fails with "This request needs an Idempotency-Key header". Adding a ticket type was the report;
-// a band and prices on a performance's set-up go through the same kind of route. A price for one
+// a section and prices on a performance's set-up go through the same kind of route. A price for one
 // performance only shows where it comes from and can be handed back to the production's. A second
 // performance copies the first one's set-up.
 import { test, expect, type Page } from '@playwright/test'
@@ -55,8 +55,8 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
 
   await visit(page, `/console/box-office/performances/${performanceId}`)
   await page.getByRole('textbox', { name: /^Name/ }).fill('Circle')
-  await page.getByRole('button', { name: 'Add band' }).click()
-  await expect(page.getByText('Band added').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Add section' }).click()
+  await expect(page.getByText('Section added').first()).toBeVisible()
   await page.getByLabel(typeName).fill('12.00')
   await page.getByRole('button', { name: 'Save prices' }).click()
   await expect(page.getByText('Prices saved').first()).toBeVisible()
@@ -104,9 +104,11 @@ test('Copy one performance\'s set-up onto another', async ({ page }) => {
   await visit(page, `/console/box-office/performances/${secondId}`)
   await expect(page.getByText('No other performance has been set up yet.')).toHaveCount(0)
   await page.getByLabel('Copy from').click()
-  await page.getByRole('option', { name: new RegExp(`The Writes Show ${stamp}`) }).click()
+  // This production's performances come first, under its title.
+  await expect(page.getByRole('listbox').getByText(`The Writes Show ${stamp}`).first()).toBeVisible()
+  await page.getByRole('option').first().click()
+  // Nothing is set up here yet, so nothing is replaced and there is no confirming.
   await page.getByRole('button', { name: 'Copy set-up' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Copy set-up' }).click()
   await expect(page.getByText('Set-up copied').first()).toBeVisible()
   await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
 })

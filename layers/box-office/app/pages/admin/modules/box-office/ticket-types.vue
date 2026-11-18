@@ -29,7 +29,7 @@ interface TicketType {
 }
 interface Listing { ticketTypes: TicketType[], requirementOptions: { value: string, label: string }[], requirementLabels: Record<string, string> }
 
-const { t } = useT()
+const { t, te } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
@@ -39,7 +39,11 @@ const { data, status, error, refresh } = await useAPI<Listing>('/api/box-office/
 const kinds = computed(() => (['standard', 'concession'] as const).map(value => ({ value, label: t(`box-office.ticket-types.kind.${value}`) })))
 const channels = computed(() => (['all', 'desk', 'online'] as const).map(value => ({ value, label: t(`box-office.ticket-types.channel.${value}`) })))
 const options = computed(() => data.value?.requirementOptions ?? [])
-const labelOf = (ref: string) => data.value?.requirementLabels[ref] ?? ref
+// A fact's label arrives as its translation key.
+const labelOf = (ref: string) => {
+  const label = data.value?.requirementLabels[ref] ?? ref
+  return te(label) ? t(label) : label
+}
 // `box-office.companion` is kept by box-office: the module's own name for it.
 const moduleName = (managedBy: string) => t(`${managedBy.slice(0, managedBy.lastIndexOf('.'))}.module.name`)
 
