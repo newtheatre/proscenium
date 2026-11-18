@@ -166,6 +166,9 @@ export const verifications = defineTable('membership_verifications', {
   outcome: col.internal(text('outcome', { enum: ['passed', 'failed', 'needs-staff'] }).notNull()),
   reason: col.internal(text('reason')),
   entryId: col.ref('membership_verification_entries', { nullable: true }),
+  // The reference the person typed for a reference list, such as a student ID, as checked, so staff
+  // can compare it with a physical card (Matt, 2026-11-18). The list itself keeps only hashes.
+  reference: col.personal(text('reference'), { erase: 'clear' }),
   decidedBy: col.account('decided_by', { role: 'actor', nullable: true }),
   note: col.freeText(text('note')),
   createdAt: col.createdAt(),

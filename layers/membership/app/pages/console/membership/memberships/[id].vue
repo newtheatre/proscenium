@@ -10,7 +10,7 @@ interface Detail {
   number: string | null
   canChangeDates: boolean
   feesOn: boolean
-  checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null }[]
+  checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null, reference: string | null, noun: string | null }[]
 }
 
 const route = useRoute()
@@ -224,7 +224,7 @@ async function saveDates() {
               v-for="(c, i) in data.checks"
               :key="i"
               :name="t(`membership.membership.outcomes.${c.outcome}`)"
-              :description="[dateTime(c.createdAt), t(`membership.screens.verifiers.${c.verifier}`), c.listName ? t('membership.membership.from-list', { list: c.listName }) : '', c.listedAs ? t('membership.membership.listed-as', { name: c.listedAs }) : '', c.decidedBy ? t('membership.membership.by', { name: c.decidedBy }) : '', c.note ?? ''].filter(Boolean).join(' · ')"
+              :description="[dateTime(c.createdAt), t(`membership.screens.verifiers.${c.verifier}`), c.listName ? t('membership.membership.from-list', { list: c.listName }) : '', c.reference ? t('membership.membership.reference', { noun: c.noun ?? t('membership.membership.reference-noun'), reference: c.reference }) : '', c.listedAs ? t('membership.membership.listed-as', { name: c.listedAs }) : '', c.decidedBy ? t('membership.membership.by', { name: c.decidedBy }) : '', c.note ?? ''].filter(Boolean).join(' · ')"
             />
           </RecordList>
         </PageSection>
