@@ -41,6 +41,8 @@ import doorOverride from '../../server/api/box-office/performances/[id]/door/ove
 import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.post'
 import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
+import doorOfflineGet from '../../server/api/box-office/performances/[id]/door/offline.get'
+import doorOfflinePost from '../../server/api/box-office/performances/[id]/door/offline.post'
 import doorTonight from '../../server/api/box-office/door/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
@@ -105,6 +107,8 @@ export const handle = server({
   'GET /api/box-office/performances': performancesGet,
   'GET /api/box-office/performances/:id/door': doorGet,
   'POST /api/box-office/performances/:id/door/admit': doorAdmit,
+  'GET /api/box-office/performances/:id/door/offline': doorOfflineGet,
+  'POST /api/box-office/performances/:id/door/offline': doorOfflinePost,
   'POST /api/box-office/performances/:id/door/override': doorOverride,
   'POST /api/box-office/performances/:id/sales/copy': copyPost,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
