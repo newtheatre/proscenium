@@ -125,46 +125,7 @@ watch(performanceId, () => {
   quantities.value = {}
   references.value = {}
   holders.value = {}
-  dropCode()
 })
-
-// A promo code the buyer gives (BO-17): tried first, so the seller sees what it does before taking
-// payment; the sale applies it again, to the dearest tickets first, as booking online does.
-interface Promo { code: string, label: string, effect: string, value: number, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] }
-const codeOpen = ref(false)
-const codeTyped = ref('')
-const promo = ref<Promo | null>(null)
-const codeRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const codeBusy = ref(false)
-const promoPrice = (row: PerformanceRow) => promo.value?.prices.find(p => p.bandId === row.bandId && p.ticketTypeId === row.ticketTypeId)?.amountMinor
-function promoWords(p: Promo) {
-  // A multi-buy or a basket offer is said by its public label: what it does depends on the whole sale.
-  if (!['percent_off', 'amount_off', 'set_price'].includes(p.effect)) return p.label
-  const what = p.effect === 'percent_off' ? t('box-office.promotions.words.percent_off', { percent: p.value / 100 }) : t(`box-office.promotions.words.${p.effect}`, { amount: money(p.value) })
-  return p.maxPerOrder ? `${what} · ${t('box-office.promotions.words.per-order', { count: p.maxPerOrder })}` : what
-}
-async function tryCode() {
-  if (!codeTyped.value.trim() || !performanceId.value) return
-  codeBusy.value = true
-  codeRefusal.value = null
-  try {
-    promo.value = await $api<Promo>(`/api/box-office/book/performances/${encodeURIComponent(performanceId.value)}/promo` as string, { query: { code: codeTyped.value.trim() } })
-    codeTyped.value = ''
-  }
-  catch (e) {
-    promo.value = null
-    codeRefusal.value = toRefusal(e)
-  }
-  finally {
-    codeBusy.value = false
-  }
-}
-function dropCode() {
-  promo.value = null
-  codeTyped.value = ''
-  codeRefusal.value = null
-  codeOpen.value = false
-}
 
 // Collecting: one order, found by what the buyer shows.
 const query = ref('')
@@ -186,21 +147,17 @@ function tell(value: unknown) {
   lastSaid = JSON.stringify(value)
   emit('update:modelValue', value)
 }
-// The receipt's lines for a walk-up sale: one for each kind of ticket in the sale, priced as the
-// code would price them, dearest first up to its limit, so the total shows before the server's.
+// The receipt's lines for a walk-up sale: one for each kind of ticket in the sale, at its price, so
+// the total shows before the server's. A code or discount is the till's, and its saving the till's line.
 function sendReceipt(rows: PerformanceRow[]) {
   if (exchange.value || mode.value !== 'sell' || !performance.value) return emit('receipt', null)
-  const each = rows.flatMap(r => Array.from({ length: quantities.value[keyOf(r)] ?? 0 }, () => ({ key: keyOf(r), full: r.amountMinor, with: promoPrice(r) })))
-  const discounted = new Map<string, number>()
-  each.filter(e => e.with !== undefined).sort((a, b) => b.full - a.full).slice(0, promo.value?.maxPerOrder ?? Infinity)
-    .forEach(e => discounted.set(e.key, (discounted.get(e.key) ?? 0) + (e.full - e.with!)))
   const show = performance.value
   const detail = t('box-office.screens.panel.receipt-detail', { title: show.title, when: dateTime(show.startsAt) })
   const added = rows.find(r => keyOf(r) === lastAdded.value)
   emit('receipt', {
     lines: rows.map((r) => {
       const quantity = quantities.value[keyOf(r)]!
-      return { key: keyOf(r), label: rowLabel(r), detail, quantity, amountMinor: r.amountMinor * quantity - (discounted.get(keyOf(r)) ?? 0), more: () => addOne(r), fewer: () => takeOne(r) }
+      return { key: keyOf(r), label: rowLabel(r), detail, quantity, amountMinor: r.amountMinor * quantity, more: () => addOne(r), fewer: () => takeOne(r) }
     }),
     added: added ? { label: rowLabel(added), undo: () => takeOne(added) } : null,
   })
@@ -221,7 +178,7 @@ function say() {
       const named = Array.from({ length: quantity }, (_, n) => (typed[n] ? '' : holders.value[keyOf(r)]?.[n]?.accountId ?? ''))
       return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(typed.some(Boolean) ? { references: typed } : {}), ...(named.some(Boolean) ? { holders: named } : {}) }
     })
-    tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
+    tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value } : null)
     sendReceipt((performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r)))
   }
   else {
@@ -229,7 +186,7 @@ function say() {
     tell(order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, references, holders, order, exchange, promo, lastAdded], say, { deep: true })
+watch([mode, admit, quantities, references, holders, order, exchange, lastAdded], say, { deep: true })
 // A booking found, or several to pick from, is what the panel shows; with none, it sells walk-up tickets.
 watch([order, matches], () => {
   mode.value = order.value || matches.value.length ? 'collect' : 'sell'
@@ -251,7 +208,7 @@ onMounted(() => {
 let lastSaid = 'null'
 // The till hands back what a sale was for when it picks a payment up after a reload: the
 // performance and how many of each ticket are shown again, as they were.
-async function restore(value: { performanceId?: unknown, lines?: unknown, admit?: unknown, email?: unknown, promoCode?: unknown }) {
+async function restore(value: { performanceId?: unknown, lines?: unknown, admit?: unknown, email?: unknown }) {
   if (typeof value.performanceId !== 'string' || !Array.isArray(value.lines)) return
   order.value = null
   matches.value = []
@@ -264,10 +221,6 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
   // Who each ticket was for is kept by account; their names were on the screen before the reload.
   holders.value = Object.fromEntries(lines.filter(l => l.holders).map(l => [keyOf(l), l.holders!.map(id => (id ? { accountId: id, label: t('box-office.screens.panel.holder.restored'), byHand: false } : undefined))]))
   admit.value = value.admit === true
-  if (typeof value.promoCode === 'string') {
-    codeTyped.value = value.promoCode
-    await tryCode()
-  }
 }
 
 // The till empties every panel after a sale, and when the seller clears the sale.
@@ -286,8 +239,7 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}
   if (Object.keys(holders.value).length) holders.value = {}
-  // The next buyer never sees who the last one was, nor uses their code.
-  dropCode()
+  // The next buyer never sees who the last one was.
   if (!order.value || mode.value !== 'collect') return
   // After a sale the booking is found again, to show it paid; the receipt's Clear puts it away.
   if (fromTill && !wasLocked) clear()
@@ -860,10 +812,7 @@ function clear() {
                     />
                   </span>
                   <span class="text-sm font-normal text-muted tabular-nums">
-                    <template v-if="promoPrice(row) !== undefined">
-                      {{ money(promoPrice(row)!) }} <s>{{ money(row.amountMinor) }}</s>
-                    </template>
-                    <template v-else>{{ money(row.amountMinor) }}</template>
+                    {{ money(row.amountMinor) }}
                   </span>
                   <span class="sr-only">{{ t('box-office.screens.panel.tile-add') }}</span>
                 </UButton>
@@ -915,70 +864,6 @@ function clear() {
               {{ t(row.companion ? 'box-office.screens.panel.holder.companion-needed' : 'box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
             </p>
           </div>
-          <div
-            v-if="promo"
-            class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated px-3 py-2 text-sm"
-          >
-            <UIcon
-              name="i-lucide-ticket-percent"
-              class="size-4 shrink-0 text-success"
-            />
-            <span class="flex-1">{{ t('box-office.screens.panel.code.applied', { code: promo.code, what: promoWords(promo) }) }}</span>
-            <UButton
-              size="sm"
-              color="neutral"
-              variant="link"
-              :label="t('box-office.screens.panel.code.remove')"
-              :disabled="locked"
-              @click="dropCode"
-            />
-          </div>
-          <UButton
-            v-else-if="!codeOpen"
-            icon="i-lucide-ticket-percent"
-            color="neutral"
-            variant="link"
-            :label="t('box-office.screens.panel.code.add')"
-            :disabled="locked"
-            @click="codeOpen = true"
-          />
-          <UForm
-            v-else
-            :state="{ codeTyped }"
-            novalidate
-            @submit="tryCode"
-          >
-            <UFormField
-              :label="t('box-office.screens.panel.code.label')"
-              :error="codeRefusal ? codeRefusal.reason : undefined"
-              name="code"
-            >
-              <div class="flex gap-2">
-                <UInput
-                  v-model="codeTyped"
-                  class="w-48 uppercase"
-                  maxlength="40"
-                  autocomplete="off"
-                  autofocus
-                  :disabled="locked"
-                />
-                <UButton
-                  type="submit"
-                  color="neutral"
-                  variant="outline"
-                  :label="t('box-office.screens.panel.code.apply')"
-                  :loading="codeBusy"
-                  :disabled="locked || !codeTyped.trim()"
-                />
-                <UButton
-                  color="neutral"
-                  variant="ghost"
-                  :label="t('core.form.cancel')"
-                  @click="dropCode"
-                />
-              </div>
-            </UFormField>
-          </UForm>
         </template>
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
           <USelect

@@ -4,7 +4,7 @@
      the selling modules switched on, each with its own pickers. Retired promotions fold away. -->
 <script setup lang="ts">
 type Effect = 'percent_off' | 'amount_off' | 'set_price' | 'multi_buy' | 'basket_amount_off'
-type Trigger = 'automatic' | 'code'
+type Trigger = 'automatic' | 'code' | 'staff'
 type Channel = 'all' | 'online' | 'till'
 type Scope = Record<string, string>
 interface Field { id: string, label: string, options: { value: string, label: string, parent?: string }[], parent?: string, needsParent?: boolean }
@@ -30,6 +30,7 @@ interface Promotion {
   maxPerSale: number | null
   combines: boolean
   notWithRequirements: boolean
+  needsReason: boolean
   active: boolean
   note: string | null
   codes: Code[]
@@ -48,7 +49,7 @@ const { data, status, error, refresh } = await useAPI<Listing>('/api/promotions'
 const ANY = '__any'
 const EFFECTS: Effect[] = ['percent_off', 'amount_off', 'set_price', 'multi_buy', 'basket_amount_off']
 const effectItems = computed(() => EFFECTS.map(value => ({ value, label: t(`promotions.effect.${value}`) })))
-const triggerItems = computed(() => (['code', 'automatic'] as const).map(value => ({ value, label: t(`promotions.trigger.${value}`) })))
+const triggerItems = computed(() => (['code', 'automatic', 'staff'] as const).map(value => ({ value, label: t(`promotions.trigger.${value}`) })))
 const channelItems = computed(() => (['all', 'online', 'till'] as const).map(value => ({ value, label: t(`promotions.channel.${value}`) })))
 const kindItems = computed(() => (data.value?.kinds ?? []).map(k => ({ value: k.kind, label: t(k.label) })))
 const kindOf = (kind: string) => data.value?.kinds.find(k => k.kind === kind)
@@ -74,7 +75,8 @@ function describe(p: Promotion) {
   return [
     effectWords(p),
     on ? t('promotions.words.on', { what: on }) : null,
-    p.trigger === 'code' ? (codes ? t('promotions.words.codes', { codes }) : null) : t('promotions.words.automatic'),
+    p.trigger === 'code' ? (codes ? t('promotions.words.codes', { codes }) : null) : t(`promotions.words.${p.trigger}`),
+    p.needsReason ? t('promotions.words.needs-reason') : null,
     p.channel !== 'all' ? t(`promotions.channel.${p.channel}`) : null,
     p.maxUses !== null ? t('promotions.words.uses-of', { used: p.used, max: p.maxUses }) : t('promotions.words.uses', { count: p.used }),
     p.maxPerSale !== null ? t('promotions.words.per-sale', { count: p.maxPerSale }) : null,
@@ -124,6 +126,7 @@ interface Form {
   countBy: 'item' | 'sale'
   combines: boolean
   notWithRequirements: boolean
+  needsReason: boolean
   validFrom: number | null
   validUntil: number | null
   note: string
@@ -132,7 +135,7 @@ const firstKind = () => data.value?.kinds[0]?.kind ?? ''
 const blank = (): Form => ({
   name: '', label: '', trigger: 'code', codes: [{ code: '', maxUses: null }], effect: 'percent_off', percent: 10, amount: null, // not-policy: a new promotion's first guess, ten per cent off
   multiBuy: 'free', buyQuantity: 2, freeQuantity: 1, minSpend: null, targets: [{ kind: firstKind(), scope: {} }], channel: 'all', // not-policy: a new multi-buy's first guess, two for one
-  maxUses: null, maxPerSale: null, countBy: 'item', combines: false, notWithRequirements: true, validFrom: null, validUntil: null, note: '',
+  maxUses: null, maxPerSale: null, countBy: 'item', combines: false, notWithRequirements: true, needsReason: false, validFrom: null, validUntil: null, note: '',
 })
 const form = ref<Form>(blank())
 const editing = ref(false)
@@ -146,7 +149,7 @@ const asForm = (p: Promotion): Form => ({
   effect: p.effect, percent: p.effect === 'percent_off' ? p.value / 100 : null, amount: p.effect === 'percent_off' || (p.effect === 'multi_buy' && p.freeQuantity) ? null : p.value,
   multiBuy: p.freeQuantity ? 'free' : 'price', buyQuantity: p.buyQuantity, freeQuantity: p.freeQuantity, minSpend: p.minSpendMinor,
   targets: p.targets.filter(x => x.role === 'applies').map(x => ({ kind: x.kind, scope: { ...x.scope } })), channel: p.channel,
-  maxUses: p.maxUses, maxPerSale: p.maxPerSale, countBy: p.countBy, combines: p.combines, notWithRequirements: p.notWithRequirements, validFrom: p.validFrom, validUntil: p.validUntil, note: p.note ?? '',
+  maxUses: p.maxUses, maxPerSale: p.maxPerSale, countBy: p.countBy, combines: p.combines, notWithRequirements: p.notWithRequirements, needsReason: p.needsReason, validFrom: p.validFrom, validUntil: p.validUntil, note: p.note ?? '',
 })
 function valueOf(f: Form) {
   if (f.effect === 'percent_off') return Math.round((f.percent ?? 0) * 100)
@@ -160,8 +163,8 @@ const asBody = (f: Form) => ({
   minSpendMinor: f.effect === 'basket_amount_off' ? f.minSpend : null,
   codes: f.trigger === 'code' ? f.codes.filter(c => c.code.trim()).map(c => ({ ...(c.id ? { id: c.id } : {}), code: c.code.trim(), maxUses: c.maxUses })) : [],
   targets: f.targets.map(x => ({ role: 'applies' as const, kind: x.kind, scope: Object.fromEntries(Object.entries(x.scope).filter(([, v]) => v && v !== ANY)) })),
-  channel: f.channel, maxUses: f.maxUses, maxPerSale: f.effect === 'basket_amount_off' ? null : f.maxPerSale, countBy: f.countBy,
-  combines: f.combines, notWithRequirements: f.notWithRequirements, validFrom: f.validFrom, validUntil: f.validUntil, note: f.note.trim() || null,
+  channel: f.trigger === 'staff' ? 'till' : f.channel, maxUses: f.maxUses, maxPerSale: f.effect === 'basket_amount_off' ? null : f.maxPerSale, countBy: f.countBy,
+  combines: f.combines, notWithRequirements: f.notWithRequirements, needsReason: f.trigger === 'staff' && f.needsReason, validFrom: f.validFrom, validUntil: f.validUntil, note: f.note.trim() || null,
 })
 function open(p?: Promotion) {
   editId.value = p?.id ?? null
@@ -354,6 +357,16 @@ const perItem = computed(() => !['basket_amount_off'].includes(form.value.effect
               v-model="form.trigger"
               :items="triggerItems"
               class="w-64"
+            />
+          </UFormField>
+          <UFormField
+            v-if="form.trigger === 'staff'"
+            name="needsReason"
+          >
+            <UCheckbox
+              v-model="form.needsReason"
+              :label="t('promotions.field.needs-reason')"
+              :description="t('promotions.field.needs-reason-help')"
             />
           </UFormField>
           <UFormField
@@ -582,6 +595,7 @@ const perItem = computed(() => !['basket_amount_off'].includes(form.value.effect
           />
           <template v-if="more">
             <UFormField
+              v-if="form.trigger !== 'staff'"
               :label="t('promotions.field.channel')"
               name="channel"
             >

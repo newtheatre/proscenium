@@ -4,7 +4,7 @@
 // claim does, so a seat given back gives its use back (contributions/promotions.target/ticket.ts).
 import { all, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
-import { describeSavings, moveSavings, priceSale, pricesWithoutCode, redeemSale, type PricedSale } from '#modules/payments'
+import { describeSavings, moveSavings, priceSale, pricesWithoutCode, redeemSale, type PricedSale, type PricingItem } from '#modules/payments'
 
 export const TICKET_KIND = 'box-office.ticket'
 
@@ -29,17 +29,22 @@ export async function priceTickets(performanceId: string, lines: readonly { band
   const typed = code?.trim()
   // Most sales have no code and nothing that applies on its own: one read says so, and they sell at list prices.
   if (!typed && !await pricesWithoutCode(channel)) return unpriced(lines.length)
+  return pricedTickets(lines, await priceSale({ channel, preview, codes: typed ? [typed] : [], items: await ticketItems(performanceId, lines) }))
+}
+
+/** One performance's tickets as items to price, one line apiece, keyed by the line's place. Reads only. */
+export async function ticketItems(performanceId: string, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[]): Promise<PricingItem[]> {
   const [performance, reduced] = await Promise.all([getPerformance(performanceId), reducedTypes()])
-  const priced = await priceSale({
-    channel,
-    preview,
-    codes: typed ? [typed] : [],
-    items: lines.map((l, i) => ({
-      key: String(i), kind: TICKET_KIND, listMinor: Math.max(0, l.amountMinor), quantity: 1, reduced: reduced.has(l.ticketTypeId),
-      facts: { productionId: performance.productionId, performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId },
-    })),
-  })
-  return { discounts: priced.items.map(i => i.discountMinor), priced }
+  return lines.map((l, i) => ({
+    key: String(i), kind: TICKET_KIND, listMinor: Math.max(0, l.amountMinor), quantity: 1, reduced: reduced.has(l.ticketTypeId),
+    facts: { productionId: performance.productionId, performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId },
+  }))
+}
+
+/** What comes off each line of a sale priced elsewhere (the till pricing all its panels together). */
+export function pricedTickets(lines: readonly unknown[], priced: PricedSale): PricedTickets {
+  const byKey = new Map(priced.items.map(i => [i.key, i.discountMinor]))
+  return { discounts: lines.map((_, i) => byKey.get(String(i)) ?? 0), priced }
 }
 
 /** Writes the savings after the seats' claims; the reference each line keeps, in the lines' order. */

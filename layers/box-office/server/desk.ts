@@ -9,7 +9,7 @@ import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
-import type { DeskContext } from '#modules/payments'
+import type { DeskContext, PricedSale, PricingItem } from '#modules/payments'
 import { passSalesMinor } from './pass-sales'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -26,7 +26,7 @@ import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
-import { moveTicketSavings, priceTickets, redeemTickets, type PricedTickets } from './promotions'
+import { moveTicketSavings, pricedTickets, redeemTickets, ticketItems, unpriced, type PricedTickets } from './promotions'
 import { availability } from './availability'
 import { salesOf } from './setup'
 
@@ -38,8 +38,8 @@ const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: 
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
-// `promoCode`, as the buyer gave it (BO-17): applied as it is online, to the dearest tickets first.
-const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional(), email: z.email().max(254).optional(), accountId: z.string().min(1).max(64).optional(), promoCode: z.string().trim().min(1).max(40).optional() }).strict() // not-policy: more kinds of ticket than any performance sells; the longest address; an id; longer than any code
+// A code the buyer gives is the till's, for the whole sale: the till prices every panel together.
+const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional(), email: z.email().max(254).optional(), accountId: z.string().min(1).max(64).optional() }).strict() // not-policy: more kinds of ticket than any performance sells; the longest address; an id
   .refine(sale => !(sale.email && sale.accountId), { message: 'A sale goes to an address or a person, not both.' })
 const id = z.string().min(1).max(64) // not-policy: shape bound
 const exchangeInput = z.object({
@@ -86,9 +86,16 @@ async function deskSale(input: SaleInput, at: number) {
   return pricedLines(input.performanceId, input.lines, at, { channel: 'desk', account: null })
 }
 
-/** The sale priced through Payments' pricing, with the buyer's code if they gave one: refused, saying why, when the code cannot be used. */
-async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[]): Promise<PricedTickets> {
-  return priceTickets(input.performanceId, lines, 'till', input.promoCode)
+/** The sale's tickets as the till priced them with its other panels (payments.pricing); at list prices when it did not. */
+function deskDiscounts(lines: readonly unknown[], priced: PricedSale | undefined): PricedTickets {
+  return priced ? pricedTickets(lines, priced) : unpriced(lines.length)
+}
+
+/** The panel's tickets for the till to price with the rest of the sale: a sale's only, since a reservation and an exchange are priced already. Reads only. */
+export async function deskItems(context: Pick<DeskContext, 'input'>): Promise<PricingItem[]> {
+  const input = panelInput(context.input)
+  if (!('sale' in input)) return []
+  return ticketItems(input.sale.performanceId, (await deskSale(input.sale, nowMs())).lines)
 }
 
 /**
@@ -109,7 +116,7 @@ export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<st
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
-export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number, key?: string }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input' | 'priced'>): Promise<{ lines: { label: string, amountMinor: number, key?: string }[], amountMinor: number }> {
   const input = panelInput(context.input)
   if ('exchange' in input) {
     const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
@@ -123,7 +130,7 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
     const at = nowMs()
     const priced = (await deskSale(input.sale, at)).lines
-    const { discounts, priced: sale } = await deskDiscounts(input.sale, priced)
+    const { discounts, priced: sale } = deskDiscounts(priced, context.priced)
     // A discounted ticket is named with the code it was given for, or the offer's own label.
     const nameOf = new Map(sale.applied.map(a => [a.promotionId, a.code ?? a.label]))
     const said = (i: number) => [...new Set(sale.savings.filter(s => s.key === String(i)).map(s => nameOf.get(s.promotionId)))].join(', ')
@@ -159,7 +166,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
   const { pool, lines, currency, guard } = await deskSale(input.sale, at)
-  const tickets = await deskDiscounts(input.sale, lines)
+  const tickets = deskDiscounts(lines, context.priced)
   const charged = lines.map((l, i) => l.amountMinor - (tickets.discounts[i] ?? 0))
   const totalMinor = charged.reduce((sum, amount) => sum + amount, 0)
   if (totalMinor <= 0) refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })

@@ -20,6 +20,8 @@ export default defineModule({
   abilities: defineAbilities('promotions', {
     // Making, limiting and retiring promotions and their codes. Privileged: it changes what customers pay.
     'promotion.manage': ability({ risk: 'privileged' }),
+    // Picking a staff promotion for a sale at the till. A promotion can ask for a stricter ability of its own.
+    'promotion.apply': ability({}),
   }),
 
   tables,
