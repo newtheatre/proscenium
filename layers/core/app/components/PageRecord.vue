@@ -18,11 +18,11 @@ const props = withDefaults(defineProps<{
   /** Everything else, destructive actions last. */
   actions?: DropdownMenuItem[][]
   /** Four to six facts. */
-  summary?: { label: string, value: string }[]
+  summary?: { label: string, value: string, to?: string }[]
   /** The record's type, such as `core.production`, and its id: what other modules' tabs and the history attach to. */
   recordType: string
   recordId: string
-  /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. */
+  /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. With only one tab in all, no tab bar is drawn. */
   tabs: RecordTab[]
   /** Where this record sits below a navigation entry, nearest parent last. */
   trail?: { label: string, to: string }[]
@@ -194,8 +194,9 @@ const { te } = useT()
       </aside>
       <div class="min-w-0 lg:order-1">
         <!-- Page-level tabs look the same everywhere (a module's page in Admin, the settings window):
-             underlined, each label in full, scrolling sideways when they do not fit. -->
+             underlined, each label in full, scrolling sideways when they do not fit. A record with only one tab draws no bar. -->
         <UTabs
+          v-if="items.length > 1"
           v-model="current"
           :items="items"
           :content="false"
@@ -205,8 +206,8 @@ const { te } = useT()
           class="mb-4"
         />
         <div
-          role="tabpanel"
-          :aria-label="items.find(i => i.value === current)?.label"
+          :role="items.length > 1 ? 'tabpanel' : undefined"
+          :aria-label="items.length > 1 ? items.find(i => i.value === current)?.label : undefined"
         >
           <!-- A tab of its own boundary: one whose content waits for data keeps the last tab in view
                until it is ready, and never unsettles the page around it. -->

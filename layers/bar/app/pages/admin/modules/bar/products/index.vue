@@ -1,47 +1,53 @@
 <!-- Products (S11): the bar's categories, in till order, each with its products and their Standard
      prices. A product opens its own page for its sizes and prices on every list. Products move up and
-     down within their category by button, so the keyboard can reorder them too. -->
+     down within their category by button, so the keyboard can reorder them too. Retired categories
+     sit below a divider; the search finds a category or a product by name. -->
 <script setup lang="ts">
 import { categoryInput } from '../../../../../../server/input'
 
-interface VariantPrice { listId: string, amountMinor: number | null }
-interface Variant { id: string, name: string, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
+interface Variant { id: string, name: string, mixerMeasure: boolean, active: boolean, prices: { listId: string, amountMinor: number | null }[] }
 interface Product { id: string, name: string, ageRestricted: boolean, active: boolean, variants: Variant[] }
 interface Category { id: string, name: string, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
 interface List { id: string, name: string, standard: boolean, percentOff: number | null, active: boolean }
+type Section = Category & { title: string }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { money } = await useMoney()
 const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
+const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<{ categories: Category[], lists: List[] }>('/api/bar/catalogue', { key: 'bar:catalogue' })
 
 const standard = computed(() => data.value?.lists.find(l => l.standard)?.id)
 const COLOURS = ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'neutral'] as const
-const colourItems = computed(() => [{ value: 'none', label: t('bar.screens.products.colour-none') }, ...COLOURS.map(c => ({ value: c, label: t(`bar.screens.colours.${c}`) }))])
+// Each colour with a swatch of itself beside its plain name.
+const colourItems = computed(() => [{ value: 'none', label: t('bar.screens.products.colour-none') }, ...COLOURS.map(c => ({ value: c, label: t(`bar.screens.colours.${c}`), chip: { color: c } }))])
+
+const query = ref('')
+const searching = ref(false)
+const showRetired = ref(false)
+const matches = (name: string) => name.toLowerCase().includes(query.value.trim().toLowerCase())
 
 // Each top-level category followed by its sub-categories, which are titled with the parent's name.
-const ordered = computed(() => {
+// While searching, a category shows when its name matches (with all its products) or any product does.
+const ordered = computed<Section[]>(() => {
   const all = data.value?.categories ?? []
   const nameOf = (id: string) => all.find(c => c.id === id)?.name ?? ''
-  return all.filter(c => !c.parentId || !all.some(p => p.id === c.parentId)).flatMap(top => [
+  const sections = all.filter(c => !c.parentId || !all.some(p => p.id === c.parentId)).flatMap(top => [
     { ...top, title: top.name },
     ...all.filter(c => c.parentId === top.id).map(c => ({ ...c, title: t('bar.screens.products.sub-title', { parent: nameOf(top.id), name: c.name }) })),
   ])
-})
-
-// One line of a product: each size on sale with its Standard price.
-function line(p: Product): string {
-  const sizes = p.variants.filter(v => v.active).map((v) => {
-    const price = v.prices.find(x => x.listId === standard.value)?.amountMinor
-    const shown = price === null || price === undefined ? t('bar.screens.products.no-price') : money(price)
-    return p.variants.length === 1 && v.name === 'Each' ? shown : `${v.name} ${shown}`
+  if (!query.value.trim()) return sections
+  return sections.flatMap((c) => {
+    if (matches(c.title)) return [c]
+    const products = c.products.filter(p => matches(p.name))
+    return products.length ? [{ ...c, products }] : []
   })
-  return [sizes.join(' · '), p.ageRestricted ? t('bar.screens.products.age-restricted') : null].filter(Boolean).join(' · ')
-}
-// A size on sale with no Standard price is not on the till yet. The mixer measure is priced by its group.
-const needsPrice = (p: Product) => p.active && p.variants.some(v => v.active && !v.mixerMeasure && (v.prices.find(x => x.listId === standard.value)?.amountMinor ?? null) === null)
+})
+const current = computed(() => ordered.value.filter(c => c.active))
+const retired = computed(() => ordered.value.filter(c => !c.active))
+// The products in a category's sub-categories, for one with none of its own.
+const inSubCategories = (c: Category) => (data.value?.categories ?? []).filter(x => x.parentId === c.id).reduce((n, x) => n + x.products.length, 0)
 
 // A category: new, or renamed, recoloured or retired.
 const category = ref<{ id: string | null, name: string, colour: string, parentId: string, ageRestricted: boolean, usualPreset: string } | null>(null)
@@ -82,9 +88,20 @@ async function saveCategory() {
   refusal.value = null
   try {
     const body = categoryBody()
-    if (c.id) await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body })
-    else await $api('/api/bar/categories', { method: 'POST', body })
-    toast.add({ title: t('bar.screens.products.category-saved'), color: 'success' })
+    if (c.id) {
+      const was = data.value?.categories.find(x => x.id === c.id)
+      await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body })
+      // Undo puts back what it was.
+      const id = c.id
+      offer(t('bar.screens.products.category-saved'), was && (async () => {
+        await $api(`/api/bar/categories/${id}` as string, { method: 'PATCH', body: { name: was.name, colour: was.colour, parentId: was.parentId, ageRestricted: was.ageRestricted, usualPreset: was.usualPreset } })
+        await refresh()
+      }))
+    }
+    else {
+      await $api('/api/bar/categories', { method: 'POST', body })
+      toast.add({ title: t('bar.screens.products.category-saved'), color: 'success' })
+    }
     category.value = null
     await refresh()
   }
@@ -93,10 +110,16 @@ async function saveCategory() {
     categoryEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
+// Retiring a category takes it and its products off the till; they stay in it, to come back with it.
 async function setCategoryActive(c: Category, active: boolean) {
   try {
     await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body: { active } })
     await refresh()
+    const count = c.products.filter(p => p.active).length
+    offer(active ? t('bar.screens.products.category-restored', { name: c.name }) : t('bar.screens.products.category-retired-toast', { name: c.name, count }), async () => {
+      await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body: { active: !active } })
+      await refresh()
+    })
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
@@ -126,12 +149,20 @@ async function move(p: Product, direction: 'up' | 'down') {
 <template>
   <PageFrame :title="t('bar.navigation.products.label')">
     <template #primary>
-      <UButton
-        icon="i-lucide-plus"
-        :label="t('bar.screens.products.new-product')"
-        :disabled="!categoryItems.length"
-        @click="newProduct()"
-      />
+      <div class="flex items-center gap-2">
+        <SearchToggle
+          v-model="query"
+          v-model:open="searching"
+          :label="t('bar.screens.products.search')"
+        />
+        <UButton
+          icon="i-lucide-plus"
+          :label="t('bar.screens.products.new-product')"
+          :disabled="!categoryItems.length"
+          :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
+          @click="newProduct()"
+        />
+      </div>
     </template>
     <DataBoundary
       :data="data"
@@ -157,80 +188,49 @@ async function move(p: Product, direction: 'up' | 'down') {
             />
           </template>
         </EmptyState>
-        <PageSection
-          v-for="c in ordered"
-          :key="c.id"
-          :title="c.title"
-          :description="c.active ? undefined : t('bar.screens.products.category-retired')"
+        <p
+          v-else-if="query.trim() && !ordered.length"
+          class="text-sm text-muted"
         >
-          <template #actions>
-            <UBadge
-              v-if="c.colour"
-              :color="c.colour as any"
-              variant="subtle"
-              :label="t(`bar.screens.colours.${c.colour}`)"
+          {{ t('bar.screens.products.no-match') }}
+        </p>
+        <div
+          v-if="current.length"
+          class="space-y-6"
+        >
+          <BarCategorySection
+            v-for="c in current"
+            :key="c.id"
+            :category="c"
+            :standard-id="standard"
+            :in-sub-categories="inSubCategories(c)"
+            :searching="!!query.trim()"
+            @add="newProduct(c)"
+            @edit="editCategory(c)"
+            @active="on => setCategoryActive(c, on)"
+            @move="move"
+          />
+        </div>
+        <CollapsibleDivider
+          :open="showRetired || !!query.trim()"
+          :label="t('bar.screens.products.retired-categories')"
+          :count="retired.length"
+          @update:open="v => showRetired = v"
+        >
+          <div class="mt-4 space-y-6">
+            <BarCategorySection
+              v-for="c in retired"
+              :key="c.id"
+              :category="c"
+              :standard-id="standard"
+              :in-sub-categories="inSubCategories(c)"
+              :searching="!!query.trim()"
+              @edit="editCategory(c)"
+              @active="on => setCategoryActive(c, on)"
+              @move="move"
             />
-            <UButton
-              v-if="c.active"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-plus"
-              :label="t('bar.screens.products.add-here')"
-              @click="newProduct(c)"
-            />
-            <RowActions
-              :label="t('bar.screens.products.category-actions', { name: c.name })"
-              :items="[
-                { label: t('bar.screens.products.edit-category'), icon: 'i-lucide-pencil', onSelect: () => editCategory(c) },
-                c.active
-                  ? { label: t('bar.screens.products.retire-category'), icon: 'i-lucide-archive', onSelect: () => setCategoryActive(c, false) }
-                  : { label: t('bar.screens.products.restore-category'), icon: 'i-lucide-archive-restore', onSelect: () => setCategoryActive(c, true) },
-              ]"
-            />
-          </template>
-          <p
-            v-if="!c.products.length"
-            class="text-sm text-muted"
-          >
-            {{ t('bar.screens.products.no-products') }}
-          </p>
-          <RecordList
-            v-else
-            :label="c.name"
-          >
-            <RecordListItem
-              v-for="(p, i) in c.products"
-              :key="p.id"
-              :description="line(p)"
-              :muted="!p.active"
-            >
-              <template #name>
-                <ULink :to="`/admin/modules/bar/products/${p.id}`">
-                  {{ p.active ? p.name : t('bar.screens.products.retired-name', { name: p.name }) }}
-                </ULink>
-              </template>
-              <StatusBadge
-                v-if="needsPrice(p)"
-                tone="warning"
-                :label="t('bar.screens.products.needs-price')"
-              />
-              <div class="flex gap-1">
-                <IconButton
-                  icon="i-lucide-arrow-up"
-                  :label="t('bar.screens.products.move-up', { name: p.name })"
-                  :disabled="i === 0"
-                  @click="move(p, 'up')"
-                />
-                <IconButton
-                  icon="i-lucide-arrow-down"
-                  :label="t('bar.screens.products.move-down', { name: p.name })"
-                  :disabled="i === c.products.length - 1"
-                  @click="move(p, 'down')"
-                />
-              </div>
-            </RecordListItem>
-          </RecordList>
-        </PageSection>
+          </div>
+        </CollapsibleDivider>
         <UButton
           v-if="data.categories.length"
           color="neutral"
@@ -319,7 +319,7 @@ async function move(p: Product, direction: 'up' | 'down') {
       :category-id="addingTo"
       :categories="data.categories"
       :lists="data.lists"
-      @added="id => navigateTo(`/admin/modules/bar/products/${id}`)"
+      @added="refresh()"
       @presets="refresh()"
     />
   </PageFrame>

@@ -1,8 +1,8 @@
 <!-- The Live page type (UI-05): one job, done standing up. A thin status strip says what this screen
      is, which performance, whether the device can reach the server, and the way out; the page's own
      task fills the rest. Leaving a screen goes back to the Tonight hub; leaving the hub goes back to
-     where the person works sitting down. Waiting writes and a device copy of data (useLiveData) are
-     not built yet: while the device is offline the strip says that changes cannot be sent. -->
+     where the person works sitting down. A screen that works offline keeps a device copy of its data
+     (useLiveData) and queues its writes (useLiveQueue); the strip says how many are waiting to be sent. -->
 <script setup lang="ts">
 import { useOnline } from '@vueuse/core'
 
@@ -18,6 +18,7 @@ const props = defineProps<{
 const { t } = useT()
 const { has } = useViewer()
 const online = useOnline()
+const waiting = useLiveWaiting()
 useHead({ title: () => props.context ? `${props.title}: ${props.context}` : props.title })
 
 const hub = '/live'
@@ -49,6 +50,14 @@ const out = computed(() => {
           {{ context }}
         </p>
       </div>
+      <UBadge
+        v-if="waiting"
+        color="warning"
+        variant="subtle"
+        size="lg"
+        icon="i-lucide-cloud-upload"
+        :label="t('core.live.waiting', { count: waiting })"
+      />
       <UBadge
         :color="online ? 'success' : 'warning'"
         variant="subtle"
