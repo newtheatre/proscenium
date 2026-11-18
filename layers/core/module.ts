@@ -45,6 +45,7 @@ export default defineModule({
     'core.home-card': [
       { id: 'core.email-unverified', home: 'admin', ability: 'core.sender.manage', component: 'CoreEmailUnverifiedCard', urgency: 'today', count: 'core.email-unverified' },
       { id: 'core.getting-ready', home: 'admin', ability: 'core.settings.manage', component: 'CoreGettingReadyCard', urgency: 'today', count: 'core.getting-ready' },
+      { id: 'core.access-scheme-waiting', home: 'console', ability: 'core.access-scheme.read', component: 'CoreAccessSchemeWaitingCard', urgency: 'today', count: 'core.access-scheme-waiting' },
     ],
     'core.account-notice': [...identity.identityContributions['core.account-notice']],
     'core.account-section': [...identity.identityContributions['core.account-section'], ...domain.contributes['core.account-section']],

@@ -2,7 +2,7 @@
 // performance would touch, and what has been decided for them.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { getPerformance } from '#modules/core'
+import { getPerformance, placeName } from '#modules/core'
 import { affected } from '../../../../../change'
 
 export default defineRoute({
@@ -12,7 +12,7 @@ export default defineRoute({
 }, async (_event, { record }) => {
   const performance = await getPerformance(record!.id!)
   return {
-    performance: { id: performance.id, title: performance.productionTitle, startsAt: performance.startsAt, state: performance.state, venue: `${performance.venueName}, ${performance.spaceName}` },
+    performance: { id: performance.id, title: performance.productionTitle, startsAt: performance.startsAt, state: performance.state, venue: await placeName(performance.spaceId) ?? performance.venueName },
     ...await affected(performance.id),
   }
 })

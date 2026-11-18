@@ -1,7 +1,7 @@
 // What a message says about a shift: the duty, the show or occasion, when to arrive, and the
 // details a person needs on the night (where, curtain up, the briefing).
 import { first, linkTokens, siteUrl, theatreTimeZone, useSetting, wordsFrom } from '#kit'
-import { getPerformance } from '#modules/core'
+import { getPerformance, placeName } from '#modules/core'
 import catalogue from '../i18n/en-GB.json'
 import type { Shift } from './shifts'
 
@@ -42,7 +42,7 @@ export async function shiftDetails(shift: Pick<Shift, 'performanceId' | 'venueId
   const lines: string[] = []
   if (shift.performanceId) {
     const performance = await getPerformance(shift.performanceId)
-    lines.push(say('front-of-house.shift-details.where', { place: `${performance.venueName}, ${performance.spaceName}` }), say('front-of-house.shift-details.curtain', { time: time(performance.startsAt) }))
+    lines.push(say('front-of-house.shift-details.where', { place: await placeName(performance.spaceId) ?? performance.venueName }), say('front-of-house.shift-details.curtain', { time: time(performance.startsAt) }))
   }
   else if (shift.venueId) {
     const venue = await first<{ name: string }>('SELECT name FROM core_venues WHERE id = ?', shift.venueId)
