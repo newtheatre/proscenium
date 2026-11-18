@@ -25,9 +25,9 @@ export default defineModule({
     'age-check.enabled': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'age-check.minimum-age': setting.integer({ default: 18, min: 16, max: 25, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'age-check.challenge-age': setting.integer({ default: 25, min: 18, max: 30, change, audience: 'public', quotable: true }),
-    'age-check.description': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
+    'age-check.description': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
     'age-check.review-every': setting.duration({ default: '7d', min: '1d', max: '90d', units: DAYS, change, audience: 'staff' }),
-    'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', units: DAYS, change, audience: 'staff', onChange: 'confirm' }),
+    'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', units: DAYS, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Allergens (tab 10, approved 17 November): the till's sheet, the public chart, and how often a label is read again.
     'allergens.enabled': setting.boolean({ default: true, change, audience: 'staff' }),
     'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', units: DAYS, change, audience: 'staff' }),
@@ -121,6 +121,10 @@ export default defineModule({
   },
 
   contributes: {
+    // The bar's line of the privacy notice's "what we hold" table (/policies/privacy).
+    'core.privacy-record': [
+      { id: 'bar.age-checks', holds: 'That a sale at the bar was refused because of age', why: 'Licensing good practice expects a record of refusals', basis: 'Our legitimate interests in selling alcohol responsibly', keptFor: 'bar.retention.age-checks', order: 300 },
+    ],
     'core.vocabulary': [{
       id: 'bar.refund-reason',
       label: 'Reasons for refunding a bar sale',

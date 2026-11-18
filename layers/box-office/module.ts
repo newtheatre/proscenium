@@ -54,7 +54,7 @@ export default defineModule({
     // Seats for wheelchair spaces not yet booked are kept back from ordinary sale until this long before
     // the start, then go on general sale (show walkthrough, decision 6). Nought keeps none back.
     'wheelchair.keep-seats-before': setting.duration({ default: '24h', min: '0m', max: '7d', change, audience: 'staff' }),
-    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
+    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
@@ -169,6 +169,11 @@ export default defineModule({
   },
 
   contributes: {
+    // The box office's lines of the privacy notice's "what we hold" table (/policies/privacy).
+    'core.privacy-record': [
+      { id: 'box-office.orders', holds: 'Your bookings: what you booked, what you paid, exchanges and cancellations, and when a ticket was scanned', why: 'To supply what you bought, and because the law requires records of sales', basis: 'To carry out our contract with you, and a legal duty (tax and accounting law)', keptFor: 'For as long as tax and accounting law requires', order: 100 },
+      { id: 'box-office.holds', holds: 'Tickets held in a basket and never bought', why: 'To keep seats from being sold twice, and to spot misuse', basis: 'Our legitimate interests in selling tickets fairly', keptFor: 'box-office.retention.holds', order: 110 },
+    ],
     // The ticket types whose rules Box office itself fixes. Companion tickets are for people on the
     // access scheme, up to the companions it allows them (core.access-scheme:companions); complimentary
     // tickets are issued only by approving a request, never sold.

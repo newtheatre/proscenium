@@ -128,6 +128,12 @@ export default defineModule({
   },
 
   contributes: {
+    // Membership's lines of the privacy notice's "what we hold" table (/policies/privacy).
+    'core.privacy-record': [
+      { id: 'membership.memberships', holds: 'Your membership: its kind, its dates and your membership number', why: 'To run your membership', basis: 'To carry out our contract with you', keptFor: 'While you are a member', order: 150 },
+      { id: 'membership.ended', holds: 'Memberships that have ended', why: 'To answer questions about past membership', basis: 'Our legitimate interests in keeping an accurate record of who our members were', keptFor: 'membership.retention.ended-after', order: 160 },
+      { id: 'membership.verification-names', holds: 'Names on a membership list another organisation sent us', why: 'So that staff can resolve a mismatch', basis: 'Our legitimate interests in checking membership fairly', keptFor: 'membership.verification.names-keep-for', order: 170 },
+    ],
     'core.navigation': [
       { id: 'membership.schemes', menu: 'admin', group: 'modules', to: '/admin/modules/membership/schemes', match: '/admin/modules/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
