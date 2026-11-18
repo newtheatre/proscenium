@@ -170,6 +170,9 @@ export default defineModule({
       { id: 'front-of-house.checklists', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/checklists', icon: 'i-lucide-list-checks', ability: 'front-of-house.checklist.manage', order: 80 },
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
+    // Coming performances with no rota yet, on the console home of whoever runs the rota.
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
+    'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
@@ -337,11 +340,11 @@ export default defineModule({
       lane: 'bulk' as const,
       topic: 'front-of-house.night-reports',
       link: '/console/front-of-house/night-reports/{{ performance }}',
-      variables: { show: 'text' as const, worked: 'text' as const, incidents: 'text' as const, performance: 'text' as const },
+      variables: { show: 'text' as const, worked: 'text' as const, incidents: 'text' as const, performance: 'text' as const, date: 'text' as const, link: 'url' as const },
       wording: {
         'en-GB': {
-          subject: 'Night report: {{ show }}',
-          body: 'The night report for **{{ show }}** has been signed off. People on shift: {{ worked }}. Incidents: {{ incidents }}.',
+          subject: 'Night report: {{ show }}, {{ date }}',
+          body: 'The night report for **{{ show }}** on {{ date }} has been signed off. People on shift: {{ worked }}. Incidents: {{ incidents }}.\n\n[Read the night report]({{ link }})',
         },
       },
     }, {
@@ -351,11 +354,11 @@ export default defineModule({
       channels: ['email' as const, 'inbox' as const],
       lane: 'bulk' as const,
       link: '/console/front-of-house/night-reports/{{ performance }}',
-      variables: { show: 'text' as const, performance: 'text' as const },
+      variables: { show: 'text' as const, performance: 'text' as const, date: 'text' as const, link: 'url' as const },
       wording: {
         'en-GB': {
-          subject: 'Night report not signed off: {{ show }}',
-          body: 'The night report for **{{ show }}** is still a draft. Please check who worked and sign it off.',
+          subject: 'Night report not signed off: {{ show }}, {{ date }}',
+          body: 'The night report for **{{ show }}** on {{ date }} is still a draft. Please check who worked and sign it off.\n\n[Open the night report]({{ link }})',
         },
       },
     }, {

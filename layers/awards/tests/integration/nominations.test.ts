@@ -82,7 +82,7 @@ describe('nominations', () => {
     expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(1)
   })
 
-  it('leaves the run waiting when the nominee already holds a once-only award', async () => {
+  it('ends the run with the reason when the nominee already holds a once-only award', async () => {
     const type = await awardType()
     await issue(type, { accountId: nominee.accountId })
     const at = await attached(type)
@@ -90,7 +90,19 @@ describe('nominations', () => {
     await move(at.formId, responseId, 'start_review')
     await move(at.formId, responseId, 'approve')
     await deliver()
-    expect(await runs(responseId)).toEqual([{ state: 'waiting', action_key: 'awards.issue-award' }])
+    expect(await runs(responseId)).toEqual([{ state: 'skipped', action_key: 'awards.issue-award' }])
+    expect(await rows('SELECT detail FROM forms_action_runs WHERE response_id = ?', responseId)).toEqual([{ detail: expect.stringMatching(/already holds/) }])
     expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(1)
+  })
+
+  it('issues nothing, and says why, when the person approving is the nominee', async () => {
+    const type = await awardType()
+    const at = await attached(type)
+    const responseId = await nominated(at, decider.accountId!)
+    await move(at.formId, responseId, 'start_review')
+    await move(at.formId, responseId, 'approve')
+    await deliver()
+    expect(await rows('SELECT state, detail FROM forms_action_runs WHERE response_id = ?', responseId)).toEqual([{ state: 'skipped', detail: expect.stringMatching(/their own account/) }])
+    expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(0)
   })
 })

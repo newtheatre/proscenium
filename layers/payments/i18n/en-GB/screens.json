@@ -293,5 +293,11 @@
   "payments.screens.providers.keys.removed": "Key removed",
   "payments.screens.providers.keys.remove-verb": "Remove",
   "payments.screens.providers.keys.remove-thing": "the {key} for {account}",
-  "payments.screens.providers.keys.remove-button": "Remove key"
+  "payments.screens.providers.keys.remove-button": "Remove key",
+  "payments.screens.home-card.refunds.one": "{count} refund is waiting for approval",
+  "payments.screens.home-card.refunds.other": "{count} refunds are waiting for approval",
+  "payments.screens.home-card.refunds-action": "Review refunds",
+  "payments.screens.home-card.attention.one": "{count} payment needs attention",
+  "payments.screens.home-card.attention.other": "{count} payments need attention",
+  "payments.screens.home-card.attention-action": "Open Needs attention"
 }
