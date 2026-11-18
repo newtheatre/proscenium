@@ -328,11 +328,12 @@ export const identityContributions = {
     channels: ['email' as const, 'inbox' as const],
     lane: 'prompt' as const,
     variables: { scheme: 'text' as const },
-    link: '/account',
+    link: '/account/access',
     wording: {
       'en-GB': {
         subject: 'We have your application to the {{ scheme }}',
         body: '{{ theatre }} has your application to the {{ scheme }}. The people who run it will read it and let you know.\n\nYou can see where it is, and correct it, in your account.',
+        action: 'See my application',
       },
     },
   }, {
@@ -348,6 +349,7 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Applications to the {{ scheme }} are waiting',
         body: 'Applications waiting longer than {{ theatre }} aims to answer: {{ count }}. The queue shows which.',
+        action: 'Open the queue',
       },
     },
   }, {
@@ -358,11 +360,12 @@ export const identityContributions = {
     channels: ['email' as const, 'inbox' as const],
     lane: 'prompt' as const,
     variables: { scheme: 'text' as const },
-    link: '/account',
+    link: '/account/access',
     wording: {
       'en-GB': {
         subject: 'News about your application to the {{ scheme }}',
         body: 'There is news about your application to the {{ scheme }} at {{ theatre }}. Sign in to your account to read it.',
+        action: 'Read the news',
       },
     },
   }, {
@@ -372,11 +375,12 @@ export const identityContributions = {
     channels: ['email' as const, 'inbox' as const],
     lane: 'prompt' as const,
     variables: { scheme: 'text' as const },
-    link: '/account',
+    link: '/account/access',
     wording: {
       'en-GB': {
         subject: 'Are your details for the {{ scheme }} still right?',
         body: 'It has been a while since {{ theatre }} accepted your application to the {{ scheme }}. Please check your details in your account and confirm they are still right, or change them.\n\nYour arrangements stay in place meanwhile.',
+        action: 'Check my details',
       },
     },
   }, {
@@ -472,10 +476,12 @@ export const identityContributions = {
     channels: ['email' as const, 'inbox' as const],
     lane: 'prompt' as const,
     variables: { until: 'text' as const },
+    link: '/account/data',
     wording: {
       'en-GB': {
         subject: 'Your data from {{ theatre }} is ready',
         body: 'The download of your data you asked {{ theatre }} for is ready. Sign in to your account to get it. It is kept until {{ until }}, then removed.\n\nIf you did not ask for this, contact the theatre straight away.',
+        action: 'Get my data',
       },
     },
   }, {
