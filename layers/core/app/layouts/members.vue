@@ -21,18 +21,11 @@ const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ labe
   <div>
     <SkipLink />
     <UHeader :title="name">
-      <!-- The badge sits beside the home link, not in it, so the link's name is the words it shows. -->
-      <template #left>
-        <ULink
-          to="/"
-          class="flex shrink-0 items-end gap-1.5 text-xl font-bold text-highlighted"
-        >
-          {{ name }}
-        </ULink>
+      <template #title>
+        {{ name }}
         <UBadge
           :label="area"
           color="neutral"
-          class="ms-2"
         />
       </template>
       <!-- A top bar on a laptop; below 640 pixels the bottom bar takes over. -->
@@ -50,7 +43,7 @@ const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ labe
     <UMain
       id="main"
       tabindex="-1"
-      :class="['outline-none', sections.length > 1 && 'max-sm:pb-20']"
+      class="outline-none max-sm:pb-20"
     >
       <slot />
     </UMain>

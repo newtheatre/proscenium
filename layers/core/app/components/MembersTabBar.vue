@@ -1,7 +1,6 @@
 <!-- The members' area on a phone (UI-03): a bar along the bottom with the first four sections and
      More for the rest. Nuxt UI has no bottom tab bar, so the shape is set here once: each tab is a
-     button with its icon above its label, 48 pixels tall, and a count sits on the icon. With one
-     section there is nothing to switch between, so no bar: the header's bell and the home lead there. -->
+     button with its icon above its label, 48 pixels tall, and a count sits on the icon. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -21,7 +20,7 @@ const tab = { base: 'min-h-(--proscenium-target-live) flex-1 flex-col justify-ce
 
 <template>
   <nav
-    v-if="sections.length > 1"
+    v-if="sections.length"
     :aria-label="label"
     class="fixed inset-x-0 bottom-0 z-40 flex border-t border-default bg-default sm:hidden"
   >
