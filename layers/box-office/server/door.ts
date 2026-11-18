@@ -15,9 +15,10 @@ import { signing } from '#kit/signing'
 import { accountLabel, getTerm } from '#modules/core'
 import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
+import { passByCode } from './pass-holding'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
 
-export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed' | 'reference'
+export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed' | 'reference' | 'pass'
 
 export interface ScanOutcome {
   result: ScanResult
@@ -173,6 +174,8 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
       if (order.state === 'confirmed') return lines.length ? { result: 'reference', scanId: null, reference: order.reference } : recorded({ result: 'unknown' })
       return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, buyer: order.account_id ? await accountLabel(order.account_id) : null, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: order.total_minor, currency: order.currency } }
     }
+    // A pass makes reservations and admits nobody: its holder needs a ticket for tonight from the box office.
+    if (await passByCode(code)) return { result: 'pass', scanId: null }
     return recorded({ result: 'unknown' })
   }
   const [kind, keyId, random, signature] = parts as [string, string, string, string]

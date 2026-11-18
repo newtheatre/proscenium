@@ -108,7 +108,7 @@ export default defineModule({
     // Making, limiting and retiring promo codes (BO-17).
     'promo.manage': ability({}),
     // Setting up passes, their prices and what they cover (BO-64).
-    'pass.manage': ability({}),
+    'pass.manage': ability({ implies: ['core.account.find'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -249,6 +249,8 @@ export default defineModule({
       { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40, settingsIn: ['box-office.performances'] },
       // The person's own bookings, in My account (C3).
       { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
+      // The person's own passes, beside their tickets.
+      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31 },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
       // Each space's seating layouts and wheelchair spaces, beside Venues in the programme's settings (decision 10).
       { id: 'box-office.seating-layouts', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/seating-layouts', icon: 'i-lucide-armchair', ability: 'box-office.pricing.manage', order: 42, settingsIn: ['programme', 'box-office.performances'] },

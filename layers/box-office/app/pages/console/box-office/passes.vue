@@ -120,7 +120,9 @@ async function save() {
 }
 const setActive = (p: PassType, on: boolean) => run(() => setState(p.id, { active: on }), t(on ? 'box-office.passes.restored' : 'box-office.passes.retired', { name: p.name }), () => setState(p.id, { active: !on }))
 const setOnSale = (p: PassType, on: boolean) => run(() => setState(p.id, { onSale: on }), t(on ? 'box-office.passes.on-sale' : 'box-office.passes.off-sale', { name: p.name }), () => setState(p.id, { onSale: !on }))
+const holdersOf = ref<PassType | null>(null)
 const actions = (p: PassType) => [[
+  { label: t('box-office.passes.holders.open'), icon: 'i-lucide-users-round', onSelect: () => { holdersOf.value = p } },
   { label: t('box-office.passes.edit'), icon: 'i-lucide-pencil', onSelect: () => open(p) },
   ...(p.active
     ? [p.onSale
@@ -177,6 +179,14 @@ const actions = (p: PassType) => [[
               :label="t(p.onSale ? 'box-office.passes.badge.on-sale' : 'box-office.passes.badge.off-sale')"
               :color="p.onSale ? 'success' : 'neutral'"
               variant="subtle"
+            />
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              icon="i-lucide-users-round"
+              :label="t('box-office.passes.holders.button', { count: p.held })"
+              @click="holdersOf = p"
             />
             <RowActions
               :items="actions(p)"
@@ -488,5 +498,10 @@ const actions = (p: PassType) => [[
         />
       </template>
     </UModal>
+    <BoxOfficePassHolders
+      :pass="holdersOf"
+      @close="holdersOf = null"
+      @changed="refresh()"
+    />
   </PageFrame>
 </template>
