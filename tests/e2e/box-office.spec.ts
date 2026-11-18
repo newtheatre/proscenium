@@ -65,11 +65,11 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await api.dispose()
 
-  // Each reservation is made by its own buyer, in a browser of their own: one person may only
-  // reserve so many tickets for a performance, and a guest stays signed in to the account their
-  // first booking made, so a shared buyer would soon reach that limit.
+  // Each reservation is made by its own guest buyer, in a browser of their own. One person may only
+  // reserve so many tickets for a performance. A context made here takes the file's `use` options,
+  // so without clearing the headers every buyer would be the seller signed in, one person.
   const basketFor = async (quantity: number) => {
-    const buyer = await playwright.request.newContext(base)
+    const buyer = await playwright.request.newContext({ ...base, extraHTTPHeaders: {} })
     const basket = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity }] })
     return { buyer, basket }
   }
