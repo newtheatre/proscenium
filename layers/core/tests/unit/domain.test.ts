@@ -8,7 +8,7 @@ import { contrast, nearestShade, solidFill } from '../../shared/colour'
 import { themeCss, tokensFor, type BrandChoice } from '../../server/brand/theme'
 import { clean, cleanSvg, sniff, Rejected } from '../../server/files/inspect'
 import { operatingDayAt, operatingDayBounds } from '../../server/calendar'
-import { render, variablesIn, isSafeUrl } from '../../server/notifications/render'
+import { hasLink, linkPath, render, variablesIn, isSafeUrl } from '../../server/notifications/render'
 import { appRoutes, componentProblems, navigationProblems, pagePaths, redirectProblems } from '../../../../scripts/checks/site'
 import { findRedirect } from '../../shared/redirects'
 
@@ -231,6 +231,25 @@ describe('email wording (C-27)', () => {
     const out = render({ subject: 'Hi', body: '[click](http://evil.example)' }, { values: {}, kinds: {}, accent: '#000000', theatre: 'T' })
     expect(out.html).not.toContain('href="http://evil.example"')
     expect(out.text).toContain('click')
+  })
+
+  it('makes a paragraph that is only a link into a button, with the address beneath', () => {
+    const out = render({ subject: 'Hi', body: 'Before.\n\n[Show my tickets]({{ link }})' }, { values: { link: 'https://t.example/o/1' }, kinds: { link: 'sealed' }, accent: '#123456', theatre: 'T' })
+    expect(out.html).toContain('background:#123456')
+    expect(out.html).toMatch(/<a href="https:\/\/t\.example\/o\/1"[^>]*>Show my tickets<\/a><\/td>/)
+    expect(out.html).toContain('word-break:break-all">https://t.example/o/1</p>')
+    expect(out.text).toContain('Show my tickets: https://t.example/o/1')
+  })
+
+  it('adds the action button only when the wording has no link of its own', () => {
+    expect(hasLink('[Open]({{ link }})', { link: 'https://t.example/x' }, { link: 'text' })).toBe(true)
+    expect(hasLink('See {{ link }}', { link: 'https://t.example/x' }, { link: 'url' })).toBe(true)
+    expect(hasLink('Open it to review it.', {}, {})).toBe(false)
+    const out = render({ subject: 'Hi', body: 'Open it to review it.' }, { values: {}, kinds: {}, accent: '#000000', theatre: 'T', action: { label: 'Open the incident', url: 'https://t.example/i/1' } })
+    expect(out.html).toContain('href="https://t.example/i/1"')
+    expect(out.text).toContain('Open the incident: https://t.example/i/1')
+    expect(linkPath('/console/incidents/{{ incident }}', { incident: 'a b' })).toBe('/console/incidents/a%20b')
+    expect(linkPath('//evil.example', {})).toBeNull()
   })
 
   it('keeps the subject on one line', () => {

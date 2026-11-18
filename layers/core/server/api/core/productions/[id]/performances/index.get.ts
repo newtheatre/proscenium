@@ -2,9 +2,9 @@
 // the lists the console's pickers offer: venues and the spaces in them that can hold performances,
 // access features, cancel reasons and the production's staging effects. With them, what a new performance takes when it says nothing
 // (the production's defaults over the theatre's, each space's doors and capacity over those), the
-// run presets and which one each space starts from, and whether anything here sells tickets. The
-// whole days closed to performances come too, so the date fields can grey them out for someone who
-// may not manage closures (L40).
+// run presets and which one each space starts from, whether anything here sells tickets, and the
+// season's dates. The whole days closed to performances come too, so the date fields can grey them
+// out for someone who may not manage closures (L40).
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute, first, nowMs, useSetting } from '#kit'
@@ -43,10 +43,13 @@ export default defineRoute({
     closuresBetween(now - DAY, now + 400 * DAY), // not-policy: as far ahead as the Closures screen looks
   ])
   const own = await first<{ doors_before_minutes: number | null, capacity: number | null }>('SELECT doors_before_minutes, capacity FROM core_productions WHERE id = ?', record!.id)
+  // The production's season's dates, which a new run's dates start from when it has none yet.
+  const season = await first<{ starts_on: string, ends_on: string }>('SELECT s.starts_on, s.ends_on FROM core_productions p JOIN core_seasons s ON s.id = p.season_id WHERE p.id = ?', record!.id)
   const used = new Set(performances.flatMap(p => [p.venueId, p.spaceId]))
   return {
     performances,
     runs,
+    season: season ? { startsOn: season.starts_on, endsOn: season.ends_on } : null,
     options: {
       venues: venues
         .map(v => ({ id: v.id, name: v.name, archived: v.archived, spaces: v.spaces.filter(s => (s.performable && !s.archived) || used.has(s.id)).map(s => ({ id: s.id, name: s.name, defaultCapacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId, archived: s.archived })) }))

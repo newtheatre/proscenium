@@ -13,16 +13,17 @@ import { nowMs } from './clock'
 import type { Rate } from './settings'
 
 // presented-value counts checks that carry a value a person typed (a membership number, a code).
-// sign-in-network counts what one network address asks of sign-in as a whole, generously, since a
-// theatre's bar or foyer puts many people behind one address; the strict sign-in class is then
-// counted per email address (and address plus network) inside the routes.
+// Signing in by email counts three ways apart, so one cannot use up another: sign-in-network for
+// each network address on the public sign-in routes (high, as a students' union or halls network
+// shares one address), sign-in-link for each email address asking for a link, and sign-in-code for
+// each email address trying a code. sign-in is the class of the other identity routes.
 // staff is not declared by routes: a signed-in person who holds a role reads under it in place of
 // default, since one console page asks for many things and staff move quickly between them (L15).
-export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'public-form', 'export', 'presented-value', 'staff'] as const
+export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'sign-in-link', 'sign-in-code', 'public-form', 'export', 'presented-value', 'staff'] as const
 export type RateClass = typeof RATE_CLASSES[number]
 
 /** Classes counted in the shared store, shared by every instance. */
-export const SHARED_RATE_CLASSES: ReadonlySet<string> = new Set(['sign-in', 'sign-in-network', 'public-form', 'presented-value'])
+export const SHARED_RATE_CLASSES: ReadonlySet<string> = new Set(['sign-in', 'sign-in-network', 'sign-in-link', 'sign-in-code', 'public-form', 'presented-value'])
 
 export interface RateDecision {
   allowed: boolean
@@ -93,6 +94,16 @@ export async function countAgainstRate(rateClass: RateClass, who: string): Promi
   const at = nowMs()
   const { allowed, resets } = await store.take(`${rateClass}:${who}`, limit, at)
   return { allowed, retryAfter: Math.max(1, Math.ceil((resets - at) / 1000)) } // not-policy: milliseconds to whole seconds
+}
+
+/** How long to wait, for a refusal's remedy: "Try again in 4 minutes." */
+export function waitRemedy(retryAfter: number): string {
+  const minute = 60 // not-policy: seconds in a minute
+  const hour = 3600 // not-policy: seconds in an hour
+  const [n, unit] = retryAfter < minute
+    ? [retryAfter, 'second']
+    : retryAfter < hour ? [Math.ceil(retryAfter / minute), 'minute'] : [Math.ceil(retryAfter / hour), 'hour']
+  return `Try again in ${n} ${unit}${n === 1 ? '' : 's'}.`
 }
 
 /** Tests only: forget every count, here and (by moving to fresh objects) in the shared store. */

@@ -178,8 +178,8 @@ export async function checklist(performanceId: string): Promise<{ items: Checkli
 
 const MISSING: Record<string, string> = {
   scheduled: 'The performance is not scheduled yet.',
-  capacity: 'No band has any capacity.',
-  prices: 'A band has no price.',
+  capacity: 'No section has any seats to sell.',
+  prices: 'A section has no price.',
   payment: 'A ticket has a price and there is no way to pay: add a payment provider first.',
 }
 

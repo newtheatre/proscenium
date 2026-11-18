@@ -1,11 +1,11 @@
 <!-- Awards: every award the theatre has given, newest first, narrowed by award or by a name.
      Revoked ones sit below a divider. "Issue an award" records one the committee has decided. -->
 <script setup lang="ts">
-interface Row { id: string, typeId: string, typeName: string, recipientName: string, awardedOn: string, awardedFor: string | null, state: 'current' | 'revoked', linked: boolean }
+interface Row { id: string, typeId: string, typeName: string, recipientName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, state: 'current' | 'revoked', linked: boolean }
 interface AwardType { id: string, name: string, state: string }
 
 const { t } = useT()
-const { day } = useDates()
+const awardDate = useAwardDate()
 const typeId = ref<string>('all')
 const q = ref('')
 const searching = ref(false)
@@ -15,7 +15,7 @@ const types = await useAPI<{ types: AwardType[] }>('/api/awards/types', { key: '
 const typeItems = computed(() => [{ value: 'all', label: t('awards.screens.awards.all-types') }, ...(types.data.value?.types ?? []).map(x => ({ value: x.id, label: x.name }))])
 const current = computed(() => (data.value?.awards ?? []).filter(a => a.state === 'current'))
 const revoked = computed(() => (data.value?.awards ?? []).filter(a => a.state === 'revoked'))
-const describe = (a: Row) => [a.typeName, day(a.awardedOn), a.awardedFor, a.linked ? null : t('awards.screens.awards.not-linked')].filter(Boolean).join(' · ')
+const describe = (a: Row) => [a.typeName, awardDate(a), a.awardedFor, a.linked ? null : t('awards.screens.awards.not-linked')].filter(Boolean).join(' · ')
 const issuing = ref(false)
 const importing = ref(false)
 const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x.state === 'active'))
@@ -39,7 +39,7 @@ const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x
         @click="importing = true"
       />
       <UButton
-        v-if="data?.canIssue"
+        v-if="data?.canIssue && activeTypes.length"
         :label="t('awards.screens.awards.issue')"
         icon="i-lucide-plus"
         :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
@@ -64,8 +64,18 @@ const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x
         v-if="!data?.awards.length"
         icon="i-lucide-award"
         :title="t(q || typeId !== 'all' ? 'awards.screens.awards.none-found' : 'awards.screens.awards.empty')"
-        :description="q || typeId !== 'all' ? undefined : t('awards.screens.awards.empty-help')"
-      />
+        :description="q || typeId !== 'all' ? undefined : t(activeTypes.length ? 'awards.screens.awards.empty-help' : 'awards.screens.awards.no-types-help')"
+      >
+        <template
+          v-if="data?.canIssue && !activeTypes.length && !q && typeId === 'all'"
+          #actions
+        >
+          <UButton
+            to="/admin/modules/awards/types"
+            :label="t('awards.screens.awards.create-type')"
+          />
+        </template>
+      </EmptyState>
       <div
         v-else
         class="space-y-4"

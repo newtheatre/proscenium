@@ -10,7 +10,7 @@ interface Group { id: string, label: string, icon: string, everyday: Entry[], se
  * entries keep their order, everyday first). `onSelect` closes the drawer on a phone.
  */
 export function sidebarGroups(groups: Group[], options: { t: (key: string) => string, path: string, onSelect: () => void }): NavigationMenuItem[] {
-  const link = (e: Entry, icon = e.icon): NavigationMenuItem => ({ label: options.t(e.label), icon, to: e.to, active: isCurrent(e, options.path), badge: e.count, onSelect: options.onSelect })
+  const link = (e: Entry, icon = e.icon): NavigationMenuItem => ({ label: options.t(e.label), icon, to: e.to, active: isCurrent(e, options.path), badge: e.count || undefined, onSelect: options.onSelect })
   return groups.flatMap((g): NavigationMenuItem[] => {
     const entries = [...g.everyday, ...g.setup]
     if (!entries.length) return []

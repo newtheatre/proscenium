@@ -9,7 +9,7 @@ import { Refusal, isRefusal, DeclarationError, type RefusalBody } from './refusa
 import { useAccessProvider, can } from './access'
 import { isEnabled } from './modules-store'
 import { createUnit, type UnitOfWork } from './unit'
-import { countAgainstRate, RATE_CLASSES, type RateClass } from './ratelimit'
+import { countAgainstRate, RATE_CLASSES, waitRemedy, type RateClass } from './ratelimit'
 import { useRegistry } from './registry'
 import { verifyTurnstile } from './turnstile'
 import { nowMs } from './clock'
@@ -178,7 +178,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const rate = await countAgainstRate(rateClass, who)
     if (!rate.allowed) {
       setResponseHeader(event, 'Retry-After', rate.retryAfter)
-      throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: 'Wait a while, then try again.' })
+      throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: waitRemedy(rate.retryAfter) })
     }
 
     const method = event.method.toUpperCase()

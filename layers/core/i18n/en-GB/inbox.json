@@ -14,9 +14,13 @@
   "core.inbox.restored-toast": "Moved {title} back to your messages",
   "core.inbox.older": "Show older messages",
   "core.inbox.empty": "No messages",
-  "core.inbox.empty-help": "Messages from the theatre about your bookings and account appear here.",
+  "core.inbox.empty-help": "Messages from the theatre about your bookings, your account and, if you are a member, your work with the theatre appear here.",
   "core.inbox.empty-archived": "Nothing archived",
   "core.inbox.bell": "Inbox",
   "core.inbox.bell-unread.one": "Inbox, 1 unread message",
-  "core.inbox.bell-unread.other": "Inbox, {count} unread messages"
+  "core.inbox.bell-unread.other": "Inbox, {count} unread messages",
+  "core.inbox.side": "Whose messages",
+  "core.inbox.side-all": "All messages",
+  "core.inbox.side-members": "As a member",
+  "core.inbox.side-audience": "Bookings and account"
 }

@@ -1,6 +1,6 @@
 <!-- Issue an award: records one the committee has decided. The recipient is somebody already
      known, a new person by name and address, or a name alone for a historical award, which is listed
-     and gives no ticket price until an account is linked. The date starts as today; the show it is
+     and gives no ticket price until an account is linked. The date starts as today, and empty for a name alone, which is dated by hand; the show it is
      for and the committee's decision are under "More details". -->
 <script setup lang="ts">
 const props = defineProps<{ types: { id: string, name: string }[], typeId?: string }>()
@@ -18,6 +18,11 @@ const more = ref(false)
 const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 let idempotency = ''
+// A past award recorded by name alone is dated by hand: today's date would be invented for it.
+watch(() => form.who, (now, before) => {
+  if (now === 'name') form.awardedOn = ''
+  else if (before === 'name' && !form.awardedOn) form.awardedOn = today()
+})
 watch(open, (now) => {
   if (!now) return
   Object.assign(form, blank())
@@ -80,6 +85,15 @@ async function issue() {
         @submit="issue"
       >
         <RefusalNotice :refusal="refusal" />
+        <UButton
+          v-if="refusal?.detail?.awardId"
+          color="neutral"
+          variant="link"
+          class="px-0"
+          icon="i-lucide-award"
+          :to="`/console/awards/${refusal.detail.awardId}`"
+          :label="t('awards.screens.issue.open-existing')"
+        />
         <UFormField
           name="typeId"
           :label="t('awards.screens.issue.type')"

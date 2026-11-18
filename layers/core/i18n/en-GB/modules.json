@@ -64,6 +64,7 @@
   "core.modules.about.required-by": "Needed by",
   "core.modules.about.uses": "Works with",
   "core.modules.about.nothing": "Nothing",
+  "core.modules.about.core-only": "Core only",
   "core.modules.about.since": "Version",
   "core.modules.about.secrets": "Secrets and credentials",
   "core.modules.about.secrets-help": "Worker secrets are set in the Cloudflare dashboard; credentials are entered in the app. Values are never shown.",
