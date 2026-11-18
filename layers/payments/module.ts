@@ -70,6 +70,8 @@ export default defineModule({
     'payments.provider': point({ kind: 'code', contract: 'provider' }),
     'payments.settlement': point({ kind: 'code', contract: 'settlement' }),
     'payments.desk-basket': point({ kind: 'code', contract: 'desk-basket' }),
+    // What prices a sale before it is written: Promotions. Nobody contributing means list prices.
+    'payments.pricing': point({ kind: 'code', contract: 'pricing' }),
   },
 
   events: {

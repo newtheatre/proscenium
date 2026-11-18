@@ -130,7 +130,7 @@ watch(performanceId, () => {
 
 // A promo code the buyer gives (BO-17): tried first, so the seller sees what it does before taking
 // payment; the sale applies it again, to the dearest tickets first, as booking online does.
-interface Promo { code: string, effect: 'percent_off' | 'amount_off' | 'set_price', value: number, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] }
+interface Promo { code: string, label: string, effect: string, value: number, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] }
 const codeOpen = ref(false)
 const codeTyped = ref('')
 const promo = ref<Promo | null>(null)
@@ -138,8 +138,10 @@ const codeRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const codeBusy = ref(false)
 const promoPrice = (row: PerformanceRow) => promo.value?.prices.find(p => p.bandId === row.bandId && p.ticketTypeId === row.ticketTypeId)?.amountMinor
 function promoWords(p: Promo) {
-  const what = p.effect === 'percent_off' ? t('box-office.codes.words.percent_off', { percent: p.value / 100 }) : t(`box-office.codes.words.${p.effect}`, { amount: money(p.value) })
-  return p.maxPerOrder ? `${what} · ${t('box-office.codes.words.per-order', { count: p.maxPerOrder })}` : what
+  // A multi-buy or a basket offer is said by its public label: what it does depends on the whole sale.
+  if (!['percent_off', 'amount_off', 'set_price'].includes(p.effect)) return p.label
+  const what = p.effect === 'percent_off' ? t('box-office.promotions.words.percent_off', { percent: p.value / 100 }) : t(`box-office.promotions.words.${p.effect}`, { amount: money(p.value) })
+  return p.maxPerOrder ? `${what} · ${t('box-office.promotions.words.per-order', { count: p.maxPerOrder })}` : what
 }
 async function tryCode() {
   if (!codeTyped.value.trim() || !performanceId.value) return

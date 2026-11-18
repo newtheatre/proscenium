@@ -247,69 +247,6 @@ export const spaceTicketPresets = defineTable('box_office_space_ticket_presets',
 })
 
 /**
- * A promotional code (BO-17): typed when booking, it takes a percentage or an amount off eligible
- * tickets, or sets their price. Each null scope column means any. `used` is kept by the triggers on
- * its redemptions, and its CHECK is the limit, so the last use of a code is given once.
- */
-export const promoCodes = defineTable('box_office_promo_codes', {
-  id: col.id(),
-  // Stored upper-case; matched whatever the buyer's capitals.
-  code: col.internal(text('code').notNull()),
-  effect: col.internal(text('effect', { enum: ['percent_off', 'amount_off', 'set_price'] }).notNull()),
-  // Basis points for percent_off, minor units otherwise.
-  value: col.internal(integer('value').notNull()),
-  productionId: col.internal(text('production_id')),
-  performanceId: col.internal(text('performance_id')),
-  ticketTypeId: col.internal(text('ticket_type_id')),
-  bandId: col.internal(text('band_id')),
-  maxUses: col.internal(integer('max_uses')),
-  used: col.internal(integer('used').notNull().default(0)),
-  // Tickets one order may have at the code's price; null means every eligible ticket in it.
-  maxPerOrder: col.internal(integer('max_per_order')),
-  // When set, the code leaves alone ticket types that carry a requirement (a membership, proof or a
-  // concession), so it does not stack on a price already reduced for who the buyer is.
-  notWithRequirements: col.internal(integer('not_with_requirements', { mode: 'boolean' }).notNull().default(false)),
-  validFrom: col.timestamp('valid_from'),
-  validUntil: col.timestamp('valid_until'),
-  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
-  note: col.internal(text('note')),
-  createdBy: col.account('created_by', { role: 'actor', nullable: true }),
-  createdAt: col.createdAt(),
-  updatedAt: col.updatedAt(),
-}, {
-  id: 'prm',
-  realm: 'operational',
-  subject: 'none',
-  extra: t => [
-    uniqueIndex('box_office_promo_codes_code').on(t.code),
-    check('box_office_promo_codes_effect', sql`${t.effect} IN ('percent_off', 'amount_off', 'set_price')`),
-    check('box_office_promo_codes_value', sql`${t.value} >= 0 AND (${t.effect} <> 'percent_off' OR ${t.value} <= 10000)`),
-    check('box_office_promo_codes_used', sql`${t.used} >= 0 AND (${t.maxUses} IS NULL OR ${t.used} <= ${t.maxUses})`),
-  ],
-})
-
-/** One ticket a code was used on. A live row counts against the code's uses; releasing it gives the use back. */
-export const promoRedemptions = defineTable('box_office_promo_redemptions', {
-  id: col.id(),
-  promoCodeId: col.ref('box_office_promo_codes'),
-  orderId: col.internal(text('order_id').notNull()),
-  // The ticket's seat: when its claim is released, so is the use.
-  claimId: col.internal(text('claim_id').notNull()),
-  state: col.internal(text('state', { enum: ['live', 'released'] }).notNull().default('live')),
-  createdAt: col.createdAt(),
-  updatedAt: col.updatedAt(),
-}, {
-  id: 'prr',
-  realm: 'audience',
-  subject: { via: 'order_id' },
-  extra: t => [
-    index('box_office_promo_redemptions_order').on(t.orderId),
-    index('box_office_promo_redemptions_claim').on(t.claimId),
-    check('box_office_promo_redemptions_state', sql`${t.state} IN ('live', 'released')`),
-  ],
-})
-
-/**
  * A pass as a product (BO-64; passes mock-up approved by Matt 2026-11-18): "Autumn Season Pass". A
  * pass gives one entry at each performance it covers, the way a ticket is one entry, and is paid for
  * once. It is not a ticket type and has no tie to one: it covers named productions, a season or
@@ -647,6 +584,7 @@ export const orderLines = defineTable('box_office_order_lines', {
   listMinor: col.minor('list_minor').notNull(),
   discountMinor: col.minor('discount_minor').notNull().default(0),
   amountMinor: col.minor('amount_minor').notNull(),
+  // The first promotion's saving on this line, as Payments' pricing gave it (the promotions module's redemption).
   promoRedemptionId: col.internal(text('promo_redemption_id')),
   passRedemptionId: col.internal(text('pass_redemption_id')),
   compRequestId: col.internal(text('comp_request_id')),
@@ -851,4 +789,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, promoCodes, promoRedemptions, passTypes, passShows, passPrices, passes, passRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, passTypes, passShows, passPrices, passes, passRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }

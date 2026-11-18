@@ -26,7 +26,7 @@ import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
-import { applyCode, judgeCode, normaliseCode, redeem, type Discounted } from './promo-codes'
+import { priceTickets, redeemTickets, type PricedTickets } from './promotions'
 import { availability } from './availability'
 import { salesOf } from './setup'
 
@@ -86,10 +86,9 @@ async function deskSale(input: SaleInput, at: number) {
   return pricedLines(input.performanceId, input.lines, at, { channel: 'desk', account: null })
 }
 
-/** What the sale's promo code takes off each ticket, if it has one: refused, saying why, when the code cannot be used. */
-async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], at: number): Promise<(Discounted | null)[]> {
-  if (!input.promoCode) return lines.map(() => null)
-  return applyCode(await judgeCode(input.promoCode, input.performanceId, at), input.performanceId, lines)
+/** The sale priced through Payments' pricing, with the buyer's code if they gave one: refused, saying why, when the code cannot be used. */
+async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[]): Promise<PricedTickets> {
+  return priceTickets(input.performanceId, lines, 'till', input.promoCode)
 }
 
 /**
@@ -124,9 +123,11 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
     const at = nowMs()
     const priced = (await deskSale(input.sale, at)).lines
-    const discounts = await deskDiscounts(input.sale, priced, at)
-    const code = normaliseCode(input.sale.promoCode ?? '')
-    lines = priced.map((l, i) => ({ label: discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor - (discounts[i]?.discountMinor ?? 0) }))
+    const { discounts, priced: sale } = await deskDiscounts(input.sale, priced)
+    // A discounted ticket is named with the code it was given for, or the offer's own label.
+    const nameOf = new Map(sale.applied.map(a => [a.promotionId, a.code ?? a.label]))
+    const said = (i: number) => [...new Set(sale.savings.filter(s => s.key === String(i)).map(s => nameOf.get(s.promotionId)))].join(', ')
+    lines = priced.map((l, i) => ({ label: discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${said(i)})` : names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor - (discounts[i] ?? 0) }))
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
@@ -190,8 +191,8 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
   const { pool, lines, currency, guard } = await deskSale(input.sale, at)
-  const discounts = await deskDiscounts(input.sale, lines, at)
-  const charged = lines.map((l, i) => l.amountMinor - (discounts[i]?.discountMinor ?? 0))
+  const tickets = await deskDiscounts(input.sale, lines)
+  const charged = lines.map((l, i) => l.amountMinor - (tickets.discounts[i] ?? 0))
   const totalMinor = charged.reduce((sum, amount) => sum + amount, 0)
   if (totalMinor <= 0) refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })
   const orderId = newId('ord')
@@ -209,9 +210,9 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${orderId}, ${actor.accountId ?? null}, ${at}, ${at})`)
   const claimed = (await claimSeats(unit, { holdId, requests: input.sale.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
   guard(unit)
-  const redemptions = redeem(unit, orderId, discounts, claimed)
+  const redemptions = await redeemTickets(unit, tickets, orderId, claimed)
   unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: discounts[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
+    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: tickets.discounts[i] ?? 0, amountMinor: charged[i]!, state: 'live',
     requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null,
   })))
   unit.expect(lines.length)

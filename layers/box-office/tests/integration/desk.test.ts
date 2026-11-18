@@ -9,7 +9,7 @@ import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
-import { createPromoCode } from '../../server/promo-codes'
+import { createPromotion } from '../../../promotions/server/promotions'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
@@ -22,6 +22,10 @@ const deferred = async (h: House) => (await rows<{ total: number }>("SELECT coal
 const tickets = (orderId: string) => rows<{ state: string, admitted_at: number | null, admitted_scan_id: string | null }>('SELECT t.state, t.admitted_at, t.admitted_scan_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ?', orderId)
 let cash: string
 let guests = 0
+
+/** A promotion on every ticket, started by `code`, as the Promotions screen makes one. */
+const promoCode = (code: string, extra: { value: number, maxUses?: number, maxPerSale?: number, notWithRequirements?: boolean }) =>
+  commit(unit => createPromotion(unit.view(), { name: code, label: code, trigger: 'code', effect: 'percent_off', codes: [{ code }], targets: [{ role: 'applies', kind: 'box-office.ticket' }], ...extra }, null))
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
   return inContext(async () => {
@@ -298,7 +302,7 @@ describe('selling at the desk', () => {
 
   it('keeps one booking when a promo code is on the sale, since splitting it could change the price', async () => {
     const h = await house(4)
-    await commit(unit => createPromoCode(unit.view(), { code: 'SPLITTEN', effect: 'percent_off', value: 1000 }, null))
+    await promoCode('SPLITTEN', { value: 1000 })
     const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }], promoCode: 'SPLITTEN' }
     const splits = [{ items: [{ basket: 'box-office', line: 0, quantity: 1 }] }, { items: [{ basket: 'box-office', line: 1, quantity: 1 }] }]
     const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits }, seller)
@@ -347,10 +351,10 @@ describe('selling at the desk', () => {
     expect(rowsOf.find(r => r.ticketTypeId === h.fullId)).not.toHaveProperty('companion')
   })
 
-  it('takes a promo code the buyer gives, on the dearest tickets first, and gives its uses back when the payment is cancelled', async () => {
+  it('takes a promo code the buyer gives, on the dearest tickets first, and gives its use back when the payment is cancelled', async () => {
     const h = await house(5)
     const code = 'DESK' + h.performanceId.slice(-6).toUpperCase()
-    await commit(unit => createPromoCode(unit.view(), { code, effect: 'percent_off', value: 5000, maxPerOrder: 1 }, null))
+    await promoCode(code, { value: 5000, maxPerSale: 1, maxUses: 1 })
     const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }], promoCode: code.toLowerCase() }
     const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
     expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 600 + 800, panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 600 }, { label: 'Concession', amountMinor: 800 }] }] })
@@ -360,10 +364,16 @@ describe('selling at the desk', () => {
     const [made] = await rows<{ id: string }>('SELECT id FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
     expect(await rows('SELECT list_minor, discount_minor, amount_minor, promo_redemption_id IS NOT NULL AS redeemed FROM box_office_order_lines WHERE order_id = ? ORDER BY list_minor DESC', made!.id))
       .toEqual([{ list_minor: 1200, discount_minor: 600, amount_minor: 600, redeemed: 1 }, { list_minor: 800, discount_minor: 0, amount_minor: 800, redeemed: 0 }])
-    expect(await count('SELECT used AS n FROM box_office_promo_codes WHERE code = ?', code)).toBe(1)
+    expect(await count('SELECT used AS n FROM promotions_codes WHERE code = ?', code)).toBe(1)
+    // Its only use is taken, so a second sale cannot have it...
+    expect((await till(input)).body.code).toBe('promotions.code.used-up')
+    // ...until the first payment is cancelled and its seats let go: the use is given back when the code is next used.
     await commit(unit => cancelIntent(unit.view(), sale.body.intentId))
-    expect(await count('SELECT used AS n FROM box_office_promo_codes WHERE code = ?', code)).toBe(0)
-    expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('box-office.promo.unknown')
+    const again = await till(input)
+    expect(again.status, JSON.stringify(again.body)).toBe(200)
+    expect(await count('SELECT used AS n FROM promotions_codes WHERE code = ?', code)).toBe(1)
+    expect(await count("SELECT count(*) AS n FROM promotions_redemptions r JOIN promotions_codes c ON c.id = r.code_id WHERE c.code = ? AND r.state = 'released'", code)).toBe(1)
+    expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('promotions.code.unknown')
   })
 
   it('shows what was sold after the payment, and emails the tickets afterwards', async () => {
@@ -401,7 +411,7 @@ describe('selling at the desk', () => {
   it('keeps a code set "not with member or concession prices" off the concession at the till', async () => {
     const h = await house(5)
     const code = 'NOREQ' + h.performanceId.slice(-6).toUpperCase()
-    await commit(unit => createPromoCode(unit.view(), { code, effect: 'percent_off', value: 2000, notWithRequirements: true }, null))
+    await promoCode(code, { value: 2000, notWithRequirements: true })
     const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }], promoCode: code }
     const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
     expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 960 + 800, panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 960 }, { label: 'Concession', amountMinor: 800 }] }] })

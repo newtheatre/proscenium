@@ -17,7 +17,7 @@ export default defineModule({
   stability: 'experimental',
   requires: ['payments', 'finance'],
   // Form builder joins this list with the checkout questions (R-17), once its module id exists.
-  uses: ['front-of-house', 'communications'],
+  uses: ['front-of-house', 'communications', 'promotions'],
 
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
@@ -70,7 +70,6 @@ export default defineModule({
     'ticket-type': { table: 'box_office_ticket_types' },
     'ticket-preset': { table: 'box_office_ticket_presets' },
     'seating-layout': { table: 'box_office_seating_layouts' },
-    'promo-code': { table: 'box_office_promo_codes' },
     'pass-type': { table: 'box_office_pass_types' },
     'pass': { table: 'box_office_passes', owner: 'account_id' },
     // The requester owns the request; a grant on a performance or its production reaches it.
@@ -104,8 +103,6 @@ export default defineModule({
     'comp.request': ability({ on: 'core.performance' }),
     // Approving issues the tickets. Never your own request.
     'comp.approve': ability({ on: 'box-office.comp-request', risk: 'privileged', owner: 'refuses' }),
-    // Making, limiting and retiring promo codes (BO-17).
-    'promo.manage': ability({}),
     // Setting up passes, their prices and what they cover (BO-64).
     'pass.manage': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
@@ -185,6 +182,8 @@ export default defineModule({
   },
 
   contributes: {
+    // Tickets, as a kind of item a promotion can apply to or require.
+    'promotions.target': [{ id: 'box-office.ticket', file: 'ticket' }],
     // The box office's lines of the privacy notice's "what we hold" table (/policies/privacy).
     // The terms a buyer agrees to by booking. Their text is content/policies/tickets/*.md.
     'core.policy': [
@@ -243,7 +242,6 @@ export default defineModule({
       { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
       { id: 'box-office.reports', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/reports/sales', icon: 'i-lucide-chart-column', ability: 'box-office.report.view', order: 38 },
-      { id: 'box-office.codes', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/codes', icon: 'i-lucide-percent', ability: 'box-office.promo.manage', order: 36 },
       { id: 'box-office.passes', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/passes', icon: 'i-lucide-id-card', ability: 'box-office.pass.manage', order: 37 },
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35, count: 'box-office.comps-waiting' },
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
