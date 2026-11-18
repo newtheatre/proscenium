@@ -15,6 +15,8 @@ const props = defineProps<{
 const model = defineModel<string | null>({ default: '' })
 const { t } = useT()
 const labelledBy = useFieldLabel()
+const input = useTemplateRef<{ $el: HTMLElement }>('input')
+useFieldPartNames(() => input.value?.$el, labelledBy)
 
 function parse(value: string | null | undefined) {
   try { return value ? parseDate(value) : undefined }
@@ -36,6 +38,7 @@ function pick(v: unknown) {
 
 <template>
   <UInputDate
+    ref="input"
     v-model="value"
     :min-value="minValue"
     :max-value="maxValue"

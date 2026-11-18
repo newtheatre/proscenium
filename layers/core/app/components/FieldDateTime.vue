@@ -16,6 +16,8 @@ const props = defineProps<{
 const model = defineModel<number | null>({ default: null })
 const { t } = useT()
 const labelledBy = useFieldLabel()
+const root = useTemplateRef<HTMLElement>('root')
+useFieldPartNames(() => root.value, labelledBy)
 const { zone } = useDates()
 
 const local = (ms: number | null | undefined) => ms === null || ms === undefined ? undefined : toCalendarDateTime(fromAbsolute(ms, zone.value))
@@ -42,7 +44,7 @@ onMounted(() => { elsewhere.value = getLocalTimeZone() !== zone.value })
 </script>
 
 <template>
-  <div>
+  <div ref="root">
     <UInputDate
       v-model="value"
       granularity="minute"
