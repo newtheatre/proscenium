@@ -68,6 +68,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', leaving))
 const more = computed(() => [[
   { label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } },
   { label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` },
+  ...(form.value.liveVersion === null ? [] : [{ label: t('forms.screens.versions.title'), icon: 'i-lucide-history', to: `/console/forms/${form.value.id}/versions` }]),
 ], [
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
   { label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } },
