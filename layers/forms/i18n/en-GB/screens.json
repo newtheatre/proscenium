@@ -783,5 +783,11 @@
   "forms.screens.fields.edit": "Edit the fields",
   "forms.screens.fields.edit-n": "Edit the fields of {name}",
   "forms.screens.fields.new": "New set of fields",
-  "forms.screens.fields.new-help": "Opens the builder. Add the questions, publish, then come back here to attach it."
+  "forms.screens.fields.new-help": "Opens the builder. Add the questions, publish, then come back here to attach it.",
+  "forms.screens.changes.title": "Your response",
+  "forms.screens.changes.not-found": "This link no longer works",
+  "forms.screens.changes.not-found-help": "It has run out, has already been used, or your response has moved on. If you still need to make changes, reply to the email the theatre sent you and quote your reference.",
+  "forms.screens.changes.sent": "Your changes have been sent",
+  "forms.screens.changes.sent-help": "Your reference is still {reference}. This link has now been used, so it no longer works.",
+  "forms.screens.changes.expires": "This link works until {when}. It works once: when you send your changes, it stops working."
 }

@@ -21,6 +21,6 @@ export async function sweepRetention(unit: UnitView, at: number): Promise<number
     params: [at],
   })
   unit.add({ sql: `UPDATE forms_review_assignments SET scores = NULL, comment = NULL WHERE response_id IN (${due})`, params: [at] })
-  unit.add({ sql: `UPDATE forms_responses SET person_id = NULL, respondent_email = NULL, unique_key = NULL, calculated = NULL, stage_note = NULL, decision_reason = NULL, anonymised_at = ?1 WHERE id IN (${due})`, params: [at] })
+  unit.add({ sql: `UPDATE forms_responses SET person_id = NULL, respondent_email = NULL, unique_key = NULL, calculated = NULL, stage_note = NULL, decision_reason = NULL, change_token_hash = NULL, change_token_expires_at = NULL, anonymised_at = ?1 WHERE id IN (${due})`, params: [at] })
   return waiting.n
 }

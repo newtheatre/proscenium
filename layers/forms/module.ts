@@ -41,6 +41,8 @@ export default defineModule({
     'reminders.returned': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
     // How long a review in an open round may be outstanding before the reviewer is reminded, once.
     'reminders.review': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
+    // How long the emailed link for sending changes works, for somebody who answered signed out (R-19).
+    'changes.link-lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'staff' }),
   }),
   settingGroups: {
     limits: { advanced: true },
@@ -151,6 +153,11 @@ export default defineModule({
         wording: { 'en-GB': { subject: '{{ status }}: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is now: **{{ status }}**.\n\n[See your response]({{ link }})' } },
       },
       {
+        // Somebody who answered signed out is sent a fresh single-use link with each return (R-19).
+        id: 'forms.returned-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, link: 'sealed' as const },
+        wording: { 'en-GB': { subject: 'Changes needed: {{ form }}', body: '{{ theatre }} has sent your response to **{{ form }}** ({{ reference }}) back to you for changes.\n\n[See what is asked and make your changes]({{ link }})\n\nThe link is yours alone: do not pass it on. It works once, for sending your changes.' } },
+      },
+      {
         id: 'forms.status-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, status: text },
         wording: { 'en-GB': { subject: '{{ status }}: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is now: **{{ status }}**.\n\nIf you have a question about it, reply to {{ theatre }} and quote your reference.' } },
       },
@@ -170,6 +177,10 @@ export default defineModule({
       {
         id: 'forms.returned-reminder', ...notice, variables: { form: text, reference: text, link: text }, link: '/account/forms',
         wording: { 'en-GB': { subject: 'Still waiting for your changes: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is still back with you for changes.\n\n[See what is asked and make your changes]({{ link }})' } },
+      },
+      {
+        id: 'forms.returned-reminder-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, link: 'sealed' as const },
+        wording: { 'en-GB': { subject: 'Still waiting for your changes: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is still back with you for changes.\n\n[See what is asked and make your changes]({{ link }})\n\nThis link replaces the one we sent before, which no longer works. It is yours alone: do not pass it on.' } },
       },
       {
         id: 'forms.review-reminder', ...notice, variables: { form: text, link: text }, link: '/account/forms',
