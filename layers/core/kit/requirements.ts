@@ -21,7 +21,7 @@ export interface SourceAnswer {
   verdict: 'met' | 'not-met' | 'unavailable'
   /** When a met verdict lapses, in UTC milliseconds, if known. */
   until?: number
-  /** A translated sentence for the person: why not, or what to do. */
+  /** A translated sentence for the person: why not, or what to do. A not-met answer without one is not for this person at all, and a host need not offer it. */
   reason?: string
   /** One short translated sentence for staff, for any verdict. No name, no typed value. */
   summary?: string

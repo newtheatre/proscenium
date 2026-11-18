@@ -7,6 +7,8 @@
      number and its prices one per ticket type. Splitting the house into sections is done on a
      performance's set-up (show walkthrough, decision 4). -->
 <script setup lang="ts">
+// The Wheelchair space and the Access ticket take the lowest price the buyer can have, so neither is priced here.
+const ACCESS_TYPES = ['box-office.wheelchair', 'box-office.access']
 const props = defineProps<{ recordId: string }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -102,7 +104,7 @@ async function saveSeats(confirmOverVenue = false, typed?: Record<string, number
 interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean, managedBy?: string | null }
 const { data: types } = await useAPI<{ ticketTypes: TicketType[] }>('/api/box-office/ticket-types', { key: 'box-office:ticket-types', default: () => ({ ticketTypes: [] }) })
 // As on a performance's set-up: complimentary tickets are never priced, a Wheelchair space follows the others.
-const priced = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary' && type.managedBy !== 'box-office.wheelchair'))
+const priced = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary' && !ACCESS_TYPES.includes(type.managedBy ?? '')))
 const cell = (bandId: string, typeId: string) => `${bandId} ${typeId}`
 const runPrice = (bandId: string, typeId: string) => data.value?.runPrices.find(p => p.bandId === bandId && p.ticketTypeId === typeId)?.amountMinor ?? null
 const prices = ref<Record<string, number | null>>({})
