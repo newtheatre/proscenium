@@ -398,7 +398,7 @@
   "bar.screens.outlets.stock": "Takes stock from",
   "bar.screens.outlets.stock-help": "Each sale here takes its recipes from this location.",
   "bar.screens.product.edit-recipe": "Edit recipe",
-  "bar.screens.product.edit-recipe-of": "Edit the recipe of {size}",
+  "bar.screens.product.edit-recipe-of": "Edit recipe of {size}",
   "bar.screens.product.recipe": "Recipe",
   "bar.screens.product.recipe-add": "Add ingredient",
   "bar.screens.product.recipe-help": "What selling one uses up. Pick a stock item, or one of this product's choices so the option picked supplies the item.",

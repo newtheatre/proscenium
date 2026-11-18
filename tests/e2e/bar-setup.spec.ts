@@ -110,7 +110,7 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   await dialog.getByLabel('Delivered as').fill('tub')
   await dialog.getByLabel('Amount in one').fill('500')
   // Once there are categories, an item needs one, so it is on some count by category.
-  await dialog.getByRole('button', { name: 'Category', exact: true }).click()
+  await dialog.getByRole('button', { name: /^Category\*?$/ }).click()
   await page.getByRole('option', { name: `Snacks ${stamp}` }).click()
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Save' }).click()
@@ -119,7 +119,7 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
 
   await visit(page, `/admin/modules/bar/products/${s.product}`)
   await expect(page.getByText('No recipe: moves no stock')).toBeVisible()
-  await page.getByRole('button', { name: 'Edit the recipe of Each' }).click()
+  await page.getByRole('button', { name: 'Edit recipe of Each' }).click()
   dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: 'Ingredient', exact: true }).click()
   await page.getByRole('option', { name: `Cocoa ${stamp}` }).click()
