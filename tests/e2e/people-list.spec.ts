@@ -64,9 +64,35 @@ test.describe('someone who reads grants', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Who holds what' })).toBeVisible()
     for (const name of ['Current', 'About to lapse', 'Ended']) await expect(page.getByRole('tab', { name })).toBeVisible()
     await noViolations(page)
+    // Reading grants is not giving them.
+    await expect(page.getByRole('button', { name: 'Give a role' })).toHaveCount(0)
     // Someone with a console sees a refusal, not a missing page.
     const response = await page.goto('/console/people')
     expect(response?.status()).toBe(403)
+  })
+})
+
+test.describe('someone who gives roles', () => {
+  test.use(as(['core.grant.read', 'core.grant.manage', 'core.account.search', 'core.account.read', 'core.account.create']))
+
+  test('gives a role from Who holds what and from a person\'s page', async ({ page }) => {
+    await visit(page, '/console/people/grants')
+    await page.getByRole('button', { name: 'Give a role' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Give a role' })).toBeVisible()
+    await expect(dialog.getByText('Person')).toBeVisible()
+    await expect(dialog.getByText('Role', { exact: true })).toBeVisible()
+    // Pressing the button says what is missing, beside each field.
+    await dialog.getByRole('button', { name: 'Give role' }).click()
+    await expect(dialog.getByText(/required|needed/i).first()).toBeVisible()
+    await noViolations(page)
+
+    const name = `Gina Granttest ${Date.now()}`
+    const made = await page.request.post('/api/core/accounts', { data: { name, address: `gina.${Date.now()}@example.org` } })
+    const { id } = await made.json() as { id: string }
+    await visit(page, `/console/people/${id}`)
+    await page.getByRole('button', { name: 'Give a role' }).click()
+    await expect(page.getByRole('dialog').getByRole('heading', { name: `Give ${name} a role` })).toBeVisible()
   })
 })
 

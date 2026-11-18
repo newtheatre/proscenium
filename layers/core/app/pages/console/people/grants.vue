@@ -1,9 +1,10 @@
 <!-- Who holds what (Identity Doc part 5; ID-23, ID-24): every grant in force, waiting or about to
-     lapse, with its holder, role, reach and end. Ended grants are a view away. Renew several at once
-     or end one, when the viewer manages grants. -->
+     lapse, with its holder, role, reach and end. Ended grants are a view away. Give a role, renew
+     several at once or end one, when the viewer manages grants. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { grantsList } from '../../../../shared/identity-lists'
+import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
 
 definePageMeta({ layout: 'console' })
 
@@ -16,7 +17,8 @@ const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { day } = useDates()
-const { data: options } = await useAPI<{ roles: { id: string, name: string }[], modules: string[], manage: boolean }>('/api/core/grants/options', { key: 'core:grants:options', default: () => ({ roles: [], modules: [], manage: false }) })
+const { data: options } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:grants:options', default: () => ({ roles: [], modules: [], manage: false, yearEnd: null, allowNoExpiry: false }) })
+const giving = ref(false)
 
 const TONES = { live: 'success', pending: 'info', lapsing: 'warning', ended: 'neutral' } as const
 const stateLabel = (state: State) => t(`core.grants.state.${state}`)
@@ -79,6 +81,16 @@ const bulkActions = computed(() => options.value?.manage
     :bulk-actions="bulkActions"
     :empty="{ title: t('core.grants.empty.title'), description: t('core.grants.empty.description'), icon: 'i-lucide-key-round' }"
   >
+    <template
+      v-if="options?.manage"
+      #primary
+    >
+      <UButton
+        icon="i-lucide-user-plus"
+        :label="t('core.grants.give.open')"
+        @click="giving = true"
+      />
+    </template>
     <template #cell-person="{ row }">
       {{ row.person }}
     </template>
@@ -97,5 +109,11 @@ const bulkActions = computed(() => options.value?.manage
         :label="stateLabel(row.state)"
       />
     </template>
+    <GiveRoleDialog
+      v-if="options?.manage"
+      v-model:open="giving"
+      :options="options"
+      @changed="refreshNuxtData('core:list:/api/core/grants/held')"
+    />
   </PageList>
 </template>
