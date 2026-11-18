@@ -690,5 +690,19 @@
   "box-office.setup.run.opened.one": "1 performance put on sale",
   "box-office.setup.run.opened.other": "{count} performances put on sale",
   "box-office.setup.run.open-skipped.one": "1 is not ready: open it to see what is missing.",
-  "box-office.setup.run.open-skipped.other": "{count} are not ready: open each to see what is missing."
+  "box-office.setup.run.open-skipped.other": "{count} are not ready: open each to see what is missing.",
+  "box-office.production-tickets.own-seats": "Own seats",
+  "box-office.production-tickets.open-set-up": "Open a performance's set-up",
+  "box-office.production-tickets.run-seats.title": "Seats for the run",
+  "box-office.production-tickets.run-seats.description": "How many of each section every performance sells. To give one night different seats, change them on its own set-up.",
+  "box-office.production-tickets.run-seats.own.one": "1 performance has seats of its own and keeps them. The rest follow these.",
+  "box-office.production-tickets.run-seats.own.other": "{count} performances have seats of their own and keep them. The rest follow these.",
+  "box-office.production-tickets.run-seats.no-sections": "There are no sections yet.",
+  "box-office.production-tickets.run-seats.save": "Save seats for the run",
+  "box-office.production-tickets.run-seats.saved.one": "Seats saved for 1 performance",
+  "box-office.production-tickets.run-seats.saved.other": "Seats saved for {count} performances",
+  "box-office.production-tickets.run-seats.skipped.one": "1 performance was left as it was: it has sold more than that, or its space holds fewer.",
+  "box-office.production-tickets.run-seats.skipped.other": "{count} performances were left as they were: they have sold more than that, or their spaces hold fewer.",
+  "box-office.production-tickets.run-prices.description": "What each ticket type costs in each section at every performance. Leave one empty not to sell it. To charge one night differently, or to change prices from a later date, use that performance's set-up.",
+  "box-office.production-tickets.price": "price"
 }

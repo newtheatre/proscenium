@@ -105,3 +105,35 @@ describe('the whole run at once', () => {
     expect(await salesState(h.performanceId)).toBe('on_sale')
   })
 })
+
+describe('the Tickets tab', () => {
+  it('sets the run\'s seats once, keeps a night\'s own seats, and lists the run\'s prices', async () => {
+    const h = await house(10, { open: false })
+    await deliver()
+    const venue = (await req('POST', '/api/core/venues', { name: 'Tab venue' })).body
+    const a = await newPerformance(h.productionId, venue, 6, false)
+    const b = await newPerformance(h.productionId, venue, 7, false)
+    await req('PUT', `/api/box-office/performances/${a}/sales`, { pools: [{ bandId: h.bandId, capacity: 10 }] })
+    // One night has seats of its own.
+    await req('PUT', `/api/box-office/performances/${b}/sales`, { pools: [{ bandId: h.bandId, capacity: 4 }] })
+    const before = (await req('GET', `/api/box-office/productions/${h.productionId}/tickets`)).body
+    expect(before.runSeats).toEqual({ [h.bandId]: 10 })
+    expect(before.performances.find((p: { id: string }) => p.id === b).ownSeats).toBe(true)
+
+    const set = await req('PUT', `/api/box-office/productions/${h.productionId}/sales/seats`, { pools: [{ bandId: h.bandId, capacity: 25 }] })
+    expect(set.status, JSON.stringify(set.body)).toBe(200)
+    expect(set.body).toMatchObject({ done: 2, skipped: [] })
+    expect(set.body.performanceIds.sort()).toEqual([h.performanceId, a].sort())
+    expect(await pools(h.performanceId)).toEqual([{ name: 'Stalls', capacity: 25 }])
+    expect(await pools(b)).toEqual([{ name: 'Stalls', capacity: 4 }])
+
+    // Undo names the nights it changed, so the night with its own seats is not touched.
+    await req('PUT', `/api/box-office/productions/${h.productionId}/sales/seats`, { pools: [{ bandId: h.bandId, capacity: 10 }], performanceIds: set.body.performanceIds })
+    expect(await pools(a)).toEqual([{ name: 'Stalls', capacity: 10 }])
+
+    await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 1100 }] })
+    const after = (await req('GET', `/api/box-office/productions/${h.productionId}/tickets`)).body
+    expect(after.runPrices).toEqual([{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 1100 }])
+    expect(after.sections.map((x: { name: string }) => x.name)).toEqual(['Stalls'])
+  })
+})
