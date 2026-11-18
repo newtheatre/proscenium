@@ -31,10 +31,12 @@ export default defineModule({
     'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', change, audience: 'staff' }),
     'allergens.statement': setting.text({ default: '', maxLength: 400, multiline: true, change, audience: 'public' }),
     'allergens.publish': setting.boolean({ default: true, change, audience: 'staff' }),
-    // Stocktakes (tab 3, "A stocktake"): whether counters see the expected level, and how small a
-    // difference the person who counted may approve themselves.
+    // Stocktakes (tab 3, "A stocktake"): whether counters see the expected level, how small a
+    // difference the person who counted may approve themselves, and above what value a line's
+    // difference needs a reason before the count is approved.
     'stocktake.blind': setting.boolean({ default: false, change, audience: 'staff' }),
     'stocktake.self-approve-under': setting.money({ default: 2000, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
+    'stocktake.reason-over': setting.money({ default: 1000, min: 0, max: 100000, change, audience: 'staff' }),
   }),
 
   records: defineRecords('bar', {

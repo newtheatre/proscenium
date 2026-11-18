@@ -15,6 +15,8 @@
   "bar.settings.stocktake.blind.help": "Counters see only what they count, so the count is not led by the figure on the screen. The approver sees both.",
   "bar.settings.stocktake.self-approve-under.label": "A counter may approve their own count when the difference is at most",
   "bar.settings.stocktake.self-approve-under.help": "Above this value, someone other than the person who submitted the count must approve it. The value is at each item's last pack cost.",
+  "bar.settings.stocktake.reason-over.label": "A difference needs a reason when it is worth more than",
+  "bar.settings.stocktake.reason-over.help": "A line of a count whose difference is worth more than this, at the item's last pack cost, cannot be approved until it has a reason.",
   "bar.abilities.sale.sell.label": "Sell from the bar in the till",
   "bar.abilities.opening.manage.label": "Close an outlet's trading",
   "bar.abilities.settings.manage.label": "Change the bar settings",
