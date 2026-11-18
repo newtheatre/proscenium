@@ -43,7 +43,7 @@ onMounted(() => { elsewhere.value = getLocalTimeZone() !== zone.value })
 
 <template>
   <div>
-    <UInputDate
+    <FieldDateParts
       v-model="value"
       granularity="minute"
       :hour-cycle="24"
@@ -76,7 +76,7 @@ onMounted(() => { elsewhere.value = getLocalTimeZone() !== zone.value })
           </template>
         </UPopover>
       </template>
-    </UInputDate>
+    </FieldDateParts>
     <p
       v-if="elsewhere"
       class="mt-1 text-xs text-muted"
