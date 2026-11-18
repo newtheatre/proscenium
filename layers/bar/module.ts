@@ -55,11 +55,13 @@ export default defineModule({
     // Outlets: the places that sell, and the list each sells from.
     'outlet.manage': ability(),
     // Stock items, where they are kept, and what each size uses up.
-    'stock.manage': ability(),
+    'stock.manage': ability({ implies: ['stock.view'] }),
+    // See how much each location holds, and how it moved.
+    'stock.view': ability(),
     // Record deliveries and move stock between locations.
-    'stock.receive': ability(),
+    'stock.receive': ability({ implies: ['stock.view'] }),
     // Write stock off as wasted, with a reason.
-    'stock.waste': ability(),
+    'stock.waste': ability({ implies: ['stock.view'] }),
     // Use the bar's panel in the till, at an outlet.
     'sale.sell': ability({ on: 'bar.outlet' }),
     // Close an outlet's opening; the person who opened it may close it.
@@ -167,6 +169,8 @@ export default defineModule({
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
       { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: 'bar.sale.view', order: 15 },
+      { id: 'bar.stock-levels', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stock', icon: 'i-lucide-package', ability: 'bar.stock.view', order: 25 },
+      { id: 'bar.deliveries', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/deliveries', match: '/console/bar/deliveries', icon: 'i-lucide-truck', ability: 'bar.stock.receive', order: 26 },
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
       { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
       { id: 'bar.choices', menu: 'admin', group: 'modules', to: '/admin/modules/bar/choices', icon: 'i-lucide-list-checks', ability: 'bar.product.manage', order: 15 },
