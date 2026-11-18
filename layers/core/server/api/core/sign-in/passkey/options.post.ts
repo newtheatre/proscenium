@@ -3,6 +3,6 @@ import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { authenticationOptions } from '../../../../identity/passkeys'
 
-export default defineRoute({ public: true, rateLimit: 'sign-in', input: z.object({}) }, async (event, { unit }) => {
+export default defineRoute({ public: true, rateLimit: 'sign-in-network', input: z.object({}) }, async (event, { unit }) => {
   return authenticationOptions(unit, event, { purpose: 'sign_in', accountId: null })
 })
