@@ -7,12 +7,13 @@
 import { sql } from 'drizzle-orm'
 import { first, nowMs, type UnitView } from '#kit'
 import { accountLabel } from '#modules/core'
-import type { Part, Settlement } from '#modules/payments'
+import type { Destination, Part, Settlement } from '#modules/payments'
 import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
 import { exchangeOrder, isExchangeRecord, releaseExchange, settleExchange } from '../../exchange'
 import { passSalesMinor } from '../../pass-sales'
 import { liveLines, ORDER, type OrderRow } from '../../orders'
+import { deskReceiptLink } from '../../desk'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
 const PASS_INCOME = { key: 'box-office.pass-income' }
@@ -31,6 +32,12 @@ export default {
     // Money for a pass is income when it is paid, in a line of its own, not shared between performances.
     const passMinor = await passSalesMinor(order.id)
     return [...await tagged(DEFERRED, totals, -1), ...(passMinor ? [{ account: PASS_INCOME, amountMinor: -passMinor, performanceId: null }] : [])]
+  },
+
+  // The till's receipt carries a desk sale's tickets: the booking joins the buyer and the receipt links to it.
+  async receiptLink(unit: UnitView, part: Part, to: Destination[]) {
+    if (isExchangeRecord(part.record)) return null
+    return deskReceiptLink(unit, part.record, to)
   },
 
   // The money for cancelled tickets has gone back: it is no longer owed to the audience.

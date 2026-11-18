@@ -13,7 +13,16 @@ export interface Part {
   record: string
   amountMinor: number
   currency: string
+  /**
+   * For a till sale split between people by item: who paid for which of this part's summary lines
+   * (by index, and by the line's `key` where the panel gave one), with the address each person gave
+   * for their receipt. Absent when the sale was not split.
+   */
+  splits?: { position: number, receiptTo: string | null, receiptAccountId: string | null, items: { line: number, key: string | null, quantity: number }[] }[]
 }
+
+/** Where a till receipt goes: a person the seller found, or an address they typed. */
+export type Destination = { accountId: string, email?: undefined } | { email: string, accountId?: undefined }
 
 /**
  * An owner's ledger entry for its part. The owner's entries total exactly the part's amount as
@@ -33,6 +42,15 @@ export interface Settlement {
    * completed). Refusing, by throwing or by a guard that fails in the batch, settles nothing.
    */
   settle: (unit: UnitView, part: Part) => Promise<OwnerEntry[]> | OwnerEntry[]
+  /**
+   * The till is sending receipts for a sale that includes this part, to these people (one for the
+   * whole sale, or each person of a split sale whose items include it). An owner with something to
+   * show them, such as their tickets, joins its record to them in the unit and gives one link to put
+   * on each receipt, so a till sale sends one email, never a receipt and a separate message. Null
+   * when it has nothing to add. Called in the unit that settles the sale, after `settle`, or later
+   * when the seller sends a receipt someone asked for after paying.
+   */
+  receiptLink?: (unit: UnitView, part: Part, to: Destination[]) => Promise<{ label: string, url: string } | null>
   /** A refund of this part succeeded: return the entries that undo the income it refunds. */
   refunded: (unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) => Promise<OwnerEntry[]> | OwnerEntry[]
   /**

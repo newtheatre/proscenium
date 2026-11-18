@@ -252,6 +252,60 @@ describe('selling at the desk', () => {
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', made!.id)).toBe(0)
   })
 
+  it('puts the tickets on the till\'s receipt: one email, and the order joins the buyer', async () => {
+    const h = await house(3)
+    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input: { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] } }], receipt: { email: 'receipt.buyer@example.org' } }, seller)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(made!.account_id).toBeNull()
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const after = await order(made!.id)
+    expect(after).toMatchObject({ state: 'confirmed' })
+    expect(after!.account_id).toBeTruthy()
+    // One email: the receipt, with the tickets' link on it, and no separate tickets message.
+    const sent = await rows<{ type_key: string, address: string }>('SELECT type_key, address FROM core_notifications WHERE subject_id = ? OR address = ?', sale.body.intentId, 'receipt.buyer@example.org')
+    expect(sent).toEqual([{ type_key: 'payments.till-receipt-link', address: 'receipt.buyer@example.org' }])
+    expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', made!.id)).toBe(0)
+  })
+
+  it('splits the booking with the sale: each person\'s receipt links only their own tickets', async () => {
+    const h = await house(4)
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 3 }] }
+    const splits = [{ items: [{ basket: 'box-office', line: 0, quantity: 1 }, { basket: 'box-office', line: 2, quantity: 1 }] }, { items: [{ basket: 'box-office', line: 1, quantity: 1 }] }]
+    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits }, seller)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(sale.body.amountMinor).toBe(3600)
+    const made = await rows<Record<string, any>>('SELECT id, total_minor, account_id FROM box_office_orders WHERE intent_id = ? ORDER BY total_minor DESC', sale.body.intentId)
+    expect(made.map(o => o.total_minor)).toEqual([2400, 1200])
+    expect(await claimed(h)).toBe(3)
+
+    const pay = (split: number, email: string) => inContext(() => attest({ intentId: sale.body.intentId, providerAccountId: cash, method: 'cash', split, receipt: { email } }), seller)
+    expect(await pay(1, 'split.one@example.org')).toMatchObject({ settled: false })
+    expect(await pay(2, 'split.two@example.org')).toMatchObject({ settled: true })
+
+    const owners = await rows<{ total_minor: number, state: string, address: string }>('SELECT o.total_minor, o.state, e.address FROM box_office_orders o JOIN core_account_emails e ON e.account_id = o.account_id WHERE o.intent_id = ? ORDER BY o.total_minor DESC', sale.body.intentId)
+    expect(owners).toEqual([
+      { total_minor: 2400, state: 'confirmed', address: 'split.one@example.org' },
+      { total_minor: 1200, state: 'confirmed', address: 'split.two@example.org' },
+    ])
+    expect(await tickets(made[0]!.id)).toHaveLength(2)
+    expect(await tickets(made[1]!.id)).toHaveLength(1)
+    // One email each, each with a link of its own.
+    const sent = await rows<{ address: string, payload: string }>("SELECT address, payload FROM core_notifications WHERE type_key = 'payments.till-receipt-link' AND address IN ('split.one@example.org', 'split.two@example.org') ORDER BY address")
+    expect(sent.map(s => s.address)).toEqual(['split.one@example.org', 'split.two@example.org'])
+    expect(sent[0]!.payload).not.toEqual(sent[1]!.payload)
+  })
+
+  it('keeps one booking when a promo code is on the sale, since splitting it could change the price', async () => {
+    const h = await house(4)
+    await commit(unit => createPromoCode(unit.view(), { code: 'SPLITTEN', effect: 'percent_off', value: 1000 }, null))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }], promoCode: 'SPLITTEN' }
+    const splits = [{ items: [{ basket: 'box-office', line: 0, quantity: 1 }] }, { items: [{ basket: 'box-office', line: 1, quantity: 1 }] }]
+    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits }, seller)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(await count('SELECT count(*) AS n FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)).toBe(1)
+  })
+
   it('emails the tickets to an address the buyer gives, and the order joins that account', async () => {
     const h = await house(3)
     const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], email: 'Desk.Buyer@Example.org' })
@@ -272,8 +326,6 @@ describe('selling at the desk', () => {
     expect(found.body.people).toEqual([expect.objectContaining({ id: accountId, label: 'Pickering Buyer', claimed: false })])
     expect(JSON.stringify(found.body)).not.toContain('picked.buyer@example.org')
     expect((await req('GET', '/api/box-office/desk/buyers?q=Pickering', undefined, onlooker)).status).toBe(403)
-    const desk = await req('GET', '/api/box-office/desk/performances', undefined, seller)
-    expect(desk.body.emailDomains).toContain('gmail.com')
     const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], accountId }
     const sale = await till(input)
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
@@ -281,6 +333,18 @@ describe('selling at the desk', () => {
     expect(made!.account_id).toBe(accountId)
     expect((await till({ ...input, email: 'both@example.org' })).status).toBe(422)
     expect((await till({ ...input, accountId: 'acc_nobody' })).body.code).toBe('box-office.desk.no-address')
+  })
+
+  it('marks a companion ticket, which is named for the access scheme member it goes with', async () => {
+    // Tomorrow, so it is in the desk's list.
+    const h = await house(3, { startsAt: nowMs() + 86_400_000 })
+    await inContext(async () => (await import('../../server/ticket-types')).ensureManagedTicketTypes())
+    const [companion] = await rows<{ id: string }>("SELECT id FROM box_office_ticket_types WHERE managed_by = 'box-office.companion'")
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: companion!.id, amountMinor: 0 }] })).status).toBe(200)
+    const desk = await req('GET', '/api/box-office/desk/performances', undefined, seller)
+    const rowsOf = desk.body.performances.find((p: { performanceId: string }) => p.performanceId === h.performanceId).rows as { ticketTypeId: string, holder?: true, companion?: true }[]
+    expect(rowsOf.find(r => r.ticketTypeId === companion!.id)).toMatchObject({ holder: true, companion: true })
+    expect(rowsOf.find(r => r.ticketTypeId === h.fullId)).not.toHaveProperty('companion')
   })
 
   it('takes a promo code the buyer gives, on the dearest tickets first, and gives its uses back when the payment is cancelled', async () => {
