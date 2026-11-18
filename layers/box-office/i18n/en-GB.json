@@ -1,4 +1,6 @@
 {
+  "box-office.upcoming.tickets.one": "{count} ticket",
+  "box-office.upcoming.tickets.other": "{count} tickets",
   "box-office.module.name": "Box office",
   "box-office.records.order": "Order",
   "box-office.figures.sold": "Sold",

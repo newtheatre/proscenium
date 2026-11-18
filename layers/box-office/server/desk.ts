@@ -11,11 +11,14 @@ import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, se
 import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
-import { entitle } from './entitlement'
+import { entitle, holderVerdict } from './entitlement'
+import { signing } from '#kit/signing'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
+import { DOOR_CODE_PURPOSE, signedPart } from './tickets'
+import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
@@ -27,7 +30,8 @@ import { salesOf } from './setup'
 const DESK_HOLD = 30 * 60_000 // not-policy: as long as the till keeps a payment open; Payments ends the hold, not this time
 
 // `references`: a buyer's student IDs or member numbers, typed by the seller in place of checking by hand.
-const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500), references: z.array(z.string().max(64)).max(500).optional() }).strict() // not-policy: the setting's own ceiling; the longest reference any list holds
+// `holders`: the account named for each ticket of a type with requirements, found by card or by name.
+const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500), references: z.array(z.string().max(64)).max(500).optional(), holders: z.array(z.string().max(64)).max(500).optional() }).strict() // not-policy: the setting's own ceiling; the longest reference any list holds
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
@@ -297,9 +301,11 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   const sellable = await sellableTypes()
   if (retype.some(r => sellable.get(r.ticketTypeId)?.kind === 'complimentary' || !sellable.has(r.ticketTypeId)))
     refuse('box-office.price.none', 'That kind of ticket is not sold for this part of the house.', { status: 422 })
-  const retyped = retype.length ? await entitle(performanceId, retype.map(r => ({ ticketTypeId: r.ticketTypeId })), sellable, { channel: 'desk', account: null }) : null
+  // A ticket that needs its holder named is the booking's buyer's.
+  const holder = order.account_id ? await canonicalAccount(order.account_id) : null
+  const retyped = retype.length ? await entitle(performanceId, retype.map(r => ({ ticketTypeId: r.ticketTypeId })), sellable, { channel: 'desk', account: holder }) : null
   retyped?.guard(unit)
-  const added = add.length ? await pricedLines(performanceId, add, at, { channel: 'desk', account: null }) : null
+  const added = add.length ? await pricedLines(performanceId, add, at, { channel: 'desk', account: holder }) : null
   added?.guard(unit)
   const after = [...kept, ...(added?.lines ?? []).map(l => ({ typeId: l.ticketTypeId, amountMinor: l.amountMinor }))]
   if (!after.length) refuse('box-office.desk.nothing-left', 'That would leave nothing on the reservation.', { status: 422, remedy: 'Release the reservation instead.' })
@@ -394,8 +400,11 @@ export interface DeskPerformance {
   startsAt: number
   state: string
   currency: string | null
-  /** `reference`, on a member price: what the buyer may give instead of the seller checking by hand, worded by its source. */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }[]
+  /**
+   * `reference`, on a member price: what the buyer may give instead of the seller checking by hand,
+   * worded by its source. `holder`: each ticket is for someone who qualifies, named at the till.
+   */
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }[]
 }
 
 /**
@@ -432,7 +441,7 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       currency: available.currency,
       rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map((x) => {
         const reference = referenceOf(x.ticketTypeId)
-        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}) }
+        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}), ...(refsOf.get(x.ticketTypeId)?.length ? { holder: true as const } : {}) }
       })),
     }
   }))
@@ -496,4 +505,52 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
   await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}` })
   unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
   return { buyer: await accountLabel(accountId) }
+}
+
+export interface DeskHolder {
+  accountId: string
+  /** Who they are, as Identity names them, so the seller can see they have the right person. */
+  label: string
+  /** Whether they may have this ticket: met by their account, or not, with the source's words. */
+  met: boolean
+  reason: string | null
+  /** Whether this seller may sell it to them anyway, having checked by hand. */
+  mayOverride: boolean
+}
+
+/**
+ * The holder named for a ticket of a type with requirements, at the till (Matt, 17 November): by a
+ * card scanned, such as a membership card, whose module says whose it is, or a person found by name.
+ * Says whether they qualify, so the seller knows before taking payment; the sale checks again.
+ */
+export async function deskHolder(input: { performanceId: string, ticketTypeId: string, code?: string, accountId?: string }): Promise<DeskHolder> {
+  const actor = useContext().actor
+  await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.performanceId])
+  const type = (await sellableTypes()).get(input.ticketTypeId)
+  if (!type || !type.requirementRefs.length) refuse('box-office.ticket-type.not-found', 'That kind of ticket does not need its holder named.', { status: 422 })
+  let found: string | null = null
+  if (input.code) {
+    const parts = input.code.trim().split('.')
+    const kind = parts.length === 4 ? await doorCodeKind(parts[0]!) : null // not-policy: kind, key id, code and signature
+    const [k, keyId, random, signature] = parts as [string, string, string, string]
+    if (!kind?.holder || !await signing.verify(DOOR_CODE_PURPOSE, keyId, signedPart(k, keyId, random), signature))
+      refuse('box-office.desk.card-unknown', 'That is not a card we can read for this.', { status: 422, remedy: 'Find them by name instead.', fields: { holder: 'unknown' } })
+    found = await kind.holder(random)
+    if (!found) refuse('box-office.desk.card-unknown', 'That card is not known.', { status: 422, remedy: 'Find them by name instead.', fields: { holder: 'unknown' } })
+  }
+  else if (input.accountId) {
+    found = input.accountId
+  }
+  else {
+    refuse('box-office.desk.bad-input', 'Scan their card or find them by name.', { status: 422 })
+  }
+  const accountId = await canonicalAccount(found!)
+  const verdict = await holderVerdict(input.performanceId, type, accountId)
+  return {
+    accountId,
+    label: await accountLabel(accountId),
+    met: !!verdict.met,
+    reason: verdict.met ? null : verdict.reason ?? (verdict.unavailable ? `${type.name} tickets cannot be checked just now.` : `This person does not qualify for ${type.name} tickets, as far as we can tell.`),
+    mayOverride: !verdict.met && (await can(actor, 'box-office.ticket-type.override-requirement', ['core.performance', input.performanceId])).allowed,
+  }
 }

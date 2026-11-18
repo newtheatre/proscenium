@@ -3,11 +3,12 @@
 // check-in: it is a record of attendance, not a key.
 import { all, can, first, newId, nowMs, refuse, usePoint, useSetting, type Actor, type UnitView } from '#kit'
 import { sql } from 'drizzle-orm'
-import { accountLabel, getPerformance } from '#modules/core'
+import { accountLabel, canonicalAccount, getPerformance } from '#modules/core'
 import { AUTHORITY_STATES, type TIMING_KINDS } from './db/schema'
 import { shiftsOf } from './shifts'
 import { runsFor } from './checklists'
 import type { TonightFigure } from './points/tonight-figure'
+import type { TonightNeed, TonightNeeds } from './points/tonight-needs'
 
 export type TimingKind = typeof TIMING_KINDS[number]
 
@@ -44,6 +45,18 @@ export async function checkIn(unit: UnitView, assignmentId: string): Promise<voi
   if (row.state !== 'checked_in') unit.audit({ action: 'state', record: ['front-of-house.assignment', assignmentId], detail: { from: row.state, to: 'checked_in' } })
 }
 
+/**
+ * Someone leading records that a person on tonight's rota is not coming, so they are not chased and
+ * sign-off does not count them. Only while they have not arrived.
+ */
+export async function markNotComing(unit: UnitView, assignmentId: string, by: string): Promise<void> {
+  const at = nowMs()
+  unit.add(sql`UPDATE front_of_house_assignments SET state = 'no_show', minutes_worked = NULL, ended_at = ${at}, ended_by = ${by}, updated_at = ${at}
+    WHERE id = ${assignmentId} AND state IN ('confirmed', 'release_requested')`)
+    .expect(1, { code: 'front-of-house.assignment-ended', reason: 'This person has arrived or is no longer on the shift.' })
+  unit.audit({ action: 'state', record: ['front-of-house.assignment', assignmentId], detail: { to: 'no_show', notComing: true } })
+}
+
 // ---------------------------------------------------------------------------------------------
 // Timings (FH-22)
 
@@ -65,6 +78,12 @@ export async function recordTiming(unit: UnitView, input: { performanceId: strin
     ON CONFLICT (performance_id, kind) DO UPDATE SET at = excluded.at, recorded_by = excluded.recorded_by, updated_at = excluded.updated_at`)
     .expect(1, { code: 'front-of-house.checklists-open', reason: 'A checklist for before the show is not finished yet.', remedy: 'Finish the checklist, or note what could not be done, then open the house.' })
   unit.audit({ action: 'update', record: ['core.performance', input.performanceId], detail: { timing: input.kind, at } })
+}
+
+/** Takes back a recorded moment, as Undo does straight after a tap. Audited; a second clear changes nothing. */
+export function clearTiming(unit: UnitView, input: { performanceId: string, kind: TimingKind }): void {
+  unit.add(sql`DELETE FROM front_of_house_timings WHERE performance_id = ${input.performanceId} AND kind = ${input.kind}`)
+  unit.audit({ action: 'update', record: ['core.performance', input.performanceId], detail: { timing: input.kind, cleared: true } })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -106,7 +125,7 @@ export async function readFigure(figure: TonightFigure, performanceId: string): 
 export interface Board {
   performance: { id: string, title: string, startsAt: number, endsAt: number, venueId: string, venueName: string, spaceName: string }
   windowClosesAt: number | null
-  shifts: { id: string, dutyName: string, isLead: boolean, callAt: number, places: number, people: { assignmentId: string, name: string, state: string, checkedInAt: number | null, notArrived: boolean }[] }[]
+  shifts: { id: string, dutyName: string, isLead: boolean, callAt: number, places: number, people: { assignmentId: string, name: string, state: string, checkedInAt: number | null, notArrived: boolean, phone: string | null }[] }[]
   timings: { kind: string, at: number }[]
   checklists: Awaited<ReturnType<typeof runsFor>>
   figures: ({ id: string, label: string, order: number } & FigureAnswer)[]
@@ -121,7 +140,13 @@ export async function board(performanceId: string, actor: Actor): Promise<Board>
   const people = await all<{ id: string, shift_id: string, account_id: string, state: string, checked_in_at: number | null }>(
     `SELECT a.id, a.shift_id, a.account_id, a.state, a.checked_in_at FROM front_of_house_assignments a JOIN front_of_house_shifts s ON s.id = a.shift_id
       WHERE s.performance_id = ? AND a.state IN (${[...AUTHORITY_STATES, 'worked', 'no_show'].map(s => `'${s}'`).join(', ')}) ORDER BY a.created_at`, performanceId)
-  const named = await Promise.all(people.map(async p => ({ ...p, name: await accountLabel(p.account_id) })))
+  // The lead may ring someone who has not come: the phone number is for them alone (NI-4).
+  const lead = (await can(actor, 'front-of-house.assignment.check-in', ['core.performance', performanceId])).allowed
+  const named = await Promise.all(people.map(async p => ({
+    ...p,
+    name: await accountLabel(p.account_id),
+    phone: lead ? (await first<{ phone: string | null }>('SELECT phone FROM core_accounts WHERE id = ?', await canonicalAccount(p.account_id)))?.phone ?? null : null,
+  })))
   const timings = await all<{ kind: string, at: number }>('SELECT kind, at FROM front_of_house_timings WHERE performance_id = ? ORDER BY at', performanceId)
   const figures: Board['figures'] = []
   for (const contribution of await usePoint<TonightFigure>('front-of-house.tonight-figure')) {
@@ -136,7 +161,7 @@ export async function board(performanceId: string, actor: Actor): Promise<Board>
     shifts: shifts.map(s => ({
       id: s.id, dutyName: s.dutyName, isLead: s.isLead, callAt: s.callAt, places: s.places,
       people: named.filter(p => p.shift_id === s.id).map(p => ({
-        assignmentId: p.id, name: p.name, state: p.state, checkedInAt: p.checked_in_at,
+        assignmentId: p.id, name: p.name, state: p.state, checkedInAt: p.checked_in_at, phone: p.phone,
         // A prompt to the lead, not a state.
         notArrived: p.state !== 'checked_in' && (AUTHORITY_STATES as readonly string[]).includes(p.state) && now > s.callAt + late * SECOND,
       })),
@@ -145,4 +170,29 @@ export async function board(performanceId: string, actor: Actor): Promise<Board>
     checklists: await runsFor(performanceId, performance.venueId),
     figures,
   }
+}
+
+/**
+ * Tonight's needs from every module that gives them, for someone leading the night (AC-1). The
+ * caller has checked that; a contribution that fails or is slow is left out rather than holding the
+ * board up.
+ */
+export async function tonightNeeds(unit: UnitView, performanceId: string): Promise<TonightNeed[]> {
+  const out: TonightNeed[] = []
+  for (const contribution of await usePoint<TonightNeeds>('front-of-house.tonight-needs')) {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const late = new Promise<TonightNeed[]>((resolve) => {
+        timer = setTimeout(() => resolve([]), FIGURE_BUDGET)
+      })
+      out.push(...await Promise.race([Promise.resolve(contribution.value.read(unit, performanceId)), late]))
+    }
+    catch {
+      // Left out: the board never fails for another module's part.
+    }
+    finally {
+      clearTimeout(timer)
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
 }
