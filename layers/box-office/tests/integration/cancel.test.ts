@@ -9,6 +9,7 @@ import { resetRateLimits } from '#kit/ratelimit'
 import { listTerms } from '#modules/core'
 import { addAttempt } from '../../../payments/server/answers'
 import { approveRefund, recordAnswer } from '../../../payments/server/services'
+import { describeRefunds } from '../../../payments/server/refunds'
 import { world } from '../../../../tests/fixtures/modules/cardco/server/contributions/payments.provider/cardco'
 import { deliver, env, inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import recogniseIncome from '../../server/tasks/recognise-income'
@@ -156,6 +157,10 @@ describe('cancelling tickets on a paid order', () => {
     expect(await claimed(h)).toBe(1)
     await deliver()
     expect(await rows('SELECT state FROM payments_refunds WHERE id = ?', done.body.refund.id)).toEqual([{ state: 'requested' }])
+    // Refunds names the order it is for, with its reference and a link to it.
+    const [reference] = await rows<{ reference: string }>('SELECT reference FROM box_office_orders WHERE id = ?', o.orderId)
+    const [summary] = await inContext(() => describeRefunds([done.body.refund.id]))
+    expect(summary!.owner).toMatchObject({ module: 'box-office', record: o.orderId, reference: reference!.reference, to: `/console/box-office/orders/${o.orderId}` })
     await expect(commit(unit => approveRefund(unit.view(), done.body.refund.id, boxOfficeManager.accountId!))).rejects.toMatchObject({ code: 'payments.refund.own' })
     await commit(unit => approveRefund(unit.view(), done.body.refund.id, newId('acc')))
     await deliver()
@@ -215,6 +220,33 @@ describe('a buyer cancelling paid tickets from their link', () => {
   const view = (token: string) => req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': token })
   const byBuyer = (token: string, body: Record<string, unknown> = {}) => req('POST', '/api/box-office/orders/link/cancel', body, null, { 'x-order-token': token })
   beforeAll(() => setClock(NOV_16))
+
+  it('lets free tickets go without the theatre switching it on, until the performance starts', async () => {
+    const HOUR = 3_600_000
+    const h = await house(4, { startsAt: NOV_16 + 30 * HOUR })
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 0 }] })).status).toBe(200)
+    const made = await buy(h, 2)
+    if (!made.ok) throw new Error(made.code)
+    const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/checkout`, { expectedTotalMinor: 0, email: `free${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
+    expect(done.body.state, JSON.stringify(done.body)).toBe('confirmed')
+    const [row] = await rows<{ sealed_variables: string, payload: string }>("SELECT sealed_variables, payload FROM core_notifications WHERE type_key IN ('box-office.order-confirmed', 'box-office.order-confirmed-guest') AND subject_id = ?", made.basket.orderId)
+    const told = { ...JSON.parse(row!.payload), ...JSON.parse((await inContext(() => openSpecial(row!.sealed_variables)))!) } as { link: string, paid: string }
+    // The email says the tickets are free, not that nothing was paid for them.
+    expect(told.paid).toBe('Free')
+    const token = told.link.slice(told.link.lastIndexOf('/') + 1)
+    // Until the performance starts, with no fee: there is nothing to refund.
+    expect((await view(token)).body.buyerCancel).toEqual({ feeMinor: 0, until: NOV_16 + 30 * HOUR })
+    const lines = await lineIds(made.basket.orderId)
+    const one = await byBuyer(token, { lineIds: [lines[0]] })
+    expect(one.status, JSON.stringify(one.body)).toBe(200)
+    expect(one.body).toMatchObject({ state: 'confirmed', lines: [{ id: lines[1] }] })
+    expect(await claimed(h)).toBe(1)
+    expect(await count('SELECT count(*) AS n FROM payments_refunds r JOIN box_office_cancellations c ON c.refund_id = r.id WHERE c.order_id = ?', made.basket.orderId)).toBe(0)
+    advanceClock(31 * HOUR)
+    expect((await view(token)).body.buyerCancel).toBeNull()
+    expect((await byBuyer(token)).body).toMatchObject({ code: 'box-office.order.cancel-at-desk' })
+    setClock(NOV_16)
+  })
 
   it('is refused while the theatre has not switched it on', async () => {
     const h = await house(4)

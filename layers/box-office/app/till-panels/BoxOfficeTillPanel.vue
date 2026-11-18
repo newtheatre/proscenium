@@ -142,10 +142,14 @@ const orderRows = computed(() => performances.value.find(p => p.performanceId ==
 const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: r.ticketType, description: money(r.amountMinor) }))
 const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: t('box-office.screens.panel.row', { band: r.band, type: r.ticketType, price: money(r.amountMinor) }) })))
 
+function tell(value: unknown) {
+  lastSaid = JSON.stringify(value)
+  emit('update:modelValue', value)
+}
 function say() {
   if (exchange.value) {
     const { reference: _, ...body } = exchange.value
-    emit('update:modelValue', { exchange: body })
+    tell({ exchange: body })
     return
   }
   if (mode.value === 'sell') {
@@ -157,10 +161,10 @@ function say() {
       const named = Array.from({ length: quantity }, (_, n) => (typed[n] ? '' : holders.value[keyOf(r)]?.[n]?.accountId ?? ''))
       return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(typed.some(Boolean) ? { references: typed } : {}), ...(named.some(Boolean) ? { holders: named } : {}) }
     })
-    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
+    tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
   }
   else {
-    emit('update:modelValue', order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
+    tell(order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
 watch([mode, admit, quantities, references, holders, order, exchange, sendTo, promo], say, { deep: true })
@@ -177,9 +181,32 @@ onMounted(() => {
   }
 })
 
+// What the panel last said, so a value the till hands back can be told from its own.
+let lastSaid = 'null'
+// The till hands back what a sale was for when it picks a payment up after a reload: the
+// performance and how many of each ticket are shown again, as they were.
+async function restore(value: { performanceId?: unknown, lines?: unknown, admit?: unknown, email?: unknown, promoCode?: unknown }) {
+  if (typeof value.performanceId !== 'string' || !Array.isArray(value.lines)) return
+  mode.value = 'sell'
+  performanceId.value = value.performanceId
+  await nextTick() // the performance's watcher empties the quantities first
+  const lines = value.lines as { bandId: string, ticketTypeId: string, quantity: number, references?: string[] }[]
+  quantities.value = Object.fromEntries(lines.map(l => [keyOf(l), l.quantity]))
+  references.value = Object.fromEntries(lines.filter(l => l.references).map(l => [keyOf(l), l.references!]))
+  admit.value = value.admit === true
+  if (typeof value.email === 'string') buyer.value = { email: value.email }
+  if (typeof value.promoCode === 'string') {
+    codeTyped.value = value.promoCode
+    await tryCode()
+  }
+}
+
 // The till empties every panel after a sale.
 watch(() => props.modelValue, (now) => {
-  if (now !== null && now !== undefined) return
+  if (now !== null && now !== undefined) {
+    if (typeof now === 'object' && JSON.stringify(now) !== lastSaid) void restore(now as Record<string, unknown>)
+    return
+  }
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}

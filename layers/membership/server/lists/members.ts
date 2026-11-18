@@ -12,7 +12,7 @@ export default defineListSource(membersList, {
     scheme: { column: 'schemeId' },
   },
   sorts: {
-    joined: { columns: ['createdAt'], bounded: 10_000 }, // not-policy: the deepest a list pages
+    joined: { columns: ['startsOn'], bounded: 10_000 }, // not-policy: the deepest a list pages
   },
   search: { name: false, number: false, scheme: false, status: false, until: false, joined: false },
 })
