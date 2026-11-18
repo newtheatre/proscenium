@@ -7,12 +7,13 @@ import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import { LIVE } from '../identity/grants'
 
-export const READY_ITEMS = ['name', 'time-zone', 'email', 'branding', 'venue', 'modules', 'staff'] as const
+export const READY_ITEMS = ['name', 'time-zone', 'contact', 'email', 'branding', 'venue', 'modules', 'staff'] as const
 export type ReadyItem = typeof READY_ITEMS[number]
 
 const WHERE: Record<ReadyItem, string> = {
   'name': '/admin/theatre?setting=core.site.name',
   'time-zone': '/admin/theatre?setting=core.locale.time-zone',
+  'contact': '/admin/theatre?setting=core.organisation.contact-email',
   'email': '/admin/email',
   'branding': '/admin/branding',
   'venue': '/admin/modules/core/venues',
@@ -29,6 +30,7 @@ async function done(item: ReadyItem): Promise<boolean> {
   switch (item) {
     case 'name': return !!await useSetting('core.site.name')
     case 'time-zone': return !!await useSetting('core.locale.time-zone')
+    case 'contact': return !!await useSetting('core.organisation.contact-email')
     case 'email': return emailVerified()
     case 'branding': return !!await useSetting('core.brand.logo')
     case 'venue': return !!await first('SELECT 1 AS one FROM core_venues WHERE state = \'active\' LIMIT 1')
