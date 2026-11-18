@@ -522,6 +522,7 @@
   "core.record.checks-done": "{done} of {total}",
   "core.record.check-done": "Done",
   "core.record.check-open": "Still to do",
+  "core.record.check-wanted": "recommended",
   "core.record.more-actions": "More actions for {name}",
   "core.record.tabs": "Sections of {name}",
   "core.abilities.history.view.label": "See the history of a record",
