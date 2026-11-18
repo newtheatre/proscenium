@@ -3,10 +3,9 @@
      the difference on an exchange to dearer tickets, sent here from the booking's page. The panel
      only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
-import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -48,16 +47,13 @@ function dropExchange() {
   void router.replace({ query })
 }
 
-const { data } = await useAPI<{ performances: Performance[], emailDomains: string[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [], emailDomains: [] }) })
+const { data } = await useAPI<{ performances: Performance[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
 const performances = computed(() => data.value?.performances ?? [])
 
 // One search box finds a booking to collect; with none found, the panel sells walk-up tickets.
 const mode = ref<'sell' | 'collect'>('sell')
 const admit = ref(false)
-// Who the tickets are emailed to, if the buyer wants them: a person picked by name or a typed
-// address. Optional; the till shows nothing back about them.
-const buyer = ref<Buyer | undefined>()
-const sendTo = computed(() => !buyer.value ? {} : 'accountId' in buyer.value ? { accountId: buyer.value.accountId } : { email: buyer.value.email })
+// Who the tickets are emailed to is the till's receipt box (Matt, 18 November): the receipt carries them.
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 // Selling: how many of each kind of ticket for one performance.
@@ -223,7 +219,7 @@ function say() {
       const named = Array.from({ length: quantity }, (_, n) => (typed[n] ? '' : holders.value[keyOf(r)]?.[n]?.accountId ?? ''))
       return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(typed.some(Boolean) ? { references: typed } : {}), ...(named.some(Boolean) ? { holders: named } : {}) }
     })
-    tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
+    tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
     sendReceipt((performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r)))
   }
   else {
@@ -231,7 +227,7 @@ function say() {
     tell(order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, references, holders, order, exchange, sendTo, promo, lastAdded], say, { deep: true })
+watch([mode, admit, quantities, references, holders, order, exchange, promo, lastAdded], say, { deep: true })
 // A booking found, or several to pick from, is what the panel shows; with none, it sells walk-up tickets.
 watch([order, matches], () => {
   mode.value = order.value || matches.value.length ? 'collect' : 'sell'
@@ -266,7 +262,6 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
   // Who each ticket was for is kept by account; their names were on the screen before the reload.
   holders.value = Object.fromEntries(lines.filter(l => l.holders).map(l => [keyOf(l), l.holders!.map(id => (id ? { accountId: id, label: t('box-office.screens.panel.holder.restored'), byHand: false } : undefined))]))
   admit.value = value.admit === true
-  if (typeof value.email === 'string') buyer.value = { email: value.email }
   if (typeof value.promoCode === 'string') {
     codeTyped.value = value.promoCode
     await tryCode()
@@ -290,7 +285,6 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (Object.keys(references.value).length) references.value = {}
   if (Object.keys(holders.value).length) holders.value = {}
   // The next buyer never sees who the last one was, nor uses their code.
-  buyer.value = undefined
   dropCode()
   if (!order.value || mode.value !== 'collect') return
   // After a sale the booking is found again, to show it paid; the receipt's Clear puts it away.
@@ -303,7 +297,6 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
 interface Sold { orderId: string, reference: string, buyer: string | null, performance: { id: string, title: string, startsAt: number } | null, lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[] }
 const sold = ref<Sold[]>([])
 const soldRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const emailTo = ref<Record<string, Buyer | undefined>>({})
 const soldBusy = ref<string | null>(null)
 async function loadSold(intent: string) {
   try {
@@ -315,7 +308,6 @@ async function loadSold(intent: string) {
 }
 watch(() => props.settled, (intent) => {
   sold.value = []
-  emailTo.value = {}
   soldRefusal.value = null
   if (intent) void loadSold(intent)
 }, { immediate: true })
@@ -333,11 +325,6 @@ async function soldAction(o: Sold, fn: () => Promise<unknown>) {
   finally {
     soldBusy.value = null
   }
-}
-function emailSold(o: Sold) {
-  const to = emailTo.value[o.orderId]
-  if (!to) return
-  void soldAction(o, () => $api(`/api/box-office/desk/orders/${o.orderId}/send` as string, { method: 'POST', body: 'accountId' in to ? { accountId: to.accountId } : { email: to.email } }))
 }
 function admitSold(o: Sold) {
   if (!o.performance) return
@@ -512,27 +499,6 @@ function clear() {
           class="size-4 text-success"
         />{{ t('box-office.screens.panel.sold.emailed', { name: o.buyer }) }}
       </p>
-      <UFormField
-        v-else
-        :label="t('box-office.screens.panel.sold.email')"
-        :help="t('box-office.screens.panel.sold.email-help')"
-      >
-        <div class="flex flex-wrap gap-2">
-          <BoxOfficeBuyerPicker
-            v-model="emailTo[o.orderId]"
-            :domains="data?.emailDomains ?? []"
-            :disabled="soldBusy === o.orderId"
-            class="min-w-64 flex-1"
-          />
-          <UButton
-            icon="i-lucide-send"
-            :label="t('box-office.screens.panel.sold.send')"
-            :loading="soldBusy === o.orderId"
-            :disabled="!emailTo[o.orderId]"
-            @click="emailSold(o)"
-          />
-        </div>
-      </UFormField>
       <div class="flex flex-wrap gap-2">
         <UButton
           v-if="waitingIn(o) && o.performance"
@@ -910,7 +876,7 @@ function clear() {
             class="space-y-2 rounded-lg border border-default p-3"
           >
             <h4 class="text-sm font-medium">
-              {{ t('box-office.screens.panel.holder.heading', { type: bands.length > 1 ? `${row.band}, ${row.ticketType}` : row.ticketType }) }}
+              {{ t(row.companion ? 'box-office.screens.panel.holder.companion-heading' : 'box-office.screens.panel.holder.heading', { type: bands.length > 1 ? `${row.band}, ${row.ticketType}` : row.ticketType }) }}
             </h4>
             <div
               v-for="n in quantities[keyOf(row)]"
@@ -922,7 +888,8 @@ function clear() {
                 :model-value="holders[keyOf(row)]?.[n - 1]"
                 :performance-id="performance.performanceId"
                 :ticket-type-id="row.ticketTypeId"
-                :label="t('box-office.screens.panel.holder.ticket', { n })"
+                :label="t(row.companion ? 'box-office.screens.panel.holder.companion-ticket' : 'box-office.screens.panel.holder.ticket', { n })"
+                :companion="row.companion"
                 :disabled="locked"
                 @update:model-value="(h: Holder | undefined) => setHolder(row, n - 1, h)"
               />
@@ -943,7 +910,7 @@ function clear() {
               class="text-sm text-warning"
               role="status"
             >
-              {{ t('box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
+              {{ t(row.companion ? 'box-office.screens.panel.holder.companion-needed' : 'box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
             </p>
           </div>
           <div
@@ -1026,18 +993,6 @@ function clear() {
       </section>
     </template>
 
-    <UFormField
-      v-if="mode === 'sell' && !exchange"
-      :label="t('box-office.screens.panel.email')"
-      :help="t('box-office.screens.panel.email-help')"
-      name="buyer"
-    >
-      <BoxOfficeBuyerPicker
-        v-model="buyer"
-        :domains="data?.emailDomains ?? []"
-        :disabled="locked"
-      />
-    </UFormField>
     <UCheckbox
       v-model="admit"
       :label="t('box-office.screens.panel.admit')"

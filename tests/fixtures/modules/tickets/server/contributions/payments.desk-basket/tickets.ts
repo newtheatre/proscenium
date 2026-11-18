@@ -2,7 +2,7 @@
 import { newId, type UnitView } from '#kit'
 import type { DeskBasket, DeskContext } from '#modules/payments'
 
-interface Input { amountMinor: number, deferredMinor?: number, performanceId?: string }
+interface Input { amountMinor: number, deferredMinor?: number, performanceId?: string, quantity?: number }
 
 export default {
   label: 'tickets.desk.label',
@@ -17,6 +17,6 @@ export default {
   },
   async summary(context: DeskContext) {
     const input = context.input as Input
-    return { lines: [{ label: 'Tickets', amountMinor: input.amountMinor }], amountMinor: input.amountMinor }
+    return { lines: [{ label: 'Tickets', amountMinor: input.amountMinor, quantity: input.quantity ?? 1, item: 'Ticket', key: 'all' }], amountMinor: input.amountMinor }
   },
 } satisfies DeskBasket

@@ -2,8 +2,8 @@
      to sell at the desk draws its own panel (payments.desk-basket); the till shows what the filled
      panels add up to, makes the one payment for the total in the seller's open session and takes it
      by any way to pay on offer at the desk. Another way is offered only once an attempt is known to
-     have failed, so nobody pays twice. After a sale the panels are emptied; after a cancel they keep
-     what was in them, so the seller can try again. A host narrows the till to some modules' panels
+     have failed, so nobody pays twice. After a sale the panels are emptied; after a cancel they are
+     emptied too unless the seller unticks the box, so they can try again. A host narrows the till to some modules' panels
      (Box office's Sell shows only its own); live mode draws the panels as tabs over the one basket,
      each with its larger live panel where its module has one. Coming to the till opens the seller's
      session if none is open, at the place this device used last; a strip above the panels says which
@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import type { YourSession } from '../../shared/sessions'
+import type { ReceiptTo } from './PaymentsReceiptTo.vue'
 
 /** One line a panel hands the receipt; `more` and `fewer` draw a stepper on it. */
 interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more?: () => void, fewer?: () => void }
@@ -32,10 +33,12 @@ interface PanelReceipt {
 }
 
 interface Panel { id: string, module: string, label: string, tab: string, icon: string | null, panel: string, livePanel: string | null }
-interface Summary { basket: string, lines: { label: string, amountMinor: number }[], amountMinor: number }
+interface Summary { basket: string, lines: { label: string, amountMinor: number, quantity?: number, item?: string }[], amountMinor: number }
+/** One person's share of a split sale, as the server holds it once the sale is made. */
+interface Share { position: number, amountMinor: number, items: { label: string, quantity: number, amountMinor: number }[], paid: boolean }
 interface Offer { providerAccountId: string, provider: string, label: string, method: string, mode: 'live' | 'test', readers?: { id: string, label: string }[] }
 type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', secret: string } | { kind: 'waiting-for-reader' | 'none' }
-interface Status { state: string, amountMinor: number, currency: string, paidMinor: number, waiting: boolean }
+interface Status { state: string, amountMinor: number, currency: string, paidMinor: number, waiting: boolean, splits?: Share[] }
 
 const props = defineProps<{
   /** The modules whose panels to show; every panel the seller may use when absent. */
@@ -51,7 +54,7 @@ const route = useRoute()
 const router = useRouter()
 const { currency, money, toMinor, toMajor } = await useMoney()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const { confirm, confirmTicked } = useConfirm()
 const toast = useToast()
 // The till's toasts replace one another rather than stacking up.
 const TOAST = 'payments-till'
@@ -232,7 +235,7 @@ const sale = ref<{ intentId: string, amountMinor: number, key: string } | null>(
 // (or a tablet that went to sleep) picks it up as it was: the lines on the receipt, what was in the
 // panels, and the amount to take this way.
 const SALE_KEY = 'payments.till.sale'
-interface Kept { intentId: string, inputs: Record<string, unknown>, held: ReceiptGroup[], splitting: boolean, part?: number }
+interface Kept { intentId: string, inputs: Record<string, unknown>, held: ReceiptGroup[], splitting: boolean }
 function keep() {
   if (!sale.value) return
   const kept: Kept = {
@@ -240,7 +243,6 @@ function keep() {
     inputs: Object.fromEntries(panels.value.flatMap(p => (inputs[p.id] === null || inputs[p.id] === undefined ? [] : [[p.id, inputs[p.id]]]))),
     held: held.value ?? [],
     splitting: splitting.value,
-    part: part.value ?? undefined,
   }
   try { localStorage.setItem(SALE_KEY, JSON.stringify(kept)) }
   catch { /* storage refused: a reload shows the payment without its lines */ }
@@ -282,7 +284,9 @@ async function takePayment() {
     // The first sale opens the session. One that closed itself while the till sat quiet is opened
     // again, and the sale made in it.
     if (!open.value && !await ensureSession()) return
-    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value }, headers: { 'idempotency-key': saleKey.value } })
+    // A split sale says who pays for which items; the server works out each person's amount.
+    const splits = splitting.value ? plan.value.map(p => ({ items: p.items.map(i => ({ basket: i.basket, line: i.line, quantity: i.quantity })) })) : undefined
+    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value, splits, receipt: splits ? undefined : destination(receiptTo.value[0]) }, headers: { 'idempotency-key': saleKey.value } })
     let made: Awaited<ReturnType<typeof sell>>
     try {
       made = await sell()
@@ -317,30 +321,101 @@ const rank = (m: Offer) => (RANK.includes(m.method) ? RANK.indexOf(m.method) : R
 const methods = computed(() => [...(offered.value?.methods ?? [])].sort((a, b) => rank(a) - rank(b)))
 const METHOD_ICONS: Record<string, string> = { card_reader: 'i-lucide-smartphone-nfc', card_attested: 'i-lucide-credit-card', card_online: 'i-lucide-credit-card', cash: 'i-lucide-banknote' }
 const methodIcon = (m: Offer) => METHOD_ICONS[m.method] ?? 'i-lucide-wallet'
-// Taking the total in parts: the amount is asked for before the way to pay.
+// Splitting the bill by item (Matt, 18 November 2026): each item on the receipt is given to a person,
+// and each person pays for their own items, so nobody types an amount. One item cannot be split.
 const splitting = ref(false)
 const paidInPart = computed(() => (payment.value?.paidMinor ?? 0) > 0)
+/** One of something on the receipt, as the server's summary counts them. */
+interface Unit { basket: string, line: number, label: string, amountMinor: number }
+/** A line's amount shared between its units, the first taking the odd pennies, as the server does. */
+function shares(amountMinor: number, quantity: number): number[] {
+  const each = Math.floor(amountMinor / quantity)
+  return Array.from({ length: quantity }, (_, i) => each + (i < amountMinor - each * quantity ? 1 : 0))
+}
+const units = computed<Unit[]>(() => (summary.value?.panels ?? []).flatMap(p => p.lines.flatMap((l, line) => {
+  const quantity = Math.max(1, l.quantity ?? 1)
+  return shares(l.amountMinor, quantity).map(amountMinor => ({ basket: p.basket, line, label: l.item ?? l.label, amountMinor }))
+})))
+const canSplit = computed(() => units.value.length >= 2)
+// Who pays for each unit, by person number, and how many people there are.
+const people = ref(2)
+const owners = ref<number[]>([])
+/** Split, before anything is taken: the items are shared out between two people to start with. */
+function startSplit(on: boolean) {
+  splitting.value = on
+  people.value = 2
+  owners.value = units.value.map((_, i) => (i % 2) + 1)
+  receiptTo.value = on ? { 1: receiptTo.value[0] } : { 0: receiptTo.value[1] }
+}
+// When the receipt changes while splitting, a new item goes to the first person.
+watch(() => units.value.map(u => `${u.basket} ${u.line}`).join('|'), (now, before) => {
+  if (!splitting.value || sale.value || now === before) return
+  owners.value = units.value.map((_, i) => Math.min(owners.value[i] ?? 1, people.value))
+})
+function addPerson() {
+  if (people.value < units.value.length) people.value++
+}
+/** Takes the last person away; their items go to the first. */
+function removePerson() {
+  if (people.value <= 2) return
+  owners.value = owners.value.map(o => (o === people.value ? 1 : o))
+  people.value--
+}
+/** Each person's items and amount, worked out as the server will: a line's units go to people in order. */
+const plan = computed(() => {
+  const byLine = new Map<string, number[]>()
+  units.value.forEach((u, i) => {
+    const key = `${u.basket} ${u.line}`
+    byLine.set(key, [...(byLine.get(key) ?? []), owners.value[i] ?? 1])
+  })
+  return Array.from({ length: people.value }, (_, n) => n + 1).map((position) => {
+    const items: { basket: string, line: number, label: string, quantity: number, amountMinor: number }[] = []
+    for (const [key, who] of byLine) {
+      const first = units.value.find(u => `${u.basket} ${u.line}` === key)!
+      const lineShares = shares(units.value.filter(u => `${u.basket} ${u.line}` === key).reduce((sum, u) => sum + u.amountMinor, 0), who.length)
+      const sorted = [...who].sort((a, b) => a - b)
+      const mine = sorted.flatMap((o, i) => (o === position ? [lineShares[i]!] : []))
+      if (mine.length) items.push({ basket: first.basket, line: first.line, label: first.label, quantity: mine.length, amountMinor: mine.reduce((sum, a) => sum + a, 0) })
+    }
+    return { position, items, amountMinor: items.reduce((sum, i) => sum + i.amountMinor, 0) }
+  })
+})
+// Everyone must have something to pay for before the sale is made.
+const planIncomplete = computed(() => splitting.value && plan.value.some(p => p.amountMinor <= 0))
+/** The people paying: the plan before the sale is made, then the server's, with who has paid. */
+const persons = computed<Share[]>(() => payment.value?.splits?.length
+  ? payment.value.splits
+  : splitting.value ? plan.value.map(p => ({ position: p.position, amountMinor: p.amountMinor, items: p.items.map(i => ({ label: i.label, quantity: i.quantity, amountMinor: i.amountMinor })), paid: false })) : [])
+const isSplit = computed(() => persons.value.length > 0)
+// Who each receipt goes to: 0 for a whole sale, or each person of a split one. Kept on the screen
+// only, never on the device. The receipt carries any tickets too, so there is no other email box.
+const receiptTo = ref<Record<number, ReceiptTo | undefined>>({})
+const destination = (to: ReceiptTo | undefined) => (!to ? undefined : 'accountId' in to ? { accountId: to.accountId } : { email: to.email })
+// The person whose payment is being taken now.
+const paying = ref<number | null>(null)
+const payingFor = computed(() => persons.value.find(p => p.position === paying.value) ?? null)
 // A way to pay that needs nothing more from the seller starts as soon as it is pressed.
 const direct = (m: Offer) => m.method !== 'cash' && !m.method.endsWith('_attested') && (m.method !== 'card_reader' || m.readers?.length === 1)
 async function choose(m: Offer) {
   choice.value = key(m)
   await nextTick()
-  if (direct(m) && !partTooMuch.value && !partMissing.value) await pay()
+  if (direct(m)) await pay()
 }
-/** One press from the receipt: makes the sale, then pays this way (the amount first, when splitting). */
+/** One press from the receipt: makes the sale, then pays this way. */
 async function payWith(m: Offer) {
-  if (partMissing.value || partTooMuch.value) {
-    sheet.value = !wide.value
-    return
-  }
   await takePayment()
   if (!sale.value) return
   await choose(m)
 }
-/** Split, before anything is taken: asks how much to take the first way. Nothing is started yet. */
-function startSplit(on: boolean) {
-  splitting.value = on
-  part.value = undefined
+/** One person pays their share this way; the first press makes the sale with the plan. */
+async function payPerson(position: number, m: Offer) {
+  paying.value = position
+  if (!sale.value) await takePayment()
+  if (!sale.value) {
+    paying.value = null
+    return
+  }
+  await choose(m)
 }
 const choice = ref<string | undefined>(undefined)
 const chosen = computed(() => methods.value.find(m => key(m) === choice.value))
@@ -358,14 +433,12 @@ function tender(minor: number) {
 // What an "other" payment was, such as a voucher number or an invoice.
 const otherNote = ref('')
 const readerId = ref<string | undefined>(undefined)
-// Part of what is due, taken by this way of paying; empty takes it all. The rest is then taken another way.
-const part = ref<number | undefined>(undefined)
-const partMinor = computed(() => (part.value === undefined || part.value === null ? undefined : toMinor(part.value)))
-const partTooMuch = computed(() => partMinor.value !== undefined && (partMinor.value <= 0 || partMinor.value > due.value))
-const taken = computed(() => partMinor.value ?? due.value)
-// The first part of a split needs its amount: a split never quietly takes the whole sum one way.
-const partMissing = computed(() => splitting.value && !paidInPart.value && partMinor.value === undefined)
-watch([splitting, part], () => keep())
+// What this payment takes: the paying person's share in a split sale, otherwise all that is due.
+const taken = computed(() => payingFor.value?.amountMinor ?? due.value)
+const splitOf = () => (isSplit.value && paying.value !== null
+  ? { split: paying.value, receipt: destination(receiptTo.value[paying.value]) }
+  : { receipt: destination(receiptTo.value[0]) })
+watch(splitting, () => keep())
 watch(chosen, (m) => {
   tendered.value = undefined
   otherNote.value = ''
@@ -414,7 +487,7 @@ async function pay(succeeded = true) {
       const handed = m.method === 'cash' ? tenderedMinor.value : undefined
       const answer = await $api<{ settled: boolean, unfulfilled: boolean, changeMinor: number }>(`/api/payments/intents/${sale.value.intentId}/attest` as string, {
         method: 'POST',
-        body: { providerAccountId: m.providerAccountId, method: m.method, amountMinor: partMinor.value, tenderedMinor: handed, note: m.method === 'other_attested' ? otherNote.value.trim() || undefined : undefined, succeeded: m.method === 'cash' ? undefined : succeeded },
+        body: { providerAccountId: m.providerAccountId, method: m.method, ...splitOf(), tenderedMinor: handed, note: m.method === 'other_attested' ? otherNote.value.trim() || undefined : undefined, succeeded: m.method === 'cash' ? undefined : succeeded },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -427,7 +500,7 @@ async function pay(succeeded = true) {
       const started = await $api<{ next: Next, state: string, settled: boolean, unfulfilled: boolean }>(`/api/payments/intents/${sale.value.intentId}/start` as string, {
         method: 'POST',
         // The SumUp app sends the seller back to this screen, which picks the sale up again (resume).
-        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, amountMinor: partMinor.value, returnTo: route.path },
+        body: { providerAccountId: m.providerAccountId, method: m.method, readerId: readerId.value, ...splitOf(), returnTo: route.path },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -459,7 +532,7 @@ function partTaken(amountMinor: number) {
   toast.add({ id: TOAST, title: t('payments.screens.till.part-paid', { amount: money(amountMinor), due: money(due.value) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
   changeMinor.value = 0
   choice.value = undefined
-  part.value = undefined
+  paying.value = null
 }
 
 // Back from a hand-off to another app, such as SumUp's: the page has loaded afresh, so the sale is
@@ -478,7 +551,6 @@ async function resume(intentId: string, said: string) {
         if (p.id in was.inputs) inputs[p.id] = was.inputs[p.id]
       }
       splitting.value = was.splitting
-      part.value = was.part
     }
     sale.value = { intentId, amountMinor: now.amountMinor, key: crypto.randomUUID() }
     payment.value = now
@@ -516,16 +588,19 @@ const waiting = computed(() => result.value?.kind === 'waiting' || result.value?
 
 async function cancel() {
   if (!sale.value) return
-  const ok = await confirm({
+  // Emptying the basket is ticked by default (Matt, 18 November): mostly the customer has gone.
+  const ok = await confirmTicked({
     verb: t('payments.screens.till.cancel-verb'),
     thing: money(sale.value.amountMinor),
     consequence: waiting.value ? t('payments.screens.till.cancel-waiting') : t('payments.screens.till.cancel-consequence'),
     button: t('payments.screens.till.cancel-button'),
+    tick: { label: t('payments.screens.till.cancel-empty'), ticked: true },
   })
   if (!ok) return
   taking.value = true
   try {
     await $api(`/api/payments/intents/${sale.value.intentId}/cancel` as string, { method: 'POST', body: {} })
+    if (ok.ticked) for (const p of panels.value) inputs[p.id] = null
     ended()
   }
   catch (e) {
@@ -584,7 +659,8 @@ function reset() {
   payment.value = null
   result.value = null
   choice.value = undefined
-  part.value = undefined
+  paying.value = null
+  receiptTo.value = {}
   saleKey.value = crypto.randomUUID()
 }
 // What the panels show, such as how many tickets are left, and the session strip are asked again
@@ -596,18 +672,39 @@ function done() {
   const paid = sale.value!
   const change = changeMinor.value
   const sold = filled.value.map(f => f.basket)
+  const split = isSplit.value
+  const receiptSent = !split && !!receiptTo.value[0]
   reset()
   afterSale()
   for (const p of panels.value) inputs[p.id] = null
   // The sale stays on the receipt, and each panel that sold something shows what it made, until the
   // seller moves on to the next customer (till proposal, "after the sale").
-  finished.value = { intentId: paid.intentId, amountMinor: paid.amountMinor, changeMinor: change, panels: sold }
+  finished.value = { intentId: paid.intentId, amountMinor: paid.amountMinor, changeMinor: change, panels: sold, split, receiptSent }
+  afterTo.value = undefined
   // Where the receipt is a sheet, what was paid and any change are said at once as well.
   if (!beside.value) toast.add({ title: t('payments.screens.till.paid', { amount: money(paid.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
   emit('settled', { intentId: paid.intentId, amountMinor: paid.amountMinor })
 }
 /** The sale just paid for, shown until the next customer. */
-const finished = ref<{ intentId: string, amountMinor: number, changeMinor: number, panels: string[] } | null>(null)
+const finished = ref<{ intentId: string, amountMinor: number, changeMinor: number, panels: string[], split: boolean, receiptSent: boolean } | null>(null)
+// A receipt asked for after paying.
+const afterTo = ref<ReceiptTo | undefined>()
+const sending = ref(false)
+async function sendAfter() {
+  if (!finished.value || !afterTo.value) return
+  sending.value = true
+  refusal.value = null
+  try {
+    await $api(`/api/payments/intents/${finished.value.intentId}/receipt` as string, { method: 'POST', body: { receipt: destination(afterTo.value) } })
+    finished.value = { ...finished.value, receiptSent: true }
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    sending.value = false
+  }
+}
 const settledFor = (id: string) => (finished.value?.panels.includes(id) ? finished.value.intentId : null)
 function nextCustomer() {
   finished.value = null
@@ -812,6 +909,39 @@ function ended() {
                   >
                     {{ t('payments.screens.till.change', { amount: money(finished.changeMinor) }) }}
                   </p>
+                  <!-- Someone who asks for a receipt after paying: one for the whole sale, or for one
+                       person of a split one, sent once. -->
+                  <p
+                    v-if="finished.receiptSent"
+                    class="flex items-center gap-2 text-sm text-muted"
+                  >
+                    <UIcon
+                      name="i-lucide-mail-check"
+                      class="size-4"
+                    />{{ t('payments.screens.till.receipt-sent') }}
+                  </p>
+                  <UFormField
+                    v-else-if="!finished.split"
+                    :label="t('payments.screens.till.receipt-after')"
+                    :hint="t('payments.screens.optional')"
+                  >
+                    <div class="flex gap-2">
+                      <PaymentsReceiptTo
+                        v-model="afterTo"
+                        class="flex-1"
+                        :disabled="sending"
+                      />
+                      <UButton
+                        color="neutral"
+                        variant="outline"
+                        icon="i-lucide-send"
+                        :loading="sending"
+                        :disabled="!afterTo"
+                        :label="t('payments.screens.till.receipt-send')"
+                        @click="sendAfter"
+                      />
+                    </div>
+                  </UFormField>
                   <UButton
                     block
                     size="xl"
@@ -841,48 +971,90 @@ function ended() {
 
               <RefusalNotice :refusal="refusal" />
 
-              <!-- Splitting, before anything is taken: the amount for the first way, then the way.
-                   The basket stays as it is until a way is pressed. -->
+              <!-- The receipt for a sale that is not split, with any tickets on it: before paying, or
+                   while it is being paid. A split sale has one for each person instead. -->
+              <UFormField
+                v-if="!isSplit && !splitting && (sale || groups.length) && methods.length && !waiting"
+                :label="t('payments.screens.till.receipt-to')"
+                :hint="t('payments.screens.optional')"
+              >
+                <PaymentsReceiptTo
+                  v-model="receiptTo[0]"
+                  :disabled="taking"
+                />
+              </UFormField>
+
+              <!-- Splitting, before anything is taken: each item is given to a person, and each person
+                   pays for their own. The basket stays as it is until someone pays. -->
               <template v-if="!sale && splitting && methods.length">
-                <UFormField
-                  :label="t('payments.screens.till.part')"
-                  :help="t('payments.screens.till.part-first-help', { amount: money(due) })"
-                  :error="partTooMuch ? t('payments.screens.till.part-too-much', { amount: money(due) }) : undefined"
-                  required
-                >
-                  <UInputNumber
-                    v-model="part"
-                    :min="0"
-                    :step="0.01"
-                    :increment="false"
-                    :decrement="false"
-                    :format-options="{ style: 'currency', currency }"
-                    class="w-36"
-                  />
-                </UFormField>
-                <div
-                  role="group"
-                  :aria-label="t('payments.screens.till.how')"
-                  class="grid grid-cols-2 gap-2"
-                >
-                  <UTooltip
-                    v-for="m in methods"
-                    :key="key(m)"
-                    :text="m.label"
-                  >
+                <div class="space-y-2">
+                  <p class="font-medium">
+                    {{ t('payments.screens.till.split-title') }}
+                  </p>
+                  <p class="text-sm text-muted">
+                    {{ t('payments.screens.till.split-help') }}
+                  </p>
+                  <ul class="divide-y divide-default">
+                    <li
+                      v-for="(u, i) in units"
+                      :key="i"
+                      class="flex items-center justify-between gap-3 py-2"
+                    >
+                      <span class="min-w-0 flex-1 truncate text-sm">{{ u.label }}</span>
+                      <span class="text-sm tabular-nums text-muted">{{ money(u.amountMinor) }}</span>
+                      <UFieldGroup
+                        role="radiogroup"
+                        :aria-label="t('payments.screens.till.give-to', { item: u.label })"
+                      >
+                        <UButton
+                          v-for="n in people"
+                          :key="n"
+                          size="sm"
+                          role="radio"
+                          :aria-checked="owners[i] === n"
+                          :aria-label="t('payments.screens.till.person', { n })"
+                          :color="owners[i] === n ? 'primary' : 'neutral'"
+                          :variant="owners[i] === n ? 'solid' : 'outline'"
+                          :label="String(n)"
+                          :disabled="taking"
+                          @click="owners[i] = n"
+                        />
+                      </UFieldGroup>
+                    </li>
+                  </ul>
+                  <div class="flex flex-wrap gap-2">
                     <UButton
-                      block
-                      size="lg"
+                      size="sm"
                       color="neutral"
-                      variant="outline"
-                      :icon="methodIcon(m)"
-                      :loading="taking && choice === key(m)"
-                      :disabled="!payable || taking || partMissing || partTooMuch"
-                      :label="methodLabel(m)"
-                      @click="payWith(m)"
+                      variant="link"
+                      icon="i-lucide-user-plus"
+                      :disabled="taking || people >= units.length"
+                      :label="t('payments.screens.till.add-person')"
+                      @click="addPerson"
                     />
-                  </UTooltip>
+                    <UButton
+                      v-if="people > 2"
+                      size="sm"
+                      color="neutral"
+                      variant="link"
+                      icon="i-lucide-user-minus"
+                      :disabled="taking"
+                      :label="t('payments.screens.till.remove-person', { n: people })"
+                      @click="removePerson"
+                    />
+                  </div>
                 </div>
+                <PaymentsTillPeople
+                  v-model:receipt-to="receiptTo"
+                  :persons="persons"
+                  :methods="methods"
+                  :method-label="methodLabel"
+                  :method-icon="methodIcon"
+                  :busy="taking || !payable || planIncomplete"
+                  :paying="paying"
+                  :money="money"
+                  @pay="payPerson"
+                />
                 <UButton
                   color="neutral"
                   variant="link"
@@ -922,16 +1094,22 @@ function ended() {
                         @click="payWith(m)"
                       />
                     </UTooltip>
-                    <UButton
-                      block
-                      size="lg"
-                      color="neutral"
-                      variant="outline"
-                      icon="i-lucide-split"
-                      :disabled="!payable || taking"
-                      :label="t('payments.screens.till.split')"
-                      @click="startSplit(true)"
-                    />
+                    <!-- One item cannot be split, so the button says why it is off. -->
+                    <UTooltip
+                      :text="t('payments.screens.till.split-one')"
+                      :disabled="canSplit"
+                    >
+                      <UButton
+                        block
+                        size="lg"
+                        color="neutral"
+                        variant="outline"
+                        icon="i-lucide-split"
+                        :disabled="!payable || taking || !canSplit"
+                        :label="t('payments.screens.till.split')"
+                        @click="startSplit(true)"
+                      />
+                    </UTooltip>
                   </div>
                 </template>
                 <UButton
@@ -1000,28 +1178,29 @@ function ended() {
                     {{ t('payments.screens.till.no-methods') }}
                   </p>
 
-                  <UFormField
-                    v-if="methods.length && (splitting || paidInPart)"
-                    :label="t('payments.screens.till.part')"
-                    :hint="partMissing || paidInPart ? undefined : t('payments.screens.optional')"
-                    :help="t(paidInPart ? 'payments.screens.till.part-help' : 'payments.screens.till.part-first-help', { amount: money(due) })"
-                    :error="partTooMuch ? t('payments.screens.till.part-too-much', { amount: money(due) }) : undefined"
-                    :required="!paidInPart"
+                  <!-- A split sale: each person pays for their own items, in any order. -->
+                  <PaymentsTillPeople
+                    v-if="isSplit && methods.length && !chosen"
+                    v-model:receipt-to="receiptTo"
+                    :persons="persons"
+                    :methods="methods"
+                    :method-label="methodLabel"
+                    :method-icon="methodIcon"
+                    :busy="taking"
+                    :paying="paying"
+                    :money="money"
+                    @pay="payPerson"
+                  />
+                  <p
+                    v-if="isSplit && chosen && payingFor"
+                    class="font-medium"
                   >
-                    <UInputNumber
-                      v-model="part"
-                      :min="0"
-                      :step="0.01"
-                      :increment="false"
-                      :decrement="false"
-                      :format-options="{ style: 'currency', currency }"
-                      class="w-36"
-                    />
-                  </UFormField>
+                    {{ t('payments.screens.till.paying-for', { n: payingFor.position, amount: money(payingFor.amountMinor) }) }}
+                  </p>
 
                   <!-- No way picked yet, or the last one is finished with: each is a button. -->
                   <div
-                    v-if="methods.length && !chosen"
+                    v-if="methods.length && !chosen && !isSplit"
                     role="group"
                     :aria-label="t('payments.screens.till.how')"
                     class="space-y-2"
@@ -1038,7 +1217,7 @@ function ended() {
                       variant="outline"
                       class="justify-start"
                       :icon="methodIcon(m)"
-                      :disabled="taking || partTooMuch || partMissing"
+                      :disabled="taking"
                       @click="choose(m)"
                     >
                       <span class="flex-1 text-start">{{ methodLabel(m) }}</span>
@@ -1144,7 +1323,7 @@ function ended() {
                       <UButton
                         size="lg"
                         :loading="taking"
-                        :disabled="partTooMuch || partMissing || (chosen.method === 'card_reader' && !readerId) || (chosen.method === 'cash' && change !== null && change < 0)"
+                        :disabled="(chosen.method === 'card_reader' && !readerId) || (chosen.method === 'cash' && change !== null && change < 0)"
                         :label="chosen.method === 'other_attested' ? t('payments.screens.till.received', { amount: money(taken) }) : chosen.method === 'card_attested' ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
                         @click="pay()"
                       />
@@ -1159,13 +1338,13 @@ function ended() {
                       />
                     </div>
                     <UButton
-                      v-if="methods.length > 1"
+                      v-if="methods.length > 1 || isSplit"
                       color="neutral"
                       variant="link"
                       icon="i-lucide-arrow-left"
                       :disabled="taking"
-                      :label="t('payments.screens.till.another-way')"
-                      @click="choice = undefined"
+                      :label="t(isSplit ? 'payments.screens.till.back-to-people' : 'payments.screens.till.another-way')"
+                      @click="choice = undefined; paying = null"
                     />
                   </template>
                 </template>
