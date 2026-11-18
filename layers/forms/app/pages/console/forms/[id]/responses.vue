@@ -479,7 +479,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             v-if="one.about"
             class="text-sm"
           >
-            <span class="font-medium">{{ t(one.about.label) }}</span>
+            <span class="font-medium">{{ t(one.about.label) }}{{ one.about.name ? ':' : '' }}</span>
             <template v-if="one.about.name">
               {{ ' ' }}{{ one.about.name }}
             </template>

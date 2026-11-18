@@ -31,6 +31,8 @@ import reviewPut from '../../server/api/forms/reviews/[id].put'
 import conflictPost from '../../server/api/forms/reviews/[id]/conflict.post'
 import sourceGet from '../../server/api/forms/sources/[source].get'
 import slotGet from '../../server/api/forms/slots/[slot]/[subject]/index.get'
+import search from '../../server/api/forms/search.get'
+import slotOpen from '../../server/api/forms/slots/[slot]/open.get'
 import slotPut from '../../server/api/forms/slots/[slot]/[subject]/[form].put'
 import slotDelete from '../../server/api/forms/slots/[slot]/[subject]/[form].delete'
 import templatesGet from '../../server/api/forms/templates/index.get'
@@ -76,6 +78,8 @@ export const handle = server({
   'GET /api/forms/templates': templatesGet,
   'POST /api/forms/templates': templatesPost,
   'DELETE /api/forms/templates/:id': templateDelete,
+  'GET /api/forms/slots/:slot/open': slotOpen,
+  'GET /api/forms/search': search,
   'GET /api/forms/slots/:slot/:subject': slotGet,
   'PUT /api/forms/slots/:slot/:subject/:form': slotPut,
   'DELETE /api/forms/slots/:slot/:subject/:form': slotDelete,

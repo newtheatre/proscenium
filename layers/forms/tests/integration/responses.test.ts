@@ -73,6 +73,11 @@ describe('sending', () => {
     expect(sent.status, JSON.stringify(sent.body)).toBe(200)
     expect(sent.body.reference).toMatch(/^[A-Z2-9]{8}$/)
 
+    // The palette finds it by its reference, for whoever may read the form's responses and nobody else.
+    const find = (who: typeof member) => req('GET', `/api/forms/search?q=${sent.body.reference.slice(0, 5)}`, undefined, who)
+    expect((await find(reader)).body.ids).toEqual([sent.body.responseId])
+    expect((await find(other)).body.ids).toEqual([])
+
     const [response] = await rows<any>('SELECT * FROM forms_responses WHERE id = ?', sent.body.responseId)
     expect(response).toMatchObject({ form_id: formId, state: 'submitted', stage_kind: 'closed', person_id: member.accountId, respondent_email: null, current_revision: 1, submitted_at: NOV_17, retention_due_at: NOV_17 + 365 * 86_400_000 })
     const answers = await rows<any>('SELECT question_id, data_class, value_text, value_cipher, label_snapshot FROM forms_answers WHERE response_id = ? ORDER BY question_id', sent.body.responseId)

@@ -112,6 +112,8 @@ export default defineModule({
   contributes: {
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }, { id: 'forms.template', file: 'template' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
+    // Responses are found by reference from the palette; the route answers only those the person may read.
+    'core.search-source': [{ id: 'forms.responses', record: 'forms.response', ability: ['forms.response.read', 'forms.form.edit'], route: '/api/forms/search', shells: ['console'] }],
     // Core contributes to no module's point, so the sources for core's records are forms' own.
     'forms.source': [
       { id: 'forms.person', file: 'person' }, { id: 'forms.production', file: 'production' }, { id: 'forms.performance', file: 'performance' },

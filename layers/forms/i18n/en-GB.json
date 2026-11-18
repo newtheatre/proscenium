@@ -31,5 +31,6 @@
   "forms.abilities.response.export.label": "Export a form's responses",
   "forms.abilities.response.read-special.label": "Open restricted answers",
   "forms.abilities.response.move.label": "Move responses between stages",
-  "forms.abilities.response.decide.label": "Approve or decline responses, and release reviews"
+  "forms.abilities.response.decide.label": "Approve or decline responses, and release reviews",
+  "forms.records.response": "Form responses"
 }

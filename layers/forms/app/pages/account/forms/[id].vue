@@ -25,6 +25,7 @@ const route = useRoute()
 const { data, error, refresh } = await useAPI<Own>(() => `/api/forms/mine/${encodeURIComponent(String(route.params.id))}`, { key: `forms:mine:${route.params.id}` })
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
 const own = computed(() => data.value!)
+provide('forms:answering', computed(() => own.value.form.slug))
 
 const changing = ref(false)
 const answers = ref<Answers>({})
