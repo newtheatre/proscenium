@@ -107,6 +107,12 @@ async function cancel(all: boolean) {
               :description="refunded ? t('box-office.manage.refunded', { amount: money(refunded, order.currency) }) : undefined"
             />
             <BoxOfficeBookingDetails :booking="order" />
+            <BoxOfficeSendPasses
+              v-if="order.passes"
+              :passes="order.passes"
+              :headers="headers"
+              @sent="order = { ...order!, passes: $event }"
+            />
             <BoxOfficeAccountCard
               v-if="order.accountUnclaimed && !viewer.signedIn && ownerOrder === null"
               :order-token="token"

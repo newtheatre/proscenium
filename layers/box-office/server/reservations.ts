@@ -9,7 +9,8 @@
 // the reserving. That link holds a random token and nothing else: its hash is on the basket with
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
-import { assertMayReserve, passSalesMinor, sendNewPasses, settlePassSales } from './pass-sales'
+import { assertMayReserve, passSalesMinor, passSalesOn, sendNewPasses, settlePassSales } from './pass-sales'
+import { getPass, movePass, sendPass } from './pass-holding'
 import { stampTerms } from './terms'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
@@ -210,6 +211,11 @@ export interface OrderView {
   tickets?: ShownOrderTicket[]
   /** What the booking is for: null only for an order with no ticket lines ever. */
   show?: OrderShow | null
+  /**
+   * The passes bought with the booking, each with its code and whether the buyer still holds it,
+   * so one can be sent on to someone else (Matt, 18 November). Never who else holds one.
+   */
+  passes?: { id: string, name: string, priceName: string, code: string | null, buyers: boolean }[]
 }
 
 /** What the booking is for, so a page can lead with it. venueSlug is set when the venue has a public page. */
@@ -316,7 +322,32 @@ export async function orderByLink(key: OrderKey): Promise<OrderView | null> {
     accountUnclaimed: order.account_id ? await canSendClaimLink(order.account_id) : false,
     tickets: await ticketsToShow(order),
     show: await showOf(lines.length ? lines : await everyLine(order.id)),
+    passes: await passesBought(order),
   }
+}
+
+/** The passes a booking bought, once they are the buyer's (reserved or confirmed). */
+async function passesBought(order: OrderRow): Promise<NonNullable<OrderView['passes']>> {
+  if (order.state !== 'reserved' && order.state !== 'confirmed') return []
+  return (await passSalesOn(order.id)).map(p => ({ id: p.passId, name: p.name, priceName: p.priceName, code: p.code, buyers: !!order.account_id && p.accountId === order.account_id }))
+}
+
+/**
+ * Sends a pass bought with a booking to someone else, from the booking's link or by its owner
+ * (Matt, 18 November): they become its holder and are emailed its code. Only while the buyer still
+ * holds it; what is booked with it tonight stays on this booking.
+ */
+export async function sendPassFromLink(unit: UnitView, key: OrderKey, passId: string, address: string): Promise<{ passes: NonNullable<OrderView['passes']> }> {
+  const order = await orderFor(key)
+  if (!order) refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
+  const pass = (await passesBought(order)).find(p => p.id === passId)
+  if (!pass) refuse('box-office.pass.not-found', 'That pass is not on this booking.', { status: 404 })
+  if (!pass.buyers) refuse('box-office.pass.sent-already', 'That pass has been sent on already.', { status: 409, remedy: 'Ask the box office to move it.' })
+  const { accountId } = await findOrCreateAccount(unit, { address: address.trim(), origin: 'guest' })
+  if (accountId === order.account_id) refuse('box-office.pass.send-to-self', 'That is your own address: the pass is yours already.', { status: 422, fields: { email: 'Give the other person\'s address.' } })
+  movePass(unit, passId, accountId)
+  await sendPass(unit, passId, `sent:${order.id}`, { ...await getPass(passId), accountId })
+  return { passes: (await passesBought(order)).map(p => (p.id === passId ? { ...p, buyers: false } : p)) }
 }
 
 /**
