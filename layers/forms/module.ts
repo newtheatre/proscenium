@@ -95,6 +95,8 @@ export default defineModule({
     announces: {
       // Ids only: what was answered stays inside, and a listener reads it through forms.
       'forms.response.submitted': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string() }), internal: true }),
+      // A form stopped taking responses. Not internal: nothing here says who answered.
+      'forms.form.closed': event({ version: 1, payload: z.object({ formId: z.string() }) }),
       // A response reached an approved or declined stage.
       'forms.response.decided': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), outcome: z.enum(['approved', 'declined']) }), internal: true }),
       'forms.response.moved': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), kind: z.enum(STAGE_KINDS), revision: z.number() }), internal: true }),

@@ -49,6 +49,8 @@ async function create() {
     refusal.value = toRefusal(e)
   }
 }
+const current = computed(() => (data.value?.forms ?? []).filter(f => f.status !== 'archived'))
+const archived = computed(() => (data.value?.forms ?? []).filter(f => f.status === 'archived'))
 const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'neutral', archived: 'neutral' } as const
 </script>
 
@@ -81,7 +83,7 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
         :label="t('forms.navigation.forms.label')"
       >
         <RecordListItem
-          v-for="f in data.forms"
+          v-for="f in current"
           :key="f.id"
           :to="`/console/forms/${f.id}`"
           icon="i-lucide-file-text"
@@ -94,6 +96,23 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
           />
         </RecordListItem>
       </RecordList>
+      <CollapsibleDivider
+        v-if="archived.length"
+        :label="t('forms.screens.list.archived')"
+        :count="archived.length"
+      >
+        <RecordList :label="t('forms.screens.list.archived')">
+          <RecordListItem
+            v-for="f in archived"
+            :key="f.id"
+            :to="`/console/forms/${f.id}`"
+            icon="i-lucide-file-text"
+            :name="f.title"
+            :description="`/${f.slug}`"
+            muted
+          />
+        </RecordList>
+      </CollapsibleDivider>
     </DataBoundary>
 
     <UModal

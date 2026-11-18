@@ -56,6 +56,7 @@ export const REASONS: Record<Shut, { reason: string, remedy?: string }> = {
 
 /** The first thing in the way of this person answering now, or null. `ownId` is a response of theirs that does not count against them. */
 export async function shut(form: FormRow, link: LinkRow, actor: Actor, at: number, ownId?: string): Promise<Shut | null> {
+  if (form.status === 'closed') return 'closed'
   if (form.status !== 'live' || link.status !== 'active') return 'paused'
   if (link.opensAt !== null && at < link.opensAt) return 'not-yet'
   if (link.closesAt !== null && at >= link.closesAt) return 'closed'

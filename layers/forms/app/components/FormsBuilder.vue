@@ -9,6 +9,8 @@ const props = defineProps<{ data: BuilderData }>()
 const emit = defineEmits<{ changed: [] }>()
 const { t } = useT()
 const toast = useToast()
+const { $api } = useNuxtApp()
+const { toRefusal } = useRefusal()
 const builder = useFormBuilder(props.data, () => props.data.fields)
 provide(FORM_BUILDER, builder)
 const form = computed(() => props.data.form)
@@ -69,7 +71,32 @@ const more = computed(() => [[
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
   { label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } },
   { label: t('forms.screens.json.title'), icon: 'i-lucide-braces', onSelect: () => { json.value = true } },
-]])
+], life.value])
+
+// ---- pausing, closing and archiving ----
+type Status = 'draft' | 'live' | 'paused' | 'closed' | 'archived'
+const undo = useUndo()
+async function setStatus(to: Status, back?: Status) {
+  try {
+    await $api(`/api/forms/forms/${form.value.id}/status` as string, { method: 'POST', body: { to } })
+    undo.offer(t(`forms.screens.life.done.${to}`), back ? async () => { await setStatus(back) } : undefined)
+    emit('changed')
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+}
+/** What can be done to the form from where it is now. Each can be undone from its toast. */
+const life = computed(() => {
+  const status = form.value.status as Status
+  const item = (key: string, icon: string, to: Status) => ({ label: t(`forms.screens.life.${key}`), icon, onSelect: () => { setStatus(to, status) } })
+  if (status === 'live') return [item('pause', 'i-lucide-pause', 'paused'), item('close', 'i-lucide-circle-stop', 'closed')]
+  if (status === 'paused') return [item('resume', 'i-lucide-play', 'live'), item('close', 'i-lucide-circle-stop', 'closed')]
+  if (status === 'closed') return [item('reopen', 'i-lucide-play', 'live'), item('archive', 'i-lucide-archive', 'archived')]
+  if (status === 'archived') return [item('restore', 'i-lucide-archive-restore', form.value.liveVersion === null ? 'draft' : 'closed')]
+  return [item('archive', 'i-lucide-archive', 'archived')]
+})
 function published(number: number) {
   toast.add({ title: t('forms.screens.publish.done', { n: number }), color: 'success' })
   emit('changed')
@@ -90,6 +117,11 @@ const reload = () => window.location.reload()
       <StatusBadge
         :tone="form.liveVersion === null ? 'neutral' : 'success'"
         :label="form.liveVersion === null ? t('forms.screens.status.draft') : t('forms.screens.builder.version', { n: form.liveVersion })"
+      />
+      <StatusBadge
+        v-if="form.status === 'paused' || form.status === 'closed' || form.status === 'archived'"
+        :tone="form.status === 'paused' ? 'warning' : 'neutral'"
+        :label="t(`forms.screens.status.${form.status}`)"
       />
     </template>
     <template #primary>
