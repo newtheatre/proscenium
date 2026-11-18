@@ -31,7 +31,7 @@ test('first-run setup asks for the first Owner, then the theatre and its time zo
   await page.getByRole('button', { name: 'Next' }).click()
   await expect(page.getByLabel('The theatre\'s name')).toBeVisible()
   await expect(page.getByText('Time zone', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Contact email address')).toHaveValue('olive@example.org')
+  await expect(page.getByLabel('Contact email address')).toHaveValue('')
   await expect(page.getByRole('button', { name: 'Make my passkey' })).toBeVisible()
 })
 
