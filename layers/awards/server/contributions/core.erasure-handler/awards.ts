@@ -1,4 +1,4 @@
-// Erasure: the person's awards leave the roll of honour in the erasure's own batch. The registry
+// Erasure: the person's awards leave the roll of honour in a stage of the erasure. The registry
 // blanks the printed name and the citation; this hides the row so a blank is never listed.
 import { nowMs, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
