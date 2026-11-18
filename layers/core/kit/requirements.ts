@@ -44,8 +44,12 @@ export type Presented = { ref: string, value: string } | { ref: string, evidence
 export interface RequirementOption { reference: string, label: string, description?: string }
 export interface RequirementDescription {
   label: string
-  /** Tells the host to show a field for a value the person presents, and how to label and check it. */
-  presentable?: { label: string, shape: string }
+  /**
+   * Tells the host to show a field for a value the person presents, and how to label and check it:
+   * `label` is the hint beside the price ("Friends: type your member number to get this price"),
+   * `field` the field's own name ("Member number"), a whole phrase never set inside a sentence.
+   */
+  presentable?: { label: string, field?: string, shape: string }
 }
 
 /** The contract of a core.requirement contribution. The contribution's id is the source id. */

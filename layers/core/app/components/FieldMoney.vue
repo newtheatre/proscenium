@@ -8,9 +8,10 @@ const props = withDefaults(defineProps<{
   min?: number
   max?: number
   disabled?: boolean
-  /** Shows the plus and minus buttons; off where an amount is typed, such as a price list. */
+  /** Shows the plus and minus buttons. Off by default: money is typed, and a stepper from an empty
+      box would only fill in a free price, then add a penny a press. */
   steppers?: boolean
-}>(), { currency: undefined, min: 0, max: undefined, steppers: true })
+}>(), { currency: undefined, min: 0, max: undefined, steppers: false })
 const model = defineModel<number | null>({ default: null })
 
 const { data: settings } = usePublicSettings()
@@ -25,8 +26,10 @@ const major = computed({
 </script>
 
 <template>
+  <!-- About ten characters wide: an amount, not a whole row. A class from the caller replaces it. -->
   <UInputNumber
     v-model="major"
+    class="w-36 max-w-full"
     :min="min / scale"
     :max="max === undefined ? undefined : max / scale"
     :step="1 / scale"

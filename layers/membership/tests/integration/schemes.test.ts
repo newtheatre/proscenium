@@ -95,6 +95,16 @@ describe('holding a scheme', () => {
     expect((await req('PATCH', `/api/membership/schemes/${id}`, { side: 'members' })).body.code).toBe('membership.scheme.side-fixed')
   })
 
+  it('offers staff only the lengths on sale, and asks for none when both dates are given', async () => {
+    const id = await scheme({ joinMode: 'staff-only' }, [12, 36])
+    await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
+    const options = (await req('GET', `/api/membership/schemes/${id}`)).body.options
+    await req('PATCH', `/api/membership/schemes/${id}/options/${options[1].id}`, { state: 'withdrawn' })
+    const address = () => `staff${Math.random().toString(36).slice(2)}@example.org`
+    expect((await req('POST', `/api/membership/schemes/${id}/members`, { address: address(), lengthOptionId: options[1].id })).body.code).toBe('membership.option.unknown')
+    expect((await req('POST', `/api/membership/schemes/${id}/members`, { address: address(), startsOn: '2026-09-01', endsOn: '2027-08-31' })).status).toBe(200)
+  })
+
   it('lets staff add a member by address, with dates by hand, and never to themselves (MEM-24)', async () => {
     const id = await scheme({ joinMode: 'staff-only', graceDays: 5 })
     await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })

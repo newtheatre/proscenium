@@ -3,6 +3,7 @@
      member directly. -->
 <script setup lang="ts">
 import { z } from 'zod'
+import type { MembershipSchemeChoice } from '../../../../../../shared/scheme-choice'
 
 interface Scheme {
   id: string
@@ -32,7 +33,7 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal, fieldErrors } = useRefusal()
+const { toRefusal } = useRefusal()
 const { day } = useDates()
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -100,42 +101,16 @@ const actions = computed(() => {
   const out = []
   if (s.state === 'closed') out.push({ label: t('membership.screens.scheme.to-archived'), icon: 'i-lucide-archive', onSelect: () => move('archived') })
   if (s.state === 'archived') out.push({ label: t('membership.screens.scheme.to-closed'), icon: 'i-lucide-archive-restore', onSelect: () => move('closed') })
-  if (data.value?.canImport && (s.state === 'open' || s.state === 'closed')) out.push({ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', onSelect: openImport })
+  if (data.value?.canImport && (s.state === 'open' || s.state === 'closed')) out.push({ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', onSelect: () => { importing.value = true } })
   if (s.state === 'draft') out.push({ label: t('membership.screens.scheme.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove })
   return out
 })
 
-// Importing members from a file (MEM-49): tried first, then queued once the officer has seen the outcome.
-interface Imported { queued: number, wouldImport?: number, refused: { line: number, reason: string }[] }
+// Adding and importing members: the windows are shared with Console > Members, and offered the schemes this viewer may use.
+const { data: choices, refresh: refreshChoices } = await useAPI<{ schemes: MembershipSchemeChoice[] }>('/api/membership/members/schemes', { key: 'membership:members:schemes', default: () => ({ schemes: [] }) })
+const canAddHere = computed(() => !!choices.value?.schemes.some(s => s.id === id.value && s.canAdd))
 const importing = ref(false)
-const importFile = ref<File | null>(null)
-const importPreview = ref<Imported | null>(null)
-const importRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function openImport() {
-  importFile.value = null
-  importPreview.value = null
-  importRefusal.value = null
-  importing.value = true
-}
-async function sendImport(dryRun: boolean): Promise<Imported | null> {
-  importRefusal.value = null
-  try {
-    return await $api<Imported>(`/api/membership/schemes/${id.value}/import` as string, { method: 'POST', body: { file: await importFile.value!.text(), dryRun } })
-  }
-  catch (e) {
-    importRefusal.value = toRefusal(e)
-    return null
-  }
-}
-watch(importFile, async (f) => {
-  importPreview.value = f ? await sendImport(true) : null
-})
-async function runImport() {
-  const done = await sendImport(false)
-  if (!done) return
-  toast.add({ title: t('membership.screens.import.queued', { count: done.queued }), description: t('membership.screens.import.queued-help'), color: 'success' })
-  importing.value = false
-}
+const adding = ref(false)
 
 // Lengths: added from a window, withdrawn or offered again from the row's menu with an Undo.
 const option = reactive({ name: '', count: 12, idempotency: '' })
@@ -157,7 +132,7 @@ async function addOption() {
     await $api(`/api/membership/schemes/${id.value}/options` as string, { method: 'POST', headers: { 'idempotency-key': option.idempotency }, body: { name: option.name, count: option.count } })
     toast.add({ title: t('membership.screens.lengths.added', { name: option.name.trim() }), color: 'success' })
     addingOption.value = false
-    await refresh()
+    await Promise.all([refresh(), refreshChoices()])
   }
   catch (e) {
     optionRefusal.value = toRefusal(e)
@@ -167,10 +142,10 @@ const setOption = (o: Option, state: Option['state']) => $api(`/api/membership/s
 async function toggleOption(o: Option) {
   const to = o.state === 'offered' ? 'withdrawn' : 'offered'
   await setOption(o, to)
-  await refresh()
+  await Promise.all([refresh(), refreshChoices()])
   offer(t(`membership.screens.lengths.${to}-done`, { name: o.name }), async () => {
     await setOption(o, o.state)
-    await refresh()
+    await Promise.all([refresh(), refreshChoices()])
   })
 }
 const optionActions = (o: Option) => [[o.state === 'offered'
@@ -180,57 +155,6 @@ const offeredOptions = computed(() => (data.value?.options ?? []).filter(o => o.
 const withdrawnOptions = computed(() => (data.value?.options ?? []).filter(o => o.state === 'withdrawn'))
 const showWithdrawn = ref(false)
 const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthOptionId === optionId)?.endsOn
-
-// Adding a member directly.
-const adding = ref(false)
-const member = reactive({ name: '', address: '', lengthOptionId: undefined as string | undefined, startsOn: '', endsOn: '', note: '', fee: 'link' as 'link' | 'waive', idempotency: '' })
-// P9: for a scheme whose fee is collected through the system, a link to pay or a waiver.
-const asksFee = computed(() => !!data.value?.feesOn)
-const byLink = computed(() => asksFee.value && member.fee === 'link')
-const memberRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const memberForm = useTemplateRef('memberForm')
-// What the add route checks, beside each field; a waived fee needs its reason.
-const memberSchema = z.object({
-  address: z.string().trim().email().max(254), // not-policy: the longest address there is
-  name: z.string().trim().max(120), // not-policy: shape bound
-  note: z.string().trim().max(1000), // not-policy: shape bound
-}).passthrough().superRefine((value, ctx) => {
-  if (asksFee.value && member.fee === 'waive' && !value.note) ctx.addIssue({ code: 'custom', path: ['note'], message: t('core.form.invalid.required') })
-})
-function openAdd() {
-  Object.assign(member, { name: '', address: '', lengthOptionId: data.value?.options.find(o => o.state === 'offered')?.id, startsOn: '', endsOn: '', note: '', fee: 'link', idempotency: crypto.randomUUID() })
-  memberRefusal.value = null
-  adding.value = true
-}
-async function addMember() {
-  memberRefusal.value = null
-  try {
-    const added = await $api<{ endsOn: string | null, opensMembersArea: boolean, waiting?: string }>(`/api/membership/schemes/${id.value}/members` as string, {
-      method: 'POST',
-      headers: { 'idempotency-key': member.idempotency },
-      body: {
-        name: member.name.trim() || undefined, address: member.address.trim(), lengthOptionId: member.lengthOptionId ?? null, note: member.note.trim() || undefined,
-        ...(byLink.value ? {} : { startsOn: member.startsOn || undefined, endsOn: member.endsOn || undefined }),
-        ...(asksFee.value ? { fee: member.fee } : {}),
-      },
-    })
-    adding.value = false
-    if (added.waiting === 'payment') {
-      toast.add({ title: t('membership.screens.add-member.link-sent'), color: 'success' })
-      return
-    }
-    toast.add({
-      title: t('membership.screens.add-member.added'),
-      description: t(added.opensMembersArea ? 'membership.screens.add-member.opens-area' : 'membership.screens.add-member.no-area'),
-      color: 'success',
-    })
-    await refresh()
-  }
-  catch (e) {
-    memberRefusal.value = toRefusal(e)
-    memberForm.value?.setErrors(fieldErrors(memberRefusal.value))
-  }
-}
 </script>
 
 <template>
@@ -250,10 +174,10 @@ async function addMember() {
     >
       <div class="flex gap-2">
         <UButton
-          v-if="scheme.state === 'open'"
+          v-if="scheme.state === 'open' && canAddHere"
           :label="t('membership.screens.add-member.title')"
           icon="i-lucide-user-plus"
-          @click="openAdd"
+          @click="adding = true"
         />
         <UButton
           v-if="scheme.state === 'draft' || scheme.state === 'closed'"
@@ -611,157 +535,16 @@ async function addMember() {
       </template>
     </UModal>
 
-    <UModal
+    <MembershipAddMemberModal
       v-model:open="adding"
-      :title="t('membership.screens.add-member.title')"
-      :description="t('membership.screens.add-member.help')"
-    >
-      <template #body>
-        <UForm
-          id="membership-add-member"
-          ref="memberForm"
-          :schema="memberSchema"
-          :state="member"
-          class="space-y-4"
-          novalidate
-          @submit="addMember"
-        >
-          <RefusalNotice :refusal="memberRefusal" />
-          <UFormField
-            name="address"
-            :label="t('membership.screens.add-member.address')"
-            required
-          >
-            <UInput
-              v-model="member.address"
-              type="email"
-              autocomplete="off"
-            />
-          </UFormField>
-          <UFormField
-            name="name"
-            :label="t('membership.screens.add-member.name')"
-            :help="t('membership.screens.add-member.name-help')"
-          >
-            <UInput
-              v-model="member.name"
-              maxlength="120"
-              autocomplete="off"
-            />
-          </UFormField>
-          <UFormField
-            v-if="data && data.options.length > 1"
-            name="lengthOptionId"
-            :label="t('membership.screens.lengths.title')"
-          >
-            <USelect
-              v-model="member.lengthOptionId"
-              :items="data.options.map(o => ({ value: o.id, label: o.name }))"
-            />
-          </UFormField>
-          <UFormField
-            v-if="asksFee"
-            name="fee"
-            :label="t('membership.screens.add-member.fee')"
-          >
-            <URadioGroup
-              v-model="member.fee"
-              :items="(['link', 'waive'] as const).map(v => ({ value: v, label: t(`membership.screens.add-member.fee-${v}`), description: t(`membership.screens.add-member.fee-${v}-help`) }))"
-            />
-          </UFormField>
-          <div
-            v-if="!byLink"
-            class="grid gap-4 sm:grid-cols-2"
-          >
-            <UFormField
-              name="startsOn"
-              :label="t('membership.screens.add-member.starts')"
-              :help="t('membership.screens.add-member.starts-help')"
-            >
-              <FieldDate v-model="member.startsOn" />
-            </UFormField>
-            <UFormField
-              name="endsOn"
-              :label="t('membership.screens.add-member.ends')"
-              :help="t('membership.screens.add-member.ends-help')"
-            >
-              <FieldDate
-                v-model="member.endsOn"
-                :min="member.startsOn || undefined"
-              />
-            </UFormField>
-          </div>
-          <UFormField
-            name="note"
-            :label="t('membership.screens.add-member.note')"
-            :help="asksFee && member.fee === 'waive' ? t('membership.screens.add-member.waive-note-help') : t('membership.screens.add-member.note-help')"
-            :required="asksFee && member.fee === 'waive'"
-          >
-            <UTextarea
-              v-model="member.note"
-              maxlength="1000"
-              :rows="2"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="membership-add-member"
-          loading-auto
-          :label="t('membership.screens.add-member.submit')"
-        />
-      </template>
-    </UModal>
-
-    <UModal
+      :schemes="choices?.schemes ?? []"
+      :scheme-id="id"
+      @added="refresh()"
+    />
+    <MembershipImportModal
       v-model:open="importing"
-      :title="t('membership.screens.import.title')"
-      :description="t('membership.screens.import.help')"
-    >
-      <template #body>
-        <div class="space-y-4">
-          <RefusalNotice :refusal="importRefusal" />
-          <UFileUpload
-            v-model="importFile"
-            accept=".csv,text/csv,text/plain"
-            :label="t('membership.screens.import.file')"
-            :description="t('membership.screens.import.file-help')"
-            class="w-full"
-          />
-          <UAlert
-            v-if="importPreview"
-            :color="importPreview.refused.length ? 'warning' : 'success'"
-            variant="subtle"
-            :title="t('membership.screens.import.would-import', { count: importPreview.wouldImport ?? 0 })"
-          >
-            <template
-              v-if="importPreview.refused.length"
-              #description
-            >
-              <p>{{ t('membership.screens.import.refused', { count: importPreview.refused.length }) }}</p>
-              <ul class="list-disc ps-5">
-                <li
-                  v-for="r in importPreview.refused.slice(0, 10)"
-                  :key="r.line"
-                >
-                  {{ t('membership.screens.list.refused-line', { line: r.line, reason: t(`membership.screens.import.reasons.${r.reason}`) }) }}
-                </li>
-              </ul>
-            </template>
-          </UAlert>
-        </div>
-      </template>
-      <template #footer>
-        <UButton
-          icon="i-lucide-file-up"
-          loading-auto
-          :disabled="!importPreview?.wouldImport"
-          :label="t('membership.screens.import.submit')"
-          @click="runImport"
-        />
-      </template>
-    </UModal>
+      :schemes="choices?.schemes ?? []"
+      :scheme-id="id"
+    />
   </PageFrame>
 </template>
