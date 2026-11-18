@@ -54,6 +54,9 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
   await expect(page.getByText('This request needs an Idempotency-Key header.')).toHaveCount(0)
 
   await visit(page, `/console/box-office/performances/${performanceId}`)
+  // With one price throughout the sections are put away until the house is split.
+  const split = page.getByRole('button', { name: 'Price parts of the house differently' })
+  if (await split.isVisible()) await split.click()
   await page.getByRole('textbox', { name: /^Name/ }).fill('Circle')
   await page.getByRole('button', { name: 'Add section' }).click()
   await expect(page.getByText('Section added').first()).toBeVisible()
@@ -115,4 +118,36 @@ test('Copy one performance\'s set-up onto another', async ({ page }) => {
   await page.getByRole('button', { name: 'Copy set-up' }).click()
   await expect(page.getByText('Set-up copied').first()).toBeVisible()
   await expect(page.getByRole('spinbutton').first()).toHaveValue(first)
+})
+
+test('A show with one price throughout is set up without sections, until the house is split', async ({ page }) => {
+  const post = async (path: string, data: unknown) => {
+    const response = await page.request.post(path, { data, headers: { 'idempotency-key': crypto.randomUUID() } })
+    expect(response.ok(), `${path}: ${await response.text()}`).toBe(true)
+    return response.json()
+  }
+  const production = await post('/api/core/productions', { title: `The Single Price Show ${stamp}`, kind: 'own' })
+  const venue = await post('/api/core/venues', { name: `Single Price Theatre ${stamp}` })
+  // A draft date takes no preset, so the show starts with no sections at all.
+  const performance = await post(`/api/core/productions/${production.id}/performances`, { venueId: venue.venueId, spaceId: venue.spaceId, startsAt: Date.now() + 86_400_000, capacity: 100 })
+
+  await visit(page, `/console/box-office/performances/${performance.id}`)
+  await expect(page.getByRole('heading', { name: 'Sections' })).toHaveCount(0)
+  await expect(page.getByText('Set the seats to sell above first.')).toBeVisible()
+  const seats = page.getByRole('spinbutton', { name: 'Seats', exact: true })
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Increment' }).first().click()
+  await expect(seats).toHaveValue('3')
+  await page.getByRole('button', { name: 'Save seats' }).click()
+  await expect(page.getByText('Seats saved').first()).toBeVisible()
+  await expect(seats).toHaveValue('3')
+  // One price for each ticket type, with no section named on the box or round it.
+  await expect(page.getByRole('group', { name: 'All seats' })).toHaveCount(0)
+  await page.getByRole('spinbutton', { name: `${typeName} price`, exact: true }).fill('10.00')
+  await page.getByRole('button', { name: 'Save prices' }).click()
+  await expect(page.getByText('Prices saved').first()).toBeVisible()
+
+  // Splitting the house shows the one section, named, ready for another to be added beside it.
+  await page.getByRole('button', { name: 'Price parts of the house differently' }).click()
+  await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'All seats' }).getByRole('spinbutton', { name: `All seats, ${typeName} price` })).toHaveValue(/10\.00/)
 })

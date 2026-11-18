@@ -4,7 +4,10 @@
      by all its performances, and so are its prices unless this performance is given its own, which
      can be handed back to the production's at any time; capacity and the sale window are this
      performance's own. A price change can be set to take effect later, such as when an early-bird
-     offer ends; changes still to come are listed under the prices and can be cancelled. -->
+     offer ends; changes still to come are listed under the prices and can be cancelled. A production
+     with one price throughout has at most one band, which is not shown or named: its seats are one
+     number and its prices one per ticket type. The bands, called sections, appear once the house is
+     split to price parts of it differently (show walkthrough, decision 4). -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
@@ -86,9 +89,34 @@ watch(data, (d) => {
   windowForm.value = { onSaleAt: d.sales?.onSaleAt ?? null, offSaleAt: d.sales?.offSaleAt ?? null, maxPerOrder: d.sales?.maxPerOrder ?? null, holdMinutes: d.sales?.holdMinutes ?? null }
 }, { immediate: true })
 
-async function saveCapacity(confirmOverVenue = false) {
-  const pools = Object.entries(capacity.value).map(([bandId, n]) => ({ bandId, capacity: n ?? 0 }))
-  // A section with no seats yet goes back to none.
+// One price throughout: a production with no more than one section. With none yet, the seats are
+// typed into a box of their own, and the one section is made when they are saved.
+// Once the house is being split, the sections are shown and named even while there is only one.
+const splitting = ref(route.hash === '#sections')
+const sectioned = computed(() => (data.value?.bands.length ?? 0) > 1 || splitting.value)
+const wholeSeats = ref(0)
+async function wholeHouse(): Promise<Record<string, number> | null> {
+  const d = data.value!
+  if (d.bands.length) return capacity.value
+  refusal.value = null
+  try {
+    const seats = wholeSeats.value
+    await $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`, { method: 'POST', body: { name: t('box-office.setup.sections.whole-house'), kind: 'standard', sort: 0 } })
+    await refresh()
+    const only = data.value?.bands[0]
+    wholeSeats.value = 0
+    return only ? { [only.id]: seats } : null
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    return null
+  }
+}
+
+async function saveCapacity(confirmOverVenue = false, typed?: Record<string, number>) {
+  const counts = typed ?? await wholeHouse()
+  if (!counts) return
+  const pools = Object.entries(counts).map(([bandId, n]) => ({ bandId, capacity: n ?? 0 }))
   const had = data.value?.pools ?? []
   const before = pools.map(p => ({ bandId: p.bandId, capacity: had.find(h => h.bandId === p.bandId)?.capacity ?? 0 }))
   refusal.value = null
@@ -103,7 +131,7 @@ async function saveCapacity(confirmOverVenue = false) {
   }
   catch (e) {
     const r = toRefusal(e)
-    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return saveCapacity(true)
+    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return saveCapacity(true, counts)
     refusal.value = r
   }
 }
@@ -170,6 +198,13 @@ async function savePrices() {
 // Changes set for later, in words: which ticket, what it becomes, from when, and for which performances.
 const typeName = (typeId: string) => types.value?.ticketTypes.find(type => type.id === typeId)?.name ?? ''
 const bandName = (bandId: string) => data.value?.bands.find(b => b.id === bandId)?.name ?? ''
+// A change to come in words, naming the section only where there is more than one.
+const comingLine = (s: ScheduledPrice) => sectioned.value
+  ? t('box-office.setup.prices.coming.line', { band: bandName(s.bandId), type: typeName(s.ticketTypeId), becomes: becomes(s), when: dateTime(s.from) })
+  : t('box-office.setup.prices.coming.line-whole', { type: typeName(s.ticketTypeId), becomes: becomes(s), when: dateTime(s.from) })
+const comingCancel = (s: ScheduledPrice) => sectioned.value
+  ? t('box-office.setup.prices.coming.cancel-label', { type: typeName(s.ticketTypeId), band: bandName(s.bandId), when: dateTime(s.from) })
+  : t('box-office.setup.prices.coming.cancel-label-whole', { type: typeName(s.ticketTypeId), when: dateTime(s.from) })
 function becomes(s: ScheduledPrice): string {
   if (s.inherits) return t('box-office.setup.prices.coming.inherits')
   return s.amountMinor === null ? t('box-office.setup.prices.coming.unsold') : money(s.amountMinor)
@@ -319,7 +354,7 @@ const folded = computed(() => !!data.value?.sales && data.value.sales.state !== 
 const dirty = computed(() => {
   const d = data.value
   if (!d) return false
-  const seats = d.bands.some(b => (capacity.value[b.id] ?? 0) !== (d.pools.find(p => p.bandId === b.id)?.capacity ?? 0))
+  const seats = d.bands.some(b => (capacity.value[b.id] ?? 0) !== (d.pools.find(p => p.bandId === b.id)?.capacity ?? 0)) || (!d.bands.length && !!wholeSeats.value)
   const priced = d.bands.some(b => activeTypes.value.some(type => (prices.value[cell(b.id, type.id)] ?? null) !== shown(layer(b.id, type.id))))
   const s = d.sales
   const windowChanged = (['onSaleAt', 'offSaleAt', 'maxPerOrder', 'holdMinutes'] as const).some(k => (windowForm.value[k] ?? null) !== (s?.[k] ?? null))
@@ -484,6 +519,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </PageSection>
 
           <PageSection
+            v-if="sectioned"
+            id="sections"
             :title="t('box-office.setup.bands.title')"
             :description="t('box-office.setup.bands.description')"
           >
@@ -538,7 +575,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
           <PageSection
             :title="t('box-office.setup.capacity.title')"
-            :description="d.houseCapacity ? t('box-office.setup.capacity.house', { capacity: d.houseCapacity, total: totalCapacity }) : t('box-office.setup.capacity.description')"
+            :description="sectioned
+              ? (d.houseCapacity ? t('box-office.setup.capacity.house', { capacity: d.houseCapacity, total: totalCapacity }) : t('box-office.setup.capacity.description'))
+              : (d.houseCapacity ? t('box-office.setup.capacity.house-whole', { capacity: d.houseCapacity }) : t('box-office.setup.capacity.description-whole'))"
           >
             <UForm
               class="space-y-4"
@@ -546,16 +585,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               novalidate
               @submit="saveCapacity()"
             >
-              <p
+              <UFormField
                 v-if="!d.bands.length"
-                class="text-sm text-muted"
+                :label="t('box-office.setup.capacity.whole')"
               >
-                {{ t('box-office.setup.bands.none') }}
-              </p>
+                <UInputNumber
+                  v-model="wholeSeats"
+                  :min="0"
+                />
+              </UFormField>
               <UFormField
                 v-for="b in d.bands"
                 :key="b.id"
-                :label="b.name"
+                :label="sectioned ? b.name : t('box-office.setup.capacity.whole')"
                 :help="t('box-office.setup.capacity.taken', { count: d.pools.find(p => p.bandId === b.id)?.claimed ?? 0 })"
               >
                 <UInputNumber
@@ -564,11 +606,25 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 />
               </UFormField>
               <UButton
-                v-if="d.bands.length"
                 type="submit"
                 :label="t('box-office.setup.capacity.save')"
               />
             </UForm>
+            <template
+              v-if="!sectioned"
+              #footer
+            >
+              <p class="text-sm text-muted">
+                {{ t('box-office.setup.sections.split-help') }}
+              </p>
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-split"
+                :label="t('box-office.setup.sections.split')"
+                @click="splitting = true"
+              />
+            </template>
           </PageSection>
 
           <PageSection
@@ -590,8 +646,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 {{ t('box-office.navigation.ticket-types.label') }}
               </ULink>
             </p>
+            <p
+              v-else-if="!d.bands.length"
+              class="text-sm text-muted"
+            >
+              {{ t('box-office.setup.prices.seats-first') }}
+            </p>
             <UForm
-              v-else-if="d.bands.length"
+              v-else
               class="space-y-6"
               :state="prices"
               :validate="() => needs({ from: when === 'later' ? from : true })"
@@ -631,7 +693,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 :key="b.id"
                 class="space-y-3"
               >
-                <legend class="font-medium">
+                <legend
+                  v-if="sectioned"
+                  class="font-medium"
+                >
                   {{ b.name }}
                 </legend>
                 <UFormField
@@ -641,7 +706,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 >
                   <!-- Each box is named for its section too, so a screen reader does not hear "Member" twice. -->
                   <template #label>
-                    <span class="sr-only">{{ b.name }}, </span>{{ type.name }}<span class="sr-only"> {{ t('box-office.setup.prices.price') }}</span>
+                    <span
+                      v-if="sectioned"
+                      class="sr-only"
+                    >{{ b.name }}, </span>{{ type.name }}<span class="sr-only"> {{ t('box-office.setup.prices.price') }}</span>
                   </template>
                   <div class="flex flex-wrap items-center gap-2">
                     <FieldMoney v-model="prices[cell(b.id, type.id)]" />
@@ -675,7 +743,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
                 >
                   <span>
-                    {{ t('box-office.setup.prices.coming.line', { band: bandName(s.bandId), type: typeName(s.ticketTypeId), becomes: becomes(s), when: dateTime(s.from) }) }}
+                    {{ comingLine(s) }}
                     <span class="text-muted">· {{ t(s.performanceId ? 'box-office.setup.prices.scope.this' : 'box-office.setup.prices.scope.all') }}</span>
                   </span>
                   <UButton
@@ -683,7 +751,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     variant="link"
                     icon="i-lucide-x"
                     :label="t('box-office.setup.prices.coming.cancel')"
-                    :aria-label="t('box-office.setup.prices.coming.cancel-label', { type: typeName(s.ticketTypeId), band: bandName(s.bandId), when: dateTime(s.from) })"
+                    :aria-label="comingCancel(s)"
                     @click="cancelScheduled(s)"
                   />
                 </li>
