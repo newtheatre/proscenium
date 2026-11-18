@@ -97,13 +97,27 @@ function open(c?: PromoCode) {
   editing.value = true
 }
 const url = (id: string) => `/api/box-office/promo-codes/${encodeURIComponent(id)}`
+// A code is kept without spaces and in capitals (the server's normaliseCode), so the form shows
+// what will be saved, checks the characters beside the field, and the toast names the stored code.
+const stored = (typed: string) => typed.replace(/\s+/g, '').toUpperCase()
+const storedAs = computed(() => {
+  const code = stored(form.value.code)
+  return code && code !== form.value.code.trim() ? t('box-office.codes.field.code-stored', { code }) : undefined
+})
+function validate(f: Form) {
+  if (!f.code.trim()) return needs({ code: '' })
+  if (!/^[A-Za-z0-9 _-]+$/.test(f.code)) return [{ name: 'code', message: t('box-office.codes.field.code-invalid') }]
+  if (stored(f.code).length < 3) return [{ name: 'code', message: t('box-office.codes.field.code-short') }] // not-policy: the server's shortest code
+  return []
+}
+
 async function save() {
   const body = asBody(form.value)
   const id = editId.value
   const before = id ? data.value?.rows.find(c => c.id === id) : undefined
   const ok = id && before
-    ? await run(() => $api(url(id), { method: 'PUT', body }), t('box-office.codes.saved', { code: body.code.toUpperCase() }), () => $api(url(id), { method: 'PUT', body: asBody(asForm(before)) }), formRefusal)
-    : await run(() => $api<{ id: string }>('/api/box-office/promo-codes', { method: 'POST', body }), t('box-office.codes.added', { code: body.code.toUpperCase() }), made => $api(`${url(made.id)}/active`, { method: 'POST', body: { active: false } }), formRefusal)
+    ? await run(() => $api(url(id), { method: 'PUT', body }), t('box-office.codes.saved', { code: stored(body.code) }), () => $api(url(id), { method: 'PUT', body: asBody(asForm(before)) }), formRefusal)
+    : await run(() => $api<{ id: string }>('/api/box-office/promo-codes', { method: 'POST', body }), t('box-office.codes.added', { code: stored(body.code) }), made => $api(`${url(made.id)}/active`, { method: 'POST', body: { active: false } }), formRefusal)
   if (ok) editing.value = false
 }
 const setActive = (c: PromoCode, on: boolean) => run(() => $api(`${url(c.id)}/active`, { method: 'POST', body: { active: on } }), t(on ? 'box-office.codes.restored' : 'box-office.codes.retired', { code: c.code }), () => $api(`${url(c.id)}/active`, { method: 'POST', body: { active: !on } }))
@@ -192,6 +206,7 @@ const actions = (c: PromoCode) => [[
         <UForm
           id="promo-code-form"
           :state="form"
+          :validate="validate"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -199,7 +214,7 @@ const actions = (c: PromoCode) => [[
           <RefusalNotice :refusal="formRefusal" />
           <UFormField
             :label="t('box-office.codes.field.code')"
-            :help="t('box-office.codes.field.code-help')"
+            :help="storedAs ?? t('box-office.codes.field.code-help')"
             name="code"
             required
           >
