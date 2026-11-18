@@ -169,8 +169,58 @@ export const points = {
   'core.requirement': point({ kind: 'code', contract: 'requirement-source' }),
   'core.erasure-handler': point({ kind: 'code', contract: 'erasure-handler' }),
   'core.record-resolver': point({ kind: 'code', contract: 'record-resolver' }),
+  // A line of the privacy notice's "what we hold" table that the schema cannot say for itself: what
+  // is held, why, the lawful basis in plain words, and for how long. `keptFor` is words, or the key
+  // of a quotable duration setting, whose live value is shown.
   'core.privacy-record': point({
     kind: 'data',
-    schema: z.object({ id: z.string(), holds: z.string(), why: z.string(), keptFor: z.string() }).strict(),
+    schema: z.object({ id: z.string(), holds: z.string(), why: z.string(), basis: z.string().optional(), keptFor: z.string(), order: z.number().int().optional() }).strict(),
+  }),
+  // A policy: a page at /policies/<id> put together from the sections every module that is on keeps
+  // in content/policies/<id>/. `accepted` says where a person agrees to it, for terms; a notice is
+  // shown and never agreed to.
+  'core.policy': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string().regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/),
+      title: z.string().min(1).max(60), // not-policy: a page title's bound
+      // One line under the title on /policies, saying what the policy covers.
+      summary: z.string().max(200).optional(), // not-policy: a one-line summary's bound
+      order: z.number().int(),
+      kind: z.enum(['notice', 'terms', 'rules', 'statement']),
+      accepted: z.enum(['sign-up', 'checkout', 'joining']).optional(),
+    }).strict().refine(p => p.accepted === undefined || p.kind === 'terms', { message: 'only terms are accepted', path: ['accepted'] }),
+  }),
+  // A value a policy quotes with :fact{name="<id>"} or tests in a condition, worked out from the
+  // system's state where no setting holds it (which card providers are connected).
+  'core.policy-fact': point({ kind: 'code', contract: 'policy-fact' }),
+  // Something kept in a visitor's browser, for the cookies table of the privacy notice. `lasts` is
+  // words, or the key of a quotable duration setting. `staff` marks what only console screens keep.
+  'core.browser-storage': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      names: z.array(z.string()).min(1),
+      kind: z.enum(['cookie', 'storage']),
+      purpose: z.string(),
+      lasts: z.string().optional(),
+      essential: z.boolean(),
+      staff: z.boolean().optional(),
+      order: z.number().int().optional(),
+    }).strict().refine(e => e.kind === 'storage' || e.lasts !== undefined, { message: 'a cookie says how long it lasts', path: ['lasts'] }),
+  }),
+  // A company personal data is shared with, for the privacy notice. `when` is a policy condition
+  // (module="payments"; fact="payments.stripe" is="true"): the line shows only while it holds.
+  // `cookies` says when and why it sets cookies of its own, if it does.
+  'core.supplier': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      name: z.string(),
+      purpose: z.string(),
+      when: z.string().optional(),
+      cookies: z.object({ when: z.string(), purpose: z.string() }).strict().optional(),
+      order: z.number().int().optional(),
+    }).strict(),
   }),
 }

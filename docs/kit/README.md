@@ -297,6 +297,67 @@ starts with its module's name; the alias is what a content file writes (`::acces
 kebab-case, unique across modules and never an HTML element's name. The build refuses a clash, and
 the core layer registers the component a second time, globally, under its alias.
 
+## Policies
+
+A policy (the privacy notice, the terms of use, the house rules) is a page at `/policies/<id>` put
+together from Markdown sections. A module declares a policy with `core.policy` (id, title, summary,
+order, and kind: `notice`, `terms`, `rules` or `statement`). Core declares `privacy`, `terms`,
+`accessibility` and `visiting`. Every policy is linked from the footer and listed at `/policies`.
+
+**Sections.** Any module adds a section to any policy by keeping a file at
+`layers/<module>/content/policies/<policy>/<section>.md`; it shows while the module is on. A section
+is one heading and its text. Its front matter is deliberately small, one `key: value` a line:
+
+```md
+---
+title: At the bar
+order: 110
+revised: 2026-11-18
+law: gb
+when: 'setting="bar.age-check.description" is="true"'
+---
+```
+
+`order` places the section among every module's. `revised` is the date the wording last changed in a
+way a reader would care about; the page shows the latest. `law` is `any` (the default) or the
+two-letter country whose law the section states: it shows only while `core.organisation.country` is
+that country. `when` holds one or more conditions split by semicolons. `must-write: true` marks a
+section upstream cannot honestly write for a theatre (how the site was tested): it is left off the
+page until the theatre writes its own.
+
+**Values that cannot drift.** A section never states a figure the console can change:
+
+- `:setting{name="core.sessions.lifetime"}` quotes a public, quotable setting. A setting with no
+  value until the theatre sets one must sit inside `::when{has="..."}` or carry a `fallback="..."`.
+- `:fact{name="payments.card-providers"}` quotes a value worked out from the system's state, which a
+  module contributes to `core.policy-fact` (a file whose `value()` answers `{ value, text }`).
+- `::when{...}` … `#otherwise` … `::` shows text only while a condition holds. A condition tests one
+  of: `setting="…"` with `is`, `not` or `above`; `has="…"` (the setting has a value); `module="…"`
+  (the module is on); `fact="…"` with `is`, `not` or `above`.
+- `::policy-table{kind="…"}` draws a table built from what modules declare: `privacy-records`
+  (`core.privacy-record`), `cookies` and `browser-storage` (`core.browser-storage`), `suppliers` and
+  `supplier-cookies` (`core.supplier`). A time in those declarations may be the key of a quotable
+  setting, whose live value is shown.
+
+A section quotes only core's settings and its own module's, since another module may be off.
+`bun run check` fails a section that quotes or tests something unknown, not public, or possibly empty.
+
+**The theatre's own words.** A theatre never edits upstream's files. A file at
+`site/content/policies/<policy>/<section>.md` with the same name as an upstream section replaces it
+(keeping its place, conditions and law unless it states its own); a new name adds a section;
+`hidden: true` with a one-line `reason` drops one. `based-on: <hash>` records the upstream text a
+replacement was written against, so a later change upstream can be pointed out. A folder holding
+`_policy.md` (title, order, kind) declares a policy of the theatre's own.
+
+**How it is put together.** The build collects every section into `.generated/policies.ts`
+(`#policies`). `layers/core/server/policies/service.ts` decides which sections apply today;
+`layers/core/shared/policies.ts` holds the pure rules, shared by the checks, the server and the
+page, and `renderPolicy` writes a policy as plain Markdown with every value filled in. The page
+draws each section from the `policies` content collection, so tokens show live values.
+
+Not built yet: recorded versions and what a person accepted, the Admin screen that lists unwritten
+and out-of-date sections, and packs of law for countries other than the UK.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency

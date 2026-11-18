@@ -30,6 +30,10 @@ export default defineModule({
   },
 
   contributes: {
+    // What the public pages keep in a browser, for the privacy notice's cookies section.
+    'core.browser-storage': [
+      { id: 'public-site.tell-me-about', names: ['Shows you asked to hear about'], kind: 'storage', purpose: 'So the button remembers you pressed it', essential: false, order: 210 },
+    ],
     // ::whats-on in a theatre's own page, such as the starter home page.
     'core.public-component': [
       { id: 'whats-on', component: 'PublicSiteWhatsOn', alias: 'whats-on', description: 'What is on: every production with a date to come, or the soonest few (limit), narrowed by category, season or venue (slugs), as a grid or a list (layout).' },

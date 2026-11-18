@@ -35,7 +35,13 @@ const accountLinks = computed(() => viewer.value.signedIn
       { label: t('core.menu.sign-out'), icon: 'i-lucide-log-out', onSelect: () => { void signOut() } },
     ]
   : [{ label: t('core.menu.sign-in'), icon: 'i-lucide-log-in', to: `/sign-in?next=${encodeURIComponent(route.fullPath)}` }])
-const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined })))
+// The footer: the theatre's own links, then every policy the site has (a module that is on adds its
+// own), so a new policy is linked without anyone editing the menu.
+const { data: policies } = await useAPI<{ policies: { id: string, title: string }[] }>('/api/core/policies', { key: 'core:policies', default: () => ({ policies: [] }) })
+const footer = computed(() => [
+  ...(navigation.value?.footer ?? []).map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined })),
+  ...(policies.value?.policies ?? []).map(p => ({ label: p.title, to: `/policies/${p.id}`, target: undefined })),
+])
 // Until the first Owner is made the site has nothing to show: every page points to setup, and
 // setup itself is drawn without the site's links or a way to sign in.
 const onSetup = computed(() => route.path === '/setup')

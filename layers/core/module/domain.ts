@@ -24,6 +24,16 @@ export const settings = defineSettings('core', {
   'organisation.address': setting.text({ unset: true, maxLength: 300, change: organisation, audience: 'public', quotable: true }),
   'organisation.legal-name': setting.text({ unset: true, maxLength: 120, change: organisation, audience: 'public', quotable: true }),
   'organisation.charity-number': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
+  'organisation.company-number': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
+  // The law the theatre's terms are read under, in words ("England and Wales", "Scotland"), quoted by the policies.
+  'organisation.law': setting.text({ default: 'England and Wales', maxLength: 60, change: organisation, audience: 'public', quotable: true }),
+  // What the policies promise and the house rules say (/policies). Each is quoted by the text, so
+  // the page and the practice cannot drift apart; changing one changes what the policy says.
+  'complaints.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change: organisation, audience: 'public', quotable: true }),
+  'visiting.latecomers': setting.choice({ default: 'suitable-break', options: ['suitable-break', 'not-admitted', 'staff-decide'], change: organisation, audience: 'public' }),
+  // Children under this age come with an adult. 0 says nothing about it.
+  'visiting.accompanied-under': setting.integer({ default: 14, min: 0, max: 18, change: organisation, audience: 'public', quotable: true }),
+  'visiting.recording-allowed': setting.boolean({ default: false, change: organisation, audience: 'public' }),
   // The day the theatre's own year ends, as MM-DD (31 July is 07-31). Identity's year-end expiry
   // of roles reads it; while it is unset, year end cannot be chosen as an expiry.
   'organisation.year-end': setting.text({ unset: true, maxLength: 5, change: organisation, onChange: 'confirm' }),
@@ -332,7 +342,43 @@ export const contributes = {
   'core.home-card': [{ id: 'core.health', home: 'admin' as const, ability: 'core.health.view', component: 'CoreHealthCard', urgency: 'overdue' as const, count: 'core.health-attention' }],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }, { id: 'core.guidance', file: 'guidance' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
-  'core.public-component': [{ id: 'setting' }],
+  'core.public-component': [
+    { id: 'setting' },
+    { id: 'fact', description: 'A value the system works out, such as which card providers are connected: :fact{name="..."}.' },
+    { id: 'when', description: 'A block shown only while a setting has a value, a module is on or a fact holds, with #otherwise for when it does not.' },
+    { id: 'policy-table', description: 'A table built from what modules declare: cookies, browser-storage, suppliers, supplier-cookies or privacy-records (kind).' },
+  ],
+  // The policies core declares (/policies/<id>). Their text is content/policies/<id>/*.md, and any
+  // module that is on adds sections to them from its own content/policies/<id>/ folder.
+  'core.policy': [
+    { id: 'privacy', title: 'Privacy notice', summary: 'What we hold about you, why, how long we keep it, the cookies we use and your rights.', order: 10, kind: 'notice' as const },
+    { id: 'terms', title: 'Terms of use', summary: 'The rules for using this website and holding an account.', order: 20, kind: 'terms' as const, accepted: 'sign-up' as const },
+    { id: 'accessibility', title: 'Accessibility', summary: 'How we make this website and our shows usable by everyone, and what to do if something does not work for you.', order: 30, kind: 'statement' as const },
+    { id: 'visiting', title: 'Visiting us', summary: 'Our house rules: arriving, latecomers, age guidance, phones and how we treat each other.', order: 40, kind: 'rules' as const },
+  ],
+  // Who personal data is shared with, for the privacy notice. A line shows only while its condition holds.
+  'core.supplier': [
+    { id: 'core.cloudflare', name: 'Cloudflare', purpose: 'Hosts this website, its database and files, sends our emails, and checks that sign-ins come from people and not robots', cookies: { when: 'Occasionally, on any page', purpose: 'To tell real visitors from robots and attacks' }, order: 10 },
+    { id: 'core.google', name: 'Google', purpose: 'Signs you in, only if you choose "Sign in with Google"', when: 'setting="core.sign-in.google" is="true"', cookies: { when: 'Only if you choose "Sign in with Google"', purpose: 'To sign you in' }, order: 30 },
+  ],
+  // What core keeps in a visitor's browser, for the cookies table. Console-only notes are marked staff.
+  'core.browser-storage': [
+    { id: 'core.session', names: ['__Host-proscenium-session'], kind: 'cookie' as const, purpose: 'Keeps you signed in', lasts: 'core.sessions.lifetime', essential: true, order: 10 },
+    { id: 'core.browser', names: ['__Host-proscenium-browser'], kind: 'cookie' as const, purpose: 'Remembers which browser asked for a sign-in link, so the link only works there', lasts: 'core.sign-in.link-lifetime', essential: true, order: 20 },
+    { id: 'core.setup', names: ['__Host-proscenium-setup'], kind: 'cookie' as const, purpose: 'Holds your answers between steps while you create an account', lasts: 'A few minutes', essential: true, order: 30 },
+    { id: 'core.provider', names: ['__Host-proscenium-provider'], kind: 'cookie' as const, purpose: 'Keeps a sign-in through another service safe while it is in progress', lasts: 'A few minutes', essential: true, order: 40 },
+    { id: 'core.passkey-later', names: ['proscenium-passkey-later'], kind: 'cookie' as const, purpose: 'Remembers that you chose not to set up a passkey yet, so we stop asking', lasts: 'A short while', essential: false, order: 50 },
+    { id: 'core.colour-mode', names: ['nuxt-color-mode', 'proscenium-mode-chosen'], kind: 'storage' as const, purpose: 'Remember whether you chose the light or dark look', essential: false, order: 60 },
+  ],
+  // The "what we hold" table of the privacy notice. `keptFor` naming a setting shows its live value.
+  'core.privacy-record': [
+    { id: 'core.account', holds: 'Your account: name, email address and how you sign in', why: 'To give you an account', basis: 'To carry out our contract with you', keptFor: 'Until you delete it', order: 10 },
+    { id: 'core.sessions', holds: 'The devices you are signed in on', why: 'So you can see them and sign them out, and to keep accounts secure', basis: 'Our legitimate interests in keeping accounts secure', keptFor: 'core.sessions.lifetime', order: 20 },
+    { id: 'core.access-needs', holds: 'Access needs you tell us about', why: 'To arrange your visit', basis: 'Your explicit consent', keptFor: 'Until you remove them or delete your account', order: 30 },
+    { id: 'core.access-scheme-rejected', holds: 'An access scheme application we turned down', why: 'To answer questions about the decision', basis: 'Your explicit consent', keptFor: 'core.access-scheme.keep-rejected', order: 40 },
+    { id: 'core.emails', holds: 'Whether emails we sent you were delivered', why: 'To know that tickets and notices reach you', basis: 'Our legitimate interests in running a reliable service', keptFor: 'While you have an account', order: 50 },
+    { id: 'core.audit', holds: 'A record of what staff changed', why: 'To protect you and them, and to put mistakes right', basis: 'Our legitimate interests in running a safe, honest theatre', keptFor: 'For as long as the record it describes', order: 60 },
+  ],
   'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [

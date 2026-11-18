@@ -44,7 +44,7 @@ export const identitySettings = defineSettings('core', {
 
   'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
-  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change, onChange: 'confirm' }),
+  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
 
   'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change, onChange: 'confirm' }),
 
@@ -53,6 +53,12 @@ export const identitySettings = defineSettings('core', {
   // Erasure and the download are not offered until the theatre says who to contact about personal data.
   'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
+  // Quoted by the privacy notice (/policies/privacy): the regulator's registration reference (the
+  // ICO's, in the UK) and where the database is kept, in words ("the European Union").
+  'privacy.registration-number': setting.text({ unset: true, maxLength: 30, change, audience: 'public', quotable: true }),
+  'privacy.data-location': setting.text({ unset: true, maxLength: 80, change, audience: 'public', quotable: true }),
+  // The youngest a person may be to hold an account, as the terms of use and privacy notice state it.
+  'accounts.minimum-age': setting.integer({ default: 16, min: 13, max: 21, change, audience: 'public', quotable: true, onChange: 'confirm' }),
 
   'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, audience: 'public', quotable: true }),
@@ -60,14 +66,14 @@ export const identitySettings = defineSettings('core', {
   'access-scheme.companions-need-verified': setting.boolean({ default: false, change }),
   'access-scheme.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   'access-scheme.review-after': setting.duration({ default: '1095d', min: '365d', max: '3650d', change }),
-  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change, onChange: 'confirm' }),
+  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   // The account sweeps (part 3, "Retention"). They are built in a later release; their settings are
   // declared now so the advanced page shows them. A retention period asks again before it is saved,
   // and arming the sweeps asks why, and only an Owner may (core.retention.arm).
   'retention.unclaimed-after': setting.duration({ default: '1095d', min: '90d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   'retention.dormant-after': setting.duration({ default: '730d', min: '180d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   'retention.run-cap': setting.integer({ default: 50, min: 1, max: 500, unit: 'core.units.accounts', change }),
-  'retention.armed': setting.boolean({ default: false, change: 'core.retention.arm', onChange: 'reason' }),
+  'retention.armed': setting.boolean({ default: false, change: 'core.retention.arm', audience: 'public', onChange: 'reason' }),
 })
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
