@@ -28,6 +28,8 @@ export default defineModule({
     'limits.response-size': setting.integer({ default: 256, min: 16, max: 1024, change, audience: 'staff' }),
     // The most responses one export holds.
     'limits.export-rows': setting.integer({ default: 5000, min: 100, max: 20000, change, audience: 'staff' }),
+    // The most files one response may hold across its file questions. Each file's size is core's document limit.
+    'limits.files-per-response': setting.integer({ default: 20, min: 1, max: 100, change, audience: 'staff' }),
     // Whether authors may write their own validation patterns (regular expressions).
     'builder.free-patterns': setting.boolean({ default: false, change, audience: 'staff' }),
     // Whether a form holding personal answers must say how long they are kept before it is published.
@@ -125,6 +127,10 @@ export default defineModule({
   contributes: {
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }, { id: 'forms.template', file: 'template' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
+    // File answers: held in core's store under their response, checked as any upload is, and read only
+    // by those forms lets read the response. Uploaded through forms' own route while answering, never core's.
+    'core.file-slot': [{ id: 'forms.answer-file', owner: 'forms.response', ability: 'forms.settings.manage', many: true, accepts: ['png' as const, 'jpeg' as const, 'webp' as const, 'pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: true }],
+    'core.file-access': [{ id: 'forms.response', file: 'response' }],
     // Core contributes to no module's point, so the sources for core's records are forms' own.
     'forms.source': [
       { id: 'forms.person', file: 'person' }, { id: 'forms.production', file: 'production' }, { id: 'forms.performance', file: 'performance' },

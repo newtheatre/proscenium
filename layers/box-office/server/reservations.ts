@@ -18,7 +18,7 @@ import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
-import { liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
+import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
 import { doorCodesForOrder, ticketNumbers } from './tickets'
 
@@ -40,6 +40,8 @@ export interface ReserveInput {
   /** Needed when nobody is signed in. */
   email?: string | null
   name?: string | null
+  /** That everyone using the tickets is old enough, for a production only for people over an age. */
+  ageConfirmed?: boolean
 }
 
 export interface Reserved {
@@ -68,6 +70,7 @@ export async function requestReservation(unit: UnitView, input: ReserveInput): P
   const order = await first<OrderRow>(`${ORDER} WHERE id = ? AND basket_token_hash = ?`, input.orderId, await hashOf(input.token))
   if (!order) refuse('box-office.basket.not-found', 'There is no such basket.', { status: 404 })
   const lines = await checkBasket(order, input.expectedTotalMinor)
+  await assertAgeConfirmed(lines, input.ageConfirmed)
 
   const actor = useContext().actor
   if (actor.kind === 'person' && actor.accountId) return reserve(unit, order, lines, actor.accountId, true)

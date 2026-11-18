@@ -1,7 +1,7 @@
 <!-- Who the tickets are emailed to at the till. The seller finds the buyer by name or address, as
      the person picker does (this box only: Matt, 17 November), which shows a name and enough to tell
      two people apart. Or they type an address and choose "Use" it; after a name with no @, or part
-     of a provider, the box offers it at each common provider (box-office.sales.desk-email-domains). The
+     of a provider, the box offers it at each common provider (box-office.till.email-domains). The
      order then joins the account for that address, made unclaimed if there is none. The value is
      the picked account's id or the address; nothing else about the buyer is shown. -->
 <script setup lang="ts">

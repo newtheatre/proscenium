@@ -25,8 +25,9 @@ export default defineModule({
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     // How long after curtain the desk may still sell, for latecomers.
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
-    // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com").
-    'sales.desk-email-domains': setting.list({ default: ['gmail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'icloud.com', 'yahoo.com', 'yahoo.co.uk', 'live.co.uk', 'btinternet.com'], of: 'text', maxLength: 253, change, audience: 'staff' }),
+    // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com"). Filed
+    // under Till rather than among the closing times it once sat with.
+    'till.email-domains': setting.list({ replaces: 'box-office.sales.desk-email-domains', default: ['gmail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'icloud.com', 'yahoo.com', 'yahoo.co.uk', 'live.co.uk', 'btinternet.com'], of: 'text', maxLength: 253, change, audience: 'staff' }),
     // Show "N seats left" only at or under this many; 0 never shows it.
     'availability.show-remaining-under': setting.integer({ default: 20, min: 0, max: 1000, change, audience: 'public' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
@@ -192,7 +193,13 @@ export default defineModule({
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
       { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40, settingsIn: ['box-office.performances'] },
+      // The person's own bookings, in My account (C3).
+      { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
+    ],
+    // Your next visit, first among the cards on My account's overview.
+    'core.account-section': [
+      { id: 'box-office.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'BoxOfficeNextVisit', order: 30, to: '/account/tickets', icon: 'i-lucide-ticket' },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
@@ -201,7 +208,7 @@ export default defineModule({
       // What is kept of a ticket's price when it is cancelled and refunded less the fee.
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
-    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }],
+    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }, { id: 'box-office.order', file: 'order' }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
     'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
