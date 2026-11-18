@@ -13,16 +13,46 @@ defineSlots<{ default?: () => unknown }>()
 
 const { t, te } = useT()
 const route = useRoute()
-const { nameOf, descriptionOf } = useModuleWords()
+const { nameOf, descriptionOf, listOf, keptOnBy } = useModuleWords()
 const { data } = await useAPI<{ modules: ModuleView[], manage: boolean }>('/api/core/modules', { key: 'core:modules' })
 const { data: tabData } = await useAPI<{ tabs: ModuleTabView[] }>(() => `/api/core/modules/${encodeURIComponent(props.module)}/tabs`, { key: `core:module-tabs:${props.module}` })
 const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [])
 
 const view = computed(() => data.value?.modules.find(m => m.id === props.module))
+const lockedBy = computed(() => view.value ? keptOnBy(view.value, data.value?.modules ?? []) : [])
+const lockedWhy = computed(() => t('core.modules.locked', { modules: listOf(lockedBy.value.map(nameOf)), those: t('core.modules.locked-those', { count: lockedBy.value.length }) }))
 const tabs = computed(() => tabData.value?.tabs ?? [])
 const items = computed(() => tabs.value.map(tab => ({ label: te(tab.label) ? t(tab.label) : tab.label, value: tab.to, icon: tab.icon })))
 // A record page below a tab's screen keeps that tab open.
 const active = computed(() => resolveEntry(tabs.value, route.path)?.to)
+
+// The tab row scrolls sideways when the tabs do not fit; a fade at the edge with more beyond says so.
+const tabStrip = useTemplateRef<HTMLElement>('tabStrip')
+const scroll = reactive({ left: true, right: true })
+let list: HTMLElement | null = null
+function measure() {
+  if (!list) return
+  scroll.left = list.scrollLeft <= 1
+  scroll.right = list.scrollLeft + list.clientWidth >= list.scrollWidth - 1
+}
+function attach() {
+  const next = tabStrip.value?.querySelector<HTMLElement>('[role="tablist"]') ?? null
+  if (next === list) return measure()
+  list?.removeEventListener('scroll', measure)
+  list = next
+  list?.addEventListener('scroll', measure, { passive: true })
+  list?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  measure()
+}
+onMounted(() => {
+  attach()
+  window.addEventListener('resize', measure)
+})
+onUpdated(attach)
+onBeforeUnmount(() => {
+  list?.removeEventListener('scroll', measure)
+  window.removeEventListener('resize', measure)
+})
 
 const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : nameOf(a.id).localeCompare(nameOf(b.id))
 const side = computed<NavigationMenuItem[][]>(() => {
@@ -65,33 +95,53 @@ const side = computed<NavigationMenuItem[][]>(() => {
       width="reading"
     >
       <template #status>
-        <StatusBadge
-          v-if="view?.alwaysOn"
-          tone="info"
-          :label="t('core.modules.state.always-on')"
-        />
-        <UBadge
-          v-if="view && view.stability !== 'stable'"
-          :color="view.stability === 'deprecated' ? 'warning' : 'neutral'"
-          variant="outline"
-          :label="t(`core.modules.stability.${view.stability}`)"
-        />
+        <!-- On a phone the title needs the room. -->
+        <span class="flex items-center gap-2 max-sm:hidden">
+          <UBadge
+            v-if="view?.alwaysOn"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-lock"
+            class="pointer-events-none"
+            :label="t('core.modules.state.always-on')"
+          />
+          <UBadge
+            v-if="view?.stability === 'deprecated'"
+            color="warning"
+            variant="outline"
+            :label="t('core.modules.stability.deprecated')"
+          />
+        </span>
       </template>
       <template #primary>
-        <USwitch
+        <UTooltip
           v-if="view && data?.manage && !view.alwaysOn"
-          :model-value="view.on"
-          :label="t(view.on ? 'core.modules.state.on' : 'core.modules.state.off')"
-          :loading="busy === view.id"
-          :aria-label="t('core.modules.toggle', { module: nameOf(module) })"
-          @update:model-value="toggle(view)"
-        />
+          :text="lockedBy.length ? lockedWhy : undefined"
+          :disabled="!lockedBy.length"
+        >
+          <span class="inline-flex">
+            <USwitch
+              :model-value="view.on"
+              :label="t(view.on ? 'core.modules.state.on' : 'core.modules.state.off')"
+              :loading="busy === view.id"
+              :disabled="lockedBy.length > 0"
+              :aria-label="t('core.modules.toggle', { module: nameOf(module) })"
+              @update:model-value="toggle(view)"
+            />
+          </span>
+        </UTooltip>
       </template>
       <p
         v-if="descriptionOf(module)"
         class="text-sm text-muted"
       >
         {{ descriptionOf(module) }}
+      </p>
+      <p
+        v-if="lockedBy.length"
+        class="text-sm text-muted"
+      >
+        {{ lockedWhy }}
       </p>
       <RefusalNotice :refusal="refusal" />
       <template v-if="view?.on">
@@ -104,16 +154,31 @@ const side = computed<NavigationMenuItem[][]>(() => {
           :description="t('core.modules.missing-secret', { name })"
         />
       </template>
-      <UTabs
+      <div
         v-if="items.length > 1"
-        :model-value="active"
-        :items="items"
-        :content="false"
-        variant="link"
-        :aria-label="t('core.modules.tabs', { module: nameOf(module) })"
-        :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
-        @update:model-value="to => navigateTo(String(to))"
-      />
+        ref="tabStrip"
+        class="relative"
+      >
+        <span
+          v-show="!scroll.left"
+          aria-hidden="true"
+          class="pointer-events-none absolute inset-y-0 start-0 z-10 w-8 bg-gradient-to-r from-default to-transparent"
+        />
+        <span
+          v-show="!scroll.right"
+          aria-hidden="true"
+          class="pointer-events-none absolute inset-y-0 end-0 z-10 w-8 bg-gradient-to-l from-default to-transparent"
+        />
+        <UTabs
+          :model-value="active"
+          :items="items"
+          :content="false"
+          variant="link"
+          :aria-label="t('core.modules.tabs', { module: nameOf(module) })"
+          :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
+          @update:model-value="to => navigateTo(String(to))"
+        />
+      </div>
       <EmbeddedScreens>
         <slot />
       </EmbeddedScreens>

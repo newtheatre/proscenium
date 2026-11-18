@@ -20,6 +20,17 @@ const also = computed(() => props.module.alsoOn.map(id => byId.value.get(id) ?? 
 const secrets = computed(() => [props.module, ...also.value].flatMap(m => (m.secrets ?? []).filter(s => s.needed !== 'optional')))
 const blocking = computed(() => [props.module, ...also.value].flatMap(m => m.missingSecrets ?? []))
 const screens = computed(() => [props.module, ...(props.on ? also.value : [])].flatMap(m => screensOf(m)))
+const shellOrder = ['console', 'live', 'admin', 'members']
+const screenGroups = computed(() => {
+  const groups = new Map<string, { menu: string, shell: string, items: typeof screens.value }>()
+  for (const s of screens.value) {
+    const g = groups.get(s.menu) ?? { menu: s.menu, shell: s.shell, items: [] }
+    g.items.push(s)
+    groups.set(s.menu, g)
+  }
+  const rank = (menu: string) => shellOrder.includes(menu) ? shellOrder.indexOf(menu) : shellOrder.length
+  return [...groups.values()].sort((a, b) => rank(a.menu) - rank(b.menu))
+})
 const preventers = computed(() => props.module.requiredBy.filter(id => byId.value.get(id)?.on))
 const blocked = computed(() => props.on ? blocking.value.length > 0 : preventers.value.length > 0)
 </script>
@@ -65,27 +76,29 @@ const blocked = computed(() => props.on ? blocking.value.length > 0 : preventers
         <div>
           <template v-if="screens.length">
             <p>{{ t(on ? 'core.modules.dialog.appear' : 'core.modules.dialog.disappear') }}</p>
-            <ul class="mt-1 list-disc ps-5">
-              <li
-                v-for="s in screens"
-                :key="s.id"
-              >
-                {{ s.label }} <span class="text-muted">({{ s.shell }})</span>
-              </li>
-            </ul>
+            <div
+              v-for="g in screenGroups"
+              :key="g.menu"
+              class="mt-2"
+            >
+              <p class="font-medium text-highlighted">
+                {{ t('core.modules.dialog.screens-in', { shell: g.shell }) }}
+              </p>
+              <ul class="mt-1 list-disc ps-5">
+                <li
+                  v-for="s in g.items"
+                  :key="s.id"
+                >
+                  {{ s.label }}
+                </li>
+              </ul>
+            </div>
           </template>
           <p v-else>
             {{ t('core.modules.dialog.no-screens') }}
           </p>
         </div>
 
-        <UAlert
-          v-if="on && module.stability === 'experimental'"
-          color="warning"
-          variant="subtle"
-          icon="i-lucide-flask-conical"
-          :description="t('core.modules.experimental-note')"
-        />
         <UAlert
           v-if="on && blocking.length"
           color="error"

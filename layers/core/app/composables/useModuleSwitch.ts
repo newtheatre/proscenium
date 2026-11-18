@@ -30,6 +30,15 @@ export function useModuleSwitch(modules: () => ModuleView[]) {
         color: 'success',
       })
       await refreshNuxtData()
+      const next = on ? modules().find(o => o.id === m.id)?.open : null
+      if (next) {
+        toast.add({
+          title: t('core.modules.set-up-title', { module: nameOf(m.id) }),
+          description: t('core.modules.set-up-help'),
+          color: 'neutral',
+          actions: [{ label: t('core.modules.set-up', { module: nameOf(m.id) }), color: 'neutral', variant: 'outline', onClick: () => { void navigateTo(next) } }],
+        })
+      }
     }
     catch (e) {
       refusal.value = toRefusal(e)

@@ -10,6 +10,21 @@ export function useModuleWords() {
   const listOf = (items: string[]) => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(items)
   const screensOf = (m: Pick<ModuleView, 'screens'>) => (m.screens ?? [])
     .filter(s => te(entryLabelKey(s.id)))
-    .map(s => ({ id: s.id, label: t(entryLabelKey(s.id)), shell: te(`core.modules.dialog.shell.${s.menu}`) ? t(`core.modules.dialog.shell.${s.menu}`) : s.menu }))
-  return { nameOf, descriptionOf, listOf, screensOf }
+    .map(s => ({ id: s.id, menu: s.menu, label: t(entryLabelKey(s.id)), shell: te(`core.modules.dialog.shell.${s.menu}`) ? t(`core.modules.dialog.shell.${s.menu}`) : s.menu }))
+  /** The modules still on that need this one: while any are, it cannot be switched off. */
+  const keptOnBy = (m: Pick<ModuleView, 'on' | 'requiredBy'>, all: ModuleView[]) => m.on
+    ? m.requiredBy.filter(id => all.find(o => o.id === id)?.on)
+    : []
+  /** Everything a module needs, those it needs in turn included. */
+  const needsOf = (m: Pick<ModuleView, 'requires'>, all: ModuleView[]) => {
+    const seen = new Set<string>()
+    const walk = (ids: string[]) => ids.forEach((id) => {
+      if (seen.has(id)) return
+      seen.add(id)
+      walk(all.find(o => o.id === id)?.requires ?? [])
+    })
+    walk(m.requires)
+    return [...seen]
+  }
+  return { nameOf, descriptionOf, listOf, screensOf, keptOnBy, needsOf }
 }
