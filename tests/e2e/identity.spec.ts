@@ -18,6 +18,8 @@ test('a Google refusal is explained on the sign-in page', async ({ page }) => {
 test('first-run setup asks for the first Owner, then the theatre and its time zone', async ({ page }) => {
   await page.goto('/setup')
   await expect(page.getByLabel('Your name')).toBeVisible()
+  // Type once the page is live: what is typed into the server's page before then is not kept.
+  await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled()
   await page.getByLabel('Your name').fill('Olive Owner')
   await page.getByLabel('Your email address').fill('olive@example.org')
   await page.getByRole('button', { name: 'Next' }).click()
