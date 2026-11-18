@@ -74,7 +74,7 @@ const columns = computed(() => [
   ...(location.value === ALL ? (data.value?.locations ?? []).map(l => ({ id: `at-${l.id}`, header: l.name })) : []),
   { id: 'total', header: location.value === ALL ? t('bar.screens.stock-levels.total') : t('bar.screens.stock-levels.here') },
   { id: 'state', header: t('bar.screens.stock-levels.state') },
-  { id: 'actions', header: '' },
+  { id: 'actions' },
 ])
 
 // Write off, or move: one item, an amount typed in its count unit, its packs or its base unit.

@@ -106,7 +106,7 @@ const columnItems = computed(() => (data.value?.columns ?? []).map(c => ({
   onSelect: (e: Event) => e.preventDefault(),
 })))
 const columns = computed(() => [
-  ...(canMoveMany.value ? [{ id: 'select', header: '' }] : []),
+  ...(canMoveMany.value ? [{ id: 'select' }] : []),
   { accessorKey: 'reference', header: t('forms.screens.responses.reference') },
   { accessorKey: 'sent', header: t('forms.screens.responses.sent') },
   ...(data.value?.stages.length ? [{ accessorKey: 'stage', header: t('forms.screens.responses.stage') }] : []),
