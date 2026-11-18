@@ -1,13 +1,13 @@
 // A form for its builder: the form, its draft and the versions published so far.
 import { getRouterParam } from 'h3'
-import { all, defineRoute, isRefusal, today } from '#kit'
+import { all, can, defineRoute, isRefusal, today } from '#kit'
 import { accountLabel } from '#modules/core'
 import type { Definition } from '../../../../shared/engine'
 import { sources } from '../../../sources'
 import { actionList } from '../../../actions'
 import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
 
-export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record }) => {
+export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record, actor }) => {
   const form = await requireForm(record!.id)
   const [draft, versions, fields] = await Promise.all([getDraft(form.id), listVersions(form.id), getFields(form.id)])
   // The operating day, for the preview's date conditions. Unknown until the theatre's time zone is set.
@@ -33,6 +33,7 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     sources: (await sources()).map(s => ({ key: s.key, label: s.label, people: !!s.people })),
     // What other modules can do when a response takes a move, for the stages editor.
     actions: await actionList(),
+    canSaveTemplate: (await can(actor, 'forms.template.manage')).allowed,
     versions: versions.map(v => ({ id: v.id, number: v.number, publishedAt: v.publishedAt, publishedBy: v.publishedBy, summary: JSON.parse(v.changeSummary) })),
   }
 })

@@ -33,6 +33,9 @@ import sourceGet from '../../server/api/forms/sources/[source].get'
 import slotGet from '../../server/api/forms/slots/[slot]/[subject]/index.get'
 import slotPut from '../../server/api/forms/slots/[slot]/[subject]/[form].put'
 import slotDelete from '../../server/api/forms/slots/[slot]/[subject]/[form].delete'
+import templatesGet from '../../server/api/forms/templates/index.get'
+import templatesPost from '../../server/api/forms/templates/index.post'
+import templateDelete from '../../server/api/forms/templates/[id].delete'
 import statusPost from '../../server/api/forms/forms/[id]/status.post'
 import runPost from '../../server/api/forms/forms/[id]/responses/[response]/actions/[run]/run.post'
 import type { Definition, Question } from '../../shared/engine'
@@ -62,6 +65,9 @@ export const handle = server({
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,
   'GET /api/forms/sources/:source': sourceGet,
   'POST /api/forms/forms/:id/status': statusPost,
+  'GET /api/forms/templates': templatesGet,
+  'POST /api/forms/templates': templatesPost,
+  'DELETE /api/forms/templates/:id': templateDelete,
   'GET /api/forms/slots/:slot/:subject': slotGet,
   'PUT /api/forms/slots/:slot/:subject/:form': slotPut,
   'DELETE /api/forms/slots/:slot/:subject/:form': slotDelete,

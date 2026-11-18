@@ -24,6 +24,7 @@ const json = ref(false)
 const settings = ref(false)
 const sharing = ref(false)
 const stages = ref(false)
+const templating = ref(false)
 
 // Beside the canvas on a laptop; a panel that slides over it on anything narrower.
 const wide = useMediaQuery('(min-width: 1280px)')
@@ -71,6 +72,7 @@ const more = computed(() => [[
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
   { label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } },
   { label: t('forms.screens.json.title'), icon: 'i-lucide-braces', onSelect: () => { json.value = true } },
+  ...(props.data.canSaveTemplate ? [{ label: t('forms.screens.templates.save'), icon: 'i-lucide-copy-plus', onSelect: () => { templating.value = true } }] : []),
 ], life.value])
 
 // ---- pausing, closing and archiving ----
@@ -314,6 +316,11 @@ const reload = () => window.location.reload()
       v-model:open="json"
       :form-id="form.id"
       :slug="form.slug"
+    />
+    <FormsTemplateDialog
+      v-model:open="templating"
+      :form-id="form.id"
+      :title="form.title"
     />
     <FormsLinkDialog
       v-model:open="sharing"

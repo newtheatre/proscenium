@@ -40,6 +40,7 @@ export default defineModule({
   records: defineRecords('forms', {
     form: { table: 'forms_forms', owner: 'created_by' },
     response: { table: 'forms_responses', owner: 'person_id' },
+    template: { table: 'forms_templates' },
   }),
   abilities: defineAbilities('forms', {
     'form.create': ability(),
@@ -56,6 +57,8 @@ export default defineModule({
     'response.export': ability({ on: 'forms.form', risk: 'privileged', implies: ['response.read'] }),
     // Opening special-category answers. Every reveal is recorded.
     'response.read-special': ability({ on: 'forms.form', risk: 'privileged', audit: 'read', implies: ['response.read'] }),
+    // Saving a form as a template the whole theatre can start from, and removing one.
+    'template.manage': ability(),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -104,7 +107,7 @@ export default defineModule({
   },
 
   contributes: {
-    'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }],
+    'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }, { id: 'forms.template', file: 'template' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
     // Core contributes to no module's point, so the sources for core's records are forms' own.
     'forms.source': [

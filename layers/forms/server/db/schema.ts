@@ -369,4 +369,18 @@ export const actionRuns = defineTable('forms_action_runs', {
   ],
 })
 
-export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns }
+/** A template the theatre saved from one of its own forms. Those the platform ships are files, not rows. */
+export const templates = defineTable('forms_templates', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  description: col.internal(text('description')),
+  definition: col.internal(text('definition').notNull()),
+  createdBy: col.account('created_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'ftpl',
+  realm: 'operational',
+  subject: 'none',
+})
+
+export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }
