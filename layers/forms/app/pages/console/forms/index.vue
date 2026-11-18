@@ -1,5 +1,7 @@
-<!-- Forms (FB-201): the forms this person may build, and New form, blank or from an exported file. -->
+<!-- Forms (FB-201, FB-208): the forms this person may build, and New form: blank, from a template, or
+     from an exported file. -->
 <script setup lang="ts">
+interface Template { key: string, name: string, description: string | null, own: boolean, anonymous: boolean, questions: number }
 interface FormRow { id: string, slug: string, title: string, status: 'draft' | 'live' | 'paused' | 'closed' | 'archived', published: boolean }
 
 const { t } = useT()
@@ -8,13 +10,54 @@ const { toRefusal } = useRefusal()
 const { data, status, error, refresh } = await useAPI<{ forms: FormRow[] }>('/api/forms/forms', { key: 'forms:forms' })
 
 const open = ref(false)
-const state = reactive({ title: '', file: '', fileName: '' })
+const BLANK = '-'
+const state = reactive({ title: '', file: '', fileName: '', template: BLANK })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const picker = useTemplateRef<HTMLInputElement>('picker')
+// ---- templates: asked for when the dialog opens, so the list is as it stands now ----
+const templates = ref<Template[]>([])
+const canManage = ref(false)
+const undo = useUndo()
+const nameOf = (tpl: Template) => tpl.own ? tpl.name : t(tpl.name)
+const startItems = computed(() => [
+  { value: BLANK, label: t('forms.screens.templates.blank') },
+  ...templates.value.map(tpl => ({ value: tpl.key, label: nameOf(tpl) })),
+])
+const chosen = computed(() => templates.value.find(tpl => tpl.key === state.template))
+const chosenHelp = computed(() => {
+  const tpl = chosen.value
+  if (!tpl) return t('forms.screens.templates.blank-help')
+  const about = tpl.own ? tpl.description : t(tpl.description ?? '')
+  return [about, t('forms.screens.templates.questions', { count: tpl.questions }), tpl.anonymous ? t('forms.screens.templates.anonymous') : ''].filter(Boolean).join(' ')
+})
+async function loadTemplates() {
+  try {
+    const got = await $api<{ templates: Template[], canManage: boolean }>('/api/forms/templates')
+    templates.value = got.templates
+    canManage.value = got.canManage
+  }
+  catch { /* a blank form can still be started */ }
+}
+async function removeTemplate(tpl: Template) {
+  refusal.value = null
+  try {
+    const { removed } = await $api<{ removed: Record<string, unknown> }>(`/api/forms/templates/${tpl.key}` as string, { method: 'DELETE', body: {} })
+    state.template = BLANK
+    await loadTemplates()
+    undo.offer(t('forms.screens.templates.removed', { name: tpl.name }), async () => {
+      await $api('/api/forms/templates', { method: 'POST', body: removed })
+      await loadTemplates()
+    })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
 function start() {
-  Object.assign(state, { title: '', file: '', fileName: '' })
+  Object.assign(state, { title: '', file: '', fileName: '', template: BLANK })
   refusal.value = null
   open.value = true
+  loadTemplates()
 }
 async function load(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
@@ -41,7 +84,7 @@ async function create() {
     }
   }
   try {
-    const made = await $api<{ formId: string }>('/api/forms/forms', { method: 'POST', body: { title: state.title, ...(definition === undefined ? {} : { definition }) } })
+    const made = await $api<{ formId: string }>('/api/forms/forms', { method: 'POST', body: { title: state.title, ...(definition !== undefined ? { definition } : state.template !== BLANK ? { template: state.template } : {}) } })
     open.value = false
     await navigateTo(`/console/forms/${made.formId}`)
   }
@@ -49,6 +92,8 @@ async function create() {
     refusal.value = toRefusal(e)
   }
 }
+const current = computed(() => (data.value?.forms ?? []).filter(f => f.status !== 'archived'))
+const archived = computed(() => (data.value?.forms ?? []).filter(f => f.status === 'archived'))
 const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'neutral', archived: 'neutral' } as const
 </script>
 
@@ -81,7 +126,7 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
         :label="t('forms.navigation.forms.label')"
       >
         <RecordListItem
-          v-for="f in data.forms"
+          v-for="f in current"
           :key="f.id"
           :to="`/console/forms/${f.id}`"
           icon="i-lucide-file-text"
@@ -94,6 +139,23 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
           />
         </RecordListItem>
       </RecordList>
+      <CollapsibleDivider
+        v-if="archived.length"
+        :label="t('forms.screens.list.archived')"
+        :count="archived.length"
+      >
+        <RecordList :label="t('forms.screens.list.archived')">
+          <RecordListItem
+            v-for="f in archived"
+            :key="f.id"
+            :to="`/console/forms/${f.id}`"
+            icon="i-lucide-file-text"
+            :name="f.title"
+            :description="`/${f.slug}`"
+            muted
+          />
+        </RecordList>
+      </CollapsibleDivider>
     </DataBoundary>
 
     <UModal
@@ -121,6 +183,27 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
               maxlength="120"
               autofocus
             />
+          </UFormField>
+          <UFormField
+            v-if="!state.fileName"
+            name="template"
+            :label="t('forms.screens.templates.start-from')"
+            :help="chosenHelp"
+          >
+            <div class="flex items-center gap-2">
+              <USelect
+                v-model="state.template"
+                :items="startItems"
+                class="min-w-64"
+              />
+              <IconButton
+                v-if="chosen?.own && canManage"
+                icon="i-lucide-trash-2"
+                size="sm"
+                :label="t('forms.screens.templates.remove', { name: chosen.name })"
+                @click="removeTemplate(chosen)"
+              />
+            </div>
           </UFormField>
           <UFormField
             :label="t('forms.screens.list.from-file')"

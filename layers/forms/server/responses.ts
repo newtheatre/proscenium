@@ -10,6 +10,7 @@ import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questi
 import { answers as answersTable } from './db/schema'
 import type { FormRow, VersionRow } from './forms'
 import { openRound } from './review'
+import { tellReceived } from './notices'
 import { recordLabels } from './sources'
 
 // ---- the link ----
@@ -55,6 +56,7 @@ export const REASONS: Record<Shut, { reason: string, remedy?: string }> = {
 
 /** The first thing in the way of this person answering now, or null. `ownId` is a response of theirs that does not count against them. */
 export async function shut(form: FormRow, link: LinkRow, actor: Actor, at: number, ownId?: string): Promise<Shut | null> {
+  if (form.status === 'closed') return 'closed'
   if (form.status !== 'live' || link.status !== 'active') return 'paused'
   if (link.opensAt !== null && at < link.opensAt) return 'not-yet'
   if (link.closesAt !== null && at >= link.closesAt) return 'closed'
@@ -290,9 +292,10 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const rows = await answerRows(def, evaluation.answers, s.responseId, 1)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   recordMove(unit, { responseId: s.responseId, from: null, to: stage, transitionKey: SUBMIT, revision: 1, actorId: s.actor.accountId ?? null, at: s.at })
-  await openRound(unit, { def, stage, formId: s.form.id, responseId: s.responseId, personId, revision: 1, at: s.at, answers: evaluation.answers })
+  await openRound(unit, { def, stage, formId: s.form.id, title: s.form.title, responseId: s.responseId, personId, revision: 1, at: s.at, answers: evaluation.answers })
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
   unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
+  await tellReceived(unit, s.form, { id: s.responseId, reference, personId, respondentEmail: email })
   return { reference }
 }
 

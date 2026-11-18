@@ -3,6 +3,7 @@
 // arrives opens a round with one assignment per reviewer. A reviewer sees only their own review
 // until the round is released, and somebody with a conflict of interest is refused everything about
 // that response, whatever else they hold.
+import { tellReviewers } from './notices'
 import { all, first, newId, refuse, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { canonicalAccount, holdersOfRole } from '#modules/core'
@@ -25,7 +26,7 @@ export async function reviewersFor(review: Review): Promise<string[]> {
  * Opens a round for a response arriving in a stage that asks for review: one assignment per
  * reviewer. The person who sent the response is assigned as conflicted, without declaring it.
  */
-export async function openRound(unit: UnitView, input: { def: Definition, stage: Stage, formId: string, responseId: string, personId: string | null, revision: number, at: number, answers?: Answers }): Promise<void> {
+export async function openRound(unit: UnitView, input: { def: Definition, stage: Stage, formId: string, title: string, responseId: string, personId: string | null, revision: number, at: number, answers?: Answers }): Promise<void> {
   if (!input.stage.review) return
   const reviewers = await reviewersFor(input.stage.review)
   // Whoever sent it, and anybody named in a question of people marked as involved (FB-406).
@@ -39,10 +40,12 @@ export async function openRound(unit: UnitView, input: { def: Definition, stage:
     params: [roundId, input.responseId, input.formId, input.stage.key, input.revision, input.at],
   })
   if (!reviewers.length) return
-  unit.insertSet(reviewAssignments, reviewers.map(reviewerId => ({
+  const ids = unit.insertSet(reviewAssignments, reviewers.map(reviewerId => ({
     roundId, responseId: input.responseId, formId: input.formId, reviewerId,
     status: barred.has(reviewerId) ? 'conflicted' : 'assigned', conflict: barred.has(reviewerId) ? 'automatic' : null, createdAt: input.at,
   })))
+  // Each reviewer who is to review is asked; one with a conflict is told nothing of it.
+  await tellReviewers(unit, { title: input.title }, input.responseId, reviewers.map((reviewerId, i) => ({ assignmentId: ids[i]!, reviewerId })).filter(a => !barred.has(a.reviewerId)))
 }
 
 const ids = (value: unknown): string[] => typeof value === 'string' && value ? [value] : Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
