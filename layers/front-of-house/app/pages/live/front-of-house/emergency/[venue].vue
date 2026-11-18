@@ -1,6 +1,6 @@
 <!-- A venue's emergency card (Front of house specification, part 5, "Live mode"; FH-26), in large
      type with the date it was last reviewed. Every card is kept on the device once opened, so the
-     card still opens with no signal. -->
+     card still opens with no signal. Its Markdown is drawn, and every telephone number is a link. -->
 <script setup lang="ts">
 interface Card { venueId: string, venueName: string, body: string, reviewedOn: string, updatedAt: number }
 const KEPT = 'proscenium:front-of-house:emergency-cards'
@@ -47,9 +47,11 @@ const fromDevice = computed(() => !data.value && !!card.value)
           {{ t('front-of-house.live.reviewed-on', { date: day(card.reviewedOn) }) }}
           <span v-if="fromDevice">· {{ t('front-of-house.live.kept-copy') }}</span>
         </p>
-        <p class="text-2xl leading-relaxed whitespace-pre-line text-highlighted">
-          {{ card.body }}
-        </p>
+        <MarkdownText
+          :text="card.body"
+          link-phones
+          class="text-2xl leading-relaxed text-highlighted"
+        />
       </template>
       <DataBoundary
         v-else

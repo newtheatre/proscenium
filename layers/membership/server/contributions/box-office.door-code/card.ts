@@ -31,6 +31,11 @@ export default {
     return card?.id ?? null
   },
 
+  /** The member, for the till, which then checks the ticket's requirement against their account. */
+  async holder(code: string): Promise<string | null> {
+    return (await first<{ account_id: string }>('SELECT account_id FROM membership_memberships WHERE id = ?', code))?.account_id ?? null
+  },
+
   /** The same summary as a check, with the scheme and the number: never the holder's name. */
   async resolve(code: string): Promise<{ headline: string, line: string, state: 'ok' | 'attention' } | null> {
     const card = await first<Card>(`${CARD} WHERE m.id = ?`, code)

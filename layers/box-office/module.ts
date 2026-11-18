@@ -180,6 +180,18 @@ export default defineModule({
     'payments.settlement': [{ id: 'box-office' }],
     // Box office's part of the night report, when Front of house is on.
     'front-of-house.report-section': [{ id: 'box-office.attendance', file: 'attendance' }],
+    // Who is coming to a performance needing help, for the duty manager's Needs tonight panel.
+    'front-of-house.tonight-needs': [{ id: 'box-office.access', file: 'access' }],
+    // Applying to the access scheme agrees to it, as it does to the box office seeing the arrangements:
+    // only the kinds of help and the seat, never a note, and only to whoever is leading that night.
+    'core.access-purpose': [{
+      id: 'box-office.on-the-night',
+      side: 'audience' as const,
+      label: 'Front of house on the night',
+      explanation: 'On the night of a performance you have tickets for, the duty manager can see what kind of help you need and where you are sitting, so the team can look after you. They never see your notes.',
+      uses: 'all' as const,
+      agreedOnApplying: true,
+    }],
     'core.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.in', file: 'in' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
@@ -221,6 +233,7 @@ export default defineModule({
     'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
     'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
+    'core.upcoming': [{ id: 'box-office.tickets', file: 'tickets' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
     'core.vocabulary': [{
       id: 'box-office.comp-reason',

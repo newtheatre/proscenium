@@ -1,11 +1,13 @@
 <!-- The tonight board (Front of house specification, part 5, "Live mode"; FH-19 to FH-23): the
      performance, time to curtain and the next timing as one large button; then People, Checklists,
      Figures and Incidents; at the foot, reporting an incident and the emergency card. Someone leading
-     also sees "Extend tonight" and the night report. It reads again every half minute. -->
+     also sees who is coming needing help, can correct a timing, and after curtain down "Extend
+     tonight" and the night report. It reads again every half minute. -->
 <script setup lang="ts">
 import { useIntervalFn } from '@vueuse/core'
 
 interface Person { assignmentId: string, name: string, state: string, checkedInAt: number | null, notArrived: boolean }
+interface Need { name: string, seat: string | null, needs: { key: string, label: string }[], companions: number }
 interface Board {
   performance: { id: string, title: string, startsAt: number, endsAt: number, venueId: string, venueName: string, spaceName: string }
   windowClosesAt: number | null
@@ -15,6 +17,7 @@ interface Board {
   figures: { id: string, label: string, value: string | number | null, state: 'ok' | 'attention' | 'unavailable', to?: string, unit?: string }[]
   mine: string | null
   openIncidents: number | null
+  needs: Need[] | null
   can: { lead: boolean, checklists: boolean, report: boolean, incident: boolean, emergency: boolean }
 }
 
@@ -26,6 +29,7 @@ const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const undo = useUndo()
 const { time } = useDates()
 const figure = useFigureValue()
 const route = useRoute()
@@ -54,12 +58,18 @@ const people = computed(() => {
   return { arrived: all.filter(p => p.state === 'checked_in').length, expected: all.length, missing: all.filter(p => p.notArrived).length }
 })
 
-async function act(run: () => Promise<unknown>, done: string) {
+async function act(run: () => Promise<unknown>, done: string, reverse?: () => Promise<unknown>) {
   refusal.value = null
   busy.value = true
   try {
     await run()
-    toast.add({ title: done, color: 'success' })
+    if (reverse) {
+      undo.offer(done, async () => {
+        await reverse()
+        await refresh()
+      })
+    }
+    else toast.add({ title: done, color: 'success' })
     await refresh()
   }
   catch (e) {
@@ -69,17 +79,84 @@ async function act(run: () => Promise<unknown>, done: string) {
     busy.value = false
   }
 }
-const record = (kind: string) => act(() => write(`${base.value}/timings`, { method: 'POST', body: { kind } }), t('front-of-house.live.recorded', { timing: t(`front-of-house.timings.${kind}`) }))
+const MINUTE = 60_000 // not-policy: unit conversion
+// When a moment is usually recorded, to ask before one far from it (NI-2). House open is half an hour
+// before curtain up, and the house is clear a quarter of an hour after curtain down.
+const FAR = 20 * MINUTE // not-policy: how far from the usual time a tap is questioned
+function usual(kind: string): number | null {
+  const p = data.value?.performance
+  if (!p) return null
+  if (kind === 'house_open') return p.startsAt - 30 * MINUTE // not-policy: the usual call
+  if (kind === 'curtain_up') return p.startsAt
+  if (kind === 'curtain_down') return p.endsAt
+  if (kind === 'house_clear') return p.endsAt + 15 * MINUTE // not-policy: the usual clear
+  return null
+}
+const preShowOpen = computed(() => (data.value?.checklists ?? []).filter(c => c.moment === 'pre-show' && !c.state.startsWith('complete')))
+async function record(kind: string) {
+  const at = Date.now()
+  // Opening with a checklist for before the show not finished: warn, as the setting promises (NI-1).
+  if (kind === 'house_open' && preShowOpen.value.length) {
+    const done = preShowOpen.value.reduce((n, c) => n + c.entered, 0)
+    const total = preShowOpen.value.reduce((n, c) => n + c.required, 0)
+    if (!(await confirm({ verb: t('front-of-house.live.open-verb'), thing: t('front-of-house.live.the-house'), consequence: t('front-of-house.live.open-checklists', { done, total, names: preShowOpen.value.map(c => c.name).join(', ') }), button: t('front-of-house.live.open-anyway') }))) return
+  }
+  const expected = usual(kind)
+  const previous = data.value?.timings.reduce<number | null>((m, x) => (m === null || x.at > m ? x.at : m), null) ?? null
+  const far = expected !== null && Math.abs(at - expected) > FAR
+  const soon = previous !== null && at - previous < MINUTE
+  if ((far || soon) && !(await confirm({
+    verb: t('front-of-house.live.record-verb'),
+    thing: t(`front-of-house.live.timing-thing.${kind}`),
+    consequence: soon ? t('front-of-house.live.record-soon') : t('front-of-house.live.record-far', { usual: time(expected!), now: time(at) }),
+    button: t(`front-of-house.live.record.${kind}`),
+  }))) return
+  await act(
+    () => write(`${base.value}/timings`, { method: 'POST', body: { kind } }),
+    t('front-of-house.live.recorded', { timing: t(`front-of-house.timings.${kind}`) }),
+    () => write(`${base.value}/timings/${kind}`, { method: 'DELETE', body: {} }),
+  )
+}
+// The lead corrects a timing already recorded, or takes it back (NI-2).
+const editing = ref<{ kind: string, at: number | null } | null>(null)
+const recordedItems = computed(() => (data.value?.timings ?? []).map(x => ({ value: x.kind, label: t(`front-of-house.timings.${x.kind}`) })))
+function editTimings() {
+  const first = data.value?.timings[data.value.timings.length - 1]
+  editing.value = first ? { kind: first.kind, at: first.at } : null
+}
+watch(() => editing.value?.kind, (kind) => {
+  if (editing.value && kind) editing.value.at = recorded(kind)?.at ?? null
+})
+async function saveTiming() {
+  const e = editing.value!
+  await act(() => write(`${base.value}/timings`, { method: 'POST', body: { kind: e.kind, at: e.at } }), t('front-of-house.live.recorded', { timing: t(`front-of-house.timings.${e.kind}`) }))
+  if (!refusal.value) editing.value = null
+}
+async function removeTiming() {
+  const e = editing.value!
+  await act(() => write(`${base.value}/timings/${e.kind}`, { method: 'DELETE', body: {} }), t('front-of-house.live.timing-removed', { timing: t(`front-of-house.timings.${e.kind}`) }))
+  if (!refusal.value) editing.value = null
+}
 const checkIn = () => act(() => write(`/api/front-of-house/assignments/${encodeURIComponent(data.value!.mine!)}/check-in`, { method: 'POST', body: {} }), t('front-of-house.live.checked-in'))
 async function extend() {
-  if (!(await confirm({ verb: t('front-of-house.live.extend'), thing: t('front-of-house.live.tonight'), consequence: t('front-of-house.live.extend-consequence'), button: t('front-of-house.live.extend') }))) return
+  if (!(await confirm({ verb: t('front-of-house.live.extend-verb'), thing: t('front-of-house.live.tonight'), consequence: t('front-of-house.live.extend-consequence'), button: t('front-of-house.live.extend') }))) return
   await act(() => write(`${base.value}/extend`, { method: 'POST', body: {} }), t('front-of-house.live.extended'))
 }
 const mineIn = computed(() => {
   const d = data.value
   return d?.mine ? d.shifts.flatMap(s => s.people).find(p => p.assignmentId === d.mine)?.state === 'checked_in' : false
 })
-const context = computed(() => data.value ? [data.value.performance.title, time(data.value.performance.startsAt), data.value.performance.venueName].filter(Boolean).join(' · ') : undefined)
+// The space only when it says more than the venue (NI-6).
+const context = computed(() => {
+  const p = data.value?.performance
+  if (!p) return undefined
+  return [p.title, time(p.startsAt), p.venueName, p.spaceName !== p.venueName ? p.spaceName : null].filter(Boolean).join(' · ')
+})
+const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('complete')
+  ? t('front-of-house.live.checklist-done')
+  : c.exceptions
+    ? t('front-of-house.live.done-problems', { done: c.entered - c.exceptions, total: c.required, problems: c.exceptions })
+    : t('front-of-house.live.done-of', { done: c.entered, total: c.required })
 </script>
 
 <template>
@@ -137,13 +214,66 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
                 @click="record(alsoNext)"
               />
             </template>
-            <p
+            <div
               v-if="d.timings.length"
-              class="text-sm text-muted"
+              class="flex flex-wrap items-center gap-x-3 gap-y-1"
             >
-              {{ d.timings.map(x => `${t(`front-of-house.timings.${x.kind}`)} ${time(x.at)}`).join(' · ') }}
-            </p>
+              <p class="text-sm text-muted">
+                {{ d.timings.map(x => `${t(`front-of-house.timings.${x.kind}`)} ${time(x.at)}`).join(' · ') }}
+              </p>
+              <UButton
+                v-if="d.can.lead"
+                color="neutral"
+                variant="link"
+                icon="i-lucide-pencil"
+                :label="t('front-of-house.live.edit-timings')"
+                @click="editTimings"
+              />
+            </div>
           </div>
+
+          <section
+            v-if="d.needs"
+            aria-labelledby="fh-board-needs"
+          >
+            <h2
+              id="fh-board-needs"
+              class="mb-3 text-sm font-semibold text-muted"
+            >
+              {{ t('front-of-house.live.needs-tonight') }}
+            </h2>
+            <p
+              v-if="!d.needs.length"
+              class="text-muted"
+            >
+              {{ t('front-of-house.live.no-needs') }}
+            </p>
+            <RecordList
+              v-else
+              :label="t('front-of-house.live.needs-tonight')"
+            >
+              <RecordListItem
+                v-for="(n, i) in d.needs"
+                :key="i"
+                icon="i-lucide-accessibility"
+                :name="n.name"
+                :description="[n.seat, n.companions ? t('front-of-house.live.companions', { count: n.companions }) : null].filter(Boolean).join(' · ')"
+              >
+                <template #below>
+                  <div class="flex flex-wrap gap-2">
+                    <UBadge
+                      v-for="need in n.needs"
+                      :key="need.key"
+                      color="neutral"
+                      variant="subtle"
+                      size="lg"
+                      :label="need.label"
+                    />
+                  </div>
+                </template>
+              </RecordListItem>
+            </RecordList>
+          </section>
 
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <UButton
@@ -198,7 +328,7 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
               >
                 <UButton
                   :to="`/live/front-of-house/${encodeURIComponent(d.performance.id)}/checklists/${encodeURIComponent(c.checklistId)}`"
-                  :icon="c.state === 'completed' ? 'i-lucide-circle-check' : 'i-lucide-list-checks'"
+                  :icon="c.state.startsWith('complete') ? 'i-lucide-circle-check' : 'i-lucide-list-checks'"
                   color="neutral"
                   variant="outline"
                   size="xl"
@@ -207,11 +337,7 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
                 >
                   <span class="flex flex-col text-start">
                     <span class="font-semibold">{{ c.name }}</span>
-                    <span>{{ c.state === 'completed' ? t('front-of-house.live.checklist-done') : t('front-of-house.live.done-of', { done: c.entered, total: c.required }) }}</span>
-                    <span
-                      v-if="c.exceptions"
-                      class="text-warning"
-                    >{{ t('front-of-house.live.exceptions', { count: c.exceptions }) }}</span>
+                    <span :class="c.exceptions ? 'text-warning' : ''">{{ checklistLine(c) }}</span>
                   </span>
                 </UButton>
               </li>
@@ -273,7 +399,7 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
           :label="t('front-of-house.live.emergency-card')"
         />
         <UButton
-          v-if="data.can.lead"
+          v-if="data.can.lead && recorded('curtain_down')"
           icon="i-lucide-clock-plus"
           color="neutral"
           variant="outline"
@@ -294,5 +420,60 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
         />
       </div>
     </template>
+
+    <UModal
+      :open="!!editing"
+      :title="t('front-of-house.live.edit-timings')"
+      :description="t('front-of-house.live.edit-timings-help')"
+      @update:open="v => { if (!v) editing = null }"
+    >
+      <template #body>
+        <UForm
+          v-if="editing"
+          id="fh-timing"
+          :state="editing"
+          :validate="() => needs({ at: editing?.at })"
+          class="space-y-4"
+          novalidate
+          @submit="saveTiming"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <UFormField
+            name="kind"
+            :label="t('front-of-house.live.timing')"
+          >
+            <USelect
+              v-model="editing.kind"
+              :items="recordedItems"
+              size="xl"
+            />
+          </UFormField>
+          <UFormField
+            name="at"
+            :label="t('front-of-house.live.timing-at')"
+          >
+            <FieldDateTime v-model="editing.at" />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          color="error"
+          variant="outline"
+          size="xl"
+          icon="i-lucide-trash-2"
+          :loading="busy"
+          :label="t('front-of-house.live.remove-timing')"
+          @click="removeTiming"
+        />
+        <UButton
+          type="submit"
+          form="fh-timing"
+          size="xl"
+          :loading="busy"
+          :label="t('front-of-house.save')"
+        />
+      </template>
+    </UModal>
   </PageLive>
 </template>

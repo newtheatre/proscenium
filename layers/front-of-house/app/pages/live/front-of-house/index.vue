@@ -2,7 +2,7 @@
      this person may open, one large button each, then reporting an incident and the emergency cards. -->
 <script setup lang="ts">
 interface Tonight {
-  performances: { id: string, show: string, startsAt: number, venueId: string | null, venue: string | null }[]
+  performances: { id: string, show: string, startsAt: number, venueId: string | null, venue: string | null, last: string | null, expected: number, arrived: number }[]
   mayReport: boolean
   cards: { venueId: string, venueName: string }[]
 }
@@ -48,6 +48,7 @@ const { data, status, error, refresh } = await useAPI<Tonight>('/api/front-of-ho
                   <span class="flex flex-col">
                     <span class="text-lg font-semibold">{{ p.show }}</span>
                     <span class="text-sm text-muted">{{ [time(p.startsAt), p.venue].filter(Boolean).join(' · ') }}</span>
+                    <span class="text-sm">{{ [p.last ? t(`front-of-house.timings.${p.last}`) : t('front-of-house.live.not-open-yet'), p.expected ? t('front-of-house.live.arrived-of', { arrived: p.arrived, expected: p.expected }) : null].filter(Boolean).join(' · ') }}</span>
                   </span>
                 </UButton>
               </li>

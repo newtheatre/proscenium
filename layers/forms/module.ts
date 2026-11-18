@@ -2,7 +2,7 @@
 // with logic, versions and, where a form wants one, a workflow. Always on, as the specification
 // decides. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
+import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { STAGE_KINDS } from './shared/engine/types'
 import { tables } from './server/db/schema'
 
@@ -125,6 +125,12 @@ export default defineModule({
       'forms.response.changed': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), revision: z.number() }), internal: true }),
       'forms.response.withdrawn': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string() }), internal: true }),
       'forms.response.moved': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), kind: z.enum(STAGE_KINDS), revision: z.number() }), internal: true }),
+      // An outcome action's job gave up after its retries; the run waits for somebody who decides to run it again.
+      'forms.action.failed': event({ version: 1, payload: z.object({ runId: z.string(), responseId: z.string(), formId: z.string(), action: code() }), internal: true }),
+    },
+    listens: {
+      // A job died: when it ran an outcome action, forms says which.
+      'core.job.died': 'action-failed',
     },
   },
 

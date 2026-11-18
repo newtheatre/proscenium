@@ -4,7 +4,7 @@
 <script setup lang="ts">
 type Outcome = 'done' | 'exception' | 'not_applicable'
 interface Item { id: string, label: string, help: string | null, kind: 'tick' | 'reading', unit: string | null, required: boolean, entry: { outcome: Outcome, reading: number | null, reasonCode: string | null, reasonNote: string | null, doneAt: number } | null }
-interface Run { runId: string | null, checklistId: string, name: string, moment: string, state: 'not_started' | 'open' | 'completed', completedAt: number | null, items: Item[] }
+interface Run { runId: string | null, checklistId: string, name: string, moment: string, state: 'not_started' | 'open' | 'complete' | 'complete_with_exceptions', completedAt: number | null, items: Item[] }
 interface Board { performance: { title: string, startsAt: number }, can: { lead: boolean, checklists: boolean } }
 
 const { t } = useT()
@@ -31,6 +31,10 @@ watch(data, (d) => {
 const editable = computed(() => data.value?.state === 'open' && !!board.value?.can.checklists)
 const required = computed(() => (data.value?.items ?? []).filter(i => i.required))
 const entered = computed(() => required.value.filter(i => i.entry).length)
+const problems = computed(() => required.value.filter(i => i.entry?.outcome === 'exception').length)
+const progress = computed(() => problems.value
+  ? t('front-of-house.live.done-problems', { done: entered.value - problems.value, total: required.value.length, problems: problems.value })
+  : t('front-of-house.live.done-of', { done: entered.value, total: required.value.length }))
 const ready = computed(() => editable.value && entered.value === required.value.length)
 
 async function run(key: string, call: () => Promise<unknown>, done?: string) {
@@ -84,10 +88,14 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
           <UProgress
             :model-value="entered"
             :max="Math.max(required.length, 1)"
-            :aria-label="t('front-of-house.live.done-of', { done: entered, total: required.length })"
+            :color="problems ? 'warning' : 'primary'"
+            :aria-label="progress"
           />
-          <p class="text-sm text-muted">
-            {{ d.state === 'completed' ? t('front-of-house.live.checklist-done') : t('front-of-house.live.done-of', { done: entered, total: required.length }) }}
+          <p
+            class="text-sm"
+            :class="problems ? 'text-warning' : 'text-muted'"
+          >
+            {{ d.state !== 'open' && d.state !== 'not_started' ? t('front-of-house.live.checklist-done') : progress }}
           </p>
 
           <RecordList :label="d.name">
@@ -144,6 +152,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                     size="xl"
                     icon="i-lucide-check"
                     :variant="item.entry?.outcome === 'done' ? 'solid' : 'outline'"
+                    :aria-pressed="item.entry?.outcome === 'done'"
                     :loading="busy === item.id"
                     :label="t('front-of-house.live.outcome.done')"
                     :aria-label="t('front-of-house.live.tick', { item: item.label })"
@@ -152,7 +161,8 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                   <UButton
                     size="xl"
                     color="warning"
-                    variant="outline"
+                    :variant="item.entry?.outcome === 'exception' ? 'solid' : 'outline'"
+                    :aria-pressed="item.entry?.outcome === 'exception'"
                     icon="i-lucide-triangle-alert"
                     :label="t('front-of-house.live.problem')"
                     :aria-label="t('front-of-house.live.problem-with', { item: item.label })"
@@ -161,7 +171,8 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                   <UButton
                     size="xl"
                     color="neutral"
-                    variant="outline"
+                    :variant="item.entry?.outcome === 'not_applicable' ? 'solid' : 'outline'"
+                    :aria-pressed="item.entry?.outcome === 'not_applicable'"
                     :label="t('front-of-house.live.outcome.not_applicable')"
                     :aria-label="t('front-of-house.live.not-needed', { item: item.label })"
                     @click="enter(item, 'not_applicable')"
@@ -236,6 +247,8 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
             <USelect
               v-model="problem.reasonCode"
               :items="reasonItems"
+              value-key="value"
+              :placeholder="t('front-of-house.live.reason-placeholder')"
               size="xl"
             />
           </UFormField>
