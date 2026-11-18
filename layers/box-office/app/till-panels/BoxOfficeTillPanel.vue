@@ -6,7 +6,7 @@
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -910,7 +910,7 @@ function clear() {
             class="space-y-2 rounded-lg border border-default p-3"
           >
             <h4 class="text-sm font-medium">
-              {{ t('box-office.screens.panel.holder.heading', { type: bands.length > 1 ? `${row.band}, ${row.ticketType}` : row.ticketType }) }}
+              {{ t(row.companion ? 'box-office.screens.panel.holder.companion-heading' : 'box-office.screens.panel.holder.heading', { type: bands.length > 1 ? `${row.band}, ${row.ticketType}` : row.ticketType }) }}
             </h4>
             <div
               v-for="n in quantities[keyOf(row)]"
@@ -922,7 +922,8 @@ function clear() {
                 :model-value="holders[keyOf(row)]?.[n - 1]"
                 :performance-id="performance.performanceId"
                 :ticket-type-id="row.ticketTypeId"
-                :label="t('box-office.screens.panel.holder.ticket', { n })"
+                :label="t(row.companion ? 'box-office.screens.panel.holder.companion-ticket' : 'box-office.screens.panel.holder.ticket', { n })"
+                :companion="row.companion"
                 :disabled="locked"
                 @update:model-value="(h: Holder | undefined) => setHolder(row, n - 1, h)"
               />
@@ -943,7 +944,7 @@ function clear() {
               class="text-sm text-warning"
               role="status"
             >
-              {{ t('box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
+              {{ t(row.companion ? 'box-office.screens.panel.holder.companion-needed' : 'box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
             </p>
           </div>
           <div
