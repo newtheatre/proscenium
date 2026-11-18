@@ -178,6 +178,9 @@ export const identityTasks = {
   // Runs confirmed erasures whose cooling-off is over, and re-checks held ones (ID-16, ID-35).
   // Hourly rather than the specification's daily, so an erasure runs within the hour it falls due.
   'core.review-data-requests': task({ every: '1h' }),
+  // Offers modules already on the default roles and fact mappings they have not offered yet (FH-4),
+  // so a site that switched a module on before its defaults shipped gets them within the hour.
+  'core.module-defaults': task({ every: '1h' }),
 }
 
 // CORE_SESSION_KEY protects every session, and CORE_OWNER_RECOVERY is for when no Owner can sign

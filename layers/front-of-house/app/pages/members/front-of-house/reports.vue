@@ -1,7 +1,8 @@
 <!-- My reports (FH-8): the incidents this person has reported, newest first, with each one's number,
-     date, kind, where it has got to and their own words. Nothing the reviewers added is shown. -->
+     date, kind, where it has got to, their own words and the people they named (IN-1). Nothing the
+     reviewers added is shown. -->
 <script setup lang="ts">
-interface Mine { id: string, reference: string, kind: 'incident' | 'near_miss', state: 'reported' | 'in_review' | 'closed', occurredAt: number, whatHappened: string }
+interface Mine { id: string, reference: string, kind: 'incident' | 'near_miss', state: 'reported' | 'in_review' | 'closed', occurredAt: number, whatHappened: string, people: { name: string, involvement: 'affected' | 'witness' | 'helped' | 'other' }[] }
 
 const { t } = useT()
 const { dateTime } = useDates()
@@ -45,6 +46,12 @@ const TONES = { reported: 'warning', in_review: 'info', closed: 'neutral' } as c
             <template #below>
               <p class="line-clamp-3 text-sm whitespace-pre-line">
                 {{ i.whatHappened }}
+              </p>
+              <p
+                v-if="i.people.length"
+                class="mt-1 text-sm text-muted"
+              >
+                {{ t('front-of-house.my-reports.people', { people: i.people.map(p => `${p.name} (${t(`front-of-house.involvements.${p.involvement}`).toLowerCase()})`).join(', ') }) }}
               </p>
             </template>
           </RecordListItem>

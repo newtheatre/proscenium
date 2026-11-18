@@ -1,13 +1,16 @@
 // Holding a scheme (Membership specification, tab 3, D1 to D4 and A1 to A3). Whether a membership
 // is current is read from its state and dates at each request and never stored, so the members'
 // area cannot outlive it and nothing has to run when it lapses.
-import { all, first, newId, nowMs, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, useSetting, wordsFrom, type UnitView } from '#kit'
 import { notify } from '#modules/core'
+import catalogue from '../i18n/en-GB.json'
 import { accountScopeSql } from '#kit/accounts'
 import { Refusal } from '#kit/refusal'
 import { today as theatreToday } from '#kit'
 import { endsOnFor, derivedStatus, type DerivedStatus } from './dates'
 import type { Scheme } from './schemes'
+
+const say = wordsFrom(catalogue)
 
 /** Today in the theatre, or null before setup has set the time zone (when nobody can hold a scheme). */
 export async function todayOrNull(): Promise<string | null> {
@@ -153,8 +156,8 @@ async function welcome(unit: UnitView, scheme: Scheme, accountId: string, member
     to: accountId,
     variables: {
       scheme: scheme.name,
-      gives: scheme.summary?.trim() || 'Your account shows what your membership includes.',
-      until: ends ? `It runs until ${ends}.` : 'It has no end date.',
+      gives: scheme.summary?.trim() || say('membership.welcome.gives'),
+      until: ends ? say('membership.welcome.until', { date: ends }) : say('membership.welcome.no-end'),
     },
     subject: ['membership.membership', membershipId],
     dedupeKey: `welcome:${membershipId}`,

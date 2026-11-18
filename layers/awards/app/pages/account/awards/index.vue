@@ -12,7 +12,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const awardDate = useAwardDate()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ awards: Mine[] }>('/api/awards/mine', { key: 'awards:mine' })
+const { data, status, error, refresh } = await useAPI<{ awards: Mine[], nominations: boolean }>('/api/awards/mine', { key: 'awards:mine' })
 const visibilities = computed(() => (['public', 'members', 'hidden'] as const).map(v => ({ value: v, label: t(`awards.screens.visibility.${v}`) })))
 
 async function list(award: Mine, visibility: Mine['visibility']) {
@@ -54,6 +54,10 @@ const qr = computed(() => {
     :description="t('awards.screens.mine.help')"
     width="reading"
   >
+    <FormsSlotOpen
+      v-if="data?.nominations"
+      slot-id="awards.nomination"
+    />
     <DataBoundary
       :data="data"
       :status="status"

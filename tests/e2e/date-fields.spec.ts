@@ -23,6 +23,12 @@ test('date fields read day first on a 24-hour clock, and give the values the ser
   await type(page, 'Run', '0109202704092027')
   await type(page, 'Curtain up', '010920271930')
   await page.getByLabel(/^Price/).fill('12.5')
+  // Each part is named by its field too, so a screen reader hears "Opens day", not a bare "day".
+  await expect(page.getByRole('spinbutton', { name: /^Opens\b.*\bday$/ })).toHaveCount(1)
+  await expect(page.getByRole('spinbutton', { name: /^Curtain up\b.*\bminute$/ })).toHaveCount(1)
+  // A range's parts say which end they are: "Run start day" and "Run end day", not "day" twice.
+  await expect(page.getByRole('spinbutton', { name: /^Run\b.*\bstart day$/ })).toHaveCount(1)
+  await expect(page.getByRole('spinbutton', { name: /^Run\b.*\bend year$/ })).toHaveCount(1)
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations).toEqual([])
 
   await page.getByRole('button', { name: 'Save choices' }).click()

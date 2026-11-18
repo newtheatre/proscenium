@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "144983ba-f6d0-4a61-af55-ad91b25efdc7",
+  "id": "39dd63c6-44e2-4faa-9345-a83154e11930",
   "prevIds": [
-    "a34461f8-1072-466d-9029-bb62669f4a14"
+    "a5a3220b-d8d3-4b7e-a1ad-855ddd2ac3a3"
   ],
   "ddl": [
     {
@@ -511,6 +511,10 @@
       "entityType": "tables"
     },
     {
+      "name": "forms_old_addresses",
+      "entityType": "tables"
+    },
+    {
       "name": "forms_placements",
       "entityType": "tables"
     },
@@ -823,16 +827,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "awards_awards",
-      "name": "listing_pending",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -12638,6 +12632,26 @@
     },
     {
       "table": "forms_action_runs",
+      "name": "record_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_action_runs",
+      "name": "record_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_action_runs",
       "name": "job_id",
       "type": "text",
       "notNull": false,
@@ -13041,6 +13055,36 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_old_addresses",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_old_addresses",
+      "name": "form_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_old_addresses",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -21149,6 +21193,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "forms_old_addresses",
+      "name": "forms_old_addresses_form",
+      "columns": [
+        {
+          "value": "form_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "forms_placements",
       "name": "forms_placements_place",
       "columns": [
@@ -24597,6 +24655,21 @@
       "entityType": "fks"
     },
     {
+      "table": "forms_old_addresses",
+      "name": "fk_forms_old_addresses_form_id_forms_forms_id_fk",
+      "columns": [
+        "form_id"
+      ],
+      "tableTo": "forms_forms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "forms_placements",
       "name": "fk_forms_placements_form_id_forms_forms_id_fk",
       "columns": [
@@ -25582,6 +25655,15 @@
       "columns": [
         "form_id",
         "question_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "forms_old_addresses",
+      "name": "forms_old_addresses_pk",
+      "columns": [
+        "slug"
       ],
       "nameExplicit": false,
       "entityType": "pks"

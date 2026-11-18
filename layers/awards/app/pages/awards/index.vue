@@ -3,7 +3,7 @@
 <script setup lang="ts">
 const { t } = useT()
 // The same request the component makes, so the page can answer "not found" before it draws.
-const { data } = await useAPI('/api/awards/roll', { key: 'awards:roll:all', query: {} })
+const { data } = await useAPI<{ nominations: boolean }>('/api/awards/roll', { key: 'awards:roll:all', query: {} })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('awards.roll.not-found'), fatal: true })
 useSeoMeta({ title: () => t('awards.roll.title'), description: () => t('awards.roll.description') })
 </script>
@@ -17,6 +17,12 @@ useSeoMeta({ title: () => t('awards.roll.title'), description: () => t('awards.r
       />
       <UPageBody>
         <AwardsRoll />
+        <section
+          v-if="data?.nominations"
+          :aria-label="t('awards.roll.nominate')"
+        >
+          <FormsSlotOpen slot-id="awards.nomination" />
+        </section>
       </UPageBody>
     </UPage>
   </UContainer>

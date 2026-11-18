@@ -1,0 +1,1 @@
+ALTER TABLE `front_of_house_incident_people` ADD `from_report` integer DEFAULT false NOT NULL;

@@ -11,6 +11,7 @@ beforeEach(async () => {
   reset()
   const { env } = await import('./helpers')
   await env.DB.prepare('DELETE FROM core_fact_abilities').run()
+  await env.DB.prepare('DELETE FROM core_module_defaults').run()
 })
 
 describe('facts', () => {
@@ -70,5 +71,83 @@ describe('what a module brings when it is switched on (FH-4)', () => {
     expect((await rows('SELECT ability FROM core_role_abilities WHERE role_id = ?', volunteer!.id)).length).toBeGreaterThan(0)
     // Twice makes nothing more.
     expect(await inContext(() => ensureModuleDefaults('front-of-house', 'acc_test'))).toEqual({ facts: 0, roles: 0 })
+  })
+})
+
+describe('defaults for modules already on, after a deploy (FH-4)', () => {
+  const PRESET_KEYS = ['volunteer', 'front-of-house-manager']
+
+  /** A site past setup whose front of house was switched on before its defaults shipped. */
+  async function switchedOnBefore(): Promise<void> {
+    const { env } = await import('./helpers')
+    const [owner] = await rows<{ id: string }>('SELECT id FROM core_roles WHERE key = \'owner\'')
+    const { accountId } = await staff()
+    await grantDirectly(accountId, [], owner ? { roleId: owner.id } : { roleKey: 'owner' })
+    await setModule('front-of-house', true)
+    await env.DB.prepare('DELETE FROM core_role_abilities WHERE role_id IN (SELECT id FROM core_roles WHERE key IN (SELECT value FROM json_each(?)))').bind(JSON.stringify(PRESET_KEYS)).run()
+    await env.DB.prepare('DELETE FROM core_roles WHERE key IN (SELECT value FROM json_each(?))').bind(JSON.stringify(PRESET_KEYS)).run()
+  }
+
+  const runTask = async () => {
+    const task = (await import('../../../server/tasks/module-defaults')).default
+    await inContext(() => (task as unknown as () => Promise<void>)(), { kind: 'job' })
+  }
+  const presetRoles = async () => (await rows<{ key: string }>('SELECT key FROM core_roles WHERE key IN (SELECT value FROM json_each(?)) ORDER BY key', JSON.stringify(PRESET_KEYS))).map(r => r.key)
+  const leadingShift = async () => (await rows('SELECT ability FROM core_fact_abilities WHERE fact = \'front-of-house.leading-shift\'')).length
+
+  it('the hourly task gives a module that is already on its preset roles and fact mappings', async () => {
+    await switchedOnBefore()
+    await runTask()
+    expect(await presetRoles()).toEqual(['front-of-house-manager', 'volunteer'])
+    const [volunteer] = await rows<{ id: string, preset: string }>('SELECT id, preset FROM core_roles WHERE key = \'volunteer\'')
+    expect(volunteer!.preset).toBe('front-of-house.volunteer')
+    expect((await rows('SELECT ability FROM core_role_abilities WHERE role_id = ?', volunteer!.id)).length).toBeGreaterThan(0)
+    expect(await leadingShift()).toBeGreaterThan(0)
+    const offered = await rows<{ kind: string, key: string }>('SELECT kind, key FROM core_module_defaults WHERE module_id = \'front-of-house\'')
+    expect(offered).toEqual(expect.arrayContaining([{ kind: 'role', key: 'front-of-house.volunteer' }, { kind: 'role', key: 'front-of-house.manager' }, { kind: 'fact', key: 'front-of-house.leading-shift' }]))
+  })
+
+  it('running twice makes nothing new', async () => {
+    const { ensureEnabledModuleDefaults } = await import('../../../server/identity/defaults')
+    await switchedOnBefore()
+    await runTask()
+    const count = async () => (await rows<{ n: number }>('SELECT (SELECT count(*) FROM core_roles) + (SELECT count(*) FROM core_role_abilities) + (SELECT count(*) FROM core_fact_abilities) + (SELECT count(*) FROM core_module_defaults) AS n'))[0]!.n
+    const before = await count()
+    expect(await inContext(() => ensureEnabledModuleDefaults())).toEqual({ facts: 0, roles: 0 })
+    await runTask()
+    expect(await count()).toBe(before)
+  })
+
+  it('a preset role or default mapping the theatre removed is not made again', async () => {
+    const { env } = await import('./helpers')
+    const { ensureModuleDefaults } = await import('../../../server/identity/defaults')
+    await switchedOnBefore()
+    await runTask()
+    await env.DB.prepare('DELETE FROM core_role_abilities WHERE role_id IN (SELECT id FROM core_roles WHERE key = \'volunteer\')').run()
+    await env.DB.prepare('DELETE FROM core_roles WHERE key = \'volunteer\'').run()
+    await env.DB.prepare('DELETE FROM core_fact_abilities WHERE fact = \'front-of-house.leading-shift\'').run()
+    await runTask()
+    // Switching the module off and on again offers nothing either.
+    expect(await inContext(() => ensureModuleDefaults('front-of-house', 'acc_test'))).toEqual({ facts: 0, roles: 0 })
+    expect(await presetRoles()).toEqual(['front-of-house-manager'])
+    expect(await leadingShift()).toBe(0)
+  })
+
+  it('a preset role the theatre already has, renamed, is left as it is and counted as offered', async () => {
+    const { env } = await import('./helpers')
+    await switchedOnBefore()
+    await env.DB.prepare('INSERT INTO core_roles (id, key, name, fixed, opens_members_area, needs_managed_identity, expiry_rule, created_at) VALUES (\'rol_ownvolunteer\', \'volunteer\', \'Usher\', 0, 0, 0, \'none\', 1)').run()
+    await runTask()
+    expect(await rows('SELECT name FROM core_roles WHERE key = \'volunteer\'')).toEqual([{ name: 'Usher' }])
+    expect(await rows('SELECT key FROM core_module_defaults WHERE kind = \'role\' AND key = \'front-of-house.volunteer\'')).toHaveLength(1)
+  })
+
+  it('offers nothing for a module that is off', async () => {
+    await switchedOnBefore()
+    await setModule('front-of-house', false)
+    await runTask()
+    expect(await presetRoles()).toEqual([])
+    expect(await leadingShift()).toBe(0)
+    expect(await rows('SELECT key FROM core_module_defaults WHERE module_id = \'front-of-house\'')).toEqual([])
   })
 })

@@ -49,6 +49,16 @@ export const personInput = z.object({
   details: z.string().trim().max(2000).nullish(), // not-policy: shape bound
 }).strict()
 
+// Someone the reporter names in the report's Who step (IN-1): an account found by search, or a name
+// (an audience member, say) with a way to reach them, and how they were involved. Welfare details
+// are left to the reviewer.
+export const reportPersonInput = z.object({
+  accountId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  name: z.string().trim().min(1).max(120).nullish(), // not-policy: shape bound, as the table's CHECK
+  contact: z.string().trim().max(200).nullish(), // not-policy: shape bound, as the table's CHECK
+  involvement: z.enum(['affected', 'witness', 'helped', 'other']),
+}).strict().refine(p => !!p.accountId || !!p.name, { message: 'A name, or choose an account.', path: ['name'] })
+
 // Calls at or after `from` and before `to`, in UTC milliseconds; or from the start of `fromDay` to
 // the end of `toDay`, the theatre's own days (YYYY-MM-DD), as the screen's date range gives them.
 const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: the shape of a YYYY-MM-DD date
