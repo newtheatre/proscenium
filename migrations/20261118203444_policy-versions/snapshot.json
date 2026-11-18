@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "39ec6b62-1624-47ea-abe8-690d50fe56d8",
+  "id": "5023dabb-0cd6-4f04-8ffa-24722f0fc76f",
   "prevIds": [
-    "c95cc8e2-5c37-460a-8d91-6fbbb54abf6e"
+    "6fc771df-4b06-41bd-932e-d39072470553"
   ],
   "ddl": [
     {
@@ -7114,6 +7114,16 @@
       "table": "core_accounts",
       "name": "first_signed_in_at",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_accounts",
+      "name": "terms_version_id",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -17322,6 +17332,16 @@
     },
     {
       "table": "membership_verification_entries",
+      "name": "by_hand",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_verification_entries",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -17493,6 +17513,16 @@
     {
       "table": "membership_verifications",
       "name": "entry_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_verifications",
+      "name": "reference",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -24400,6 +24430,21 @@
         "merge_id"
       ],
       "tableTo": "core_account_merges",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_accounts",
+      "name": "fk_core_accounts_terms_version_id_core_policy_versions_id_fk",
+      "columns": [
+        "terms_version_id"
+      ],
+      "tableTo": "core_policy_versions",
       "columnsTo": [
         "id"
       ],
