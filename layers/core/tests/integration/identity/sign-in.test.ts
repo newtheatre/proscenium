@@ -75,6 +75,8 @@ describe('email sign-in (ID-01)', () => {
     const browser = new Browser()
     const to = address()
     const { message } = await emailSignIn(browser, to)
+    // The email says how long the link and code last (EM-9).
+    expect(message!.text).toMatch(/The link and the code work for \d+ (minutes|hours)\./)
     const used = await browser.post('/api/core/sign-in/code', { address: to, code: message!.variables.code })
     expect(used.status).toBe(200)
     expect((await browser.get('/api/core/me')).body.signedIn).toBe(true)
@@ -266,6 +268,13 @@ describe('landing where I was going (ID-07)', () => {
     const device = new Authenticator()
     await addPasskey(browser, device)
     expect((await passkeySignIn(new Browser(), device, '/account')).body.next).toBe('/account')
+  })
+
+  it('keeps a page\'s own return address, such as the access form opened from choosing tickets', async () => {
+    const browser = new Browser()
+    const next = `/account/access/apply?next=${encodeURIComponent('/whats-on/hamlet/book?performance=p1')}`
+    const { message } = await emailSignIn(browser, address(), next)
+    expect((await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.next).toBe(next)
   })
 
   it('ignores a return address that is not a path on this site', async () => {

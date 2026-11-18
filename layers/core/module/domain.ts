@@ -323,10 +323,12 @@ export const contributes = {
     },
   }],
   // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
-  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }],
+  'core.count': [{ id: 'core.health-attention', file: 'health-attention' }, { id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }],
   'core.account-section': [
     { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
   ],
+  // The Admin overview's health card: every check that is not ok (AC-12).
+  'core.home-card': [{ id: 'core.health', home: 'admin' as const, ability: 'core.health.view', component: 'CoreHealthCard', urgency: 'overdue' as const, count: 'core.health-attention' }],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }, { id: 'core.guidance', file: 'guidance' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],

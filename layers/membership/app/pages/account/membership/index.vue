@@ -9,7 +9,7 @@
 <script setup lang="ts">
 interface Fee { amountMinor: number, currency: string }
 interface RenewAsks { options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, asksFor: string | null, endsByList: boolean, online: boolean }
-interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', reason: string | null, charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null, endsByList: boolean }
 
 const { t } = useT()
@@ -23,6 +23,10 @@ const offered = await useAPI<{ schemes: Offered[] }>('/api/membership/schemes', 
 const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 'lapsed': 'neutral' } as const
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
+/** A refusal about one field, shown under it; anything else shows above the form. */
+const fieldRefusal = (refusal: ReturnType<typeof toRefusal> | null | undefined, field: string) => refusal?.fields?.[field] ? refusal : null
+/** Why an application waits on the theatre, in the applicant's words. */
+const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
 // One card: a membership that follows on from one held now is not shown as a second card.
 const cardFor = (m: Mine['memberships'][number]) => m.status === 'current' || m.status === 'in-grace' || (m.status === 'upcoming' && !(mine.data.value?.memberships ?? []).some(o => o.schemeId === m.schemeId && (o.status === 'current' || o.status === 'in-grace')))
 /** A held membership's line: when it starts if it has not yet, until when, and its renewal. */
@@ -44,7 +48,6 @@ function terms(s: Offered): string {
 const joining = ref<Offered | null>(null)
 const joinState = reactive({ lengthOptionId: undefined as string | undefined, reference: '' })
 const joinRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const joinForm = useTemplateRef('joinForm')
 // A list that sets the end date leaves no length to choose (finding: a chosen length was ignored).
 const joinOptions = computed(() => joining.value?.endsByList ? [] : joining.value?.options ?? [])
 /** The price of the length chosen, or of the scheme, for the dialog. */
@@ -60,16 +63,6 @@ function openJoin(s: Offered) {
   Object.assign(joinState, { lengthOptionId: undefined, reference: '' })
   joinRefusal.value = null
 }
-// A refusal about the reference is said beside it; the miss in the membership's own words (V15).
-function referenceError(refusal: ReturnType<typeof toRefusal>): { name: string, message: string }[] {
-  const field = refusal.fields?.reference
-  if (!field) return []
-  const WORDS: Record<string, string> = {
-    'membership.join.not-on-list': t('membership.screens.mine.not-on-list'),
-    'membership.join.needs-reference': translate('core.form.invalid.required'),
-  }
-  return [{ name: 'reference', message: WORDS[refusal.code] ?? refusal.reason }]
-}
 async function join() {
   const s = joining.value
   if (!s) return
@@ -79,7 +72,7 @@ async function join() {
     if (joined.waiting === 'payment') return navigateTo(`/account/membership/${joined.membershipId}/pay`)
     joining.value = null
     if (joined.pending) {
-      toast.add({ title: t('membership.screens.mine.applied', { scheme: s.name }), description: t('membership.screens.mine.waiting-staff'), color: 'success' })
+      toast.add({ title: t('membership.screens.mine.applied', { scheme: s.name }), description: waitingText(joined.waiting), color: 'success' })
       await mine.refresh()
       return
     }
@@ -88,10 +81,8 @@ async function join() {
     reloadNuxtApp()
   }
   catch (e) {
-    const refusal = toRefusal(e)
-    const errors = referenceError(refusal)
-    if (errors.length) joinForm.value?.setErrors(errors)
-    else joinRefusal.value = refusal
+    // A refusal about the reference is said under its field, with its way forward (a contact link).
+    joinRefusal.value = toRefusal(e)
   }
 }
 const { confirm } = useConfirm()
@@ -214,7 +205,7 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="a in mine.data.value.applications"
               :key="a.id"
               :name="a.schemeName"
-              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : t('membership.screens.mine.waiting-staff')"
+              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : waitingText(a.reason)"
             >
               <UButton
                 v-if="a.waiting === 'payment' && a.charge"
@@ -280,16 +271,21 @@ async function withdraw(a: Mine['applications'][number]) {
         <UForm
           id="membership-renew"
           :state="renewChoice"
+          :validate="() => needs({ ...(!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1 ? { lengthOptionId: renewChoice.lengthOptionId } : {}), ...(renewScheme?.asksFor ? { reference: renewChoice.reference } : {}) })"
           class="space-y-4"
           novalidate
           @submit="renew"
         >
-          <RefusalNotice :refusal="renewRefusal" />
+          <RefusalNotice
+            v-if="renewRefusal && !(renewScheme?.asksFor && fieldRefusal(renewRefusal, 'reference')) && !(!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1 && fieldRefusal(renewRefusal, 'lengthOptionId'))"
+            :refusal="renewRefusal"
+          />
           <UFormField
             v-if="!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1"
             name="lengthOptionId"
             :label="t('membership.screens.mine.choose-length')"
-            :error="renewRefusal?.fields?.lengthOptionId ? renewRefusal.reason : undefined"
+            :error="fieldRefusal(renewRefusal, 'lengthOptionId')?.reason"
+            required
           >
             <USelect
               v-model="renewChoice.lengthOptionId"
@@ -304,13 +300,25 @@ async function withdraw(a: Mine['applications'][number]) {
           </p>
           <UFormField
             v-if="renewScheme?.asksFor"
+            name="reference"
             :label="renewScheme.asksFor"
+            :error="fieldRefusal(renewRefusal, 'reference')?.reason"
+            required
           >
             <UInput
               v-model="renewChoice.reference"
               autocomplete="off"
               maxlength="254"
             />
+            <template
+              v-if="fieldRefusal(renewRefusal, 'reference')"
+              #error
+            >
+              <MembershipRefusalText
+                :reason="renewRefusal!.reason"
+                :remedy="renewRefusal!.remedy"
+              />
+            </template>
           </UFormField>
           <p class="text-sm text-muted">
             {{ t(renewScheme?.endsByList ? 'membership.screens.mine.renew-help-list' : 'membership.screens.mine.renew-help') }}
@@ -336,14 +344,13 @@ async function withdraw(a: Mine['applications'][number]) {
         <UForm
           v-if="joining"
           id="membership-join"
-          ref="joinForm"
           :state="joinState"
           :validate="() => needs({ lengthOptionId: joinOptions.length > 1 ? joinState.lengthOptionId : true, reference: joining?.asksFor ? joinState.reference : true })"
           class="space-y-4"
           novalidate
           @submit="join"
         >
-          <RefusalNotice :refusal="joinRefusal" />
+          <RefusalNotice :refusal="joinRefusal?.fields?.reference ? null : joinRefusal" />
           <UFormField
             v-if="joinOptions.length > 1"
             name="lengthOptionId"
@@ -365,6 +372,7 @@ async function withdraw(a: Mine['applications'][number]) {
             v-if="joining.asksFor"
             name="reference"
             :label="joining.asksFor"
+            :error="joinRefusal?.fields?.reference ? joinRefusal.reason : undefined"
             required
           >
             <UInput
@@ -372,6 +380,15 @@ async function withdraw(a: Mine['applications'][number]) {
               autocomplete="off"
               maxlength="254"
             />
+            <template
+              v-if="joinRefusal?.fields?.reference"
+              #error
+            >
+              <MembershipRefusalText
+                :reason="joinRefusal.reason"
+                :remedy="joinRefusal.remedy"
+              />
+            </template>
           </UFormField>
           <p
             v-if="joining.requiresPayment"

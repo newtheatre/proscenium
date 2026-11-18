@@ -1,16 +1,32 @@
 <script setup lang="ts">
-// Productions (C-01): every production, with its state and season. "New production" starts a draft
-// and opens it. Dates, and so the next performance, arrive with performances.
+// Productions (C-01): every production with when it is on, its next performance, where, and its
+// state; the season is a filter. "New production" starts a draft in a season, the one on now or
+// the next to come by default, and opens it.
 import { productionInput } from '../../../../../server/programme/input'
 
-interface Row { id: string, title: string, kind: string, state: 'draft' | 'published' | 'withdrawn' | 'cancelled', seasonId: string | null, companyName: string | null }
+interface Row {
+  id: string
+  title: string
+  kind: string
+  state: 'draft' | 'published' | 'withdrawn' | 'cancelled'
+  seasonId: string | null
+  companyName: string | null
+  firstStartsAt: number | null
+  lastEndsAt: number | null
+  next: { startsAt: number, space: string } | null
+  space: string | null
+}
+interface Season { id: string, name: string, startsOn: string, endsOn: string, state: string }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { data: seasons } = await useAPI<{ rows: { id: string, name: string }[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
+const { range, dateTime, toLocal } = useDates()
+const { data: seasons } = await useAPI<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
 const columns = [
   { key: 'title', label: 'Production', sortable: true, card: true },
-  { key: 'season', label: 'Season', card: true },
+  { key: 'dates', label: 'Dates', sortable: true, sortType: 'date' as const, card: true },
+  { key: 'next', label: 'Next performance' },
+  { key: 'space', label: 'Space' },
   { key: 'state', label: 'State', card: true },
 ]
 const filters = computed(() => [
@@ -19,15 +35,30 @@ const filters = computed(() => [
 ])
 const KINDS = [{ value: 'own', label: 'Our own production' }, { value: 'visiting', label: 'A visiting company' }, { value: 'hire', label: 'A hire' }, { value: 'event', label: 'An event, such as a workshop' }]
 const TONES = { draft: 'neutral', published: 'success', withdrawn: 'warning', cancelled: 'danger' } as const
-const seasonName = (id: string | null) => seasons.value?.rows.find(s => s.id === id)?.name ?? ''
+
+// The season a new production most likely belongs to: the one on today, else the next to start.
+const NONE = '__none'
+const today = toLocal(Date.now()).slice(0, 10) // not-policy: the date part of a local date and time
+const openSeasons = computed(() => (seasons.value?.rows ?? []).filter(s => s.state !== 'archived'))
+const likelySeason = computed(() => {
+  const now = openSeasons.value.find(s => s.startsOn <= today && s.endsOn >= today)
+  const next = openSeasons.value.filter(s => s.startsOn > today).sort((a, b) => a.startsOn.localeCompare(b.startsOn))[0]
+  return (now ?? next)?.id ?? NONE
+})
 
 // A short form, so it opens as a panel over the list, checked by the schema the server uses.
 const creating = ref(false)
-const fields = [
+const fields = computed(() => [
   { name: 'title', label: 'Title', kind: 'text' as const },
   { name: 'kind', label: 'What it is', kind: 'radio' as const, options: KINDS },
-]
-const create = (values: Record<string, unknown>) => $api<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: values.title, kind: values.kind } })
+  ...(openSeasons.value.length
+    ? [{ name: 'seasonId', label: 'Season', kind: 'select' as const, help: 'You can change it later on Details.', options: [...openSeasons.value.map(s => ({ value: s.id, label: s.name })), { value: NONE, label: 'No season' }] }]
+    : []),
+])
+const create = (values: Record<string, unknown>) => $api<{ id: string }>('/api/core/productions', {
+  method: 'POST',
+  body: { title: values.title, kind: values.kind, seasonId: !values.seasonId || values.seasonId === NONE ? null : values.seasonId },
+})
 const created = (result: unknown) => navigateTo(`/console/programme/productions/${(result as { id: string }).id}`)
 
 // The palette's actions arrive here: ?new=1 opens New production; ?run=1 asks which production a
@@ -79,8 +110,22 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
         class="text-sm text-muted"
       > · {{ row.companyName }}</span>
     </template>
-    <template #cell-season="{ row }">
-      {{ seasonName(row.seasonId) }}
+    <template #cell-dates="{ row }">
+      <span v-if="row.firstStartsAt && row.lastEndsAt">{{ range(row.firstStartsAt, row.lastEndsAt) }}</span>
+      <span
+        v-else
+        class="text-muted"
+      >No dates yet</span>
+    </template>
+    <template #cell-next="{ row }">
+      <span v-if="row.next">{{ dateTime(row.next.startsAt) }}</span>
+      <span
+        v-else
+        class="text-muted"
+      >None to come</span>
+    </template>
+    <template #cell-space="{ row }">
+      {{ row.space ?? '' }}
     </template>
     <template #cell-state="{ row }">
       <StatusBadge
@@ -94,9 +139,10 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
       title="New production"
       description="It starts as a draft. Nothing is public until you publish it."
       submit-label="Create production"
+      saved-title="Production created"
       :schema="productionInput"
       :fields="fields"
-      :initial="{ title: '', kind: 'own' }"
+      :initial="{ title: '', kind: 'own', seasonId: likelySeason }"
       :submit="create"
       @saved="created"
     />
