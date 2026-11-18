@@ -14,12 +14,12 @@ export interface NotificationType {
   category: 'transactional' | 'optional'
   side: 'audience' | 'members'
   channels: ('email' | 'inbox')[]
-  /** The inbox item's link: a path inside the application that may use the type's variables. */
+  /** The inbox item's link and the email's button: a path inside the application that may use the type's variables. */
   link?: string
   lane?: 'prompt' | 'bulk'
   topic?: string
   variables: Record<string, VariableKind>
-  wording: Record<string, { subject: string, body: string }>
+  wording: Record<string, { subject: string, body: string, action?: string }>
 }
 
 export interface NotifyAddressOptions {
