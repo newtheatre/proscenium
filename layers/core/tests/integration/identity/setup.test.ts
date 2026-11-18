@@ -1,7 +1,7 @@
 // First-run setup makes the first Owner (ID-37), and only once.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Authenticator } from './authenticator'
-import { Browser, address, leaveIdentity, reset, setUpOwner, useIdentity } from './helpers'
+import { Browser, address, env, leaveIdentity, reset, setUpOwner, useIdentity } from './helpers'
 import { rows } from '../../../../../tests/integration/helpers'
 
 beforeAll(useIdentity)
@@ -20,12 +20,25 @@ describe('first-run setup (ID-37)', () => {
     expect(passkey.body.recoveryCodes).toHaveLength(10)
     expect((await browser.post('/api/core/setup/finish', { code: 'abcde-fghjk' })).body.code).toBe('core.setup.code-wrong')
     expect(await rows('SELECT id FROM core_accounts')).toEqual([])
+    // A time zone not on the list is refused beside its field (AC-11).
+    const wrong = await new Browser().post('/api/core/setup/start', { name: 'Olive Owner', address: address(), theatre: 'The Lyric', timeZone: 'Mars/Olympus' })
+    expect(wrong.status).toBe(422)
+    expect(wrong.body.fields).toEqual({ timeZone: 'invalid' })
   })
 
   it('makes one Owner with a passkey, saved recovery codes and a strong session; then cannot run again', async () => {
     const browser = new Browser()
     const device = new Authenticator()
-    const ownerId = await setUpOwner(browser, device)
+    // The test site already has a name; set it aside so setup can give one.
+    const keys = '(\'core.site.name\', \'core.locale.time-zone\')'
+    const before = await rows<{ key: string, value: string, updated_at: number }>(`SELECT key, value, updated_at FROM core_settings WHERE key IN ${keys}`)
+    await env.DB.prepare(`DELETE FROM core_settings WHERE key IN ${keys}`).run()
+    const ownerId = await setUpOwner(browser, device, address(), { theatre: 'The Lyric', timeZone: 'Europe/Dublin' })
+    // The theatre's name and time zone asked on the first step are saved with the Owner (AC-11).
+    const saved = await rows<{ key: string, value: string }>(`SELECT key, value FROM core_settings WHERE key IN ${keys} ORDER BY key`)
+    await env.DB.prepare(`DELETE FROM core_settings WHERE key IN ${keys}`).run()
+    for (const r of before) await env.DB.prepare('INSERT INTO core_settings (key, value, updated_at) VALUES (?, ?, ?)').bind(r.key, r.value, r.updated_at).run()
+    expect(saved).toEqual([{ key: 'core.locale.time-zone', value: '"Europe/Dublin"' }, { key: 'core.site.name', value: '"The Lyric"' }])
     const me = await browser.get('/api/core/me')
     expect(me.body).toMatchObject({ signedIn: true, session: { assurance: 'strong' }, passkeys: 1 })
     expect(await rows('SELECT key, fixed FROM core_roles')).toEqual([{ key: 'owner', fixed: 1 }])

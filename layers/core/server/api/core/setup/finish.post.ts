@@ -25,6 +25,9 @@ export default defineRoute({
   // The address setup ran on becomes the site's one origin, unless the Worker names it already.
   const origin = normaliseOrigin(requestUrl(event).origin)
   if (origin && !(await useSetting('core.site.origin'))) await changeSetting(unit, 'core.site.origin', origin, { confirm: true })
+  // The theatre's name and time zone, as asked on the first step.
+  if (ticket.theatre && !(await useSetting('core.site.name'))) await changeSetting(unit, 'core.site.name', ticket.theatre, { confirm: true })
+  if (ticket.timeZone && !(await useSetting('core.locale.time-zone'))) await changeSetting(unit, 'core.locale.time-zone', ticket.timeZone, { confirm: true })
   unit.afterCommit(() => clearTicket(event))
   return { next: '/' }
 })
