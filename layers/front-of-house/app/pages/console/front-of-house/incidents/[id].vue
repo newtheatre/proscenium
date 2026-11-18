@@ -17,6 +17,7 @@ interface Person {
   involvement: Involvement
   isChild: boolean
   details: string | null
+  fromReport: boolean
 }
 interface Action {
   id: string
@@ -293,7 +294,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
                   :key="p.id"
                   icon="i-lucide-user"
                   :name="p.name ?? t('front-of-house.incident.unnamed')"
-                  :description="[t(`front-of-house.involvements.${p.involvement}`), p.isChild ? t('front-of-house.incident.child') : null, p.contact].filter(Boolean).join(' · ')"
+                  :description="[t(`front-of-house.involvements.${p.involvement}`), p.isChild ? t('front-of-house.incident.child') : null, p.contact, p.fromReport ? t('front-of-house.incident.named-in-report') : null].filter(Boolean).join(' · ')"
                 >
                   <UButton
                     v-if="p.details"

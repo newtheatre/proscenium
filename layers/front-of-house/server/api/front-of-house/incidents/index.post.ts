@@ -1,8 +1,9 @@
-// Reports an incident or near miss (FH-27). A queued write from a phone without signal.
+// Reports an incident or near miss (FH-27), with the people the reporter names (IN-1). A queued write from a phone without signal.
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { INCIDENT_KINDS } from '../../../db/schema'
 import { reportIncident } from '../../../incidents'
+import { reportPersonInput } from '../../../inputs'
 
 const id = z.string().min(1).max(40) // not-policy: shape bound
 
@@ -22,5 +23,7 @@ export default defineRoute({
     firstAidGiven: z.boolean().optional(),
     emergencyServicesCalled: z.boolean().optional(),
     serious: z.boolean().optional(),
+    // Who was involved (IN-1), as the reporter names them.
+    people: z.array(reportPersonInput).max(20).optional(), // not-policy: shape bound
   }).strict(),
 }, (_event, { input, actor, unit }) => reportIncident(unit.view(), { ...input, by: actor.accountId! }))

@@ -367,6 +367,8 @@ export const incidentPeople = defineTable('front_of_house_incident_people', {
   contact: col.personal(text('contact'), kept),
   involvement: col.internal(text('involvement', { enum: INVOLVEMENTS }).notNull()),
   isChild: col.internal(integer('is_child', { mode: 'boolean' }).notNull().default(false)),
+  // Named by the reporter in the report's Who step (IN-1), rather than added later by a reviewer.
+  fromReport: col.internal(integer('from_report', { mode: 'boolean' }).notNull().default(false)),
   // Injury and treatment. Sealed; cleared at once on erasure.
   details: col.special('details'),
   createdAt: col.createdAt(),

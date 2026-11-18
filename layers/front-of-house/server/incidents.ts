@@ -5,7 +5,7 @@
 import { accountScopeSql } from '#kit/accounts'
 import { all, first, localDate, newId, nowMs, openSpecial, refuse, sealSpecial, useSetting, type UnitView } from '#kit'
 import { sql } from 'drizzle-orm'
-import { accountLabel, assertTerm, holdersOf, notify } from '#modules/core'
+import { accountLabel, assertTerm, canonicalAccount, holdersOf, notify } from '#modules/core'
 import type { INVOLVEMENTS, INCIDENT_KINDS } from './db/schema'
 import { SEVERITIES } from './db/schema'
 
@@ -34,8 +34,13 @@ export interface ReportInput {
   emergencyServicesCalled?: boolean
   /** The reporter marks it serious. */
   serious?: boolean
+  /** Who was involved, as the reporter names them (IN-1). */
+  people?: ReportPerson[]
   by: string
 }
+
+/** Someone named in a report: an account, or a name and a way to reach them, and how they were involved. */
+export interface ReportPerson { accountId?: string | null, name?: string | null, contact?: string | null, involvement: Involvement }
 
 /** The severity at report: serious when marked, at least moderate when either flag is set. */
 export function severityAtReport(input: Pick<ReportInput, 'serious' | 'firstAidGiven' | 'emergencyServicesCalled'>): Severity {
@@ -63,8 +68,19 @@ export async function reportIncident(unit: UnitView, input: ReportInput): Promis
     params: [id, number, year, input.kind, severity, input.performanceId ?? null, input.venueId ?? null, input.spaceId ?? null, input.whereNote ?? null, input.occurredAt,
       input.whatHappened, input.immediateAction ?? null, input.firstAidGiven ? 1 : 0, input.emergencyServicesCalled ? 1 : 0, input.by, at, at, at],
   })
+  // The people the reporter names (IN-1): an account chosen in the picker must still be one, and a
+  // name stands alone with its contact. Welfare details are the reviewer's to add.
+  for (const p of input.people ?? []) {
+    if (!p.accountId && !p.name) refuse('front-of-house.person-unnamed', 'Choose the person\'s account, or give their name.', { status: 422, fields: { people: 'A name, or choose an account.' } })
+    const accountId = p.accountId ? await canonicalAccount(p.accountId) : null
+    unit.add({
+      sql: `INSERT INTO front_of_house_incident_people (id, incident_id, account_id, name, contact, involvement, is_child, from_report, created_at, updated_at)
+        SELECT ?, ?, ?, ?, ?, ?, 0, 1, ?, ? WHERE ? IS NULL OR EXISTS (SELECT 1 FROM core_accounts WHERE id = ? AND anonymised_at IS NULL)`,
+      params: [newId('inp'), id, accountId, accountId ? null : p.name ?? null, accountId ? null : p.contact ?? null, p.involvement, at, at, accountId, accountId],
+    }).expect(1, { code: 'front-of-house.unknown-person', reason: 'One of the people named is not someone on the system.', remedy: 'Choose them again, or give their name instead.' })
+  }
   unit.announce('front-of-house.incident.reported', { incidentId: id, severity }, { record: ['front-of-house.incident', id] })
-  unit.audit({ action: 'create', record: ['front-of-house.incident', id], detail: { kind: input.kind, severity } })
+  unit.audit({ action: 'create', record: ['front-of-house.incident', id], detail: { kind: input.kind, severity, people: input.people?.length ?? 0 } })
   const threshold = await useSetting('front-of-house.incidents.immediate-severity') as Severity
   if (rank(severity) >= rank(threshold)) {
     const managers = await holdersOf('front-of-house.incident.manage')
@@ -117,21 +133,37 @@ async function row(id: string): Promise<IncidentRow> {
   return r
 }
 
-/** Incidents for reviewers, newest first, with no free text and no people. */
-/** What a reporter sees of their own reports: number, kind, state and their own words. Nothing else. */
-export async function myReports(accountId: string): Promise<{ id: string, reference: string, kind: IncidentKind, state: IncidentRow['state'], occurredAt: number, whatHappened: string }[]> {
+/** Someone the reporter named, as they see it again: the name and how they were involved. */
+export interface NamedPerson { name: string, involvement: Involvement }
+
+/**
+ * What a reporter sees of their own reports: number, kind, state, their own words and the people they
+ * named (IN-1). Nothing the reviewers added.
+ */
+export async function myReports(accountId: string): Promise<{ id: string, reference: string, kind: IncidentKind, state: IncidentRow['state'], occurredAt: number, whatHappened: string, people: NamedPerson[] }[]> {
   const rows = await all<IncidentRow>(`SELECT * FROM front_of_house_incidents WHERE reported_by IN (${accountScopeSql('?1')}) ORDER BY reported_at DESC`, accountId)
-  return rows.map(r => ({ id: r.id, reference: reference(r.year, r.number), kind: r.kind, state: r.state, occurredAt: r.occurred_at, whatHappened: r.what_happened }))
+  const named = rows.length
+    ? await all<{ incident_id: string, account_id: string | null, name: string | null, involvement: Involvement }>(
+        `SELECT incident_id, account_id, name, involvement FROM front_of_house_incident_people
+          WHERE from_report = 1 AND incident_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`, JSON.stringify(rows.map(r => r.id)))
+    : []
+  const people = new Map<string, NamedPerson[]>()
+  for (const p of named) {
+    const name = p.name ?? (p.account_id ? await accountLabel(p.account_id) : null)
+    if (!name) continue
+    people.set(p.incident_id, [...people.get(p.incident_id) ?? [], { name, involvement: p.involvement }])
+  }
+  return rows.map(r => ({ id: r.id, reference: reference(r.year, r.number), kind: r.kind, state: r.state, occurredAt: r.occurred_at, whatHappened: r.what_happened, people: people.get(r.id) ?? [] }))
 }
 
-export interface IncidentPerson { id: string, accountId: string | null, name: string | null, contact: string | null, involvement: Involvement, isChild: boolean, details: string | null }
+export interface IncidentPerson { id: string, accountId: string | null, name: string | null, contact: string | null, involvement: Involvement, isChild: boolean, details: string | null, fromReport: boolean }
 export interface IncidentAction { id: string, what: string, ownerId: string | null, dueOn: string | null, state: 'open' | 'done' | 'dropped', resolvedAt: number | null, resolvedNote: string | null }
 
 /** The whole incident, for holders of incident.view: people with their welfare details, actions and the log. */
 export async function readIncident(id: string) {
   const r = await row(id)
-  const people = await all<{ id: string, account_id: string | null, name: string | null, contact: string | null, involvement: Involvement, is_child: number, details: string | null }>(
-    'SELECT id, account_id, name, contact, involvement, is_child, details FROM front_of_house_incident_people WHERE incident_id = ? ORDER BY created_at', id)
+  const people = await all<{ id: string, account_id: string | null, name: string | null, contact: string | null, involvement: Involvement, is_child: number, details: string | null, from_report: number }>(
+    'SELECT id, account_id, name, contact, involvement, is_child, details, from_report FROM front_of_house_incident_people WHERE incident_id = ? ORDER BY created_at', id)
   const actions = await all<{ id: string, what: string, owner_id: string | null, due_on: string | null, state: IncidentAction['state'], resolved_at: number | null, resolved_note: string | null }>(
     'SELECT * FROM front_of_house_incident_actions WHERE incident_id = ? ORDER BY created_at', id)
   const updates = await all<{ id: string, kind: string, from_value: string | null, to_value: string | null, body: string | null, author_id: string, created_at: number }>(
@@ -144,7 +176,7 @@ export async function readIncident(id: string) {
     reviewerId: r.reviewer_id, closedBy: r.closed_by, closedAt: r.closed_at, closingNote: r.closing_note,
     people: await Promise.all(people.map(async (p): Promise<IncidentPerson> => ({
       id: p.id, accountId: p.account_id, name: p.name ?? (p.account_id ? await accountLabel(p.account_id) : null), contact: p.contact,
-      involvement: p.involvement, isChild: !!p.is_child, details: await openSpecial(p.details),
+      involvement: p.involvement, isChild: !!p.is_child, details: await openSpecial(p.details), fromReport: !!p.from_report,
     }))),
     actions: actions.map((a): IncidentAction => ({ id: a.id, what: a.what, ownerId: a.owner_id, dueOn: a.due_on, state: a.state, resolvedAt: a.resolved_at, resolvedNote: a.resolved_note })),
     updates: updates.map(u => ({ id: u.id, kind: u.kind, from: u.from_value, to: u.to_value, body: u.body, authorId: u.author_id, at: u.created_at })),

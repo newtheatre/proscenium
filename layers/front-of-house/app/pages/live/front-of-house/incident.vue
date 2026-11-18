@@ -1,15 +1,18 @@
-<!-- Report an incident (Front of house specification, part 5, "Live mode"; FH-27): three short steps,
-     what happened (and what kind); when and where; what was done straight away, first aid, emergency
-     services and whether it is serious. The time is a day (today, or yesterday for something just
-     before midnight) and a clock time, both in the theatre's time zone whatever the phone's.
-     People involved are added afterwards by whoever reviews it. Then "Sent"
-     with its number. Sending needs a connection for now: while the device is offline the steps can
+<!-- Report an incident (Front of house specification, part 5, "Live mode"; FH-27, IN-1): four short
+     steps, what happened (and what kind); when and where; who was involved; what was done straight
+     away, first aid, emergency services and whether it is serious. The time is a day (today, or
+     yesterday for something just before midnight) and a clock time, both in the theatre's time zone
+     whatever the phone's. Who is optional: someone on the system found by search, or anyone else by
+     name (an audience member, say) with a way to reach them, each with how they were involved.
+     Welfare details are left to whoever reviews it. Then "Sent" with its number. Sending needs a connection for now: while the device is offline the steps can
      be filled in but the send button waits, and says why. -->
 <script setup lang="ts">
 import { CalendarDateTime, now as nowIn, Time, toZoned } from '@internationalized/date'
 import { useOnline } from '@vueuse/core'
 
 interface Board { performance: { id: string, title: string, startsAt: number, venueId: string } }
+type Involvement = 'affected' | 'witness' | 'helped' | 'other'
+interface Named { key: string, accountId: string | null, name: string, contact: string | null, involvement: Involvement }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -29,6 +32,36 @@ const day = ref<'today' | 'yesterday'>('today')
 const days = computed(() => (['today', 'yesterday'] as const).map(value => ({ value, label: t(`front-of-house.live.incident.${value}`) })))
 const form = ref({ whatHappened: '', whereNote: '', kind: 'incident' as 'incident' | 'near_miss', immediateAction: '', firstAidGiven: false, emergencyServicesCalled: false, serious: false })
 const step = ref(0)
+
+// Who was involved (IN-1). People are added one at a time: found on the system, or named.
+const people = ref<Named[]>([])
+const involvements = computed(() => (['affected', 'witness', 'helped', 'other'] as const).map(value => ({ value, label: t(`front-of-house.involvements.${value}`) })))
+const sources = computed(() => [
+  { value: 'system', label: t('front-of-house.live.incident.who-system') },
+  { value: 'other', label: t('front-of-house.live.incident.who-other') },
+])
+const blank = () => ({ source: 'system' as 'system' | 'other', accountId: undefined as string | undefined, label: '', name: '', contact: '', involvement: 'affected' as Involvement })
+const person = ref(blank())
+const unnamed = ref(false)
+const picked = computed(() => people.value.flatMap(p => p.accountId ? [p.accountId] : []))
+function addPerson() {
+  const p = person.value
+  const name = p.source === 'system' ? p.label : p.name.trim()
+  if (p.source === 'system' ? !p.accountId : !name) {
+    unnamed.value = true
+    return
+  }
+  people.value.push({
+    key: crypto.randomUUID(),
+    accountId: p.source === 'system' ? p.accountId! : null,
+    name,
+    contact: p.source === 'other' ? p.contact.trim() || null : null,
+    involvement: p.involvement,
+  })
+  person.value = { ...blank(), source: p.source }
+  unnamed.value = false
+}
+watch(() => [person.value.source, person.value.accountId, person.value.name], () => { unnamed.value = false })
 const sent = ref<{ reference: string } | null>(null)
 const sending = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -38,6 +71,7 @@ let reportKey: string | undefined
 const steps = computed(() => [
   { title: t('front-of-house.live.incident.step-what'), icon: 'i-lucide-pen-line' },
   { title: t('front-of-house.live.incident.step-when'), icon: 'i-lucide-clock' },
+  { title: t('front-of-house.live.incident.step-who'), icon: 'i-lucide-users' },
   { title: t('front-of-house.live.incident.step-help'), icon: 'i-lucide-heart-pulse' },
 ])
 const kinds = computed(() => (['incident', 'near_miss'] as const).map(value => ({ value, label: t(`front-of-house.incident-kinds.${value}`) })))
@@ -56,6 +90,8 @@ function next() {
     later.value = true
     return
   }
+  // Someone filled in but not yet added is added on the way, rather than lost.
+  if (step.value === 2 && (person.value.accountId || person.value.name.trim())) addPerson()
   step.value++
 }
 
@@ -79,6 +115,7 @@ async function send() {
         firstAidGiven: f.firstAidGiven,
         emergencyServicesCalled: f.emergencyServicesCalled,
         serious: f.serious,
+        people: people.value.map(p => ({ accountId: p.accountId, name: p.accountId ? null : p.name, contact: p.contact, involvement: p.involvement })),
       },
     })
     sent.value = { reference: answer.reference }
@@ -186,6 +223,96 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
         </div>
 
         <div
+          v-else-if="step === 2"
+          class="space-y-4"
+        >
+          <p class="text-muted">
+            {{ t('front-of-house.live.incident.who-help') }}
+          </p>
+          <RecordList
+            v-if="people.length"
+            :label="t('front-of-house.live.incident.who-list')"
+          >
+            <RecordListItem
+              v-for="(p, i) in people"
+              :key="p.key"
+              icon="i-lucide-user"
+              :name="p.name"
+              :description="[t(`front-of-house.involvements.${p.involvement}`), p.contact].filter(Boolean).join(' · ')"
+            >
+              <IconButton
+                icon="i-lucide-x"
+                size="lg"
+                :label="t('front-of-house.live.incident.who-remove', { name: p.name })"
+                @click="people.splice(i, 1)"
+              />
+            </RecordListItem>
+          </RecordList>
+          <div class="space-y-4 rounded-md border border-default p-4">
+            <URadioGroup
+              v-model="person.source"
+              :items="sources"
+              orientation="horizontal"
+              size="xl"
+              variant="card"
+              :aria-label="t('front-of-house.live.incident.who-source')"
+            />
+            <UFormField
+              v-if="person.source === 'system'"
+              :label="t('front-of-house.live.incident.who-person')"
+              :error="unnamed ? t('front-of-house.live.incident.who-choose') : undefined"
+            >
+              <PersonPicker
+                v-model="person.accountId"
+                endpoint="/api/front-of-house/incidents/people"
+                :exclude="picked"
+                size="xl"
+                @picked="p => person.label = p?.label ?? ''"
+              />
+            </UFormField>
+            <template v-else>
+              <UFormField
+                :label="t('front-of-house.live.incident.who-name')"
+                :error="unnamed ? t('front-of-house.live.incident.who-name-needed') : undefined"
+              >
+                <UInput
+                  v-model="person.name"
+                  :maxlength="120"
+                  size="xl"
+                />
+              </UFormField>
+              <UFormField
+                :label="t('front-of-house.live.incident.who-contact')"
+                :help="t('front-of-house.live.incident.who-contact-help')"
+              >
+                <UInput
+                  v-model="person.contact"
+                  :maxlength="200"
+                  size="xl"
+                />
+              </UFormField>
+            </template>
+            <UFormField :label="t('front-of-house.live.incident.who-involvement')">
+              <URadioGroup
+                v-model="person.involvement"
+                :items="involvements"
+                size="xl"
+                variant="card"
+              />
+            </UFormField>
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="xl"
+              block
+              icon="i-lucide-user-plus"
+              :label="t('front-of-house.live.incident.who-add')"
+              @click="addPerson"
+            />
+          </div>
+        </div>
+
+        <div
           v-else
           class="space-y-4"
         >
@@ -239,7 +366,7 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           @click="step--"
         />
         <UButton
-          v-if="step < 2"
+          v-if="step < 3"
           size="xl"
           class="flex-1 justify-center"
           trailing-icon="i-lucide-arrow-right"
