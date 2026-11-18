@@ -3,7 +3,7 @@
 // owned by the exchange. A refund comes out of the latest payment first, and out of more than one
 // when no single payment has enough left; the self-approve limit is judged on the whole amount, so
 // splitting a refund never lets it through without the approval it would otherwise need.
-import { all, refuse, type UnitView } from '#kit'
+import { all, first, refuse, type UnitView } from '#kit'
 import { intentStatus, requestRefund } from '#modules/payments'
 import type { OrderRow } from './orders'
 
@@ -23,9 +23,14 @@ export async function orderPayments(order: Pick<OrderRow, 'id' | 'intent_id'>): 
     'SELECT id, intent_id FROM box_office_exchanges WHERE order_id = ? AND state = \'completed\' AND intent_id IS NOT NULL ORDER BY created_at DESC, id DESC', order.id))
     .map(e => ({ intentId: e.intent_id, record: e.id }))
   if (order.intent_id) owned.push({ intentId: order.intent_id, record: order.id })
+  // A booking split off a paid one at the till (one person's share of a split sale) was paid by the
+  // booking it came from: its money is that booking's part.
+  const from = order.intent_id ? (await first<{ split_from_id: string | null }>('SELECT split_from_id FROM box_office_orders WHERE id = ?', order.id))?.split_from_id : null
   const out: Payable[] = []
   for (const { intentId, record } of owned) {
-    const part = (await intentStatus(intentId))?.parts.find(p => p.owner.module === 'box-office' && p.owner.record === record)
+    const parts = (await intentStatus(intentId))?.parts ?? []
+    const part = parts.find(p => p.owner.module === 'box-office' && p.owner.record === record)
+      ?? (record === order.id && from ? parts.find(p => p.owner.module === 'box-office' && p.owner.record === from) : undefined)
     if (part?.settled && part.amountMinor > part.refundedMinor) out.push({ partId: part.id, leftMinor: part.amountMinor - part.refundedMinor })
   }
   return out

@@ -38,7 +38,7 @@ const issue = (type: Awaited<ReturnType<typeof passType>>, paid = true, accountI
 const pass = async (id: string) => (await rows<Record<string, any>>('SELECT * FROM box_office_passes WHERE id = ?', id))[0]!
 const sale = (input: Record<string, unknown>) => req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }] }, seller)
 const summary = (input: Record<string, unknown>) => req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
-const payCash = (intentId: string) => inContext(() => attest({ intentId, providerAccountId: cash, method: 'cash' }), seller)
+const payCash = (intentId: string, more: { split?: number, receipt?: { email: string } } = {}) => inContext(() => attest({ intentId, providerAccountId: cash, method: 'cash', ...more }), seller)
 const linesOf = (orderId: string) => rows<{ kind: string, amount_minor: number, entry: number }>('SELECT kind, amount_minor, pass_redemption_id IS NOT NULL AS entry FROM box_office_order_lines WHERE order_id = ? AND state = \'live\' ORDER BY kind, amount_minor DESC', orderId)
 const passIncome = async () => (await rows<{ total: number }>("SELECT coalesce(sum(e.amount_minor), 0) AS total FROM finance_entries e JOIN finance_accounts f ON f.id = e.account_id WHERE f.system_key = 'box-office.pass-income'"))[0]!.total
 const orderOf = async (intentId: string) => (await rows<{ id: string, state: string, account_id: string | null }>('SELECT id, state, account_id FROM box_office_orders WHERE intent_id = ?', intentId))[0]!
@@ -142,6 +142,25 @@ describe('selling a pass at the till', () => {
     // Nobody was named for it: the after-sale panel shows its code to hand over.
     expect((await req('GET', `/api/box-office/desk/sold?intent=${made.body.intentId}`, undefined, seller)).body.orders).toMatchObject([{ performance: null, lines: [], passes: [{ name: type.name, priceName: 'Member', holder: null, code: expect.stringMatching(/^PASS-/) }] }])
     expect(await passIncome() - before).toBe(-2100)
+  })
+})
+
+describe('a pass in a sale split between people', () => {
+  it('goes to whoever paid for it, unless the seller named its holder', async () => {
+    const type = await passType()
+    const named = await commit(async unit => (await (await import('#modules/core')).findOrCreateAccount(unit.view(), { address: 'named.holder@example.org', origin: 'guest' })).accountId)
+    const buy = (more: Record<string, unknown> = {}) => ({ passTypeId: type.id, passPriceId: type.prices[0]!.id, entry: false, ...more })
+    const input = { performanceId: a.performanceId, lines: [{ bandId: a.bandId, ticketTypeId: a.fullId, quantity: 1 }], buy: [buy(), buy(), buy({ accountId: named })] }
+    // Lines: the ticket, then each pass sold. Person 1 pays for the ticket and the first pass; person 2 for the other two.
+    const made = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits: [{ items: [{ basket: 'box-office', line: 0, quantity: 1 }, { basket: 'box-office', line: 1, quantity: 1 }] }, { items: [{ basket: 'box-office', line: 2, quantity: 1 }, { basket: 'box-office', line: 3, quantity: 1 }] }] }, seller)
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    await payCash(made.body.intentId, { split: 2, receipt: { email: 'Second.Payer@example.org' } })
+    expect(await payCash(made.body.intentId, { split: 1, receipt: { email: 'first.payer@example.org' } })).toMatchObject({ settled: true })
+    const sold = await rows<{ account_id: string | null }>(`SELECT p.account_id FROM box_office_passes p
+      JOIN box_office_order_lines l ON l.id = p.order_line_id JOIN box_office_orders o ON o.id = l.order_id WHERE o.intent_id = ? ORDER BY l.rowid`, made.body.intentId)
+    const accountOf = (address: string) => commit(async unit => (await (await import('#modules/core')).findOrCreateAccount(unit.view(), { address, origin: 'guest' })).accountId)
+    expect(sold.map(p => p.account_id)).toEqual([await accountOf('first.payer@example.org'), await accountOf('second.payer@example.org'), named])
+    for (const p of sold) expect(await rows("SELECT 1 FROM core_notifications WHERE type_key = 'box-office.pass-issued' AND account_id = ?", p.account_id)).toHaveLength(1)
   })
 })
 

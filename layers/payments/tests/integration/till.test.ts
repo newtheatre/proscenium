@@ -19,7 +19,7 @@ import intentGet from '../../server/api/payments/intents/[id].get'
 import methodsGet from '../../server/api/payments/methods.get'
 import panelsGet from '../../server/api/payments/till/panels.get'
 import tillMethodsGet from '../../server/api/payments/till/methods.get'
-import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
+import { call, deliver, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 12)
 let cash: string
@@ -311,6 +311,8 @@ describe('splitting a sale by item', () => {
 
     const last = await attest(id, me, { split: 1, receipt: { email: 'first@example.com' }, tenderedMinor: 1000 })
     expect(last.body).toMatchObject({ settled: true, changeMinor: 316 })
+    // They go just after the sale, each in a unit of its own.
+    await deliver()
     const sent = await rows<{ address: string, payload: string }>("SELECT address, payload FROM core_notifications WHERE type_key = 'payments.till-receipt' AND subject_id = ? ORDER BY address", id)
     expect(sent.map(s => s.address)).toEqual(['first@example.com', 'second@example.com'])
     expect(JSON.parse(sent[1]!.payload)).toMatchObject({ items: '2 × Ticket', amount: '£6.66', method: 'Cash' })
@@ -319,7 +321,7 @@ describe('splitting a sale by item', () => {
       { position: 1, receiptTo: 'first@example.com', receiptAccountId: null, items: [{ line: 0, key: 'all', quantity: 1 }] },
       { position: 2, receiptTo: 'second@example.com', receiptAccountId: null, items: [{ line: 0, key: 'all', quantity: 2 }] },
     ])
-    // Once the sale is over, the addresses are gone.
+    // Once the receipts have gone, the addresses are gone.
     expect(await rows('SELECT receipt_to FROM payments_till_splits WHERE intent_id = ? AND receipt_to IS NOT NULL', id)).toEqual([])
     expect((await get(`/api/payments/intents/${id}`, me)).body).toMatchObject({ state: 'succeeded', splits: [{ paid: true }, { paid: true }] })
   })
@@ -329,11 +331,13 @@ describe('splitting a sale by item', () => {
     await post('/api/payments/sessions', me, { pointLabel: 'Foyer' }, true)
     const first = await post('/api/payments/till/sale', me, { panels, receipt: { email: 'whole@example.com' } }, true)
     expect((await attest(first.body.intentId, me, {})).body).toMatchObject({ settled: true })
+    await deliver()
     const [whole] = await rows<{ payload: string }>("SELECT payload FROM core_notifications WHERE address = 'whole@example.com'")
     expect(JSON.parse(whole!.payload)).toMatchObject({ items: '3 × Ticket, 1 × Snacks', amount: '£13.50', method: 'Cash' })
 
     const second = await post('/api/payments/till/sale', me, { panels }, true)
     expect((await attest(second.body.intentId, me, { receipt: { email: 'paying@example.com' } })).body).toMatchObject({ settled: true })
+    await deliver()
     expect(await rows("SELECT 1 FROM core_notifications WHERE address = 'paying@example.com'")).toHaveLength(1)
 
     const third = await post('/api/payments/till/sale', me, { panels }, true)

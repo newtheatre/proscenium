@@ -10,7 +10,7 @@ import { clearingFor } from './providers'
 import { refundInFull } from './refunds'
 import { isTestMoney } from './test-money'
 import type { Method, ProviderAnswer } from './points/provider'
-import { paidByOf, rowsOf, sendReceipts, splitsForPart } from './splits'
+import { rowsOf, splitsForPart } from './splits'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
 export interface AttemptRow { id: string, intent_id: string, provider_account_id: string, method: Method, amount_minor: number, state: AttemptState, idempotency_key: string, provider_ref: string | null, reader_id: string | null, started_at: number, refunded_minor: number }
@@ -115,8 +115,10 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
     if (total !== -part.amount_minor) throw new SettlementRefused(part.owner_module, new Refusal('payments.settlement.part-mismatch', `${part.owner_module}'s ledger entries for its part total ${-total}, not the part's ${part.amount_minor}.`, { status: 500 }))
     for (const e of entries) owned.push({ account: e.account, amountMinor: e.amountMinor, forModule: part.owner_module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null })
   }
-  // Each receipt asked for at the till goes now the sale is whole, with any owner's link on it.
-  if (rows.length && !test) await sendReceipts(unit, intent, parts, rows, handlers, await paidByOf(intent.id, rows, attempt))
+  // Each receipt asked for at the till goes now the sale is whole, with any owner's link on it: one
+  // person at a time, each in a unit of their own, so a sale shared by any number of people settles
+  // in one small unit (an owner may give each person a record of their own as their receipt goes).
+  if (!test && rows.some(r => r.receipt_sent_at === null && (r.receipt_to || r.receipt_account_id))) unit.enqueue('payments.till-receipts', { intentId: intent.id })
   if (!test) {
     try {
       await postEntries(unit, {

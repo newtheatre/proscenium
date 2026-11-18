@@ -7,7 +7,7 @@
 // money is pass income when it is paid, never split between performances.
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, openColumn, refuse, requirements, useSetting, type UnitView } from '#kit'
-import { getPerformance, getProduction, notify } from '#modules/core'
+import { findOrCreateAccount, getPerformance, getProduction, notify } from '#modules/core'
 import { orderLines } from './db/schema'
 import type { JudgedPass } from './pass-entries'
 import { issuePass, passCodeHashes, shownPassCode } from './pass-holding'
@@ -215,6 +215,31 @@ export async function sendNewPasses(unit: UnitView, order: { id: string, currenc
       dedupeKey: `pass-issued:${sale.passId}`,
     })
   }
+}
+
+/**
+ * In a till sale split between people, a pass nobody was named for goes to whoever paid for it
+ * (Matt, 18 November): `payers` says who paid for each keyed summary line, and `pass:<n>` is the
+ * nth pass sold on the order. A holder the seller picked keeps it, and anyone may move it later.
+ * Each address is looked up once, so two passes for one person make one account.
+ */
+export async function passPayers(unit: UnitView, orderId: string, payers: readonly { key: string, to: { accountId?: string, email?: string } }[]): Promise<Map<string, string>> {
+  const holders = new Map<string, string>()
+  if (!payers.some(p => p.key.startsWith('pass:'))) return holders
+  const sold = (await passSalesOn(orderId)).filter(s => s.fresh)
+  const accounts = new Map<string, string>()
+  for (const { key, to } of payers) {
+    const sale = key.startsWith('pass:') ? sold[Number(key.slice(5))] : undefined // not-policy: the length of 'pass:'
+    if (!sale || sale.accountId || holders.has(sale.passId)) continue
+    let accountId = to.accountId
+    if (!accountId && to.email) {
+      const address = to.email.trim().toLowerCase()
+      accountId = accounts.get(address) ?? (await findOrCreateAccount(unit, { address, origin: 'guest' })).accountId
+      accounts.set(address, accountId)
+    }
+    if (accountId) holders.set(sale.passId, accountId)
+  }
+  return holders
 }
 
 /**

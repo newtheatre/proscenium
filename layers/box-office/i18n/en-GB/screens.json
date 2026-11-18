@@ -809,7 +809,7 @@
   "box-office.screens.panel.pass.check": "Only some people may have this price: check they qualify.",
   "box-office.screens.panel.pass.holder": "Who holds it",
   "box-office.screens.panel.pass.holder-placeholder": "Name or email address",
-  "box-office.screens.panel.pass.holder-help": "Optional. They are emailed the pass's code. Left empty, it goes to the buyer, if they give an address.",
+  "box-office.screens.panel.pass.holder-help": "Optional. They are emailed the pass's code. Left empty, it goes to the buyer, or in a split payment to whoever pays for it, if they give an address.",
   "box-office.screens.panel.pass.holder-needed": "This pass is in one person's name: find them, or type their address.",
   "box-office.screens.panel.pass.entry-tonight": "Use one entry tonight",
   "box-office.screens.panel.pass.not-tonight": "This pass does not cover tonight's show, so it is sold on its own.",

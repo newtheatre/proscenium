@@ -7,11 +7,11 @@
 import { sql } from 'drizzle-orm'
 import { first, nowMs, type UnitView } from '#kit'
 import { accountLabel } from '#modules/core'
-import type { Destination, Part, Settlement } from '#modules/payments'
+import { payersOf, type Part, type ReceiptPerson, type Settlement } from '#modules/payments'
 import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
 import { exchangeOrder, isExchangeRecord, releaseExchange, settleExchange } from '../../exchange'
-import { passSalesMinor } from '../../pass-sales'
+import { passPayers, passSalesMinor } from '../../pass-sales'
 import { liveLines, ORDER, type OrderRow } from '../../orders'
 import { deskReceiptLink } from '../../desk'
 
@@ -26,7 +26,9 @@ export default {
     if (!order) throw new Error(`No order ${part.record} for payment part ${part.id}`)
     const lines = await liveLines(order.id)
     // The batch refuses unless the order is still waiting for this payment and its total is the part's.
-    await confirmOrder(unit, { ...order, total_minor: part.amountMinor }, lines, { from: 'awaiting_payment', intentId: part.intentId })
+    // In a sale split between people, a pass goes to whoever paid for it.
+    const passHolders = await passPayers(unit, order.id, await payersOf(part.intentId, { module: 'box-office', record: order.id }))
+    await confirmOrder(unit, { ...order, total_minor: part.amountMinor }, lines, { from: 'awaiting_payment', intentId: part.intentId, passHolders })
     const totals = new Map<string, number>()
     for (const line of lines) totals.set(line.performance_id, (totals.get(line.performance_id) ?? 0) + line.amount_minor)
     // Money for a pass is income when it is paid, in a line of its own, not shared between performances.
@@ -35,9 +37,9 @@ export default {
   },
 
   // The till's receipt carries a desk sale's tickets: the booking joins the buyer and the receipt links to it.
-  async receiptLink(unit: UnitView, part: Part, to: Destination[]) {
+  async receiptLink(unit: UnitView, part: Part, person: ReceiptPerson) {
     if (isExchangeRecord(part.record)) return null
-    return deskReceiptLink(unit, part.record, to)
+    return deskReceiptLink(unit, part.record, person)
   },
 
   // The money for cancelled tickets has gone back: it is no longer owed to the audience.
