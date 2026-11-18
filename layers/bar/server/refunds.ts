@@ -23,6 +23,11 @@ export interface SaleLine {
   /** What refunds hold or have taken, failed ones aside. */
   reversedQuantity: number
   reversedMinor: number
+  /**
+   * Whether what was sold can go back on the shelf: its size's recipe is only things counted as
+   * themselves (a can, a packet) or whole packs. A poured drink, or one made with a choice, cannot.
+   */
+  packaged: boolean
   reversals: { id: string, state: 'requested' | 'succeeded' | 'failed', quantity: number, amountMinor: number, reason: string, stockOutcome: string, at: number }[]
 }
 
@@ -53,10 +58,13 @@ export async function saleByReference(reference: string): Promise<SaleDetail | n
     reference,
   )
   if (!sale) return null
-  const lines = await all<Omit<SaleLine, 'reversals'>>(
+  const lines = await all<Omit<SaleLine, 'reversals' | 'packaged'> & { packaged: number }>(
     `SELECT l.id, ${LABEL} || coalesce(' · ' || (SELECT group_concat(c.label, ', ') FROM bar_sale_line_choices c WHERE c.sale_line_id = l.id), '') AS label, l.quantity, l.unit_minor AS unitMinor, l.amount_minor AS amountMinor,
             coalesce((SELECT sum(r.quantity) FROM bar_sale_reversals r WHERE r.sale_line_id = l.id AND r.state <> 'failed'), 0) AS reversedQuantity,
-            coalesce((SELECT sum(r.amount_minor) FROM bar_sale_reversals r WHERE r.sale_line_id = l.id AND r.state <> 'failed'), 0) AS reversedMinor
+            coalesce((SELECT sum(r.amount_minor) FROM bar_sale_reversals r WHERE r.sale_line_id = l.id AND r.state <> 'failed'), 0) AS reversedMinor,
+            (EXISTS (SELECT 1 FROM bar_recipe_lines r WHERE r.variant_id = l.variant_id)
+              AND NOT EXISTS (SELECT 1 FROM bar_recipe_lines r LEFT JOIN bar_stock_items i ON i.id = r.stock_item_id
+                               WHERE r.variant_id = l.variant_id AND (i.id IS NULL OR (i.base_unit <> 'each' AND r.quantity % i.pack_size <> 0)))) AS packaged
        FROM bar_sale_lines l JOIN bar_variants v ON v.id = l.variant_id JOIN bar_products p ON p.id = v.product_id
       WHERE l.sale_id = ? ORDER BY l.created_at, l.id`,
     sale.id,
@@ -71,7 +79,7 @@ export async function saleByReference(reference: string): Promise<SaleDetail | n
   return {
     ...rest,
     soldBy: soldById ? await accountLabel(soldById) : '',
-    lines: lines.map(l => ({ ...l, reversals: reversals.filter(r => r.lineId === l.id).map(({ lineId: _, ...r }) => r) })),
+    lines: lines.map(l => ({ ...l, packaged: !!l.packaged, reversals: reversals.filter(r => r.lineId === l.id).map(({ lineId: _, ...r }) => r) })),
   }
 }
 
