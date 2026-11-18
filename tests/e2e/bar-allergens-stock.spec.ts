@@ -10,7 +10,7 @@ const manager = {
   name: 'Ali Allergen',
   assurance: 'strong',
   reassertedAt: Date.now(),
-  grants: ['core.settings.manage', 'core.modules.manage', 'bar.product.manage', 'bar.price.manage', 'bar.allergens.manage', 'bar.stock.manage'].map(grant),
+  grants: ['core.settings.manage', 'core.modules.manage', 'bar.product.manage', 'bar.price.manage', 'bar.allergens.manage', 'bar.stock.manage', 'bar.outlet.manage'].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
@@ -33,6 +33,8 @@ test.beforeAll(async ({ playwright }) => {
   s.item = (await send('post', '/api/bar/stock/items', { name: `Fruit cup ${stamp}`, baseUnit: 'ml', packSize: 700, packName: 'bottle', countUnitSize: 700 })).stockItemId
   const product = await (await api.get(`/api/bar/products/${s.product}`)).json()
   await send('post', `/api/bar/variants/${product.product.variants[0].id}/recipe`, { lines: [{ stockItemId: s.item, quantity: 200 }] })
+  // An outlet of its own, so the product is on sale and the public chart lists it.
+  await send('post', '/api/bar/outlets', { name: `Allergen bar ${stamp}`, kind: 'bar' })
   await api.dispose()
 })
 test.use(as(manager))
@@ -75,8 +77,9 @@ test.describe('the public chart', () => {
     await visit(page, '/bar/allergens')
     await expect(page.getByRole('heading', { name: 'Allergens at the bar', level: 1 })).toBeVisible()
     await noViolations(page)
-    await page.getByLabel('Sulphites').check()
-    await expect(page.getByText('May contain Sulphites').first()).toBeVisible()
+    await expect(page.getByText(`Fruit cup jug ${stamp} · Each`).first()).toBeVisible()
+    await page.getByLabel('Sulphur dioxide and sulphites').check()
+    await expect(page.getByText('May contain Sulphur dioxide and sulphites').first()).toBeVisible()
     await noViolations(page)
   })
 })

@@ -3,7 +3,7 @@
 // the till: contains, may contain, or not checked. It never says "free from".
 import { all, nowMs, useSetting } from '#kit'
 import { allergenAnswers, allergenSettings, sizeAnswer, stockLinks, type Allergen } from './allergens'
-import { menu, outlets } from './catalogue'
+import { menu, outlets, priceLists } from './catalogue'
 
 export interface ChartAnswer { contains: Allergen[], mayContain: Allergen[], checked: boolean }
 export interface ChartRow {
@@ -26,7 +26,9 @@ export async function allergenChart(): Promise<Chart | null> {
   if (!settings.enabled || !settings.publish) return null
   const out: Chart['outlets'] = []
   let complete = true
-  for (const outlet of (await outlets()).filter(o => o.active)) {
+  const lists = new Set((await priceLists()).filter(l => l.active).map(l => l.id))
+  // An outlet whose price list has been retired sells nothing, so it has no chart.
+  for (const outlet of (await outlets()).filter(o => o.active && lists.has(o.priceListId))) {
     const m = await menu(outlet.id)
     const groups = new Map(m.groups.map(g => [g.id, g]))
     const categories = m.categories.map(c => ({
