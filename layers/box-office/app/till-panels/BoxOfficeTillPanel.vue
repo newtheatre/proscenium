@@ -93,6 +93,11 @@ function takeOne(row: PerformanceRow) {
   for (const list of [holders.value[keyOf(row)], references.value[keyOf(row)]]) if (list && list.length > n) list.splice(Math.max(n, 0))
   if (n <= 0 && lastAdded.value === keyOf(row)) lastAdded.value = null
 }
+// A performance whose production has one price throughout sells in one section, which is not named.
+const oneSection = (id: string | undefined) => {
+  const rows = performances.value.find(p => p.performanceId === id)?.rows ?? []
+  return rows.length > 0 && rows.every(r => r.bandId === rows[0]!.bandId)
+}
 const rowLabel = (row: PerformanceRow) => (bands.value.length > 1 ? t('box-office.screens.panel.sold.line', { band: row.band, type: row.ticketType }) : row.ticketType)
 
 function setQuantity(row: PerformanceRow, value: number | null | undefined) {
@@ -175,7 +180,9 @@ const adding = ref<string | undefined>(undefined)
 const orderRows = computed(() => performances.value.find(p => p.performanceId === order.value?.lines[0]?.performanceId)?.rows ?? [])
 // The price shows under each choice in the list; the box shows the name, with the line's price beside it.
 const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: r.ticketType, description: money(r.amountMinor) }))
-const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: t('box-office.screens.panel.row', { band: r.band, type: r.ticketType, price: money(r.amountMinor) }) })))
+const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: oneSection(order.value?.lines[0]?.performanceId)
+  ? t('box-office.screens.panel.row-whole', { type: r.ticketType, price: money(r.amountMinor) })
+  : t('box-office.screens.panel.row', { band: r.band, type: r.ticketType, price: money(r.amountMinor) }) })))
 
 function tell(value: unknown) {
   lastSaid = JSON.stringify(value)
@@ -463,7 +470,7 @@ function clear() {
           :key="line.id"
           class="flex items-center justify-between gap-2 py-1.5"
         >
-          <span>{{ line.band ? t('box-office.screens.panel.sold.line', { band: line.band, type: line.ticketType }) : line.ticketType }}</span>
+          <span>{{ line.band && !oneSection(o.performance?.id) ? t('box-office.screens.panel.sold.line', { band: line.band, type: line.ticketType }) : line.ticketType }}</span>
           <span class="flex shrink-0 items-center gap-2">
             <UBadge
               v-if="line.admitted"
@@ -819,7 +826,8 @@ function clear() {
             <div
               class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
               role="group"
-              :aria-label="b.band"
+              :aria-label="bands.length > 1 ? b.band : undefined"
+              :aria-labelledby="bands.length > 1 ? undefined : `walk-up-${performance.performanceId}`"
             >
               <UChip
                 v-for="row in b.rows"
@@ -840,7 +848,10 @@ function clear() {
                   @click="addOne(row)"
                 >
                   <span class="flex items-start justify-between gap-2 font-medium">
-                    <span class="min-w-0 break-words">{{ row.ticketType }}<span class="sr-only"> {{ t('box-office.screens.panel.tile-band', { band: b.band }) }}</span></span>
+                    <span class="min-w-0 break-words">{{ row.ticketType }}<span
+                      v-if="bands.length > 1"
+                      class="sr-only"
+                    > {{ t('box-office.screens.panel.tile-band', { band: b.band }) }}</span></span>
                     <UIcon
                       v-if="row.holder"
                       name="i-lucide-id-card"
