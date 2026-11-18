@@ -20,6 +20,8 @@ const links = computed(() => [
   { label: t('core.public.whats-on'), to: '/whats-on' },
   // The archive of past shows, unless the theatre keeps it private (public-site.archive.public).
   ...(settings.value?.['public-site.archive.public']?.value === true ? [{ label: t('core.public.past-shows'), to: '/shows' }] : []),
+  // The roll of honour, when the awards module is on and the theatre shows it.
+  ...(settings.value?.['awards.roll.public']?.value === true ? [{ label: t('core.public.roll-of-honour'), to: '/awards' }] : []),
   ...(navigation.value?.header ?? []),
 ].map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined, active: route.path === l.to || route.path.startsWith(`${l.to}/`) })))
 const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined })))
