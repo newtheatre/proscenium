@@ -131,6 +131,9 @@ export default defineModule({
     'finance.system-account': [
       { id: 'cash', name: 'Cash in tills', kind: 'asset' },
       { id: 'card-clearing', name: 'Card clearing', kind: 'asset', scoped: true },
+      // Money taken some other way at the desk (a voucher, a bank transfer, an invoice): no card
+      // machine pays it out, so it is kept apart from card clearing until the treasurer moves it.
+      { id: 'other', name: 'Other payments taken', kind: 'asset' },
       { id: 'bank', name: 'Bank', kind: 'asset' },
       { id: 'provider-fees', name: 'Payment provider fees', kind: 'expense' },
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
@@ -165,6 +168,11 @@ export default defineModule({
     'core.count': [
       { id: 'payments.attention', file: 'attention' },
       { id: 'payments.refunds-waiting', file: 'refunds-waiting' },
+    ],
+    // On the console home for whoever can act on them: payments that need settling, and refunds to approve.
+    'core.home-card': [
+      { id: 'payments.attention', home: 'console', ability: 'payments.attempt.reconcile', component: 'PaymentsAttentionCard', urgency: 'today', count: 'payments.attention' },
+      { id: 'payments.refunds', home: 'console', ability: 'payments.refund.approve', component: 'PaymentsRefundsCard', urgency: 'today', count: 'payments.refunds-waiting' },
     ],
     'core.vocabulary': [{
       id: 'payments.refund-decline-reason',
