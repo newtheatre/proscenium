@@ -22,7 +22,7 @@ const facts = computed(() => {
     { label: t('awards.screens.award.awarded-on'), value: day(x.awardedOn) },
     ...(x.awardedFor ? [{ label: t('awards.screens.award.awarded-for'), value: x.awardedFor }] : []),
     ...(x.productionTitle ? [{ label: t('awards.screens.award.production'), value: x.productionTitle }] : []),
-    { label: t('awards.screens.award.listed'), value: t(`awards.screens.visibility.${x.visibility}`) },
+    { label: t('awards.screens.award.listed'), value: x.state === 'revoked' ? t('awards.screens.award.listed-revoked') : t(`awards.screens.visibility.${x.visibility}`) },
     { label: t('awards.screens.award.source'), value: t(`awards.screens.sources.${x.source}`) },
   ]
 })
@@ -126,7 +126,7 @@ async function revoke() {
       #primary
     >
       <UButton
-        v-if="data?.canUpdate"
+        v-if="data?.canUpdate && a.state === 'current'"
         color="neutral"
         variant="outline"
         icon="i-lucide-pencil"
@@ -134,7 +134,7 @@ async function revoke() {
         @click="openEdit()"
       />
       <UButton
-        v-if="data?.canRevoke"
+        v-if="data?.canRevoke && a.state === 'current'"
         color="neutral"
         variant="outline"
         icon="i-lucide-undo-2"
@@ -357,7 +357,7 @@ async function revoke() {
 
     <UModal
       v-model:open="revoking"
-      :title="t('awards.screens.award.revoke')"
+      :title="t('awards.screens.award.revoke-title', { name: a?.recipientName ?? '', award: a?.typeName ?? '' })"
       :description="t('awards.screens.award.revoke-help')"
     >
       <template #body>

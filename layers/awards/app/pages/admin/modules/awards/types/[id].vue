@@ -15,7 +15,7 @@ const toast = useToast()
 const { data, status, error, refresh } = await useAPI<Detail>(() => `/api/awards/types/${id.value}`, { key: `awards:type:${id.value}` })
 const type = computed(() => data.value?.type)
 
-const form = ref<TypeForm>({ name: '', key: '', summary: '', givesTicketBenefit: false, onePerPerson: true, defaultVisibility: 'public' })
+const form = ref<TypeForm>({ name: '', key: '', summary: '', givesTicketBenefit: false, onePerPerson: false, defaultVisibility: 'public' })
 watch(type, (x) => {
   if (x) form.value = { name: x.name, key: x.key, summary: x.summary ?? '', givesTicketBenefit: x.givesTicketBenefit, onePerPerson: x.onePerPerson, defaultVisibility: x.defaultVisibility }
 }, { immediate: true })
