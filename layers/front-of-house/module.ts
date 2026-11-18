@@ -171,12 +171,14 @@ export default defineModule({
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
-    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
-    'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
+    // and the members' home card: the person's next shift and the open ones (AC-7).
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.members-home', file: 'members-home' }],
+    'core.home-card': [
+      { id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' },
+      { id: 'front-of-house.shifts', home: 'members', ability: 'front-of-house.shift.sign-up', component: 'FrontOfHouseShiftsCard', urgency: 'info', count: 'front-of-house.members-home' },
+    ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.upcoming': [{ id: 'front-of-house.shifts', file: 'shifts' }],
-    'core.count': [{ id: 'front-of-house.members-home', file: 'members-home' }],
-    'core.home-card': [{ id: 'front-of-house.shifts', home: 'members', ability: 'front-of-house.shift.sign-up', component: 'FrontOfHouseShiftsCard', urgency: 'info', count: 'front-of-house.members-home' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
     'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],
