@@ -3,6 +3,8 @@
      marks each drink: contains, may contain, not checked (ask at the bar), or none of those listed. It
      never says "free from". It prints for the bar, one outlet to a page. -->
 <script setup lang="ts">
+import { answerVerdict, itemVerdict, type Verdict } from '../../../shared/allergen-verdict'
+
 type Allergen = 'gluten' | 'crustaceans' | 'eggs' | 'fish' | 'peanuts' | 'soya' | 'milk' | 'nuts' | 'celery' | 'mustard' | 'sesame' | 'sulphites' | 'lupin' | 'molluscs'
 interface Answer { contains: Allergen[], mayContain: Allergen[], checked: boolean }
 interface Row { variantId: string, product: string, size: string, allergens: Answer & { dependsOnChoice: boolean }, choices: { group: string, options: { label: string, allergens: Answer }[] }[] }
@@ -16,7 +18,7 @@ useSeoMeta({ title: () => t('bar.chart.title') })
 
 const avoid = ref<Allergen[]>([])
 const avoidItems = computed(() => ALLERGENS.map(k => ({ value: k, label: t(`bar.allergen.${k}`) })))
-const named = (keys: Allergen[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
+const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
 
 // One answer in words: what it lists, or that nothing was checked.
 function says(a: Answer): string {
@@ -24,23 +26,35 @@ function says(a: Answer): string {
   if (!a.contains.length && !a.mayContain.length) return t('bar.chart.none-listed')
   return [a.contains.length ? t('bar.chart.contains', { list: named(a.contains) }) : null, a.mayContain.length ? t('bar.chart.may-contain', { list: named(a.mayContain) }) : null].filter(Boolean).join(' · ')
 }
-// For someone avoiding some of the 14: the worst of contains, may contain or not checked.
-function verdict(a: Answer): { tone: 'danger' | 'warning' | 'neutral', label: string } | null {
-  if (!avoid.value.length) return null
-  const hit = avoid.value.filter(k => a.contains.includes(k))
-  if (hit.length) return { tone: 'danger', label: t('bar.chart.verdict.contains', { list: named(hit) }) }
-  if (!a.checked) return { tone: 'warning', label: t('bar.chart.verdict.not-checked') }
-  const may = avoid.value.filter(k => a.mayContain.includes(k))
-  if (may.length) return { tone: 'warning', label: t('bar.chart.verdict.may-contain', { list: named(may) }) }
-  return { tone: 'neutral', label: t('bar.chart.verdict.none-listed') }
+// A row's own answer in words. An item made from its choices has none of its own to say.
+const ownSays = (row: Row) => (row.choices.length && row.allergens.checked && !row.allergens.contains.length && !row.allergens.mayContain.length ? null : says(row.allergens))
+
+// For someone avoiding some of the 14, the same verdict the till gives (shared/allergen-verdict).
+const verdicts = {
+  'contains': (v: Verdict) => ({ tone: 'danger' as const, label: t('bar.chart.verdict.contains', { list: named(v.hit) }) }),
+  'may-contain': (v: Verdict) => ({ tone: 'warning' as const, label: t('bar.chart.verdict.may-contain', { list: named(v.hit) }) }),
+  'not-checked': () => ({ tone: 'warning' as const, label: t('bar.chart.verdict.not-checked') }),
+  'depends': (v: Verdict) => ({ tone: 'warning' as const, label: t('bar.chart.verdict.depends', { groups: v.groups.map(g => g.toLocaleLowerCase('en-GB')).join(', ') }) }),
+  'none-listed': () => ({ tone: 'neutral' as const, label: t('bar.chart.verdict.none-listed') }),
 }
-// The item's own answer, then each choice's options with theirs, marked when someone avoids them.
-function describe(row: Row): string {
-  const choices = row.choices.map(c => `${t('bar.chart.choice', { group: c.group })} ${c.options.map((o) => {
-    const v = verdict(o.allergens)
-    return `${o.label}: ${says(o.allergens)}${v && v.tone !== 'neutral' ? ` (${v.label})` : ''}`
-  }).join('; ')}`)
-  return [says(row.allergens), ...choices].join(' · ')
+function verdictOf(row: Row) {
+  const v = itemVerdict(avoid.value, row.allergens, row.choices)
+  return v ? verdicts[v.kind](v) : null
+}
+// Whether an option is one of the things someone avoids, or unchecked, so it can be marked.
+const flagged = (a: Answer) => !!avoid.value.length && answerVerdict(avoid.value, a).kind !== 'none-listed'
+
+// Sizes that give the same answer share a row: "House lager · Half, Pint".
+interface Shown { key: string, name: string, row: Row }
+function shown(rows: Row[]): Shown[] {
+  const out: { key: string, row: Row, sizes: string[] }[] = []
+  for (const row of rows) {
+    const key = `${row.product}|${JSON.stringify([row.allergens, row.choices])}`
+    const found = out.find(o => o.key === key)
+    if (found) found.sizes.push(row.size)
+    else out.push({ key, row, sizes: [row.size] })
+  }
+  return out.map(o => ({ key: o.key, name: `${o.row.product} · ${o.sizes.join(t('bar.chart.sizes-separator'))}`, row: o.row }))
 }
 function print() {
   window.print()
@@ -118,17 +132,55 @@ function print() {
               </h3>
               <RecordList :label="`${outlet.name}: ${category.name}`">
                 <RecordListItem
-                  v-for="row in category.rows"
-                  :key="row.variantId"
-                  :name="`${row.product} · ${row.size}`"
-                  :description="describe(row)"
+                  v-for="r in shown(category.rows)"
+                  :key="r.key"
+                  :name="r.name"
+                  :description="ownSays(r.row) ?? undefined"
                   class="break-inside-avoid"
                 >
-                  <StatusBadge
-                    v-if="verdict(row.allergens)"
-                    :tone="verdict(row.allergens)!.tone"
-                    :label="verdict(row.allergens)!.label"
-                  />
+                  <template v-if="verdictOf(r.row)">
+                    <UBadge
+                      v-if="verdictOf(r.row)!.tone === 'neutral'"
+                      color="neutral"
+                      variant="subtle"
+                      :label="verdictOf(r.row)!.label"
+                      class="print:hidden"
+                    />
+                    <StatusBadge
+                      v-else
+                      :tone="verdictOf(r.row)!.tone"
+                      :label="verdictOf(r.row)!.label"
+                      class="print:hidden"
+                    />
+                  </template>
+                  <template
+                    v-if="r.row.choices.length"
+                    #below
+                  >
+                    <div
+                      v-for="c in r.row.choices"
+                      :key="c.group"
+                      class="space-y-1"
+                    >
+                      <p class="text-sm font-medium text-muted">
+                        {{ t('bar.chart.choice', { group: c.group }) }}
+                      </p>
+                      <ul class="space-y-0.5 text-sm text-muted">
+                        <li
+                          v-for="o in c.options"
+                          :key="o.label"
+                          :class="flagged(o.allergens) && 'font-semibold text-default print:font-normal print:text-muted'"
+                        >
+                          <UIcon
+                            v-if="flagged(o.allergens)"
+                            name="i-lucide-triangle-alert"
+                            class="mr-1 inline size-4 align-text-bottom print:hidden"
+                            aria-hidden="true"
+                          />{{ o.label }}: {{ says(o.allergens) }}
+                        </li>
+                      </ul>
+                    </div>
+                  </template>
                 </RecordListItem>
               </RecordList>
             </div>
@@ -141,3 +193,16 @@ function print() {
     </UPage>
   </UContainer>
 </template>
+
+<style>
+/* Printed for the bar: A4, the chart only, and nothing that depends on what one person ticked. */
+@page {
+  size: A4;
+}
+@media print {
+  header,
+  footer {
+    display: none !important;
+  }
+}
+</style>
