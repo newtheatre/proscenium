@@ -11,7 +11,7 @@ import { all, first, newId, nowMs, openColumn, refuse, requirements, theatreTime
 import { accountScopeIds, accountScopeSql } from '#kit/accounts'
 import { getPerformance, getProduction } from '#modules/core'
 import { hashOf } from './codes'
-import { normalisePassCode, shownPassCode } from './pass-holding'
+import { passCodeHashes, shownPassCode } from './pass-holding'
 import { HIDDEN_TYPE, managedType } from './ticket-types'
 
 /** The ticket type Box office keeps for a pass entry's line. It is never listed, priced or sold. */
@@ -53,7 +53,7 @@ export async function judgePass(typed: string, performanceId: string, buyer: { c
   const row = await first<Row>(
     `SELECT p.id, p.pass_type_id, t.name, r.name AS price_name, r.requirement_refs, p.account_id, p.named, p.once, p.uses_total, p.uses_taken, p.amount_minor, p.issued_at, p.paid_at, p.state, p.order_line_id,
         t.covers, t.season_id, t.covers_from, t.covers_until, t.reserve_unpaid, t.recheck
-      FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id WHERE p.code_hash = ?`, await hashOf(normalisePassCode(typed)))
+      FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id WHERE p.code_hash = ? OR p.alias_hash = ?`, ...await passCodeHashes(typed))
   const own = row && !row.issued_at && ownOrderId && await first('SELECT 1 AS one FROM box_office_order_lines WHERE id = ? AND order_id = ?', row.order_line_id, ownOrderId)
   if (!row || (!row.issued_at && !own))
     refuse('box-office.pass.unknown', 'We do not recognise that pass code.', { status: 422, remedy: 'Check how it is spelt. It is on the pass and in its email.', fields: field('unknown') })
