@@ -2,13 +2,16 @@
 // size is checked only when every item its recipe names is; an option with a stock item answers with
 // the item's; a product with no recipe keeps its own answer.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createUnit, newId, setClock } from '#kit'
+import { changeSetting, createUnit, newId, setClock } from '#kit'
 import { call, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import menuGet from '../../server/api/bar/till/menu.get'
 import itemAllergensPost from '../../server/api/bar/stock/items/[id]/allergens.post'
 import itemAllergensGet from '../../server/api/bar/stock/items/[id]/allergens.get'
 import productAllergensPost from '../../server/api/bar/products/[id]/allergens.post'
 import productAllergensGet from '../../server/api/bar/products/[id]/allergens.get'
+import chartGet from '../../server/api/bar/allergens/chart.get'
+import uncheckedCount from '../../server/contributions/core.count/allergens-unchecked'
+import { labelsDue } from '../../server/allergen-chart'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addProduct } from '../../server/catalogue'
 import { addGroup, addOption, setProductGroups } from '../../server/choices'
@@ -21,6 +24,7 @@ const handle = server({
   'GET /api/bar/stock/items/:id/allergens': itemAllergensGet,
   'POST /api/bar/products/:id/allergens': productAllergensPost,
   'GET /api/bar/products/:id/allergens': productAllergensGet,
+  'GET /api/bar/allergens/chart': chartGet,
 })
 const manager = person(['bar.sale.sell', 'bar.allergens.manage'], { reassertedAt: NOW })
 
@@ -117,5 +121,46 @@ describe('an option with a stock item', () => {
     const m = await menu()
     expect(option(m, s.milkGroup, s.oat).allergens).toEqual({ contains: ['gluten'], mayContain: [], checked: true })
     expect(item(m, s.jug).allergens.dependsOnChoice).toBe(true)
+  })
+})
+
+describe('step 3: the public chart, the home card and the re-check prompt', () => {
+  const chart = async () => {
+    const response = await call(handle, 'GET', '/api/bar/allergens/chart')
+    return { status: response.status, body: await response.json() as any }
+  }
+  const row = (c: any, variantId: string) => c.outlets.flatMap((o: any) => o.categories.flatMap((k: any) => k.rows)).find((r: any) => r.variantId === variantId)
+
+  it('shows anyone the till\'s answers, with each choice\'s options', async () => {
+    const c = await chart()
+    expect(c.status).toBe(200)
+    expect(row(c.body, s.jug).allergens).toMatchObject({ contains: [], mayContain: ['sulphites'], checked: true })
+    expect(row(c.body, s.jug).choices).toEqual([{ group: 'Stock allergen milk', options: [{ label: 'Oat', allergens: { contains: ['gluten'], mayContain: [], checked: true } }] }])
+  })
+
+  it('says it is incomplete, and counts what is not checked, while a size on sale is unchecked', async () => {
+    const before = await inContext(() => uncheckedCount.value(manager))
+    const water = await commit(async (unit) => {
+      const category = (await rows<{ category_id: string }>('SELECT category_id FROM bar_products WHERE id = ?', s.crispsProduct))[0]!.category_id
+      return (await addProduct(unit.view(), { categoryId: category, name: 'Stock allergen water' }, { amountMinor: 100 }, manager.accountId!)).variantId
+    })
+    const c = await chart()
+    expect(c.body.complete).toBe(false)
+    expect(row(c.body, water).allergens.checked).toBe(false)
+    expect(await inContext(() => uncheckedCount.value(manager))).toBe(before + 1)
+    expect(await inContext(() => uncheckedCount.value(person(['bar.sale.sell'])))).toBe(0)
+  })
+
+  it('asks for a label read again once the re-check period has passed, or when it never was', async () => {
+    const never = await commit(unit => addStockItem(unit.view(), { name: 'Stock allergen tonic', baseUnit: 'each', packSize: 24, packName: 'case', countUnitSize: 1 }))
+    expect((await inContext(() => labelsDue([s.pimms, never]))).map(d => d.stockItemId)).toEqual([never])
+    setClock(NOW + 200 * 86_400_000) // not-policy: past the six-month default
+    expect((await inContext(() => labelsDue([s.pimms, never]))).map(d => d.stockItemId)).toEqual([s.pimms, never])
+    setClock(NOW)
+  })
+
+  it('is not there when the theatre does not publish it', async () => {
+    await commit(unit => changeSetting(unit.view(), 'bar.allergens.publish' as never, false, { reason: 'test' }))
+    expect((await chart()).status).toBe(404)
   })
 })
