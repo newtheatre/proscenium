@@ -87,6 +87,21 @@ describe('joining against a list', () => {
     expect(other.body).toMatchObject({ pending: true, waiting: 'entry-already-used' })
   })
 
+  it('lets staff add a member with a student ID, checking and claiming the entry', async () => {
+    const { id } = await listScheme()
+    const add = (body: Record<string, unknown>) => req('POST', `/api/membership/schemes/${id}/members`, { address: `ada${Math.random().toString(36).slice(2)}@example.org`, ...body })
+    expect((await add({ reference: '123' })).body.code).toBe('membership.join.not-well-formed')
+    expect((await add({ reference: '20000000' })).body.code).toBe('membership.join.not-on-list')
+    const added = await add({ reference: '20123456' })
+    expect(added.body, JSON.stringify(added.body)).toMatchObject({ endsOn: '2027-07-31' })
+    const row = await inContext(() => first<{ used: string | null, outcome: string }>(
+      'SELECT e.used_by AS used, v.outcome FROM membership_verifications v JOIN membership_verification_entries e ON e.id = v.entry_id WHERE v.membership_id = ?', added.body.membershipId))
+    expect(row).toEqual({ used: added.body.membershipId, outcome: 'passed' })
+    expect((await add({ reference: '20123456' })).body.code).toBe('membership.join.entry-already-used')
+    // Without a reference nothing is checked, as before.
+    expect((await add({})).status).toBe(200)
+  })
+
   it('cannot open until the scheme has a list', async () => {
     const id = await scheme()
     expect((await req('PATCH', `/api/membership/schemes/${id}`, { verifier: 'membership.list' })).body.code).toBe('membership.scheme.list-needed')
