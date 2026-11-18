@@ -4,6 +4,9 @@
 <script setup lang="ts">
 import type { GridSection, GridType } from '../../../../components/BoxOfficeTicketGrid.vue'
 
+// The Wheelchair space and the Access ticket take the lowest price the buyer can have, so neither is priced here.
+const ACCESS_TYPES = ['box-office.wheelchair', 'box-office.access']
+
 interface PresetSection { name: string | null, seats: number | null, prices: { ticketTypeId: string, amountMinor: number }[] }
 interface Preset { id: string, name: string, sections: PresetSection[], spaceIds: string[] }
 interface Listing { rows: Preset[], usual: string | null, spaces: { id: string, name: string }[] }
@@ -20,7 +23,7 @@ const { data: typeList } = await useAPI<{ ticketTypes: TicketType[] }>('/api/box
 
 /** The types a preset can price: sold, and not given only by approving a request or priced by Box office itself. */
 const types = computed<GridType[]>(() => (typeList.value?.ticketTypes ?? [])
-  .filter(type => type.active && type.available && type.kind !== 'complimentary' && type.managedBy !== 'box-office.wheelchair')
+  .filter(type => type.active && type.available && type.kind !== 'complimentary' && !ACCESS_TYPES.includes(type.managedBy ?? ''))
   .map(type => ({ id: type.id, name: type.name, hint: type.proofNote })))
 const typeName = (id: string) => typeList.value?.ticketTypes.find(type => type.id === id)?.name ?? '?'
 
