@@ -471,6 +471,19 @@ export async function wheelchairFor(accountId: string): Promise<'accepted' | 'su
   return asks(await openApp(row.pending)) ? 'submitted' : null
 }
 
+/**
+ * Whether the person may have an ordinary access ticket (Matt, 2026-11-18): on the scheme, or with
+ * an application waiting, as for the wheelchair space, and not needing a wheelchair space, which is
+ * the ticket for those who do. 'accepted', 'submitted' while it waits, or null.
+ */
+export async function accessSeatFor(accountId: string): Promise<'accepted' | 'submitted' | null> {
+  if (!await schemeEnabled()) return null
+  const row = await profileOf(accountId)
+  if (!row || row.status === 'rejected' || await wheelchairFor(accountId)) return null
+  if (row.status === 'accepted') return 'accepted'
+  return row.pending ? 'submitted' : null
+}
+
 /** The companions an account may book now, for the requirement source. */
 export async function companionsFor(accountId: string): Promise<number> {
   const row = await profileOf(accountId)

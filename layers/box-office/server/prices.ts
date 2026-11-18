@@ -25,13 +25,15 @@ export const PRICES_IN_FORCE = `SELECT p.id, p.band_id, p.ticket_type_id, p.amou
       AND s.ticket_type_id = p.ticket_type_id AND s.performance_id = ?1 AND s.effective_from <= ?2 AND s.inherits = 0 AND ${NEWEST('s')}))`
 
 /**
- * `derived` marks a price no one set: the Wheelchair space's, taken from another type's
- * (wheelchairPrices). `house` marks one taken from anywhere in the house rather than its own band.
+ * `derived` marks a price no one set: the Wheelchair space's or the Access ticket's, taken from
+ * another type's (accessPrices). `house` marks one taken from anywhere in the house rather than its own band.
  */
 export interface Price { id: string, bandId: string, ticketTypeId: string, amountMinor: number, currency: string, derived?: true, house?: true }
 
 /** The Wheelchair space type Box office keeps, while the access scheme runs. */
 export const WHEELCHAIR_TYPE = 'box-office.wheelchair'
+/** The ordinary Access ticket Box office keeps for everyone else on the scheme (Matt, 2026-11-18). */
+export const ACCESS_TYPE = 'box-office.access'
 
 /** What each ticket type costs in each pooled band at this performance, now. Withdrawn prices are left out. */
 export async function pricesFor(performanceId: string, at = nowMs()): Promise<Price[]> {
@@ -42,7 +44,7 @@ export async function pricesFor(performanceId: string, at = nowMs()): Promise<Pr
       WHERE o.performance_id = ? AND b.kind = 'wheelchair' AND (s.layout_id IS NOT NULL OR s.wheelchair_spaces IS NOT NULL)`, performanceId),
   ])
   const set = rows.filter(r => r.amount_minor !== null).map(r => ({ id: r.id, bandId: r.band_id, ticketTypeId: r.ticket_type_id, amountMinor: r.amount_minor!, currency: r.currency }))
-  return wheelchairPrices(set, new Set(wheelchairBands.map(b => b.band_id)))
+  return accessPrices(set, new Set(wheelchairBands.map(b => b.band_id)))
 }
 
 /**
@@ -50,43 +52,51 @@ export async function pricesFor(performanceId: string, at = nowMs()): Promise<Pr
  * cheapest type sold everywhere that asks for nothing, such as Concession. A buyer who qualifies for
  * a cheaper type, such as Member, pays that instead (baskets.ts). Its price row is the one it is
  * taken from. A band where the theatre has set a Wheelchair space price of its own keeps that.
+ * The Access ticket, for everyone else on the scheme, is priced the same way in each band of seats
+ * (Matt, 2026-11-18).
  *
  * With a seating layout the spaces are counted in the wheelchair band: there, and only there, a
  * Wheelchair space is sold, at the lowest such price anywhere in the house, and nothing else is.
  */
-async function wheelchairPrices(set: Price[], wheelchairBands: Set<string>): Promise<Price[]> {
+async function accessPrices(set: Price[], wheelchairBands: Set<string>): Promise<Price[]> {
   const enabled = set.length > 0 && await useSetting('core.access-scheme.enabled')
   const types = enabled
     ? await all<{ id: string, managed_by: string | null, requirement_refs: string | null, kind: string, channel: string, active: number }>(
         'SELECT id, managed_by, requirement_refs, kind, channel, active FROM box_office_ticket_types')
     : []
   const wheelchair = types.find(t => t.managed_by === WHEELCHAIR_TYPE && t.active)
-  if (wheelchairBands.size) {
-    const seats = set.filter(p => !wheelchairBands.has(p.bandId) && p.ticketTypeId !== wheelchair?.id)
-    if (!wheelchair) return seats
-    const open = openTypes(types, wheelchair.id)
-    const lowest = seats.filter(p => open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
-    const spaces = [...wheelchairBands].flatMap((bandId) => {
-      const own = set.find(p => p.bandId === bandId && p.ticketTypeId === wheelchair.id)
-      if (own) return [own]
-      return lowest ? [{ ...lowest, bandId, ticketTypeId: wheelchair.id, derived: true as const, house: true as const }] : []
-    })
-    return [...seats, ...spaces]
-  }
-  if (!wheelchair) return set
-  const open = openTypes(types, wheelchair.id)
+  const access = types.find(t => t.managed_by === ACCESS_TYPE && t.active)
+  const kept = new Set([wheelchair?.id, access?.id].filter((id): id is string => !!id))
+  const open = openTypes(types, kept)
+  const seats = set.filter(p => !wheelchairBands.has(p.bandId) && !(wheelchairBands.size && p.ticketTypeId === wheelchair?.id))
   const out: Price[] = []
-  for (const bandId of new Set(set.map(p => p.bandId))) {
-    if (set.some(p => p.bandId === bandId && p.ticketTypeId === wheelchair.id)) continue
-    const lowest = set.filter(p => p.bandId === bandId && open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
-    if (lowest) out.push({ ...lowest, ticketTypeId: wheelchair.id, derived: true })
+  // Each kept type takes the lowest open price in each band of seats it has no price of its own in.
+  const derive = (typeId: string, among: Price[]) => {
+    for (const bandId of new Set(among.map(p => p.bandId))) {
+      if (among.some(p => p.bandId === bandId && p.ticketTypeId === typeId)) continue
+      const lowest = among.filter(p => p.bandId === bandId && open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
+      if (lowest) out.push({ ...lowest, ticketTypeId: typeId, derived: true })
+    }
   }
+  if (access) derive(access.id, seats)
+  if (wheelchairBands.size) {
+    if (wheelchair) {
+      const lowest = seats.filter(p => open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
+      for (const bandId of wheelchairBands) {
+        const own = set.find(p => p.bandId === bandId && p.ticketTypeId === wheelchair.id)
+        if (own) out.push(own)
+        else if (lowest) out.push({ ...lowest, bandId, ticketTypeId: wheelchair.id, derived: true, house: true })
+      }
+    }
+    return [...seats, ...out]
+  }
+  if (wheelchair) derive(wheelchair.id, set)
   return [...set, ...out]
 }
 
-/** The types anyone may choose a Wheelchair space's price from: sold everywhere, asking for nothing. */
-function openTypes(types: { id: string, requirement_refs: string | null, kind: string, channel: string, active: number }[], wheelchairId: string): Set<string> {
-  return new Set(types.filter(t => t.active && t.channel === 'all' && (t.kind === 'standard' || t.kind === 'concession') && t.id !== wheelchairId
+/** The types anyone may choose a kept access type's price from: sold everywhere, asking for nothing. */
+function openTypes(types: { id: string, requirement_refs: string | null, kind: string, channel: string, active: number }[], kept: Set<string>): Set<string> {
+  return new Set(types.filter(t => t.active && t.channel === 'all' && (t.kind === 'standard' || t.kind === 'concession') && !kept.has(t.id)
     && (!t.requirement_refs || t.requirement_refs === '[]')).map(t => t.id))
 }
 
