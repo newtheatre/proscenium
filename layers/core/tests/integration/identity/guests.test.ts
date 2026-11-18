@@ -160,6 +160,9 @@ describe('adding and inviting people (ID-06)', () => {
     const browser = new Browser()
     const used = await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })
     expect(used.status).toBe(200)
+    // The landing says who invited them and to what (AC-9).
+    const inviter = (await owner.browser.get('/api/core/me')).body.account
+    expect(used.body.invitation).toEqual({ by: inviter.preferredName || inviter.name, roles: ['Front of house lead'] })
     expect((await browser.get('/api/core/me')).body.account.id).toBe(given.body.accountId)
     expect((await browser.get('/api/core/roles')).status).toBe(200)
     // It works once.
@@ -175,6 +178,22 @@ describe('adding and inviting people (ID-06)', () => {
     await deliver()
     const message = mailbox.find(m => m.address === to)!
     expect(await rows('SELECT count(*) AS n FROM core_notifications WHERE payload LIKE ?', `%${tokenOf(message)}%`)).toEqual([{ n: 0 }])
+  })
+
+  it('an invitation is emailed, and while email cannot be sent its link is given back once to pass on', async () => {
+    const roleId = await makeRole(['core.role.read'])
+    const emailed = await owner.browser.post('/api/core/grants', { person: { address: address(), name: 'Ivy Invited' }, roleId })
+    expect(emailed.body).toMatchObject({ invited: true, emailed: true })
+    expect(emailed.body.link).toBeUndefined()
+
+    await clearSetting('core.notifications.verified-domain')
+    try {
+      const shown = await owner.browser.post('/api/core/grants', { person: { address: address(), name: 'Ivy Invited' }, roleId })
+      expect(shown.body).toMatchObject({ invited: true, emailed: false, link: expect.stringMatching(/\/sign-in\/link#.+/), expiresAt: expect.any(Number) })
+    }
+    finally {
+      await setSetting('core.notifications.verified-domain', 'mail.example.org')
+    }
   })
 
   it('the invitation lasts for the invite-lifetime setting', async () => {
