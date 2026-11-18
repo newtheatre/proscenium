@@ -2,7 +2,8 @@
 // admitted, its cancellations, and which of release, keep, cancel and refund the viewer may do.
 import { getRouterParam } from 'h3'
 import { all, can, defineRoute, first, refuse, useSetting } from '#kit'
-import { accountLabel, getPerformance, getProduction, getTerm } from '#modules/core'
+import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from '#modules/core'
+import { paymentsOf } from '#modules/payments'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
 interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null }
@@ -26,6 +27,9 @@ export default defineRoute({
   const cancellations = await all<Cancellation>('SELECT id, kind, reason_term_id, note, line_ids, refund_id, fee_minor, by, created_at FROM box_office_cancellations WHERE order_id = ? ORDER BY created_at', id)
   const performanceId = lines.find(l => l.performance_id)?.performance_id
   const performance = performanceId ? await getPerformance(performanceId) : null
+  // What was paid and refunded, from Payments: the order's own payment and any taken for an exchange.
+  const exchanges = await all<{ id: string }>('SELECT id FROM box_office_exchanges WHERE order_id = ?', id)
+  const money = await paymentsOf('box-office', [id, ...exchanges.map(e => e.id)])
   const ref = ['box-office.order', id] as const
   const allowed = async (ability: Parameters<typeof can>[1]) => (await can(actor, ability, ref)).allowed
 
@@ -41,8 +45,10 @@ export default defineRoute({
     createdAt: order.created_at,
     confirmedAt: order.confirmed_at,
     cancelledAt: order.cancelled_at,
-    buyer: order.account_id ? { id: order.account_id, name: await accountLabel(order.account_id) } : null,
+    buyer: order.account_id ? { id: order.account_id, name: await accountLabel(order.account_id), email: await addressFor(order.account_id, 'audience') } : null,
     soldBy: order.sold_by ? await accountLabel(order.sold_by) : null,
+    payments: money.payments.map(p => ({ intentId: p.intentId, amountMinor: p.amountMinor, refundedMinor: p.refundedMinor, methods: p.methods, takenBy: p.takenByName, point: p.point, at: p.at })),
+    refunds: money.refunds.map(r => ({ id: r.id, amountMinor: r.amountMinor, method: r.method, state: r.state, handBack: r.handBack, requestedBy: r.requestedByName, approvedBy: r.approvedByName, at: r.createdAt })),
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
     lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: l.requirement_evidence_id === 'pending' })),
     // The fee kept on each ticket when a cancellation is refunded less the fee, so the dialogue can show the refund.
@@ -54,6 +60,7 @@ export default defineRoute({
     }))),
     can: {
       release: order.state === 'reserved' && await allowed('box-office.order.release'),
+      collect: order.state === 'reserved' && await allowed('box-office.order.take-payment'),
       cancel: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.cancel'),
       refund: order.state === 'confirmed' && await allowed('box-office.order.refund'),
       exchange: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.exchange'),

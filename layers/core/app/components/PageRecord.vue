@@ -19,11 +19,11 @@ const props = withDefaults(defineProps<{
   /** Everything else, destructive actions last. */
   actions?: DropdownMenuItem[][]
   /** Four to six facts. */
-  summary?: { label: string, value: string }[]
+  summary?: { label: string, value: string, to?: string }[]
   /** The record's type, such as `core.production`, and its id: what other modules' tabs and the history attach to. */
   recordType: string
   recordId: string
-  /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. */
+  /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. With only one tab in all, no tab bar is drawn. */
   tabs: RecordTab[]
   /** Where this record sits below a navigation entry, nearest parent last. */
   trail?: { label: string, to: string }[]
@@ -183,15 +183,17 @@ const { te } = useT()
         </template>
       </aside>
       <div class="min-w-0 lg:order-1">
+        <!-- A record with one tab of contents shows it plainly: a bar with one tab says nothing. -->
         <UTabs
+          v-if="items.length > 1"
           v-model="current"
           :items="items"
           :content="false"
           class="mb-4"
         />
         <div
-          role="tabpanel"
-          :aria-label="items.find(i => i.value === current)?.label"
+          :role="items.length > 1 ? 'tabpanel' : undefined"
+          :aria-label="items.length > 1 ? items.find(i => i.value === current)?.label : undefined"
         >
           <!-- A tab of its own boundary: one whose content waits for data keeps the last tab in view
                until it is ready, and never unsettles the page around it. -->
