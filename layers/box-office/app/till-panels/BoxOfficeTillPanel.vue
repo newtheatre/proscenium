@@ -829,11 +829,10 @@ function clear() {
                   class="min-h-16 flex-col items-stretch justify-between gap-1 border-s-4 border-s-primary text-start"
                   :class="(quantities[keyOf(row)] ?? 0) > 0 ? 'bg-elevated' : ''"
                   :disabled="locked || takenIn(b.bandId) >= b.free"
-                  :aria-label="t('box-office.screens.panel.tile', { type: row.ticketType, band: b.band, price: money(promoPrice(row) ?? row.amountMinor) })"
                   @click="addOne(row)"
                 >
                   <span class="flex items-start justify-between gap-2 font-medium">
-                    <span class="min-w-0 break-words">{{ row.ticketType }}</span>
+                    <span class="min-w-0 break-words">{{ row.ticketType }}<span class="sr-only"> {{ t('box-office.screens.panel.tile-band', { band: b.band }) }}</span></span>
                     <UIcon
                       v-if="row.holder"
                       name="i-lucide-id-card"
@@ -846,6 +845,7 @@ function clear() {
                     </template>
                     <template v-else>{{ money(row.amountMinor) }}</template>
                   </span>
+                  <span class="sr-only">{{ t('box-office.screens.panel.tile-add') }}</span>
                 </UButton>
               </UChip>
             </div>

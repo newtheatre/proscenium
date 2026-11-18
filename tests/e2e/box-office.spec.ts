@@ -123,7 +123,7 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Sell' }).first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
   // A tile for each kind of ticket; each tap adds one, and the receipt holds how many.
-  const tile = page.getByRole('button', { name: `${typeName}, Stalls, £12.00: add one` })
+  const tile = page.getByRole('button', { name: new RegExp(`^${typeName}\\s*in Stalls\\s*£12\\.00\\s*add one$`) })
   // How many are left shows beside the performance, and counts what the sale holds only once sold.
   const left = page.getByText(/^\d+ left$/)
   const before = Number((await left.textContent())!.match(/(\d+) left/)![1])
