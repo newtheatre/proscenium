@@ -481,13 +481,23 @@ describe('switching on-the-night sharing on for people already on the scheme', (
 
   it('switches it on for a member with no choice, through the audited write, and emails them once', async () => {
     const { browser, accountId, mine } = await memberFromBefore()
-    await runTask()
+    await setSetting('core.site.origin', 'https://theatre.example.org')
+    try {
+      await runTask()
+      await deliver()
+    }
+    finally {
+      await clearSetting('core.site.origin')
+    }
     expect(await shared(accountId)).toBe(true)
     const [audit] = await rows<{ detail: string }>('SELECT detail FROM core_audit WHERE record_type = \'core.account\' AND record_id = ? AND json_extract(detail, \'$.accessShare\') = ?', accountId, PURPOSE)
     expect(JSON.parse(audit!.detail)).toMatchObject({ accessShare: PURPOSE, on: true, onForExisting: true })
-    await deliver()
     expect(to(mine).map(e => e.subject)).toEqual([SUBJECT])
     expect(to(mine)[0]!.text).toMatch(/switch it off at any time/)
+    // The button to My account, where the switch is (EM-1).
+    expect(to(mine)[0]!.html).toContain('href="https://theatre.example.org/account/access"')
+    expect(to(mine)[0]!.html).toContain('>Open my account</a>')
+    expect(to(mine)[0]!.text).toContain('Open my account: https://theatre.example.org/account/access')
     expect(to(mine)[0]!.text).not.toMatch(/crowds|quiet corner/i)
     expect(await rows('SELECT kind, key FROM core_module_defaults WHERE module_id = \'box-office\' AND kind = \'purpose\'')).toEqual([{ kind: 'purpose', key: PURPOSE }])
     // The person sees it on, and can switch it off.
