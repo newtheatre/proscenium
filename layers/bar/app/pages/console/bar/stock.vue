@@ -1,16 +1,19 @@
 <!-- Stock (S7): how much of each item every location holds, in the unit people count in. A level below
      nought is shown in words, as a sign that a delivery or a count is missing; stock never stops a
-     sale. From a row: write stock off, move it between locations, or read how it moved. Setting up
-     items and locations is in Admin. -->
+     sale. From a row: write stock off, move it between locations, or read how it moved. An amount to
+     write off or move is typed in the unit people count in, in packs or in base units; taking more
+     than a location holds is said plainly and asked about first. Setting up items and locations is
+     in Admin. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
 
-type Unit = 'each' | 'ml' | 'g'
 interface Item {
   id: string
   name: string
-  baseUnit: Unit
+  baseUnit: StockUnit
   countUnitSize: number
+  packSize: number
+  packName: string
   reorderLevel: number | null
   levels: { locationId: string, quantity: number }[]
   total: number
@@ -24,6 +27,9 @@ const router = useRouter()
 const { $api } = useNuxtApp()
 const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
+const { confirm } = useConfirm()
+const { offer } = useUndo()
+const { number, amount: stockAmount, entryUnits } = useStockAmounts()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: { id: string, name: string }[], wastageReasons: { id: string, label: string }[], can: { receive: boolean, waste: boolean } }>('/api/bar/stock/levels', { key: 'bar:stock-levels' })
 
@@ -55,13 +61,9 @@ const rows = computed(() => (data.value?.items ?? []).filter((i) => {
   return true
 }))
 
-const number = (n: number, digits = 2) => n.toLocaleString(undefined, { maximumFractionDigits: digits })
-const unitLabel = (u: Unit) => t(`bar.screens.stock.units.${u}`)
-// "1.5 (1,050 ml)"; a can is counted as itself. Below nought it says so in words.
-function amount(i: { baseUnit: Unit, countUnitSize: number }, quantity: number): string {
-  const size = Math.abs(quantity)
-  const base = `${number(size, 0)} ${unitLabel(i.baseUnit)}`
-  const text = i.countUnitSize === 1 ? base : t('bar.screens.stock.counted', { count: number(size / i.countUnitSize), base })
+// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words.
+function amount(i: Item, quantity: number): string {
+  const text = stockAmount(i, Math.abs(quantity))
   return quantity < 0 ? t('bar.screens.stock-levels.below-zero', { amount: text }) : text
 }
 const columns = computed(() => [
@@ -72,24 +74,52 @@ const columns = computed(() => [
   { id: 'actions', header: '' },
 ])
 
-// Write off, or move: one item, one quantity in its base unit.
-const act = ref<{ kind: 'waste' | 'move', item: Item, locationId: string, toLocationId: string, reasonId: string, quantity: number | null } | null>(null)
+// Write off, or move: one item, an amount typed in its count unit, its packs or its base unit.
+const act = ref<{ kind: 'waste' | 'move', item: Item, locationId: string, toLocationId: string, reasonId: string, quantity: number | null, unit: EntryUnit['value'] } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function open(kind: 'waste' | 'move', item: Item) {
   refusal.value = null
   const from = location.value !== ALL ? location.value : item.levels.find(l => l.quantity > 0)?.locationId ?? data.value?.locations[0]?.id ?? ''
-  act.value = { kind, item, locationId: from, toLocationId: data.value?.locations.find(l => l.id !== from)?.id ?? '', reasonId: '', quantity: null }
+  act.value = { kind, item, locationId: from, toLocationId: data.value?.locations.find(l => l.id !== from)?.id ?? '', reasonId: '', quantity: null, unit: entryUnits(item)[0]!.value }
 }
+const actUnits = computed(() => act.value ? entryUnits(act.value.item) : [])
+// What was typed, in base units: what the server is sent.
+const baseQuantity = computed(() => {
+  const a = act.value
+  if (!a?.quantity) return 0
+  return Math.round(a.quantity * (actUnits.value.find(u => u.value === a.unit)?.size ?? 1))
+})
+const held = computed(() => act.value ? levelAt(act.value.item, act.value.locationId) : 0)
+const takesTooMuch = computed(() => !!act.value?.locationId && baseQuantity.value > held.value)
 const otherLocations = computed(() => (data.value?.locations ?? []).filter(l => l.id !== act.value?.locationId).map(l => ({ value: l.id, label: l.name })))
 const reasonItems = computed(() => (data.value?.wastageReasons ?? []).map(r => ({ value: r.id, label: r.label })))
 async function save() {
   const a = act.value!
   refusal.value = null
-  const lines = [{ stockItemId: a.item.id, quantity: a.quantity }]
+  const quantity = baseQuantity.value
+  // Taking more than is there is allowed (a level may go below nought until a count), but asked about.
+  if (takesTooMuch.value) {
+    const ok = await confirm({
+      verb: a.kind === 'waste' ? t('bar.screens.stock-levels.waste') : t('bar.screens.stock-levels.move'),
+      thing: t('bar.screens.stock-levels.amount-of', { amount: stockAmount(a.item, quantity), name: a.item.name }),
+      consequence: t('bar.screens.stock-levels.more-than-held-consequence', { location: locationName(a.locationId), amount: amount(a.item, held.value) }),
+    })
+    if (!ok) return
+  }
+  const lines = [{ stockItemId: a.item.id, quantity }]
   try {
-    if (a.kind === 'waste') await $api('/api/bar/stock/wastage', { method: 'POST', body: { locationId: a.locationId, reasonTermId: a.reasonId, lines } })
-    else await $api('/api/bar/stock/transfers', { method: 'POST', body: { fromLocationId: a.locationId, toLocationId: a.toLocationId, lines } })
-    toast.add({ title: t(a.kind === 'waste' ? 'bar.screens.stock-levels.wasted' : 'bar.screens.stock-levels.moved', { name: a.item.name }), color: 'success' })
+    if (a.kind === 'waste') {
+      await $api('/api/bar/stock/wastage', { method: 'POST', body: { locationId: a.locationId, reasonTermId: a.reasonId, lines } })
+      toast.add({ title: t('bar.screens.stock-levels.wasted', { name: a.item.name }), color: 'success' })
+    }
+    else {
+      await $api('/api/bar/stock/transfers', { method: 'POST', body: { fromLocationId: a.locationId, toLocationId: a.toLocationId, lines } })
+      // A move is undone by moving it back.
+      offer(t('bar.screens.stock-levels.moved', { name: a.item.name }), async () => {
+        await $api('/api/bar/stock/transfers', { method: 'POST', body: { fromLocationId: a.toLocationId, toLocationId: a.locationId, lines } })
+        await refresh()
+      })
+    }
     act.value = null
     await refresh()
   }
@@ -99,7 +129,7 @@ async function save() {
 }
 const needsFor = (a: NonNullable<typeof act.value>) => needs({
   locationId: a.locationId,
-  quantity: a.quantity,
+  quantity: baseQuantity.value >= 1 ? true : null,
   reasonId: a.kind === 'waste' ? a.reasonId : true,
   toLocationId: a.kind === 'move' ? a.toLocationId : true,
 })
@@ -243,29 +273,38 @@ function actions(i: Item) {
           </UFormField>
           <UFormField
             :label="t('bar.screens.stock-levels.quantity')"
-            :help="act.locationId ? t('bar.screens.stock-levels.holds', { amount: amount(act.item, levelAt(act.item, act.locationId)) }) : undefined"
+            :help="act.locationId ? t('bar.screens.stock-levels.holds', { amount: amount(act.item, held) }) : undefined"
             name="quantity"
             required
           >
             <UFieldGroup>
               <UInputNumber
                 v-model="act.quantity"
-                :min="1"
+                :min="0"
+                :step="act.unit === 'base' ? 1 : 0.1"
+                :format-options="{ maximumFractionDigits: act.unit === 'base' ? 0 : 2 }"
               />
-              <UBadge
-                color="neutral"
-                variant="outline"
-                size="lg"
-                :label="unitLabel(act.item.baseUnit)"
+              <USelect
+                v-model="act.unit"
+                :items="actUnits"
+                :aria-label="t('bar.screens.stock-levels.quantity-unit')"
+                class="w-32"
               />
             </UFieldGroup>
           </UFormField>
           <p
-            v-if="act.quantity && act.item.countUnitSize > 1"
+            v-if="baseQuantity && act.unit !== 'base'"
             class="text-sm text-muted"
           >
-            {{ amount(act.item, act.quantity) }}
+            {{ t('bar.screens.stock-levels.in-base', { amount: `${number(baseQuantity, 0)} ${t(`bar.screens.stock.units.${act.item.baseUnit}`)}` }) }}
           </p>
+          <UAlert
+            v-if="takesTooMuch"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('bar.screens.stock-levels.more-than-held', { location: locationName(act.locationId), amount: amount(act.item, held) })"
+          />
           <UFormField
             v-if="act.kind === 'waste'"
             :label="t('bar.screens.stock-levels.reason')"

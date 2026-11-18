@@ -11,10 +11,19 @@ export async function abilityCatalogue(actor: Actor) {
   const registry = useRegistry()
   const names = [...registry.abilities.keys()]
   const missing = new Set(await notHeld(actor, names))
+  // The record types an ability's record sits under, its own first, so the facts screen can offer a
+  // fact on a performance the abilities on a performance or on anything under one.
+  const within = (type: string | undefined): string[] => {
+    const out: string[] = []
+    for (let at = type; at && !out.includes(at); at = registry.records.get(at)?.decl.parent) out.push(at)
+    return out
+  }
   return [...registry.abilities].map(([name, { module, decl }]) => ({
     name,
     module,
     risk: decl.risk,
+    on: decl.on ?? null,
+    within: within(decl.on),
     implies: (decl.implies ?? []).map(entry => impliedAbility(module, entry)),
     label: `${module}.abilities.${name.slice(module.length + 1)}.label`,
     held: !missing.has(name),

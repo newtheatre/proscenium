@@ -1,5 +1,5 @@
 // Importing past awards from a file. A file has up to five columns: the name on the award, the date
-// it was awarded (a date, or a year alone, kept as 1 January), what it was for, the citation, and
+// it was awarded (a date, or a year alone, kept as 1 January and shown as the year), what it was for, the citation, and
 // the holder's email address. Without an address the award is recorded by name alone and can be
 // linked to an account later; with one, the account is found or made. A dry run reports the rows
 // that would be refused; the import itself runs as bulk jobs, a share of rows each. Nobody is told:
@@ -7,10 +7,10 @@
 import { first, nowMs, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findOrCreateAccount } from '#modules/core'
-import { holdsType, writeAward } from './awards'
+import { holdsType, startingVisibility, writeAward } from './awards'
 import { requireType, type AwardType } from './types'
 
-export interface ImportRow { line: number, name: string, awardedOn: string, awardedFor: string | null, citation: string | null, address: string | null }
+export interface ImportRow { line: number, name: string, awardedOn: string, /** Absent in a job queued before it was kept: the day. */ awardedPrecision?: 'day' | 'year', awardedFor: string | null, citation: string | null, address: string | null }
 export type ImportRefusal = 'no-name' | 'bad-date' | 'not-an-address' | 'repeated' | 'own-account' | 'already-held' | 'already-recorded'
 
 /** The most rows one file may carry. */
@@ -31,6 +31,9 @@ export function dateOf(text: string): string | undefined {
   const parsed = iso ? new Date(`${iso}T00:00:00Z`) : null
   return parsed && !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(iso!) ? iso! : undefined
 }
+
+/** Whether a cell is a year alone. */
+export const yearOnly = (text: string): boolean => YEAR.test(text.trim())
 
 /** Splits a file into rows of cells, honouring double quotes, which may hold commas and new lines. */
 export function table(text: string): { line: number, cells: string[] }[] {
@@ -92,7 +95,7 @@ export function parseAwards(text: string): { rows: ImportRow[], refused: { line:
     const key = `${name.toLowerCase()}|${awardedOn}`
     if (seen.has(key)) return void refused.push({ line, reason: 'repeated' })
     seen.add(key)
-    rows.push({ line, name, awardedOn, awardedFor: third.trim().slice(0, 200) || null, citation: fourth.trim().slice(0, 2000) || null, address }) // not-policy: the bounds on the two texts
+    rows.push({ line, name, awardedOn, awardedPrecision: yearOnly(second) ? 'year' : 'day', awardedFor: third.trim().slice(0, 200) || null, citation: fourth.trim().slice(0, 2000) || null, address }) // not-policy: the bounds on the two texts
   })
   return { rows, refused }
 }
@@ -142,13 +145,14 @@ export async function importShare(unit: UnitView, job: ImportJob): Promise<{ imp
       skipped++
       continue
     }
-    const accountId = row.address ? (await findOrCreateAccount(unit, { address: row.address, name: row.name, origin: 'staff' })).accountId : null
+    const found = row.address ? await findOrCreateAccount(unit, { address: row.address, name: row.name, origin: 'staff' }) : null
+    const accountId = found?.accountId ?? null
     if (accountId && type.onePerPerson && given.has(accountId)) {
       skipped++
       continue
     }
     if (accountId) given.add(accountId)
-    writeAward(unit, { type, accountId, recipientName: row.name, awardedOn: row.awardedOn, awardedFor: row.awardedFor, citation: row.citation, source: 'import', issuedBy: job.importedBy })
+    writeAward(unit, { type, accountId, recipientName: row.name, awardedOn: row.awardedOn, awardedPrecision: row.awardedPrecision, awardedFor: row.awardedFor, citation: row.citation, visibility: await startingVisibility(type, accountId, found?.claimed), source: 'import', issuedBy: job.importedBy })
     imported++
   }
   unit.audit({ action: 'create', record: ['awards.type', type.id], detail: { importId: job.importId, imported, skipped, at: nowMs() } })

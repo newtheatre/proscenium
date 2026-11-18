@@ -10,6 +10,7 @@ import { assertTerm } from '#modules/core'
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor, forProvider, providerAccount, providers } from './providers'
+import { describeOwners, type DescribedOwner } from './owners'
 import { labelsOf } from './people'
 import { isTestMoney } from './test-money'
 import type { AttemptRow } from './answers'
@@ -200,7 +201,7 @@ export async function confirmRefund(unit: UnitView, refundId: string, by: string
   await succeed(unit, refund)
 }
 
-export interface RefundSummary { id: string, partId: string, attemptId: string, owner: { module: string, record: string }, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, requestedByName: string | null, approvedBy: string | null, approvedByName: string | null, selfApproveLimitMinor: number, createdAt: number, /** A person hands the money back and confirms it: cash, or a provider that cannot refund itself. */ handBack: boolean }
+export interface RefundSummary { id: string, partId: string, attemptId: string, /** The order (or other record) refunded, with its reference, buyer and address when its owner gives them. */ owner: DescribedOwner, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, requestedByName: string | null, approvedBy: string | null, approvedByName: string | null, selfApproveLimitMinor: number, createdAt: number, /** A person hands the money back and confirms it: cash, or a provider that cannot refund itself. */ handBack: boolean }
 
 /** The refunds with these ids, as Refunds shows them, in the order given. */
 export async function describeRefunds(ids: string[]): Promise<RefundSummary[]> {
@@ -214,7 +215,8 @@ export async function describeRefunds(ids: string[]): Promise<RefundSummary[]> {
   const names = await labelsOf(rows.flatMap(r => [r.requested_by, r.approved_by]))
   const name = (id: string | null) => (id ? names.get(id) ?? null : null)
   const known = await providers()
-  return rows.map(r => ({ id: r.id, partId: r.part_id, attemptId: r.attempt_id, owner: { module: r.owner_module, record: r.owner_record }, amountMinor: r.amount_minor, currency: r.currency, method: r.method, state: r.state, requestedBy: r.requested_by, requestedByName: name(r.requested_by), approvedBy: r.approved_by, approvedByName: name(r.approved_by), selfApproveLimitMinor: r.self_approve_limit_minor, createdAt: r.created_at, handBack: !known.get(r.provider)?.refund }))
+  const owners = await describeOwners(rows.map(r => ({ module: r.owner_module, record: r.owner_record })))
+  return rows.map(r => ({ id: r.id, partId: r.part_id, attemptId: r.attempt_id, owner: owners.get(`${r.owner_module}:${r.owner_record}`)!, amountMinor: r.amount_minor, currency: r.currency, method: r.method, state: r.state, requestedBy: r.requested_by, requestedByName: name(r.requested_by), approvedBy: r.approved_by, approvedByName: name(r.approved_by), selfApproveLimitMinor: r.self_approve_limit_minor, createdAt: r.created_at, handBack: !known.get(r.provider)?.refund }))
 }
 
 /**

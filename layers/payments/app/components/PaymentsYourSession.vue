@@ -89,6 +89,8 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
       :description="t(`payments.screens.session.handoff.${handoff}-help`)"
     />
 
+    <PaymentsHandBack @changed="emit('changed')" />
+
     <PageSection
       :title="t('payments.screens.session.yours')"
       :description="data.session ? undefined : t('payments.screens.session.none-open')"
