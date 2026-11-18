@@ -218,6 +218,24 @@ test('Split is off for a single item, gives every item to someone, and a reload 
   await expect(page.getByText('A payment of £6.00 was not finished')).toHaveCount(0)
 })
 
+test('cancelling a sale empties the basket unless the seller unticks the box', async ({ page }) => {
+  await visit(page, '/live/till')
+  const programmes = page.getByLabel('Programmes sold')
+  for (const empty of [false, true]) {
+    await programmes.fill('2')
+    await programmes.blur()
+    await cash(page).click()
+    await page.getByRole('button', { name: 'Cancel sale' }).click()
+    const dialog = page.getByRole('dialog')
+    const box = dialog.getByRole('checkbox', { name: 'Empty the basket' })
+    await expect(box).toBeChecked()
+    if (!empty) await box.uncheck()
+    await dialog.getByRole('button', { name: 'Cancel sale' }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(programmes).toHaveValue(empty ? '' : '2')
+  }
+})
+
 test('the Till gives back what was taken when the customer leaves a sale paid in part', async ({ page }) => {
   await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('2')

@@ -3,9 +3,12 @@
 <script setup lang="ts">
 import type { ConfirmRequest } from '../composables/useConfirm'
 
-defineProps<ConfirmRequest>()
-const emit = defineEmits<{ close: [confirmed: boolean] }>()
+const props = defineProps<ConfirmRequest>()
+// With a tick box, confirming answers whether it was left ticked.
+const emit = defineEmits<{ close: [answer: boolean | { ticked: boolean }] }>()
 const { t } = useT()
+const ticked = ref(props.tick?.ticked ?? false)
+const confirmed = () => emit('close', props.tick ? { ticked: ticked.value } : true)
 </script>
 
 <template>
@@ -14,6 +17,15 @@ const { t } = useT()
     :description="consequence"
     :close="{ onClick: () => emit('close', false) }"
   >
+    <template
+      v-if="tick"
+      #body
+    >
+      <UCheckbox
+        v-model="ticked"
+        :label="tick.label"
+      />
+    </template>
     <template #footer>
       <UButton
         color="neutral"
@@ -24,7 +36,7 @@ const { t } = useT()
       <UButton
         :color="tone === 'primary' ? 'primary' : 'error'"
         :label="button ?? verb"
-        @click="emit('close', true)"
+        @click="confirmed"
       />
     </template>
   </UModal>

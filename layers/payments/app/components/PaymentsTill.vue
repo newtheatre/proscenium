@@ -2,8 +2,8 @@
      to sell at the desk draws its own panel (payments.desk-basket); the till shows what the filled
      panels add up to, makes the one payment for the total in the seller's open session and takes it
      by any way to pay on offer at the desk. Another way is offered only once an attempt is known to
-     have failed, so nobody pays twice. After a sale the panels are emptied; after a cancel they keep
-     what was in them, so the seller can try again. A host narrows the till to some modules' panels
+     have failed, so nobody pays twice. After a sale the panels are emptied; after a cancel they are
+     emptied too unless the seller unticks the box, so they can try again. A host narrows the till to some modules' panels
      (Box office's Sell shows only its own); live mode draws the panels as tabs over the one basket,
      each with its larger live panel where its module has one. Coming to the till opens the seller's
      session if none is open, at the place this device used last; a strip above the panels says which
@@ -54,7 +54,7 @@ const route = useRoute()
 const router = useRouter()
 const { currency, money, toMinor, toMajor } = await useMoney()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const { confirm, confirmTicked } = useConfirm()
 const toast = useToast()
 // The till's toasts replace one another rather than stacking up.
 const TOAST = 'payments-till'
@@ -588,16 +588,19 @@ const waiting = computed(() => result.value?.kind === 'waiting' || result.value?
 
 async function cancel() {
   if (!sale.value) return
-  const ok = await confirm({
+  // Emptying the basket is ticked by default (Matt, 18 November): mostly the customer has gone.
+  const ok = await confirmTicked({
     verb: t('payments.screens.till.cancel-verb'),
     thing: money(sale.value.amountMinor),
     consequence: waiting.value ? t('payments.screens.till.cancel-waiting') : t('payments.screens.till.cancel-consequence'),
     button: t('payments.screens.till.cancel-button'),
+    tick: { label: t('payments.screens.till.cancel-empty'), ticked: true },
   })
   if (!ok) return
   taking.value = true
   try {
     await $api(`/api/payments/intents/${sale.value.intentId}/cancel` as string, { method: 'POST', body: {} })
+    if (ok.ticked) for (const p of panels.value) inputs[p.id] = null
     ended()
   }
   catch (e) {
