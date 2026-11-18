@@ -130,7 +130,7 @@
   "box-office.performances.sales.on_sale": "On sale",
   "box-office.performances.sales.paused": "Paused",
   "box-office.performances.sales.closed": "Closed",
-  "box-office.performances.taken": "{when} · {taken} of {capacity} taken",
+  "box-office.performances.taken": "{taken} of {capacity} taken",
   "box-office.setup.title": "{title}, {when}",
   "box-office.setup.thing": "sales for {title}",
   "box-office.setup.checklist": "Before it goes on sale",

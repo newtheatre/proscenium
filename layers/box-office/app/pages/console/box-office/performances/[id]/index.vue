@@ -8,7 +8,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
-type Sales = 'draft' | 'on_sale' | 'paused' | 'closed'
 interface Band { id: string, name: string, kind: string, sort: number }
 interface Pool { bandId: string, capacity: number, claimed: number }
 interface Price { bandId: string, ticketTypeId: string, amountMinor: number }
@@ -16,7 +15,7 @@ interface TicketType { id: string, name: string, kind: string, active: boolean, 
 interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
 interface ScheduledPrice { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }
 interface Setup {
-  sales: { state: Sales, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
+  sales: { state: SaleState, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
   houseCapacity: number | null
   pools: Pool[]
   prices: Price[]
@@ -272,7 +271,6 @@ async function pause() {
   await act(pausing, t('box-office.setup.paused'), opening)
 }
 
-const TONES = { draft: 'neutral', on_sale: 'success', paused: 'warning', closed: 'neutral' } as const
 // A missing way to pay is fixed under Payments, so that line links there.
 const CHECK_LINKS: Record<string, string> = { payment: '/admin/modules/payments/providers' }
 const checks = computed(() => (data.value?.checklist ?? []).map(c => ({ id: c.code, done: c.done, sentence: t(`box-office.setup.check.${c.code}`), link: CHECK_LINKS[c.code] })))
@@ -315,10 +313,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :trail="trail"
       >
         <template #status>
-          <StatusBadge
-            :tone="d.sales ? TONES[d.sales.state] : 'neutral'"
-            :label="d.sales ? t(`box-office.performances.sales.${d.sales.state}`) : t('box-office.performances.not-set-up')"
-          />
+          <StatusBadge v-bind="saleStateBadge(d.sales?.state ?? null, d.pools.reduce((sum, p) => sum + p.capacity, 0), t)" />
         </template>
         <template #primary>
           <UButton
