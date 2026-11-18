@@ -121,10 +121,21 @@ async function savePrice() {
 const ALLERGENS = ['gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs'] as const
 type Answer = { contains: string[], mayContain: string[], checked: boolean, checkedAt: number | null }
 const allergens = ref<Answer | null>(null)
+// Sizes made from stock answer with their recipe's items; the product's own label is for the rest.
+const stockSizes = ref<{ variantId: string, name: string, answer: Answer, items: { id: string, name: string, checked: boolean }[] }[]>([])
 async function loadAllergens() {
   if (!data.value?.canAllergens) return
-  allergens.value = (await $api<{ answer: Answer }>(`/api/bar/products/${id.value}/allergens` as string)).answer
+  const read = await $api<{ answer: Answer, sizes: typeof stockSizes.value }>(`/api/bar/products/${id.value}/allergens` as string)
+  allergens.value = read.answer
+  stockSizes.value = read.sizes
 }
+const ownLabelUsed = computed(() => (data.value?.product.variants ?? []).some(v => v.active && !stockSizes.value.some(s => s.variantId === v.id)))
+function describeAnswer(a: Answer): string {
+  if (!a.checked) return t('bar.screens.product.allergens-unchecked')
+  if (!a.contains.length && !a.mayContain.length) return t('bar.screens.product.none-listed')
+  return [a.contains.length ? `${t('bar.screens.product.contains')}: ${named(a.contains)}` : null, a.mayContain.length ? `${t('bar.screens.product.may-contain')}: ${named(a.mayContain)}` : null].filter(Boolean).join(' · ')
+}
+const fromItems = (items: { name: string, checked: boolean }[]) => t('bar.screens.product.allergens-from', { items: items.map(i => i.checked ? i.name : t('bar.screens.product.allergens-item-unchecked', { name: i.name })).join(', ') })
 watch(() => data.value?.canAllergens, loadAllergens, { immediate: true })
 const allergenItems = computed(() => ALLERGENS.map(k => ({ value: k as string, label: t(`bar.allergen.${k}`) })))
 const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
@@ -272,7 +283,10 @@ function planned(v: Variant, l: List): string | null {
           :title="t('bar.screens.product.allergens')"
           :description="t('bar.screens.product.allergens-help')"
         >
-          <template #actions>
+          <template
+            v-if="ownLabelUsed"
+            #actions
+          >
             <UButton
               color="neutral"
               variant="outline"
@@ -281,7 +295,32 @@ function planned(v: Variant, l: List): string | null {
               @click="editAllergens"
             />
           </template>
-          <FactStrip :facts="allergenFacts" />
+          <div class="space-y-4">
+            <template v-if="ownLabelUsed">
+              <p
+                v-if="stockSizes.length"
+                class="text-sm text-muted"
+              >
+                {{ t('bar.screens.product.allergens-own') }}
+              </p>
+              <FactStrip :facts="allergenFacts" />
+            </template>
+            <template v-if="stockSizes.length">
+              <p class="text-sm text-muted">
+                {{ t('bar.screens.product.allergens-from-stock') }}
+              </p>
+              <RecordList :label="t('bar.screens.product.allergens')">
+                <RecordListItem
+                  v-for="sz in stockSizes"
+                  :key="sz.variantId"
+                  :name="sz.name"
+                  :description="fromItems(sz.items)"
+                >
+                  <span class="text-sm">{{ describeAnswer(sz.answer) }}</span>
+                </RecordListItem>
+              </RecordList>
+            </template>
+          </div>
         </PageSection>
 
         <PageSection
