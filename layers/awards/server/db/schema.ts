@@ -69,6 +69,9 @@ export const awards = defineTable('awards_awards', {
   // The nomination, when there was a form. The form builder's table, by id only until it exists.
   responseId: col.internal(text('response_id')),
   visibility: col.internal(text('visibility', { enum: VISIBILITIES }).notNull()),
+  // Left off the roll because the holder had never signed in: the holder is asked once to choose,
+  // and staff can list it for them. Cleared by either choice.
+  listingPending: col.internal(integer('listing_pending', { mode: 'boolean' }).notNull().default(false)),
   state: col.internal(text('state', { enum: AWARD_STATES }).notNull().default('current')),
   issuedBy: col.account('issued_by', { role: 'actor', nullable: true }),
   revokedAt: col.timestamp('revoked_at'),

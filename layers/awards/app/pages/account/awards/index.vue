@@ -1,10 +1,11 @@
 <!-- My awards: what the theatre has given the person, with the citation, and their choice of where
      each is listed. Their choice stands over the theatre's default. An award that carries a ticket
-     price has a card, opened full screen with a code signed afresh each time, to show a seller. -->
+     price has a card, opened full screen with a code signed afresh each time, to show a seller. An
+     award given before the person ever signed in waits off the roll, and asks them to choose. -->
 <script setup lang="ts">
 import { encode } from 'uqr'
 
-interface Mine { id: string, card: boolean, recipientName: string, typeName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, visibility: 'public' | 'members' | 'hidden' }
+interface Mine { id: string, card: boolean, recipientName: string, typeName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, visibility: 'public' | 'members' | 'hidden', listingPending: boolean, defaultVisibility: 'public' | 'members' | 'hidden' }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -88,7 +89,20 @@ const qr = computed(() => {
             :label="t('awards.screens.mine.show-card')"
             @click="showCard(award)"
           />
+          <UAlert
+            v-if="award.listingPending"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-award"
+            :title="t('awards.screens.mine.pending.title')"
+            :description="t(`awards.screens.mine.pending.description.${award.defaultVisibility}`)"
+            :actions="[
+              { label: t('awards.screens.mine.pending.show'), onClick: () => list(award, award.defaultVisibility) },
+              { label: t('awards.screens.mine.pending.keep-off'), color: 'neutral', variant: 'outline', onClick: () => list(award, 'hidden') },
+            ]"
+          />
           <UFormField
+            v-else
             :label="t('awards.screens.mine.listed')"
             :help="t('awards.screens.mine.listed-help')"
           >

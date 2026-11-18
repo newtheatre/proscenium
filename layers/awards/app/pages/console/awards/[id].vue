@@ -2,7 +2,7 @@
      Correcting changes its wording, date and where it is listed; revoking takes it back with a
      reason, which leaves the roll and stops its ticket price. -->
 <script setup lang="ts">
-interface Award { id: string, typeId: string, typeName: string, accountId: string | null, recipientName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, productionId: string | null, productionTitle: string | null, decidedOn: string | null, decisionNote: string | null, source: string, visibility: 'public' | 'members' | 'hidden', state: 'current' | 'revoked', revokedAt: number | null, revokeReason: string | null, responseId: string | null }
+interface Award { id: string, typeId: string, typeName: string, accountId: string | null, recipientName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, productionId: string | null, productionTitle: string | null, decidedOn: string | null, decisionNote: string | null, source: string, visibility: 'public' | 'members' | 'hidden', state: 'current' | 'revoked', revokedAt: number | null, revokeReason: string | null, responseId: string | null, listingPending: boolean, typeDefaultVisibility: 'public' | 'members' | 'hidden' }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -59,6 +59,19 @@ async function save() {
   catch (e) {
     refusal.value = toRefusal(e)
     formEl.value?.setErrors(fieldErrors(refusal.value))
+  }
+}
+
+// An award left off the roll for a holder who has not signed in: staff may list it for them.
+async function listForHolder() {
+  try {
+    await $api(`/api/awards/awards/${id.value}` as string, { method: 'PATCH', body: { visibility: a.value!.typeDefaultVisibility } })
+    toast.add({ title: t('awards.screens.award.listed-toast'), color: 'success' })
+    await Promise.all([refresh(), refreshNuxtData('awards:list')])
+  }
+  catch (e) {
+    const r = toRefusal(e)
+    toast.add({ title: r.reason, description: r.remedy, color: 'error' })
   }
 }
 
@@ -173,6 +186,15 @@ async function revoke() {
           :title="t('awards.screens.award.not-linked')"
           :description="t('awards.screens.award.not-linked-help')"
           :actions="data.canUpdate ? [{ label: t('awards.screens.link.title'), color: 'neutral', variant: 'outline', onClick: openLink }] : undefined"
+        />
+        <UAlert
+          v-if="a.state === 'current' && a.listingPending"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-award"
+          :title="t('awards.screens.award.pending')"
+          :description="t('awards.screens.award.pending-help')"
+          :actions="data.canUpdate && a.typeDefaultVisibility !== 'hidden' ? [{ label: t('awards.screens.award.list-for-holder'), color: 'neutral', variant: 'outline', onClick: listForHolder }] : undefined"
         />
         <FactStrip :facts="facts" />
         <PageSection

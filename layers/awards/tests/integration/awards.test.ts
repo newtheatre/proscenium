@@ -4,6 +4,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { eraseAccount } from '../../../core/server/identity/erasure'
+import unlisted from '../../server/contributions/core.account-notice/unlisted'
 import { awardType, holder, holds, issue, NOV_17, ready, req } from './stage'
 
 beforeAll(ready)
@@ -71,6 +72,27 @@ describe('issuing an award', () => {
     // Somebody who has never signed in is not put on the public roll for them; a name alone (a past award) is.
     expect((await req('GET', `/api/awards/awards/${made.body.awardId}`)).body.award.visibility).toBe('hidden')
     expect((await req('GET', `/api/awards/awards/${past}`)).body.award.visibility).toBe('public')
+  })
+
+  it('asks a holder who had never signed in whether to list it, and lets staff list it for them', async () => {
+    const type = await awardType({ defaultVisibility: 'members' })
+    const first = await req('POST', `/api/awards/types/${type}/awards`, { awardedOn: '2026-11-17', recipientName: 'Mary Somerville', address: 'mary@example.org' })
+    const second = await req('POST', `/api/awards/types/${await awardType()}/awards`, { awardedOn: '2026-11-17', recipientName: 'Mary Somerville', address: 'mary@example.org' })
+    expect((await req('GET', `/api/awards/awards/${first.body.awardId}`)).body.award).toMatchObject({ visibility: 'hidden', listingPending: true, typeDefaultVisibility: 'members' })
+    const mary = person([], { accountId: first.body.accountId })
+    const asked = await inContext(() => unlisted.notices(mary), mary)
+    expect(asked.map(n => [n.id, n.to])).toEqual(expect.arrayContaining([[first.body.awardId, '/account/awards'], [second.body.awardId, '/account/awards']]))
+    expect((await req('GET', '/api/awards/mine', undefined, mary)).body.awards.find((a: any) => a.id === first.body.awardId)).toMatchObject({ listingPending: true, defaultVisibility: 'members' })
+
+    // The holder answers for the first; the question goes.
+    expect((await req('POST', `/api/awards/mine/${first.body.awardId}/visibility`, { visibility: 'members' }, mary)).status).toBe(200)
+    expect((await req('GET', `/api/awards/awards/${first.body.awardId}`)).body.award).toMatchObject({ visibility: 'members', listingPending: false })
+    // A correction that does not touch the listing leaves the question open; staff listing it closes it.
+    expect((await req('PATCH', `/api/awards/awards/${second.body.awardId}`, { citation: 'For the comet.' })).status).toBe(200)
+    expect((await req('GET', `/api/awards/awards/${second.body.awardId}`)).body.award.listingPending).toBe(true)
+    expect((await req('PATCH', `/api/awards/awards/${second.body.awardId}`, { visibility: 'public' })).status).toBe(200)
+    expect((await req('GET', `/api/awards/awards/${second.body.awardId}`)).body.award).toMatchObject({ visibility: 'public', listingPending: false })
+    expect(await inContext(() => unlisted.notices(mary), mary)).toEqual([])
   })
 
   it('refuses a person\'s own award, and needs a person or a name', async () => {
