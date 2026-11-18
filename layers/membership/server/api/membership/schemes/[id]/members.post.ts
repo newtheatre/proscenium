@@ -12,8 +12,10 @@ import { findOrCreateAccount, notify } from '#modules/core'
 import { charger } from '../../../../charge'
 import { endsOnFor } from '../../../../dates'
 import { chooseLength, writePaying } from '../../../../joining'
+import { schemeList } from '../../../../lists'
 import { holdsScheme, writeActive } from '../../../../memberships'
 import { requireScheme } from '../../../../schemes'
+import { passList, recordPass, type ListPass } from '../../../../verify'
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: the shape of a date
 
@@ -30,6 +32,8 @@ export default defineRoute({
     startsOn: DATE.optional(),
     endsOn: DATE.nullish(),
     note: z.string().trim().max(1000).optional(), // not-policy: the specification's bound
+    // For a scheme checked against a list of references (a student ID): the reference to check and claim.
+    reference: z.string().trim().max(60).optional(), // not-policy: a reference's bound
     // P9, for a scheme that requires payment: send a link to pay, or waive the fee.
     fee: z.enum(['link', 'waive']).optional(),
   }).refine(i => !!i.accountId !== !!i.address, { message: 'Pick a person or give an address', path: ['accountId'] }),
@@ -46,7 +50,12 @@ export default defineRoute({
   // G3: never one's own account, whichever account in a merge it is.
   if (actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId))
     refuse('membership.membership.own', 'You cannot add a membership to your own account.', { status: 403, remedy: 'Ask another membership officer.' })
-  const option = await chooseLength(scheme, input.lengthOptionId, true)
+  // A reference on a scheme checked against a list is checked and claimed like a member joining (V4); the entry's end date is used unless staff set one (D9).
+  const list = input.reference ? await schemeList(scheme) : null
+  const pass: ListPass | null = list && list.keyKind === 'reference' ? await passList(list, accountId, input.reference, await today()) : null
+  const entryEnds = pass?.endsOn && input.endsOn === undefined ? pass.endsOn : undefined
+  // Staff who give both dates need no length; withdrawn lengths are never offered.
+  const option = !input.lengthOptionId && ((input.startsOn && input.endsOn) || entryEnds) ? null : await chooseLength(scheme, input.lengthOptionId)
   // S5 lets staff add a member to a paid scheme while the fees module is off, as before.
   const fees = scheme.requiresPayment ? await charger() : null
   if (fees) {
@@ -65,14 +74,16 @@ export default defineRoute({
     // The link is the address of their own application page: it carries no token, and asks them to sign in.
     await notify(unit, 'membership.pay-link', { to: accountId, variables: { scheme: scheme.name, amount, link: await siteUrl(`/account/membership/${membershipId}/pay`) }, subject: ['membership.membership', membershipId], dedupeKey: `pay-link:${membershipId}` })
     unit.audit({ action: 'create', record: ['membership.membership', membershipId], detail: { origin: 'added', waiting: 'payment' } })
+    if (pass) recordPass(unit, membershipId, accountId, pass)
     return { membershipId, accountId, pending: true, waiting: 'payment', amountMinor: quote.amountMinor, currency: quote.currency }
   }
   const startsOn = input.startsOn ?? await today()
-  const endsOn = input.endsOn !== undefined ? input.endsOn : endsOnFor(scheme, startsOn, option?.count ?? 1)
+  const endsOn = input.endsOn !== undefined ? input.endsOn : entryEnds ?? endsOnFor(scheme, startsOn, option?.count ?? 1)
   if (endsOn && endsOn < startsOn) refuse('membership.membership.dates', 'The end date cannot be before the start.', { status: 422, fields: { endsOn: 'membership.membership.dates' } })
   if (await holdsScheme(accountId, scheme.id, startsOn) && !input.startsOn)
     refuse('membership.membership.already-held', 'This person already holds this scheme.', { status: 409, remedy: 'Change the dates of their membership instead.' })
   const written = await writeActive(unit, { scheme, accountId, origin: 'added', lengthOptionId: option?.id ?? null, count: option?.count ?? 1, startsOn, endsOn, addedBy: actor.accountId ?? null, note: input.note ?? null })
+  if (pass) recordPass(unit, written.membershipId, accountId, pass)
   // G2 and D7: verification and approval are taken as given by the member of staff; both sets of dates are kept.
   unit.audit({ action: 'create', record: ['membership.membership', written.membershipId], detail: { origin: 'added', calculatedEndsOn: endsOnFor(scheme, startsOn, option?.count ?? 1), endsOn, ...(fees ? { fee: 'waived' } : {}) } })
   return { ...written, accountId, opensMembersArea: scheme.side === 'members' }
