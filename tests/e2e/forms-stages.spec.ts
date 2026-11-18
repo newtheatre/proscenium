@@ -70,7 +70,7 @@ test('a response moves through stages, goes back for changes and returns as a ne
   const address = new URL(await share.getByLabel('Address').inputValue()).pathname
   const builder = new URL(page.url()).pathname
   await share.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared')).toBeVisible()
+  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
 
   // ---- a member answers ----
   const mine = await as(browser, member)
