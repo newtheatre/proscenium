@@ -202,6 +202,9 @@ export default defineModule({
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
     'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }],
+    // The Tickets tab and fact on a production's page (show walkthrough, decision 1).
+    'core.record-tab': [{ id: 'box-office.production', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTickets', order: 10 }],
+    'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
     'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],

@@ -659,5 +659,21 @@
   "box-office.codes.field.note-help": "For staff only, such as who the code was given to.",
   "box-office.home-card.comps.one": "{count} comps request is waiting for your decision",
   "box-office.home-card.comps.other": "{count} comps requests are waiting for your decision",
-  "box-office.home-card.comps-action": "Decide comps"
+  "box-office.home-card.comps-action": "Decide comps",
+  "box-office.record-tabs.production.label": "Tickets",
+  "box-office.production-tickets.fact.label": "Tickets",
+  "box-office.production-tickets.fact.value": "{taken} taken, {onSale} of {performances} on sale",
+  "box-office.production-tickets.fact.none": "No performances",
+  "box-office.production-tickets.performances": "Performances",
+  "box-office.production-tickets.on-sale": "On sale",
+  "box-office.production-tickets.taken": "Seats taken",
+  "box-office.production-tickets.seats": "{taken} of {capacity} taken",
+  "box-office.production-tickets.draft-on-sale.title.one": "1 performance is on sale, but the production is not published",
+  "box-office.production-tickets.draft-on-sale.title.other": "{count} performances are on sale, but the production is not published",
+  "box-office.production-tickets.draft-on-sale.description": "Its booking pages open once the production is published. Until then only the box office can sell. Publish it, or pause sales if it is not ready.",
+  "box-office.production-tickets.empty.title": "No performances yet",
+  "box-office.production-tickets.empty.description": "Add dates on the Dates tab, then set each one up for sale.",
+  "box-office.setup.unpublished.title": "The production is not published",
+  "box-office.setup.unpublished.description": "Its booking pages open once it is published, so buyers cannot book online yet, even while this performance is on sale.",
+  "box-office.setup.unpublished.link": "Open the production"
 }
