@@ -34,7 +34,15 @@ test('custom fields are built, attached for every record and filled in on one', 
   const attached = page.getByRole('list', { name: 'Custom fields attached here' })
 
   // ---- a new set of fields opens in the builder, with no link and no stages ----
+  // The template the gallery ships for this slot is offered first and chosen; this test starts blank.
   await page.getByRole('button', { name: 'New set of fields' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New set of fields' })
+  await expect(dialog.getByRole('combobox', { name: 'Start from' })).toHaveText(/Show details/)
+  await expect(dialog.getByText(/Running time and whether there is an interval\. 2 questions\./)).toBeVisible()
+  await axe(page)
+  await dialog.getByRole('combobox', { name: 'Start from' }).click()
+  await page.getByRole('option', { name: 'A blank set of fields' }).click()
+  await dialog.getByRole('button', { name: 'Create the set' }).click()
   await page.waitForURL(/\/console\/forms\/frm_/)
   const builder = new URL(page.url()).pathname
   await expect(page.getByText('Custom fields', { exact: true }).first()).toBeVisible()

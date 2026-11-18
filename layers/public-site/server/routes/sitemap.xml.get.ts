@@ -23,6 +23,7 @@ export default defineEventHandler(async (event) => {
     const paths = [...new Set([
       ...pages.filter(p => p.placeholder !== true && p.noindex !== true).map(p => p.path).filter((p): p is string => typeof p === 'string' && p.startsWith('/')),
       '/whats-on',
+      '/venues',
       ...(pastVisible ? ['/shows'] : []),
       ...await publicProgrammePaths({ pastVisible }),
     ])]
