@@ -557,6 +557,10 @@ function ended() {
             :label="t('payments.screens.till.your-session')"
           />
         </div>
+        <PaymentsHandBack
+          :live="live"
+          class="mb-6"
+        />
         <EmptyState
           v-if="!panels.length"
           :title="t('payments.screens.till.no-panels')"
