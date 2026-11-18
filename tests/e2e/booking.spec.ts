@@ -148,7 +148,7 @@ test('a buyer cancels paid tickets from their link when the theatre allows it, a
   await expect(page.getByText('To change or cancel a paid booking, contact the box office.')).toHaveCount(0)
   await noViolations(page)
 
-  await page.getByRole('checkbox', { name: /^Ticket 1, / }).check()
+  await page.getByRole('checkbox', { name: /^Ticket 1:/ }).check()
   await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByText('£8.50 goes back to the card you paid with.', { exact: false })).toBeVisible()
