@@ -54,11 +54,21 @@ watch(() => data.value, () => { picked.value = picked.value.filter(id => data.va
 function toggle(id: string, on: boolean) {
   picked.value = on ? [...new Set([...picked.value, id])] : picked.value.filter(x => x !== id)
 }
+// Only performances in a space the theatre manages can be ticked.
+const pickable = computed(() => (data.value?.performances ?? []).filter(p => p.managed).map(p => p.id))
+const allPicked = computed<boolean | 'indeterminate'>(() => {
+  if (!picked.value.length) return false
+  return pickable.value.every(id => picked.value.includes(id)) ? true : 'indeterminate'
+})
+function pickAll(on: boolean | 'indeterminate') {
+  picked.value = on === true ? [...pickable.value] : []
+}
 async function apply() {
   refusal.value = null
   try {
     const result = await write<{ added: unknown[], skipped: unknown[] }>(`/api/front-of-house/rota-templates/${encodeURIComponent(template.value!)}/apply`, { method: 'POST', body: { performanceIds: picked.value } })
-    toast.add({ title: t('front-of-house.rota.applied', { count: picked.value.length - result.skipped.length }), color: 'success' })
+    if (result.added.length) toast.add({ title: t('front-of-house.rota.applied', { count: result.added.length }), color: 'success' })
+    else toast.add({ title: t('front-of-house.rota.nothing-to-add-many'), color: 'info' })
     await refresh()
   }
   catch (e) {
@@ -141,64 +151,90 @@ const lineText = (l: Line) => t('front-of-house.rota.line', { duty: l.duty, take
             :description="t('front-of-house.rota.empty.description')"
             icon="i-lucide-calendar-range"
           />
-          <RecordList
-            v-else
-            :label="t('front-of-house.navigation.rota.label')"
-          >
-            <RecordListItem
-              v-for="p in d.performances"
-              :key="p.id"
-              :to="`/console/front-of-house/rota/${encodeURIComponent(p.id)}`"
-              icon="i-lucide-calendar-range"
-              :name="p.show"
-              :description="[dateTime(p.startsAt), p.venue].filter(Boolean).join(' · ')"
-            >
-              <div class="flex items-center gap-3">
-                <StatusBadge
-                  v-if="!p.managed"
-                  tone="neutral"
-                  :label="t('front-of-house.rota.not-our-space')"
-                />
-                <UCheckbox
-                  v-else
-                  size="lg"
-                  :ui="{ base: 'size-6' }"
-                  :label="t('front-of-house.rota.tick')"
-                  :model-value="picked.includes(p.id)"
-                  :aria-label="t('front-of-house.rota.pick', { show: p.show, when: dateTime(p.startsAt) })"
-                  @update:model-value="v => toggle(p.id, !!v)"
-                />
-              </div>
-              <template #below>
-                <p
-                  v-if="!p.duties.length"
-                  class="text-sm text-muted"
-                >
-                  {{ t('front-of-house.rota.no-shifts') }}
-                </p>
-                <ul
-                  v-else
-                  class="space-y-1 text-sm"
-                >
-                  <li
-                    v-for="l in p.duties"
-                    :key="l.dutyId"
-                    class="flex items-center gap-3"
+          <template v-else>
+            <UCheckbox
+              v-if="pickable.length"
+              class="mb-3 px-4"
+              size="lg"
+              :model-value="allPicked"
+              :label="t('front-of-house.rota.pick-all')"
+              @update:model-value="pickAll"
+            />
+            <RecordList :label="t('front-of-house.navigation.rota.label')">
+              <!-- The row is not a link, so ticking it never opens it: the performance's name is the link. -->
+              <RecordListItem
+                v-for="p in d.performances"
+                :key="p.id"
+                icon="i-lucide-calendar-range"
+                :description="[dateTime(p.startsAt), p.venue].filter(Boolean).join(' · ')"
+              >
+                <template #leading>
+                  <UCheckbox
+                    v-if="p.managed"
+                    size="lg"
+                    :ui="{ base: 'size-6' }"
+                    :model-value="picked.includes(p.id)"
+                    :aria-label="t('front-of-house.rota.pick', { show: p.show, when: dateTime(p.startsAt) })"
+                    @update:model-value="v => toggle(p.id, !!v)"
+                  />
+                  <span
+                    v-else
+                    class="size-6 shrink-0"
+                  />
+                </template>
+                <template #name>
+                  <ULink
+                    :to="`/console/front-of-house/rota/${encodeURIComponent(p.id)}`"
+                    class="font-medium text-highlighted hover:underline"
                   >
-                    <UProgress
-                      :model-value="l.taken"
-                      :max="l.places"
-                      size="sm"
-                      class="w-24"
-                      :aria-label="lineText(l)"
-                      :color="l.taken < l.places ? 'warning' : 'success'"
-                    />
-                    <span>{{ lineText(l) }}</span>
-                  </li>
-                </ul>
-              </template>
-            </RecordListItem>
-          </RecordList>
+                    {{ p.show }}
+                  </ULink>
+                </template>
+                <div class="flex items-center gap-3">
+                  <StatusBadge
+                    v-if="!p.managed"
+                    tone="neutral"
+                    :label="t('front-of-house.rota.not-our-space')"
+                  />
+                  <IconButton
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-chevron-right"
+                    :to="`/console/front-of-house/rota/${encodeURIComponent(p.id)}`"
+                    :label="t('front-of-house.rota.open', { show: p.show, when: dateTime(p.startsAt) })"
+                  />
+                </div>
+                <template #below>
+                  <p
+                    v-if="!p.duties.length"
+                    class="text-sm text-muted"
+                  >
+                    {{ t('front-of-house.rota.no-shifts') }}
+                  </p>
+                  <ul
+                    v-else
+                    class="space-y-1 text-sm"
+                  >
+                    <li
+                      v-for="l in p.duties"
+                      :key="l.dutyId"
+                      class="flex items-center gap-3"
+                    >
+                      <UProgress
+                        :model-value="l.taken"
+                        :max="l.places"
+                        size="sm"
+                        class="w-24"
+                        :aria-label="lineText(l)"
+                        :color="l.taken < l.places ? 'warning' : 'success'"
+                      />
+                      <span>{{ lineText(l) }}</span>
+                    </li>
+                  </ul>
+                </template>
+              </RecordListItem>
+            </RecordList>
+          </template>
         </template>
       </DataBoundary>
     </div>
