@@ -45,6 +45,7 @@ const year = (date: string) => date.slice(0, 4) // not-policy: the year of a dat
         >
           <p>
             <span class="font-medium">{{ a.name }}</span>
+            <span class="sr-only">, </span>
             <span class="ms-2 text-sm text-muted">{{ year(a.awardedOn) }}</span>
           </p>
           <p

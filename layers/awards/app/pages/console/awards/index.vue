@@ -39,7 +39,7 @@ const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x
         @click="importing = true"
       />
       <UButton
-        v-if="data?.canIssue"
+        v-if="data?.canIssue && activeTypes.length"
         :label="t('awards.screens.awards.issue')"
         icon="i-lucide-plus"
         :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
@@ -64,8 +64,18 @@ const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x
         v-if="!data?.awards.length"
         icon="i-lucide-award"
         :title="t(q || typeId !== 'all' ? 'awards.screens.awards.none-found' : 'awards.screens.awards.empty')"
-        :description="q || typeId !== 'all' ? undefined : t('awards.screens.awards.empty-help')"
-      />
+        :description="q || typeId !== 'all' ? undefined : t(activeTypes.length ? 'awards.screens.awards.empty-help' : 'awards.screens.awards.no-types-help')"
+      >
+        <template
+          v-if="data?.canIssue && !activeTypes.length && !q && typeId === 'all'"
+          #actions
+        >
+          <UButton
+            to="/admin/modules/awards/types"
+            :label="t('awards.screens.awards.create-type')"
+          />
+        </template>
+      </EmptyState>
       <div
         v-else
         class="space-y-4"

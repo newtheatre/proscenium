@@ -7,7 +7,7 @@
 import { first, nowMs, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findOrCreateAccount } from '#modules/core'
-import { holdsType, writeAward } from './awards'
+import { holdsType, startingVisibility, writeAward } from './awards'
 import { requireType, type AwardType } from './types'
 
 export interface ImportRow { line: number, name: string, awardedOn: string, /** Absent in a job queued before it was kept: the day. */ awardedPrecision?: 'day' | 'year', awardedFor: string | null, citation: string | null, address: string | null }
@@ -145,13 +145,14 @@ export async function importShare(unit: UnitView, job: ImportJob): Promise<{ imp
       skipped++
       continue
     }
-    const accountId = row.address ? (await findOrCreateAccount(unit, { address: row.address, name: row.name, origin: 'staff' })).accountId : null
+    const found = row.address ? await findOrCreateAccount(unit, { address: row.address, name: row.name, origin: 'staff' }) : null
+    const accountId = found?.accountId ?? null
     if (accountId && type.onePerPerson && given.has(accountId)) {
       skipped++
       continue
     }
     if (accountId) given.add(accountId)
-    writeAward(unit, { type, accountId, recipientName: row.name, awardedOn: row.awardedOn, awardedPrecision: row.awardedPrecision, awardedFor: row.awardedFor, citation: row.citation, source: 'import', issuedBy: job.importedBy })
+    writeAward(unit, { type, accountId, recipientName: row.name, awardedOn: row.awardedOn, awardedPrecision: row.awardedPrecision, awardedFor: row.awardedFor, citation: row.citation, visibility: await startingVisibility(type, accountId, found?.claimed), source: 'import', issuedBy: job.importedBy })
     imported++
   }
   unit.audit({ action: 'create', record: ['awards.type', type.id], detail: { importId: job.importId, imported, skipped, at: nowMs() } })
