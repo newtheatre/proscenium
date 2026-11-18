@@ -5,13 +5,14 @@
      the booking is made, this page says what happened and forgets the basket. -->
 <script setup lang="ts">
 import { z } from 'zod'
+import type { BookingDoneOutcome } from '../../utils/booking'
 
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
-interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number }[] }
+interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number }[], promo?: { code: string, savingMinor: number } | null }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string, ageMin: number | null, ageRestricted: boolean }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string }[] }[] }
 type Outcome
-  = | { state: 'confirmed', reference: string, totalMinor: number }
-    | { state: 'reserved', reference: string, token: string, deskCode: string, amountDueMinor: number }
+  = | (BookingDoneOutcome & { state: 'confirmed', totalMinor: number })
+    | (BookingDoneOutcome & { state: 'reserved' })
     | { state: 'confirm-email' }
     | { state: 'processing' }
 
@@ -24,8 +25,8 @@ const { toRefusal, fieldErrors } = useRefusal()
 const { dateTime, time } = useDates()
 const { money } = await useMoney()
 const { viewer } = useViewer()
+const { signOut } = useSignOut()
 const route = useRoute()
-useSeoMeta({ title: () => t('box-office.basket.title'), robots: 'noindex' })
 
 const remembered = ref<ReturnType<typeof recallBasket>>(null)
 const basket = ref<Basket | null>(null)
@@ -113,19 +114,56 @@ watch(announced, (v) => {
   if (v) spoken.value = v
 })
 
-const names = computed(() => new Map((page.value?.bands ?? []).flatMap(b => b.types.map(type => [`${b.bandId} ${type.ticketTypeId}`, `${b.name}, ${type.name}`]))))
+// The part of the house is named only when the show prices more than one.
+const names = computed(() => new Map((page.value?.bands ?? []).flatMap(b => b.types.map(type => [`${b.bandId} ${type.ticketTypeId}`, page.value!.bands.length > 1 ? `${b.name}, ${type.name}` : type.name]))))
+// Each line at its price before any promo code, which then has a line of its own above the total.
 const lines = computed(() => {
   const grouped = new Map<string, { label: string, count: number, amountMinor: number }>()
   for (const l of basket.value?.lines ?? []) {
     const key = `${l.bandId} ${l.ticketTypeId}`
     const row = grouped.get(key) ?? { label: names.value.get(key) ?? '', count: 0, amountMinor: 0 }
     row.count++
-    row.amountMinor += l.amountMinor
+    row.amountMinor += basket.value?.promo ? (l.listMinor ?? l.amountMinor) : l.amountMinor
     grouped.set(key, row)
   }
   return [...grouped.values()]
 })
 const free = computed(() => basket.value?.totalMinor === 0)
+useSeoMeta({ title: () => (free.value ? t('box-office.basket.title-free') : t('box-office.basket.title')), robots: 'noindex' })
+// An amount, or Free when there is nothing to pay.
+const amount = (minor: number) => (minor === 0 ? t('box-office.basket.free') : money(minor, basket.value?.currency))
+// Where a signed-in buyer's tickets go: their account's audience address.
+const sendTo = ref<string | null>(null)
+watch(() => viewer.value.signedIn, async (signedIn) => {
+  if (!signedIn) return
+  const found = await $api<{ addresses: { address: string, audience: boolean }[] }>('/api/core/me/addresses').catch(() => null)
+  sendTo.value = found?.addresses.find(a => a.audience)?.address ?? null
+}, { immediate: true })
+
+// Change tickets: back to Choose tickets with these choices filled; the seats stay held until the new
+// choice is, and then this basket is let go. Cancel and release lets it go now.
+function changeTickets() {
+  if (!remembered.value) return
+  return navigateTo({ path: remembered.value.back.split('?')[0], query: { change: '1' } })
+}
+const releasing = ref(false)
+async function release() {
+  if (!basket.value || !remembered.value) return
+  releasing.value = true
+  try {
+    await $api(`/api/box-office/baskets/${encodeURIComponent(basket.value.orderId)}/release`, { method: 'POST', body: {}, headers: { 'x-basket-token': remembered.value.token } })
+    const back = remembered.value.back
+    forgetBasket()
+    useToast().add({ title: t('box-office.basket.released'), color: 'success' })
+    await navigateTo(back)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    releasing.value = false
+  }
+}
 const canPay = computed(() => free.value || page.value?.timing !== 'reserve')
 const canReserve = computed(() => !free.value && page.value?.timing !== 'pay-now' && basket.value?.state === 'basket')
 const detailsNeeded = computed(() => !viewer.value.signedIn)
@@ -162,8 +200,8 @@ async function pay() {
   try {
     // A buyer back from a payment that did not go through is already past checkout.
     if (basket.value.state === 'basket') {
-      const started = await $api<{ state: 'awaiting_payment' | 'confirmed', reference?: string, totalMinor?: number, expiresAt?: number }>(`/api/box-office/baskets/${encodeURIComponent(basket.value.orderId)}/checkout`, { method: 'POST', body: body.value, headers: headers.value })
-      if (started.state === 'confirmed') return done({ state: 'confirmed', reference: started.reference!, totalMinor: started.totalMinor ?? 0 })
+      const started = await $api<{ state: 'awaiting_payment' | 'confirmed', reference?: string, totalMinor?: number, expiresAt?: number, token?: string, accountLinkSent?: boolean }>(`/api/box-office/baskets/${encodeURIComponent(basket.value.orderId)}/checkout`, { method: 'POST', body: body.value, headers: headers.value })
+      if (started.state === 'confirmed') return done({ state: 'confirmed', reference: started.reference!, totalMinor: started.totalMinor ?? 0, token: started.token, accountLinkSent: started.accountLinkSent })
       basket.value = { ...basket.value, state: 'awaiting_payment', expiresAt: started.expiresAt ?? basket.value.expiresAt }
     }
     const next = await $api<{ next: { kind: string, url?: string }, settled: boolean }>(`/api/box-office/baskets/${encodeURIComponent(basket.value.orderId)}/pay`, { method: 'POST', body: {}, headers: { 'x-basket-token': remembered.value.token, 'idempotency-key': crypto.randomUUID() } })
@@ -205,7 +243,7 @@ async function reserve() {
 <template>
   <UContainer>
     <UPage>
-      <UPageHeader :title="outcome ? t(`box-office.basket.done.${outcome.state}.title`) : t('box-office.basket.title')" />
+      <UPageHeader :title="outcome ? t(`box-office.basket.done.${outcome.state}.title`) : free ? t('box-office.basket.title-free') : t('box-office.basket.title')" />
       <UPageBody>
         <div class="max-w-2xl space-y-6">
           <p
@@ -216,35 +254,10 @@ async function reserve() {
           </p>
 
           <template v-else-if="outcome">
-            <template v-if="outcome.state === 'confirmed'">
-              <p>{{ t('box-office.basket.done.confirmed.body') }}</p>
-              <p class="text-lg">
-                {{ t('box-office.basket.reference', { reference: outcome.reference }) }}
-              </p>
-              <BoxOfficeAccountCard v-if="!viewer.signedIn" />
-            </template>
-            <template v-else-if="outcome.state === 'reserved'">
-              <p>{{ t('box-office.basket.done.reserved.body', { amount: money(outcome.amountDueMinor, basket?.currency) }) }}</p>
-              <p class="text-lg">
-                {{ t('box-office.basket.reference', { reference: outcome.reference }) }}
-              </p>
-              <p class="text-lg">
-                {{ t('box-office.basket.desk-code', { code: outcome.deskCode }) }}
-              </p>
-              <QrCode
-                :value="outcome.deskCode"
-                :label="t('box-office.basket.desk-code-qr')"
-              />
-              <p class="text-sm text-muted">
-                {{ t('box-office.basket.done.reserved.note') }}
-              </p>
-              <UButton
-                :to="`/book/order/${outcome.token}`"
-                variant="outline"
-                color="neutral"
-                :label="t('box-office.manage.open')"
-              />
-            </template>
+            <BoxOfficeBookingDone
+              v-if="outcome.state === 'confirmed' || outcome.state === 'reserved'"
+              :outcome="{ currency: basket?.currency, ...outcome }"
+            />
             <p v-else>
               {{ t(`box-office.basket.done.${outcome.state}.body`) }}
             </p>
@@ -314,13 +327,38 @@ async function reserve() {
                   class="flex justify-between py-2"
                 >
                   <span>{{ t('box-office.basket.line', { count: line.count, label: line.label }) }}</span>
-                  <span>{{ money(line.amountMinor, basket.currency) }}</span>
+                  <span>{{ amount(line.amountMinor) }}</span>
+                </li>
+                <li
+                  v-if="basket.promo"
+                  class="flex justify-between py-2"
+                >
+                  <span>{{ t('box-office.basket.promo', { code: basket.promo.code }) }}</span>
+                  <span>{{ t('box-office.basket.saving', { amount: money(basket.promo.savingMinor, basket.currency) }) }}</span>
                 </li>
               </ul>
               <p class="flex justify-between font-semibold">
                 <span>{{ t('box-office.basket.total') }}</span>
-                <span>{{ money(basket.totalMinor, basket.currency) }}</span>
+                <span>{{ amount(basket.totalMinor) }}</span>
               </p>
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  v-if="basket.state === 'basket'"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-pencil"
+                  :label="t('box-office.basket.change')"
+                  @click="changeTickets"
+                />
+                <UButton
+                  v-if="basket.state === 'basket'"
+                  color="neutral"
+                  variant="ghost"
+                  :loading="releasing"
+                  :label="t('box-office.basket.release')"
+                  @click="release"
+                />
+              </div>
             </section>
 
             <p
@@ -385,7 +423,14 @@ async function reserve() {
                 v-else
                 class="text-sm text-muted"
               >
-                {{ t('box-office.basket.signed-in', { name: viewer.name ?? '' }) }}
+                {{ sendTo ? t('box-office.basket.signed-in-to', { name: viewer.name ?? '', address: sendTo }) : t('box-office.basket.signed-in', { name: viewer.name ?? '' }) }}
+                {{ t('box-office.basket.not-you') }}
+                <UButton
+                  variant="link"
+                  class="p-0 align-baseline"
+                  :label="t('box-office.basket.sign-out')"
+                  @click="signOut()"
+                />
               </p>
               <UFormField
                 v-if="ageMin !== null"
