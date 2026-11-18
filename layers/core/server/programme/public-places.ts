@@ -167,3 +167,45 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
     productions: pastVisible ? productions : productions.filter(p => !p.past),
   }
 }
+
+/** A venue in brief, for the venues index and a production page's "Getting here": no spaces. */
+export interface PublicVenueSummary {
+  id: string
+  slug: string
+  name: string
+  address: PublicVenue['address']
+  gettingHere: string | null
+  /** The venue's own access features, not any space's. */
+  access: PublicFeature[]
+}
+
+/**
+ * Active venues in brief, by name: the ones given, or every one audiences go to (with a space that
+ * can hold a performance) when none are.
+ */
+export async function publicVenues(ids?: string[]): Promise<PublicVenueSummary[]> {
+  if (ids && !ids.length) return []
+  const rows = await all<Pick<VenueRow, 'id' | 'slug' | 'name' | 'address_lines' | 'locality' | 'postcode' | 'country' | 'getting_here'>>(
+    `SELECT v.id, v.slug, v.name, v.address_lines, v.locality, v.postcode, v.country, v.getting_here
+       FROM core_venues v
+      WHERE v.state = 'active'
+        AND ${ids ? 'v.id IN (SELECT value FROM json_each(?))' : 'EXISTS (SELECT 1 FROM core_spaces s WHERE s.venue_id = v.id AND s.state = \'active\' AND s.performable = 1)'}
+      ORDER BY lower(v.name), v.id`,
+    ...(ids ? [JSON.stringify(ids)] : []),
+  )
+  const features = rows.length
+    ? await all<{ venue_id: string, term_id: string, label: string, icon: string | null, note: string | null }>(
+        `SELECT a.venue_id, a.term_id, t.label, t.icon, a.note FROM core_place_access a JOIN core_terms t ON t.id = a.term_id
+          WHERE a.venue_id IN (SELECT value FROM json_each(?)) AND a.space_id IS NULL ORDER BY a.sort, t.sort`,
+        JSON.stringify(rows.map(r => r.id)),
+      )
+    : []
+  return rows.map(v => ({
+    id: v.id,
+    slug: v.slug,
+    name: v.name,
+    address: { lines: (v.address_lines ?? '').split('\n').map(l => l.trim()).filter(Boolean), locality: v.locality, postcode: v.postcode, country: v.country },
+    gettingHere: v.getting_here,
+    access: features.filter(f => f.venue_id === v.id).map(f => ({ termId: f.term_id, label: f.label, icon: f.icon, note: f.note })),
+  }))
+}
