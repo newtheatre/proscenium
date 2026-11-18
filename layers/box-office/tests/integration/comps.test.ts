@@ -50,6 +50,25 @@ describe('complimentary tickets', () => {
 
     const seen = await req('GET', '/api/box-office/comps', undefined, requester)
     expect(seen.body.mine.find((r: { id: string }) => r.id === id)).toMatchObject({ state: 'issued', quantity: 2, forName: 'A Critic', reason: 'Press' })
+    // The approver finds what they decided, with the order it made.
+    const decided = await req('GET', '/api/box-office/comps', undefined, approver)
+    expect(decided.body.decided.find((r: { id: string }) => r.id === id)).toMatchObject({ state: 'issued', orderId: approved.body.orderId })
+    expect(seen.body.decided).toEqual([])
+    // Orders shows it as complimentary, not as paid.
+    const page = await req('GET', `/api/box-office/orders/${approved.body.orderId}`, undefined, person(['box-office.order.view']))
+    expect(page.body.complimentary).toBe(true)
+    // The sales report counts them as complimentary, not as sold at the desk.
+    const report = await req('GET', `/api/box-office/reports/sales?productionId=${h.productionId}`, undefined, person(['box-office.report.view']))
+    expect(report.body.report.byChannel).toEqual([expect.objectContaining({ channel: 'complimentary', tickets: 2, valueMinor: 0 })])
+  })
+
+  it('takes the seats with most room when no band is chosen, and offers no performance that has started', async () => {
+    const asked = await ask({ bandId: undefined, quantity: 1 })
+    expect(asked.status, JSON.stringify(asked.body)).toBe(200)
+    expect(await rows('SELECT band_id FROM box_office_comp_requests WHERE id = ?', asked.body.requestId)).toEqual([{ band_id: h.bandId }])
+    expect((await decide(asked.body.requestId, 'withdraw', requester)).status).toBe(200)
+    const seen = await req('GET', '/api/box-office/comps', undefined, requester)
+    expect(seen.body.performances.every((p: { startsAt: number }) => p.startsAt > NOV_16)).toBe(true)
   })
 
   it('never lets anyone decide their own request', async () => {

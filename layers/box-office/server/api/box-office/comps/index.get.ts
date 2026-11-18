@@ -8,7 +8,6 @@ import { compsWhere, type CompRow } from '../../../comps'
 import { poolsOf } from '../../../setup'
 
 const MOST = 200 // not-policy: how many performances the form offers at once
-const DAY = 86_400_000 // not-policy: performances that started earlier today stay listed
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
   const titles = new Map<string, string>()
@@ -35,11 +34,15 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     if ((await can(actor, 'box-office.comp.approve', ['box-office.comp-request', r.id])).allowed) open.push(await view(r))
   }
 
+  // What this person has decided, newest first, so an approver can look back at it.
+  const decided = await Promise.all((await compsWhere(sql`${inAccountScope('decided_by', actor.accountId!)} AND state IN ('issued', 'declined')`)).map(view))
+
+  // Only performances still to start: tickets for one under way are no use to anyone.
   const performances = []
-  for (const p of (await listPerformances({ from: nowMs() - DAY })).filter(x => x.state !== 'cancelled').slice(0, MOST)) {
+  for (const p of (await listPerformances({ from: nowMs() })).filter(x => x.state !== 'cancelled' && x.startsAt > nowMs()).slice(0, MOST)) {
     if (!(await can(actor, 'box-office.comp.request', ['core.performance', p.id])).allowed) continue
     const bands = (await poolsOf(p.id)).map(b => ({ id: b.bandId, name: b.bandName }))
     if (bands.length) performances.push({ id: p.id, title: await titleOf(p.productionId), label: p.label, startsAt: p.startsAt, bands })
   }
-  return { mine, waiting: open, performances, needsApproval: await useSetting('box-office.comps.needs-approval') as boolean }
+  return { mine, waiting: open, decided, performances, needsApproval: await useSetting('box-office.comps.needs-approval') as boolean }
 })

@@ -44,6 +44,7 @@ export default defineRoute({
     buyer: order.account_id ? { id: order.account_id, name: await accountLabel(order.account_id) } : null,
     soldBy: order.sold_by ? await accountLabel(order.sold_by) : null,
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
+    complimentary: (await first<{ one: number }>('SELECT 1 AS one FROM box_office_order_lines WHERE order_id = ? AND comp_request_id IS NOT NULL LIMIT 1', id)) !== null,
     lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: l.requirement_evidence_id === 'pending' })),
     cancellations: await Promise.all(cancellations.map(async c => ({
       id: c.id, kind: c.kind, note: c.note, lineCount: (JSON.parse(c.line_ids) as string[]).length, refunded: !!c.refund_id, feeMinor: c.fee_minor,
