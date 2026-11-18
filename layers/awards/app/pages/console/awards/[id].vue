@@ -67,13 +67,17 @@ function openLink() {
   linkKey = crypto.randomUUID()
   linking.value = true
 }
-async function saveLink() {
+async function saveLink(merge: unknown = false) {
   linkRefusal.value = null
+  const merging = merge === true
+  // A merge says something different from the link that was refused, so it is its own request.
+  if (merging) linkKey = crypto.randomUUID()
   try {
-    await $api(`/api/awards/awards/${id.value}/link` as string, { method: 'POST', headers: { 'idempotency-key': linkKey }, body: link.how === 'person' ? { accountId: link.accountId } : { address: link.address.trim() } })
+    const who = link.how === 'person' ? { accountId: link.accountId } : { address: link.address.trim() }
+    await $api(`/api/awards/awards/${id.value}/link` as string, { method: 'POST', headers: { 'idempotency-key': linkKey }, body: merging ? { ...who, merge: true } : who })
     linking.value = false
-    toast.add({ title: t('awards.screens.link.linked-toast'), color: 'success' })
-    await Promise.all([refresh(), refreshNuxtData('awards:list')])
+    toast.add({ title: t(merging ? 'awards.screens.link.merged-toast' : 'awards.screens.link.linked-toast'), color: 'success' })
+    await Promise.all([refresh(), refreshNuxtData(['awards:list', 'awards:types'])])
   }
   catch (e) {
     linkRefusal.value = toRefusal(e)
@@ -294,6 +298,25 @@ async function revoke() {
           @submit="saveLink"
         >
           <RefusalNotice :refusal="linkRefusal" />
+          <div
+            v-if="linkRefusal?.detail?.awardId"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-merge"
+              :label="t('awards.screens.link.merge')"
+              @click="saveLink(true)"
+            />
+            <UButton
+              color="neutral"
+              variant="link"
+              icon="i-lucide-award"
+              :to="`/console/awards/${linkRefusal.detail.awardId}`"
+              :label="t('awards.screens.link.open-existing')"
+            />
+          </div>
           <UFormField
             name="how"
             :label="t('awards.screens.issue.who')"

@@ -80,6 +80,15 @@ async function issue() {
         @submit="issue"
       >
         <RefusalNotice :refusal="refusal" />
+        <UButton
+          v-if="refusal?.detail?.awardId"
+          color="neutral"
+          variant="link"
+          class="px-0"
+          icon="i-lucide-award"
+          :to="`/console/awards/${refusal.detail.awardId}`"
+          :label="t('awards.screens.issue.open-existing')"
+        />
         <UFormField
           name="typeId"
           :label="t('awards.screens.issue.type')"
