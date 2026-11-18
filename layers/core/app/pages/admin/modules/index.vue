@@ -6,7 +6,7 @@
 import type { ModuleView } from '../../../utils/modules'
 
 const { t } = useT()
-const { nameOf, descriptionOf, listOf } = useModuleWords()
+const { nameOf, descriptionOf, listOf, keptOnBy, needsOf } = useModuleWords()
 const { data, status, error, refresh } = await useAPI<{ modules: ModuleView[], manage: boolean }>('/api/core/modules', { key: 'core:modules' })
 const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [])
 
@@ -30,9 +30,14 @@ const shown = computed(() => {
 const missing = (m: ModuleView) => m.on
   ? [...m.missingSecrets.map(name => t('core.modules.missing-secret', { name })), ...m.credentials.filter(c => c.needed === 'always' && !c.set).map(c => t('core.modules.missing-credential', { name: c.name }))]
   : []
-const footnote = (m: ModuleView) => m.settings
-  ? t('core.modules.settings-count', { count: m.settings })
-  : m.requires.length ? t('core.modules.needs', { modules: listOf(m.requires.map(nameOf)) }) : ''
+const modules = computed(() => data.value?.modules ?? [])
+// Every card says what it needs, those needs' own needs included, and while it is on what keeps it on.
+const needs = (m: ModuleView) => {
+  const ids = needsOf(m, modules.value)
+  return ids.length ? t('core.modules.needs', { modules: listOf(ids.map(nameOf)) }) : ''
+}
+const lockedBy = (m: ModuleView) => keptOnBy(m, modules.value)
+const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count', { count: m.settings }) : ''
 </script>
 
 <template>
@@ -40,15 +45,6 @@ const footnote = (m: ModuleView) => m.settings
     :title="t('core.modules.title')"
     width="standard"
   >
-    <template #primary>
-      <UInput
-        v-model="search"
-        icon="i-lucide-search"
-        :placeholder="t('core.modules.search')"
-        :aria-label="t('core.modules.search')"
-        class="w-56 max-sm:hidden"
-      />
-    </template>
     <p class="text-sm text-muted">
       {{ t('core.modules.description') }}
     </p>
@@ -79,7 +75,7 @@ const footnote = (m: ModuleView) => m.settings
           icon="i-lucide-search"
           :placeholder="t('core.modules.search')"
           :aria-label="t('core.modules.search')"
-          class="sm:hidden"
+          class="sm:w-56"
         />
       </div>
       <EmptyState
@@ -120,9 +116,12 @@ const footnote = (m: ModuleView) => m.settings
                   />
                 </div>
                 <div class="mt-1 flex flex-wrap items-center gap-2">
-                  <StatusBadge
+                  <UBadge
                     v-if="m.alwaysOn"
-                    tone="info"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-lock"
+                    class="pointer-events-none"
                     :label="t('core.modules.state.always-on')"
                   />
                   <span
@@ -130,8 +129,8 @@ const footnote = (m: ModuleView) => m.settings
                     class="text-sm text-muted"
                   >{{ t(m.on ? 'core.modules.state.on' : 'core.modules.state.off') }}</span>
                   <UBadge
-                    v-if="m.stability !== 'stable'"
-                    :color="m.stability === 'deprecated' ? 'warning' : 'neutral'"
+                    v-if="m.stability === 'deprecated'"
+                    color="warning"
                     variant="outline"
                     size="sm"
                     :label="t(`core.modules.stability.${m.stability}`)"
@@ -163,6 +162,18 @@ const footnote = (m: ModuleView) => m.settings
               icon="i-lucide-triangle-alert"
               :description="line"
             />
+            <p
+              v-if="needs(m)"
+              class="text-sm text-muted"
+            >
+              {{ needs(m) }}
+            </p>
+            <p
+              v-if="lockedBy(m).length"
+              class="text-sm text-muted"
+            >
+              {{ t('core.modules.needed-by', { modules: listOf(lockedBy(m).map(nameOf)) }) }}
+            </p>
             <div class="flex items-center justify-between gap-2 text-sm">
               <span class="text-muted">{{ footnote(m) }}</span>
               <UButton

@@ -388,7 +388,7 @@
   "front-of-house.open-shifts.needs-remedy": "Ask the front-of-house manager what you need to do.",
   "front-of-house.open-shifts.overlaps": "You are already on another shift at that time.",
   "front-of-house.open-shifts.empty.title": "No shifts are open yet",
-  "front-of-house.open-shifts.empty.description": "You'll get an email when the next rota goes up. You can choose which emails you get in your notification choices.",
+  "front-of-house.open-shifts.empty.description": "You'll get an email when the next rota goes up. You can choose which emails you get under Notifications in My account.",
   "front-of-house.shift.duty": "Duty",
   "front-of-house.shift.venue": "Venue",
   "front-of-house.shift.call-at": "Arrive by",
@@ -597,5 +597,15 @@
   "front-of-house.live.notes": "Notes",
   "front-of-house.home-card.unrostered": "{count} performances in the next fortnight have no rota",
   "front-of-house.home-card.unrostered.one": "1 performance in the next fortnight has no rota",
-  "front-of-house.home-card.unrostered-action": "Open the rota"
+  "front-of-house.home-card.unrostered-action": "Open the rota",
+  "front-of-house.duties.requirements": "Who may take it",
+  "front-of-house.duties.requirements-help": "Leave empty for anyone who can sign up. Otherwise only people who meet every one of these can take it; others see it with the reason. A manager can still add someone who does not.",
+  "front-of-house.duties.requirements-none": "Anyone who can sign up",
+  "front-of-house.duties.only-for": "Only for: {what}",
+  "front-of-house.duties.and": " and ",
+
+  "front-of-house.notification-topics.cover-needed.label": "Cover requests",
+  "front-of-house.notification-topics.cover-needed.description": "When someone asks for cover on a shift you could take.",
+  "front-of-house.notification-topics.night-reports.label": "Night reports",
+  "front-of-house.notification-topics.night-reports.description": "When a night report is signed off."
 }

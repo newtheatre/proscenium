@@ -9,7 +9,7 @@ import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import menuGet from '../../server/api/bar/till/menu.get'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addPriceList, addProduct, addVariant } from '../../server/catalogue'
-import { addGroup, addOption, setMixer, setProductGroups, updateGroup } from '../../server/choices'
+import { addGroup, addOption, orderOptions, setMixer, setProductGroups, updateGroup } from '../../server/choices'
 import { lessPercent } from '../../server/pricing'
 
 const NOW = Date.UTC(2026, 10, 17, 22) // not-policy: a test's moment
@@ -152,5 +152,20 @@ describe('selling with choices', () => {
     const menu = (await send('GET', `/api/bar/till/menu?outlet=${s.outlet}`)).body
     expect(menu.percentOff).toBe(25)
     expect(menu.categories.flatMap((c: any) => c.items).find((i: any) => i.variantId === s.single).baseMinor).toBe(450)
+  })
+})
+
+describe('setting choices up', () => {
+  it('puts a hand-listed group\'s options in a new order, and refuses a list that leaves one out', async () => {
+    await commit(unit => orderOptions(unit.view(), s.spirit, [s.hendricks, s.gin]))
+    const menu = (await send('GET', `/api/bar/till/menu?outlet=${s.outlet}`)).body
+    expect(menu.groups.find((g: any) => g.id === s.spirit).options.map((o: any) => o.key)).toEqual([s.hendricks, s.gin])
+    await expect(commit(unit => orderOptions(unit.view(), s.spirit, [s.gin]))).rejects.toMatchObject({ code: 'bar.choice.order' })
+  })
+
+  it('takes a mixer as a new Mixer choice\'s usual pick, and refuses one for a list by hand', async () => {
+    const id = await commit(unit => addGroup(unit.view(), { name: 'Choices second mixer', source: 'mixers', defaultKey: s.colaMix }))
+    expect(await rows('SELECT default_key FROM bar_choice_groups WHERE id = ?', id)).toEqual([{ default_key: s.colaMix }])
+    await expect(commit(unit => addGroup(unit.view(), { name: 'Choices by hand', source: 'options', defaultKey: s.colaMix }))).rejects.toMatchObject({ code: 'bar.choice.bad-default' })
   })
 })

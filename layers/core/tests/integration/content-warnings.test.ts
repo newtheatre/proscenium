@@ -111,7 +111,7 @@ describe('content warnings and effects', () => {
   it('need both answers to publish, and listing one clears its "none"', async () => {
     const id = await production()
     await req('PATCH', `/api/core/productions/${id}`, { summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true, externalBookingUrl: BOOKING })
-    expect((await req('POST', `/api/core/productions/${id}/publish`)).body.reason).toBe('To publish, the production needs its staging effects, or confirmation that it has none.')
+    expect((await req('POST', `/api/core/productions/${id}/publish`)).body).toMatchObject({ reason: 'This production needs 1 more thing before it can be published.', remedy: 'Still to do: staging effects listed, or none confirmed.' })
     await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: true })
     expect((await req('POST', `/api/core/productions/${id}/publish`)).status).toBe(200)
 
