@@ -56,6 +56,12 @@ export interface Pricing {
    * by key, what the seller answers for when asked whether the saving still stands (a seat's claim).
    */
   redeem: (unit: UnitView, priced: PricedSale, owner: { kind: string, saleRef: string, refs: Record<string, string> }) => Record<string, string>
+  /**
+   * Moves kept savings to new references, when the seller moves an item: a seat let go and taken
+   * again for a split booking. The use stays counted once; returns the new id for each old one that
+   * was still standing, by old id. Reads first, then writes into the unit.
+   */
+  move: (unit: UnitView, moves: { id: string, ref: string, saleRef: string }[]) => Promise<Record<string, string>>
   /** What a kept reference was: the promotion's label and the code it was used with. */
   describe: (ids: string[]) => Promise<Map<string, { label: string, code: string | null }>>
 }

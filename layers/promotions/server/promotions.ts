@@ -369,6 +369,24 @@ export function redeemPromotions(unit: UnitView, priced: PricedSale, owner: { ki
   return out
 }
 
+/**
+ * Moves savings to new references (payments.pricing's move): the seller let a seat go and took it
+ * again, for a split booking. Each live redemption is released and written again on the new
+ * reference, so the use is counted once throughout; one already given back is left as it is.
+ */
+export async function moveRedemptions(unit: UnitView, moves: { id: string, ref: string, saleRef: string }[]): Promise<Record<string, string>> {
+  const live = new Set((await all<{ id: string }>("SELECT id FROM promotions_redemptions WHERE state = 'live' AND id IN (SELECT value FROM json_each(?))", JSON.stringify(moves.map(m => m.id)))).map(r => r.id))
+  const going = moves.filter(m => live.has(m.id)).map(m => ({ ...m, to: newId('prdm') }))
+  if (!going.length) return {}
+  const at = nowMs()
+  const MOVED = { code: 'promotions.redemption.moved', reason: 'These savings have just changed.' }
+  unit.add(sql`UPDATE promotions_redemptions SET state = 'released', updated_at = ${at} WHERE state = 'live' AND id IN (SELECT json_extract(value, '$.id') FROM json_each(${JSON.stringify(going)}))`).expect(going.length, MOVED)
+  unit.add(sql`INSERT INTO promotions_redemptions (id, promotion_id, code_id, kind, sale_ref, ref, uses, discount_minor, reason, applied_by, state, created_at, updated_at)
+    SELECT json_extract(m.value, '$.to'), r.promotion_id, r.code_id, r.kind, json_extract(m.value, '$.saleRef'), json_extract(m.value, '$.ref'), r.uses, r.discount_minor, r.reason, r.applied_by, 'live', ${at}, ${at}
+      FROM json_each(${JSON.stringify(going)}) m JOIN promotions_redemptions r ON r.id = json_extract(m.value, '$.id')`).expect(going.length, MOVED)
+  return Object.fromEntries(going.map(m => [m.id, m.to]))
+}
+
 /** What kept references were (payments.pricing's describe). */
 export async function describeRedemptions(ids: string[]): Promise<Map<string, { label: string, code: string | null }>> {
   const rows = await all<{ id: string, label: string, code: string | null }>(`SELECT r.id, p.label, c.code FROM promotions_redemptions r JOIN promotions_promotions p ON p.id = r.promotion_id

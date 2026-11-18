@@ -4,7 +4,7 @@
 // claim does, so a seat given back gives its use back (contributions/promotions.target/ticket.ts).
 import { all, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
-import { describeSavings, priceSale, redeemSale, type PricedSale } from '#modules/payments'
+import { describeSavings, moveSavings, priceSale, redeemSale, type PricedSale } from '#modules/payments'
 
 export const TICKET_KIND = 'box-office.ticket'
 
@@ -54,4 +54,13 @@ export async function redeemTickets(unit: UnitView, priced: PricedTickets, order
 export const unpriced = (count: number): PricedTickets => ({ discounts: Array.from({ length: count }, () => 0), priced: { items: [], applied: [], savings: [], stale: [] } })
 
 /** What the promotions kept on lines were, for the basket's summary. */
+/**
+ * Moves the promotions' uses on tickets to the seats they were taken again on (a split booking):
+ * each line's kept saving, by old redemption id, becomes a new one on the new claim and order.
+ */
+export async function moveTicketSavings(unit: UnitView, orderId: string, lines: readonly { redemptionId: string | null, claimId: string }[]): Promise<Map<string, string>> {
+  const moves = lines.flatMap(l => l.redemptionId ? [{ id: l.redemptionId, ref: l.claimId, saleRef: orderId }] : [])
+  return new Map(Object.entries(await moveSavings(unit, moves)))
+}
+
 export { describeSavings }

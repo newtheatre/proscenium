@@ -25,6 +25,12 @@ export async function redeemSale(unit: UnitView, priced: PricedSale, owner: { ki
   return p ? p.redeem(unit, priced, owner) : {}
 }
 
+/** Moves kept savings to new references (a seat taken again for a split booking); the new id by old id. */
+export async function moveSavings(unit: UnitView, moves: { id: string, ref: string, saleRef: string }[]): Promise<Record<string, string>> {
+  const p = moves.length ? await pricer() : null
+  return p ? p.move(unit, moves) : {}
+}
+
 /** What the references kept on lines were, for a receipt or a basket's summary. */
 export async function describeSavings(ids: string[]): Promise<Map<string, { label: string, code: string | null }>> {
   const p = ids.length ? await pricer() : null

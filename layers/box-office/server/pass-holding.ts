@@ -33,6 +33,14 @@ export function normalisePassCode(typed: string): string {
 /** Whether what was typed has the shape of a pass code, so the desk's find box can tell one from a name. */
 export const looksLikePassCode = (typed: string) => /^PASS[-\s]?[A-Za-z0-9]{4}[-\s]?[A-Za-z0-9]{4}$/i.test(typed.trim()) // not-policy: the shape of a code, PASS-XXXX-XXXX
 
+/** The hash of a code from another system as it scans, kept beside a pass brought in from there. */
+export const aliasHashOf = (text: string) => hashOf(text.trim().toUpperCase())
+
+/** What a typed or scanned code is looked up by: as one of ours, and as another system's whole. */
+export async function passCodeHashes(typed: string): Promise<[string, string]> {
+  return [await hashOf(normalisePassCode(typed)), await aliasHashOf(typed)]
+}
+
 export interface IssueInput {
   passTypeId: string
   passPriceId: string
@@ -48,6 +56,8 @@ export interface IssueInput {
   id?: string
   /** A code to keep, for a pass brought in from another system; a new one otherwise. */
   code?: string
+  /** The text of the code its holder already has from another system, of any length, which then finds the pass too. */
+  alias?: string
 }
 
 /**
@@ -66,10 +76,11 @@ export async function issuePass(unit: UnitView, input: IssueInput): Promise<{ id
   const id = input.id ?? newId('pass')
   const at = nowMs()
   const hash = await hashOf(code)
-  unit.add(sql`INSERT INTO box_office_passes (id, pass_type_id, pass_price_id, order_line_id, account_id, named, code_hash, code, uses_total, once, amount_minor, currency, issued_at, paid_at, state, issued_by, created_at, updated_at)
-    SELECT ${id}, ${type.id}, ${price.id}, ${input.orderLineId ?? null}, ${input.accountId}, ${named ? 1 : 0}, ${hash}, ${await sealColumn(code)}, ${type.uses}, ${type.perShow === 'once' ? 1 : 0}, ${price.amountMinor}, ${type.currency},
+  const alias = input.alias ? await aliasHashOf(input.alias) : null
+  unit.add(sql`INSERT INTO box_office_passes (id, pass_type_id, pass_price_id, order_line_id, account_id, named, code_hash, alias_hash, code, uses_total, once, amount_minor, currency, issued_at, paid_at, state, issued_by, created_at, updated_at)
+    SELECT ${id}, ${type.id}, ${price.id}, ${input.orderLineId ?? null}, ${input.accountId}, ${named ? 1 : 0}, ${hash}, ${alias}, ${await sealColumn(code)}, ${type.uses}, ${type.perShow === 'once' ? 1 : 0}, ${price.amountMinor}, ${type.currency},
       ${(input.issued ?? true) ? at : null}, ${input.paid ? at : null}, 'active', ${input.issuedBy}, ${at}, ${at}
-    WHERE NOT EXISTS (SELECT 1 FROM box_office_passes WHERE code_hash = ${hash})`).expect(1, { code: 'box-office.pass.code-taken', reason: 'Another pass already has that code.', remedy: 'Choose another code.' })
+    WHERE NOT EXISTS (SELECT 1 FROM box_office_passes WHERE code_hash = ${hash} OR (${alias} IS NOT NULL AND alias_hash = ${alias}))`).expect(1, { code: 'box-office.pass.code-taken', reason: 'Another pass already has that code.', remedy: 'Choose another code.' })
   unit.audit({ action: 'create', record: ['box-office.pass', id], detail: { passTypeId: type.id, paid: input.paid } })
   return { id, code: shownPassCode(code), named }
 }
@@ -108,7 +119,7 @@ async function toPass(r: PassRow): Promise<HeldPass> {
 
 /** The pass a code belongs to, or null. */
 export async function passByCode(typed: string): Promise<HeldPass | null> {
-  const row = await first<PassRow>(`${PASSES} WHERE p.code_hash = ?`, await hashOf(normalisePassCode(typed)))
+  const row = await first<PassRow>(`${PASSES} WHERE p.code_hash = ? OR p.alias_hash = ?`, ...await passCodeHashes(typed))
   return row ? toPass(row) : null
 }
 
