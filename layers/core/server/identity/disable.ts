@@ -4,6 +4,7 @@
 import { nowMs, refuse, type UnitView } from '#kit'
 import { accountById } from './accounts'
 import { guardLastOwner, isOwner } from './grants'
+import { erasureStarted } from './erasure'
 import { endSessionsOf } from './sessions'
 
 export async function disableAccount(unit: UnitView, id: string, reason: 'security' | 'conduct' | 'requested' | 'duplicate'): Promise<void> {
@@ -18,6 +19,7 @@ export async function disableAccount(unit: UnitView, id: string, reason: 'securi
 }
 
 export async function enableAccount(unit: UnitView, id: string): Promise<void> {
+  if (await erasureStarted(id)) refuse('core.account.erasing', 'This account is being erased.', { status: 409 })
   unit.add({ sql: 'UPDATE core_accounts SET disabled_at = NULL, disabled_reason = NULL WHERE id = ? AND disabled_at IS NOT NULL', params: [id] })
     .expect(1, { code: 'core.account.not-disabled', reason: 'This account is not disabled.' })
   unit.announce('core.account.enabled', { accountId: id }, { record: ['core.account', id] })

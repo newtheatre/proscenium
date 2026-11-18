@@ -15,7 +15,7 @@ Workstream 2 of the detailed-design stage. One person has one account; the audie
 | What protects sensitive work? | A session is basic or strong. Privileged abilities need a strong session (a passkey). One that changes something also needs a fresh check, asked in place; one that only reads is audited instead. |
 | What stops access piling up? | Grants carry an end date and are never edited; facts end by themselves; nobody grants themselves or gives what they lack; the theatre always keeps an Owner. |
 | What about duplicates? | Staff merge two accounts. The person is one account at once; their rows follow in the background, module by module, from a declaration on each column, and a test built from the registry proves none was missed. A merge can be undone for 30 days. |
-| What about leaving? | A person downloads their data or asks for erasure. Erasure waits a cooling-off, respects holds a module declares, then clears every personal value in one batch. |
+| What about leaving? | A person downloads their data or asks for erasure. Erasure waits a cooling-off, respects holds a module declares, then clears every personal value, in stages that lock the person out first. |
 
 Three choices carry most of the weight. **States are read, not stored**, so an account cannot be "pending" in one table and "active" in another. **An account exists only after a proof or a real record**, so there are no half-made sign-ups to clean. **Completeness is tested from registries**, so merge, erasure and the members' area boundary stay whole as modules are added.
 
