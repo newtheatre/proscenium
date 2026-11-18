@@ -10,9 +10,13 @@ const emit = defineEmits<{ 'update:other': [text: string] }>()
 const model = defineModel<Value>()
 const { t } = useT()
 const q = computed(() => props.question)
+const TYPED = ['email', 'phone', 'url', 'number', 'money', 'date', 'time', 'datetime', 'consent', 'rating', 'scale']
 const error = computed(() => {
   const issue = props.issues?.[0]
-  return issue ? issue.message || t(`forms.issues.${issue.rule}`, issue.params ?? {}) : undefined
+  if (!issue) return undefined
+  // An answer of the wrong kind is told what kind is wanted, where the type says it.
+  if (issue.rule === 'type' && TYPED.includes(q.value.type)) return t(`forms.issues.type-${q.value.type}`)
+  return issue.message || t(`forms.issues.${issue.rule}`, issue.params ?? {})
 })
 const options = computed(() => [...(q.value.options ?? []).map(o => ({ value: o.id, label: o.label })), ...(q.value.allowOther ? [{ value: OTHER, label: t('forms.screens.options.other') }] : [])])
 const text = computed({ get: () => (typeof model.value === 'string' ? model.value : ''), set: (v: string) => { model.value = v === '' ? undefined : v } })
@@ -41,6 +45,7 @@ function setAddress(key: keyof Address, value: string) {
   model.value = Object.values(next).some(Boolean) ? next as Address : undefined
 }
 const ADDRESS: (keyof Address)[] = ['line1', 'line2', 'town', 'county', 'postcode']
+const AUTOCOMPLETE: Partial<Record<keyof Address, string>> = { line1: 'address-line1', line2: 'address-line2', town: 'address-level2', county: 'address-level1', postcode: 'postal-code' }
 
 const DATE_LENGTH = 10 // not-policy: the length of a date
 const timeOf = (value: string) => {
@@ -103,12 +108,13 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
     />
     <FieldDate
       v-else-if="q.type === 'date'"
+      class="w-48"
       :model-value="text"
       @update:model-value="text = $event ?? ''"
     />
     <UInputTime
       v-else-if="q.type === 'time'"
-      class="w-24"
+      class="w-28"
       :model-value="timeOf(text)"
       :hour-cycle="24"
       @update:model-value="text = clock($event)"
@@ -118,11 +124,12 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       class="flex flex-wrap items-center gap-2"
     >
       <FieldDate
+        class="w-48"
         :model-value="datePart"
         @update:model-value="setDateTime($event ?? '', timePart)"
       />
       <UInputTime
-        class="w-24"
+        class="w-28"
         :model-value="timeOf(timePart)"
         :hour-cycle="24"
         :aria-label="t('forms.screens.fill.time')"
@@ -190,7 +197,10 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       :items="[{ value: 'true', label: t('forms.screens.logic.yes') }, { value: 'false', label: t('forms.screens.logic.no') }]"
       @update:model-value="model = $event === 'true'"
     />
-    <div v-else-if="q.type === 'rating' || q.type === 'scale'">
+    <div
+      v-else-if="q.type === 'rating' || q.type === 'scale'"
+      class="inline-block max-w-full"
+    >
       <div
         class="flex flex-wrap gap-1"
         role="radiogroup"
@@ -220,14 +230,19 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       v-else-if="q.type === 'address'"
       class="space-y-2"
     >
-      <UInput
+      <label
         v-for="part in ADDRESS"
         :key="part"
-        :model-value="address[part] ?? ''"
-        :placeholder="t(`forms.screens.fill.address.${part}`)"
-        :aria-label="t(`forms.screens.fill.address.${part}`)"
-        @update:model-value="setAddress(part, String($event))"
-      />
+        class="block space-y-1"
+      >
+        <span class="text-sm text-muted">{{ t(`forms.screens.fill.address.${part}`) }}</span>
+        <UInput
+          :class="part === 'postcode' ? 'w-40' : 'w-full'"
+          :model-value="address[part] ?? ''"
+          :autocomplete="AUTOCOMPLETE[part]"
+          @update:model-value="setAddress(part, String($event))"
+        />
+      </label>
     </div>
     <UCheckbox
       v-else-if="q.type === 'consent'"

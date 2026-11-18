@@ -144,6 +144,9 @@ describe('returning a response for changes', () => {
 
     const mine = await req('GET', `/api/forms/mine/${responseId}`, undefined, member)
     expect(mine.body.progress).toEqual({ status: 'Back with you', kind: 'returned', note: 'Please say more about why.', canChange: true })
+    // What has happened so far, in the words the form chose for them and with nobody named.
+    expect(mine.body.history.at(-1)).toMatchObject({ status: 'Back with you', kind: 'returned' })
+    expect(mine.body.history).toHaveLength(3)
     const listed = await req('GET', '/api/forms/mine', undefined, member)
     expect(listed.body.sent.find((s: any) => s.responseId === responseId).progress).toEqual({ status: 'Back with you', kind: 'returned', canChange: true })
 

@@ -6,6 +6,7 @@
 import { all, first, linkTokens, newId, openSpecial, refuse, sealSpecial, today, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import type { Answers, DataClass, Definition, Entry, Evaluation, Question, Stage, Value } from '../shared/engine'
+import { moneyWords } from '../shared/words'
 import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questionsOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow, VersionRow } from './forms'
@@ -364,13 +365,14 @@ export function toAnswers(def: Definition, stored: StoredAnswer[]): Answers {
 }
 
 /** An answer as one line of plain words, for a table cell or a CSV field. */
-export function words(answer: StoredAnswer, type: string | undefined): string {
+export function words(answer: StoredAnswer, type: string | undefined, currency?: string): string {
   if (answer.restricted) return ''
   if (answer.label !== null) return answer.label
   const v = answer.value
   if (v === null || v === undefined) return ''
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-  if (typeof v === 'number') return type === 'money' ? (v / 100).toFixed(2) : String(v) // not-policy: minor units to units
+  // With a currency, money reads as money ("£12.50"); without, as a plain figure a spreadsheet can add up.
+  if (typeof v === 'number') return type !== 'money' ? String(v) : currency ? moneyWords(v, currency) : (v / 100).toFixed(2) // not-policy: minor units to units
   if (typeof v === 'string') return v
   if (Array.isArray(v)) return v.map(x => typeof x === 'string' ? x : x.name).join('; ')
   return [v.line1, v.line2, v.town, v.county, v.postcode, v.country].filter(Boolean).join(', ')
@@ -439,11 +441,11 @@ export function columnsOf(fields: { questionId: string, key: string, label: stri
 }
 
 /** A response's answers as one cell per column. Entries of a repeating group share a cell. */
-export function cells(answers: StoredAnswer[], columns: Column[]): Record<string, { text: string, restricted: boolean }> {
+export function cells(answers: StoredAnswer[], columns: Column[], currency?: string): Record<string, { text: string, restricted: boolean }> {
   const out: Record<string, { text: string, restricted: boolean }> = {}
   const type = new Map(columns.map(c => [c.questionId, c.type]))
   for (const a of answers) {
-    const text = words(a, type.get(a.questionId))
+    const text = words(a, type.get(a.questionId), currency)
     const cell = out[a.questionId]
     if (!cell) out[a.questionId] = { text, restricted: a.restricted }
     else if (!a.restricted && text) cell.text = cell.text ? `${cell.text} | ${text}` : text

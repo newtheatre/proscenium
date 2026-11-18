@@ -112,6 +112,21 @@ export async function changedIn(responseId: string, revision: number): Promise<s
   return [...new Set([...now.keys(), ...before.keys()])].filter(id => now.get(id) !== before.get(id)).sort()
 }
 
+/**
+ * What has happened to a person's own response, oldest first, in the words the form chose for them:
+ * each change of status and when. Who moved it, and stages that read the same to them, are left out.
+ */
+export async function ownHistory(def: Definition, response: ResponseRow): Promise<{ at: number, status: string, kind: string }[]> {
+  if (!hasStages(def)) return []
+  const rows = await all<{ at: number, toStage: string, toKind: string }>('SELECT at, to_stage AS toStage, to_kind AS toKind FROM forms_stage_history WHERE response_id = ? ORDER BY at, id', response.id)
+  const out: { at: number, status: string, kind: string }[] = []
+  for (const r of rows) {
+    const status = statusOf(stageOf(def, r.toStage)) || r.toStage
+    if (out.at(-1)?.status !== status) out.push({ at: r.at, status, kind: r.toKind })
+  }
+  return out
+}
+
 /** What a person is shown about where their own response is. */
 export function ownStatus(def: Definition, response: ResponseRow): { status: string, kind: string, note: string | null, canChange: boolean } | null {
   if (!hasStages(def) || response.state !== 'submitted') return null

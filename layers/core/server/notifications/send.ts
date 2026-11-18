@@ -69,7 +69,8 @@ export async function senderFor(topic: string, domain: string): Promise<Sender> 
 }
 
 export async function theatreName(fallback: string): Promise<string> {
-  return (await useSetting('core.site.name') as string | null) ?? fallback
+  // A name left blank is no name: the message still needs somebody to be from.
+  return (await useSetting('core.site.name') as string | null)?.trim() || fallback
 }
 
 async function dedupeKeyFor(typeKey: string, key: string): Promise<string> {
