@@ -201,7 +201,9 @@ export default defineModule({
       // What is kept of a ticket's price when it is cancelled and refunded less the fee.
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
-    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }],
+    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }, { id: 'box-office.order', file: 'order' }],
+    // Orders found by reference or buyer in the command palette.
+    'core.search-source': [{ id: 'box-office.orders', record: 'box-office.order', ability: 'box-office.order.view', route: '/api/box-office/search', shells: ['console'] }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
     'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],

@@ -25,6 +25,14 @@ const fields = [
 ]
 const create = (values: Record<string, unknown>) => $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
 const created = (result: unknown) => navigateTo(`/admin/modules/core/venues/${(result as { venueId: string }).venueId}`)
+// The palette's New venue arrives with ?new=1.
+const route = useRoute()
+onMounted(() => {
+  if (route.query.new !== '1') return
+  creating.value = true
+  const { new: _, ...rest } = route.query
+  void navigateTo({ query: rest }, { replace: true })
+})
 
 // A space the theatre does not run (R-36) is marked in the list.
 const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)

@@ -1,5 +1,6 @@
 {
   "box-office.module.name": "Box office",
+  "box-office.records.order": "Order",
   "box-office.module.description": "Selling tickets: what is on sale and for how much, seats held and sold, reservations paid for at the desk, orders, tickets and the door.",
   "box-office.settings-sections.cancellations": "Cancellations",
   "box-office.settings-sections.presets": "Ticket presets",

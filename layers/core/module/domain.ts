@@ -329,7 +329,22 @@ export const contributes = {
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }, { id: 'core.guidance', file: 'guidance' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
-  'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
+  'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
+  // What the command palette finds by name (H9): each type through its own list's search.
+  'core.search-source': [
+    { id: 'core.productions', record: 'core.production', ability: 'core.production.view', route: '/api/core/search/productions', shells: ['console' as const] },
+    { id: 'core.seasons', record: 'core.season', ability: 'core.production.view', route: '/api/core/search/seasons', shells: ['console' as const] },
+    { id: 'core.venues', record: 'core.venue', ability: 'core.venue.manage', route: '/api/core/search/venues', shells: ['console' as const] },
+    { id: 'core.people', record: 'core.account', ability: 'core.account.read', route: '/api/core/search/people', shells: ['console' as const] },
+  ],
+  // The palette's Do group (M30): where each common act starts. The pages open their form from ?new=1.
+  'core.quick-action': [
+    { id: 'core.new-production', to: '/console/programme/productions?new=1', icon: 'i-lucide-plus', ability: 'core.production.create', keywords: 'core.quick-actions.new-production.keywords' },
+    { id: 'core.add-run', to: '/console/programme/productions?run=1', icon: 'i-lucide-calendar-plus', ability: 'core.performance.schedule', keywords: 'core.quick-actions.add-run.keywords' },
+    { id: 'core.new-venue', to: '/admin/modules/core/venues?new=1', icon: 'i-lucide-building', ability: 'core.venue.manage', keywords: 'core.quick-actions.new-venue.keywords' },
+    { id: 'core.give-role', to: '/console/people/grants?give=1', icon: 'i-lucide-key-round', ability: 'core.grant.manage', keywords: 'core.quick-actions.give-role.keywords' },
+    { id: 'core.invite', to: '/console/people?invite=1', icon: 'i-lucide-user-plus', ability: 'core.account.create', keywords: 'core.quick-actions.invite.keywords' },
+  ],
   // The production page's "Ready to publish?" checklist (R-35).
   'core.record-check': ['summary', 'category', 'effects', 'advisories', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),
   'core.operating-day': [{ id: 'core.performances', table: 'core_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
