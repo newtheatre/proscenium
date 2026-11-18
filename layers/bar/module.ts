@@ -187,6 +187,9 @@ export default defineModule({
       { id: 'bar.sale', file: 'sale' },
     ],
     // The console's Bar group for everyday work; set-up screens are tabs of the bar's page in Admin.
+    // Sizes on sale whose labels are not all read, as a card on the console home for whoever records allergens.
+    'core.count': [{ id: 'bar.allergens-unchecked', file: 'allergens-unchecked' }],
+    'core.home-card': [{ id: 'bar.allergens', home: 'console', ability: 'bar.allergens.manage', component: 'BarAllergensCard', urgency: 'info', count: 'bar.allergens-unchecked' }],
     'core.navigation': [
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },

@@ -67,3 +67,16 @@ test('a stock item\'s label is checked, and the product made from it answers wit
   await expect(page.getByText('May contain: Sulphites')).toBeVisible()
   await noViolations(page)
 })
+
+test.describe('the public chart', () => {
+  test.use({ extraHTTPHeaders: {} })
+
+  test('shows anyone what each item lists, and marks what someone avoids', async ({ page }) => {
+    await visit(page, '/bar/allergens')
+    await expect(page.getByRole('heading', { name: 'Allergens at the bar', level: 1 })).toBeVisible()
+    await noViolations(page)
+    await page.getByLabel('Sulphites').check()
+    await expect(page.getByText('May contain Sulphites').first()).toBeVisible()
+    await noViolations(page)
+  })
+})
