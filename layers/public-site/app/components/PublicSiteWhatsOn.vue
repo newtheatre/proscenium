@@ -1,6 +1,8 @@
 <!-- What's on, for a theatre's own pages: ::whats-on in a content file (part 5, public components).
      Every prop is optional: `limit` shows only the soonest few, with a link to the whole list;
-     `category`, `season` and `venue` take slugs; `layout` is "grid" (the default) or "list". -->
+     `category`, `season` and `venue` take slugs; `layout` is "grid" (the default) or "list".
+     With nothing to list, or the public site still off on a new site, it says nothing is on sale
+     yet, so the page's own "What's on" heading never stands empty. -->
 <script setup lang="ts">
 interface Listing {
   id: string
@@ -28,7 +30,7 @@ const { t } = useT()
 const { range } = useDates()
 const query = computed(() => Object.fromEntries(Object.entries({ limit: props.limit, category: props.category, season: props.season, venue: props.venue }).filter(([, v]) => v !== undefined && v !== '')))
 const key = computed(() => `public-site:whats-on-component:${JSON.stringify(query.value)}`)
-// The public site being off answers "not found"; the component then shows nothing at all.
+// The public site being off answers "not found"; the component then says only that nothing is on sale.
 const { data } = await useAPI<{ productions: Listing[] }>('/api/public-site/productions', { key: key.value, query })
 const productions = computed(() => data.value?.productions ?? [])
 const limited = computed(() => props.limit !== undefined && productions.value.length >= Number(props.limit))
@@ -36,10 +38,7 @@ const list = computed(() => props.layout === 'list')
 </script>
 
 <template>
-  <div
-    v-if="data"
-    class="not-prose"
-  >
+  <div class="not-prose">
     <ul
       v-if="productions.length"
       :class="list ? 'grid gap-4' : 'grid gap-6 sm:grid-cols-2 lg:grid-cols-3'"
@@ -66,7 +65,7 @@ const list = computed(() => props.layout === 'list')
       v-else
       class="text-muted"
     >
-      {{ t('public-site.whats-on.empty') }}
+      {{ t('public-site.whats-on.nothing-on-sale') }}
     </p>
     <UButton
       v-if="limited"
