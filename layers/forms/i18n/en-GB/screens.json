@@ -697,6 +697,8 @@
   "forms.screens.slot.state.paused": "Paused",
   "forms.screens.slot.state.closed": "Closed",
   "forms.screens.slot.state.not-yet": "Not open yet",
+  "forms.screens.slot.new": "Start a new form",
+  "forms.screens.slot.new-help": "Opens the builder. Add or change the questions, publish, then come back here to attach it.",
   "forms.screens.actions.title": "What happened next",
   "forms.screens.actions.then": "Then: {action}",
   "forms.screens.actions.add": "Add something to do next",
@@ -732,6 +734,10 @@
   "forms.screens.templates.questions.one": "{count} question.",
   "forms.screens.templates.questions.other": "{count} questions.",
   "forms.screens.templates.anonymous": "Answers are anonymous unless you change that before publishing.",
+  "forms.screens.templates.record": "It makes a set of custom fields for a record.",
+  "forms.screens.templates.suited": "Made for this place",
+  "forms.screens.templates.blank-fields": "A blank set of fields",
+  "forms.screens.templates.blank-fields-help": "No fields yet. Or choose a template: a working set you then make your own.",
   "forms.screens.templates.remove": "Remove the template {name}",
   "forms.screens.templates.removed": "The template {name} was removed",
   "forms.screens.templates.save": "Save as a template",
@@ -832,5 +838,7 @@
   "forms.screens.calculations.written": "This formula was written as JSON",
   "forms.screens.calculations.written-help": "It uses more than the builder can show, so it is kept as it is. Change it in Form as JSON, or start it again here.",
   "forms.screens.calculations.start-again": "Start again",
-  "forms.screens.calculations.key-help": "The column name in exports. Letters, digits and underscores."
+  "forms.screens.calculations.key-help": "The column name in exports. Letters, digits and underscores.",
+  "forms.screens.fields.create": "Create the set",
+  "forms.screens.fields.new-help": "Opens the builder. Add the questions, publish, then come back here to attach it."
 }

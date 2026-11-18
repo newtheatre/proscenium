@@ -542,7 +542,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
                 <span
                   v-else-if="run.state === 'skipped'"
                   class="block text-muted"
-                >{{ t('forms.screens.actions.skipped-slot') }}</span>
+                >{{ run.detail && run.detail !== 'slot' ? run.detail : t('forms.screens.actions.skipped-slot') }}</span>
               </li>
             </ul>
           </section>

@@ -19,6 +19,7 @@ import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
+import { applyCode, judgeCode, normaliseCode, redeem, type Discounted } from './promo-codes'
 import { availability } from './availability'
 import { salesOf } from './setup'
 
@@ -29,7 +30,8 @@ const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: 
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
-const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional(), email: z.email().max(254).optional(), accountId: z.string().min(1).max(64).optional() }).strict() // not-policy: more kinds of ticket than any performance sells; the longest address; an id
+// `promoCode`, as the buyer gave it (BO-17): applied as it is online, to the dearest tickets first.
+const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional(), email: z.email().max(254).optional(), accountId: z.string().min(1).max(64).optional(), promoCode: z.string().trim().min(1).max(40).optional() }).strict() // not-policy: more kinds of ticket than any performance sells; the longest address; an id; longer than any code
   .refine(sale => !(sale.email && sale.accountId), { message: 'A sale goes to an address or a person, not both.' })
 const id = z.string().min(1).max(64) // not-policy: shape bound
 const exchangeInput = z.object({
@@ -76,6 +78,12 @@ async function deskSale(input: SaleInput, at: number) {
   return pricedLines(input.performanceId, input.lines, at, { channel: 'desk', account: null })
 }
 
+/** What the sale's promo code takes off each ticket, if it has one: refused, saying why, when the code cannot be used. */
+async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], at: number): Promise<(Discounted | null)[]> {
+  if (!input.promoCode) return lines.map(() => null)
+  return applyCode(await judgeCode(input.promoCode, input.performanceId, at), input.performanceId, lines)
+}
+
 /** The panel's lines and amount, for the till to show. Reads only. */
 export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
   const input = panelInput(context.input)
@@ -89,7 +97,11 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
   }
   else {
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
-    lines = (await deskSale(input.sale, nowMs())).lines.map(l => ({ label: names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor }))
+    const at = nowMs()
+    const priced = (await deskSale(input.sale, at)).lines
+    const discounts = await deskDiscounts(input.sale, priced, at)
+    const code = normaliseCode(input.sale.promoCode ?? '')
+    lines = priced.map((l, i) => ({ label: discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor - (discounts[i]?.discountMinor ?? 0) }))
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
@@ -121,7 +133,9 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
   const { pool, lines, currency, guard } = await deskSale(input.sale, at)
-  const totalMinor = lines.reduce((sum, l) => sum + l.amountMinor, 0)
+  const discounts = await deskDiscounts(input.sale, lines, at)
+  const charged = lines.map((l, i) => l.amountMinor - (discounts[i]?.discountMinor ?? 0))
+  const totalMinor = charged.reduce((sum, amount) => sum + amount, 0)
   if (totalMinor <= 0) refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })
   const orderId = newId('ord')
   const holdId = newId('hold')
@@ -138,9 +152,10 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${orderId}, ${actor.accountId ?? null}, ${at}, ${at})`)
   const claimed = (await claimSeats(unit, { holdId, requests: input.sale.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
   guard(unit)
+  const redemptions = redeem(unit, orderId, discounts, claimed)
   unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
-    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null,
+    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: discounts[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
+    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null,
   })))
   unit.expect(lines.length)
   unit.add(sql`UPDATE box_office_orders SET state = 'awaiting_payment', session_id = ${context.sessionId}, sold_by = ${actor.accountId ?? null}, admit_on_payment = ${input.sale.admit ? 1 : 0}, updated_at = ${at}
@@ -379,7 +394,7 @@ export interface DeskPerformance {
   state: string
   currency: string | null
   /** `reference`, on a member price: what the buyer may give instead of the seller checking by hand, worded by its source. */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string } }[]
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }[]
 }
 
 /**
