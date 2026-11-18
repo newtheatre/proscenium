@@ -8,7 +8,8 @@ import type { wheelchairChoice } from '../../server/input'
 type Choice = z.input<typeof wheelchairChoice>
 interface Shown {
   layouts: { id: string, name: string, usual: boolean, spaceName: string | null }[]
-  choice: { layoutId: string | null, wheelchairSpaces: number | null, seatsPerSpace: number | null } | null
+  choice: { layoutId: string | null, wheelchairSpaces: number | null, seatsPerSpace: number | null, seatsBandId: string | null } | null
+  sections: { id: string, name: string }[]
   ownCount: number
 }
 
@@ -24,7 +25,7 @@ const { data, refresh } = await useAPI<Shown>(url, { key: `box-office:run-layout
 const current = computed<Choice>(() => {
   const c = data.value?.choice
   if (!c) return { use: 'inherit' }
-  return c.layoutId ? { use: 'layout', layoutId: c.layoutId } : { use: 'numbers', wheelchairSpaces: c.wheelchairSpaces ?? 0, seatsPerSpace: c.seatsPerSpace ?? 0 }
+  return c.layoutId ? { use: 'layout', layoutId: c.layoutId } : { use: 'numbers', wheelchairSpaces: c.wheelchairSpaces ?? 0, seatsPerSpace: c.seatsPerSpace ?? 0, ...(c.seatsBandId ? { seatsBandId: c.seatsBandId } : {}) }
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
@@ -56,6 +57,7 @@ async function save(choice: Choice) {
       <RefusalNotice :refusal="refusal" />
       <BoxOfficeWheelchairChoice
         :layouts="data.layouts"
+        :sections="data.sections"
         :current="current"
         :inherit-label="t('box-office.layouts.choice.usual')"
         :inherit-description="t('box-office.layouts.choice.usual-description')"

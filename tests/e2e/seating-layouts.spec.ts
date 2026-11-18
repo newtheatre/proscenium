@@ -164,3 +164,18 @@ test('the run types its own numbers on the Tickets tab, and one performance over
   await visit(page, `/console/programme/productions/${productionId}?tab=box-office.production`)
   await expect(page.getByText('1 performance has wheelchair spaces of its own, which this leaves as they are.')).toBeVisible()
 })
+
+test('staff put the seats kept for unbooked spaces on sale early, and keep them back again', async ({ page }) => {
+  await visit(page, `/console/box-office/performances/${performanceId}`)
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
+  await expect(section.getByText(/^2 seats until /)).toBeVisible()
+  await section.getByRole('button', { name: 'Put kept seats on sale now' }).click()
+  const dialog = page.getByRole('alertdialog').or(page.getByRole('dialog'))
+  await expect(dialog).toBeVisible()
+  await noViolations(page)
+  await dialog.getByRole('button', { name: /Put on sale/ }).click()
+  await expect(section.getByText(/^None: let go early, /)).toBeVisible()
+  await section.getByRole('button', { name: 'Keep the seats back again' }).click()
+  await expect(section.getByText(/^2 seats until /)).toBeVisible()
+  await noViolations(page)
+})

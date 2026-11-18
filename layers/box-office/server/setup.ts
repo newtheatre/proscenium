@@ -27,6 +27,8 @@ export interface SalesRecord {
   seatsPerSpace: number | null
   /** Whether the layout or numbers are this performance's own, not its run's or its space's usual. */
   layoutOwn: boolean
+  /** The section a wheelchair space's seats come from; null for the first seating section. */
+  seatsBandId: string | null
 }
 
 /** Whether a layout or typed numbers give the performance its wheelchair spaces. */
@@ -34,9 +36,9 @@ export const laidOut = (sales: SalesRecord | null) => !!sales && (sales.layoutId
 
 export interface Pool { id: string, bandId: string, bandName: string, bandKind: string, capacity: number, claimed: number }
 
-interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null, layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null, layout_own: number }
+interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null, layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null, layout_own: number, seats_band_id: string | null }
 
-const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, paymentTiming: r.payment_timing, layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, layoutOwn: !!r.layout_own })
+const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, paymentTiming: r.payment_timing, layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, layoutOwn: !!r.layout_own, seatsBandId: r.seats_band_id })
 
 export async function salesOf(performanceId: string): Promise<SalesRecord | null> {
   const row = await first<SalesRow>('SELECT * FROM box_office_performance_sales WHERE performance_id = ?', performanceId)

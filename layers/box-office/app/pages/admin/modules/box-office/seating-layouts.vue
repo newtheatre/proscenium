@@ -6,7 +6,7 @@
 import type { z } from 'zod'
 import { layoutInput } from '../../../../../server/input'
 
-interface Layout { id: string, spaceId: string, name: string, seats: number | null, wheelchairSpaces: number, seatsPerSpace: number, usual: boolean }
+interface Layout { id: string, spaceId: string, name: string, seats: number | null, wheelchairSpaces: number, seatsPerSpace: number, seatsSection: string | null, usual: boolean }
 interface Listing { rows: Layout[], spaces: { id: string, name: string, capacity: number | null }[] }
 
 const { t } = useT()
@@ -45,9 +45,11 @@ function describe(l: Layout) {
   const seats = l.seats ?? space?.capacity ?? null
   const parts = [seats === null ? t('box-office.layouts.seats-of-space') : t('box-office.layouts.seats', { count: seats })]
   if (!l.wheelchairSpaces) parts.push(t('box-office.layouts.no-spaces'))
-  else parts.push(l.seatsPerSpace
-    ? t('box-office.layouts.spaces-taking', { spaces: t('box-office.layouts.spaces', { count: l.wheelchairSpaces }), seats: t('box-office.layouts.seats', { count: l.seatsPerSpace }) })
-    : t('box-office.layouts.spaces-apart', { spaces: t('box-office.layouts.spaces', { count: l.wheelchairSpaces }) }))
+  else if (!l.seatsPerSpace) parts.push(t('box-office.layouts.spaces-apart', { spaces: t('box-office.layouts.spaces', { count: l.wheelchairSpaces }) }))
+  else {
+    const taking = t('box-office.layouts.spaces-taking', { spaces: t('box-office.layouts.spaces', { count: l.wheelchairSpaces }), seats: t('box-office.layouts.seats', { count: l.seatsPerSpace }) })
+    parts.push(l.seatsSection ? t('box-office.layouts.from-section', { what: taking, section: l.seatsSection }) : taking)
+  }
   return parts.join(' · ')
 }
 
@@ -55,19 +57,19 @@ type Form = z.input<typeof layoutInput>
 const editing = ref(false)
 const editId = ref<string | null>(null)
 const formRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const form = reactive<Form>({ spaceId: '', name: '', seats: null, wheelchairSpaces: 2, seatsPerSpace: 2 })
+const form = reactive<Form>({ spaceId: '', name: '', seats: null, wheelchairSpaces: 2, seatsPerSpace: 2, seatsSection: null })
 const spaceItems = computed(() => (data.value?.spaces ?? []).map(s => ({ value: s.id, label: s.name })))
 
 function open(l?: Layout) {
   editId.value = l?.id ?? null
   Object.assign(form, l
-    ? { spaceId: l.spaceId, name: l.name, seats: l.seats, wheelchairSpaces: l.wheelchairSpaces, seatsPerSpace: l.seatsPerSpace }
-    : { spaceId: spaceItems.value.length === 1 ? spaceItems.value[0]!.value : '', name: '', seats: null, wheelchairSpaces: 2, seatsPerSpace: 2 })
+    ? { spaceId: l.spaceId, name: l.name, seats: l.seats, wheelchairSpaces: l.wheelchairSpaces, seatsPerSpace: l.seatsPerSpace, seatsSection: l.seatsSection }
+    : { spaceId: spaceItems.value.length === 1 ? spaceItems.value[0]!.value : '', name: '', seats: null, wheelchairSpaces: 2, seatsPerSpace: 2, seatsSection: null })
   formRefusal.value = null
   editing.value = true
 }
 const url = (id: string) => `/api/box-office/seating-layouts/${encodeURIComponent(id)}`
-const bodyOf = (l: Layout | Form) => ({ spaceId: l.spaceId, name: l.name.trim(), seats: l.seats ?? null, wheelchairSpaces: l.wheelchairSpaces, seatsPerSpace: l.seatsPerSpace })
+const bodyOf = (l: Layout | Form) => ({ spaceId: l.spaceId, name: l.name.trim(), seats: l.seats ?? null, wheelchairSpaces: l.wheelchairSpaces, seatsPerSpace: l.seatsPerSpace, seatsSection: l.seatsSection?.trim() || null })
 async function save() {
   const body = bodyOf(form)
   const id = editId.value
@@ -235,6 +237,18 @@ const actions = (l: Layout) => [[
               v-model="form.seatsPerSpace"
               :min="0"
               :max="20"
+            />
+          </UFormField>
+          <UFormField
+            v-if="form.wheelchairSpaces && form.seatsPerSpace"
+            :label="t('box-office.layouts.section-label')"
+            name="seatsSection"
+            :help="t('box-office.layouts.section-help')"
+          >
+            <UInput
+              :model-value="form.seatsSection ?? ''"
+              maxlength="80"
+              @update:model-value="form.seatsSection = String($event) || null"
             />
           </UFormField>
         </UForm>

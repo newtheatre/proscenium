@@ -983,5 +983,15 @@
   "box-office.layouts.run.title": "Wheelchair spaces",
   "box-office.layouts.run.description": "How many wheelchair spaces every performance has, and the seats each takes the place of. A performance can have its own on its set-up.",
   "box-office.layouts.run.own.one": "{count} performance has wheelchair spaces of its own, which this leaves as they are.",
-  "box-office.layouts.run.own.other": "{count} performances have wheelchair spaces of their own, which this leaves as they are."
+  "box-office.layouts.run.own.other": "{count} performances have wheelchair spaces of their own, which this leaves as they are.",
+  "box-office.layouts.from-section": "{what}, from {section}",
+  "box-office.layouts.section-label": "Seats come from the section",
+  "box-office.layouts.section-help": "The name of a show's section here, such as Stalls. Left blank, or where a show has no section by that name, the seats come from its first section.",
+  "box-office.layouts.fact.section": "Seats from",
+  "box-office.layouts.fact.released": "None: let go early, {when}",
+  "box-office.layouts.release.button": "Put kept seats on sale now",
+  "box-office.layouts.release.verb": "Put on sale",
+  "box-office.layouts.release.consequence": "The seats kept for wheelchair spaces not yet booked go on general sale now, before the keep-back time. If they sell, someone who needs a space later may find it cannot be booked.",
+  "box-office.layouts.release.done": "Kept seats are on sale",
+  "box-office.layouts.release.keep": "Keep the seats back again"
 }

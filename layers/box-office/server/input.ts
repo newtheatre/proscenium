@@ -19,6 +19,8 @@ export const layoutInput = z.object({
   seats: z.number().int().min(0).max(100_000).nullable(), // not-policy: a sanity bound, larger than any house
   wheelchairSpaces: z.number().int().min(0).max(500), // not-policy: a sanity bound
   seatsPerSpace: z.number().int().min(0).max(20), // not-policy: a sanity bound on seats taken out for one space
+  // The section of a show here the seats come from, by name; blank for the first seating section.
+  seatsSection: z.string().trim().max(80).nullable().optional().transform(v => v || null), // not-policy: as a section's name
 }).strict()
 
 /**
@@ -33,5 +35,7 @@ export const wheelchairChoice = z.discriminatedUnion('use', [
     use: z.literal('numbers'),
     wheelchairSpaces: z.number().int().min(0).max(500), // not-policy: a sanity bound, as a layout's
     seatsPerSpace: z.number().int().min(0).max(20), // not-policy: a sanity bound, as a layout's
+    // The production's seating section the seats come from; left out, its first.
+    seatsBandId: z.string().min(3).max(40).nullable().optional(), // not-policy: an id's length
   }).strict(),
 ])

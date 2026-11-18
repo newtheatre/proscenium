@@ -8,15 +8,15 @@ import type { wheelchairChoice } from '../../server/input'
 type Choice = z.input<typeof wheelchairChoice>
 interface Layout { id: string, name: string, usual: boolean, spaceName?: string | null }
 
-const props = defineProps<{ layouts: Layout[], current: Choice, inheritLabel: string, inheritDescription: string }>()
+const props = defineProps<{ layouts: Layout[], sections: { id: string, name: string }[], current: Choice, inheritLabel: string, inheritDescription: string }>()
 const emit = defineEmits<{ save: [choice: Choice] }>()
 const { t } = useT()
 
-const state = reactive({ use: 'inherit' as Choice['use'], layoutId: undefined as string | undefined, wheelchairSpaces: 2, seatsPerSpace: 2 })
+const state = reactive({ use: 'inherit' as Choice['use'], layoutId: undefined as string | undefined, wheelchairSpaces: 2, seatsPerSpace: 2, seatsBandId: undefined as string | undefined })
 watch(() => props.current, (c) => {
   state.use = c.use
   state.layoutId = c.use === 'layout' ? c.layoutId : undefined
-  if (c.use === 'numbers') Object.assign(state, { wheelchairSpaces: c.wheelchairSpaces, seatsPerSpace: c.seatsPerSpace })
+  if (c.use === 'numbers') Object.assign(state, { wheelchairSpaces: c.wheelchairSpaces, seatsPerSpace: c.seatsPerSpace, seatsBandId: c.seatsBandId ?? undefined })
 }, { immediate: true })
 
 const ways = computed(() => [
@@ -32,8 +32,10 @@ const items = computed(() => props.layouts.map((l) => {
 function chosen(): Choice | null {
   if (state.use === 'inherit') return { use: 'inherit' }
   if (state.use === 'layout') return state.layoutId ? { use: 'layout', layoutId: state.layoutId } : null
-  return { use: 'numbers', wheelchairSpaces: state.wheelchairSpaces, seatsPerSpace: state.seatsPerSpace }
+  const from = props.sections.length > 1 && state.seatsBandId && state.seatsBandId !== props.sections[0]!.id ? { seatsBandId: state.seatsBandId } : {}
+  return { use: 'numbers', wheelchairSpaces: state.wheelchairSpaces, seatsPerSpace: state.seatsPerSpace, ...from }
 }
+const sectionItems = computed(() => props.sections.map(s => ({ value: s.id, label: s.name })))
 const unchanged = computed(() => JSON.stringify(chosen()) === JSON.stringify(props.current))
 function submit() {
   const choice = chosen()
@@ -94,6 +96,17 @@ function submit() {
           v-model="state.seatsPerSpace"
           :min="0"
           :max="20"
+        />
+      </UFormField>
+      <UFormField
+        v-if="sections.length > 1 && state.seatsPerSpace"
+        :label="t('box-office.layouts.section-label')"
+        name="seatsBandId"
+      >
+        <USelect
+          :model-value="state.seatsBandId ?? sections[0]!.id"
+          :items="sectionItems"
+          @update:model-value="state.seatsBandId = $event"
         />
       </UFormField>
     </div>
