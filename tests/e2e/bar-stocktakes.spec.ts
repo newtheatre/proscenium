@@ -11,7 +11,7 @@ const manager = {
   name: 'Cass Count',
   assurance: 'strong',
   reassertedAt: Date.now(),
-  grants: ['core.settings.manage', 'core.modules.manage', 'bar.stock.manage', 'bar.stock.receive', 'bar.stocktake.approve'].map(grant),
+  grants: ['core.settings.manage', 'core.modules.manage', 'bar.product.manage', 'bar.stock.manage', 'bar.stock.receive', 'bar.stocktake.approve'].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
