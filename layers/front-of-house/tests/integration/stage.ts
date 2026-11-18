@@ -31,6 +31,7 @@ import cancelPost from '../../server/api/front-of-house/shifts/[id]/cancel.post'
 import signUpPost from '../../server/api/front-of-house/shifts/[id]/sign-up.post'
 import shiftGet from '../../server/api/front-of-house/shifts/[id]/index.get'
 import assignPost from '../../server/api/front-of-house/shifts/[id]/assign.post'
+import shiftPeopleGet from '../../server/api/front-of-house/shifts/[id]/people.get'
 import confirmPost from '../../server/api/front-of-house/assignments/[id]/confirm.post'
 import declinePost from '../../server/api/front-of-house/assignments/[id]/decline.post'
 import removePost from '../../server/api/front-of-house/assignments/[id]/remove.post'
@@ -110,6 +111,7 @@ export const handle = server({
   'POST /api/front-of-house/shifts/:id/sign-up': signUpPost,
   'GET /api/front-of-house/shifts/:id': shiftGet,
   'POST /api/front-of-house/shifts/:id/assign': assignPost,
+  'GET /api/front-of-house/shifts/:id/people': shiftPeopleGet,
   'POST /api/front-of-house/assignments/:id/confirm': confirmPost,
   'POST /api/front-of-house/assignments/:id/decline': declinePost,
   'POST /api/front-of-house/assignments/:id/remove': removePost,

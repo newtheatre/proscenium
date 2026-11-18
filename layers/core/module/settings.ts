@@ -91,7 +91,12 @@ export const settings = defineSettings('core', {
   'rate-limits.default': setting.rate({ default: { count: 600, per: '1m' }, change, onChange: 'confirm' }),
   'rate-limits.write': setting.rate({ default: { count: 120, per: '1m' }, change, onChange: 'confirm' }),
   'rate-limits.sign-in': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
-  'rate-limits.sign-in-network': setting.rate({ default: { count: 200, per: '10m' }, change, onChange: 'confirm' }),
+  // Signing in by email and passkey, counted apart (see #kit/ratelimit). One network address may be
+  // a whole students' union on the night bookings open, so its allowance is high; guessing is held
+  // back by the per-address counts and each code's own tries.
+  'rate-limits.sign-in-network': setting.rate({ default: { count: 1000, per: '10m' }, change, onChange: 'confirm' }),
+  'rate-limits.sign-in-link': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
+  'rate-limits.sign-in-code': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
   'rate-limits.public-form': setting.rate({ default: { count: 20, per: '10m' }, change, onChange: 'confirm' }),
   'rate-limits.export': setting.rate({ default: { count: 10, per: '1h' }, change, onChange: 'confirm' }),
   'rate-limits.presented-value': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),

@@ -255,6 +255,9 @@ export const identityContributions = {
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
   'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // The people who decide access scheme applications, made with the site (FH-4). Not an Owner's or
+  // Administrator's by default, so the theatre gives it to whoever runs the scheme.
+  'core.role-preset': [{ id: 'core.access-coordinator', key: 'access-coordinator', name: 'Access coordinator', description: 'Reads and decides access scheme applications.', abilities: ['core.access-scheme.review'] }],
   // The access scheme's screens (ID-38, ID-40). "Offered" is one while the scheme runs, so My
   // account's entry and section hide while it is off; "waiting" sits beside the console's entry.
   'core.count': [

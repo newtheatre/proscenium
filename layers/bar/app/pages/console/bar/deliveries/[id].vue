@@ -1,11 +1,12 @@
 <!-- A delivery (S9). A draft: where it goes, the supplier and the delivery note number, then a line per
      item with packs, loose units and the pack cost if it changed. Receiving it moves the stock in at
      once and is final; a mistake is put right by another delivery, by wastage or at the next count.
-     A received delivery is its record. "new" starts one. A saved draft asks "Has the label changed?"
-     about items whose label is due a fresh look, for someone who records allergens. -->
+     A received delivery is its record. "new" starts one. Pressing Enter in the form saves the draft;
+     receiving is its own button and asks first, naming what will arrive and where. A saved draft
+     asks "Has the label changed?" about items whose label is due a fresh look, for someone who
+     records allergens. -->
 <script setup lang="ts">
-type Unit = 'each' | 'ml' | 'g'
-interface FormItem { id: string, name: string, baseUnit: Unit, packSize: number, packName: string, countUnitSize: number, costMinor: number | null }
+interface FormItem { id: string, name: string, baseUnit: StockUnit, packSize: number, packName: string, countUnitSize: number, costMinor: number | null }
 interface Line { stockItemId: string, packs: number, looseUnits: number, packCostMinor: number | null }
 interface Delivery { id: string, locationId: string, supplierTermId: string | null, supplier: string | null, supplierRef: string | null, state: 'draft' | 'received', createdBy: string, receivedBy: string | null, receivedAt: number | null, createdAt: number, lines: (Line & { quantity: number })[] }
 interface FormData { items: FormItem[], locations: { id: string, name: string }[], suppliers: { id: string, label: string }[] }
@@ -18,6 +19,7 @@ const { money } = await useMoney()
 const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
+const { amount } = useStockAmounts()
 const toast = useToast()
 
 const id = computed(() => route.params.id as string)
@@ -51,13 +53,10 @@ watch(adding, (itemId) => {
 })
 const removeLine = (itemId: string) => { form.value.lines = form.value.lines.filter(l => l.stockItemId !== itemId) }
 
-const number = (n: number, digits = 2) => n.toLocaleString(undefined, { maximumFractionDigits: digits })
 function arriving(line: Line): string {
   const item = itemOf(line.stockItemId)
   if (!item) return ''
-  const quantity = (line.packs || 0) * item.packSize + (line.looseUnits || 0)
-  const base = `${number(quantity, 0)} ${t(`bar.screens.stock.units.${item.baseUnit}`)}`
-  return item.countUnitSize === 1 ? base : t('bar.screens.stock.counted', { count: number(quantity / item.countUnitSize), base })
+  return amount(item, (line.packs || 0) * item.packSize + (line.looseUnits || 0))
 }
 const locationName = computed(() => data.value?.locations.find(l => l.id === form.value.locationId)?.name ?? '')
 
@@ -77,6 +76,26 @@ async function saveDraft(): Promise<string> {
   }
   await $api(`/api/bar/stock/deliveries/${id.value}` as string, { method: 'PATCH', body: body() })
   return id.value
+}
+const formEl = useTemplateRef<{ validate: () => Promise<unknown> }>('formEl')
+// Receiving is final, so it is asked about first, naming what arrives and where.
+async function receive() {
+  try {
+    await formEl.value?.validate()
+  }
+  catch {
+    return
+  }
+  const SHOWN = 6 // not-policy: how many lines the question names before "and more"
+  const what = form.value.lines.slice(0, SHOWN).map(l => `${arriving(l)} ${itemOf(l.stockItemId)?.name ?? ''}`)
+  const more = form.value.lines.length - SHOWN
+  const ok = await confirm({
+    verb: t('bar.screens.deliveries.receive-verb'),
+    thing: t('bar.screens.deliveries.receive-thing', { count: form.value.lines.length, location: locationName.value }),
+    consequence: t('bar.screens.deliveries.receive-consequence', { what: more > 0 ? t('bar.screens.deliveries.and-more', { list: what.join('; '), count: more }) : what.join('; ') }),
+    button: t('bar.screens.deliveries.receive', { count: form.value.lines.length, location: locationName.value }),
+  })
+  if (ok) await run('receive')
 }
 async function run(act: 'save' | 'receive') {
   refusal.value = null
@@ -181,11 +200,12 @@ const title = computed(() => isNew.value
         <UForm
           v-else
           id="bar-delivery"
+          ref="formEl"
           :state="form"
           :validate="validate"
           class="space-y-6"
           novalidate
-          @submit="run('receive')"
+          @submit="run('save')"
         >
           <RefusalNotice :refusal="refusal" />
           <PageSection
@@ -333,17 +353,17 @@ const title = computed(() => isNew.value
     >
       <div class="flex flex-wrap gap-2">
         <UButton
-          type="submit"
-          form="bar-delivery"
           :loading="busy"
           :label="t('bar.screens.deliveries.receive', { count: form.lines.length, location: locationName || t('bar.screens.deliveries.somewhere') })"
+          @click="receive"
         />
         <UButton
+          type="submit"
+          form="bar-delivery"
           color="neutral"
           variant="outline"
           :loading="busy"
           :label="t('bar.screens.deliveries.save-draft')"
-          @click="run('save')"
         />
         <UButton
           v-if="!isNew"

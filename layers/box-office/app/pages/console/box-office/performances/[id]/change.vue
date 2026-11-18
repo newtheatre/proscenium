@@ -14,6 +14,8 @@ interface Change {
   paidMinor: number
   reservations: number
   reservedTickets: number
+  complimentary: number
+  complimentaryBookings: number
   currency: string | null
   decision: Decision | null
   decidedAt: number | null
@@ -80,7 +82,7 @@ const trail = computed(() => [
         <div class="space-y-8">
           <PageSection :title="t('box-office.change.affected')">
             <EmptyState
-              v-if="!d.bookings && !d.reservations"
+              v-if="!d.bookings && !d.reservations && !d.complimentaryBookings"
               :title="t('box-office.change.none.title')"
               :description="t('box-office.change.none.description')"
               icon="i-lucide-ticket"
@@ -88,6 +90,7 @@ const trail = computed(() => [
             <dl
               v-else
               class="grid gap-4 sm:grid-cols-3"
+              :class="d.complimentary ? 'lg:grid-cols-4' : undefined"
             >
               <div>
                 <dt class="text-sm text-muted">
@@ -119,11 +122,22 @@ const trail = computed(() => [
                   {{ t('box-office.change.bookings', { count: d.reservations }) }}
                 </dd>
               </div>
+              <div v-if="d.complimentary">
+                <dt class="text-sm text-muted">
+                  {{ t('box-office.change.complimentary') }}
+                </dt>
+                <dd class="text-2xl font-semibold">
+                  {{ t('box-office.change.tickets', { count: d.complimentary }) }}
+                </dd>
+                <dd class="text-sm text-muted">
+                  {{ t('box-office.change.bookings', { count: d.complimentaryBookings }) }}
+                </dd>
+              </div>
             </dl>
           </PageSection>
 
           <PageSection
-            v-if="d.bookings || d.reservations"
+            v-if="d.bookings || d.reservations || d.complimentaryBookings"
             :title="t('box-office.change.decide')"
             :description="t('box-office.change.decide-help')"
           >

@@ -255,6 +255,9 @@ describe('copying a set-up from another performance', () => {
     const venue = await req('POST', '/api/core/venues', { name: 'Copy venue' })
     const second = await req('POST', `/api/core/productions/${source.productionId}/performances`, { venueId: venue.body.venueId, spaceId: venue.body.spaceId, startsAt: Date.UTC(2027, 3, 1, 19, 30), capacity: 500 })
     await req('POST', `/api/core/performances/${second.body.id}/schedule`, {})
+    // The production's own performance is offered first, ahead of any other production's.
+    const offered = (await req('GET', `/api/box-office/performances/${second.body.id}/sales/sources`)).body.performances
+    expect(offered[0]).toMatchObject({ id: source.performanceId, productionId: source.productionId, sameProduction: true })
     setClock(NOV_16 + 1000)
     await req('POST', `/api/box-office/productions/${source.productionId}/prices`, { prices: [{ bandId: source.bandId, ticketTypeId: source.fullId, performanceId: source.performanceId, amountMinor: 700 }] })
     expect((await copy(second.body.id, source.performanceId)).body).toEqual({ bands: 0, pools: 1, prices: 1 })
