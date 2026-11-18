@@ -40,6 +40,7 @@ export default defineModule({
     'category': { table: 'bar_categories' },
     'stock-item': { table: 'bar_stock_items' },
     'stock-location': { table: 'bar_stock_locations' },
+    'delivery': { table: 'bar_deliveries', owner: 'created_by' },
     'product-preset': { table: 'bar_product_presets' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
@@ -55,6 +56,10 @@ export default defineModule({
     'outlet.manage': ability(),
     // Stock items, where they are kept, and what each size uses up.
     'stock.manage': ability(),
+    // Record deliveries and move stock between locations.
+    'stock.receive': ability(),
+    // Write stock off as wasted, with a reason.
+    'stock.waste': ability(),
     // Use the bar's panel in the till, at an outlet.
     'sale.sell': ability({ on: 'bar.outlet' }),
     // Close an outlet's opening; the person who opened it may close it.
@@ -79,6 +84,8 @@ export default defineModule({
       'bar.opening.closed': event({ version: 1, payload: z.object({ openingId: z.string(), outletId: z.string() }), internal: false }),
       // For the duty manager's night report. Never carries the description.
       'bar.sale.refunded': event({ version: 1, payload: z.object({ saleId: z.string(), refundId: z.string() }), internal: false }),
+      // For a stock report or an outside purchasing system: what arrived where, no person.
+      'bar.delivery.received': event({ version: 1, payload: z.object({ deliveryId: z.string(), locationId: z.string() }), internal: false }),
       'bar.age-check.refused': event({ version: 1, payload: z.object({ ageCheckId: z.string(), openingId: z.string() }), internal: true }),
     },
     // Standard is made when the bar is switched on.
@@ -117,6 +124,24 @@ export default defineModule({
         { slug: 'drunk', label: 'Already drunk' },
         { slug: 'other', label: 'Other' },
       ],
+    }, {
+      id: 'bar.wastage-reason',
+      label: 'Reasons for writing stock off',
+      termClass: 'internal',
+      terms: [
+        { slug: 'broken', label: 'Broken or spilled' },
+        { slug: 'out-of-date', label: 'Out of date' },
+        { slug: 'gone-off', label: 'Gone off' },
+        { slug: 'line-cleaning', label: 'Line cleaning' },
+        { slug: 'staff', label: 'Staff drink' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
+      id: 'bar.supplier',
+      label: 'Bar suppliers',
+      description: 'The businesses the bar buys stock from, named on a delivery.',
+      ordering: 'alphabetical',
+      terms: [],
     }],
     // Drinks paid for at the till, alone or on the same payment as tickets (tab 4).
     'payments.settlement': [{ id: 'bar' }],

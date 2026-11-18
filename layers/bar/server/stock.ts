@@ -238,17 +238,17 @@ export async function setRecipe(unit: UnitView, variantId: string, input: Recipe
   unit.audit({ action: 'update', record: ['bar.product', (await first<{ product_id: string }>('SELECT product_id FROM bar_variants WHERE id = ?', variantId))!.product_id], detail: { recipe: variantId } })
 }
 
-interface Movement { itemId: string, locationId: string, kind: 'sale' | 'sale_reversal', quantity: number, sourceType: string, sourceId: string, key: string, by: string | null }
+export interface Movement { itemId: string, locationId: string, kind: 'sale' | 'sale_reversal' | 'delivery' | 'wastage' | 'transfer_out' | 'transfer_in', quantity: number, reasonTerm?: string | null, sourceType: string, sourceId: string, key: string, by: string | null }
 
 /** Writes movements in one statement whatever their number; one already written (by its key) is passed over. */
-function writeMovements(unit: UnitView, rows: Movement[], at: number): void {
+export function writeMovements(unit: UnitView, rows: Movement[], at: number): void {
   if (!rows.length) return
   unit.add({
     sql: `INSERT INTO bar_stock_movements (id, stock_item_id, location_id, kind, quantity, reason_term, source_type, source_id, idempotency_key, by, at, created_at)
-          SELECT json_extract(j.value, '$.id'), json_extract(j.value, '$.i'), json_extract(j.value, '$.l'), json_extract(j.value, '$.k'), json_extract(j.value, '$.q'), NULL,
+          SELECT json_extract(j.value, '$.id'), json_extract(j.value, '$.i'), json_extract(j.value, '$.l'), json_extract(j.value, '$.k'), json_extract(j.value, '$.q'), json_extract(j.value, '$.r'),
                  json_extract(j.value, '$.st'), json_extract(j.value, '$.s'), json_extract(j.value, '$.key'), json_extract(j.value, '$.by'), ?1, ?1
             FROM json_each(?2) j WHERE true ON CONFLICT (idempotency_key) DO NOTHING`,
-    params: [at, JSON.stringify(rows.map(r => ({ id: newId('bstm'), i: r.itemId, l: r.locationId, k: r.kind, q: r.quantity, st: r.sourceType, s: r.sourceId, key: r.key, by: r.by })))],
+    params: [at, JSON.stringify(rows.map(r => ({ id: newId('bstm'), i: r.itemId, l: r.locationId, k: r.kind, q: r.quantity, r: r.reasonTerm ?? null, st: r.sourceType, s: r.sourceId, key: r.key, by: r.by })))],
   })
 }
 
