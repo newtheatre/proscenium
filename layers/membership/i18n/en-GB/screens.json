@@ -371,8 +371,6 @@
   "membership.screens.mine.show-card": "Show card",
   "membership.screens.mine.valid-until": "Valid until",
   "membership.screens.mine.card-code": "Membership card code",
-  "membership.screens.mine.card-help": "Show this at the door or the desk to be scanned.",
-  "membership.screens.mine.card-no-code": "Show this card at the door or the desk.",
 
   "membership.screens.import.action": "Import members",
   "membership.screens.import.title": "Import members",
