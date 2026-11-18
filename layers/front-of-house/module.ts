@@ -81,9 +81,10 @@ export default defineModule({
 
   // Authority follows the rota (part 3, "The three facts"). Every answer is read from stored times.
   facts: defineFacts('front-of-house', {
-    'on-shift': factDecl({ on: 'core.performance', standing: true }),
-    'leading-shift': factDecl({ on: 'core.performance' }),
-    'rostered': factDecl({ standing: true }),
+    // Each brings the abilities part 7 suggests, mapped when the module is first switched on (FH-4).
+    'on-shift': factDecl({ on: 'core.performance', standing: true, defaults: ['front-of-house.shift.view', 'front-of-house.checklist.complete', 'front-of-house.incident.report'] }),
+    'leading-shift': factDecl({ on: 'core.performance', defaults: ['front-of-house.assignment.check-in', 'front-of-house.night-report.sign-off'] }),
+    'rostered': factDecl({ standing: true, defaults: ['front-of-house.emergency-card.view'] }),
   }),
 
   tables,
@@ -173,6 +174,11 @@ export default defineModule({
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
     'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
     'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
+    // The roles part 7 suggests, made when the module is first switched on (FH-4).
+    'core.role-preset': [
+      { id: 'front-of-house.volunteer', key: 'volunteer', name: 'Volunteer', description: 'Signs up for shifts, reports incidents and opens the emergency card.', abilities: ['front-of-house.shift.sign-up', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], opensMembersArea: true },
+      { id: 'front-of-house.manager', key: 'front-of-house-manager', name: 'Front of house manager', description: 'Runs the rota, duties and checklists, reviews incidents and reads night reports and hours.', abilities: ['front-of-house.shift.manage', 'front-of-house.checklist.manage', 'front-of-house.duty.manage', 'front-of-house.incident.manage', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view', 'front-of-house.hours.view', 'front-of-house.emergency-card.view'], opensMembersArea: true },
+    ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],

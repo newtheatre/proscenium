@@ -192,5 +192,6 @@
   "awards.roll.title": "Roll of honour",
   "awards.roll.description": "The people the theatre has honoured.",
   "awards.roll.empty": "No awards are listed yet.",
-  "awards.roll.not-found": "There is nothing here."
+  "awards.roll.not-found": "There is nothing here.",
+  "awards.facts.type-holder.label": "Holds a current award of this type"
 }
