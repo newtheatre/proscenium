@@ -388,6 +388,8 @@ test.describe('the box office console', () => {
 
   test('a ticket preset is made with typed prices, with sections, and made the theatre\'s usual', async ({ page }) => {
     const name = `Preset ${stamp}`
+    // The theatre's usual preset is put back after, so shows set up by later tests start as before.
+    const usual = (await (await page.request.get('/api/box-office/ticket-presets')).json()).usual as string | null
     await visit(page, '/admin/modules/box-office/ticket-presets')
     // Someone without Admin sees it in the settings window over the console.
     await expect(page.getByRole('heading', { name: 'Ticket presets' }).first()).toBeVisible()
@@ -406,6 +408,8 @@ test.describe('the box office console', () => {
     await page.getByRole('menuitem', { name: 'Make it the theatre\'s usual' }).click()
     await expect(page.getByText('The theatre\'s usual').first()).toBeVisible()
     await noViolations(page)
+    const restored = await page.request.put('/api/core/settings', { data: { changes: [{ key: 'box-office.presets.usual', value: usual }], confirm: true }, headers: key() })
+    expect(restored.ok(), await restored.text()).toBe(true)
   })
 
   test('a promo code is made, limited and retired, and Undo brings it back', async ({ page }) => {
