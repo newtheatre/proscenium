@@ -299,6 +299,36 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   return { reference }
 }
 
+/**
+ * Sends a response on a place, with every check the public route makes (FB-301, FB-302): a repeat
+ * of the same submission stores nothing and gets the same reply; an id that is somebody else's
+ * reads as no response; the place must be open to this person now; the answers must fit the size
+ * limit; somebody signed out gives an address unless the form is anonymous. Then the response is
+ * written in the caller's unit by writeSubmission. Shared by POST /api/forms/open/:slug/responses
+ * and the addResponse service another module calls.
+ */
+export async function sendResponse(unit: UnitView, input: { form: FormRow, version: VersionRow, link: LinkRow, actor: Actor, responseId: string, answers: Answers, email: string | null, at: number }): Promise<{ responseId: string, reference: string }> {
+  const { form, link, actor } = input
+  const existing = await getResponse(input.responseId)
+  const theirs = existing ? await owns(existing, actor) : false
+  if (existing) {
+    // Sent before: the same reply, and nothing written. A signed-out person's is known by the address it carried.
+    const same = existing.formId === form.id && (theirs || (!existing.personId && !actor.accountId && existing.respondentEmail === (form.anonymous ? null : input.email)))
+    if (existing.state === 'submitted' && same) return { responseId: existing.id, reference: existing.reference }
+    // Somebody else's id reads the same as one that was never an id.
+    if (!(existing.state === 'draft' && theirs && existing.formId === form.id)) return refuse('forms.response.not-found', 'There is no response here.', { status: 404 }) // not-policy: HTTP status
+  }
+
+  const why = await shut(form, link, actor, input.at)
+  if (why) refuseShut(why)
+  if (JSON.stringify(input.answers).length > await answersLimit()) return refuse('forms.response.too-large', 'These answers are too long to send.', { status: 413 }) // not-policy: HTTP status
+  if (!form.anonymous && !actor.accountId && !input.email)
+    return refuse('forms.response.email-needed', 'Give an email address so we know who these answers are from.', { status: 422, fields: { email: 'forms.response.email-needed' } }) // not-policy: HTTP status
+
+  const { reference } = await writeSubmission(unit, { responseId: input.responseId, form, version: input.version, link, actor, email: input.email, answers: input.answers, draft: existing, at: input.at })
+  return { responseId: input.responseId, reference }
+}
+
 // ---- reading answers back ----
 
 export interface StoredAnswer {
