@@ -20,13 +20,16 @@ interface Scan {
   unchecked?: boolean
   ticketId?: string
   overridable?: boolean
+  ticketPerformance?: DoorElsewhere
+  reference?: string
 }
 interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number }
 type Tone = 'success' | 'warning' | 'info' | 'error'
 interface Shown { tone: Tone, icon: string, headline: string, line: string, at: number, override?: { ticketId: string, ticketType: string, reason: string | null } }
 interface Term { id: string, label: string }
 
-const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'info' }
+// Another performance's ticket is ours, so it is amber, with the show and time to tell them (D1).
+const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info' }
 const ICONS: Record<Tone, string> = { success: 'i-lucide-circle-check', warning: 'i-lucide-circle-alert', info: 'i-lucide-hand-coins', error: 'i-lucide-circle-x' }
 // The banner's colours: strong enough to read across a foyer, with text that passes contrast on each.
 const BANNER: Record<Tone, string> = { success: 'bg-success text-inverted', warning: 'bg-warning text-inverted', info: 'bg-info text-inverted', error: 'bg-error text-inverted' }
@@ -39,6 +42,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { time } = useDates()
 const { money } = await useMoney()
+const elsewhere = useDoorElsewhere()
 const online = useOnline()
 const route = useRoute()
 const id = computed(() => String(route.params.performance))
@@ -73,6 +77,9 @@ function describe(out: Scan): Shown {
   else if (out.result === 'requirement_not_met' && out.requirement?.reason) {
     line = t('box-office.live-door.line.requirement_not_met', { type: out.requirement.ticketType, reason: out.requirement.reason })
   }
+  else if (out.result === 'wrong_performance') {
+    line = elsewhere(out.ticketPerformance, data.value?.performance.startsAt)
+  }
   else if (out.result === 'already_admitted' && out.booking && out.admittedAt) {
     line = t('box-office.live-door.line.already_admitted', { when: time(out.admittedAt), reference: out.booking.reference })
   }
@@ -99,6 +106,12 @@ async function scan(code: string) {
   }
   try {
     const out = await $api<Scan>(`${base.value}/scan`, { method: 'POST', body: { code: code.trim() } })
+    // A paid booking's reference for tonight: the list finds it, and its tickets are admitted there.
+    if (out.result === 'reference' && out.reference) {
+      query.value = out.reference
+      finding.value = true
+      return
+    }
     show(describe(out))
     if (out.result === 'admitted') await refresh()
   }
