@@ -95,6 +95,8 @@ export default defineModule({
     }),
     // Something a module does once a response has taken a move, such as issuing the award.
     'forms.outcome-action': point({ kind: 'code', contract: 'outcome-action' }),
+    // A ready-made form a module ships, such as a nomination for an award: offered in New form, and first where its slot is filled.
+    'forms.template': point({ kind: 'code', contract: 'template' }),
   },
 
   jobs: {

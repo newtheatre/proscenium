@@ -48,6 +48,7 @@ export const promoInput = z.object({
   productionId: z.string().min(3).max(40).nullable().optional(), // not-policy: an id
   performanceId: idSchema('perf').nullable().optional(),
   ticketTypeId: idSchema('tty').nullable().optional(),
+  bandId: idSchema('band').nullable().optional(),
   maxUses: z.number().int().min(1).max(1_000_000).nullable().optional(), // not-policy: a sanity bound
   maxPerOrder: z.number().int().min(1).max(500).nullable().optional(), // not-policy: the desk cap's own ceiling
   validFrom: z.number().int().positive().nullable().optional(),
@@ -61,6 +62,13 @@ export async function listPromoCodes(): Promise<PromoCode[]> {
 }
 
 async function checked(input: PromoInput): Promise<PromoInput & { code: string }> {
+  // A part of the house is a production's own, so a code limited to one is limited to its production too.
+  if (input.bandId) {
+    const band = await first<{ production_id: string }>('SELECT production_id FROM box_office_bands WHERE id = ?', input.bandId)
+    if (!band) refuse('box-office.band.not-found', 'There is no such part of the house.', { status: 422, fields: { bandId: 'Choose another.' } })
+    if (input.productionId && band.production_id !== input.productionId) refuse('box-office.promo.scope', 'That part of the house is not of that production.', { status: 422, fields: { bandId: 'Not of this production.' } })
+    input = { ...input, productionId: band.production_id }
+  }
   if (input.effect === 'percent_off' && (input.value < 1 || input.value > 10000)) // not-policy: basis points, 1 to 100 per cent
     refuse('box-office.promo.percent', 'A percentage off is between 1 and 100.', { status: 422, fields: { value: 'Between 1 and 100.' } })
   if (input.effect === 'amount_off' && input.value < 1) refuse('box-office.promo.amount', 'An amount off is more than nothing.', { status: 422, fields: { value: 'More than nothing.' } })
@@ -82,8 +90,8 @@ export async function createPromoCode(unit: UnitView, input: PromoInput, actorId
   if (await first('SELECT 1 FROM box_office_promo_codes WHERE code = ?', c.code)) refuse(TAKEN.code, TAKEN.reason, { status: 409, fields: TAKEN.fields })
   const id = newId('prm')
   const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_promo_codes (id, code, effect, value, production_id, performance_id, ticket_type_id, max_uses, max_per_order, valid_from, valid_until, active, note, created_by, created_at, updated_at)
-    SELECT ${id}, ${c.code}, ${c.effect}, ${c.value}, ${c.productionId ?? null}, ${c.performanceId ?? null}, ${c.ticketTypeId ?? null}, ${c.maxUses ?? null}, ${c.maxPerOrder ?? null}, ${c.validFrom ?? null}, ${c.validUntil ?? null}, 1, ${c.note ?? null}, ${actorId}, ${at}, ${at}
+  unit.add(sql`INSERT INTO box_office_promo_codes (id, code, effect, value, production_id, performance_id, ticket_type_id, band_id, max_uses, max_per_order, valid_from, valid_until, active, note, created_by, created_at, updated_at)
+    SELECT ${id}, ${c.code}, ${c.effect}, ${c.value}, ${c.productionId ?? null}, ${c.performanceId ?? null}, ${c.ticketTypeId ?? null}, ${c.bandId ?? null}, ${c.maxUses ?? null}, ${c.maxPerOrder ?? null}, ${c.validFrom ?? null}, ${c.validUntil ?? null}, 1, ${c.note ?? null}, ${actorId}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_promo_codes WHERE code = ${c.code})`).expect(1, TAKEN)
   unit.audit({ action: 'create', record: ['box-office.promo-code', id] })
   return id
@@ -97,7 +105,7 @@ export async function updatePromoCode(unit: UnitView, id: string, input: PromoIn
   if (c.maxUses !== null && c.maxUses !== undefined && c.maxUses < now.used)
     refuse('box-office.promo.below-used', `This code has been used ${now.used} times, so its limit cannot go below that.`, { status: 422, fields: { maxUses: `At least ${now.used}.` } })
   unit.add(sql`UPDATE box_office_promo_codes SET code = ${c.code}, effect = ${c.effect}, value = ${c.value}, production_id = ${c.productionId ?? null}, performance_id = ${c.performanceId ?? null},
-    ticket_type_id = ${c.ticketTypeId ?? null}, max_uses = ${c.maxUses ?? null}, max_per_order = ${c.maxPerOrder ?? null}, valid_from = ${c.validFrom ?? null}, valid_until = ${c.validUntil ?? null},
+    ticket_type_id = ${c.ticketTypeId ?? null}, band_id = ${c.bandId ?? null}, max_uses = ${c.maxUses ?? null}, max_per_order = ${c.maxPerOrder ?? null}, valid_from = ${c.validFrom ?? null}, valid_until = ${c.validUntil ?? null},
     note = ${c.note ?? null}, updated_at = ${nowMs()}
     WHERE id = ${id} AND NOT EXISTS (SELECT 1 FROM box_office_promo_codes WHERE code = ${c.code} AND id <> ${id})
       AND (${c.maxUses ?? null} IS NULL OR used <= ${c.maxUses ?? null})`).expect(1, TAKEN)
