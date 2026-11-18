@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
+import { bookingSchema } from './shared/import-booking'
 
 const change = 'box-office.settings.manage'
 const performance = z.object({ performanceId: z.string() })
@@ -91,6 +92,8 @@ export default defineModule({
     // Exchanging a paid ticket for a cheaper one also needs order.refund, for the difference.
     'order.exchange': ability({ on: 'box-office.order', owner: 'refuses', implies: ['order.view'] }),
     'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
+    // Bringing in bookings from another system, for a theatre moving here part-way through a season.
+    'order.import': ability({ risk: 'privileged' }),
     // The door finds a booking by the buyer's name as well as by its reference.
     'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
     // Sales reports, by grant on a production for a visiting company's manager.
@@ -165,6 +168,8 @@ export default defineModule({
   jobs: {
     // One booking of a decision to refund everyone, so a refund that fails is retried and listed without holding up the rest.
     'box-office.cancel-order': job({ payload: z.object({ orderId: z.string(), performanceId: z.string(), what: z.string() }), retries: 8 }),
+    // A share of an import of bookings from another system, on the bulk lane so a large file never holds up the prompt one.
+    'box-office.import-bookings': job({ payload: z.object({ importId: z.string(), bookings: z.array(bookingSchema) }), lane: 'bulk' }),
   },
 
   tasks: {
