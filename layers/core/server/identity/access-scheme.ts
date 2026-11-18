@@ -5,7 +5,7 @@
 // person has switched on, through accessNeedsFor, which audits every read and answers nothing,
 // the same way, whatever the reason.
 import type { H3Event } from 'h3'
-import { all, can, first, isEnabled, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
+import { all, can, createUnit, first, isEnabled, log, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { notify } from '../notifications/notify'
 import { notifyAddress } from '../notifications/send'
 import { getTerm, listTerms } from '../vocabularies/service'
@@ -72,6 +72,8 @@ export interface Purpose {
   note?: boolean
   on?: string
   agreedOnApplying?: boolean
+  fixed?: boolean
+  onForExisting?: string
 }
 
 const NOT_FOUND = (): never => refuse('core.not-found', 'There is no such page.', { status: 404 })
@@ -288,18 +290,55 @@ export async function sharingOf(accountId: string, actor: Actor) {
   for (const { module, value } of await purposes()) {
     if (!(await isEnabled(module))) continue
     if (value.side === 'members' && !(await hasStanding(actor))) continue
-    out.push({ id: value.id, label: value.label, explanation: value.explanation, on: on.has(value.id), fixed: !!value.agreedOnApplying })
+    out.push({ id: value.id, label: value.label, explanation: value.explanation, on: on.has(value.id), fixed: !!value.fixed })
   }
   return out
 }
 
-export async function setSharing(unit: UnitView, actor: Actor, accountId: string, purposeId: string, on: boolean): Promise<void> {
+export async function setSharing(unit: UnitView, actor: Actor, accountId: string, purposeId: string, on: boolean, options: { onForExisting?: boolean } = {}): Promise<void> {
   const purpose = (await sharingOf(accountId, actor)).find(p => p.id === purposeId)
   if (!purpose) refuse('core.not-found', 'There is no such use.', { status: 404 })
   if (purpose.fixed && !on && (await profileOf(accountId))) refuse('core.access.share-fixed', 'The box office always sees your arrangements while you are on the scheme.', { status: 409, remedy: 'Leave the scheme to stop it.' })
   if (on) unit.add({ sql: 'INSERT OR IGNORE INTO core_access_shares (account_id, purpose, created_at) VALUES (?, ?, ?)', params: [accountId, purposeId, nowMs()] })
   else unit.add({ sql: 'DELETE FROM core_access_shares WHERE account_id = ? AND purpose = ?', params: [accountId, purposeId] })
-  unit.audit({ action: 'update', record: ['core.account', accountId], detail: { accessShare: purposeId, on } })
+  unit.audit({ action: 'update', record: ['core.account', accountId], detail: { accessShare: purposeId, on, ...(options.onForExisting ? { onForExisting: true } : {}) } })
+}
+
+const SWITCHED_ON: Actor = { kind: 'system' }
+
+/**
+ * Switches a purpose that asks for it (onForExisting) on for the people already accepted on the
+ * scheme who have made no choice about it, and tells each of them once by the purpose's message. A
+ * person with a share row, or who has ever switched the purpose on or off (an audited choice), is
+ * left alone, as is an account that is locked, erased or merged. Each person is their own unit,
+ * written through setSharing like a switch in My account, so a run that stops part way is picked up
+ * where it stopped. At most `limit` people a run; `done` says nobody is left to reach.
+ */
+export async function switchOnForExisting(purposeId: string, limit = 100): Promise<{ switchedOn: number, done: boolean }> { // not-policy: a run's share of the work
+  const found = (await purposes()).find(p => p.value.id === purposeId)
+  const message = found?.value.onForExisting
+  if (!found || !message || !(await isEnabled(found.module))) return { switchedOn: 0, done: true }
+  const people = await all<{ id: string }>(
+    `SELECT a.id FROM core_access_profiles p JOIN core_accounts a ON a.id = p.account_id
+      WHERE p.status = 'accepted' AND a.disabled_at IS NULL AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM core_access_shares s WHERE s.account_id = a.id AND s.purpose = ?)
+        AND NOT EXISTS (SELECT 1 FROM core_audit u WHERE u.record_type = 'core.account' AND u.record_id = a.id AND json_valid(u.detail) AND json_extract(u.detail, '$.accessShare') = ?)
+      ORDER BY a.id LIMIT ?`, purposeId, purposeId, limit) // exact-account: a profile and its shares belong to the living account
+  let switchedOn = 0
+  for (const { id } of people) {
+    try {
+      const unit = createUnit()
+      await setSharing(unit, SWITCHED_ON, id, purposeId, true, { onForExisting: true })
+      await notify(unit, message, { to: id, dedupeKey: `${purposeId}:on-for-existing` })
+      await unit.commit()
+      switchedOn++
+    }
+    catch (error) {
+      log.error('core.access.on-for-existing-failed', { purpose: purposeId, accountId: id, error: String((error as Error)?.message ?? error) })
+    }
+  }
+  // A full page where nobody could be switched on would come back every run: stop there, logged above.
+  return { switchedOn, done: people.length < limit || switchedOn === 0 }
 }
 
 /**

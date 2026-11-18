@@ -1,9 +1,9 @@
 // The access scheme (ID-38 to ID-44).
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fact, requirements } from '#kit'
 import { createUnit } from '#kit/unit'
 import { Browser, deliver, env, grantDirectly, leaveIdentity, reset, setSetting, clearSetting, staff, useIdentity } from './helpers'
-import { inContext, rows } from '../../../../../tests/integration/helpers'
+import { inContext, rows, setModule } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { countOf } from '../../../server/interface/counts'
 import { accessNeedsFor, sweepAccessScheme } from '../../../server/identity/access-scheme'
@@ -444,5 +444,105 @@ describe('changing, confirming and leaving (ID-42, ID-44)', () => {
       await unit.commit()
     })
     expect(await rows('SELECT count(*) AS n FROM core_access_profiles WHERE account_id = ?', accountId)).toEqual([{ n: 0 }])
+  })
+})
+
+describe('switching on-the-night sharing on for people already on the scheme', () => {
+  const PURPOSE = 'box-office.on-the-night'
+  const SUBJECT = 'The duty manager can now see the help you need'
+
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM core_module_defaults').run()
+    // A site past setup, with box office on.
+    const [owner] = await rows<{ id: string }>('SELECT id FROM core_roles WHERE key = \'owner\'')
+    const { accountId } = await staff()
+    await grantDirectly(accountId, [], owner ? { roleId: owner.id } : { roleKey: 'owner' })
+    await setModule('box-office', true)
+  })
+  afterEach(() => setModule('box-office', false))
+
+  const runTask = async () => {
+    const task = (await import('../../../server/tasks/module-defaults')).default
+    await inContext(() => (task as unknown as () => Promise<void>)(), { kind: 'job' })
+  }
+  const shared = async (accountId: string) => (await rows('SELECT 1 AS n FROM core_access_shares WHERE account_id = ? AND purpose = ?', accountId, PURPOSE)).length > 0
+
+  /** Somebody accepted on the scheme before the purpose shipped: no choice recorded for it. */
+  async function memberFromBefore() {
+    const person = await applicant()
+    await person.browser.post('/api/core/me/access', { needs: [{ term: person.need.crowds, note: 'Quiet corner' }], companions: 0 })
+    const desk = await reviewer()
+    expect((await desk.browser.post(`/api/core/access-scheme/${person.accountId}/decision`, { action: 'accept' })).status).toBe(200)
+    await env.DB.prepare('DELETE FROM core_access_shares WHERE account_id = ? AND purpose = ?').bind(person.accountId, PURPOSE).run()
+    await deliver()
+    sent.length = 0
+    return person
+  }
+
+  it('switches it on for a member with no choice, through the audited write, and emails them once', async () => {
+    const { browser, accountId, mine } = await memberFromBefore()
+    await setSetting('core.site.origin', 'https://theatre.example.org')
+    try {
+      await runTask()
+      await deliver()
+    }
+    finally {
+      await clearSetting('core.site.origin')
+    }
+    expect(await shared(accountId)).toBe(true)
+    const [audit] = await rows<{ detail: string }>('SELECT detail FROM core_audit WHERE record_type = \'core.account\' AND record_id = ? AND json_extract(detail, \'$.accessShare\') = ?', accountId, PURPOSE)
+    expect(JSON.parse(audit!.detail)).toMatchObject({ accessShare: PURPOSE, on: true, onForExisting: true })
+    expect(to(mine).map(e => e.subject)).toEqual([SUBJECT])
+    expect(to(mine)[0]!.text).toMatch(/switch it off at any time/)
+    // The button to My account, where the switch is (EM-1).
+    expect(to(mine)[0]!.html).toContain('href="https://theatre.example.org/account/access"')
+    expect(to(mine)[0]!.html).toContain('>Open my account</a>')
+    expect(to(mine)[0]!.text).toContain('Open my account: https://theatre.example.org/account/access')
+    expect(to(mine)[0]!.text).not.toMatch(/crowds|quiet corner/i)
+    expect(await rows('SELECT kind, key FROM core_module_defaults WHERE module_id = \'box-office\' AND kind = \'purpose\'')).toEqual([{ kind: 'purpose', key: PURPOSE }])
+    // The person sees it on, and can switch it off.
+    expect((await browser.get('/api/core/me/access')).body.sharing).toEqual(expect.arrayContaining([expect.objectContaining({ id: PURPOSE, on: true, fixed: false })]))
+    expect((await browser.put('/api/core/me/access/sharing', { purpose: PURPOSE, on: false })).status).toBe(200)
+    expect(await shared(accountId)).toBe(false)
+  })
+
+  it('leaves alone a member who switched it off', async () => {
+    const { browser, accountId, mine } = await memberFromBefore()
+    await browser.put('/api/core/me/access/sharing', { purpose: PURPOSE, on: true })
+    await browser.put('/api/core/me/access/sharing', { purpose: PURPOSE, on: false })
+    await runTask()
+    expect(await shared(accountId)).toBe(false)
+    await deliver()
+    expect(to(mine)).toEqual([])
+  })
+
+  it('running again does nothing, even for a member it reached who has since switched it off', async () => {
+    const first = await memberFromBefore()
+    await runTask()
+    await deliver()
+    expect(to(first.mine).map(e => e.subject)).toEqual([SUBJECT])
+    await first.browser.put('/api/core/me/access/sharing', { purpose: PURPOSE, on: false })
+    // Somebody accepted without the share after the run (as if added by hand) is not reached either: it ran once.
+    const later = await memberFromBefore()
+    await runTask()
+    await runTask()
+    expect(await shared(first.accountId)).toBe(false)
+    expect(await shared(later.accountId)).toBe(false)
+    await deliver()
+    expect(to(first.mine)).toEqual([])
+    expect(to(later.mine)).toEqual([])
+  })
+
+  it('leaves alone people not on the scheme, waiting on it, or whose account is locked', async () => {
+    const outsider = await applicant()
+    const waiting = await applicant()
+    await waiting.browser.post('/api/core/me/access', { needs: [{ term: waiting.need.standing }], companions: 0 })
+    await env.DB.prepare('DELETE FROM core_access_shares WHERE account_id = ?').bind(waiting.accountId).run()
+    const locked = await memberFromBefore()
+    await env.DB.prepare('UPDATE core_accounts SET disabled_at = ?, disabled_reason = \'security\' WHERE id = ?').bind(Date.now(), locked.accountId).run()
+    await runTask()
+    for (const person of [outsider, waiting, locked]) expect(await shared(person.accountId)).toBe(false)
+    await deliver()
+    for (const person of [outsider, waiting, locked]) expect(to(person.mine)).toEqual([])
   })
 })
