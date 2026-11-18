@@ -17,7 +17,7 @@ const toast = useToast()
 const id = computed(() => String(route.params.id))
 interface RecipeLine { id: string, stockItemId: string | null, choiceGroupId: string | null, quantity: number }
 interface StockItem { id: string, name: string, baseUnit: 'each' | 'ml' | 'g' }
-const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], groups: { id: string, name: string, source: 'options' | 'mixers' }[], lists: List[], canPrice: boolean, canAllergens: boolean, canStock: boolean, recipes: Record<string, RecipeLine[]>, stockItems: StockItem[] }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
+const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], groups: { id: string, name: string, source: 'options' | 'mixers', unit: StockItem['baseUnit'] | null }[], lists: List[], canPrice: boolean, canAllergens: boolean, canStock: boolean, recipes: Record<string, RecipeLine[]>, stockItems: StockItem[] }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/admin/modules/bar/products' }])
@@ -170,30 +170,47 @@ async function saveAllergens() {
 
 // A size's recipe: what selling one uses up. A line is a stock item, or one of the product's choices,
 // where the option picked supplies the item (a mixer choice counts servings of the mixer's own recipe).
+// A recipe reads as people say it: "25 ml of the chosen spirit, 1 serving of the chosen mixer".
 type Draft = { what: string, quantity: number | null }
 const recipeOf = ref<{ variant: Variant, lines: Draft[] } | null>(null)
+const groupOf = (ref: string) => data.value?.groups.find(g => g.id === ref)
+// "the chosen spirit": a choice's name in the middle of a sentence, unless it is an acronym.
+const lowered = (name: string) => /^[A-Z][a-z]/.test(name) ? name[0]!.toLowerCase() + name.slice(1) : name
 const whatItems = computed(() => [
   ...(data.value?.stockItems ?? []).map(i => ({ value: `i:${i.id}`, label: i.name })),
-  ...(data.value?.groups ?? []).filter(g => data.value!.product.groupIds.includes(g.id)).map(g => ({ value: `g:${g.id}`, label: t('bar.screens.product.recipe-choice', { name: g.name }) })),
+  ...(data.value?.groups ?? []).filter(g => data.value!.product.groupIds.includes(g.id)).map(g => ({ value: `g:${g.id}`, label: t('bar.screens.product.recipe-chosen', { name: lowered(g.name) }) })),
 ])
+const whatName = (what: string) => whatItems.value.find(w => w.value === what)?.label ?? ''
 function unitOf(what: string): string {
   const [kind, ref] = [what.slice(0, 1), what.slice(2)]
   if (kind === 'i') return t(`bar.screens.stock.units.${data.value?.stockItems.find(i => i.id === ref)?.baseUnit ?? 'each'}`)
-  return data.value?.groups.find(g => g.id === ref)?.source === 'mixers' ? t('bar.screens.product.recipe-servings') : t('bar.screens.product.recipe-measure')
+  const group = groupOf(ref)
+  if (group?.source === 'mixers') return t('bar.screens.product.recipe-servings')
+  return group?.unit ? t(`bar.screens.stock.units.${group.unit}`) : t('bar.screens.product.recipe-measure')
 }
+function lineText(what: string, quantity: number): string {
+  if (what.startsWith('g:') && groupOf(what.slice(2))?.source === 'mixers')
+    return t('bar.screens.product.recipe-line-servings', { count: quantity, name: whatName(what) })
+  return t('bar.screens.product.recipe-line', { amount: `${quantity} ${unitOf(what)}`, name: whatName(what) })
+}
+const whatOf = (l: RecipeLine) => l.stockItemId ? `i:${l.stockItemId}` : `g:${l.choiceGroupId}`
 function recipeText(v: Variant): string {
   const lines = data.value?.recipes[v.id] ?? []
   if (!lines.length) return t('bar.screens.product.recipe-none')
-  return lines.map((l) => {
-    const what = l.stockItemId ? `i:${l.stockItemId}` : `g:${l.choiceGroupId}`
-    const name = l.stockItemId ? data.value!.stockItems.find(i => i.id === l.stockItemId)?.name : t('bar.screens.product.recipe-choice', { name: data.value!.groups.find(g => g.id === l.choiceGroupId)?.name ?? '' })
-    return `${l.quantity} ${unitOf(what)} · ${name}`
-  }).join(', ')
+  return lines.map(l => lineText(whatOf(l), l.quantity)).join(', ')
 }
 function editRecipe(v: Variant) {
   refusal.value = null
-  const lines = (data.value?.recipes[v.id] ?? []).map(l => ({ what: l.stockItemId ? `i:${l.stockItemId}` : `g:${l.choiceGroupId}`, quantity: l.quantity as number | null }))
+  const lines = (data.value?.recipes[v.id] ?? []).map(l => ({ what: whatOf(l), quantity: l.quantity as number | null }))
   recipeOf.value = { variant: v, lines: lines.length ? lines : [{ what: '', quantity: null }] }
+}
+// Copy another size's recipe in, to change from there: a Double from the Single.
+const copyItems = computed(() => (data.value?.product.variants ?? [])
+  .filter(v => v.id !== recipeOf.value?.variant.id && (data.value?.recipes[v.id]?.length ?? 0) > 0)
+  .map(v => ({ value: v.id, label: v.name })))
+function copyFrom(variantId: string) {
+  if (!recipeOf.value) return
+  recipeOf.value.lines = (data.value?.recipes[variantId] ?? []).map(l => ({ what: whatOf(l), quantity: l.quantity as number | null }))
 }
 async function saveRecipe() {
   const r = recipeOf.value!
@@ -555,6 +572,7 @@ function planned(v: Variant, l: List): string | null {
       :open="!!recipeOf"
       :title="recipeOf ? t('bar.screens.product.recipe-title', { size: recipeOf.variant.name }) : ''"
       :description="t('bar.screens.product.recipe-help')"
+      :ui="{ content: 'sm:max-w-2xl' }"
       @update:open="v => { if (!v) recipeOf = null }"
     >
       <template #body>
@@ -573,6 +591,20 @@ function planned(v: Variant, l: List): string | null {
           >
             {{ t('bar.screens.product.recipe-no-items') }}
           </p>
+          <UFormField
+            v-if="copyItems.length"
+            :label="t('bar.screens.product.recipe-copy')"
+            :help="t('bar.screens.product.recipe-copy-help')"
+            name="copyFrom"
+          >
+            <USelect
+              :model-value="undefined"
+              :items="copyItems"
+              :placeholder="t('bar.screens.product.recipe-copy-pick')"
+              class="w-48"
+              @update:model-value="v => copyFrom(v as string)"
+            />
+          </UFormField>
           <div
             v-for="(line, i) in recipeOf.lines"
             :key="i"
@@ -581,7 +613,7 @@ function planned(v: Variant, l: List): string | null {
             <UFormField
               :label="t('bar.screens.product.recipe-what')"
               :name="`lines.${i}.what`"
-              class="flex-1"
+              class="min-w-0 flex-1"
             >
               <USelectMenu
                 v-model="line.what"
@@ -609,7 +641,7 @@ function planned(v: Variant, l: List): string | null {
             </UFormField>
             <IconButton
               icon="i-lucide-x"
-              :label="t('bar.screens.product.recipe-remove')"
+              :label="line.what ? t('bar.screens.product.recipe-remove-named', { name: whatName(line.what) }) : t('bar.screens.product.recipe-remove')"
               @click="recipeOf.lines.splice(i, 1)"
             />
           </div>

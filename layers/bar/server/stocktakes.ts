@@ -16,7 +16,8 @@ export type StocktakeState = 'counting' | 'submitted' | 'approved' | 'abandoned'
 const id = z.string().min(1).max(64) // not-policy: an id's length
 const MAX_LINES = 500 // not-policy: matches core.units.set-rows-limit's default
 
-export const startInput = z.object({ locationId: id, categoryId: id.nullable().optional() }).strict()
+// heldOnly: only the items this location has held, rather than every item in use.
+export const startInput = z.object({ locationId: id, categoryId: id.nullable().optional(), heldOnly: z.boolean().optional() }).strict()
 export type StartInput = z.infer<typeof startInput>
 
 // A line is counted in base units, or weighed in grams (for an item with weights) with any full ones
@@ -132,7 +133,10 @@ async function list(stocktakeId: string | null, limit: number): Promise<Stocktak
   }))
 }
 
-/** Starts a count at a location: a line per item in use, or per item in a category and its sub-categories. */
+/**
+ * Starts a count at a location: a line per item in use, or per item in a category and its
+ * sub-categories, and if asked only those the location has held.
+ */
 export async function startStocktake(unit: UnitView, input: StartInput, by: string): Promise<string> {
   if (!await first('SELECT 1 FROM bar_stock_locations WHERE id = ? AND active = 1', input.locationId))
     refuse('bar.stock-location.unknown', 'There is no such location in use.', { status: 422, remedy: 'Pick a location that is in use.' })
@@ -140,8 +144,9 @@ export async function startStocktake(unit: UnitView, input: StartInput, by: stri
     refuse('bar.stocktake.live', 'This location is already being counted.', { status: 409, remedy: 'Finish or abandon that count first.' })
   const category = input.categoryId ?? null
   const items = await all<{ id: string }>(
-    'SELECT id FROM bar_stock_items WHERE active = 1 AND (? IS NULL OR category_id IN (SELECT id FROM bar_categories WHERE id = ? OR parent_id = ?))',
-    category, category, category,
+    `SELECT id FROM bar_stock_items WHERE active = 1 AND (? IS NULL OR category_id IN (SELECT id FROM bar_categories WHERE id = ? OR parent_id = ?))
+       AND (? = 0 OR EXISTS (SELECT 1 FROM bar_stock_levels v WHERE v.stock_item_id = bar_stock_items.id AND v.location_id = ?))`,
+    category, category, category, input.heldOnly ? 1 : 0, input.locationId,
   )
   if (!items.length) refuse('bar.stocktake.nothing', 'There is nothing to count.', { status: 422, remedy: category ? 'Pick a category with stock items in it.' : 'Add stock items first.' })
   const limit = await useSetting('core.units.set-rows-limit') as number

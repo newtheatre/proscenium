@@ -2,9 +2,10 @@
      item with packs, loose units and the pack cost if it changed. Receiving it moves the stock in at
      once and is final; a mistake is put right by another delivery, by wastage or at the next count.
      A received delivery is its record. "new" starts one. Pressing Enter in the form saves the draft;
-     receiving is its own button and asks first, naming what will arrive and where. A saved draft
-     asks "Has the label changed?" about items whose label is due a fresh look, for someone who
-     records allergens. -->
+     receiving is its own button and asks first, naming what will arrive and where. Items are added
+     from a searchable list, several at once; a supplier not on the list yet can be added from the
+     supplier box. For someone who records allergens, the form asks "Has the label changed?" about
+     each item on it whose label is due a fresh look, before it is received and after. -->
 <script setup lang="ts">
 interface FormItem { id: string, name: string, baseUnit: StockUnit, packSize: number, packName: string, countUnitSize: number, costMinor: number | null }
 interface Line { stockItemId: string, packs: number, looseUnits: number, packCostMinor: number | null }
@@ -44,13 +45,32 @@ const received = computed(() => data.value?.delivery?.state === 'received')
 const itemOf = (itemId: string) => data.value?.items.find(i => i.id === itemId)
 const locationItems = computed(() => (data.value?.locations ?? []).map(l => ({ value: l.id, label: l.name })))
 const supplierItems = computed(() => [{ value: NONE, label: t('bar.screens.deliveries.no-supplier') }, ...(data.value?.suppliers ?? []).map(s => ({ value: s.id, label: s.label }))])
-const addable = computed(() => (data.value?.items ?? []).filter(i => !form.value.lines.some(l => l.stockItemId === i.id)).map(i => ({ value: i.id, label: i.name })))
-const adding = ref<string | undefined>(undefined)
-watch(adding, (itemId) => {
-  if (!itemId) return
-  form.value.lines.push({ stockItemId: itemId, packs: 1, looseUnits: 0, packCostMinor: null })
-  adding.value = undefined
-})
+// A supplier typed that is not on the list is added to it, and chosen.
+const addingSupplier = ref(false)
+async function addSupplier(label: string) {
+  refusal.value = null
+  addingSupplier.value = true
+  try {
+    const made = await $api<{ supplierTermId: string }>('/api/bar/stock/suppliers', { method: 'POST', body: { label } })
+    data.value?.suppliers.push({ id: made.supplierTermId, label: label.trim() })
+    form.value.supplierTermId = made.supplierTermId
+    toast.add({ title: t('bar.screens.deliveries.supplier-added', { name: label.trim() }), color: 'success' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    addingSupplier.value = false
+  }
+}
+// The item picker ticks what is on the delivery: ticking adds a line, unticking takes it off.
+const itemChoices = computed(() => (data.value?.items ?? []).map(i => ({ value: i.id, label: i.name })))
+const onDelivery = computed(() => form.value.lines.map(l => l.stockItemId))
+function pick(itemIds: string[]) {
+  const kept = form.value.lines.filter(l => itemIds.includes(l.stockItemId))
+  const added = itemIds.filter(i => !kept.some(l => l.stockItemId === i)).map(stockItemId => ({ stockItemId, packs: 1, looseUnits: 0, packCostMinor: null }))
+  form.value.lines = [...kept, ...added]
+}
 const removeLine = (itemId: string) => { form.value.lines = form.value.lines.filter(l => l.stockItemId !== itemId) }
 
 function arriving(line: Line): string {
@@ -132,11 +152,20 @@ async function discard() {
 }
 const validate = () => needs({ locationId: form.value.locationId })
 
-// Has the label changed? A due item's label is read again here, with the new stock to hand.
-const checking = ref<{ title: string, endpoint: string, contains: string[], mayContain: string[] } | null>(null)
+// Has the label changed? A due item's label is read again here, with the new stock to hand: each
+// item on the delivery whose label is due, before it is received and after. A label checked here
+// leaves the list without reloading the form, so lines not saved yet stay.
+const checking = ref<{ title: string, endpoint: string, contains: string[], mayContain: string[], stockItemId: string } | null>(null)
+const checked = ref<string[]>([])
+const labelsShown = computed(() => (data.value?.labelsDue ?? []).filter(d => !checked.value.includes(d.stockItemId)
+  && (received.value ? data.value!.delivery!.lines : form.value.lines).some(l => l.stockItemId === d.stockItemId)))
 async function checkLabel(due: LabelDue) {
   const read = await $api<{ answer: { contains: string[], mayContain: string[] } }>(`/api/bar/stock/items/${due.stockItemId}/allergens` as string)
-  checking.value = { title: t('bar.screens.choices.allergens-of', { name: due.name }), endpoint: `/api/bar/stock/items/${due.stockItemId}/allergens`, contains: read.answer.contains, mayContain: read.answer.mayContain }
+  checking.value = { title: t('bar.screens.choices.allergens-of', { name: due.name }), endpoint: `/api/bar/stock/items/${due.stockItemId}/allergens`, contains: read.answer.contains, mayContain: read.answer.mayContain, stockItemId: due.stockItemId }
+}
+function labelChecked() {
+  if (checking.value) checked.value.push(checking.value.stockItemId)
+  checking.value = null
 }
 const columns = computed(() => [
   { id: 'item', header: t('bar.screens.deliveries.item') },
@@ -179,10 +208,34 @@ const title = computed(() => isNew.value
           <FactStrip
             :facts="[
               { label: t('bar.screens.deliveries.location'), value: locationName },
-              { label: t('bar.screens.deliveries.supplier'), value: [d.delivery.supplier, d.delivery.supplierRef].filter(Boolean).join(' · ') || t('bar.screens.deliveries.no-supplier') },
+              { label: t('bar.screens.deliveries.supplier'), value: d.delivery.supplier ?? t('bar.screens.deliveries.no-supplier') },
+              ...(d.delivery.supplierRef ? [{ label: t('bar.screens.deliveries.note-number'), value: d.delivery.supplierRef }] : []),
               { label: t('bar.screens.deliveries.received-by'), value: d.delivery.receivedBy ?? '' },
             ]"
           />
+          <PageSection
+            v-if="labelsShown.length"
+            :title="t('bar.screens.deliveries.labels-due')"
+            :description="t('bar.screens.deliveries.labels-due-help')"
+          >
+            <RecordList :label="t('bar.screens.deliveries.labels-due')">
+              <RecordListItem
+                v-for="due in labelsShown"
+                :key="due.stockItemId"
+                :name="due.name"
+                :description="due.checkedAt ? t('bar.screens.deliveries.last-checked', { when: dateTime(due.checkedAt) }) : t('bar.screens.deliveries.never-checked')"
+              >
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-clipboard-check"
+                  :label="t('bar.screens.product.check-label')"
+                  :aria-label="t('bar.screens.deliveries.check-label-of', { name: due.name })"
+                  @click="checkLabel(due)"
+                />
+              </RecordListItem>
+            </RecordList>
+          </PageSection>
           <RecordList :label="t('bar.screens.deliveries.lines')">
             <RecordListItem
               v-for="l in d.delivery.lines"
@@ -209,13 +262,13 @@ const title = computed(() => isNew.value
         >
           <RefusalNotice :refusal="refusal" />
           <PageSection
-            v-if="d.labelsDue?.length"
+            v-if="labelsShown.length"
             :title="t('bar.screens.deliveries.labels-due')"
             :description="t('bar.screens.deliveries.labels-due-help')"
           >
             <RecordList :label="t('bar.screens.deliveries.labels-due')">
               <RecordListItem
-                v-for="due in d.labelsDue"
+                v-for="due in labelsShown"
                 :key="due.stockItemId"
                 :name="due.name"
                 :description="due.checkedAt ? t('bar.screens.deliveries.last-checked', { when: dateTime(due.checkedAt) }) : t('bar.screens.deliveries.never-checked')"
@@ -246,14 +299,21 @@ const title = computed(() => isNew.value
               </UFormField>
               <UFormField
                 :label="t('bar.screens.deliveries.supplier')"
-                :help="d.suppliers.length ? undefined : t('bar.screens.deliveries.supplier-help')"
+                :help="t('bar.screens.deliveries.supplier-help')"
                 name="supplierTermId"
               >
                 <USelectMenu
                   v-model="form.supplierTermId"
                   :items="supplierItems"
                   value-key="value"
-                />
+                  create-item
+                  :loading="addingSupplier"
+                  @create="addSupplier"
+                >
+                  <template #create-item-label="{ item }">
+                    {{ t('bar.screens.deliveries.add-supplier', { name: item }) }}
+                  </template>
+                </USelectMenu>
               </UFormField>
               <UFormField
                 :label="t('bar.screens.deliveries.note-number')"
@@ -272,12 +332,20 @@ const title = computed(() => isNew.value
           >
             <template #actions>
               <USelectMenu
-                v-model="adding"
-                :items="addable"
+                :model-value="onDelivery"
+                :items="itemChoices"
                 value-key="value"
+                multiple
                 icon="i-lucide-plus"
-                :placeholder="t('bar.screens.deliveries.add-item')"
-              />
+                :search-input="{ placeholder: t('bar.screens.deliveries.find-item') }"
+                :aria-label="t('bar.screens.deliveries.add-item')"
+                class="min-w-48"
+                @update:model-value="pick"
+              >
+                <template #default>
+                  {{ t('bar.screens.deliveries.add-item') }}
+                </template>
+              </USelectMenu>
             </template>
             <p
               v-if="!form.lines.length"
@@ -378,7 +446,7 @@ const title = computed(() => isNew.value
       :target="checking"
       :help="t('bar.screens.stock.allergens-help')"
       @close="checking = null"
-      @saved="checking = null; refresh()"
+      @saved="labelChecked"
     />
   </PageFrame>
 </template>

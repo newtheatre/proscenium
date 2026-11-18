@@ -57,7 +57,11 @@ const columns = computed(() => [
             {{ locationName(row.original.locationId) }}
           </template>
           <template #supplier-cell="{ row }">
-            {{ [row.original.supplier, row.original.supplierRef].filter(Boolean).join(' · ') || t('bar.screens.deliveries.no-supplier') }}
+            {{ row.original.supplier ?? t('bar.screens.deliveries.no-supplier') }}
+            <span
+              v-if="row.original.supplierRef"
+              class="block text-sm text-muted"
+            >{{ t('bar.screens.deliveries.note-ref', { ref: row.original.supplierRef }) }}</span>
           </template>
           <template #lines-cell="{ row }">
             {{ row.original.lines.length }}

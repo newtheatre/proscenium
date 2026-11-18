@@ -199,6 +199,17 @@ describe('a stocktake', () => {
     expect((await level(s.cider, store))!.quantity).toBe(55000)
   })
 
+  it('counts only what a location has held when asked', async () => {
+    const shelf = (await send('POST', '/api/bar/stock/locations', { name: 'Count shelf' })).body.locationId
+    const d = (await send('POST', '/api/bar/stock/deliveries', { locationId: shelf, lines: [{ stockItemId: s.gin, packs: 1, looseUnits: 0 }] })).body.deliveryId
+    expect((await send('POST', `/api/bar/stock/deliveries/${d}/receive`)).status).toBe(200)
+    const id = (await send('POST', '/api/bar/stocktakes', { locationId: shelf, heldOnly: true }, counter)).body.stocktakeId
+    expect((await send('GET', `/api/bar/stocktakes/${id}`, undefined, counter)).body.lines.map((l: any) => l.stockItemId)).toEqual([s.gin])
+    expect((await send('POST', `/api/bar/stocktakes/${id}/abandon`, undefined, counter)).status).toBe(200)
+    // The list says how many items in use have no category, as they are on no count by category.
+    expect((await send('GET', '/api/bar/stocktakes', undefined, counter)).body.uncategorised).toBeGreaterThanOrEqual(2)
+  })
+
   it('hides the level from counters when counts are blind', async () => {
     await commit(unit => changeSetting(unit.view(), 'bar.stocktake.blind' as never, true, { reason: 'test', confirm: true }))
     const id = (await send('POST', '/api/bar/stocktakes', { locationId: s.cellar }, counter)).body.stocktakeId

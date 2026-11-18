@@ -1,5 +1,6 @@
-// One delivery for its page (S9): a draft to finish and receive, or the record of one received. A
-// draft says which of its items' labels are due a fresh look, for someone who records allergens.
+// One delivery for its page (S9): a draft to finish and receive, or the record of one received. For
+// someone who records allergens, which items' labels are due a fresh look: every item the form
+// offers, so a line added before receiving is asked about too, and those received.
 import { getRouterParam } from 'h3'
 import { can, defineRoute, refuse } from '#kit'
 import { labelsDue } from '../../../../allergen-chart'
@@ -13,10 +14,11 @@ export default defineRoute({
   const [delivery] = await deliveries({ id: record!.id, limit: 1 })
   if (!delivery) refuse('bar.delivery.unknown', 'There is no such delivery.', { status: 404 })
   const canAllergens = (await can(actor, 'bar.allergens.manage')).allowed
+  const form = await deliveryForm()
   return {
     delivery,
-    ...await deliveryForm(),
+    ...form,
     canAllergens,
-    labelsDue: canAllergens && delivery!.state === 'draft' ? await labelsDue(delivery!.lines.map(l => l.stockItemId)) : [],
+    labelsDue: canAllergens ? await labelsDue([...new Set([...form.items.map(i => i.id), ...delivery!.lines.map(l => l.stockItemId)])]) : [],
   }
 })

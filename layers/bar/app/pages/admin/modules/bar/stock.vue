@@ -2,9 +2,11 @@
      location holds, and the locations themselves. Quantities are kept in base units (each, ml or g)
      and shown in the unit people count in. A level is never typed: it moves with sales, refunds and,
      later, deliveries, wastage, transfers and stocktakes. Stock never stops a sale, so a level may
-     go below nought. -->
+     go below nought. A pack's size may be typed in litres or kilograms; each form says beside its
+     fields what is missing, and a category is needed once there are categories, so every item is
+     on some count by category. -->
 <script setup lang="ts">
-type Unit = 'each' | 'ml' | 'g'
+type Unit = StockUnit
 interface Item {
   id: string
   name: string
@@ -28,7 +30,8 @@ interface Venue { id: string, name: string, spaces: { id: string, name: string }
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { money } = await useMoney()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
+const { number, amount, countWord } = useStockAmounts()
 const toast = useToast()
 type Answer = { contains: string[], mayContain: string[], checked: boolean, checkedAt: number | null }
 const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: Location[], currency: string, categories: { id: string, name: string }[], venues: Venue[], canAllergens: boolean, allergens: Record<string, Answer> }>('/api/bar/stock', { key: 'bar:stock' })
@@ -42,13 +45,6 @@ const placeItems = computed(() => [
 ])
 const placeName = (l: Location) => placeItems.value.find(p => p.value === (l.spaceId ? `s:${l.spaceId}` : l.venueId ? `v:${l.venueId}` : 'none'))?.label
 
-// "1.5 bottles (1,050 ml)"; a can is counted as itself.
-const number = (n: number, digits = 2) => n.toLocaleString(undefined, { maximumFractionDigits: digits })
-function amount(item: Item, quantity: number): string {
-  const base = `${number(quantity, 0)} ${t(`bar.screens.stock.units.${item.baseUnit}`)}`
-  if (item.countUnitSize === 1) return base
-  return t('bar.screens.stock.counted', { count: number(quantity / item.countUnitSize), base })
-}
 const locationName = (id: string) => data.value?.locations.find(l => l.id === id)?.name ?? ''
 const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
 // What the label says, for someone who records allergens: products made from the item answer with it.
@@ -69,21 +65,51 @@ function checkLabel(i: Item) {
   checking.value = { title: t('bar.screens.choices.allergens-of', { name: i.name }), endpoint: `/api/bar/stock/items/${i.id}/allergens`, contains: a?.contains ?? [], mayContain: a?.mayContain ?? [] }
 }
 
-const item = ref<{ id: string | null, name: string, categoryId: string, baseUnit: Unit, packSize: number | null, packName: string, countUnitSize: number | null, costMinor: number | null, reorderLevel: number | null, weighed: boolean, fullWeightG: number | null, emptyWeightG: number | null, moved: boolean } | null>(null)
+// A pack's size is kept in base units but may be typed in litres or kilograms: 50 l, not 50000 ml.
+const LARGE = 1000 // not-policy: a litre in ml, a kilogram in g
+const scaleItems = (u: Unit) => u === 'each' ? [] : [{ value: 1, label: t(`bar.screens.stock.units.${u}`) }, { value: LARGE, label: t(`bar.screens.stock.units.large-${u}`) }]
+const item = ref<{ id: string | null, name: string, categoryId: string, baseUnit: Unit, packAmount: number | null, packScale: number, packName: string, countUnitSize: number | null, costMinor: number | null, reorderLevel: number | null, weighed: boolean, fullWeightG: number | null, emptyWeightG: number | null, moved: boolean } | null>(null)
+const packSize = computed(() => item.value?.packAmount ? Math.round(item.value.packAmount * (item.value.baseUnit === 'each' ? 1 : item.value.packScale)) : null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const itemForm = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('itemForm')
+const locationForm = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('locationForm')
 function editItem(i?: Item) {
   refusal.value = null
+  const large = !!i && i.baseUnit !== 'each' && i.packSize % LARGE === 0
   item.value = i
-    ? { id: i.id, name: i.name, categoryId: i.categoryId ?? 'none', baseUnit: i.baseUnit, packSize: i.packSize, packName: i.packName, countUnitSize: i.countUnitSize, costMinor: i.costMinor, reorderLevel: i.reorderLevel, weighed: i.fullWeightG !== null, fullWeightG: i.fullWeightG, emptyWeightG: i.emptyWeightG, moved: i.levels.length > 0 }
-    : { id: null, name: '', categoryId: 'none', baseUnit: 'ml', packSize: null, packName: '', countUnitSize: null, costMinor: null, reorderLevel: null, weighed: false, fullWeightG: null, emptyWeightG: null, moved: false }
+    ? { id: i.id, name: i.name, categoryId: i.categoryId ?? 'none', baseUnit: i.baseUnit, packAmount: large ? i.packSize / LARGE : i.packSize, packScale: large ? LARGE : 1, packName: i.packName, countUnitSize: i.countUnitSize, costMinor: i.costMinor, reorderLevel: i.reorderLevel, weighed: i.fullWeightG !== null, fullWeightG: i.fullWeightG, emptyWeightG: i.emptyWeightG, moved: i.levels.length > 0 }
+    : { id: null, name: '', categoryId: 'none', baseUnit: 'ml', packAmount: null, packScale: 1, packName: '', countUnitSize: null, costMinor: null, reorderLevel: null, weighed: false, fullWeightG: null, emptyWeightG: null, moved: false }
 }
+// What the form still needs, beside each field. A category is needed once there are any, so no
+// item is left off every count by category.
+function checkItem() {
+  const f = item.value!
+  const missing = needs({
+    name: f.name,
+    packName: f.packName,
+    packAmount: f.packAmount ? true : null,
+    categoryId: !(data.value?.categories.length) || f.categoryId !== 'none' ? true : null,
+    fullWeightG: f.weighed ? f.fullWeightG : true,
+    emptyWeightG: f.weighed ? f.emptyWeightG !== null : true,
+  })
+  if (f.weighed && f.fullWeightG !== null && f.emptyWeightG !== null && f.fullWeightG <= f.emptyWeightG)
+    missing.push({ name: 'fullWeightG', message: t('bar.screens.stock.weights-wrong') })
+  return missing
+}
+// What one counted thing is called, for the hint under the count field.
+const countPreview = computed(() => {
+  const f = item.value
+  if (!f || !packSize.value) return ''
+  const size = f.countUnitSize ?? (f.baseUnit === 'each' ? 1 : packSize.value)
+  return t('bar.screens.stock.count-preview', { unit: countWord({ baseUnit: f.baseUnit, countUnitSize: size, packSize: packSize.value, packName: f.packName.trim() || undefined }, 2) })
+})
 async function saveItem() {
   const f = item.value!
   refusal.value = null
   const body = {
-    name: f.name, categoryId: f.categoryId === 'none' ? null : f.categoryId, packSize: f.packSize, packName: f.packName,
+    name: f.name, categoryId: f.categoryId === 'none' ? null : f.categoryId, packSize: packSize.value, packName: f.packName,
     // A can or a case counts in ones; a keg or a bottle in itself unless told otherwise.
-    countUnitSize: f.countUnitSize ?? (f.baseUnit === 'each' ? 1 : f.packSize), costMinor: f.costMinor, reorderLevel: f.reorderLevel,
+    countUnitSize: f.countUnitSize ?? (f.baseUnit === 'each' ? 1 : packSize.value), costMinor: f.costMinor, reorderLevel: f.reorderLevel,
     fullWeightG: f.weighed ? f.fullWeightG : null, emptyWeightG: f.weighed ? f.emptyWeightG : null,
     ...(f.moved ? {} : { baseUnit: f.baseUnit }),
   }
@@ -96,6 +122,8 @@ async function saveItem() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    // The server names the body's packSize; the field that types it is packAmount.
+    itemForm.value?.setErrors(fieldErrors(refusal.value).map(x => x.name === 'packSize' ? { ...x, name: 'packAmount' } : x))
   }
 }
 
@@ -119,6 +147,7 @@ async function saveLocation() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    locationForm.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 
@@ -247,7 +276,9 @@ async function setActive(path: string, active: boolean) {
         <UForm
           v-if="item"
           id="bar-stock-item"
+          ref="itemForm"
           :state="item"
+          :validate="checkItem"
           class="space-y-4"
           novalidate
           @submit="saveItem"
@@ -283,19 +314,29 @@ async function setActive(path: string, active: boolean) {
           <UFormField
             :label="t('bar.screens.stock.pack-size')"
             :help="t('bar.screens.stock.pack-size-help')"
-            name="packSize"
+            name="packAmount"
             required
           >
             <UFieldGroup>
               <UInputNumber
-                v-model="item.packSize"
-                :min="1"
+                v-model="item.packAmount"
+                :min="0"
+                :step="item.baseUnit !== 'each' && item.packScale === LARGE ? 0.1 : 1"
+                :format-options="{ maximumFractionDigits: item.baseUnit !== 'each' && item.packScale === LARGE ? 3 : 0 }"
+              />
+              <USelect
+                v-if="item.baseUnit !== 'each'"
+                v-model="item.packScale"
+                :items="scaleItems(item.baseUnit)"
+                :aria-label="t('bar.screens.stock.pack-size-unit')"
+                class="w-28"
               />
               <UBadge
+                v-else
                 color="neutral"
                 variant="outline"
                 size="lg"
-                :label="t(`bar.screens.stock.units.${item.baseUnit}`)"
+                :label="t('bar.screens.stock.units.each')"
               />
             </UFieldGroup>
           </UFormField>
@@ -310,6 +351,7 @@ async function setActive(path: string, active: boolean) {
             :label="t('bar.screens.stock.category')"
             :help="t('bar.screens.stock.category-help')"
             name="categoryId"
+            :required="!!data?.categories.length"
           >
             <USelectMenu
               v-model="item.categoryId"
@@ -328,14 +370,14 @@ async function setActive(path: string, active: boolean) {
               <div class="space-y-4 pt-2">
                 <UFormField
                   :label="t('bar.screens.stock.count-unit')"
-                  :help="t('bar.screens.stock.count-unit-help')"
+                  :help="[t('bar.screens.stock.count-unit-help'), countPreview].filter(Boolean).join(' ')"
                   name="countUnitSize"
                 >
                   <UFieldGroup>
                     <UInputNumber
                       v-model="item.countUnitSize"
                       :min="1"
-                      :placeholder="String(item.baseUnit === 'each' ? 1 : item.packSize ?? '')"
+                      :placeholder="String(item.baseUnit === 'each' ? 1 : packSize ?? '')"
                     />
                     <UBadge
                       color="neutral"
@@ -410,7 +452,7 @@ async function setActive(path: string, active: boolean) {
             </template>
           </UCollapsible>
           <p
-            v-if="item.costMinor !== null && item.packSize"
+            v-if="item.costMinor !== null && packSize"
             class="text-sm text-muted"
           >
             {{ t('bar.screens.stock.cost-per', { amount: money(item.costMinor), pack: item.packName || t('bar.screens.stock.pack-fallback') }) }}
@@ -435,7 +477,9 @@ async function setActive(path: string, active: boolean) {
         <UForm
           v-if="location"
           id="bar-stock-location"
+          ref="locationForm"
           :state="location"
+          :validate="() => needs({ name: location?.name })"
           class="space-y-4"
           novalidate
           @submit="saveLocation"
