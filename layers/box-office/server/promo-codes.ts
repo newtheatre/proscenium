@@ -4,7 +4,8 @@
 // and to a number of tickets in one order, and to a window of dates. Each ticket it is used on is a
 // redemption tied to the ticket's seat: the triggers keep the code's count, its CHECK is the limit,
 // so the last use is given once however many baskets ask at the same moment, and a seat given back
-// gives back its use. An expired, used-up or inapplicable code says which.
+// gives back its use. An expired, used-up or inapplicable code says which. A code may also be kept
+// off member, concession and other proof-needing prices, so it does not stack on them.
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, first, idSchema, newId, nowMs, refuse, type UnitView } from '#kit'
@@ -25,17 +26,19 @@ export interface PromoCode {
   maxUses: number | null
   used: number
   maxPerOrder: number | null
+  /** Not on ticket types that carry a requirement: a membership, proof or a concession. */
+  notWithRequirements: boolean
   validFrom: number | null
   validUntil: number | null
   active: boolean
   note: string | null
 }
 
-interface Row { id: string, code: string, effect: Effect, value: number, production_id: string | null, performance_id: string | null, ticket_type_id: string | null, band_id: string | null, max_uses: number | null, used: number, max_per_order: number | null, valid_from: number | null, valid_until: number | null, active: number, note: string | null }
+interface Row { id: string, code: string, effect: Effect, value: number, production_id: string | null, performance_id: string | null, ticket_type_id: string | null, band_id: string | null, max_uses: number | null, used: number, max_per_order: number | null, not_with_requirements: number, valid_from: number | null, valid_until: number | null, active: number, note: string | null }
 
 const toCode = (r: Row): PromoCode => ({
   id: r.id, code: r.code, effect: r.effect, value: r.value, productionId: r.production_id, performanceId: r.performance_id, ticketTypeId: r.ticket_type_id, bandId: r.band_id,
-  maxUses: r.max_uses, used: r.used, maxPerOrder: r.max_per_order, validFrom: r.valid_from, validUntil: r.valid_until, active: !!r.active, note: r.note,
+  maxUses: r.max_uses, used: r.used, maxPerOrder: r.max_per_order, notWithRequirements: !!r.not_with_requirements, validFrom: r.valid_from, validUntil: r.valid_until, active: !!r.active, note: r.note,
 })
 
 /** A code as typed: spaces dropped and upper-case, so "spring 25" and "SPRING25" are the same code. */
@@ -48,8 +51,10 @@ export const promoInput = z.object({
   productionId: z.string().min(3).max(40).nullable().optional(), // not-policy: an id
   performanceId: idSchema('perf').nullable().optional(),
   ticketTypeId: idSchema('tty').nullable().optional(),
+  bandId: idSchema('band').nullable().optional(),
   maxUses: z.number().int().min(1).max(1_000_000).nullable().optional(), // not-policy: a sanity bound
   maxPerOrder: z.number().int().min(1).max(500).nullable().optional(), // not-policy: the desk cap's own ceiling
+  notWithRequirements: z.boolean().optional(),
   validFrom: z.number().int().positive().nullable().optional(),
   validUntil: z.number().int().positive().nullable().optional(),
   note: z.string().trim().max(200).nullable().optional(), // not-policy: one line about who it is for
@@ -61,6 +66,13 @@ export async function listPromoCodes(): Promise<PromoCode[]> {
 }
 
 async function checked(input: PromoInput): Promise<PromoInput & { code: string }> {
+  // A part of the house is a production's own, so a code limited to one is limited to its production too.
+  if (input.bandId) {
+    const band = await first<{ production_id: string }>('SELECT production_id FROM box_office_bands WHERE id = ?', input.bandId)
+    if (!band) refuse('box-office.band.not-found', 'There is no such part of the house.', { status: 422, fields: { bandId: 'Choose another.' } })
+    if (input.productionId && band.production_id !== input.productionId) refuse('box-office.promo.scope', 'That part of the house is not of that production.', { status: 422, fields: { bandId: 'Not of this production.' } })
+    input = { ...input, productionId: band.production_id }
+  }
   if (input.effect === 'percent_off' && (input.value < 1 || input.value > 10000)) // not-policy: basis points, 1 to 100 per cent
     refuse('box-office.promo.percent', 'A percentage off is between 1 and 100.', { status: 422, fields: { value: 'Between 1 and 100.' } })
   if (input.effect === 'amount_off' && input.value < 1) refuse('box-office.promo.amount', 'An amount off is more than nothing.', { status: 422, fields: { value: 'More than nothing.' } })
@@ -82,8 +94,8 @@ export async function createPromoCode(unit: UnitView, input: PromoInput, actorId
   if (await first('SELECT 1 FROM box_office_promo_codes WHERE code = ?', c.code)) refuse(TAKEN.code, TAKEN.reason, { status: 409, fields: TAKEN.fields })
   const id = newId('prm')
   const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_promo_codes (id, code, effect, value, production_id, performance_id, ticket_type_id, max_uses, max_per_order, valid_from, valid_until, active, note, created_by, created_at, updated_at)
-    SELECT ${id}, ${c.code}, ${c.effect}, ${c.value}, ${c.productionId ?? null}, ${c.performanceId ?? null}, ${c.ticketTypeId ?? null}, ${c.maxUses ?? null}, ${c.maxPerOrder ?? null}, ${c.validFrom ?? null}, ${c.validUntil ?? null}, 1, ${c.note ?? null}, ${actorId}, ${at}, ${at}
+  unit.add(sql`INSERT INTO box_office_promo_codes (id, code, effect, value, production_id, performance_id, ticket_type_id, band_id, max_uses, max_per_order, not_with_requirements, valid_from, valid_until, active, note, created_by, created_at, updated_at)
+    SELECT ${id}, ${c.code}, ${c.effect}, ${c.value}, ${c.productionId ?? null}, ${c.performanceId ?? null}, ${c.ticketTypeId ?? null}, ${c.bandId ?? null}, ${c.maxUses ?? null}, ${c.maxPerOrder ?? null}, ${c.notWithRequirements ? 1 : 0}, ${c.validFrom ?? null}, ${c.validUntil ?? null}, 1, ${c.note ?? null}, ${actorId}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_promo_codes WHERE code = ${c.code})`).expect(1, TAKEN)
   unit.audit({ action: 'create', record: ['box-office.promo-code', id] })
   return id
@@ -97,7 +109,7 @@ export async function updatePromoCode(unit: UnitView, id: string, input: PromoIn
   if (c.maxUses !== null && c.maxUses !== undefined && c.maxUses < now.used)
     refuse('box-office.promo.below-used', `This code has been used ${now.used} times, so its limit cannot go below that.`, { status: 422, fields: { maxUses: `At least ${now.used}.` } })
   unit.add(sql`UPDATE box_office_promo_codes SET code = ${c.code}, effect = ${c.effect}, value = ${c.value}, production_id = ${c.productionId ?? null}, performance_id = ${c.performanceId ?? null},
-    ticket_type_id = ${c.ticketTypeId ?? null}, max_uses = ${c.maxUses ?? null}, max_per_order = ${c.maxPerOrder ?? null}, valid_from = ${c.validFrom ?? null}, valid_until = ${c.validUntil ?? null},
+    ticket_type_id = ${c.ticketTypeId ?? null}, band_id = ${c.bandId ?? null}, max_uses = ${c.maxUses ?? null}, max_per_order = ${c.maxPerOrder ?? null}, not_with_requirements = ${c.notWithRequirements ? 1 : 0}, valid_from = ${c.validFrom ?? null}, valid_until = ${c.validUntil ?? null},
     note = ${c.note ?? null}, updated_at = ${nowMs()}
     WHERE id = ${id} AND NOT EXISTS (SELECT 1 FROM box_office_promo_codes WHERE code = ${c.code} AND id <> ${id})
       AND (${c.maxUses ?? null} IS NULL OR used <= ${c.maxUses ?? null})`).expect(1, TAKEN)
@@ -118,9 +130,21 @@ export function discountOf(code: Pick<PromoCode, 'effect' | 'value'>, listMinor:
   return Math.max(0, listMinor - code.value)
 }
 
-/** Whether a code applies to one ticket: its production, performance, type and part of the house. */
-export function appliesTo(code: PromoCode, line: { productionId: string, performanceId: string, ticketTypeId: string, bandId: string }): boolean {
-  return (!code.productionId || code.productionId === line.productionId)
+/**
+ * The ticket types a code set "not with member or concession prices" leaves alone: any that carries
+ * a requirement (a membership or proof), is a concession or asks for proof. Empty for other codes.
+ */
+export async function keptOff(code: Pick<PromoCode, 'notWithRequirements'>): Promise<Set<string>> {
+  if (!code.notWithRequirements) return new Set()
+  const rows = await all<{ id: string }>(`SELECT id FROM box_office_ticket_types
+    WHERE (requirement_refs IS NOT NULL AND requirement_refs <> '[]') OR kind = 'concession' OR (proof_note IS NOT NULL AND proof_note <> '')`)
+  return new Set(rows.map(r => r.id))
+}
+
+/** Whether a code applies to one ticket: its production, performance, type and part of the house, and not a type it is kept off. */
+export function appliesTo(code: PromoCode, line: { productionId: string, performanceId: string, ticketTypeId: string, bandId: string }, kept: ReadonlySet<string> = new Set()): boolean {
+  return !kept.has(line.ticketTypeId)
+    && (!code.productionId || code.productionId === line.productionId)
     && (!code.performanceId || code.performanceId === line.performanceId)
     && (!code.ticketTypeId || code.ticketTypeId === line.ticketTypeId)
     && (!code.bandId || code.bandId === line.bandId)
@@ -152,8 +176,9 @@ export interface Discounted { promoCodeId: string, discountMinor: number }
  */
 export async function applyCode(code: PromoCode, performanceId: string, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[]): Promise<(Discounted | null)[]> {
   const performance = await getPerformance(performanceId)
+  const kept = await keptOff(code)
   const out: (Discounted | null)[] = lines.map(() => null)
-  const order = lines.map((l, i) => ({ l, i })).filter(({ l }) => l.amountMinor > 0 && appliesTo(code, { productionId: performance.productionId, performanceId, ticketTypeId: l.ticketTypeId, bandId: l.bandId }))
+  const order = lines.map((l, i) => ({ l, i })).filter(({ l }) => l.amountMinor > 0 && appliesTo(code, { productionId: performance.productionId, performanceId, ticketTypeId: l.ticketTypeId, bandId: l.bandId }, kept))
     .sort((a, b) => b.l.amountMinor - a.l.amountMinor)
   const left = code.maxUses === null ? Infinity : code.maxUses - code.used
   const most = Math.min(code.maxPerOrder ?? Infinity, left)

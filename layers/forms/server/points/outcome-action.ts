@@ -54,5 +54,7 @@ export interface OutcomeAction {
   slot?: string
   inputs: ActionInput[]
   /** Adds what the action does to the unit. A refusal or a throw leaves the run waiting, and the job tries again. */
-  run: (unit: UnitView, call: ActionCall) => Promise<void>
+  /** Does the work in the job's unit. Answering `{ skipped }` ends the run as not done, with that reason shown to staff in plain words. */
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- an action with nothing to say returns nothing
+  run: (unit: UnitView, call: ActionCall) => Promise<{ skipped: string } | undefined | void>
 }

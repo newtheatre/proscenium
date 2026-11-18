@@ -39,7 +39,8 @@ export interface CompRow {
 
 export interface CompRequestInput {
   performanceId: string
-  bandId: string
+  /** Left out, the band with most seats free is taken: whoever asks rarely knows the house. */
+  bandId?: string
   quantity: number
   /** Who the tickets are for. An address nobody holds makes an unclaimed account for them. */
   email: string
@@ -64,7 +65,11 @@ export async function requestComps(unit: UnitView, input: CompRequestInput): Pro
   if (!actor.accountId) refuse('box-office.comp.signed-out', 'Sign in to ask for complimentary tickets.', { status: 401 })
   const performance = await getPerformance(input.performanceId)
   if (performance.state === 'cancelled') refuse('box-office.comp.cancelled', 'This performance is cancelled.', { status: 409 })
-  if (!(await poolsOf(input.performanceId)).some(p => p.bandId === input.bandId))
+  if (performance.startsAt <= nowMs()) refuse('box-office.comp.started', 'This performance has already started.', { status: 409, fields: { performanceId: 'invalid' }, remedy: 'Choose a later performance.' })
+  const pools = await poolsOf(input.performanceId)
+  // Any seats: the band with most room for them, which the approver sees on the request.
+  const bandId = input.bandId || [...pools].sort((a, b) => (b.capacity - b.claimed) - (a.capacity - a.claimed))[0]?.bandId
+  if (!bandId || !pools.some(p => p.bandId === bandId))
     refuse('box-office.comp.bad-band', 'That band is not on sale for this performance.', { status: 422, fields: { bandId: 'invalid' } })
   const most = await useSetting('box-office.comps.per-request') as number
   if (input.quantity > most) refuse('box-office.comp.too-many', `At most ${most} complimentary tickets in one request.`, { status: 422, fields: { quantity: 'too-many' }, remedy: 'Ask for fewer, or make a second request.' })
@@ -76,11 +81,11 @@ export async function requestComps(unit: UnitView, input: CompRequestInput): Pro
   const at = nowMs()
   const requestId = newId('comp')
   unit.add(sql`INSERT INTO box_office_comp_requests (id, performance_id, band_id, quantity, for_account_id, reason_term_id, requested_by, state, created_at, updated_at)
-    VALUES (${requestId}, ${input.performanceId}, ${input.bandId}, ${input.quantity}, ${accountId}, ${input.reasonTermId}, ${actor.accountId}, 'requested', ${at}, ${at})`)
+    VALUES (${requestId}, ${input.performanceId}, ${bandId}, ${input.quantity}, ${accountId}, ${input.reasonTermId}, ${actor.accountId}, 'requested', ${at}, ${at})`)
   unit.announce('box-office.comp-request.requested', { requestId }, { record: ['box-office.comp-request', requestId] })
   // With no approval needed, the tickets are issued in the same batch, decided by nobody.
   if (!await useSetting('box-office.comps.needs-approval')) {
-    await issueComps(unit, { id: requestId, performance_id: input.performanceId, band_id: input.bandId, quantity: input.quantity, for_account_id: accountId }, null)
+    await issueComps(unit, { id: requestId, performance_id: input.performanceId, band_id: bandId, quantity: input.quantity, for_account_id: accountId }, null)
     return { requestId, issued: true }
   }
   return { requestId, issued: false }

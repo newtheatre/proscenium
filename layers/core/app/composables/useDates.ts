@@ -57,6 +57,14 @@ export function useDates() {
     return first === last ? first : t('core.dates.range', { from: first, to: last })
   }
 
+  /** "2–6 Mar 2027": a span of days as short as the language writes it, sharing the month and year where it can. */
+  function span(from: DateInput, to: DateInput): string {
+    const calendar = typeof from === 'string' && CALENDAR_DATE.test(from)
+    const at = (v: DateInput) => typeof v === 'string' ? new Date(CALENDAR_DATE.test(v) ? `${v}T00:00:00Z` : v) : v
+    const [first, last] = [format('day', from), format('day', to)]
+    return first === last ? first : formats.value[calendar ? 'calendar' : 'instant'].day.formatRange(at(from), at(to))
+  }
+
   /** A month's name from its number, 1 to 12: "August". */
   const monthName = (month: number) => new Intl.DateTimeFormat(language.value, { month: 'long', timeZone: 'UTC' }).format(Date.UTC(2001, month - 1, 1)) // not-policy: any year, to name a month
 
@@ -71,5 +79,5 @@ export function useDates() {
     return toCalendarDateTime(fromAbsolute(ms, zone.value)).toString().slice(0, 16) // not-policy: the length of a date and time to the minute
   }
 
-  return { language, timeZone, zone, monthName, dayOfYear, day, dayLong, dayNamed, dateTime, brief, monthYear, time, range, toLocal }
+  return { language, timeZone, zone, monthName, dayOfYear, day, dayLong, dayNamed, dateTime, brief, monthYear, time, range, span, toLocal }
 }

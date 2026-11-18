@@ -85,13 +85,14 @@ This table is the single index of every secret in `core`, whichever area declare
 
 A route names a class. Each allowance is the setting `core.rate-limits.<class>`; the figures are proposals.
 
-**What each class counts by (as built, 16 November 2026).** A route's class counts by the signed-in account, or by the network address when nobody is signed in. `sign-in` also counts by the email address typed, and over either limit the person sees the same quiet "sent" screen. `presented-value` counts each check twice, by session and by network address, and over either the check is refused. The `sign-in`, `public-form` and `presented-value` classes count in the shared counter (a SQLite-backed Durable Object, so it runs on Cloudflare's free plan; an object clears its storage when its window ends); the others count in memory. The shipped figures are in the Formats tab's fourth "As built" list and prevail over the proposals below.
+**What each class counts by (as built, 16 November 2026).** A route's class counts by the signed-in account, or by the network address when nobody is signed in. `sign-in` also counts by the email address typed, and over either limit the person sees the same quiet "sent" screen. `presented-value` counts each check twice, by session and by network address, and over either the check is refused. Since 18 November 2026 the sign-in steps that every visitor takes (opening the sign-in page, asking for a code, using a code or link, a passkey or a provider) count against `sign-in-network` by network address, and the strict `sign-in` allowance is counted for the email address typed (asking) and for the email address from that network address (using a code). The `sign-in`, `sign-in-network`, `public-form` and `presented-value` classes count in the shared counter (a SQLite-backed Durable Object, so it runs on Cloudflare's free plan; an object clears its storage when its window ends); the others count in memory. The shipped figures are in the Formats tab's fourth "As built" list and prevail over the proposals below.
 
 | Class | Counted per | Proposed allowance | Used for |
 | --- | --- | --- | --- |
 | `default` | account or network address | 600 a minute | Reads |
 | `write` | account | 120 a minute | Any change |
 | `sign-in` | email address and network address | 10 in 10 minutes | Sign-in and sign-up |
+| `sign-in-network` | network address | 200 in 10 minutes | The sign-in steps many people on one network take (passkey options, asking for and using an emailed code or link); added 18 November 2026 so a theatre's shared Wi-Fi does not lock people out |
 | `public-form` | network address | 20 in 10 minutes | Forms open to people with no account |
 | `export` | account | 10 an hour | Downloads of many records |
 | `presented-value` | session and network address | 10 in 10 minutes | Requirement checks that carry a typed value |

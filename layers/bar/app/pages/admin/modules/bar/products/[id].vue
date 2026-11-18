@@ -123,13 +123,16 @@ type Answer = { contains: string[], mayContain: string[], checked: boolean, chec
 const allergens = ref<Answer | null>(null)
 // Sizes made from stock answer with their recipe's items; the product's own label is for the rest.
 const stockSizes = ref<{ variantId: string, name: string, answer: Answer, items: { id: string, name: string, checked: boolean }[] }[]>([])
+// Sizes made only from choices have no label of their own: what is picked answers for them.
+const choiceOnly = ref<string[]>([])
 async function loadAllergens() {
   if (!data.value?.canAllergens) return
-  const read = await $api<{ answer: Answer, sizes: typeof stockSizes.value }>(`/api/bar/products/${id.value}/allergens` as string)
+  const read = await $api<{ answer: Answer, sizes: typeof stockSizes.value, choiceOnly?: string[] }>(`/api/bar/products/${id.value}/allergens` as string)
   allergens.value = read.answer
   stockSizes.value = read.sizes
+  choiceOnly.value = read.choiceOnly ?? []
 }
-const ownLabelUsed = computed(() => (data.value?.product.variants ?? []).some(v => v.active && !stockSizes.value.some(s => s.variantId === v.id)))
+const ownLabelUsed = computed(() => (data.value?.product.variants ?? []).some(v => v.active && !choiceOnly.value.includes(v.id) && !stockSizes.value.some(s => s.variantId === v.id)))
 function describeAnswer(a: Answer): string {
   if (!a.checked) return t('bar.screens.product.allergens-unchecked')
   if (!a.contains.length && !a.mayContain.length) return t('bar.screens.product.none-listed')

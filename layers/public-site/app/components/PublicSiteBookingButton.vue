@@ -2,7 +2,8 @@
      it is on, the theatre's external link when it is not, and nothing with neither. The answer is
      facts, and the words for each of the five states are here, so they follow the visitor's
      language. `when` names the performance for a screen reader, so a page of "Book" buttons can be
-     told apart. -->
+     told apart. The theatre's own outside link says whose site it opens, with `company` for a
+     visiting show, and that it opens in a new tab. -->
 <script setup lang="ts">
 interface Booking {
   state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed'
@@ -13,7 +14,7 @@ interface Booking {
   label?: string
   external?: true
 }
-const props = defineProps<{ booking: Booking | null, when: string, size?: 'sm' | 'md' | 'lg' }>()
+const props = defineProps<{ booking: Booking | null, when: string, size?: 'sm' | 'md' | 'lg', company?: string | null }>()
 const { t } = useT()
 const { dateTime } = useDates()
 
@@ -25,6 +26,12 @@ const note = computed(() => {
   if (b.state === 'not-yet') return b.opensAt ? t('public-site.booking.opens', { when: dateTime(b.opensAt) }) : t('public-site.booking.not-yet')
   if (b.state === 'closed') return t('public-site.booking.closed')
   return null
+})
+const label = computed(() => {
+  const b = props.booking
+  if (b?.label) return b.label
+  if (b?.external) return props.company ? t('public-site.booking.book-with', { company: props.company }) : t('public-site.booking.book-elsewhere')
+  return t('public-site.booking.book')
 })
 const bookable = computed(() => !!props.booking?.link && (props.booking.state === 'available' || props.booking.state === 'limited'))
 </script>
@@ -45,7 +52,7 @@ const bookable = computed(() => !!props.booking?.link && (props.booking.state ==
       :trailing-icon="booking.external ? 'i-lucide-external-link' : undefined"
       :size="size ?? 'md'"
     >
-      {{ booking.label ?? t('public-site.booking.book') }}<span class="sr-only">{{ t('public-site.booking.for', { when }) }}</span>
+      {{ label }}<span class="sr-only">{{ t('public-site.booking.for', { when }) }}<template v-if="booking.external">{{ t('public-site.booking.new-tab') }}</template></span>
     </UButton>
     <ULink
       v-else-if="booking.state === 'sold-out' && booking.waitingList"
