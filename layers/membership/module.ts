@@ -21,7 +21,7 @@ export default defineModule({
   uses: ['forms', 'communications', 'box-office', 'front-of-house'],
 
   settings: defineSettings('membership', {
-    'applications.expire-after': setting.duration({ default: '14d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
+    'applications.expire-after': setting.duration({ default: '14d', min: '1d', max: '90d', change, whenModule: 'membership-fees', audience: 'public', quotable: true }),
     'renewal.opens-before': setting.duration({ default: '30d', min: '0d', max: '180d', change, audience: 'staff' }),
     'renewal.grace': setting.duration({ default: '0d', min: '0d', max: '90d', change, audience: 'staff' }),
     'reminders.first': setting.duration({ default: '30d', min: '1d', max: '180d', change, audience: 'staff' }),

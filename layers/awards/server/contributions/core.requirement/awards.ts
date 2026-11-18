@@ -59,7 +59,7 @@ export default defineRequirementSource({
         const held = account ? await heldBy(account, ref) : []
         out.push(held.length
           ? { account, ref: fullRef, verdict: 'met', evidence: held[0]!.id, quantity: 1, summary: `${held[0]!.typeName}: current.` }
-          : { account, ref: fullRef, verdict: 'not-met', reason: gone ? 'This price is for an award that is no longer given.' : forWhom, summary: 'Holds no such award.' })
+          : { account, ref: fullRef, verdict: 'not-met', reason: gone ? 'This price is for an award that is no longer given.' : account ? forWhom : `${forWhom} Sign in if you hold one.`, summary: 'Holds no such award.' })
       }
     }
     return out

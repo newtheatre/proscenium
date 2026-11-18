@@ -161,6 +161,11 @@ export default defineModule({
       { id: 'payments.attention', file: 'attention' },
       { id: 'payments.refunds-waiting', file: 'refunds-waiting' },
     ],
+    // On the console home for whoever can act on them: payments that need settling, and refunds to approve.
+    'core.home-card': [
+      { id: 'payments.attention', home: 'console', ability: 'payments.attempt.reconcile', component: 'PaymentsAttentionCard', urgency: 'today', count: 'payments.attention' },
+      { id: 'payments.refunds', home: 'console', ability: 'payments.refund.approve', component: 'PaymentsRefundsCard', urgency: 'today', count: 'payments.refunds-waiting' },
+    ],
     'core.vocabulary': [{
       id: 'payments.refund-decline-reason',
       label: 'Reasons for declining a refund',
