@@ -82,7 +82,7 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page).toHaveURL(/\/book\/basket$/)
   await expect(page.getByRole('heading', { name: 'Check and pay' })).toBeVisible()
   await expect(page.getByText(/Held for \d+:\d\d/)).toBeVisible()
-  await expect(page.getByText(`2 × Circle, Online price ${stamp}`)).toBeVisible()
+  await expect(page.getByText(`2 × Online price ${stamp}`)).toBeVisible()
   await page.getByLabel('Your name').fill('Online Buyer')
   await page.getByLabel('Email address').fill(`online.buyer.${stamp}@example.org`)
   await noViolations(page)

@@ -78,3 +78,35 @@ test('a ticket type is dragged by its handle, or moved from the keyboard, and th
   await expect.poll(() => saved(page)).toEqual([names[1], names[0], names[2]])
   await expect(handle(names[1]!)).toBeFocused()
 })
+
+// A slow network: each save waits before it reaches the server and each load arrives late, so the
+// load after one save can be answered before the next save is stored and land after it was made.
+// The screen keeps the newer order, and the next move starts from it.
+test('a load answered before the latest save does not put rows back', async ({ page }) => {
+  await page.route('**/api/box-office/ticket-types**', async (route) => {
+    if (route.request().method() === 'PUT') {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      return route.continue()
+    }
+    if (route.request().method() !== 'GET') return route.continue()
+    const response = await route.fetch()
+    await new Promise(resolve => setTimeout(resolve, 400))
+    return route.fulfill({ response })
+  })
+  await visit(page)
+  const start = await drawn(page)
+  const handle = (name: string) => page.getByRole('button', { name: `Move ${name}` })
+
+  // The first row goes down one, then down one more as soon as the first move is stored.
+  await handle(start[0]!).focus()
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => saved(page)).toEqual([start[1], start[0], start[2]])
+  await handle(start[0]!).focus()
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => saved(page)).toEqual([start[1], start[2], start[0]])
+  // Then the middle row goes up: from the order on screen, not the one the late load carried.
+  await handle(start[2]!).focus()
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(() => drawn(page)).toEqual([start[2], start[1], start[0]])
+  await expect.poll(() => saved(page)).toEqual([start[2], start[1], start[0]])
+})

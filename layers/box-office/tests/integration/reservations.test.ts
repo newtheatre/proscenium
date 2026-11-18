@@ -89,6 +89,7 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     const told = await mail('box-office.order-reserved', b.orderId)
     expect(told).toMatchObject({ reference: b.reference, tickets: '2 × Full price', deskCode: done.body.deskCode })
     expect(told.amountDue).toContain('24.00')
+    expect(told.doors).toMatch(/\d/)
     expect(tokenOf(told.link!)).toBe(done.body.token)
     // With no site address recorded there is no link to open the account, so nothing promises one.
     expect(told.account).toBeUndefined()
