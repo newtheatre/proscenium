@@ -1,7 +1,8 @@
-// First-run setup makes the first Owner (ID-37). It runs only while no Owner role exists, and it
-// will not finish without a passkey and a recovery code typed back. Between steps, what has been
-// given travels in a sealed cookie; nothing is written until the last step, which writes
-// everything in one batch guarded by "no Owner role yet".
+// First-run setup makes the first Owner (ID-37) and records the theatre's name, time zone, country
+// and contact address: without a time zone no theatre date can be worked out (R7). It runs only
+// while no Owner role exists, and it will not finish without a passkey and a recovery code typed
+// back. Between steps, what has been given travels in a sealed cookie; nothing is written until the
+// last step, which writes everything in one batch guarded by "no Owner role yet".
 import type { H3Event } from 'h3'
 import { first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { openValue, sealValue } from './crypto'
@@ -11,12 +12,18 @@ import type { NewCredential } from './passkeys'
 
 export const SETUP_LIFETIME = 30 * 60 // not-policy: seconds a person has to finish the three setup steps
 
+/** The theatre's own details, asked for in setup's second step and saved with the Owner. */
+export interface SetupTheatre {
+  name: string
+  timeZone: string
+  country: string
+  contactEmail?: string
+}
+
 export interface SetupTicket {
   name: string
   address: string
-  /** The theatre's name and time zone, asked at setup (AC-11) and saved with the Owner. */
-  theatre?: string
-  timeZone?: string
+  theatre?: SetupTheatre
   userId: string
   challengeId: string
   credential?: NewCredential

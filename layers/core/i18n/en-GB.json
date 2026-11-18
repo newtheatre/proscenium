@@ -188,6 +188,8 @@
   "core.failed.offline": "You seem to be offline, so this could not be loaded.",
   "core.failed.retry": "Try again",
   "core.failed.stale": "Could not refresh. Showing what was loaded at {time}.",
+  "core.refusal.time-zone-unset.action": "Set the time zone",
+  "core.refusal.time-zone-unset.ask": "Ask an admin to set the theatre's time zone in Admin, on the Theatre page.",
   "core.not-found.title": "Page not found",
   "core.not-found.description": "There is nothing at this address. It may have moved, or it may never have existed.",
   "core.refused.title": "You cannot open this page",

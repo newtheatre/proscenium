@@ -142,9 +142,12 @@ export async function reassert(browser: Browser, device: Authenticator) {
   return browser.post('/api/core/me/reassert', { challengeId: options.body.challengeId, response: await device.get(options.body.options) })
 }
 
+/** The theatre setup's second step describes. UTC keeps a test's times where they were before setup asked. */
+export const SETUP_THEATRE = { name: 'The Test Theatre', timeZone: 'UTC', country: 'GB' }
+
 /** Runs first-run setup in a browser and returns the Owner's account id. */
-export async function setUpOwner(browser: Browser, device: Authenticator, to = address(), theatre: { theatre?: string, timeZone?: string } = {}): Promise<string> {
-  const start = await browser.post('/api/core/setup/start', { name: 'Olive Owner', address: to, ...theatre })
+export async function setUpOwner(browser: Browser, device: Authenticator, to = address()): Promise<string> {
+  const start = await browser.post('/api/core/setup/start', { name: 'Olive Owner', address: to, theatre: SETUP_THEATRE })
   if (start.status !== 200) throw new Error(`setup start failed: ${JSON.stringify(start.body)}`)
   const passkey = await browser.post('/api/core/setup/passkey', { response: await device.create(start.body.options) })
   const finished = await browser.post('/api/core/setup/finish', { code: passkey.body.recoveryCodes[0] })
