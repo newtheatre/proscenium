@@ -74,8 +74,8 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page.getByRole('button', { name: 'Choose your tickets' })).toBeDisabled()
   await noViolations(page)
 
-  await page.getByRole('button', { name: 'Increment' }).click()
-  await page.getByRole('button', { name: 'Increment' }).click()
+  await page.getByRole('button', { name: `Add one Online price ${stamp} ticket` }).click()
+  await page.getByRole('button', { name: `Add one Online price ${stamp} ticket` }).click()
   await page.getByRole('button', { name: 'Hold 2 tickets, £20.00' }).click()
 
   await expect(page).toHaveURL(/\/book\/basket$/)
@@ -168,8 +168,8 @@ test('a buyer types a promo code, sees the saving on one ticket, and holds at th
   await expect(page.getByText(`${promoCode} applied. The prices above include it.`)).toBeVisible()
   await noViolations(page)
   // The code is for one ticket an order: the second is at the full price.
-  await page.getByRole('button', { name: 'Increment' }).click()
-  await page.getByRole('button', { name: 'Increment' }).click()
+  await page.getByRole('button', { name: `Add one Online price ${stamp} ticket` }).click()
+  await page.getByRole('button', { name: `Add one Online price ${stamp} ticket` }).click()
   await page.getByRole('button', { name: 'Hold 2 tickets, £18.00' }).click()
   await expect(page).toHaveURL(/\/book\/basket$/)
   await expect(page.getByRole('button', { name: 'Reserve and pay £18.00 at the box office' })).toBeVisible()
