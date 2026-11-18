@@ -217,3 +217,33 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await browser.close()
   }
 })
+
+test('the door keeps checking tickets offline from its copy, and sends what it admitted on reconnecting', async ({ playwright }) => {
+  const browser = await playwright.chromium.launch()
+  const context = await browser.newContext({ ...base, ...as(seller) })
+  const page = await context.newPage()
+  try {
+    const copied = page.waitForResponse(r => r.url().includes(`/performances/${performanceId}/door/offline`) && r.request().method() === 'GET')
+    await visit(page, `/live/door/${performanceId}`)
+    await copied
+    await context.setOffline(true)
+    await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeVisible()
+    const box = () => page.getByRole('dialog').getByLabel('Ticket code, booking reference or name')
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await box().fill(doorCode)
+    await box().press('Enter')
+    // Its signature is checked on the device and its ticket found in the copy: in, or in already.
+    const checked = page.getByRole('status').filter({ hasText: /Admitted|Already in/ })
+    await expect(checked).toContainText('Checked on this device')
+    // A code the theatre did not sign is caught without the server.
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await box().fill('tkt.nokey.NOTACODE.c2lnbmF0dXJl')
+    await box().press('Enter')
+    await expect(page.getByRole('status').filter({ hasText: 'Altered code' })).toBeVisible()
+    await context.setOffline(false)
+    await expect(page.getByText(/waiting to send/)).toHaveCount(0, { timeout: 15_000 })
+  }
+  finally {
+    await browser.close()
+  }
+})
