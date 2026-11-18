@@ -11,6 +11,8 @@ export interface ConfirmRequest {
   consequence: string
   /** The button's own words, when more than the verb helps: "Cancel performance". */
   button?: string
+  /** 'danger' (the default) draws the button red, for an act that takes something away; 'primary' for one that does not. */
+  tone?: 'danger' | 'primary'
 }
 
 export function useConfirm() {

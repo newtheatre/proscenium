@@ -219,7 +219,7 @@ export interface Definition {
   calculations?: Calculation[]
   endings?: Ending[]
   workflow?: Workflow
-  presentation?: { submitLabel?: string, confirmation?: string, progress?: boolean }
+  presentation?: { introduction?: string, submitLabel?: string, confirmation?: string, progress?: boolean }
 }
 
 // ---- answers and results ----

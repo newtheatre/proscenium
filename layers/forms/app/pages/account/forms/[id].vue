@@ -14,6 +14,7 @@ interface Own {
   calculated?: Record<string, string | number | null> | null
   values: Answers | null
   progress: { status: string, kind: string, note: string | null, canChange: boolean } | null
+  history: { at: number, status: string, kind: string }[]
   today: string
 }
 const { t } = useT()
@@ -118,13 +119,42 @@ async function send(kept: Answers): Promise<boolean> {
           @click="changing = false"
         />
       </template>
-      <FormsAnswers
-        v-else
-        :definition="own.definition"
-        :answers="own.answers"
-        :calculated="own.calculated"
-        placed-only
-      />
+      <template v-else>
+        <section
+          v-if="own.history.length > 1"
+          class="space-y-2"
+        >
+          <h2 class="text-sm font-medium text-muted">
+            {{ t('forms.screens.mine.history') }}
+          </h2>
+          <ol class="space-y-1.5">
+            <li
+              v-for="(h, i) in own.history"
+              :key="i"
+              class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+            >
+              <StatusBadge
+                :tone="formsStageTone(h.kind)"
+                :label="h.status"
+              />
+              <span class="text-muted">{{ dateTime(h.at) }}</span>
+            </li>
+          </ol>
+        </section>
+        <FormsAnswers
+          :definition="own.definition"
+          :answers="own.answers"
+          :calculated="own.calculated"
+          placed-only
+        />
+        <UButton
+          :label="t('forms.screens.mine.back')"
+          icon="i-lucide-arrow-left"
+          to="/account/forms"
+          color="neutral"
+          variant="subtle"
+        />
+      </template>
     </div>
   </PageFrame>
 </template>

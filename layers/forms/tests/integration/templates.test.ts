@@ -32,6 +32,11 @@ describe('templates', () => {
     const stages = await draftOf(proposal.body.formId)
     expect(stages.workflow.stages).toHaveLength(5)
     expect(stages.calculations[0].key).toBe('total')
+    // A shipped template says how long it keeps answers, so it can be published as it comes; the builder is told what would stop it.
+    expect((await rows('SELECT retention_days FROM forms_forms WHERE id = ?', proposal.body.formId))[0]).toEqual({ retention_days: 730 })
+    const plan = await req('GET', `/api/forms/forms/${proposal.body.formId}/publish`)
+    expect(plan.body.refusals).toEqual([])
+    expect((await req('GET', `/api/forms/forms/${proposal.body.formId}`)).body).toMatchObject({ requireRetention: true, shared: false })
     expect((await req('POST', '/api/forms/forms', { title: 'Nothing', template: 'ftpl_nothing' })).body.code).toBe('forms.template.not-found')
   })
 

@@ -8,7 +8,7 @@
 // made from, so a whole run can be edited later: the new pattern is matched against what the run
 // made, and the difference is shown (added, moved, cancelled) before anything changes.
 import { sql, type SQL } from 'drizzle-orm'
-import { all, createUnit, first, isRefusal, newId, nowMs, refuse, requireAbility, useSetting } from '#kit'
+import { all, createUnit, first, isRefusal, newId, nowMs, refuse, requireAbility, TIME_ZONE_REMEDY, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
@@ -86,7 +86,7 @@ const rows = async () => await useSetting('core.units.set-rows-limit') as number
 const toStatus = (r: RunRow): RunStatus => ({ id: r.id, total: r.total, done: r.done, state: r.state, stopReason: r.stop_reason, scheduled: !!r.scheduled })
 
 async function rule(): Promise<DayRule> {
-  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
+  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
 }
 
 function* dates(from: string, to: string): Generator<{ date: string, weekday: number }> {

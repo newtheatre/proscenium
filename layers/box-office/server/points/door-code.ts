@@ -17,4 +17,10 @@ export interface DoorCodeKind {
   issue: (subjectId: string) => Promise<string | null>
   /** What a scan shows: a headline and one line, holding no name. Null when the code is not known. */
   resolve: (code: string) => Promise<{ headline: string, line: string, state: 'ok' | 'attention' } | null>
+  /**
+   * Whose card it is, for the till: the holder's account, so a ticket for members or holders can be
+   * sold to them by scanning it. Never shown at the door. Null when the code is not known. Optional:
+   * a kind without it cannot name a holder.
+   */
+  holder?: (code: string) => Promise<string | null>
 }

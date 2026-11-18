@@ -22,7 +22,7 @@ const { t } = useT()
         @click="emit('close', false)"
       />
       <UButton
-        color="error"
+        :color="tone === 'primary' ? 'primary' : 'error'"
         :label="button ?? verb"
         @click="emit('close', true)"
       />

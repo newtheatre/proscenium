@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import type { DataClass, Definition, FileRef, Question, Value } from '../../shared/engine'
 import type { Figure } from '../../shared/figures'
+import { moneyWords } from '../../shared/words'
 
 export interface ShownAnswer { questionId: string, repeatIndex: number, dataClass: DataClass, restricted: boolean, value: Value, other: string | null, label: string | null }
 
@@ -26,6 +27,8 @@ const figures = (onPage: (page: string | undefined) => boolean) => props.calcula
   ? (props.definition.calculations ?? []).filter(c => onPage(c.page) && props.calculated![c.id] !== undefined).map(c => ({ key: `calc:${c.id}`, id: c.id, label: figureName(c), text: figure(c, props.calculated![c.id]) }))
   : []
 const unplaced = computed(() => props.placedOnly ? [] : figures(page => !props.definition.pages.some(p => p.id === page)))
+const { data: settings } = usePublicSettings()
+const currency = computed(() => (settings.value?.['core.locale.currency']?.value as string | undefined) ?? 'GBP')
 
 const of = (id: string) => props.answers.filter(a => a.questionId === id)
 function words(q: Question, a: ShownAnswer): string {
@@ -33,7 +36,7 @@ function words(q: Question, a: ShownAnswer): string {
   const v = a.value
   if (v === null || v === undefined) return ''
   if (typeof v === 'boolean') return v ? t('forms.screens.logic.yes') : t('forms.screens.logic.no')
-  if (typeof v === 'number') return q.type === 'money' ? (v / 100).toFixed(2) : String(v) // not-policy: minor units to units
+  if (typeof v === 'number') return q.type === 'money' ? moneyWords(v, currency.value) : String(v)
   if (typeof v === 'string') return q.type === 'date' ? day(v) : q.type === 'datetime' ? dateTime(new Date(v)) : v
   if (Array.isArray(v)) return v.map(x => typeof x === 'string' ? x : x.name).join(', ')
   return [v.line1, v.line2, v.town, v.county, v.postcode, v.country].filter(Boolean).join(', ')
@@ -45,13 +48,16 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
     const questions = item.kind === 'question' ? [item] : item.kind === 'row' || item.kind === 'group' ? item.items : []
     return questions.flatMap(q => of(q.id).map(a => ({
       key: `${q.id}.${a.repeatIndex}`,
-      label: item.kind === 'group' ? `${item.label} ${a.repeatIndex + 1}: ${formsQuestionName(q)}` : formsQuestionName(q),
+      label: formsQuestionName(q),
+      // An entry of a repeating group is read under the group's name and its number.
+      entry: item.kind === 'group' ? { name: item.label, n: a.repeatIndex + 1 } : null,
       restricted: a.restricted,
       changed: !!props.changed?.includes(q.id),
       text: a.restricted ? '' : words(q, a),
       // A file answer reads as links to the files, which open for whoever may read the response.
       files: !a.restricted && q.type === 'file' && Array.isArray(a.value) ? a.value as FileRef[] : null,
-    })))
+    }))).sort((a, b) => (a.entry?.n ?? 0) - (b.entry?.n ?? 0))
+      .map((row, i, rows) => ({ ...row, heading: row.entry && (i === 0 || rows[i - 1]!.entry?.n !== row.entry.n) ? row.entry : null }))
   }),
   figures: figures(id => id === page.id),
 })).filter(p => p.rows.length || p.figures.length))
@@ -81,7 +87,14 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
           v-for="row in page.rows"
           :key="row.key"
           class="grid gap-1 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-4"
+          :class="row.entry ? 'ps-3' : ''"
         >
+          <p
+            v-if="row.heading"
+            class="-ms-3 text-sm font-medium sm:col-span-2"
+          >
+            {{ t('forms.screens.answers.entry', { name: row.heading.name, n: row.heading.n }) }}
+          </p>
           <dt class="text-sm text-muted">
             {{ row.label }}
             <StatusBadge

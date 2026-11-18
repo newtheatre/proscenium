@@ -117,6 +117,30 @@ describe('routes (F-04)', () => {
       })
     }
   })
+
+  it('lets staff read under their own, larger allowance (L15)', async () => {
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'core.rate-limits.default', { count: 2, per: '1m' }, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
+    try {
+      const reads = async (actor: ReturnType<typeof person>) => {
+        const statuses: number[] = []
+        for (let i = 0; i < 3; i++) statuses.push((await call(handle, 'GET', '/api/core/health', { actor })).status)
+        return statuses
+      }
+      expect(await reads(person([]))).toEqual([200, 200, 429])
+      expect(await reads(person(['core.settings.manage']))).toEqual([200, 200, 200])
+    }
+    finally {
+      await inContext(async () => {
+        const unit = createUnit()
+        await changeSetting(unit.view(), 'core.rate-limits.default', null, { reset: true, reason: 'test', confirm: true })
+        await unit.commit()
+      })
+    }
+  })
 })
 
 describe('settings (F-09)', () => {

@@ -17,7 +17,9 @@ import type { Rate } from './settings'
 // each network address on the public sign-in routes (high, as a students' union or halls network
 // shares one address), sign-in-link for each email address asking for a link, and sign-in-code for
 // each email address trying a code. sign-in is the class of the other identity routes.
-export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'sign-in-link', 'sign-in-code', 'public-form', 'export', 'presented-value'] as const
+// staff is not declared by routes: a signed-in person who holds a role reads under it in place of
+// default, since one console page asks for many things and staff move quickly between them (L15).
+export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'sign-in-link', 'sign-in-code', 'public-form', 'export', 'presented-value', 'staff'] as const
 export type RateClass = typeof RATE_CLASSES[number]
 
 /** Classes counted in the shared store, shared by every instance. */

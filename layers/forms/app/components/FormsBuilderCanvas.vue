@@ -73,10 +73,13 @@ function onEnd(event: any) {
 
 function add(kind: QuestionType | 'content' | 'group', into = page.value.id) {
   const item = kind === 'content' ? blankContent(def.value) : kind === 'group' ? blankGroup(def.value) : blankQuestion(def.value, kind)
+  // A new choice starts with options that can be read, so it is not a list of problems before anything is typed.
+  if (item.kind === 'question') item.options?.forEach((o, i) => { o.label = t('forms.screens.options.placeholder', { n: i + 1 }) })
   builder.apply(addItem(def.value, into, item))
   builder.select(item.id)
 }
 defineExpose({ add })
+const outline = ref(false)
 
 // ---- the outline: pages and endings ----
 const { confirm } = useConfirm()
@@ -162,7 +165,18 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
         class="space-y-4 lg:sticky lg:top-4 lg:self-start"
         :aria-label="t('forms.screens.builder.outline')"
       >
-        <div>
+        <!-- On a phone the outline folds away, so the questions are not a screen below it. -->
+        <UButton
+          class="lg:hidden"
+          :label="t('forms.screens.builder.outline-n', { page: pageName(page, def.pages.indexOf(page)), n: def.pages.indexOf(page) + 1, count: def.pages.length })"
+          :trailing-icon="outline ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          color="neutral"
+          variant="subtle"
+          block
+          :aria-expanded="outline"
+          @click="outline = !outline"
+        />
+        <div :class="outline ? '' : 'hidden lg:block'">
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('forms.screens.builder.pages') }}
           </p>
@@ -188,7 +202,7 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
             @click="newPage"
           />
         </div>
-        <div>
+        <div :class="outline ? '' : 'hidden lg:block'">
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('forms.screens.endings.title') }}
           </p>

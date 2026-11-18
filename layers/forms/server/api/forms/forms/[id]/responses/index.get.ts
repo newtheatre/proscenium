@@ -4,7 +4,7 @@
 // a time.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { can, defineRoute } from '#kit'
+import { can, defineRoute, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
 import { cells, columnsOf, figureColumns, listResponses, readAnswers, storedFigures } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
@@ -36,12 +36,13 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
   const staged = !!liveDef && hasStages(liveDef)
   const mayMove = staged && (await can(actor, 'forms.response.move', on)).allowed
   const mayDecide = mayMove && (await can(actor, 'forms.response.decide', on)).allowed
+  const currency = await useSetting('core.locale.currency') as string
   return {
     form: { id: form.id, title: form.title, slug: form.slug, anonymous: form.anonymous, status: form.status },
     columns,
     // A column per calculation of the live version. One worked out from restricted answers shows as restricted.
     calculations: figureColumns(liveDef),
-    rows: rows.map(r => ({ figures: storedFigures(defs.get(r.versionId)!, r.calculated, false) ?? {}, id: r.id, reference: r.reference, version: r.versionNumber, who: r.personName ?? r.respondentEmail, submittedAt: r.submittedAt, stage: hasStages(defs.get(r.versionId)!) ? { key: r.stageKey, name: stageIn(defs.get(r.versionId)!, r).name, kind: r.stageKind } : null, cells: cells(answers.get(r.id)!, columns) })),
+    rows: rows.map(r => ({ figures: storedFigures(defs.get(r.versionId)!, r.calculated, false) ?? {}, id: r.id, reference: r.reference, version: r.versionNumber, who: r.personName ?? r.respondentEmail, submittedAt: r.submittedAt, stage: hasStages(defs.get(r.versionId)!) ? { key: r.stageKey, name: stageIn(defs.get(r.versionId)!, r).name, kind: r.stageKind } : null, cells: cells(answers.get(r.id)!, columns, currency) })),
     // The stages to filter by are the live version's; a form without stages shows nothing about them.
     // Each carries the moves staff may make from it, which is what one move on several rows offers.
     stages: staged ? liveDef!.workflow!.stages.map(s => ({ key: s.key, name: s.name, kind: s.kind, moves: mayMove ? staffMoves(liveDef!, s.key, mayDecide).map(m => ({ key: m.key, label: m.label, to: stageOf(liveDef!, m.to)?.name ?? m.to, toKind: stageOf(liveDef!, m.to)?.kind ?? 'closed', decision: isDecision(liveDef!, m), needsReason: !!m.needsReason })) : [] })) : [],
