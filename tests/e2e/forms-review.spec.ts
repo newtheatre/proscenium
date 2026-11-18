@@ -75,7 +75,7 @@ test('a panel votes in private, the chair releases the result and decides with a
   await expect(share.getByLabel('Address')).toHaveValue(/\/forms\//)
   const address = new URL(await share.getByLabel('Address').inputValue()).pathname
   await share.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared')).toBeVisible()
+  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
 
   // ---- a member sends a nomination, and the chair puts it to the panel ----
   const mine = await as(browser, member)
