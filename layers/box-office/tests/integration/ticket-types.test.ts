@@ -274,7 +274,7 @@ describe('a member price by reference', () => {
     await referenced()
     await publish(h)
     const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
-    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.', reference: { label: expect.stringMatching(/: type your (member number|membership reference) to get this price$/), field: expect.stringMatching(/^(Member number|Membership reference)$/) } })
+    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.', reference: { label: expect.stringMatching(/: type your (member number|membership reference or member number) to get this price$/), field: expect.stringMatching(/^(Member number|Membership reference)$/) } })
   })
 })
 

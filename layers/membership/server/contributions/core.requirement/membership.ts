@@ -7,7 +7,7 @@
 // Evidence is the list entry's id where one exists, otherwise the membership's id (V11).
 import { all, defineRequirementSource, first, localDate, useSetting, type SourceAnswer } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { findEntry, getList, normalise, schemeList, wellFormed, type ListRow } from '../../lists'
+import { findEntry, getList, normalise, nounOf, schemeList, wellFormed, type ListRow } from '../../lists'
 import { getScheme, listSchemes, type Scheme } from '../../schemes'
 import { shapeText } from '../../verify'
 
@@ -130,9 +130,11 @@ export default defineRequirementSource({
     const out: Record<string, { label: string, presentable?: { label: string, field?: string, shape: string } }> = {}
     const presentableOf = async (scheme: Scheme) => {
       const list = await schemeList(scheme)
-      // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a sentence.
+      // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a
+      // sentence; the hint uses the list's short noun, and says a member number works too, since a
+      // member added by staff may have no reference on the list.
       return list?.keyKind === 'reference'
-        ? { label: `${scheme.name}: type your reference to get this price`, field: list.referenceLabel ?? 'Membership reference', shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
+        ? { label: `${scheme.name}: type your ${nounOf(list)} or member number to get this price`, field: list.referenceLabel ?? 'Membership reference', shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
         : { label: `${scheme.name}: type your member number to get this price`, field: 'Member number', shape: 'member-number' }
     }
     for (const ref of refs) {
@@ -143,7 +145,7 @@ export default defineRequirementSource({
         const taking = (await listSchemes(['open', 'closed'])).filter(s => s.acceptsReference)
         out[ref] = taking.length === 1
           ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
-          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference to get this price', field: 'Membership reference', shape: 'reference' } } : { label: 'Members' }
+          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', shape: 'reference' } } : { label: 'Members' }
         continue
       }
       const scheme = await getScheme(id)
@@ -151,7 +153,7 @@ export default defineRequirementSource({
         out[ref] = { label: NO_LONGER }
         continue
       }
-      // V13: the label names the scheme, never a bare noun. A list's own label where it has one.
+      // V13: the list's own question, never a bare noun; for member numbers, built from the scheme's name.
       out[ref] = scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }
     }
     return out
@@ -211,7 +213,7 @@ export default defineRequirementSource({
             if (number === null && !shaped) {
               // V15: not well formed, so say what one looks like.
               const sample = lists[0]?.list
-              const reason = sample ? shapeText(sample.referenceShape) : 'That is not a member number. It is the number on your membership card, such as M-412.'
+              const reason = sample ? shapeText(nounOf(sample), sample.referenceShape) : 'That is not a member number. It is the number on your membership card, such as M-412.'
               out.push({ account, ref: fullRef, verdict: 'not-met', reason, summary: 'Not a well-formed reference.' })
               continue
             }
@@ -229,8 +231,8 @@ export default defineRequirementSource({
           const reason = !list || typedValue === null
             ? 'We could not find a current membership for that number. Have a membership? Contact us.'
             : lists.some(l => wellFormed(l.list.referenceShape, typedValue))
-              ? 'We could not find a current membership with that reference. Have a membership? Contact us.'
-              : shapeText(list.referenceShape)
+              ? `We could not find a current membership with that ${nounOf(list)}. Have a membership? Contact us.`
+              : shapeText(nounOf(list), list.referenceShape)
           out.push({ account, ref: fullRef, verdict: 'not-met', reason, help, summary: 'No current membership found for the reference given.' })
           continue
         }
