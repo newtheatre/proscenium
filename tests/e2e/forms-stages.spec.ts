@@ -116,7 +116,7 @@ test('a response moves through stages, goes back for changes and returns as a ne
   await mine.getByRole('button', { name: 'Send changes' }).click()
   await expect(mine.getByText('Your changes have been sent', { exact: true })).toBeVisible()
   // They are told what the form chose to tell them, not the stage's own name.
-  await expect(mine.getByText('Being considered', { exact: true })).toBeVisible()
+  await expect(mine.getByText('Being considered', { exact: true }).first()).toBeVisible()
   await expect(mine.getByRole('button', { name: 'Make changes' })).toHaveCount(0)
 
   // ---- staff see what changed, compare with the first version, and decide ----
