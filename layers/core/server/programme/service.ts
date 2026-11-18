@@ -9,6 +9,7 @@ import { assertTerm } from '../vocabularies/service'
 import { orderWarnings, type WarningLevel } from './guidance'
 import { changeImpact, firstRefusal, syncProductionDates } from './performances'
 import { sellsHere } from './booking'
+import { missingToPublish, type PublishingNeed } from './readiness'
 
 // ---------------------------------------------------------------------------------------------
 // Slugs
@@ -319,6 +320,29 @@ export async function createProduction(unit: UnitView, input: ProductionInput, a
 }
 
 /**
+ * A new draft from an existing production (C-01), a quick start on a revival or next year's show:
+ * its details, defaults, staging effects and content warnings come across; its season, dates,
+ * credits, poster and photos do not, nor its state.
+ */
+export async function duplicateProduction(unit: UnitView, id: string, actorId: string | null): Promise<string> {
+  const row = await productionRow(id)
+  const copy = newId('prd')
+  const title = `${row.title} (copy)`.slice(0, 200) // not-policy: the table's bound on a title
+  const slug = await freeSlug(slugFrom(title, 'production'), s => productionSlugTaken(s))
+  unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_min, age_restricted,
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, state, listed, created_by, created_at)
+    SELECT ${copy}, ${slug}, ${title}, subtitle, summary, description, kind, category_term_id, NULL, company_name, age_min, age_restricted,
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, 'draft', listed, ${actorId}, ${nowMs()}
+    FROM core_productions WHERE id = ${id}`).expect(1, { code: 'core.production.changed', reason: 'Someone else changed this production just now.', remedy: 'Refresh and try again.' })
+  unit.add(sql`INSERT INTO core_production_advisories (production_id, term_id, level, level_assumed, detail)
+    SELECT ${copy}, term_id, level, level_assumed, detail FROM core_production_advisories WHERE production_id = ${id}`)
+  unit.add(sql`INSERT INTO core_production_effects (production_id, term_id, detail)
+    SELECT ${copy}, term_id, detail FROM core_production_effects WHERE production_id = ${id}`)
+  unit.audit({ action: 'create', record: ['core.production', copy], detail: { from: id } })
+  return copy
+}
+
+/**
  * Changes a production's details. A new slug keeps the old one as a redirect once the production
  * has ever been public. On a published production, a change to a public field is announced with
  * the names of the fields, never their values.
@@ -404,17 +428,10 @@ export async function setEffects(unit: UnitView, id: string, effects: Effect[]):
   if (row.state === 'published') unit.announce('core.production.updated', { productionId: id, fields: ['effects'], ...(added.length ? { guidanceAdded: { effectTermIds: added, warnings: [] } } : {}) }, { record: ['core.production', id] })
 }
 
-/** What publishing still needs, in the words the person sees. Empty when it can be published. */
-export async function publishingNeeds(id: string): Promise<string[]> {
-  const row = await productionRow(id)
-  const needs: string[] = []
-  if (!row.summary) needs.push('a summary')
-  if (!row.category_term_id) needs.push('a category')
-  if (!row.effects_confirmed_none && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id)) needs.push('its staging effects, or confirmation that it has none')
-  if (!row.advisories_confirmed_none && !await first('SELECT 1 FROM core_production_advisories WHERE production_id = ?', id)) needs.push('its content warnings, or confirmation that it has none')
-  // With no booking module switched on, the public can only book through the production's own link.
-  if (!row.external_booking_url && !await sellsHere()) needs.push('a booking link, as nothing here sells tickets')
-  return needs
+/** What publishing still needs, as the page's "Ready to publish?" lines that stop it. Empty when it can be published. */
+export async function publishingNeeds(id: string): Promise<PublishingNeed[]> {
+  await productionRow(id)
+  return missingToPublish(id)
 }
 
 /** Draft or withdrawn to published (part 3). Does not publish its dates. */
@@ -423,7 +440,7 @@ export async function publishProduction(unit: UnitView, id: string): Promise<voi
   if (row.state === 'published') return
   if (row.state === 'cancelled') refuse('core.production.cancelled', 'A cancelled production cannot be published.', { status: 409, remedy: 'Undo the cancellation first.' })
   const needs = await publishingNeeds(id)
-  if (needs.length) refuse('core.production.not-ready', `To publish, the production needs ${needs.join(', ')}.`, { status: 422 })
+  if (needs.length) refuse('core.production.not-ready', needs.length === 1 ? 'This production needs 1 more thing before it can be published.' : `This production needs ${needs.length} more things before it can be published.`, { status: 422, remedy: `Still to do: ${needs.map(n => n.sentence.charAt(0).toLowerCase() + n.sentence.slice(1)).join('; ')}.` })
   unit.add(sql`UPDATE core_productions SET state = 'published', published_at = coalesce(published_at, ${nowMs()})
     WHERE id = ${id} AND state = ${row.state} AND summary IS NOT NULL AND category_term_id IS NOT NULL
       AND (effects_confirmed_none = 1 OR EXISTS (SELECT 1 FROM core_production_effects WHERE production_id = ${id}))

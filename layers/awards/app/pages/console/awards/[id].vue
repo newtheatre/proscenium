@@ -2,7 +2,7 @@
      Correcting changes its wording, date and where it is listed; revoking takes it back with a
      reason, which leaves the roll and stops its ticket price. -->
 <script setup lang="ts">
-interface Award { id: string, typeId: string, typeName: string, accountId: string | null, recipientName: string, awardedOn: string, awardedFor: string | null, citation: string | null, productionId: string | null, productionTitle: string | null, decidedOn: string | null, decisionNote: string | null, source: string, visibility: 'public' | 'members' | 'hidden', state: 'current' | 'revoked', revokedAt: number | null, revokeReason: string | null }
+interface Award { id: string, typeId: string, typeName: string, accountId: string | null, recipientName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, productionId: string | null, productionTitle: string | null, decidedOn: string | null, decisionNote: string | null, source: string, visibility: 'public' | 'members' | 'hidden', state: 'current' | 'revoked', revokedAt: number | null, revokeReason: string | null, responseId: string | null }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -10,6 +10,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const { day, dateTime } = useDates()
+const awardDate = useAwardDate()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ award: Award, canUpdate: boolean, canRevoke: boolean }>(() => `/api/awards/awards/${id.value}`, { key: `awards:award:${id.value}` })
 const a = computed(() => data.value?.award)
@@ -19,13 +20,21 @@ const facts = computed(() => {
   if (!x) return []
   return [
     { label: t('awards.screens.award.type'), value: x.typeName },
-    { label: t('awards.screens.award.awarded-on'), value: day(x.awardedOn) },
+    { label: t('awards.screens.award.awarded-on'), value: awardDate(x) },
     ...(x.awardedFor ? [{ label: t('awards.screens.award.awarded-for'), value: x.awardedFor }] : []),
     ...(x.productionTitle ? [{ label: t('awards.screens.award.production'), value: x.productionTitle }] : []),
-    { label: t('awards.screens.award.listed'), value: t(`awards.screens.visibility.${x.visibility}`) },
+    { label: t('awards.screens.award.listed'), value: x.state === 'revoked' ? t('awards.screens.award.listed-revoked') : t(`awards.screens.visibility.${x.visibility}`) },
     { label: t('awards.screens.award.source'), value: t(`awards.screens.sources.${x.source}`) },
   ]
 })
+// The nomination an award came from, as forms names it, for those who may read its responses.
+const nomination = ref<{ title: string, to: string | null } | null>(null)
+watch(() => a.value?.responseId, async (responseId) => {
+  nomination.value = null
+  if (!responseId) return
+  const found = await $api<{ records: { title: string, to: string | null }[] }>('/api/core/records', { query: { type: 'forms.response', ids: responseId } }).catch(() => ({ records: [] }))
+  nomination.value = found.records[0] ?? null
+}, { immediate: true })
 const decision = computed(() => [a.value?.decidedOn ? day(a.value.decidedOn) : null, a.value?.decisionNote].filter(Boolean).join(' · '))
 
 const editing = ref(false)
@@ -66,13 +75,17 @@ function openLink() {
   linkKey = crypto.randomUUID()
   linking.value = true
 }
-async function saveLink() {
+async function saveLink(merge: unknown = false) {
   linkRefusal.value = null
+  const merging = merge === true
+  // A merge says something different from the link that was refused, so it is its own request.
+  if (merging) linkKey = crypto.randomUUID()
   try {
-    await $api(`/api/awards/awards/${id.value}/link` as string, { method: 'POST', headers: { 'idempotency-key': linkKey }, body: link.how === 'person' ? { accountId: link.accountId } : { address: link.address.trim() } })
+    const who = link.how === 'person' ? { accountId: link.accountId } : { address: link.address.trim() }
+    await $api(`/api/awards/awards/${id.value}/link` as string, { method: 'POST', headers: { 'idempotency-key': linkKey }, body: merging ? { ...who, merge: true } : who })
     linking.value = false
-    toast.add({ title: t('awards.screens.link.linked-toast'), color: 'success' })
-    await Promise.all([refresh(), refreshNuxtData('awards:list')])
+    toast.add({ title: t(merging ? 'awards.screens.link.merged-toast' : 'awards.screens.link.linked-toast'), color: 'success' })
+    await Promise.all([refresh(), refreshNuxtData(['awards:list', 'awards:types'])])
   }
   catch (e) {
     linkRefusal.value = toRefusal(e)
@@ -118,7 +131,7 @@ async function revoke() {
       #primary
     >
       <UButton
-        v-if="data?.canUpdate"
+        v-if="data?.canUpdate && a.state === 'current'"
         color="neutral"
         variant="outline"
         icon="i-lucide-pencil"
@@ -126,7 +139,7 @@ async function revoke() {
         @click="openEdit()"
       />
       <UButton
-        v-if="data?.canRevoke"
+        v-if="data?.canRevoke && a.state === 'current'"
         color="neutral"
         variant="outline"
         icon="i-lucide-undo-2"
@@ -166,6 +179,9 @@ async function revoke() {
           v-if="a.accountId"
           :title="t('awards.screens.award.holder')"
         >
+          <p class="font-medium">
+            {{ a.recipientName }}
+          </p>
           <UButton
             color="neutral"
             variant="link"
@@ -193,6 +209,15 @@ async function revoke() {
           <p :class="decision ? '' : 'text-muted'">
             {{ decision || t('awards.screens.award.no-decision') }}
           </p>
+          <UButton
+            v-if="nomination?.to"
+            color="neutral"
+            variant="link"
+            class="px-0"
+            icon="i-lucide-file-text"
+            :to="nomination.to"
+            :label="t('awards.screens.award.open-nomination', { reference: nomination.title })"
+          />
         </PageSection>
       </div>
     </DataBoundary>
@@ -293,6 +318,25 @@ async function revoke() {
           @submit="saveLink"
         >
           <RefusalNotice :refusal="linkRefusal" />
+          <div
+            v-if="linkRefusal?.detail?.awardId"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-merge"
+              :label="t('awards.screens.link.merge')"
+              @click="saveLink(true)"
+            />
+            <UButton
+              color="neutral"
+              variant="link"
+              icon="i-lucide-award"
+              :to="`/console/awards/${linkRefusal.detail.awardId}`"
+              :label="t('awards.screens.link.open-existing')"
+            />
+          </div>
           <UFormField
             name="how"
             :label="t('awards.screens.issue.who')"
@@ -337,7 +381,7 @@ async function revoke() {
 
     <UModal
       v-model:open="revoking"
-      :title="t('awards.screens.award.revoke')"
+      :title="t('awards.screens.award.revoke-title', { name: a?.recipientName ?? '', award: a?.typeName ?? '' })"
       :description="t('awards.screens.award.revoke-help')"
     >
       <template #body>

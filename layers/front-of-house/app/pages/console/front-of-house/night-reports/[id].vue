@@ -17,14 +17,16 @@ interface Report {
   signedOffBy: string | null
   signedOffAt: number | null
   report: Snapshot
-  unresolved: { people: { assignmentId: string, accountId: string, state: string, duty: string }[], openChecklists: string[], missingTimings: string[] } | null
+  /** Each checklist problem's reason and note, keyed `checklistId:item`. */
+  problems: Record<string, { reason: string | null, note: string | null }>
+  unresolved: { people: { assignmentId: string, accountId: string, state: string, duty: string, arrived: boolean }[], openChecklists: string[], missingTimings: string[] } | null
   notes: { id: string, kind: 'note' | 'addendum', topic: Topic, body: string, authorId: string, at: number }[]
   names: Record<string, string>
   performance: { title: string, startsAt: number } | null
   can: { write: boolean, signOff: boolean }
 }
 
-const { t, te } = useT()
+const { t } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
@@ -61,7 +63,9 @@ async function submit() {
 function open(which: 'note' | 'sign-off') {
   refusal.value = null
   noteForm.value = { topic: 'other', body: '' }
-  noShows.value = []
+  // Once anyone was marked arrived, the rest start as not come (they can be unticked).
+  const people = data.value?.unresolved?.people ?? []
+  noShows.value = people.some(p => p.arrived) ? people.filter(p => !p.arrived).map(p => p.assignmentId) : []
   dialog.value = which
 }
 
@@ -75,14 +79,27 @@ const primary = computed(() => {
 const summary = computed(() => {
   const d = data.value
   if (!d) return []
-  const timing = (kind: string) => d.report.timings.find(x => x.kind === kind)
   return [
     ...(d.performance ? [{ label: t('front-of-house.report.performance'), value: dateTime(d.performance.startsAt) }] : []),
-    ...(['house_open', 'curtain_up', 'curtain_down'] as const).map(kind => ({ label: t(`front-of-house.timings.${kind}`), value: timing(kind) ? time(timing(kind)!.at) : t('front-of-house.report.not-recorded') })),
     ...(d.signedOffBy ? [{ label: t('front-of-house.report.signed-off-by'), value: d.names[d.signedOffBy] ?? '' }] : []),
+    ...(d.signedOffAt ? [{ label: t('front-of-house.report.signed-off-at'), value: dateTime(d.signedOffAt) }] : []),
   ]
 })
-const reason = (code: string | null) => code ? (te(code) ? t(code) : code) : t('front-of-house.report.no-reason')
+// Every timing: the four that bound the night always, the interval's two when it had one.
+const timings = computed(() => {
+  const d = data.value
+  if (!d) return []
+  const at = (kind: string) => d.report.timings.find(x => x.kind === kind)?.at
+  const interval = at('interval_start') !== undefined || at('interval_end') !== undefined
+  return (['house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear'] as const)
+    .filter(kind => interval || !kind.startsWith('interval'))
+    .map(kind => ({ label: t(`front-of-house.timings.${kind}`), value: at(kind) !== undefined ? time(at(kind)!) : t('front-of-house.report.not-recorded') }))
+})
+function problem(checklistId: string, x: { item: string, reasonCode: string | null }): string {
+  const found = data.value?.problems?.[`${checklistId}:${x.item}`]
+  const reason = found?.reason ?? t('front-of-house.report.no-reason')
+  return found?.note ? `${x.item}: ${reason} (${found.note})` : `${x.item}: ${reason}`
+}
 const figure = useFigureValue()
 const trail = computed(() => [{ label: t('front-of-house.navigation.night-reports.label'), to: '/console/front-of-house/night-reports' }])
 const title = computed(() => data.value?.performance ? t('front-of-house.report.title', { show: data.value.performance.title }) : t('front-of-house.navigation.night-reports.label'))
@@ -126,11 +143,17 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
         </template>
         <div class="space-y-6">
           <RefusalNotice :refusal="refusal" />
-          <FactStrip :facts="summary" />
+          <FactStrip
+            v-if="summary.length"
+            :facts="summary"
+          />
+          <PageSection :title="t('front-of-house.report.timings')">
+            <FactStrip :facts="timings" />
+          </PageSection>
           <PageSection
             v-for="section in d.report.sections"
             :key="section.id"
-            :title="section.label"
+            :title="figure.label(section.label)"
           >
             <FactStrip
               v-if="section.lines"
@@ -173,7 +196,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
                 :key="c.checklistId"
                 icon="i-lucide-list-checks"
                 :name="c.name"
-                :description="c.exceptions.map(x => `${x.item}: ${reason(x.reasonCode)}`).join(' · ')"
+                :description="c.exceptions.map(x => problem(c.checklistId, x)).join(' · ')"
               >
                 <StatusBadge
                   :tone="c.exceptions.length ? 'warning' : c.state === 'open' ? 'info' : 'success'"
@@ -279,8 +302,11 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
                 v-model="noShows"
                 :legend="t('front-of-house.report.no-shows')"
                 :description="t('front-of-house.report.no-shows-help')"
-                :items="d.unresolved.people.map(p => ({ value: p.assignmentId, label: `${d.names[p.accountId] ?? ''} (${p.duty})` }))"
+                :items="d.unresolved.people.map(p => ({ value: p.assignmentId, label: `${d.names[p.accountId] ?? ''} (${p.duty})`, description: t(p.arrived ? 'front-of-house.report.arrived' : 'front-of-house.report.not-marked-arrived') }))"
               />
+              <p class="text-sm text-muted">
+                {{ t('front-of-house.report.sign-off-final') }}
+              </p>
             </template>
           </UForm>
         </template>

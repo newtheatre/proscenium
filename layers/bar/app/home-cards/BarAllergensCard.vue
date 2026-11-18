@@ -1,5 +1,6 @@
 <!-- The console home card for sizes on sale whose labels are not all read (core.home-card); left off
-     the home while there are none. -->
+     the home while there are none. It lives in app/home-cards, the only folder the home resolves cards
+     from. Its button opens Stock filtered to the items not checked. -->
 <script setup lang="ts">
 defineProps<{ count?: number }>()
 const { t } = useT()
@@ -11,7 +12,7 @@ const { t } = useT()
       {{ t('bar.screens.allergen-card.unchecked', { count: count ?? 0 }) }}
     </p>
     <UButton
-      to="/bar/allergens"
+      to="/admin/modules/bar/stock?allergens=unchecked"
       :label="t('bar.screens.allergen-card.action')"
       color="neutral"
       variant="outline"

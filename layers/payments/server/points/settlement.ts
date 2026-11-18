@@ -40,4 +40,13 @@ export interface Settlement {
    * part (seats, stock). Safe to call twice.
    */
   release?: (unit: UnitView, part: Part) => Promise<void> | void
+  /**
+   * How a person recognises the owner's record behind a part: its reference (an order's, say), who
+   * bought it, and where it opens in the console. Reads only. Money screens show the module's name
+   * alone without it.
+   */
+  describe?: (record: string) => Promise<OwnerRecord | null> | OwnerRecord | null
 }
+
+/** The owner's record behind a part, as money screens name it. */
+export interface OwnerRecord { reference: string, buyer?: string | null, to?: string }

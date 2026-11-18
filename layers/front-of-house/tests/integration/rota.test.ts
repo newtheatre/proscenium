@@ -4,8 +4,8 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, factHolders, newId, setClock } from '#kit'
 import { signUp } from '../../server/assignments'
-import { deliver, inContext, rows, setModule } from '../../../../tests/integration/helpers'
-import { duty, holds, performance, ready, req, setting, shift, shiftRow, volunteer, MINUTE } from './stage'
+import { deliver, env, inContext, rows, setModule } from '../../../../tests/integration/helpers'
+import { duty, holds, manager, performance, ready, req, setting, shift, shiftRow, volunteer, MINUTE } from './stage'
 
 beforeAll(ready)
 
@@ -206,5 +206,45 @@ describe('the console\'s rota', () => {
     expect(one.body.performance).toMatchObject({ title: expect.stringContaining('Front of house show'), startsAt: p.startsAt })
     expect(one.body.shifts).toEqual([expect.objectContaining({ id, places: 3, people: [{ assignmentId: a, accountId: amy.accountId, name: expect.any(String), state: 'confirmed' }] })])
     expect((await req('GET', `/api/front-of-house/performances/${p.id}/rota`, undefined, volunteer())).status).toBe(403)
+  })
+})
+
+describe('the console home card', () => {
+  it('counts coming performances with no shifts, for whoever runs the rota', async () => {
+    const { default: unrostered } = await import('../../server/contributions/core.count/unrostered')
+    const p = await performance()
+    setClock(p.startsAt - 24 * 60 * MINUTE)
+    const before = await inContext(() => unrostered.value(manager))
+    expect(before).toBeGreaterThanOrEqual(1)
+    await shift(p.id, await duty('Steward'), 2, false)
+    expect(await inContext(() => unrostered.value(manager))).toBe(before - 1)
+    expect(await inContext(() => unrostered.value(volunteer()))).toBe(0)
+  })
+})
+
+describe('applying a template twice', () => {
+  it('adds nothing the second time and says so in its answer', async () => {
+    const p = await performance()
+    const template = await req('POST', '/api/front-of-house/rota-templates', { name: `Twice ${newId('tst')}`, lines: [{ dutyId: await duty('Steward'), places: 2 }] })
+    expect(template.status, JSON.stringify(template.body)).toBe(200)
+    const first = await req('POST', `/api/front-of-house/performances/${p.id}/shifts/apply`, { templateId: template.body.templateId })
+    expect(first.body.added).toHaveLength(1)
+    const second = await req('POST', `/api/front-of-house/performances/${p.id}/shifts/apply`, { templateId: template.body.templateId })
+    expect(second.status).toBe(200)
+    expect(second.body).toMatchObject({ added: [], skipped: [{ performanceId: p.id, reason: 'nothing-new' }] })
+  })
+})
+
+describe('FH-2: finding someone to put on a shift', () => {
+  it('lets whoever runs the rota search people on the shift\'s own picker, and nobody else', async () => {
+    const p = await performance()
+    const id = await shift(p.id, await duty('Steward'))
+    const accountId = newId('acc')
+    await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, \'Zebedee Rotafinder\', \'staff\', ?)').bind(accountId, Date.now()).run()
+    const found = await req('GET', `/api/front-of-house/shifts/${id}/people?q=Rotafinder`)
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.people).toEqual([expect.objectContaining({ id: accountId, label: 'Zebedee Rotafinder' })])
+    expect(JSON.stringify(found.body)).not.toContain('@')
+    expect((await req('GET', `/api/front-of-house/shifts/${id}/people?q=Rotafinder`, undefined, volunteer())).status).toBe(403)
   })
 })
