@@ -12,7 +12,7 @@
 // the queue.
 import { all, can, createUnit, first, newId, nowMs, refuse, requirements, useContext } from '#kit'
 import { signing } from '#kit/signing'
-import { getTerm } from '#modules/core'
+import { accountLabel, getTerm } from '#modules/core'
 import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
@@ -36,11 +36,11 @@ export interface ScanOutcome {
   /** A code of another kind (box-office.door-code), such as a membership card: what it says. */
   card?: { kind: string, headline: string, line: string, state: 'ok' | 'attention' }
   /** Admitted or already in: the ticket and how much of its booking is in now. */
-  booking?: { reference: string, ticketType: string, admitted: number, tickets: number }
+  booking?: { reference: string, buyer: string | null, ticketType: string, admitted: number, tickets: number }
   /** A paid booking's reference for this performance: the door finds it in the list, where it can admit them. */
   reference?: string
   /** Not paid: the reservation the door sends to the box office or the bar, and what is owed. */
-  reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
+  reservation?: { reference: string, buyer: string | null, tickets: number, amountDueMinor: number, currency: string }
   /** Requirement not met: the source's words, such as "Membership not current", and the ticket's type. */
   requirement?: { reason: string | null, ticketType: string }
   /** Admitted without its requirement being checked again: the source was off, failing or not open to this steward. */
@@ -89,14 +89,14 @@ async function recheck(ticketId: string, performanceId: string): Promise<{ verdi
 
 /** The booking a ticket belongs to, at this performance: its reference, the ticket's type, and how many are in. */
 async function bookingOf(ticketId: string, performanceId: string): Promise<ScanOutcome['booking']> {
-  const row = await first<{ reference: string, type_name: string, order_id: string }>(
-    `SELECT o.reference, y.name AS type_name, o.id AS order_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id
+  const row = await first<{ reference: string, type_name: string, order_id: string, account_id: string | null }>(
+    `SELECT o.reference, y.name AS type_name, o.id AS order_id, o.account_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id
       JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types y ON y.id = l.ticket_type_id WHERE t.id = ?`, ticketId)
   if (!row) return undefined
   const counts = await first<{ tickets: number, admitted: number }>(
     `SELECT count(*) AS tickets, sum(CASE WHEN t.admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted FROM box_office_tickets t
       JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ? AND t.performance_id = ? AND t.state = 'valid'`, row.order_id, performanceId)
-  return { reference: row.reference, ticketType: row.type_name, admitted: Number(counts?.admitted ?? 0), tickets: Number(counts?.tickets ?? 0) }
+  return { reference: row.reference, buyer: row.account_id ? await accountLabel(row.account_id) : null, ticketType: row.type_name, admitted: Number(counts?.admitted ?? 0), tickets: Number(counts?.tickets ?? 0) }
 }
 
 /** The performance a ticket or booking is for, as the door names it to the customer. */
@@ -151,13 +151,13 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
     // What a reservation's message carries is not a ticket: the desk takes the payment first. A paid
     // booking's reference is ours too: for another night it says which, and for tonight the door
     // finds the booking in its list, where its tickets can be admitted.
-    const order = await first<{ id: string, reference: string, state: string, total_minor: number, currency: string }>("SELECT id, reference, state, total_minor, currency FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment', 'confirmed') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
+    const order = await first<{ id: string, reference: string, state: string, total_minor: number, currency: string, account_id: string | null }>("SELECT id, reference, state, total_minor, currency, account_id FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment', 'confirmed') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
     if (order) {
       const lines = await all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live' ORDER BY performance_id", order.id)
       // A booking for another night is that, whether paid or not.
       if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ...await elsewhere(lines[0]!.performance_id) }
       if (order.state === 'confirmed') return lines.length ? { result: 'reference', scanId: null, reference: order.reference } : recorded({ result: 'unknown' })
-      return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: order.total_minor, currency: order.currency } }
+      return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, buyer: order.account_id ? await accountLabel(order.account_id) : null, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: order.total_minor, currency: order.currency } }
     }
     return recorded({ result: 'unknown' })
   }
