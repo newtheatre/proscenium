@@ -223,3 +223,26 @@ test.describe('keys typed into the app', () => {
     await expect(card.getByText('Not set').first()).toBeVisible()
   })
 })
+
+test.describe('the Branding screen', () => {
+  test.use(as(siteOwner('Bea Brand', ['core.branding.edit'])))
+
+  test('offers logo uploads and a preview before saving, and hides what the system keeps', async ({ page }) => {
+    await visit(page, '/admin/branding')
+    await expect(page.getByRole('heading', { level: 1, name: 'Branding' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Upload a logo' })).toHaveCount(2)
+    await expect(page.getByText('Brand revision')).toHaveCount(0)
+    await expect(page.getByText('Set on the brand screen')).toHaveCount(0)
+    // Who may change the brand is said once for each section, not under every field.
+    await expect(page.getByText('Changed by people who can: Change the brand.')).toHaveCount(2)
+    await expect(page.getByRole('figure').filter({ hasText: 'Light' })).toBeVisible()
+    await page.getByRole('combobox', { name: 'Corners' }).click()
+    await page.getByRole('option', { name: 'Square' }).click()
+    await expect(page.getByText('1 change', { exact: true })).toBeVisible()
+    // Check once the menu has closed: while it is open the rest of the page is hidden from assistive tech.
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    // The email preview is a sandboxed frame that runs no scripts, so axe cannot enter it and would wait until the test times out.
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).exclude('iframe[title="Email preview"]').analyze()
+    expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
+  })
+})

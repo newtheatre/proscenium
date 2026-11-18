@@ -198,6 +198,14 @@ describe("a module's page in Admin", () => {
     expect(await index(staff())).toBe('/console?settings=gallery')
     expect(await index(person(['core.settings.manage', 'gallery.sample.manage']))).toBe('/admin/modules/gallery')
   })
+
+  it('never offers a setting the system keeps, such as the brand\'s revision or its logos', async () => {
+    const found = ((await (await call(handle, 'GET', '/api/core/settings/index', { actor: person(['core.branding.edit']) })).json()) as { settings: { key: string }[] }).settings.map(s => s.key)
+    expect(found).toContain('core.brand.accent')
+    expect(found).not.toContain('core.brand.revision')
+    expect(found).not.toContain('core.brand.logo')
+    expect(found).not.toContain('core.brand.logo-dark')
+  })
 })
 
 describe("core's settings", () => {
