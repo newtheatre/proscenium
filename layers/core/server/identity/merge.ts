@@ -7,6 +7,7 @@
 import { accountScopeSql } from '#kit/accounts'
 import { all, moveAccountColumn, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { accountById, verifiedAddressesOf } from './accounts'
+import { ERASING } from './erasure'
 import { LIVE, guardLastOwner, isOwner } from './grants'
 import { SETTLED_IN_STAGE_ONE, accountColumns, moveModules, startMergeMove } from './merge-move'
 import { endSessionsOf } from './sessions'
@@ -78,6 +79,7 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
   if (!survivor || !mergedAccount) refuse('core.not-found', 'There is no such person.', { status: 404 })
   for (const account of [survivor, mergedAccount]) {
     if (account.anonymised_at) refuse('core.merge.erased', 'An erased account cannot be merged.', { status: 409 })
+    if (account.disabled_reason === ERASING) refuse('core.merge.erasing', 'An account being erased cannot be merged.', { status: 409 })
     if (account.merged_into_id) refuse('core.merge.already-merged', 'This account has already been merged into another.', { status: 409, remedy: 'Merge with the account it went into instead.' })
   }
   const plan = mergePlan()
