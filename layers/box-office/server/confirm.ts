@@ -9,7 +9,7 @@ import { nowMs, type UnitView } from '#kit'
 import { claimLink, notify } from '#modules/core'
 import { hashOf, randomToken } from './codes'
 import { siteUrl } from './links'
-import { RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
+import { RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { issueTickets, ticketNumbers } from './tickets'
 
 export interface Confirmed {
@@ -69,7 +69,7 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
 /** Sends the buyer their tickets: the ticket numbers and the link to the booking, whose token is `token`, which shows the codes. */
 export async function sendTickets(unit: UnitView, order: Pick<OrderRow, 'id' | 'reference' | 'currency' | 'total_minor'>, lines: LineRow[], send: { accountId: string, token: string, dedupeKey: string, madeWith?: Parameters<typeof claimLink>[2] }): Promise<boolean> {
   const words = await wordsFor(order, lines, order.total_minor)
-  const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.ticketsWithAge, paid: order.total_minor === 0 ? 'Free' : words.amount, numbers: (await ticketNumbers(order, lines.map(l => l.id))).join(', '), link: await siteUrl(`/book/order/${send.token}`) }
+  const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, paid: order.total_minor === 0 ? 'Free' : words.amount, numbers: (await ticketNumbers(order, lines.map(l => l.id))).join(', '), link: await siteUrl(`/book/order/${send.token}`) }
   // A buyer who has never signed in also gets the link that opens their account (core's claim link).
   const account = await claimLink(unit, send.accountId, send.madeWith)
   await notify(unit, account ? 'box-office.order-confirmed-guest' : 'box-office.order-confirmed', {
