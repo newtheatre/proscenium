@@ -3,7 +3,7 @@
      tickets it is for. Retired codes fold away under a divider. -->
 <script setup lang="ts">
 type Effect = 'percent_off' | 'amount_off' | 'set_price'
-interface PromoCode { id: string, code: string, effect: Effect, value: number, productionId: string | null, performanceId: string | null, ticketTypeId: string | null, bandId: string | null, maxUses: number | null, used: number, maxPerOrder: number | null, validFrom: number | null, validUntil: number | null, active: boolean, note: string | null }
+interface PromoCode { id: string, code: string, effect: Effect, value: number, productionId: string | null, performanceId: string | null, ticketTypeId: string | null, bandId: string | null, maxUses: number | null, used: number, maxPerOrder: number | null, notWithRequirements: boolean, validFrom: number | null, validUntil: number | null, active: boolean, note: string | null }
 interface Production { id: string, title: string, performances: { id: string, startsAt: number }[], bands: { id: string, name: string }[] }
 interface Listing { rows: PromoCode[], productions: Production[], ticketTypes: { id: string, name: string }[] }
 
@@ -44,6 +44,7 @@ function describe(c: PromoCode) {
     scope ? t('box-office.codes.words.for', { scope }) : null,
     c.maxUses !== null ? t('box-office.codes.words.uses-of', { used: c.used, max: c.maxUses }) : t('box-office.codes.words.uses', { count: c.used }),
     c.maxPerOrder !== null ? t('box-office.codes.words.per-order', { count: c.maxPerOrder }) : null,
+    c.notWithRequirements ? t('box-office.codes.words.not-with-requirements') : null,
     c.validUntil !== null ? t('box-office.codes.words.until', { when: dateTime(c.validUntil) }) : null,
     c.note,
   ].filter(Boolean).join(' · ')
@@ -67,8 +68,8 @@ async function run<T>(fn: () => Promise<T>, done: string, undo?: (result: T) => 
   }
 }
 
-interface Form { code: string, effect: Effect, percent: number | null, amount: number | null, productionId: string, performanceId: string, bandId: string, ticketTypeId: string, maxUses: number | null, maxPerOrder: number | null, validFrom: number | null, validUntil: number | null, note: string }
-const blank = (): Form => ({ code: '', effect: 'percent_off', percent: 10, amount: null, productionId: ANY, performanceId: ANY, bandId: ANY, ticketTypeId: ANY, maxUses: null, maxPerOrder: null, validFrom: null, validUntil: null, note: '' }) // not-policy: a new code's first guess, ten per cent off
+interface Form { code: string, effect: Effect, percent: number | null, amount: number | null, productionId: string, performanceId: string, bandId: string, ticketTypeId: string, maxUses: number | null, maxPerOrder: number | null, notWithRequirements: boolean, validFrom: number | null, validUntil: number | null, note: string }
+const blank = (): Form => ({ code: '', effect: 'percent_off', percent: 10, amount: null, productionId: ANY, performanceId: ANY, bandId: ANY, ticketTypeId: ANY, maxUses: null, maxPerOrder: null, notWithRequirements: false, validFrom: null, validUntil: null, note: '' }) // not-policy: a new code's first guess, ten per cent off
 const form = ref<Form>(blank())
 const editing = ref(false)
 const editId = ref<string | null>(null)
@@ -80,7 +81,7 @@ watch(() => form.value.productionId, () => {
 })
 const asForm = (c: PromoCode): Form => ({
   code: c.code, effect: c.effect, percent: c.effect === 'percent_off' ? c.value / 100 : null, amount: c.effect === 'percent_off' ? null : c.value,
-  productionId: c.productionId ?? ANY, performanceId: c.performanceId ?? ANY, bandId: c.bandId ?? ANY, ticketTypeId: c.ticketTypeId ?? ANY, maxUses: c.maxUses, maxPerOrder: c.maxPerOrder, validFrom: c.validFrom, validUntil: c.validUntil, note: c.note ?? '',
+  productionId: c.productionId ?? ANY, performanceId: c.performanceId ?? ANY, bandId: c.bandId ?? ANY, ticketTypeId: c.ticketTypeId ?? ANY, maxUses: c.maxUses, maxPerOrder: c.maxPerOrder, notWithRequirements: c.notWithRequirements, validFrom: c.validFrom, validUntil: c.validUntil, note: c.note ?? '',
 })
 const asBody = (f: Form) => ({
   code: f.code.trim(), effect: f.effect, value: f.effect === 'percent_off' ? Math.round((f.percent ?? 0) * 100) : (f.amount ?? 0),
@@ -88,7 +89,7 @@ const asBody = (f: Form) => ({
   performanceId: f.productionId === ANY || f.performanceId === ANY ? null : f.performanceId,
   bandId: f.productionId === ANY || f.bandId === ANY ? null : f.bandId,
   ticketTypeId: f.ticketTypeId === ANY ? null : f.ticketTypeId,
-  maxUses: f.maxUses ?? null, maxPerOrder: f.maxPerOrder ?? null, validFrom: f.validFrom, validUntil: f.validUntil, note: f.note.trim() || null,
+  maxUses: f.maxUses ?? null, maxPerOrder: f.maxPerOrder ?? null, notWithRequirements: f.notWithRequirements, validFrom: f.validFrom, validUntil: f.validUntil, note: f.note.trim() || null,
 })
 function open(c?: PromoCode) {
   editId.value = c?.id ?? null
@@ -304,6 +305,13 @@ const actions = (c: PromoCode) => [[
               v-model="form.ticketTypeId"
               :items="typeItems"
               class="w-56"
+            />
+          </UFormField>
+          <UFormField name="notWithRequirements">
+            <UCheckbox
+              v-model="form.notWithRequirements"
+              :label="t('box-office.codes.field.not-with-requirements')"
+              :description="t('box-office.codes.field.not-with-requirements-help')"
             />
           </UFormField>
           <div class="flex flex-wrap gap-4">

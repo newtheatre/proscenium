@@ -5,5 +5,9 @@ export interface RecordCheck {
   record: string
   ability: string | string[]
   order: number
-  check: (recordId: string) => Promise<{ done: boolean, sentence: string, link?: string }>
+  /**
+   * The line for one record, or null when it asks nothing of this theatre. `needed` says the owner's
+   * action stops without it, so the page can tell what must be done from what is only wanted.
+   */
+  check: (recordId: string) => Promise<{ done: boolean, sentence: string, link?: string, needed?: boolean } | null>
 }

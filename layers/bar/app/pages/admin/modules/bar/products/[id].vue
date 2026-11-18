@@ -2,6 +2,8 @@
      price is never edited: setting one writes a new price from now or a later moment, so a sale already
      rung up keeps what it was charged. A size or product that has been sold is retired, not deleted. -->
 <script setup lang="ts">
+import { priceInput, productPatch, variantInput, variantPatch } from '../../../../../../server/input'
+
 interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
 interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, active: boolean, groupIds: string[], variants: Variant[] }
@@ -12,14 +14,20 @@ const route = useRoute()
 const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { dateTime } = useDates()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
+const { offer } = useUndo()
 const id = computed(() => String(route.params.id))
 interface RecipeLine { id: string, stockItemId: string | null, choiceGroupId: string | null, quantity: number }
 interface StockItem { id: string, name: string, baseUnit: 'each' | 'ml' | 'g' }
 const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], groups: { id: string, name: string, source: 'options' | 'mixers' }[], lists: List[], canPrice: boolean, canAllergens: boolean, canStock: boolean, recipes: Record<string, RecipeLine[]>, stockItems: StockItem[] }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+type FormRef = { setErrors: (errors: FieldError[]) => void }
+const editEl = useTemplateRef<FormRef>('editEl')
+const sizeEl = useTemplateRef<FormRef>('sizeEl')
+const priceEl = useTemplateRef<FormRef>('priceEl')
+const labelEl = useTemplateRef<FormRef>('labelEl')
 const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/admin/modules/bar/products' }])
 const categoryItems = computed(() => (data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name })))
 
@@ -43,9 +51,13 @@ async function patch(body: Record<string, unknown>) {
   await $api(`/api/bar/products/${id.value}` as string, { method: 'PATCH', body })
   await refresh()
 }
+const productBody = () => {
+  const { name, categoryId, age } = editing.value!
+  return { name, categoryId, ageRestricted: age === 'category' ? null : age === 'yes' }
+}
 async function save() {
-  const { groupIds, mixer, age, ...rest } = editing.value!
-  const fields = { ...rest, ageRestricted: age === 'category' ? null : age === 'yes' }
+  const { groupIds, mixer } = editing.value!
+  const fields = productBody()
   refusal.value = null
   try {
     if (groupIds.join() !== data.value!.product.groupIds.join()) await $api(`/api/bar/products/${id.value}/choices` as string, { method: 'POST', body: { groupIds } })
@@ -56,11 +68,13 @@ async function save() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    editEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function setActive(active: boolean) {
   try {
     await patch({ active })
+    offer(active ? t('bar.screens.product.restored') : t('bar.screens.product.retired'), () => patch({ active: !active }))
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
@@ -73,24 +87,33 @@ function editSize(v?: Variant) {
   refusal.value = null
   size.value = v ? { id: v.id, name: v.name, barcode: v.barcode ?? '', amountMinor: null } : { id: null, name: '', barcode: '', amountMinor: null }
 }
+const sizeBody = () => {
+  const s = size.value!
+  const barcode = s.barcode.trim() || null
+  return s.id ? { name: s.name, barcode } : { name: s.name, barcode, amountMinor: data.value?.canPrice ? s.amountMinor : undefined }
+}
 async function saveSize() {
   const s = size.value!
   refusal.value = null
   try {
-    const barcode = s.barcode.trim() || null
-    if (s.id) await $api(`/api/bar/variants/${s.id}` as string, { method: 'PATCH', body: { name: s.name, barcode } })
-    else await $api(`/api/bar/products/${id.value}/variants` as string, { method: 'POST', body: { name: s.name, barcode, amountMinor: data.value?.canPrice ? s.amountMinor : undefined } })
+    if (s.id) await $api(`/api/bar/variants/${s.id}` as string, { method: 'PATCH', body: sizeBody() })
+    else await $api(`/api/bar/products/${id.value}/variants` as string, { method: 'POST', body: sizeBody() })
     size.value = null
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    sizeEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function setSizeActive(v: Variant, active: boolean) {
   try {
     await $api(`/api/bar/variants/${v.id}` as string, { method: 'PATCH', body: { active } })
     await refresh()
+    offer(active ? t('bar.screens.product.size-restored', { name: v.name }) : t('bar.screens.product.size-retired', { name: v.name }), async () => {
+      await $api(`/api/bar/variants/${v.id}` as string, { method: 'PATCH', body: { active: !active } })
+      await refresh()
+    })
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
@@ -103,17 +126,32 @@ function setPrice(variant: Variant, list: List) {
   refusal.value = null
   pricing.value = { variant, list, amountMinor: priceOf(variant, list)?.amountMinor ?? null, later: false, effectiveFrom: null }
 }
-async function savePrice() {
+const priceBody = () => {
   const p = pricing.value!
+  return { variantId: p.variant.id, priceListId: p.list.id, amountMinor: p.amountMinor, effectiveFrom: p.later && p.effectiveFrom ? p.effectiveFrom : undefined }
+}
+const validatePrice = () => [...bodyErrors(priceInput, priceBody()), ...needs({ effectiveFrom: pricing.value?.later ? pricing.value.effectiveFrom : true })]
+async function savePrice() {
   refusal.value = null
+  const p = pricing.value!
+  // A price set from now that replaced the list's own can be undone by setting the old one again.
+  const was = priceOf(p.variant, p.list)
+  const undoable = !p.later && was?.from === 'list'
   try {
-    await $api('/api/bar/prices', { method: 'POST', body: { variantId: p.variant.id, priceListId: p.list.id, amountMinor: p.amountMinor, effectiveFrom: p.later && p.effectiveFrom ? p.effectiveFrom : undefined } })
+    await $api('/api/bar/prices', { method: 'POST', body: priceBody() })
     pricing.value = null
-    toast.add({ title: t('bar.screens.product.price-saved'), color: 'success' })
+    const back = { variantId: p.variant.id, priceListId: p.list.id, amountMinor: was?.amountMinor ?? null }
+    offer(t('bar.screens.product.price-saved'), undoable
+      ? async () => {
+        await $api('/api/bar/prices', { method: 'POST', body: back })
+        await refresh()
+      }
+      : undefined)
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    priceEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 
@@ -123,13 +161,16 @@ type Answer = { contains: string[], mayContain: string[], checked: boolean, chec
 const allergens = ref<Answer | null>(null)
 // Sizes made from stock answer with their recipe's items; the product's own label is for the rest.
 const stockSizes = ref<{ variantId: string, name: string, answer: Answer, items: { id: string, name: string, checked: boolean }[] }[]>([])
+// Sizes made only from choices have no label of their own: what is picked answers for them.
+const choiceOnly = ref<string[]>([])
 async function loadAllergens() {
   if (!data.value?.canAllergens) return
-  const read = await $api<{ answer: Answer, sizes: typeof stockSizes.value }>(`/api/bar/products/${id.value}/allergens` as string)
+  const read = await $api<{ answer: Answer, sizes: typeof stockSizes.value, choiceOnly?: string[] }>(`/api/bar/products/${id.value}/allergens` as string)
   allergens.value = read.answer
   stockSizes.value = read.sizes
+  choiceOnly.value = read.choiceOnly ?? []
 }
-const ownLabelUsed = computed(() => (data.value?.product.variants ?? []).some(v => v.active && !stockSizes.value.some(s => s.variantId === v.id)))
+const ownLabelUsed = computed(() => (data.value?.product.variants ?? []).some(v => v.active && !choiceOnly.value.includes(v.id) && !stockSizes.value.some(s => s.variantId === v.id)))
 function describeAnswer(a: Answer): string {
   if (!a.checked) return t('bar.screens.product.allergens-unchecked')
   if (!a.contains.length && !a.mayContain.length) return t('bar.screens.product.none-listed')
@@ -165,6 +206,7 @@ async function saveAllergens() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    labelEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 
@@ -269,11 +311,12 @@ function planned(v: Variant, l: List): string | null {
             />
           </template>
           <FactStrip
+            class="max-sm:grid-cols-1! lg:grid-cols-4!"
             :facts="[
               { label: t('bar.screens.products.category'), value: data.categories.find(c => c.id === data!.product.categoryId)?.name ?? '' },
               { label: t('bar.screens.product.age-check'), value: (data.product.ageRestricted ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no')) + (data.product.ageFromCategory ? ` ${t('bar.screens.product.from-category')}` : '') },
               { label: t('bar.screens.product.choices'), value: groupNames || t('bar.screens.product.no-choices') },
-              { label: t('bar.screens.product.mixer'), value: isMixer ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no') },
+              { label: t('bar.screens.product.mixer'), value: isMixer ? t('bar.screens.product.mixer-yes') : t('bar.screens.product.mixer-no') },
             ]"
           />
         </PageSection>
@@ -324,12 +367,15 @@ function planned(v: Variant, l: List): string | null {
         </PageSection>
 
         <PageSection
-          v-for="v in data.product.variants"
+          v-for="v in data.product.variants.filter(x => x.active || !x.mixerMeasure)"
           :key="v.id"
           :title="v.active ? v.name : t('bar.screens.products.retired-name', { name: v.name })"
-          :description="v.barcode ? t('bar.screens.product.barcode-is', { barcode: v.barcode }) : undefined"
+          :description="v.mixerMeasure ? t('bar.screens.product.mixer-measure-help') : v.barcode ? t('bar.screens.product.barcode-is', { barcode: v.barcode }) : undefined"
         >
-          <template #actions>
+          <template
+            v-if="!v.mixerMeasure"
+            #actions
+          >
             <RowActions
               :label="t('bar.screens.product.size-actions', { name: v.name })"
               :items="[
@@ -340,7 +386,10 @@ function planned(v: Variant, l: List): string | null {
               ]"
             />
           </template>
-          <RecordList :label="t('bar.screens.product.prices-of', { name: v.name })">
+          <RecordList
+            v-if="!v.mixerMeasure || data.canStock"
+            :label="t('bar.screens.product.prices-of', { name: v.name })"
+          >
             <RecordListItem
               v-if="data.canStock"
               :name="t('bar.screens.product.recipe')"
@@ -356,7 +405,7 @@ function planned(v: Variant, l: List): string | null {
               />
             </RecordListItem>
             <RecordListItem
-              v-for="l in data.lists"
+              v-for="l in v.mixerMeasure ? [] : data.lists"
               :key="l.id"
               :name="l.name"
               :description="[shown(v, l), planned(v, l)].filter(Boolean).join(' · ')"
@@ -385,7 +434,9 @@ function planned(v: Variant, l: List): string | null {
         <UForm
           v-if="editing"
           id="bar-product-edit"
+          ref="editEl"
           :state="editing"
+          :validate="() => bodyErrors(productPatch, productBody())"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -410,7 +461,7 @@ function planned(v: Variant, l: List): string | null {
           <UFormField
             :label="t('bar.screens.product.age-check')"
             :help="t('bar.screens.products.age-check-help')"
-            name="age"
+            name="ageRestricted"
           >
             <USelect
               v-model="editing.age"
@@ -455,7 +506,9 @@ function planned(v: Variant, l: List): string | null {
         <UForm
           v-if="size"
           id="bar-size"
+          ref="sizeEl"
           :state="size"
+          :validate="() => bodyErrors(size?.id ? variantPatch : variantInput, sizeBody())"
           class="space-y-4"
           novalidate
           @submit="saveSize"
@@ -503,6 +556,7 @@ function planned(v: Variant, l: List): string | null {
         <UForm
           v-if="label"
           id="bar-allergens"
+          ref="labelEl"
           novalidate
           :state="label"
           class="space-y-4"
@@ -640,7 +694,9 @@ function planned(v: Variant, l: List): string | null {
         <UForm
           v-if="pricing"
           id="bar-price"
+          ref="priceEl"
           :state="pricing"
+          :validate="validatePrice"
           class="space-y-4"
           novalidate
           @submit="savePrice"

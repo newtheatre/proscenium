@@ -15,16 +15,18 @@ export interface ListRow {
   referenceLabel: string | null
   referenceShape: Shape | null
   uploadedAt: number
+  /** Whether a file has ever been loaded: a new list's upload time is 0 until one is. */
+  loaded: boolean
 }
 
 /** What a well-formed reference looks like (V15). Never a free pattern. */
 export interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
 
 const LIST_COLUMNS = `id, name, key_kind AS keyKind, entry_count AS entryCount, valid_until AS validUntil, reference_label AS referenceLabel,
-  reference_shape AS referenceShape, uploaded_at AS uploadedAt`
+  reference_shape AS referenceShape, uploaded_at AS uploadedAt, uploaded_at > 0 AS loaded`
 
 function toList(row: Record<string, unknown>): ListRow {
-  return { ...row, referenceShape: row.referenceShape ? JSON.parse(String(row.referenceShape)) as Shape : null } as ListRow
+  return { ...row, loaded: !!row.loaded, referenceShape: row.referenceShape ? JSON.parse(String(row.referenceShape)) as Shape : null } as ListRow
 }
 
 export async function getList(id: string | undefined): Promise<ListRow | null> {
@@ -60,10 +62,16 @@ let keyCache: { secret: string, key: CryptoKey } | undefined
 
 /** Refuses while the list key is not set: the list verifier stays unavailable until then. */
 async function hmacKey(): Promise<CryptoKey> {
-  const secret = await credential(LIST_KEY)
-  if (!secret) refuse('membership.list.no-key', 'Verification lists need a list key, which has not been set.', { status: 409, remedy: 'Save a list key under Keys on Membership > Lists (any long random string).' })
+  const secret = await requireListKey()
   if (keyCache?.secret !== secret) keyCache = { secret: secret!, key: await crypto.subtle.importKey('raw', new TextEncoder().encode(secret!), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']) }
   return keyCache.key
+}
+
+/** Refuses while the list key is not set, and says where to save one. Returns the key. */
+export async function requireListKey(): Promise<string> {
+  const secret = await credential(LIST_KEY)
+  if (!secret) refuse('membership.list.no-key', 'Verification lists need a list key, which has not been set.', { status: 409, remedy: 'Save a list key under Keys on the Verification lists tab (Admin > Modules > Membership), or press Generate there.' })
+  return secret!
 }
 
 export async function hasListKey(): Promise<boolean> {
@@ -160,6 +168,15 @@ export async function findEntry(list: ListRow, value: string, day: string): Prom
     'SELECT id, ends_on AS endsOn, used_by AS usedBy FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND (ends_on IS NULL OR ends_on >= ?3)',
     list.id, hash, day,
   )
+}
+
+/**
+ * D9: whether a list's entries carry their own end dates, which then decide when a membership
+ * verified against it ends. A length chosen alongside would be ignored, so none is asked for.
+ */
+export async function listSetsEnd(list: ListRow | null): Promise<boolean> {
+  if (!list) return false
+  return !!(await first<{ x: number }>('SELECT 1 AS x FROM membership_verification_entries WHERE list_id = ? AND ends_on IS NOT NULL LIMIT 1', list.id))
 }
 
 /** The scheme's reference list, from its verifier configuration, when it checks against one. */

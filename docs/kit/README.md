@@ -97,7 +97,7 @@ export default defineRoute({
 
 Before the handler runs the kit checks, in order: the module is on (else 404), the rate limit
 (429), Turnstile if `protect: 'turnstile'`, the ability (401 or 403), and then the input (422
-naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
+naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields?, detail? }`. `detail` holds facts a screen may link to or act on (the id of the record in the way), never prose. The kit commits the unit
 of work after the handler returns, with an audit entry when the ability is audited.
 
 A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the body unread for the
@@ -399,7 +399,8 @@ still reads it). Use it for a setting a feature of the other module needs, not t
 Durations may also be written `6mo` or `7y`; a month is 30 days and a year 365. `formatDuration`
 and the `DurationInput` component (a number and a unit, `v-model` in seconds, `min` and `max` as
 seconds or written durations) show a value in the largest unit that divides it exactly, and the
-control offers only units that can hold a value between the limits. A duration setting's label and
+control offers only units that can hold a value between the limits. A setting counted in days names
+its units, `units: ['week', 'day']`, so its control offers no hours or seconds. A duration setting's label and
 help never name a unit, since the control does; the conformance run checks.
 
 Every change is in `core_setting_changes`. `GET /api/core/settings/history` lists them newest first,
@@ -487,7 +488,11 @@ in the specification's "As built" list; this guide is the reference from here on
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
   old history is the daily task `core.prune-history`.
 - Rate limits (F-36): each class's allowance is the `rate` setting `core.rate-limits.<class>`, a
-  count in a period. `sign-in`, `sign-in-network`, `public-form` and `presented-value` count in the RateLimitCounter
+  count in a period. Email sign-in counts three ways apart: `sign-in-network` per network address
+  on the public sign-in routes (high, as a students' union shares one address), `sign-in-link` per
+  email address asking for a link and `sign-in-code` per email address trying a code; `sign-in`
+  covers the other identity routes. A route's refusal says how long to wait (`waitRemedy`). The
+  sign-in classes, `public-form` and `presented-value` count in the RateLimitCounter
   Durable Object (binding `RATE_LIMITS`), one object per class and caller, shared by every
   instance; the others count in memory in each instance. Cloudflare's rate limiting binding was
   evaluated and not used: its period is fixed at deploy to 10 or 60 seconds and its counts are

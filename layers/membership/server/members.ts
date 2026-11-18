@@ -28,7 +28,7 @@ function statusWhere(status: string, day: string): SQL {
 /** The most rows one export holds. */
 export const EXPORT_LIMIT = 10_000 // not-policy: a bound on one export
 
-export interface MemberRow { id: string, accountId: string | null, name: string, number: string | null, scheme: string, status: string, until: string | null, joined: number | null }
+export interface MemberRow { id: string, accountId: string | null, name: string, number: string | null, scheme: string, status: string, until: string | null, joined: string | null }
 
 /** The members list as the query asks for it: one page, or with `whole`, the whole view. */
 export async function readMembers(query: Record<string, string | string[] | undefined>, actor: Actor, unit: UnitView, whole = false) {
@@ -58,6 +58,8 @@ export async function readMembers(query: Record<string, string | string[] | unde
   for (const m of found) {
     const scheme = schemes.get(m.schemeId!)!
     const number = await all<{ number: number }>('SELECT min(number) AS number FROM membership_members WHERE account_id = ?', m.accountId) // exact-account: the row's own account, for its number
+    // Joined is the person's earliest start date, so back-dated and imported members, and corrected dates, read true.
+    const first = await all<{ since: string | null }>("SELECT min(starts_on) AS since FROM membership_memberships WHERE account_id = ? AND state IN ('active', 'ended')", m.accountId) // exact-account: the row's own account, for its join date
     rows.push({
       id: m.id,
       accountId: m.accountId,
@@ -66,7 +68,7 @@ export async function readMembers(query: Record<string, string | string[] | unde
       scheme: scheme.name,
       status: m.state === 'ended' ? 'ended' : derivedStatus({ startsOn: m.startsOn!, endsOn: m.endsOn }, scheme.grace_days, day),
       until: m.endsOn,
-      joined: m.createdAt,
+      joined: first[0]?.since ?? m.startsOn,
     })
   }
   return { rows, total, dropped: read.dropped, ignoredWords, searchTooShort }

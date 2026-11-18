@@ -411,6 +411,12 @@ a layout, not a shell, and it has no navigation of its own.
   screens under its address, exactly as in the other shells. An ability held through a fact (such as
   being on shift) counts. Whoever holds the ability of at least one live entry gets the `live` side in
   the viewer and "Tonight" first in the account menu; for anyone else `/live` does not exist.
+- **The Tonight hub** (`/live`) lists the performances of the theatre's operating day (so a show
+  that runs past midnight stays until `core.locale.day-start`), each with its start time and the
+  figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
+  `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
+  minor units): Box office gives sold and in, Payments what the tills have taken. The screens'
+  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.
@@ -437,9 +443,17 @@ a layout, not a shell, and it has no navigation of its own.
   `payments.sessions.default-space`, else unknown), which the strip above the till can change before
   or after; the seller's own session is the "Your session" card at the top of Money › Sessions, not a
   page of its own.
-- **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
-  the device is offline the strip says that changes cannot be sent; a live screen should disable its
-  writes then rather than lose them.
+- **Offline.** A live screen that must keep working without a connection reads through
+  `useLiveData(key, url, { every? })`: online it fetches and keeps a copy in browser storage, offline it
+  answers from that copy (with `at`, when it was made), and `update()` changes the copy for what was
+  done offline. Copies older than a day are dropped. Writes go through `useLiveQueue(key, send)`:
+  `add(item)` keeps the item on the device and `send(items)` is called with everything waiting when
+  online, oldest first; a batch whose answer was lost is sent again unchanged, so give each item an
+  id the server recognises (the door's scans carry ids made on the device). The strip shows how many
+  writes are waiting on every queue. The door (`useOfflineDoor`) is the first user: it checks signed
+  door codes against the public keys on the device. A screen without them still cannot send changes
+  offline and should disable its writes rather than lose them. Pages are not cached for offline
+  loading, so a screen must be open before the connection goes.
 
 ## Seams for Identity
 
