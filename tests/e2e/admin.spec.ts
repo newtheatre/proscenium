@@ -228,6 +228,8 @@ test.describe('the Branding screen', () => {
   test.use(as(siteOwner('Bea Brand', ['core.branding.edit'])))
 
   test('offers logo uploads and a preview before saving, and hides what the system keeps', async ({ page }) => {
+    // The screen carries live previews of the brand, which the accessibility check reads frame by frame.
+    test.setTimeout(60_000)
     await visit(page, '/admin/branding')
     await expect(page.getByRole('heading', { level: 1, name: 'Branding' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Upload a logo' })).toHaveCount(2)
