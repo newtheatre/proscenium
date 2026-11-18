@@ -208,7 +208,7 @@ async function onHandleKey(event: KeyboardEvent, g: Group, o: Option) {
 
 // An option's allergens, from its label: what it brings to the drink it is picked for.
 const allergenItems = computed(() => ALLERGENS.map(k => ({ value: k as string, label: t(`bar.allergen.${k}`) })))
-const sourceOfCheck = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(`bar.screens.product.sources.${s}`) })))
+const sourceOfCheck = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(s === 'label' ? 'bar.screens.product.sources.label-option' : `bar.screens.product.sources.${s}`) })))
 const label = ref<{ optionId: string, name: string, contains: string[], mayContain: string[], source: 'label' | 'supplier' | 'other' } | null>(null)
 function editAllergens(o: Option) {
   const a = data.value?.allergens[o.optionId!]

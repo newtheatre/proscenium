@@ -22,7 +22,7 @@ export default defineModule({
     // Whether the person is told by email when an award is issued to their account.
     'issuing.tell-recipient': setting.boolean({ default: true, change, audience: 'staff' }),
     // Whether the roll of honour is shown at /awards and through ::awards-roll.
-    'roll.public': setting.boolean({ default: true, change, audience: 'staff' }),
+    'roll.public': setting.boolean({ default: true, change, audience: 'public' }),
   }),
 
   records: defineRecords('awards', {
@@ -70,7 +70,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'You have been awarded: {{ award }}',
-          body: '{{ theatre }} has awarded you **{{ award }}**.\n\nSign in to see it, and to choose whether it is shown publicly: [My awards]({{ link }})',
+          body: '{{ theatre }} has awarded you **{{ award }}**.\n\nSign in to see it, and to choose where it is listed on the roll of honour: [My awards]({{ link }})',
         },
       },
     }],
@@ -92,9 +92,10 @@ export default defineModule({
     'forms.slot': [{ id: 'awards.nomination', subject: 'awards.type', attach: 'awards.type.manage', label: 'awards.forms.nomination.label', source: 'awards.type' }],
     'forms.source': [{ id: 'awards.type', file: 'type' }],
     'forms.outcome-action': [{ id: 'awards.issue-award', file: 'issue-award' }],
+    'forms.template': [{ id: 'awards.nomination', file: 'nomination' }],
     // ::awards-roll in a theatre's own page.
     'core.public-component': [
-      { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its short code).' },
+      { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its web address).' },
     ],
     // The holder's card, read by the door and the desk.
     'box-office.door-code': [{ id: 'awards.card', file: 'card' }],
@@ -110,7 +111,7 @@ export default defineModule({
         importId: z.string(),
         typeId: z.string(),
         importedBy: z.string().nullable(),
-        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
+        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedPrecision: z.enum(['day', 'year']).optional(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
       }),
       lane: 'bulk',
     }),

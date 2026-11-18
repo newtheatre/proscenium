@@ -33,7 +33,7 @@ export default defineRoute({
   const on = await enabledModules()
   const placeOf = (pageId?: string) => pageId ? registry.settingPages.get(pageId)!.place : undefined
   const mine = [...registry.settings].filter(([key, s]) => {
-    if (!on.has(s.module)) return false
+    if (!on.has(s.module) || (s.entry.whenModule && !on.has(s.entry.whenModule))) return false
     const home = registry.settingHomes.get(key)!
     if (input.page !== undefined) return home.page === input.page
     if (input.screen !== undefined) return home.screen === input.screen

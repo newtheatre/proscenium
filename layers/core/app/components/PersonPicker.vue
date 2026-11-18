@@ -1,13 +1,20 @@
 <!-- The person picker (identity spec part 6, rule 3; `searchAccounts`): a person is chosen, never
      typed. It searches by name or full address as the user types, two characters or more, and shows
      only a name and enough to tell two people apart, never contact details. Unclaimed accounts are
-     found too. The value is the chosen account's id. Needs core.account.search. -->
+     found too. The value is the chosen account's id. Needs core.account.search, unless `endpoint`
+     names a module's own search for one narrow screen, under its own ability. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
 
 export interface PickedPerson { id: string, label: string, name: string | null, since: number, claimed: boolean, disabled: boolean }
 
-const props = defineProps<{ placeholder?: string, exclude?: string[], disabled?: boolean }>()
+const props = defineProps<{
+  placeholder?: string
+  exclude?: string[]
+  disabled?: boolean
+  /** A module's own search answering the same shape, such as the people who can be put on a shift. */
+  endpoint?: string
+}>()
 const model = defineModel<string | undefined>()
 const emit = defineEmits<{ picked: [person: PickedPerson | undefined] }>()
 
@@ -17,7 +24,7 @@ const term = ref('')
 const found = ref<PickedPerson[]>([])
 const chosen = ref<PickedPerson | undefined>()
 const loading = ref(false)
-const failed = ref(false)
+const failed = ref<false | 'error' | 'refused'>(false)
 
 const { monthYear: year } = useDates()
 const describe = (p: PickedPerson) => [
@@ -42,11 +49,12 @@ async function search(q: string) {
   loading.value = true
   failed.value = false
   try {
-    const answer = await $api<{ people: PickedPerson[] }>('/api/core/accounts', { query: { q: q.trim() } })
+    const answer = await $api<{ people: PickedPerson[] }>((props.endpoint ?? '/api/core/accounts') as '/api/core/accounts', { query: { q: q.trim() } })
     if (asked === latest) found.value = answer.people
   }
-  catch {
-    if (asked === latest) failed.value = true
+  catch (e) {
+    // A refusal is said as one, so it does not read as a fault worth trying again.
+    if (asked === latest) failed.value = toRefusal(e).status === 403 ? 'refused' : 'error'
   }
   finally {
     if (asked === latest) loading.value = false
@@ -77,7 +85,7 @@ watch(model, (id) => {
     :ui="{ placeholder: 'text-muted' }"
   >
     <template #empty>
-      {{ failed ? t('core.picker.failed') : term.trim().length < 3 ? t('core.picker.type-more') : t('core.picker.none') }}
+      {{ failed === 'refused' ? t('core.picker.refused') : failed ? t('core.picker.failed') : term.trim().length < 3 ? t('core.picker.type-more') : t('core.picker.none') }}
     </template>
   </USelectMenu>
 </template>

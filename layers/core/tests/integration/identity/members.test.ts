@@ -103,6 +103,51 @@ async function welfareLead() {
   return { ...lead, roleName: role!.name }
 }
 
+describe('one inbox (AC-2)', () => {
+  it('holds both sides for a member, narrows to one, and gives one count everywhere', async () => {
+    const { browser, accountId } = await member()
+    const at = Date.now()
+    for (const [side, title] of [['audience', 'Your tickets'], ['members', 'Your shift'], ['members', 'Cover needed']] as const) {
+      await env.DB.prepare('INSERT INTO core_inbox_items (id, account_id, side, title, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(`inb_${crypto.randomUUID().replace(/-/g, '').slice(0, 26)}`, accountId, side, title, at + 86_400_000, at).run()
+    }
+    const all = (await browser.get('/api/core/me/inbox?side=all')).body
+    expect(all.items.map((i: { title: string }) => i.title).sort()).toEqual(['Cover needed', 'Your shift', 'Your tickets'])
+    expect(all.unread).toBe(3)
+    expect((await browser.get('/api/core/me/inbox?side=members')).body.items).toHaveLength(2)
+    expect((await browser.get('/api/core/me/inbox/unread')).body).toEqual({ signedIn: true, audience: 1, members: 2, total: 3 })
+    const counts = (shell: string) => browser.get(`/api/core/navigation?shell=${shell}`)
+    const inboxCount = async (shell: string) => (await counts(shell)).body.items?.find((i: { id: string }) => i.id === (shell === 'members' ? 'core.members-inbox' : 'core.inbox'))?.count
+    expect(await inboxCount('account')).toBe(3)
+    expect(await inboxCount('members')).toBe(3)
+    expect((await browser.post('/api/core/me/inbox/read-all', { side: 'all' })).status).toBe(200)
+    expect((await browser.get('/api/core/me/inbox/unread')).body.total).toBe(0)
+  })
+})
+
+describe('notification choices (FH-6)', () => {
+  it('lists the optional topics of the person\'s sides, and switches one off on both channels', async () => {
+    const { browser, accountId } = await member()
+    const listed = (await browser.get('/api/core/me/notifications')).body.topics
+    expect(listed).toContainEqual({ id: 'core.credits', module: 'core', side: 'members', on: true })
+    expect((await browser.put('/api/core/me/notifications/core.credits', { on: false })).status).toBe(200)
+    expect(await rows('SELECT channel, enabled FROM core_notification_preferences WHERE account_id = ? AND topic_key = \'core.credits\' ORDER BY channel', accountId))
+      .toEqual([{ channel: 'email', enabled: 0 }, { channel: 'inbox', enabled: 0 }])
+    expect((await browser.get('/api/core/me/notifications')).body.topics).toContainEqual(expect.objectContaining({ id: 'core.credits', on: false }))
+    expect((await browser.put('/api/core/me/notifications/core.credits', { on: true })).status).toBe(200)
+    expect((await browser.get('/api/core/me/notifications')).body.topics).toContainEqual(expect.objectContaining({ id: 'core.credits', on: true }))
+    expect((await browser.put('/api/core/me/notifications/core.nothing', { on: false })).status).toBe(404)
+  })
+
+  it('shows no members\' topics to someone without a standing', async () => {
+    const browser = new Browser()
+    await signInByEmail(browser)
+    const topics = (await browser.get('/api/core/me/notifications')).body.topics as { side: string }[]
+    expect(topics.every(t => t.side === 'audience')).toBe(true)
+    expect((await browser.put('/api/core/me/notifications/core.credits', { on: false })).status).toBe(404)
+  })
+})
+
 describe('emergency contacts (ID-17)', () => {
   it('a member records up to three, having told them; without a standing the write is refused as missing', async () => {
     const { browser } = await member()

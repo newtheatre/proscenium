@@ -5,7 +5,7 @@
      A payment still waiting for an answer stops it closing; each is named with when it turns unknown.
      A hand-off to the SumUp app that started nowhere else returns here. -->
 <script setup lang="ts">
-import type { YourSession, YourSessionSummary as Session } from '../../shared/sessions'
+import type { YourSale, YourSession, YourSessionSummary as Session } from '../../shared/sessions'
 
 const props = defineProps<{ data: YourSession }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -68,7 +68,7 @@ async function close() {
 
 const facts = (s: Session) => [
   { label: t('payments.screens.session.opened-at'), value: when(s.openedAt), strong: false },
-  ...(s.lastSaleAt && s.lastSaleAt > s.openedAt ? [{ label: t('payments.screens.session.last-sale'), value: time(s.lastSaleAt), strong: false }] : []),
+  ...(s.lastSaleAt && s.lastSaleAt > s.openedAt ? [{ label: t('payments.screens.session.last-sale'), value: when(s.lastSaleAt), strong: false }] : []),
   ...(s.handlesCash
     ? [
         { label: t('payments.screens.session.float'), value: money(s.floatMinor, s.currency), strong: false },
@@ -77,6 +77,11 @@ const facts = (s: Session) => [
     : s.closesAt ? [{ label: t('payments.screens.session.closes-at'), value: time(s.closesAt), strong: false }] : []),
 ]
 const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
+// What the session has taken, each way of paying and in all.
+const takings = computed(() => props.data.takings ?? [])
+const takenInAll = computed(() => takings.value.reduce((sum, m) => sum + m.amountMinor, 0))
+const saleName = (s: YourSale) => [money(s.amountMinor, s.currency), s.methods.map(methodLabel).join(', ')].filter(Boolean).join(' · ')
+const saleAbout = (s: YourSale) => [time(s.at), s.state === 'succeeded' ? '' : t(`payments.screens.session.sale-states.${s.state}`), ...s.notes].filter(Boolean).join(' · ')
 </script>
 
 <template>
@@ -88,6 +93,8 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
       :title="t(`payments.screens.session.handoff.${handoff}`)"
       :description="t(`payments.screens.session.handoff.${handoff}-help`)"
     />
+
+    <PaymentsHandBack @changed="emit('changed')" />
 
     <PageSection
       :title="t('payments.screens.session.yours')"
@@ -114,6 +121,34 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
             />
           </UFormField>
           <FactStrip :facts="facts(data.session)" />
+
+          <div
+            v-if="takings.length"
+            class="space-y-2"
+          >
+            <p class="font-medium">
+              {{ t('payments.screens.session.takings-title') }}
+            </p>
+            <FactStrip :facts="[...takings.map(m => ({ label: methodLabel(m.method), value: money(m.amountMinor, data.session!.currency), strong: false })), { label: t('payments.screens.session.takings-total'), value: money(takenInAll, data.session.currency) }]" />
+          </div>
+
+          <div
+            v-if="data.sales?.length"
+            class="space-y-2"
+          >
+            <p class="font-medium">
+              {{ t('payments.screens.session.sales-title') }}
+            </p>
+            <RecordList :label="t('payments.screens.session.sales-title')">
+              <RecordListItem
+                v-for="s in data.sales"
+                :key="s.intentId"
+                :name="saleName(s)"
+                :description="saleAbout(s)"
+                :muted="s.state !== 'succeeded'"
+              />
+            </RecordList>
+          </div>
 
           <div
             v-if="data.waiting.length"

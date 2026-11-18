@@ -31,6 +31,7 @@ export default defineModule({
       { id: 'gallery.show-fields', subject: 'gallery.production', attach: 'gallery.sample.manage', edit: 'gallery.sample.view', mode: 'record' as const, label: 'gallery.forms.fields.label', limit: 3 },
     ],
     'forms.outcome-action': [{ id: 'gallery.note', file: 'note' }],
+    'forms.template': [{ id: 'gallery.show-feedback', file: 'show-feedback' }, { id: 'gallery.show-fields', file: 'show-fields' }],
     'payments.desk-basket': [{ id: 'gallery' }],
     'payments.settlement': [{ id: 'gallery' }],
     'finance.system-account': [{ id: 'income', name: 'Gallery income', kind: 'income' }],
