@@ -243,10 +243,10 @@ export async function getProduction(id: string): Promise<Production & { advisori
   return { ...production, advisories, effects }
 }
 
-export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next', order?: 'asc' | 'desc' }
+export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next' | 'dates', order?: 'asc' | 'desc' }
 
 /** The console's list: newest first by default, or by title, or by when the run starts. */
-export async function listProductions(query: ProductionQuery): Promise<{ rows: Production[], total: number }> {
+export async function listProductions(query: ProductionQuery): Promise<{ rows: (Production & { next: { startsAt: number, space: string } | null, space: string | null })[], total: number }> {
   const where: string[] = []
   const params: unknown[] = []
   // To be replaced: search moves behind the kit's readList (Foundations part 4), and no module keeps
@@ -263,10 +263,31 @@ export async function listProductions(query: ProductionQuery): Promise<{ rows: P
   }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const direction = query.order === 'asc' ? 'ASC' : 'DESC'
-  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' ? `first_starts_at IS NULL, first_starts_at ${direction}` : 'created_at DESC'
+  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' || query.sort === 'dates' ? `first_starts_at IS NULL, first_starts_at ${direction}` : 'created_at DESC'
   const total = (await first<{ n: number }>(`SELECT count(*) AS n FROM core_productions ${clause}`, ...params))!.n
   const rows = await all<ProductionRow>(`SELECT * FROM core_productions ${clause} ORDER BY ${order}, id LIMIT ? OFFSET ?`, ...params, query.size, (query.page - 1) * query.size)
-  return { rows: rows.map(toProduction), total }
+  const placed = await whereAndWhen(rows.map(r => r.id))
+  return { rows: rows.map(r => ({ ...toProduction(r), ...(placed.get(r.id) ?? { next: null, space: null }) })), total }
+}
+
+/**
+ * For the list, each production's next scheduled performance and the space it is in, or, with none
+ * to come, the space of its latest date. Cancelled and draft dates are left out.
+ */
+async function whereAndWhen(ids: string[]): Promise<Map<string, { next: { startsAt: number, space: string } | null, space: string | null }>> {
+  const out = new Map<string, { next: { startsAt: number, space: string } | null, space: string | null }>()
+  if (!ids.length) return out
+  const list = JSON.stringify(ids)
+  // SQLite gives the other columns of the row that holds the min() or max().
+  const next = await all<{ production_id: string, starts_at: number, space: string }>(`SELECT p.production_id, min(p.starts_at) AS starts_at, s.name AS space
+    FROM core_performances p JOIN core_spaces s ON s.id = p.space_id
+    WHERE p.production_id IN (SELECT value FROM json_each(?)) AND p.state = 'scheduled' AND p.ends_at > ? GROUP BY p.production_id`, list, nowMs())
+  const last = await all<{ production_id: string, starts_at: number, space: string }>(`SELECT p.production_id, max(p.starts_at) AS starts_at, s.name AS space
+    FROM core_performances p JOIN core_spaces s ON s.id = p.space_id
+    WHERE p.production_id IN (SELECT value FROM json_each(?)) AND p.state IN ('scheduled', 'completed') GROUP BY p.production_id`, list)
+  for (const r of last) out.set(r.production_id, { next: null, space: r.space })
+  for (const r of next) out.set(r.production_id, { next: { startsAt: r.starts_at, space: r.space }, space: r.space })
+  return out
 }
 
 /** The production a slug names now, or named once: an old slug redirects for ever. */
