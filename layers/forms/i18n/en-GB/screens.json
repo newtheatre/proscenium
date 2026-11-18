@@ -845,5 +845,16 @@
   "forms.screens.settings.address-help": "Lower-case letters, numbers and hyphens.",
   "forms.screens.settings.address-help-live": "Lower-case letters, numbers and hyphens. Links to the old address carry on working.",
   "forms.screens.actions.preview": "This will also: {action}",
-  "forms.screens.actions.preview-blocked": "This will not happen"
+  "forms.screens.actions.preview-blocked": "This will not happen",
+  "forms.screens.settings.allow-edits": "Allow response edits",
+  "forms.screens.settings.allow-edits-help": "People signed in can change their answers or withdraw their response, until somebody starts considering it or the form closes.",
+  "forms.screens.settings.allow-edits-anonymous": "Not on an anonymous form: nobody can be shown which response is theirs.",
+  "forms.screens.mine.edit": "Change my answers",
+  "forms.screens.mine.withdraw": "Withdraw",
+  "forms.screens.mine.withdraw-title": "Withdraw this response?",
+  "forms.screens.mine.withdraw-help": "The theatre will no longer see it, and it cannot be brought back. You can answer the form again while it is open.",
+  "forms.screens.mine.withdraw-confirm": "Withdraw my response",
+  "forms.screens.mine.withdraw-keep": "Keep it",
+  "forms.screens.mine.withdrawn": "Response {reference} withdrawn",
+  "forms.screens.responses.history-note": "Told the sender: {note}"
 }

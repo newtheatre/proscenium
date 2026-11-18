@@ -118,6 +118,8 @@ export default defineModule({
       'forms.form.closed': event({ version: 1, payload: z.object({ formId: z.string() }) }),
       // A response reached an approved or declined stage.
       'forms.response.decided': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), outcome: z.enum(['approved', 'declined']) }), internal: true }),
+      'forms.response.changed': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), revision: z.number() }), internal: true }),
+      'forms.response.withdrawn': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string() }), internal: true }),
       'forms.response.moved': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), kind: z.enum(STAGE_KINDS), revision: z.number() }), internal: true }),
     },
   },

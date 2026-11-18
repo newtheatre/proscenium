@@ -45,7 +45,13 @@ export function checkVariables(declared: Record<string, VariableKind>, given: Re
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') // not-policy: HTML entities
 
-export interface Rendered { subject: string, text: string, html: string }
+export interface Rendered {
+  subject: string
+  text: string
+  html: string
+  /** The message for the inbox, where it is read beside a link of its own: a link reads as its words, with no address written out. */
+  inbox: string
+}
 export interface RenderOptions {
   values: Record<string, string>
   kinds: Record<string, VariableKind>
@@ -63,9 +69,11 @@ export function render(wording: { subject: string, body: string }, options: Rend
 
   const paragraphs = wording.body.trim().split(/\n\s*\n/)
   const textParts: string[] = []
+  const inboxParts: string[] = []
   const htmlParts: string[] = []
   for (const paragraph of paragraphs) {
     textParts.push(inlineText(paragraph, values))
+    inboxParts.push(inlineText(paragraph, values, false))
     htmlParts.push(`<p style="margin:0 0 16px">${inlineHtml(paragraph, values, options)}</p>`)
   }
   if (options.footer) {
@@ -79,7 +87,7 @@ export function render(wording: { subject: string, body: string }, options: Rend
     ...htmlParts,
     '</div></body></html>',
   ].join('')
-  return { subject, text: `${textParts.join('\n\n')}\n`, html }
+  return { subject, text: `${textParts.join('\n\n')}\n`, html, inbox: inboxParts.join('\n\n') }
 }
 
 // [label](target): the target is a variable or a literal https address.
@@ -91,12 +99,12 @@ function linkTarget(raw: string, values: Record<string, string>): string | undef
   return target && isSafeUrl(target) ? target : undefined
 }
 
-function inlineText(paragraph: string, values: Record<string, string>): string {
+function inlineText(paragraph: string, values: Record<string, string>, addresses = true): string {
   return paragraph
     .replace(LINK, (_, label: string, raw: string) => {
       const target = linkTarget(raw, values)
       const shown = label.replace(VARIABLE, (__, n: string) => values[n] ?? '')
-      return target ? `${shown}: ${target}` : shown
+      return target && addresses ? `${shown}: ${target}` : shown
     })
     .replace(VARIABLE, (_, name: string) => values[name] ?? '')
     .replace(/\*\*(.+?)\*\*/g, '$1')

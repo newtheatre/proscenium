@@ -195,7 +195,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
           deliveryId: made[i]!,
           side: type.side,
           title: message.subject.slice(0, 120), // not-policy: the column's bound
-          body: message.text.trim().slice(0, 500) || null, // not-policy: the column's bound
+          body: message.inbox.trim().slice(0, 500) || null, // not-policy: the column's bound
           link: inboxLink(type.link, r.values),
           expiresAt: at + keepFor * 1000, // not-policy: seconds to milliseconds
         }

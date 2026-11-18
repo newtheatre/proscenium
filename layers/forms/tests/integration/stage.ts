@@ -22,6 +22,7 @@ import responsesExport from '../../server/api/forms/forms/[id]/responses/export.
 import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
 import mineOnePut from '../../server/api/forms/mine/[id].put'
+import mineWithdraw from '../../server/api/forms/mine/[id]/withdraw.post'
 import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
 import moveManyPost from '../../server/api/forms/forms/[id]/responses/move.post'
 import releasePost from '../../server/api/forms/forms/[id]/responses/[response]/release.post'
@@ -67,6 +68,7 @@ export const handle = server({
   'GET /api/forms/mine': mineGet,
   'GET /api/forms/mine/:id': mineOneGet,
   'PUT /api/forms/mine/:id': mineOnePut,
+  'POST /api/forms/mine/:id/withdraw': mineWithdraw,
   'POST /api/forms/forms/:id/responses/move': moveManyPost,
   'POST /api/forms/forms/:id/responses/:response/move': movePost,
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,

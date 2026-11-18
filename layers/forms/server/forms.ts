@@ -15,6 +15,8 @@ export interface FormRow {
   status: 'draft' | 'live' | 'paused' | 'closed' | 'archived'
   liveVersionId: string | null
   anonymous: boolean
+  /** Whether a person may change or withdraw their own response before it is considered. */
+  allowEdits: boolean
   retentionDays: number | null
   retentionDeclinedDays: number | null
   createdBy: string
@@ -25,20 +27,20 @@ export interface DraftRow { definition: string, editRevision: number, editedBy: 
 export interface FieldRow { questionId: string, key: string, type: string, dataClass: DataClass, label: string, firstVersion: number, retiredInVersion: number | null }
 export interface VersionRow { id: string, number: number, definition: string, definitionHash: string, changeSummary: string, publishedBy: string, publishedAt: number }
 
-const FORM = `id, slug, title, mode, status, live_version_id AS liveVersionId, anonymous, retention_days AS retentionDays,
+const FORM = `id, slug, title, mode, status, live_version_id AS liveVersionId, anonymous, allow_edits AS allowEdits, retention_days AS retentionDays,
   retention_declined_days AS retentionDeclinedDays, created_by AS createdBy, created_at AS createdAt, archived_at AS archivedAt`
 
 export async function getForm(id: string | undefined): Promise<FormRow | null> {
   if (!id) return null
   const row = await first<FormRow>(`SELECT ${FORM} FROM forms_forms WHERE id = ?`, id)
-  return row ? { ...row, anonymous: !!row.anonymous } : null
+  return row ? { ...row, anonymous: !!row.anonymous, allowEdits: !!row.allowEdits } : null
 }
 
 /** The form at a public address, such as the `spring-auditions` of /forms/spring-auditions. */
 export async function getFormBySlug(slug: string | undefined): Promise<FormRow | null> {
   if (!slug) return null
   const row = await first<FormRow>(`SELECT ${FORM} FROM forms_forms WHERE slug = ?`, slug)
-  return row ? { ...row, anonymous: !!row.anonymous } : null
+  return row ? { ...row, anonymous: !!row.anonymous, allowEdits: !!row.allowEdits } : null
 }
 
 /** The address now of the form that used to be at this one, for sending an old link on. */
@@ -57,7 +59,7 @@ export async function requireForm(id: string | undefined): Promise<FormRow> {
 }
 
 export async function listForms(): Promise<FormRow[]> {
-  return (await all<FormRow>(`SELECT ${FORM} FROM forms_forms ORDER BY archived_at IS NOT NULL, title COLLATE NOCASE, id`)).map(r => ({ ...r, anonymous: !!r.anonymous }))
+  return (await all<FormRow>(`SELECT ${FORM} FROM forms_forms ORDER BY archived_at IS NOT NULL, title COLLATE NOCASE, id`)).map(r => ({ ...r, anonymous: !!r.anonymous, allowEdits: !!r.allowEdits }))
 }
 
 export async function getDraft(formId: string): Promise<DraftRow> {

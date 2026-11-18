@@ -33,7 +33,7 @@ interface One {
   changed: string[]
   stage: (Stage & { note: string | null }) | null
   moves: Move[]
-  history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null }[]
+  history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null, note: string | null }[]
   review: (ReviewResult & { stage: string, mode: 'scores' | 'vote', open: boolean, released: boolean, conflicted: number, quorum: number | null, quorate: boolean, canRelease: boolean }) | null
   decision: { at: number, reason: string | null } | null
   about: { slot: string, label: string, name: string | null } | null
@@ -633,6 +633,10 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               >
                 <span class="block font-medium">{{ h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }) }}</span>
                 <span class="block text-muted">{{ h.by ? t('forms.screens.responses.by-at', { who: h.by, when: dateTime(h.at) }) : dateTime(h.at) }}</span>
+                <span
+                  v-if="h.note"
+                  class="mt-1 block border-l-2 border-default pl-2 whitespace-pre-line"
+                >{{ t('forms.screens.responses.history-note', { note: h.note }) }}</span>
               </li>
             </ol>
           </section>

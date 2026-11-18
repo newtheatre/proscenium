@@ -29,6 +29,8 @@ export const forms = defineTable('forms_forms', {
   // How long answers are kept. A form's own field, not a setting (part 6).
   retentionDays: col.internal(integer('retention_days')),
   retentionDeclinedDays: col.internal(integer('retention_declined_days')),
+  // Whether the person who sent a response may change it or withdraw it before it is considered.
+  allowEdits: col.internal(integer('allow_edits', { mode: 'boolean' }).notNull().default(false)),
   templateKey: col.internal(text('template_key')),
   createdBy: col.account('created_by', { role: 'actor' }),
   createdAt: col.createdAt(),
@@ -108,6 +110,25 @@ export const PLACEMENT_STATUSES = ['active', 'paused', 'ended'] as const
 export const RESPONSE_STATES = ['draft', 'awaiting_payment', 'submitted', 'withdrawn'] as const
 export const STAGE_KINDS = ['pending', 'in_review', 'returned', 'approved', 'declined', 'closed'] as const
 export const RESPONSE_REALMS = ['audience', 'members'] as const
+/**
+ * What staff wrote to the person with a move, kept so staff can see later why a response was sent
+ * back. The history itself holds no words and is never changed; these are words, so they sit apart,
+ * where erasure and retention can remove them. Only staff read them: the person sees the note of
+ * the stage their response is in now, and nothing once they have sent their changes.
+ */
+export const stageNotes = defineTable('forms_stage_notes', {
+  id: col.id(),
+  responseId: col.ref('forms_responses'),
+  // When the move was made: the same instant as its row in the history.
+  at: col.timestamp('at').notNull(),
+  note: col.freeText(text('note'), { erase: 'clear' }),
+}, {
+  id: 'fsn',
+  realm: 'operational',
+  subject: { via: 'response_id' },
+  extra: t => [index('forms_stage_notes_response').on(t.responseId, t.at)],
+})
+
 export const ASSIGNMENT_STATUSES = ['assigned', 'submitted', 'conflicted'] as const
 export const CONFLICTS = ['declared', 'automatic'] as const
 export const VOTES = ['for', 'against', 'abstain'] as const
@@ -409,4 +430,4 @@ export const oldAddresses = defineTable('forms_old_addresses', {
   extra: t => [primaryKey({ columns: [t.slug] }), index('forms_old_addresses_form').on(t.formId)],
 })
 
-export const tables = { oldAddresses, forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }
+export const tables = { oldAddresses, stageNotes, forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }
