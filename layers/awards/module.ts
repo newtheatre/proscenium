@@ -92,6 +92,7 @@ export default defineModule({
     'forms.slot': [{ id: 'awards.nomination', subject: 'awards.type', attach: 'awards.type.manage', label: 'awards.forms.nomination.label', source: 'awards.type' }],
     'forms.source': [{ id: 'awards.type', file: 'type' }],
     'forms.outcome-action': [{ id: 'awards.issue-award', file: 'issue-award' }],
+    'forms.template': [{ id: 'awards.nomination', file: 'nomination' }],
     // ::awards-roll in a theatre's own page.
     'core.public-component': [
       { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its web address).' },

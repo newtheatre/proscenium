@@ -186,6 +186,8 @@
   "awards.forms.issue-award.nominee": "The person nominated",
   "awards.forms.issue-award.awarded-for": "What it is for",
   "awards.forms.issue-award.citation": "Citation",
+  "awards.forms.nomination-template.name": "Nomination for an award",
+  "awards.forms.nomination-template.description": "Asks who is nominated, what for and why. Giving the award issues it to the person named.",
 
   "awards.roll.title": "Roll of honour",
   "awards.roll.description": "The people the theatre has honoured.",
