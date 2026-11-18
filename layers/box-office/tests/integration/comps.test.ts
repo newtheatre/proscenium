@@ -58,6 +58,15 @@ describe('complimentary tickets', () => {
     expect((await req('GET', '/api/box-office/comps', undefined, approver)).body.waiting.map((r: { id: string }) => r.id)).not.toContain(own)
   })
 
+  it('puts requests waiting for a decision on the approver\'s console home, not the requester\'s', async () => {
+    const waiting = (await ask()).body.requestId as string
+    const home = async (actor: typeof approver) => (await req('GET', '/api/core/home?home=console', undefined, actor)).body.cards as { id: string, count?: number }[]
+    const card = (await home(approver)).find(c => c.id === 'box-office.comps')
+    expect(card?.count).toBeGreaterThanOrEqual(1)
+    expect((await home(requester)).map(c => c.id)).not.toContain('box-office.comps')
+    expect((await decide(waiting, 'decline')).status).toBe(200)
+  })
+
   it('keeps a performance within its cap and a request within its size', async () => {
     expect((await ask({ quantity: 5 })).body).toMatchObject({ code: 'box-office.comp.too-many' })
     await set('box-office.comps.per-performance', 3)
