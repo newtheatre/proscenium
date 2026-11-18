@@ -5,12 +5,13 @@
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, changeSetting, createUnit, nowMs, setClock } from '#kit'
-import { findOrCreateAccount } from '#modules/core'
+import { findOrCreateAccount, listTerms } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
 import { createPromoCode } from '../../server/promo-codes'
-import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { cancelLines } from '../../server/cancel'
+import { deliver, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const seller = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
@@ -52,6 +53,8 @@ beforeAll(async () => {
     await changeSetting(unit.view(), 'box-office.reservations.confirm-email', false, { reason: 'test', confirm: true })
     await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }) // these take cash
     await changeSetting(unit.view(), 'box-office.checkout.payment-timing', 'buyer-chooses', { reason: 'test', confirm: true })
+    // Receipts go from a job, with no request to take the site's address from.
+    await changeSetting(unit.view(), 'core.site.origin', 'https://theatre.example', { reason: 'test', confirm: true })
   })
   cash = (await rows<{ id: string }>("SELECT id FROM payments_provider_accounts WHERE provider = 'cash'"))[0]!.id
   for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
@@ -259,6 +262,7 @@ describe('selling at the desk', () => {
     const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
     expect(made!.account_id).toBeNull()
     expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    await deliver()
     const after = await order(made!.id)
     expect(after).toMatchObject({ state: 'confirmed' })
     expect(after!.account_id).toBeTruthy()
@@ -268,42 +272,57 @@ describe('selling at the desk', () => {
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', made!.id)).toBe(0)
   })
 
-  it('splits the booking with the sale: each person\'s receipt links only their own tickets', async () => {
-    const h = await house(4)
-    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 3 }] }
-    const splits = [{ items: [{ basket: 'box-office', line: 0, quantity: 1 }, { basket: 'box-office', line: 2, quantity: 1 }] }, { items: [{ basket: 'box-office', line: 1, quantity: 1 }] }]
+  it('gives each person of a split sale a booking of their own as their receipt goes, however many there are', async () => {
+    const h = await house(8)
+    await commit(unit => createPromoCode(unit.view(), { code: 'SPLITFIVE', effect: 'amount_off', value: 500, maxPerOrder: 1 }, null))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 6 }], promoCode: 'SPLITFIVE' }
+    // Six people, one ticket each; the code came off the first ticket.
+    const splits = [0, 1, 2, 3, 4, 5].map(line => ({ items: [{ basket: 'box-office', line, quantity: 1 }] }))
     const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits }, seller)
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
-    expect(sale.body.amountMinor).toBe(3600)
-    const made = await rows<Record<string, any>>('SELECT id, total_minor, account_id FROM box_office_orders WHERE intent_id = ? ORDER BY total_minor DESC', sale.body.intentId)
-    expect(made.map(o => o.total_minor)).toEqual([2400, 1200])
-    expect(await claimed(h)).toBe(3)
+    expect(sale.body.amountMinor).toBe(6700)
+    for (const n of [1, 2, 3, 4, 5, 6]) await inContext(() => attest({ intentId: sale.body.intentId, providerAccountId: cash, method: 'cash', split: n, receipt: { email: `six${n}@example.org` } }), seller)
+    const [original] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ? AND split_from_id IS NULL', sale.body.intentId)
+    expect(original).toMatchObject({ state: 'confirmed', total_minor: 6700 })
+    // The receipts go just after, each with its own booking.
+    await deliver()
+    const owned = await rows<{ total_minor: number, address: string, tickets: number }>(
+      `SELECT o.total_minor, e.address, (SELECT count(*) FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = o.id AND t.state = 'valid') AS tickets
+        FROM box_office_orders o JOIN core_account_emails e ON e.account_id = o.account_id WHERE o.intent_id = ? ORDER BY e.address`, sale.body.intentId)
+    expect(owned).toEqual([1, 2, 3, 4, 5, 6].map(n => ({ total_minor: n === 1 ? 700 : 1200, address: `six${n}@example.org`, tickets: 1 })))
+    expect(await claimed(h)).toBe(6)
+    expect(await count("SELECT count(*) AS n FROM box_office_promo_redemptions WHERE promo_code_id = (SELECT id FROM box_office_promo_codes WHERE code = 'SPLITFIVE') AND state = 'live'")).toBe(1)
+    expect(await count("SELECT count(*) AS n FROM core_notifications WHERE type_key = 'payments.till-receipt-link' AND address LIKE 'six%@example.org'")).toBe(6)
+    expect(await deferred(h)).toBe(-6700)
 
-    const pay = (split: number, email: string) => inContext(() => attest({ intentId: sale.body.intentId, providerAccountId: cash, method: 'cash', split, receipt: { email } }), seller)
-    expect(await pay(1, 'split.one@example.org')).toMatchObject({ settled: false })
-    expect(await pay(2, 'split.two@example.org')).toMatchObject({ settled: true })
-
-    const owners = await rows<{ total_minor: number, state: string, address: string }>('SELECT o.total_minor, o.state, e.address FROM box_office_orders o JOIN core_account_emails e ON e.account_id = o.account_id WHERE o.intent_id = ? ORDER BY o.total_minor DESC', sale.body.intentId)
-    expect(owners).toEqual([
-      { total_minor: 2400, state: 'confirmed', address: 'split.one@example.org' },
-      { total_minor: 1200, state: 'confirmed', address: 'split.two@example.org' },
-    ])
-    expect(await tickets(made[0]!.id)).toHaveLength(2)
-    expect(await tickets(made[1]!.id)).toHaveLength(1)
-    // One email each, each with a link of its own.
-    const sent = await rows<{ address: string, payload: string }>("SELECT address, payload FROM core_notifications WHERE type_key = 'payments.till-receipt-link' AND address IN ('split.one@example.org', 'split.two@example.org') ORDER BY address")
-    expect(sent.map(s => s.address)).toEqual(['split.one@example.org', 'split.two@example.org'])
-    expect(sent[0]!.payload).not.toEqual(sent[1]!.payload)
+    // A split-off booking is refunded from the payment that paid for it.
+    const [second] = await rows<{ id: string }>("SELECT o.id FROM box_office_orders o JOIN core_account_emails e ON e.account_id = o.account_id WHERE e.address = 'six2@example.org'")
+    const reason = (await inContext(() => listTerms('box-office.cancellation-reason'))).find(t => t.slug === 'cannot-attend')!.id
+    const cancelled = await commit(unit => inContext(() => cancelLines(unit.view(), second!.id, { refund: 'full', reasonTermId: reason, by: seller.accountId! }), seller))
+    expect(cancelled.refund).toMatchObject({ amountMinor: 1200 })
   })
 
-  it('keeps one booking when a promo code is on the sale, since splitting it could change the price', async () => {
-    const h = await house(4)
-    await commit(unit => createPromoCode(unit.view(), { code: 'SPLITTEN', effect: 'percent_off', value: 1000 }, null))
-    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }], promoCode: 'SPLITTEN' }
-    const splits = [{ items: [{ basket: 'box-office', line: 0, quantity: 1 }] }, { items: [{ basket: 'box-office', line: 1, quantity: 1 }] }]
-    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits }, seller)
+  it('splits a reservation paid by several people: the first keeps it, anyone else who gives an address gets their own', async () => {
+    const h = await house(5)
+    const r = await reserved(h, 3)
+    const panels = [{ basket: 'box-office', input: { orderId: r.orderId, expectedTotalMinor: r.totalMinor } }]
+    const splits = [0, 1, 2].map(line => ({ items: [{ basket: 'box-office', line, quantity: 1 }] }))
+    const sale = await req('POST', '/api/payments/till/sale', { panels, splits }, seller)
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
-    expect(await count('SELECT count(*) AS n FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)).toBe(1)
+    const pay = (split: number, receipt?: { email: string }) => inContext(() => attest({ intentId: sale.body.intentId, providerAccountId: cash, method: 'cash', split, receipt }), seller)
+    await pay(1, { email: 'first.payer@example.org' })
+    await pay(2, { email: 'second.payer@example.org' })
+    expect(await pay(3)).toMatchObject({ settled: true })
+    await deliver()
+
+    expect(await order(r.orderId)).toMatchObject({ state: 'confirmed', reference: r.reference, total_minor: r.totalMinor / 3 * 2 })
+    expect((await tickets(r.orderId)).filter(t => t.state === 'valid')).toHaveLength(2)
+    const [off] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE split_from_id = ?', r.orderId)
+    expect(off).toMatchObject({ state: 'confirmed', total_minor: r.totalMinor / 3 })
+    const [owner] = await rows<{ address: string }>('SELECT address FROM core_account_emails WHERE account_id = ?', off!.account_id)
+    expect(owner!.address).toBe('second.payer@example.org')
+    const sent = await rows<{ type_key: string, address: string }>("SELECT type_key, address FROM core_notifications WHERE type_key LIKE 'payments.till-receipt%' AND address IN ('first.payer@example.org', 'second.payer@example.org') ORDER BY address")
+    expect(sent).toEqual([{ type_key: 'payments.till-receipt', address: 'first.payer@example.org' }, { type_key: 'payments.till-receipt-link', address: 'second.payer@example.org' }])
   })
 
   it('emails the tickets to an address the buyer gives, and the order joins that account', async () => {

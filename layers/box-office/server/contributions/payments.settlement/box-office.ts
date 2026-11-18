@@ -7,7 +7,7 @@
 import { sql } from 'drizzle-orm'
 import { first, nowMs, type UnitView } from '#kit'
 import { accountLabel } from '#modules/core'
-import type { Destination, Part, Settlement } from '#modules/payments'
+import type { Part, ReceiptPerson, Settlement } from '#modules/payments'
 import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
 import { exchangeOrder, isExchangeRecord, releaseExchange, settleExchange } from '../../exchange'
@@ -35,9 +35,9 @@ export default {
   },
 
   // The till's receipt carries a desk sale's tickets: the booking joins the buyer and the receipt links to it.
-  async receiptLink(unit: UnitView, part: Part, to: Destination[]) {
+  async receiptLink(unit: UnitView, part: Part, person: ReceiptPerson) {
     if (isExchangeRecord(part.record)) return null
-    return deskReceiptLink(unit, part.record, to)
+    return deskReceiptLink(unit, part.record, person)
   },
 
   // The money for cancelled tickets has gone back: it is no longer owed to the audience.
