@@ -280,6 +280,18 @@ describe('selling at the desk', () => {
     expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('box-office.promo.unknown')
   })
 
+  it('keeps a code set "not with member or concession prices" off the concession at the till', async () => {
+    const h = await house(5)
+    const code = 'NOREQ' + h.performanceId.slice(-6).toUpperCase()
+    await commit(unit => createPromoCode(unit.view(), { code, effect: 'percent_off', value: 2000, notWithRequirements: true }, null))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }], promoCode: code }
+    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
+    expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 960 + 800, panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 960 }, { label: 'Concession', amountMinor: 800 }] }] })
+    const sale = await till(input)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(sale.body.amountMinor).toBe(1760)
+  })
+
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {
     const h = await house(2)
     const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] })

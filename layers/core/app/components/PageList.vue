@@ -711,7 +711,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               color="neutral"
               variant="outline"
               icon="i-lucide-download"
-              :label="t('core.list.export', { total })"
+              :label="t('core.list.export', { total, count: total })"
             />
             <p
               v-if="!exportBlocked"
