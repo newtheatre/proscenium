@@ -17,6 +17,8 @@ import performanceLayoutGet from '../../server/api/box-office/performances/[id]/
 import performanceLayoutPut from '../../server/api/box-office/performances/[id]/layout.put'
 import runLayoutGet from '../../server/api/box-office/productions/[id]/layout.get'
 import runLayoutPut from '../../server/api/box-office/productions/[id]/layout.put'
+import releaseKept from '../../server/api/box-office/performances/[id]/layout/release.post'
+import keepAgain from '../../server/api/box-office/performances/[id]/layout/keep.post'
 import { availability } from '../../server/availability'
 import { createBasket } from '../../server/baskets'
 import { buy, house, manager, NOV_16, ready, req, type House } from './stage'
@@ -31,6 +33,8 @@ const handle = server({
   'PUT /api/box-office/performances/:id/layout': performanceLayoutPut,
   'GET /api/box-office/productions/:id/layout': runLayoutGet,
   'PUT /api/box-office/productions/:id/layout': runLayoutPut,
+  'POST /api/box-office/performances/:id/layout/release': releaseKept,
+  'POST /api/box-office/performances/:id/layout/keep': keepAgain,
 })
 let keys = 0
 async function api<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> = manager): Promise<{ status: number, body: T }> {
@@ -94,8 +98,8 @@ async function bookSpace(h: House, holder?: ReturnType<typeof person>, quantity 
 }
 
 /** A layout for the performance's space, which, being the space's first, is its usual one and is applied. */
-async function layout(h: House, numbers: { seats?: number | null, wheelchairSpaces: number, seatsPerSpace: number }, name = 'End-on') {
-  const made = await api('POST', '/api/box-office/seating-layouts', { spaceId: await spaceOf(h), name, seats: numbers.seats ?? null, wheelchairSpaces: numbers.wheelchairSpaces, seatsPerSpace: numbers.seatsPerSpace })
+async function layout(h: House, numbers: { seats?: number | null, wheelchairSpaces: number, seatsPerSpace: number, seatsSection?: string }, name = 'End-on') {
+  const made = await api('POST', '/api/box-office/seating-layouts', { spaceId: await spaceOf(h), name, seats: numbers.seats ?? null, wheelchairSpaces: numbers.wheelchairSpaces, seatsPerSpace: numbers.seatsPerSpace, ...(numbers.seatsSection ? { seatsSection: numbers.seatsSection } : {}) })
   expect(made.status, JSON.stringify(made.body)).toBe(200)
   return made.body.id as string
 }
@@ -335,5 +339,64 @@ describe('the seats a space takes', () => {
     finally {
       setClock(NOV_16)
     }
+  })
+})
+
+describe('the kept seats let go early', () => {
+  it('go on general sale before the keep-back time, audited, and Undo keeps them again while spaces are unbooked', async () => {
+    const h = await house(10)
+    await layout(h, { wheelchairSpaces: 2, seatsPerSpace: 2 })
+    expect(await buy(h, 7)).toMatchObject({ ok: false, code: 'box-office.capacity.kept-for-wheelchair' })
+    const released = await api('POST', `/api/box-office/performances/${h.performanceId}/layout/release`, {})
+    expect(released.status, JSON.stringify(released.body)).toBe(200)
+    expect(await count("SELECT count(*) AS n FROM core_audit WHERE record_id = ? AND detail LIKE '%released%'", h.performanceId)).toBe(1)
+    expect((await api('GET', `/api/box-office/performances/${h.performanceId}/layout`)).body.wheelchair).toMatchObject({ kept: 0, keepUntil: null })
+    expect((await api('POST', `/api/box-office/performances/${h.performanceId}/layout/release`, {})).body.code).toBe('box-office.layout.nothing-kept')
+    expect((await buy(h, 4)).ok).toBe(true)
+    // Undo keeps back what is still free for the two unbooked spaces.
+    expect((await api('POST', `/api/box-office/performances/${h.performanceId}/layout/keep`, {})).status).toBe(200)
+    expect(await buy(h, 3)).toMatchObject({ ok: false, code: 'box-office.capacity.kept-for-wheelchair' })
+    expect((await api('GET', `/api/box-office/performances/${h.performanceId}/layout`)).body.wheelchair).toMatchObject({ kept: 4, releasedAt: null })
+    // With every space booked there is nothing to keep, so it cannot be undone.
+    expect((await api('POST', `/api/box-office/performances/${h.performanceId}/layout/release`, {})).status).toBe(200)
+    expect((await bookSpace(h)).ok).toBe(true)
+    expect((await bookSpace(h)).ok).toBe(true)
+    expect((await api('POST', `/api/box-office/performances/${h.performanceId}/layout/keep`, {})).body.code).toBe('box-office.layout.all-booked')
+  })
+})
+
+describe('the section a space\'s seats come from', () => {
+  async function circle(h: House, capacity = 10) {
+    const band = await req('POST', `/api/box-office/productions/${h.productionId}/bands`, { name: 'Circle' })
+    expect(band.status, JSON.stringify(band.body)).toBe(200)
+    expect((await req('PUT', `/api/box-office/performances/${h.performanceId}/sales`, { pools: [{ bandId: band.body.bandId, capacity }], confirmOverVenue: true })).status).toBe(200)
+    await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: band.body.bandId, ticketTypeId: h.fullId, amountMinor: 1000 }] })
+    return band.body.bandId as string
+  }
+  const claimedIn = async (h: House, bandId: string) => (await rows<{ claimed: number }>('SELECT claimed FROM box_office_pools WHERE performance_id = ? AND band_id = ?', h.performanceId, bandId))[0]!.claimed
+
+  it('is the section a layout names, by name, else the first', async () => {
+    const h = await house(10)
+    const circleId = await circle(h)
+    const id = await layout(h, { wheelchairSpaces: 2, seatsPerSpace: 2, seatsSection: 'circle' })
+    expect((await api('GET', '/api/box-office/seating-layouts')).body.rows.find((l: { id: string }) => l.id === id)).toMatchObject({ seatsSection: 'circle' })
+    expect((await bookSpace(h)).ok).toBe(true)
+    expect(await claimedIn(h, circleId)).toBe(2)
+    expect(await claimedIn(h, h.bandId)).toBe(0)
+    expect((await api('GET', `/api/box-office/performances/${h.performanceId}/layout`)).body.wheelchair).toMatchObject({ section: 'Circle', kept: 2 })
+  })
+
+  it('is the section chosen with numbers for the run or one performance, and must be the production\'s', async () => {
+    const h = await house(10)
+    const circleId = await circle(h)
+    expect((await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'numbers', wheelchairSpaces: 2, seatsPerSpace: 1, seatsBandId: circleId })).status).toBe(200)
+    expect((await bookSpace(h)).ok).toBe(true)
+    expect(await claimedIn(h, circleId)).toBe(1)
+    const own = await api('PUT', `/api/box-office/performances/${h.performanceId}/layout`, { use: 'numbers', wheelchairSpaces: 2, seatsPerSpace: 1, seatsBandId: h.bandId })
+    expect(own.status, JSON.stringify(own.body)).toBe(200)
+    expect((await bookSpace(h)).ok).toBe(true)
+    expect(await claimedIn(h, h.bandId)).toBe(1)
+    const other = await house(10)
+    expect((await api('PUT', `/api/box-office/performances/${h.performanceId}/layout`, { use: 'numbers', wheelchairSpaces: 2, seatsPerSpace: 1, seatsBandId: other.bandId })).body.code).toBe('box-office.band.not-found')
   })
 })

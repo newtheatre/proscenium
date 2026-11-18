@@ -53,7 +53,7 @@ export async function copySetup(unit: UnitView, targetPerformanceId: string, sou
   const sales = await salesOf(source.id)
   // Wheelchair spaces: the source's own where it has them (a layout only in the same space), else the target's run's or space's.
   const sameSpace = source.spaceId === target.spaceId
-  const own = sales?.layoutOwn ? (sales.layoutId ? (sameSpace ? { use: 'layout' as const, layoutId: sales.layoutId } : undefined) : { use: 'numbers' as const, wheelchairSpaces: sales.wheelchairSpaces ?? 0, seatsPerSpace: sales.seatsPerSpace ?? 0 }) : undefined
+  const own = sales?.layoutOwn ? (sales.layoutId ? (sameSpace ? { use: 'layout' as const, layoutId: sales.layoutId } : undefined) : { use: 'numbers' as const, wheelchairSpaces: sales.wheelchairSpaces ?? 0, seatsPerSpace: sales.seatsPerSpace ?? 0, seatsBandId: sameProduction ? sales.seatsBandId : null }) : undefined
   await saveSales(unit, target.id, {
     pools: pools.filter(p => !(laidOut(sales) && p.bandKind === 'wheelchair')).map(p => ({ bandId: map.get(p.bandId)!, capacity: p.capacity })),
     ...(own ? { wheelchair: own } : {}),

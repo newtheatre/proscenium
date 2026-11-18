@@ -8,13 +8,14 @@ import type { wheelchairChoice } from '../../server/input'
 
 type Choice = z.input<typeof wheelchairChoice>
 interface Layout { id: string, name: string, seats: number | null, wheelchairSpaces: number, seatsPerSpace: number, usual: boolean }
-interface Said { layoutId: string | null, name: string | null, wheelchairSpaces: number, seatsPerSpace: number }
+interface Said { layoutId: string | null, name: string | null, wheelchairSpaces: number, seatsPerSpace: number, seatsBandId: string | null }
 interface Shown {
   layouts: Layout[]
+  sections: { id: string, name: string }[]
   layoutId: string | null
   own: Said | null
   inherited: (Said & { from: 'run' | 'usual' }) | null
-  wheelchair: { spaces: number, booked: number, seatsEach: number, section: string | null, kept: number, keepUntil: number | null } | null
+  wheelchair: { spaces: number, booked: number, seatsEach: number, section: string | null, kept: number, keepUntil: number | null, releasedAt: number | null, wouldKeepUntil: number | null } | null
 }
 
 const props = defineProps<{ performanceId: string }>()
@@ -24,6 +25,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { offer } = useUndo()
 const { dateTime } = useDates()
+const { confirm } = useConfirm()
 const words = useWheelchairWords()
 const url = computed(() => `/api/box-office/performances/${encodeURIComponent(props.performanceId)}/layout`)
 const { data, refresh } = await useAPI<Shown>(url, { key: `box-office:layout:${props.performanceId}` })
@@ -31,7 +33,7 @@ const { data, refresh } = await useAPI<Shown>(url, { key: `box-office:layout:${p
 const current = computed<Choice>(() => {
   const own = data.value?.own
   if (!own) return { use: 'inherit' }
-  return own.layoutId ? { use: 'layout', layoutId: own.layoutId } : { use: 'numbers', wheelchairSpaces: own.wheelchairSpaces, seatsPerSpace: own.seatsPerSpace }
+  return own.layoutId ? { use: 'layout', layoutId: own.layoutId } : { use: 'numbers', wheelchairSpaces: own.wheelchairSpaces, seatsPerSpace: own.seatsPerSpace, ...(own.seatsBandId ? { seatsBandId: own.seatsBandId } : {}) }
 })
 const inheritDescription = computed(() => {
   const i = data.value?.inherited ?? null
@@ -56,15 +58,50 @@ async function save(choice: Choice) {
   }
 }
 
+// Letting the kept seats go before the keep-back time, and Undo while spaces are still unbooked.
+async function keep(path: 'release' | 'keep') {
+  await $api(`${url.value}/${path}`, { method: 'POST', body: {} })
+  await refresh()
+  emit('changed')
+}
+async function release() {
+  const w = data.value?.wheelchair
+  if (!w) return
+  if (!await confirm({ verb: t('box-office.layouts.release.verb'), thing: t('box-office.layouts.seats', { count: w.kept }), consequence: t('box-office.layouts.release.consequence') })) return
+  refusal.value = null
+  try {
+    await keep('release')
+    offer(t('box-office.layouts.release.done'), () => keep('keep'))
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+async function keepBack() {
+  refusal.value = null
+  try {
+    await keep('keep')
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+const canKeepAgain = computed(() => {
+  const w = data.value?.wheelchair
+  return !!w?.releasedAt && !!w.wouldKeepUntil && Date.now() < w.wouldKeepUntil && w.booked < w.spaces
+})
+
 const facts = computed(() => {
   const w = data.value?.wheelchair
   if (!w) return []
   return [
     { label: t('box-office.layouts.fact.spaces'), value: t('box-office.layouts.fact.booked', { booked: w.booked, spaces: w.spaces }) },
     { label: t('box-office.layouts.fact.each'), value: w.seatsEach ? t('box-office.layouts.seats', { count: w.seatsEach }) : t('box-office.layouts.fact.apart') },
+    ...(w.seatsEach && w.section && data.value!.sections.length > 1 ? [{ label: t('box-office.layouts.fact.section'), value: w.section }] : []),
     ...(w.seatsEach && w.keepUntil
       ? [{ label: t('box-office.layouts.fact.kept'), value: w.kept ? t('box-office.layouts.fact.kept-until', { seats: t('box-office.layouts.seats', { count: w.kept }), when: dateTime(w.keepUntil) }) : t('box-office.layouts.fact.none-kept') }]
       : []),
+    ...(w.seatsEach && w.releasedAt ? [{ label: t('box-office.layouts.fact.kept'), value: t('box-office.layouts.fact.released', { when: dateTime(w.releasedAt) }) }] : []),
   ]
 })
 </script>
@@ -91,6 +128,7 @@ const facts = computed(() => {
       <RefusalNotice :refusal="refusal" />
       <BoxOfficeWheelchairChoice
         :layouts="data.layouts"
+        :sections="data.sections"
         :current="current"
         :inherit-label="t('box-office.layouts.choice.as-run')"
         :inherit-description="inheritDescription"
@@ -100,6 +138,27 @@ const facts = computed(() => {
         v-if="facts.length"
         :facts="facts"
       />
+      <div
+        v-if="data.wheelchair?.kept || canKeepAgain"
+        class="flex flex-wrap gap-2"
+      >
+        <UButton
+          v-if="data.wheelchair?.kept"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-lock-open"
+          :label="t('box-office.layouts.release.button')"
+          @click="release"
+        />
+        <UButton
+          v-if="canKeepAgain"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-lock"
+          :label="t('box-office.layouts.release.keep')"
+          @click="keepBack"
+        />
+      </div>
     </div>
   </PageSection>
 </template>
