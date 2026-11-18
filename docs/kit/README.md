@@ -97,7 +97,7 @@ export default defineRoute({
 
 Before the handler runs the kit checks, in order: the module is on (else 404), the rate limit
 (429), Turnstile if `protect: 'turnstile'`, the ability (401 or 403), and then the input (422
-naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
+naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields?, detail? }`. `detail` holds facts a screen may link to or act on (the id of the record in the way), never prose. The kit commits the unit
 of work after the handler returns, with an audit entry when the ability is audited.
 
 A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the body unread for the

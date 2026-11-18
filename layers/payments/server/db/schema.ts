@@ -139,6 +139,10 @@ export const attempts = defineTable('payments_attempts', {
   feeMinor: col.minor('fee_minor'),
   refundedMinor: col.minor('refunded_minor').notNull().default(0),
   tenderedMinor: col.minor('tendered_minor'),
+  // What an "other" payment was: a voucher number or an invoice's reference, as the seller typed it.
+  // A reference, not a note about anyone, so internal. At most 200 characters, checked by the route:
+  // a check here would mean rebuilding the table, and with it its triggers.
+  note: col.internal(text('note')),
   answeredBy: col.account('answered_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   failureCode: col.internal(text('failure_code')),
   startedAt: col.timestamp('started_at').notNull(),

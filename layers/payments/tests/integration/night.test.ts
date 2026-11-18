@@ -5,15 +5,23 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { newId } from '#kit'
 import figure from '../../server/contributions/front-of-house.tonight-figure/tills'
 import section from '../../server/contributions/front-of-house.report-section/tills'
+import takings from '../../server/contributions/core.tonight-figure/takings'
 import { performance, ready, req } from '../../../front-of-house/tests/integration/stage'
 import { env, inContext, person, setModule } from '../../../../tests/integration/helpers'
 
 const HOUR = 3_600_000
 let p: Awaited<ReturnType<typeof performance>>
 
-async function session(label: string, openedAt: number, state: 'open' | 'counting' | 'closed', cash?: { expected: number, counted: number, closedAt: number }) {
+async function session(label: string, openedAt: number, state: 'open' | 'counting' | 'closed', cash?: { expected: number, counted: number, closedAt: number }): Promise<string> {
+  const id = newId('till')
   await env.DB.prepare(`INSERT INTO payments_sessions (id, point_label, opened_by, opened_at, closed_at, state, float_minor, expected_cash_minor, counted_cash_minor, currency, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'GBP', ?, ?)`).bind(newId('till'), label, newId('acc'), openedAt, cash?.closedAt ?? null, state, cash?.expected ?? null, cash?.counted ?? null, openedAt, openedAt).run()
+    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'GBP', ?, ?)`).bind(id, label, newId('acc'), openedAt, cash?.closedAt ?? null, state, cash?.expected ?? null, cash?.counted ?? null, openedAt, openedAt).run()
+  return id
+}
+
+async function payment(sessionId: string, amountMinor: number, state: 'succeeded' | 'open') {
+  await env.DB.prepare(`INSERT INTO payments_intents (id, amount_minor, currency, channel, state, expires_at, session_id, settled_at, created_at, updated_at)
+    VALUES (?, ?, 'GBP', 'desk', ?, ?, ?, ?, ?, ?)`).bind(newId('pay'), amountMinor, state, p.startsAt + HOUR, sessionId, state === 'succeeded' ? p.startsAt : null, p.startsAt, p.startsAt).run()
 }
 
 beforeAll(async () => {
@@ -21,10 +29,14 @@ beforeAll(async () => {
   await setModule('payments', true)
   p = await performance()
   // The night: one till cashed up 50p short, one still being counted.
-  await session('Foyer desk', p.startsAt - 2 * HOUR, 'closed', { expected: 10_000, counted: 9_950, closedAt: p.startsAt + 3 * HOUR })
-  await session('Box office desk', p.startsAt - HOUR, 'counting')
+  const foyer = await session('Foyer desk', p.startsAt - 2 * HOUR, 'closed', { expected: 10_000, counted: 9_950, closedAt: p.startsAt + 3 * HOUR })
+  const desk = await session('Box office desk', p.startsAt - HOUR, 'counting')
+  await payment(foyer, 1_200, 'succeeded')
+  await payment(desk, 800, 'succeeded')
+  await payment(desk, 5_000, 'open')
   // Another day's tills.
-  await session('Foyer desk', p.startsAt - 48 * HOUR, 'closed', { expected: 500, counted: 500, closedAt: p.startsAt - 46 * HOUR })
+  const before = await session('Foyer desk', p.startsAt - 48 * HOUR, 'closed', { expected: 500, counted: 500, closedAt: p.startsAt - 46 * HOUR })
+  await payment(before, 500, 'succeeded')
   await session('Foyer desk', p.startsAt + 48 * HOUR, 'open')
 })
 
@@ -40,6 +52,12 @@ describe('the tills figure on the board', () => {
     expect(board.body.figures).toEqual([expect.objectContaining({ id: 'payments.tills', label: 'payments.figures.tills', value: 1, state: 'attention' })])
     const steward = person(['front-of-house.shift.view'])
     expect((await req('GET', `/api/front-of-house/performances/${p.id}/tonight`, undefined, steward)).body.figures).toEqual([])
+  })
+})
+
+describe('the takings figure on the Tonight hub', () => {
+  it('adds up what went through the day\'s tills, in minor units of their currency', async () => {
+    expect(await inContext(() => takings.read(p.id))).toEqual({ value: 2_000, state: 'ok', unit: 'GBP' })
   })
 })
 

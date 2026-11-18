@@ -2,7 +2,7 @@
 // what they do not hold, and a privileged ability counts only once the theatre confirms it.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { grantDirectly, leaveIdentity, reset, staff, useIdentity } from './helpers'
-import { inContext, rows } from '../../../../../tests/integration/helpers'
+import { inContext, rows, setModule } from '../../../../../tests/integration/helpers'
 import { factAbilityMap } from '../../../server/identity/grants'
 
 beforeAll(useIdentity)
@@ -49,5 +49,26 @@ describe('facts', () => {
     const admin = await staff()
     await grantDirectly(admin.accountId, ['core.role.manage'])
     expect((await admin.browser.put('/api/core/facts/core.nothing', { abilities: [] })).status).toBe(404)
+  })
+})
+
+describe('what a module brings when it is switched on (FH-4)', () => {
+  it('maps its facts\' defaults and makes its preset roles once, leaving the theatre\'s own alone', async () => {
+    const { env } = await import('./helpers')
+    const { ensureModuleDefaults } = await import('../../../server/identity/defaults')
+    await setModule('front-of-house', true)
+    await env.DB.prepare('DELETE FROM core_roles WHERE key IN (\'volunteer\', \'front-of-house-manager\')').run()
+    await env.DB.prepare('INSERT INTO core_fact_abilities (fact, ability, pinned_record, created_by, created_at) VALUES (\'front-of-house.rostered\', \'front-of-house.shift.sign-up\', \'\', \'acc_test\', 1)').run()
+    const made = await inContext(() => ensureModuleDefaults('front-of-house', 'acc_test'))
+    expect(made).toEqual({ facts: 2, roles: 2 })
+    const leading = (await rows<{ ability: string }>('SELECT ability FROM core_fact_abilities WHERE fact = \'front-of-house.leading-shift\' ORDER BY ability')).map(r => r.ability)
+    expect(leading).toEqual(expect.arrayContaining(['front-of-house.assignment.check-in', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.write', 'front-of-house.shift.view']))
+    // The theatre's own mapping stands.
+    expect(await rows('SELECT ability FROM core_fact_abilities WHERE fact = \'front-of-house.rostered\'')).toEqual([{ ability: 'front-of-house.shift.sign-up' }])
+    const [volunteer] = await rows<{ id: string, name: string, opens_members_area: number, preset: string }>('SELECT id, name, opens_members_area, preset FROM core_roles WHERE key = \'volunteer\'')
+    expect(volunteer).toMatchObject({ name: 'Volunteer', opens_members_area: 1, preset: 'front-of-house.volunteer' })
+    expect((await rows('SELECT ability FROM core_role_abilities WHERE role_id = ?', volunteer!.id)).length).toBeGreaterThan(0)
+    // Twice makes nothing more.
+    expect(await inContext(() => ensureModuleDefaults('front-of-house', 'acc_test'))).toEqual({ facts: 0, roles: 0 })
   })
 })

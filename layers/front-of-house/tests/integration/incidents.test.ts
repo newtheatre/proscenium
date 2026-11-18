@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, newId, setAccessProvider, setClock } from '#kit'
 import { listTerms } from '#modules/core'
 import { chaseActions, sendDigest } from '../../server/incidents'
+import myReportsCount from '../../server/contributions/core.count/my-reports'
 import { env, inContext, person, rows, testAccess } from '../../../../tests/integration/helpers'
 import { notes, ready, req, setting } from './stage'
 
@@ -68,6 +69,9 @@ describe('FH-27: reporting', () => {
     expect(listed).toEqual([{ id: mine.incidentId, reference: mine.reference, kind: 'incident', state: 'reported', occurredAt: expect.any(Number), whatHappened: 'A patron slipped on the foyer stairs.' }])
     expect((await req('GET', `/api/front-of-house/incidents/${mine.incidentId}`, undefined, amy)).status).toBe(403)
     expect((await req('GET', '/api/front-of-house/incidents', undefined, amy)).status).toBe(403)
+    // My reports appears in the members' area once there is one to show.
+    expect(await inContext(() => myReportsCount.value(amy))).toBe(1)
+    expect(await inContext(() => myReportsCount.value(reporter()))).toBe(0)
   })
 })
 
