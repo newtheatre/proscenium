@@ -34,7 +34,7 @@ interface Shown { tone: Tone, icon: string, headline: string, line: string, at: 
 interface Term { id: string, label: string }
 
 // Another performance's ticket is ours, so it is amber, with the show and time to tell them (D1).
-const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info', not_on_list: 'warning', card_offline: 'warning' }
+const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info', pass: 'info', not_on_list: 'warning', card_offline: 'warning' }
 const ICONS: Record<Tone, string> = { success: 'i-lucide-circle-check', warning: 'i-lucide-circle-alert', info: 'i-lucide-hand-coins', error: 'i-lucide-circle-x' }
 // The banner's colours: strong enough to read across a foyer, with text that passes contrast on each.
 const BANNER: Record<Tone, string> = { success: 'bg-success text-inverted', warning: 'bg-warning text-inverted', info: 'bg-info text-inverted', error: 'bg-error text-inverted' }

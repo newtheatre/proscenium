@@ -4,7 +4,9 @@
 // may hold any number of passes. Issuing here is by staff, or for passes brought in from another
 // system; a pass bought in an order is issued by the sale (pass-sales.ts) through the same function.
 import { sql } from 'drizzle-orm'
-import { all, first, newId, nowMs, openColumn, refuse, sealColumn, type UnitView } from '#kit'
+import { all, first, newId, nowMs, openColumn, refuse, sealColumn, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
+import { accountLabel, getPerformance, getProduction, notify } from '#modules/core'
 import { hashOf, REFERENCE_ALPHABET } from './codes'
 import { getPassType } from './passes'
 
@@ -132,4 +134,109 @@ export async function getPass(id: string): Promise<HeldPass> {
 /** The passes of one kind people hold, newest first, for the staff list. */
 export async function passesOfType(passTypeId: string): Promise<HeldPass[]> {
   return Promise.all((await all<PassRow>(`${PASSES} WHERE p.pass_type_id = ? AND p.issued_at IS NOT NULL ORDER BY p.created_at DESC, p.id`, passTypeId)).map(toPass))
+}
+
+export interface PassHolder extends HeldPass {
+  /** Who holds it, as staff see a person; null for a pass nobody is named on. */
+  holder: string | null
+  /** Entries booked with it that still stand, and how many shows they are for. */
+  entries: number
+  shows: number
+}
+
+/** The passes of one kind people hold, with who holds each and what they have booked, for the staff list. */
+export async function holdersOf(passTypeId: string): Promise<PassHolder[]> {
+  const used = new Map((await all<{ pass_id: string, entries: number, shows: number }>(
+    `SELECT d.pass_id, count(*) AS entries, count(DISTINCT d.production_id) AS shows FROM box_office_pass_redemptions d JOIN box_office_passes p ON p.id = d.pass_id
+      JOIN box_office_orders o ON o.id = d.order_id WHERE p.pass_type_id = ? AND d.state = 'live' AND o.state IN ('reserved', 'awaiting_payment', 'confirmed') GROUP BY d.pass_id`, passTypeId)).map(r => [r.pass_id, r]))
+  return Promise.all((await passesOfType(passTypeId)).map(async pass => ({
+    ...pass, holder: pass.accountId ? await accountLabel(pass.accountId) : null, entries: used.get(pass.id)?.entries ?? 0, shows: used.get(pass.id)?.shows ?? 0,
+  })))
+}
+
+export interface PassEntry { orderId: string, reference: string, performanceId: string, productionId: string, show: string, startsAt: number, /** Whether the booking is paid or free, so its ticket is issued. */ confirmed: boolean }
+
+/** What has been booked with a pass and still stands, soonest first. */
+export async function entriesOf(passId: string): Promise<PassEntry[]> {
+  const rows = await all<{ order_id: string, reference: string, performance_id: string, production_id: string, state: string }>(
+    `SELECT d.order_id, o.reference, d.performance_id, d.production_id, o.state FROM box_office_pass_redemptions d JOIN box_office_orders o ON o.id = d.order_id
+      WHERE d.pass_id = ? AND d.state = 'live' AND o.state IN ('reserved', 'awaiting_payment', 'confirmed')`, passId)
+  const out: PassEntry[] = []
+  for (const r of rows) {
+    const performance = await getPerformance(r.performance_id)
+    out.push({ orderId: r.order_id, reference: r.reference, performanceId: r.performance_id, productionId: r.production_id, show: (await getProduction(r.production_id)).title, startsAt: performance.startsAt, confirmed: r.state === 'confirmed' })
+  }
+  return out.sort((a, b) => a.startsAt - b.startsAt)
+}
+
+const GONE = { code: 'box-office.pass.changed', reason: 'This pass has just changed.', remedy: 'Reload to see it as it is now.' }
+
+/** Tells a pass's holder its code: when it is given by hand, moved to them, or asked for again. */
+export async function sendPass(unit: UnitView, passId: string, reason: string, made?: Pick<HeldPass, 'id' | 'accountId' | 'code' | 'state' | 'currency' | 'amountMinor' | 'name' | 'priceName' | 'paidAt'>): Promise<boolean> {
+  const pass = made ?? await getPass(passId)
+  if (!pass.accountId || !pass.code || pass.state !== 'active') return false
+  const amount = new Intl.NumberFormat((await useSetting('core.locale.language') as string | null) ?? 'en-GB', { style: 'currency', currency: pass.currency }).format(pass.amountMinor / 100) // not-policy: minor units to units
+  await notify(unit, 'box-office.pass-issued', {
+    to: pass.accountId,
+    variables: { pass: pass.name, price: pass.priceName, code: pass.code, paid: pass.paidAt ? 'It is paid for.' : `There is ${amount} to pay for it, which is taken at the box office when you come to your first show.` },
+    subject: ['box-office.pass', pass.id],
+    dedupeKey: `pass-issued:${pass.id}:${reason}`,
+  })
+  return true
+}
+
+/**
+ * A pass given by hand, from the console: to a person, or to nobody in particular where the pass
+ * allows that. `settled` says nothing is owed for it (a gift, or paid for some other way); otherwise
+ * its price is collected with the first booking it is used on. Its holder is sent the code.
+ */
+export async function givePass(unit: UnitView, input: { passTypeId: string, passPriceId: string, accountId: string | null, settled: boolean }, by: string | null): Promise<{ id: string, code: string }> {
+  const type = await getPassType(input.passTypeId)
+  if (!type.active) refuse('box-office.pass.retired', `${type.name} has been retired.`, { status: 409, remedy: 'Bring it back first.' })
+  const pass = await issuePass(unit, { passTypeId: type.id, passPriceId: input.passPriceId, accountId: input.accountId, paid: input.settled, issuedBy: by })
+  const price = type.prices.find(p => p.id === input.passPriceId)!
+  await sendPass(unit, pass.id, 'given', { id: pass.id, accountId: input.accountId, code: pass.code, state: 'active', currency: type.currency, amountMinor: price.amountMinor, name: type.name, priceName: price.name, paidAt: input.settled ? nowMs() : null })
+  return { id: pass.id, code: pass.code }
+}
+
+/** Moves a pass to another person: what is booked with it stays booked, and it is theirs to use from now on. */
+export function movePass(unit: UnitView, passId: string, accountId: string): void {
+  unit.add(sql`UPDATE box_office_passes SET account_id = ${accountId}, updated_at = ${nowMs()} WHERE id = ${passId} AND state = 'active' AND issued_at IS NOT NULL`).expect(1, GONE)
+  unit.audit({ action: 'update', record: ['box-office.pass', passId], detail: { movedTo: accountId } })
+}
+
+/** Cancels a pass, or brings a cancelled one back. Tickets already booked with it stay as they are. */
+export function setPassVoid(unit: UnitView, passId: string, isVoid: boolean): void {
+  unit.add(sql`UPDATE box_office_passes SET state = ${isVoid ? 'void' : 'active'}, updated_at = ${nowMs()} WHERE id = ${passId} AND state = ${isVoid ? 'active' : 'void'} AND issued_at IS NOT NULL`).expect(1, GONE)
+  unit.audit({ action: 'update', record: ['box-office.pass', passId], detail: { state: isVoid ? 'void' : 'active' } })
+}
+
+/** Records that nothing more is owed for a pass, for money taken some other way. Money taken here is recorded by the sale. */
+export function settlePass(unit: UnitView, passId: string): void {
+  const at = nowMs()
+  unit.add(sql`UPDATE box_office_passes SET paid_at = ${at}, updated_at = ${at} WHERE id = ${passId} AND paid_at IS NULL AND state = 'active' AND issued_at IS NOT NULL`).expect(1, GONE)
+  unit.audit({ action: 'update', record: ['box-office.pass', passId], detail: { settledByHand: true } })
+}
+
+export interface MyPass { id: string, name: string, priceName: string, code: string | null, owedMinor: number, currency: string, left: number | null, state: 'active' | 'void', entries: PassEntry[], /** Shows it covers that are not booked with it yet. */ open: { productionId: string, title: string, slug: string }[] }
+
+/** The passes on a person's account, with what each has booked and the shows it could still book. */
+export async function myPasses(accountId: string): Promise<MyPass[]> {
+  const rows = await all<PassRow>(`${PASSES} WHERE p.issued_at IS NOT NULL AND p.account_id IN (${accountScopeSql('?1')}) ORDER BY p.created_at DESC, p.id`, accountId)
+  const out: MyPass[] = []
+  for (const row of rows) {
+    const pass = await toPass(row)
+    const entries = await entriesOf(pass.id)
+    const type = await getPassType(pass.passTypeId)
+    const booked = new Set(entries.map(e => e.productionId))
+    const open: MyPass['open'] = []
+    if (type.covers === 'productions' && pass.state === 'active') {
+      for (const id of type.productionIds.filter(id => !booked.has(id) || !pass.once)) {
+        const production = await getProduction(id).catch(() => null)
+        if (production && !booked.has(id)) open.push({ productionId: id, title: production.title, slug: production.slug })
+      }
+    }
+    out.push({ id: pass.id, name: pass.name, priceName: pass.priceName, code: pass.code, owedMinor: pass.paidAt ? 0 : pass.amountMinor, currency: pass.currency, left: pass.usesTotal === null ? null : pass.usesTotal - pass.usesTaken, state: pass.state, entries, open })
+  }
+  return out
 }
