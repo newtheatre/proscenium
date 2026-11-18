@@ -536,6 +536,7 @@
   "box-office.live-door.result.problem": "Not checked",
   "box-office.live-door.line.admitted": "{type} · {admitted} of {tickets} on {reference} in",
   "box-office.live-door.line.already_admitted": "At {when} · {reference}",
+  "box-office.live-door.line.already_admitted-here": "This ticket is already in · {reference}",
   "box-office.live-door.line.requirement_not_met": "{type}: {reason} Send them to the box office to change the ticket.",
   "box-office.live-door.line.not_paid.one": "1 ticket, {amount} to pay, booking {reference}. Send them to the till to pay.",
   "box-office.live-door.line.not_paid.other": "{count} tickets, {amount} to pay, booking {reference}. Send them to the till to pay.",

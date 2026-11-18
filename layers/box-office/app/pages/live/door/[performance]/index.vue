@@ -110,6 +110,10 @@ function describe(out: Scan): Shown {
   else if (out.result === 'already_admitted' && out.booking && out.admittedAt) {
     line = t('box-office.live-door.line.already_admitted', { when: time(out.admittedAt), reference: out.booking.reference })
   }
+  else if (out.result === 'already_admitted' && out.booking) {
+    // Checked on the device, which knows the ticket is in but not when.
+    line = t('box-office.live-door.line.already_admitted-here', { reference: out.booking.reference })
+  }
   else if (out.result === 'not_paid' && out.reservation) {
     const owed = { count: out.reservation.tickets, amount: money(out.reservation.amountDueMinor, out.reservation.currency), reference: out.reservation.reference }
     line = out.reservation.buyer
