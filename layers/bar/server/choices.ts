@@ -13,7 +13,7 @@ export const MIXER_MEASURE = 'Mixer measure'
 // ---- Input ---------------------------------------------------------------------------------------
 
 const id = z.string().min(1).max(64) // not-policy: an id's length
-export { groupInput, groupPatch, optionInput, optionPatch } from './input'
+export { groupInput, groupPatch, optionInput, optionOrderInput, optionPatch } from './input'
 export const pickInput = z.object({ groupId: id, key: id }).strict()
 export type Pick = z.infer<typeof pickInput>
 
@@ -37,6 +37,14 @@ export function addGroup(unit: UnitView, input: GroupInput): string {
           SELECT ?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_choice_groups WHERE lower(name) = lower(?))`,
     params: [groupId, input.name, input.source, input.required === false ? 0 : 1, input.maxPicks ?? 1, rule.pricing, rule.fixed, at, at, input.name],
   }).expect(1, NAME_TAKEN('a choice'))
+  // A usual pick given as it is made can only be a mixer: a group listed by hand has no options yet.
+  if (input.defaultKey) {
+    unit.add({
+      sql: `UPDATE bar_choice_groups SET default_key = ? WHERE id = ? AND source = 'mixers'
+            AND EXISTS (SELECT 1 FROM bar_variants WHERE id = ? AND mixer_measure = 1 AND active = 1)`,
+      params: [input.defaultKey, groupId, input.defaultKey],
+    }).expect(1, { code: 'bar.choice.bad-default', reason: 'The usual choice must be one of its options.' })
+  }
   unit.audit({ action: 'create', record: ['bar.choice-group', groupId] })
   return groupId
 }
@@ -87,6 +95,19 @@ export async function updateOption(unit: UnitView, optionId: string, input: z.in
       input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), optionId, row!.group_id, name, optionId],
   }).expect(1, NAME_TAKEN('an option'))
   unit.audit({ action: 'update', record: ['bar.choice-group', row!.group_id], detail: { optionChanged: optionId } })
+}
+
+/** Puts a hand-listed group's options in a new order. The ids must be exactly its options in use. */
+export async function orderOptions(unit: UnitView, groupId: string, optionIds: string[]): Promise<void> {
+  const current = await all<{ id: string }>("SELECT o.id FROM bar_choice_options o JOIN bar_choice_groups g ON g.id = o.group_id WHERE o.group_id = ? AND o.active = 1 AND g.source = 'options'", groupId)
+  const given = new Set(optionIds)
+  if (given.size !== optionIds.length || given.size !== current.length || current.some(o => !given.has(o.id)))
+    refuse('bar.choice.order', 'Give every option of the choice once, in its new order.', { status: 422 })
+  const at = nowMs()
+  optionIds.forEach((optionId, position) => {
+    unit.add({ sql: 'UPDATE bar_choice_options SET position = ?, updated_at = ? WHERE id = ? AND group_id = ?', params: [position, at, optionId, groupId] }).expect(1, GONE('option'))
+  })
+  unit.audit({ action: 'update', record: ['bar.choice-group', groupId], detail: { optionsOrdered: true } })
 }
 
 /** The groups a product asks, in order. Replaces what was attached. */

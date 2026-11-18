@@ -13,7 +13,7 @@ import { listRunPresets, theatreRunPreset } from '../../../../../programme/run-p
 import { sellsHere } from '../../../../../programme/booking'
 import { listVenues } from '../../../../../places/service'
 import { closuresBetween } from '../../../../../places/closures'
-import { openRuns } from '../../../../../programme/runs'
+import { editableRuns, openRuns } from '../../../../../programme/runs'
 import { productionEffects } from '../../../../../programme/guidance'
 import { listTerms } from '../../../../../vocabularies/service'
 
@@ -27,9 +27,10 @@ export default defineRoute({
 }, async (_event, { record }) => {
   const option = (t: { id: string, label: string, retired: boolean }) => ({ id: t.id, label: t.label, retired: t.retired })
   const now = nowMs()
-  const [performances, runs, venues, access, reasons, effects, defaults, theatre, presets, usualPreset, scheduleRuns, sells, closures] = await Promise.all([
+  const [performances, runs, editable, venues, access, reasons, effects, defaults, theatre, presets, usualPreset, scheduleRuns, sells, closures] = await Promise.all([
     listPerformances({ productionId: record!.id }),
     openRuns(record!.id),
+    editableRuns(record!.id),
     listVenues({ archived: true }),
     listTerms('core.access-feature', { includeRetired: true }),
     listTerms('core.cancel-reason'),
@@ -49,6 +50,8 @@ export default defineRoute({
   return {
     performances,
     runs,
+    // Runs added whole, with the pattern each was made from, which can be edited as a whole.
+    editableRuns: editable,
     season: season ? { startsOn: season.starts_on, endsOn: season.ends_on } : null,
     options: {
       venues: venues

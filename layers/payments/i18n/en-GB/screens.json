@@ -110,7 +110,7 @@
   "payments.screens.providers.empty": "No provider accounts yet",
   "payments.screens.providers.empty-help": "Add an account to take card payments. Cash needs an account too, so that it can be offered at the desk.",
   "payments.screens.providers.available-title": "Providers this site can use",
-  "payments.screens.providers.available-help": "A provider that needs a secret cannot be used until it is set on the site's Worker by whoever runs it.",
+  "payments.screens.providers.available-help": "Add an account with a provider, then save its keys on the account's card above. Keys are kept encrypted in the app.",
   "payments.screens.providers.not-ready": "Not ready",
   "payments.screens.providers.missing": "Missing {secrets}",
   "payments.screens.providers.missing-help": "Payments through this account are not offered until its keys are saved below.",

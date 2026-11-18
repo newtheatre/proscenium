@@ -4,7 +4,8 @@
      still to pay. Free tickets can be handed back here until the performance starts. A reservation can be cancelled here, whole or some of its tickets, and the seats go
      back on sale at once. A paid booking can be cancelled here too when the theatre allows it and the
      cut-off has not passed, and the price less the fee goes back to the card; otherwise the box
-     office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page. -->
+     office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page.
+     The signed-in owner opens the same page from My tickets, by the order's id. -->
 <script setup lang="ts">
 import type { BookingView } from '../../../utils/booking'
 
@@ -20,10 +21,14 @@ const { money } = await useMoney()
 const route = useRoute()
 const { viewer } = useViewer()
 const token = computed(() => String(route.params.token))
+// /book/order/mine?order=<id> is the same page for the signed-in owner, from My tickets: the booking
+// is found by its id and their account, since only the link's hash is kept. A link token is never
+// "mine", which is too short to be one.
+const ownerOrder = computed(() => token.value === 'mine' ? String(route.query.order ?? '') : null)
 useSeoMeta({ title: () => t('box-office.manage.title'), robots: 'noindex' })
 
-const headers = computed(() => ({ 'x-order-token': token.value }))
-const { data: order, error } = await useAPI<Order>('/api/box-office/orders/link', { key: `box-office:manage:${token.value}`, headers })
+const headers = computed((): Record<string, string> => ownerOrder.value !== null ? { 'x-order-id': ownerOrder.value } : { 'x-order-token': token.value })
+const { data: order, error } = await useAPI<Order>('/api/box-office/orders/link', { key: `box-office:manage:${ownerOrder.value ?? token.value}`, headers })
 const kindOf = bookingLineName
 const reserved = computed(() => order.value?.state === 'reserved')
 // The buyer's own cancellation of what they paid for, on the theatre's terms.
@@ -103,7 +108,7 @@ async function cancel(all: boolean) {
             />
             <BoxOfficeBookingDetails :booking="order" />
             <BoxOfficeAccountCard
-              v-if="order.accountUnclaimed && !viewer.signedIn"
+              v-if="order.accountUnclaimed && !viewer.signedIn && ownerOrder === null"
               :order-token="token"
             />
 
