@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { noOverrides, overrideErrors, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
+import { parseTime } from '@internationalized/date'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
 // first, and a module that refuses it says why. Times are shown and entered in the theatre's time
-// zone, whatever the viewer's.
+// zone, whatever the viewer's. The list is grouped by week, and rows can be selected to change the
+// time, set access or cancel several at once.
 type State = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 interface Performance {
   id: string
@@ -28,6 +30,7 @@ interface Run { id: string, total: number, done: number, state: 'running' | 'sto
 interface Answer {
   performances: Performance[]
   runs: Run[]
+  season: { startsOn: string, endsOn: string } | null
   options: {
     venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null, doorsBeforeMinutes: number | null, runPresetId: string | null }[] }[]
     access: Option[]
@@ -52,11 +55,13 @@ const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: str
 const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const TONES = { draft: 'neutral', scheduled: 'success', cancelled: 'danger', completed: 'info' } as const
 const performances = computed(() => data.value?.performances ?? [])
-const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId }))))
+// A space named as its venue is shown by the venue's name alone.
+const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: s.name === v.name ? v.name : `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId }))))
 /** What a performance in this space takes when it says nothing: the production's own over the space's over the theatre's. */
 function defaultsIn(spaceId: string): ShowDefaultValues {
   const d = data.value!.defaults
@@ -71,10 +76,33 @@ function defaultsIn(spaceId: string): ShowDefaultValues {
   }
 }
 const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?.label ?? 'A space no longer listed'
-/** Where, doors, end and seats, on one line. */
-const summaryOf = (p: Performance) => [place(p), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
+/** Whether every performance is in the one space, which is then said once above the list. */
+const oneSpace = computed(() => new Set(performances.value.map(p => p.spaceId)).size === 1)
+/** Where (unless there is only one space), doors, end and seats, on one line. */
+const summaryOf = (p: Performance) => [...(oneSpace.value ? [] : [place(p)]), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
 const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
+const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+// Grouped by the week each starts in, Monday first, in the theatre's time zone.
+const DAY_MS = 86_400_000 // not-policy: milliseconds in a day
+const DATE_LENGTH = 10 // not-policy: the length of a date, YYYY-MM-DD
+function mondayOf(p: Performance): string {
+  const local = dates.toLocal(p.startsAt).slice(0, DATE_LENGTH)
+  const at = Date.parse(`${local}T00:00:00Z`)
+  const weekday = new Date(at).getUTCDay() || 7 // not-policy: Sunday is 7, ISO style
+  return new Date(at - (weekday - 1) * DAY_MS).toISOString().slice(0, DATE_LENGTH)
+}
+const weeks = computed(() => {
+  const list: { monday: string, label: string, rows: Performance[] }[] = []
+  for (const p of performances.value) {
+    const monday = mondayOf(p)
+    const last = list.at(-1)
+    if (last?.monday === monday) last.rows.push(p)
+    else list.push({ monday, label: `Week of ${dates.day(monday)}`, rows: [p] })
+  }
+  return list
+})
 
 // A form's own save passes the form, so what the server refuses shows beside each field.
 async function run(fn: () => Promise<unknown>, done?: string, form?: { setErrors: (errors: { name: string, message: string }[]) => void } | null): Promise<boolean> {
@@ -259,6 +287,171 @@ async function saveEffects() {
   if (await run(() => call(p.id, '/effects', 'PUT', { termIds }), 'Staging effects saved')) effectsFor.value = null
 }
 
+// Several at once: rows that can still change are selected, then their time, access or
+// (for scheduled ones) the performance itself is changed for every one, one request each.
+const selected = ref<Set<string>>(new Set())
+const selectable = (p: Performance) => p.state === 'draft' || p.state === 'scheduled'
+const chosen = computed(() => performances.value.filter(p => selected.value.has(p.id) && selectable(p)))
+const chosenScheduled = computed(() => chosen.value.filter(p => p.state === 'scheduled'))
+function toggle(ids: string[], on: boolean) {
+  const next = new Set(selected.value)
+  for (const id of ids) {
+    if (on) next.add(id)
+    else next.delete(id)
+  }
+  selected.value = next
+}
+/** Ticked, unticked or some of them, for a week's or the whole list's box. */
+function tickState(rows: Performance[]): boolean | 'indeterminate' {
+  const ids = rows.filter(selectable).map(p => p.id)
+  const on = ids.filter(id => selected.value.has(id)).length
+  return on === 0 ? false : on === ids.length ? true : 'indeterminate'
+}
+// A performance that has gone or can no longer change drops out of the selection.
+watch(performances, (list) => {
+  const still = new Set(list.filter(selectable).map(p => p.id))
+  if ([...selected.value].some(id => !still.has(id))) selected.value = new Set([...selected.value].filter(id => still.has(id)))
+})
+const counted = (n: number) => n === 1 ? '1 performance' : `${n} performances`
+
+/** Each change in turn; says how many worked and why the first that failed did not. */
+async function eachOf<T>(rows: T[], fn: (row: T) => Promise<unknown>): Promise<{ done: T[], failed: number, reason: string | null }> {
+  const done: T[] = []
+  let failed = 0
+  let reason: string | null = null
+  for (const row of rows) {
+    try {
+      await fn(row)
+      done.push(row)
+    }
+    catch (e) {
+      failed++
+      reason ??= toRefusal(e).reason
+    }
+  }
+  return { done, failed, reason }
+}
+/** Each in turn, stopping at the first that fails, for an Undo that should say so. */
+async function everyOf<T>(rows: T[], fn: (row: T) => Promise<unknown>) {
+  for (const row of rows) await fn(row)
+}
+async function afterBulk(result: { done: unknown[], failed: number, reason: string | null }, message: string, undo?: () => Promise<unknown>) {
+  await refresh()
+  emit('changed')
+  if (result.failed) toast.add({ title: `${message}; ${counted(result.failed)} could not be changed`, description: result.reason ?? undefined, color: 'warning' })
+  else offer(message, undo && (async () => {
+    await undo()
+    await refresh()
+    emit('changed')
+  }))
+}
+
+// A new start time for every selected performance, each on its own day; the end and doors move with it.
+const bulkTime = ref<{ open: boolean, time: string }>({ open: false, time: '' })
+const bulkBusy = ref(false)
+function startBulkTime() {
+  refusal.value = null
+  const first = chosen.value[0]
+  bulkTime.value = { open: true, time: first ? dates.toLocal(first.startsAt).slice(11, 16) : '' } // not-policy: positions in YYYY-MM-DDTHH:mm
+}
+function timeValue(value: string) {
+  try { return value ? parseTime(value) : undefined }
+  catch { return undefined }
+}
+function timeOf(value: unknown) {
+  bulkTime.value.time = value ? String(value).slice(0, 5) : '' // not-policy: HH:mm
+}
+async function saveBulkTime() {
+  const time = bulkTime.value.time
+  const rows = chosen.value
+  const was = rows.map(p => ({ p, startsAt: p.startsAt, minutes: Math.round((p.endsAt - p.startsAt) / MINUTE) }))
+  const moving = was.filter(w => dates.toLocal(w.startsAt).slice(11, 16) !== time) // not-policy: positions in YYYY-MM-DDTHH:mm
+  refusal.value = null
+  if (!moving.length) {
+    bulkTime.value.open = false
+    return
+  }
+  bulkBusy.value = true
+  try {
+    // What the scheduled ones would touch, in one confirmation; a module's refusal stops it all.
+    const reached = await Promise.all(moving.filter(w => w.p.state === 'scheduled').map(w => reach(w.p.id, 'reschedule')))
+    const refused = reached.find(x => x.refusal)?.refusal
+    if (refused) {
+      refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
+      return
+    }
+    const lines = [...new Set(reached.flatMap(x => x.lines))]
+    if (lines.length && !await confirm({ verb: 'Change', thing: `the time of ${counted(moving.length)}`, consequence: lines.join(' '), button: 'Change the time' })) return
+    const result = await eachOf(moving, w => call(w.p.id, '', 'PATCH', { startsAt: `${dates.toLocal(w.startsAt).slice(0, 10)}T${time}`, runningMinutes: w.minutes })) // not-policy: the length of a date
+    bulkTime.value.open = false
+    await afterBulk(result, `Time changed for ${counted(result.done.length)}`, () => everyOf(result.done, w => call(w.p.id, '', 'PATCH', { startsAt: w.startsAt, runningMinutes: w.minutes })))
+  }
+  finally {
+    bulkBusy.value = false
+  }
+}
+
+// Access features for every selected performance: a box ticked for some of them leaves each as it is.
+const bulkAccess = ref<{ open: boolean, chosen: Record<string, { on: boolean | 'indeterminate', detail: string }> }>({ open: false, chosen: {} })
+const bulkAccessShown = computed(() => (data.value?.options.access ?? []).filter(a => !a.retired || bulkAccess.value.chosen[a.id]?.on !== false))
+function startBulkAccess() {
+  refusal.value = null
+  const chosenRows: Record<string, { on: boolean | 'indeterminate', detail: string }> = {}
+  for (const a of data.value?.options.access ?? []) {
+    const having = chosen.value.filter(p => p.access.some(x => x.termId === a.id))
+    const details = new Set(having.map(p => p.access.find(x => x.termId === a.id)?.detail ?? ''))
+    chosenRows[a.id] = { on: having.length === 0 ? false : having.length === chosen.value.length ? true : 'indeterminate', detail: details.size === 1 ? [...details][0]! : '' }
+  }
+  bulkAccess.value = { open: true, chosen: chosenRows }
+}
+async function saveBulkAccess() {
+  const rows = chosen.value
+  const set = bulkAccess.value.chosen
+  const before = rows.map(p => ({ p, features: p.access.map(a => ({ termId: a.termId, detail: a.detail })) }))
+  const featuresFor = (p: Performance) => (data.value?.options.access ?? []).flatMap((a) => {
+    const own = p.access.find(x => x.termId === a.id)
+    const state = set[a.id]?.on ?? false
+    if (state === 'indeterminate') return own ? [{ termId: a.id, detail: own.detail }] : []
+    if (!state) return []
+    return [{ termId: a.id, detail: set[a.id]!.detail.trim() || own?.detail || null }]
+  })
+  bulkBusy.value = true
+  try {
+    const result = await eachOf(before, b => call(b.p.id, '/access', 'PUT', { features: featuresFor(b.p) }))
+    bulkAccess.value.open = false
+    await afterBulk(result, `Access saved for ${counted(result.done.length)}`, () => everyOf(result.done, b => call(b.p.id, '/access', 'PUT', { features: b.features })))
+  }
+  finally {
+    bulkBusy.value = false
+  }
+}
+
+// Cancelling the selected scheduled performances, with one reason; Undo reinstates them.
+const bulkCancel = ref<{ open: boolean, reasonTermId: string, note: string, reach: Reach | null }>({ open: false, reasonTermId: '', note: '', reach: null })
+async function startBulkCancel() {
+  refusal.value = null
+  bulkCancel.value = { open: true, reasonTermId: '', note: '', reach: null }
+  try {
+    const reached = await Promise.all(chosenScheduled.value.map(p => reach(p.id, 'cancel')))
+    bulkCancel.value.reach = { lines: [...new Set(reached.flatMap(x => x.lines))], refusal: reached.find(x => x.refusal)?.refusal ?? null }
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+async function saveBulkCancel() {
+  const rows = chosenScheduled.value
+  bulkBusy.value = true
+  try {
+    const result = await eachOf(rows, p => call(p.id, '/cancel', 'POST', { reasonTermId: bulkCancel.value.reasonTermId, note: bulkCancel.value.note }))
+    bulkCancel.value.open = false
+    await afterBulk(result, `${upperFirst(counted(result.done.length))} cancelled`, () => everyOf(result.done, p => call(p.id, '/reinstate', 'POST')))
+  }
+  finally {
+    bulkBusy.value = false
+  }
+}
+
 // Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
 const addingRun = ref(false)
 const runs = computed(() => data.value?.runs ?? [])
@@ -273,11 +466,36 @@ watch(moving, (on) => {
   }
 }, { immediate: true })
 onBeforeUnmount(() => clearInterval(timer))
-async function added(answer: { created: number } | { run: { id: string, total: number } }) {
+async function added(answer: { created: number, ids: string[] } | { run: { id: string, total: number } }) {
   await refresh()
   emit('changed')
-  toast.add({ title: 'created' in answer ? `${answer.created} performances added` : `Adding ${answer.run.total} performances`, color: 'success' })
+  if (!('created' in answer)) {
+    toast.add({ title: `Adding ${answer.run.total} performances`, color: 'success' })
+    return
+  }
+  // Undo removes what the run just added, drafts and scheduled alike.
+  offer(t('core.counts.performances-added', { count: answer.created }), async () => {
+    await $api<unknown>(`/api/core/productions/${props.productionId}/performances/undo` as string, { method: 'POST', body: { ids: answer.ids } })
+    await refresh()
+    emit('changed')
+  })
 }
+/** Where a new run's dates start: the day after the last performance, for a week, else the production's season. */
+const DAY = 86_400_000 // not-policy: milliseconds in a day
+const WEEK = 6 // not-policy: a suggested run's last date, six days after its first
+const shiftDay = (day: string, by: number) => new Date(Date.parse(`${day}T00:00:00Z`) + by * DAY).toISOString().slice(0, 10) // not-policy: the length of a date
+const suggestedRun = computed(() => {
+  const today = dates.toLocal(Date.now()).slice(0, 10) // not-policy: the length of a date
+  const last = performances.value.filter(p => p.state !== 'cancelled').at(-1)
+  if (last) {
+    const lastDay = dates.toLocal(last.startsAt).slice(0, 10) // not-policy: the length of a date
+    const start = shiftDay(lastDay > today ? lastDay : today, 1)
+    return { start, end: shiftDay(start, WEEK) }
+  }
+  const season = data.value?.season
+  if (season && season.endsOn > today) return { start: season.startsOn > today ? season.startsOn : shiftDay(today, 1), end: season.endsOn }
+  return null
+})
 const finishRun = (r: Run) => run(() => $api<unknown>(`/api/core/productions/${props.productionId}/runs/${r.id}/finish` as string, { method: 'POST', body: {} }), 'Finishing the run')
 async function removeRun(r: Run) {
   if (!await confirm({ verb: 'Remove', thing: `the ${r.done} performances this run added`, consequence: 'Drafts are deleted and scheduled performances are cancelled, as if each were cancelled.', button: 'Remove them' })) return
@@ -302,7 +520,7 @@ function actions(p: Performance) {
 <template>
   <PageSection
     title="Performances"
-    description="Each starts as a draft and is public once scheduled."
+    description="Each starts as a draft. Scheduled dates go public when the production is published."
   >
     <template #actions>
       <div class="flex flex-wrap gap-2">
@@ -341,7 +559,7 @@ function actions(p: Performance) {
       Add a venue with a space that can hold performances first.
     </p>
     <RefusalNotice
-      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun"
+      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun && !bulkTime.open && !bulkAccess.open && !bulkCancel.open"
       :refusal="refusal"
     />
     <DataBoundary
@@ -356,46 +574,116 @@ function actions(p: Performance) {
         description="Add each performance as a draft, then schedule it when its time and space are settled."
         icon="i-lucide-calendar"
       />
-      <RecordList
+      <div
         v-else
-        label="Performances"
+        class="space-y-4"
       >
-        <RecordListItem
-          v-for="p in performances"
-          :key="p.id"
-          :description="summaryOf(p)"
-        >
-          <template #name>
-            {{ dates.dateTime(p.startsAt) }}<span
-              v-if="p.label"
-              class="font-normal text-muted"
-            > · {{ p.label }}</span>
-            <UBadge
-              v-for="a in p.access"
-              :key="a.termId"
-              :label="accessLabel(a.termId)"
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <UCheckbox
+            :model-value="tickState(performances)"
+            :disabled="!performances.some(selectable)"
+            :label="chosen.length ? `${counted(chosen.length)} selected` : 'Select all'"
+            @update:model-value="toggle(performances.filter(selectable).map(p => p.id), $event === true)"
+          />
+          <template v-if="chosen.length">
+            <UButton
+              label="Edit time"
+              icon="i-lucide-clock"
               color="neutral"
+              variant="outline"
               size="sm"
-              class="ms-1"
+              @click="startBulkTime"
+            />
+            <UButton
+              label="Access"
+              icon="i-lucide-accessibility"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              @click="startBulkAccess"
+            />
+            <UButton
+              v-if="chosenScheduled.length"
+              :label="chosenScheduled.length === chosen.length ? 'Cancel' : `Cancel the ${chosenScheduled.length} scheduled`"
+              icon="i-lucide-calendar-x"
+              color="error"
+              variant="outline"
+              size="sm"
+              @click="startBulkCancel"
+            />
+            <UButton
+              label="Clear"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="selected = new Set()"
             />
           </template>
-          <StatusBadge
-            :tone="TONES[p.state]"
-            :label="t(`core.states.${p.state}`)"
+          <span
+            v-else-if="oneSpace && performances[0]"
+            class="text-muted"
+          >All in {{ place(performances[0]) }}.</span>
+        </div>
+        <section
+          v-for="w in weeks"
+          :key="w.monday"
+          class="space-y-2"
+          :aria-label="w.label"
+        >
+          <UCheckbox
+            :model-value="tickState(w.rows)"
+            :disabled="!w.rows.some(selectable)"
+            :label="w.label"
+            :ui="{ label: 'text-sm font-medium text-muted' }"
+            @update:model-value="toggle(w.rows.filter(selectable).map(p => p.id), $event === true)"
           />
-          <RowActions
-            :items="actions(p)"
-            :label="`Actions for ${dates.dateTime(p.startsAt)}`"
-            size="md"
-          />
-        </RecordListItem>
-      </RecordList>
+          <RecordList :label="w.label">
+            <RecordListItem
+              v-for="p in w.rows"
+              :key="p.id"
+              :description="summaryOf(p)"
+            >
+              <template #leading>
+                <UCheckbox
+                  :model-value="selected.has(p.id)"
+                  :disabled="!selectable(p)"
+                  :aria-label="`Select ${dates.dateTime(p.startsAt)}`"
+                  @update:model-value="toggle([p.id], $event === true)"
+                />
+              </template>
+              <template #name>
+                {{ dates.dateTime(p.startsAt) }}<span
+                  v-if="p.label"
+                  class="font-normal text-muted"
+                > · {{ p.label }}</span>
+                <UBadge
+                  v-for="a in p.access"
+                  :key="a.termId"
+                  :label="accessLabel(a.termId)"
+                  color="neutral"
+                  size="sm"
+                  class="ms-1"
+                />
+              </template>
+              <StatusBadge
+                :tone="TONES[p.state]"
+                :label="t(`core.states.${p.state}`)"
+              />
+              <RowActions
+                :items="actions(p)"
+                :label="`Actions for ${dates.dateTime(p.startsAt)}`"
+                size="md"
+              />
+            </RecordListItem>
+          </RecordList>
+        </section>
+      </div>
     </DataBoundary>
 
     <UModal
       v-model:open="open"
       :title="editing ? 'Edit performance' : 'Add performance'"
-      :description="editing?.state === 'scheduled' ? 'It is scheduled, so a new time or space must be free.' : 'It starts as a draft. Nothing is public until it is scheduled.'"
+      :description="editing?.state === 'scheduled' ? 'It is scheduled, so a new time or space must be free.' : 'It starts as a draft. Scheduled dates go public when the production is published.'"
     >
       <template #body>
         <UForm
@@ -448,8 +736,8 @@ function actions(p: Performance) {
 
     <UModal
       v-model:open="cancelOpen"
-      title="Cancel performance"
-      :description="cancelling ? `Cancel ${thing(cancelling)}?` : undefined"
+      title="Cancel this performance?"
+      :description="cancelling ? `${upperFirst(thing(cancelling))}.` : undefined"
     >
       <template #body>
         <UForm
@@ -511,13 +799,189 @@ function actions(p: Performance) {
         </UForm>
       </template>
       <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Keep the performance"
+            color="neutral"
+            variant="outline"
+            @click="cancelling = null"
+          />
+          <UButton
+            type="submit"
+            form="cancel-performance"
+            label="Cancel performance"
+            color="error"
+            :disabled="!!cancelReach?.refusal"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="bulkTime.open"
+      title="Edit the time"
+      :description="`A new start time for ${counted(chosen.length)}, each on its own day. The end and doors move with it.`"
+    >
+      <template #body>
+        <UForm
+          id="performances-time"
+          class="space-y-4"
+          :state="bulkTime"
+          :validate="() => needs({ time: bulkTime.time })"
+          novalidate
+          @submit="saveBulkTime"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <UFormField
+            label="Starts at"
+            name="time"
+            required
+          >
+            <UInputTime
+              :model-value="timeValue(bulkTime.time)"
+              :hour-cycle="24"
+              @update:model-value="timeOf($event)"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
         <UButton
           type="submit"
-          form="cancel-performance"
-          label="Cancel performance"
-          color="error"
-          :disabled="!!cancelReach?.refusal"
+          form="performances-time"
+          label="Change the time"
+          :loading="bulkBusy"
         />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="bulkAccess.open"
+      title="Access at these performances"
+      :description="`What ${counted(chosen.length)} offer. A box ticked for only some of them leaves each as it is.`"
+    >
+      <template #body>
+        <UForm
+          id="performances-access"
+          class="space-y-3"
+          :state="bulkAccess.chosen"
+          novalidate
+          @submit="saveBulkAccess"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <div
+            v-for="a in bulkAccessShown"
+            :key="a.id"
+            class="flex flex-wrap items-center gap-3"
+          >
+            <UCheckbox
+              v-model="bulkAccess.chosen[a.id]!.on"
+              :label="a.label"
+              class="w-56"
+            />
+            <UInput
+              v-if="bulkAccess.chosen[a.id]!.on === true"
+              v-model="bulkAccess.chosen[a.id]!.detail"
+              placeholder="Detail, such as who provides it"
+              :aria-label="`Detail for ${a.label}`"
+              maxlength="200"
+              size="sm"
+              class="flex-1"
+            />
+          </div>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="performances-access"
+          label="Save access"
+          :loading="bulkBusy"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="bulkCancel.open"
+      :title="chosenScheduled.length === 1 ? 'Cancel this performance?' : `Cancel these ${chosenScheduled.length} performances?`"
+      description="Only scheduled performances are cancelled. Any drafts in the selection are left as they are."
+    >
+      <template #body>
+        <UForm
+          id="cancel-performances"
+          class="space-y-4"
+          :state="bulkCancel"
+          :validate="() => needs({ reasonTermId: bulkCancel.reasonTermId })"
+          novalidate
+          @submit="saveBulkCancel"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <UAlert
+            v-if="bulkCancel.reach?.refusal"
+            color="error"
+            icon="i-lucide-circle-x"
+            :title="bulkCancel.reach.refusal.reason"
+          >
+            <template
+              v-if="bulkCancel.reach.refusal.link"
+              #description
+            >
+              <ULink :to="bulkCancel.reach.refusal.link">
+                See what is holding it
+              </ULink>
+            </template>
+          </UAlert>
+          <ul
+            v-if="bulkCancel.reach?.lines.length"
+            class="list-disc space-y-1 ps-5 text-sm"
+          >
+            <li
+              v-for="line in bulkCancel.reach.lines"
+              :key="line"
+            >
+              {{ line }}
+            </li>
+          </ul>
+          <UFormField
+            name="reasonTermId"
+            label="Reason"
+            required
+          >
+            <USelect
+              v-model="bulkCancel.reasonTermId"
+              :items="reasons"
+              placeholder="Choose a reason"
+            />
+          </UFormField>
+          <UFormField
+            label="Note"
+            help="Kept with each performance, for the team."
+          >
+            <UTextarea
+              v-model="bulkCancel.note"
+              :rows="2"
+              maxlength="200"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            :label="chosenScheduled.length === 1 ? 'Keep the performance' : 'Keep the performances'"
+            color="neutral"
+            variant="outline"
+            @click="bulkCancel.open = false"
+          />
+          <UButton
+            type="submit"
+            form="cancel-performances"
+            :label="chosenScheduled.length === 1 ? 'Cancel performance' : `Cancel ${chosenScheduled.length} performances`"
+            color="error"
+            :loading="bulkBusy"
+            :disabled="!!bulkCancel.reach?.refusal"
+          />
+        </div>
       </template>
     </UModal>
 
@@ -603,6 +1067,7 @@ function actions(p: Performance) {
       :presets="data.options.presets"
       :defaults="data.defaults"
       :defaults-in="defaultsIn"
+      :suggested="suggestedRun"
       @added="added"
       @presets-changed="refresh()"
     />

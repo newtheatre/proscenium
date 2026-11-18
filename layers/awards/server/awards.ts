@@ -3,7 +3,8 @@
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import type { SOURCES } from './db/schema'
+import { isUnclaimed } from '#modules/core'
+import type { PRECISIONS, SOURCES } from './db/schema'
 import { VISIBILITIES } from './db/schema'
 import type { AwardType } from './types'
 
@@ -14,6 +15,8 @@ export interface Award {
   accountId: string | null
   recipientName: string
   awardedOn: string
+  /** Whether awardedOn is known to the day or only to the year. */
+  awardedPrecision: typeof PRECISIONS[number]
   awardedFor: string | null
   citation: string | null
   productionId: string | null
@@ -26,7 +29,7 @@ export interface Award {
   revokeReason: string | null
 }
 
-const COLUMNS = `a.id, a.type_id AS typeId, t.name AS typeName, a.account_id AS accountId, a.recipient_name AS recipientName, a.awarded_on AS awardedOn,
+const COLUMNS = `a.id, a.type_id AS typeId, t.name AS typeName, a.account_id AS accountId, a.recipient_name AS recipientName, a.awarded_on AS awardedOn, a.awarded_precision AS awardedPrecision,
   a.awarded_for AS awardedFor, a.citation, a.production_id AS productionId, a.decided_on AS decidedOn, a.decision_note AS decisionNote, a.source,
   a.visibility, a.state, a.revoked_at AS revokedAt, a.revoke_reason AS revokeReason`
 const FROM = 'FROM awards_awards a JOIN awards_types t ON t.id = a.type_id'
@@ -87,11 +90,21 @@ export const awardFields = z.object({
   visibility: z.enum(VISIBILITIES),
 })
 
+/**
+ * Where a new award is listed when nobody has said: the type's choice, except for somebody who has
+ * never signed in (`claimed` says so when the caller has just found or made the account), whose award waits unlisted until they choose (or staff correct it), so a person
+ * who never signs in is not put on the public roll for them.
+ */
+export async function startingVisibility(type: AwardType, accountId: string | null, claimed?: boolean): Promise<typeof VISIBILITIES[number]> {
+  return accountId && type.defaultVisibility !== 'hidden' && !(claimed ?? !await isUnclaimed(accountId)) ? 'hidden' : type.defaultVisibility
+}
+
 export interface NewAward {
   type: AwardType
   accountId: string | null
   recipientName: string
   awardedOn: string
+  awardedPrecision?: typeof PRECISIONS[number]
   awardedFor?: string | null
   citation?: string | null
   productionId?: string | null
@@ -114,11 +127,11 @@ export function writeAward(unit: UnitView, input: NewAward): string {
   const at = nowMs()
   const once = input.type.onePerPerson && input.accountId
   const held = once ? ` AND NOT EXISTS (SELECT 1 FROM awards_awards WHERE type_id = ?2 AND state = 'current' AND account_id IN (${accountScopeSql('?3')}))` : '' // not-policy: numbered parameters
-  const sql = `INSERT INTO awards_awards (id, type_id, account_id, recipient_name, awarded_on, awarded_for, citation, production_id, decided_on, decision_note, source, visibility, state, issued_by, created_at, updated_at, response_id) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'current', ?13, ?14, ?14, ?15 WHERE (SELECT state FROM awards_types WHERE id = ?2) = 'active'${held}` // not-policy: numbered parameters
+  const sql = `INSERT INTO awards_awards (id, type_id, account_id, recipient_name, awarded_on, awarded_for, citation, production_id, decided_on, decision_note, source, visibility, state, issued_by, created_at, updated_at, response_id, awarded_precision) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'current', ?13, ?14, ?14, ?15, ?16 WHERE (SELECT state FROM awards_types WHERE id = ?2) = 'active'${held}` // not-policy: numbered parameters
   unit.add({
     sql,
     params: [id, input.type.id, input.accountId, input.recipientName, input.awardedOn, input.awardedFor ?? null, input.citation ?? null, input.productionId ?? null,
-      input.decidedOn ?? null, input.decisionNote ?? null, input.source, input.visibility ?? input.type.defaultVisibility, input.issuedBy, at, input.responseId ?? null],
+      input.decidedOn ?? null, input.decisionNote ?? null, input.source, input.visibility ?? input.type.defaultVisibility, input.issuedBy, at, input.responseId ?? null, input.awardedPrecision ?? 'day'],
   }).expect(1, once
     ? { code: 'awards.award.already-held', reason: `This person already holds ${input.type.name}.`, remedy: 'Open their award to correct it instead.' }
     : { code: 'awards.type.archived', reason: `${input.type.name} is archived, so it cannot be given.`, remedy: 'Restore the award first.' })

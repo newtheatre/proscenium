@@ -68,5 +68,9 @@
   "membership.notices.renewal-open.description": "Renew now and the new membership starts the day after this one ends.",
   "membership.notices.renewal-open.action": "Renew",
 
-  "membership.records.membership": "Members"
+  "membership.records.membership": "Members",
+  "membership.facts.holder.label": "Holds a current membership",
+  "membership.facts.supporter.label": "Is a supporter",
+  "membership.facts.voter.label": "May vote: a member of a voting scheme past the qualifying period",
+  "membership.facts.scheme-holder.label": "Holds a membership of this scheme"
 }

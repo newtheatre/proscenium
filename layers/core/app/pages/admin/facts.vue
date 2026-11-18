@@ -25,6 +25,16 @@ const nameOf = (fact: Fact) => te(fact.label)
   : `${te(`${fact.module}.module.name`) ? t(`${fact.module}.module.name`) : fact.module}: ${fact.name.slice(fact.module.length + 1).replace(/-/g, ' ')}`
 const confirmedOf = (fact: Fact) => fact.abilities.filter(a => a.confirmed).map(a => a.ability)
 const privileged = computed(() => new Set((data.value?.catalogue ?? []).filter(a => a.risk === 'privileged').map(a => a.name)))
+// Each fact offers first the abilities that fit it: its own module's, and those on the record type the
+// fact is about or on anything under it (a fact on a performance: admitting to it, its rota). A fact
+// about no record offers site-wide abilities of normal risk. "Show every ability" offers the rest.
+const everything = reactive<Record<string, boolean>>({})
+function fits(fact: Fact) {
+  return (ability: CatalogueAbility) => ability.module === fact.module
+    || (fact.on ? !!ability.within?.includes(fact.on) : !ability.on && ability.risk === 'normal')
+}
+const hiddenCount = (fact: Fact) => (data.value?.catalogue ?? []).filter(a => !fits(fact)(a) && !(drafts[fact.name] ?? []).includes(a.name)).length
+
 /** Privileged abilities ticked for this fact that the theatre has not confirmed yet. */
 const unconfirmed = (fact: Fact) => (drafts[fact.name] ?? []).filter(a => privileged.value.has(a) && !confirmedOf(fact).includes(a))
 
@@ -71,6 +81,12 @@ async function save(fact: Fact) {
           v-model="drafts[fact.name]!"
           :catalogue="data.catalogue"
           :confirmed="confirmedOf(fact)"
+          :shown="everything[fact.name] ? undefined : fits(fact)"
+        />
+        <USwitch
+          v-if="hiddenCount(fact)"
+          v-model="everything[fact.name]"
+          :label="t('core.facts.show-all', { count: hiddenCount(fact) })"
         />
         <UCheckbox
           v-if="unconfirmed(fact).length"

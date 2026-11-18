@@ -58,7 +58,10 @@ async function load(append = false) {
     more.value = false
   }
 }
-watch(() => props.query, () => load(), { immediate: true, deep: true })
+// Fetched in the browser only: a load started while the server draws the page could finish before or
+// after it, so the server might draw rows the browser's first render does not have (a hydration mismatch).
+onMounted(() => load())
+watch(() => props.query, () => load(), { deep: true })
 
 const { dateTime: when } = useDates()
 const who = (c: SettingChange) => c.by ? (c.by.name ?? t('core.settings-history.someone')) : t('core.settings-history.system')

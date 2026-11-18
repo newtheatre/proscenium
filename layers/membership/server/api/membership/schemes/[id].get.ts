@@ -3,6 +3,7 @@
 import { getRouterParam } from 'h3'
 import { all, can, defineRoute } from '#kit'
 import { charger } from '../../../charge'
+import { listSetsEnd, schemeList } from '../../../lists'
 import { todayOrNull } from '../../../memberships'
 import { exampleDates, hasMemberships, lengthOptions, openChecklist, requireScheme } from '../../../schemes'
 
@@ -21,6 +22,8 @@ export default defineRoute({
     // S2: the side is fixed once any membership exists.
     sideLocked: await hasMemberships(scheme.id),
     example: day ? exampleDates(scheme, options, day) : [],
+    // D9: the list's end dates decide when a membership ends, so the example dates do not apply.
+    endsByList: await listSetsEnd(await schemeList(scheme)),
     // The lists it may check against, by name only: never their contents.
     lists: await all<{ id: string, name: string }>('SELECT id, name FROM membership_verification_lists ORDER BY name'),
     // Whether a fee is collected through the system, so adding a member asks how it is settled (P9).

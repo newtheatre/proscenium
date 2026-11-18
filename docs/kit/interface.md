@@ -263,6 +263,14 @@ the server for actions and sources when it is first opened, not on every page.
   `<module>.record-tabs.<name>.label`. A tab the viewer may not open, or of a module that is off, is
   absent. The history panel reads the record's audit entries through `GET /api/core/history`, which
   needs the ability `core.history.view`.
+- **Tabs, one style per level.** Tabs that divide a page (a record's tabs, a module's page in Admin,
+  the settings window, a list's views) are `UTabs` with `variant="link"`: underlined, each label in
+  full, scrolling sideways when they do not fit rather than truncating. Filled pills are for a control
+  inside a part of a page (a till's panels), never for a page's own tabs. On a phone a record's name
+  takes a line of its own under the console's bar (`PageFrame`'s `longTitle`).
+- **Width and hydration.** The server cannot know the width, so markup chosen by width is drawn both
+  ways and picked with CSS (`lg:hidden`, `max-lg:hidden`). Where it cannot be, `useScreenQuery` answers
+  false until the page has hydrated, so the browser's first render matches the server's.
 - **`PageHome`** (UI-16): a queue. Cards come from `core.home-card` (`{ id, home, ability, component,
   urgency, count? }`), components in the module's `app/home-cards/` folder that receive `count`. They
   sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
@@ -410,6 +418,12 @@ a layout, not a shell, and it has no navigation of its own.
   screens under its address, exactly as in the other shells. An ability held through a fact (such as
   being on shift) counts. Whoever holds the ability of at least one live entry gets the `live` side in
   the viewer and "Tonight" first in the account menu; for anyone else `/live` does not exist.
+- **The Tonight hub** (`/live`) lists the performances of the theatre's operating day (so a show
+  that runs past midnight stays until `core.locale.day-start`), each with its start time and the
+  figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
+  `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
+  minor units): Box office gives sold and in, Payments what the tills have taken. The screens'
+  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.

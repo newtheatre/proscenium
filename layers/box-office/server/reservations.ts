@@ -11,14 +11,14 @@
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
 import { first, inAccountScope, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
-import { findOrCreateAccount, getPerformance, isUnclaimed, notify, notifyAddress } from '#modules/core'
+import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
-import { liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
+import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
@@ -39,6 +39,8 @@ export interface ReserveInput {
   /** Needed when nobody is signed in. */
   email?: string | null
   name?: string | null
+  /** That everyone using the tickets is old enough, for a production only for people over an age. */
+  ageConfirmed?: boolean
 }
 
 export interface Reserved {
@@ -52,6 +54,8 @@ export interface Reserved {
   currency: string
   amountDueMinor: number
   releaseAt: number | null
+  /** The message carries the link that opens the buyer's account, so the page may say so. */
+  accountLinkSent: boolean
 }
 
 export type ReserveOutcome = Reserved | Confirmed | { state: 'confirm-email', orderId: string, expiresAt: number }
@@ -65,14 +69,15 @@ export async function requestReservation(unit: UnitView, input: ReserveInput): P
   const order = await first<OrderRow>(`${ORDER} WHERE id = ? AND basket_token_hash = ?`, input.orderId, await hashOf(input.token))
   if (!order) refuse('box-office.basket.not-found', 'There is no such basket.', { status: 404 })
   const lines = await checkBasket(order, input.expectedTotalMinor)
+  await assertAgeConfirmed(lines, input.ageConfirmed)
 
   const actor = useContext().actor
   if (actor.kind === 'person' && actor.accountId) return reserve(unit, order, lines, actor.accountId, true)
 
   if (!input.email) refuse('box-office.reservation.email-needed', 'We need an email address to send your reservation to.', { status: 422, fields: { email: 'required' } })
   if (!await useSetting('box-office.reservations.confirm-email')) {
-    const { accountId } = await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
-    return reserve(unit, order, lines, accountId, false)
+    const { accountId, madeWith } = await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
+    return reserve(unit, order, lines, accountId, false, madeWith)
   }
 
   // Asked again, perhaps with the address put right: the earlier link stops working.
@@ -99,8 +104,8 @@ export async function confirmReservation(unit: UnitView, token: string): Promise
     : null
   if (!order) refuse('box-office.reservation.link-invalid', 'This link does not confirm a reservation. It may have been used already, or the seats were held for too short a time.', { status: 404, remedy: 'If your reservation was confirmed, its details are in the email that followed. Otherwise choose your tickets again.' })
   const lines = await checkBasket(order, order.total_minor)
-  const { accountId } = await findOrCreateAccount(unit, { address: order.confirm_email, name: order.confirm_name, origin: 'guest' })
-  return reserve(unit, order, lines, accountId, false)
+  const { accountId, madeWith } = await findOrCreateAccount(unit, { address: order.confirm_email, name: order.confirm_name, origin: 'guest' })
+  return reserve(unit, order, lines, accountId, false, madeWith)
 }
 
 // What can be told before the batch: the basket is still held, reserving is offered, and the size
@@ -123,9 +128,9 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
 
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
-async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean): Promise<Reserved | Confirmed> {
+async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean, madeWith?: { address: string } | null): Promise<Reserved | Confirmed> {
   // An order with nothing to pay never rests reserved: it is confirmed and its tickets issued at once.
-  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn } })
+  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith } })
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
   const releaseBefore = await useSetting('box-office.reservations.release-before') as number | null
@@ -158,13 +163,16 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   unit.add(sql`UPDATE box_office_holds SET kind = 'reservation', updated_at = ${at} WHERE order_id = ${order.id} AND kind = 'basket'`).expect(1, RAN_OUT)
 
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
-  await notify(unit, 'box-office.order-reserved', {
+  const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
+  // A buyer who has never signed in also gets the link that opens their account (core's claim link).
+  const account = await claimLink(unit, accountId, madeWith)
+  await notify(unit, account ? 'box-office.order-reserved-guest' : 'box-office.order-reserved', {
     to: accountId,
-    variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) },
+    variables: account ? { ...variables, account } : variables,
     subject: ['box-office.order', order.id],
     dedupeKey: order.id,
   })
-  return { state: 'reserved', orderId: order.id, reference: order.reference, token, deskCode, currency: order.currency, amountDueMinor: order.total_minor, releaseAt }
+  return { state: 'reserved', orderId: order.id, reference: order.reference, token, deskCode, currency: order.currency, amountDueMinor: order.total_minor, releaseAt, accountLinkSent: !!account }
 }
 
 export interface OrderView {
@@ -193,10 +201,13 @@ export interface OrderView {
  * goes back to the card that paid with nobody at a till, and every performance on it is further off
  * than the cut-off. Null when any of that fails.
  */
-export async function buyerCancelTerms(order: Pick<OrderRow, 'state' | 'sold_by'>, lines: LineRow[]): Promise<OrderView['buyerCancel']> {
+export async function buyerCancelTerms(order: Pick<OrderRow, 'state' | 'sold_by' | 'total_minor'>, lines: LineRow[]): Promise<OrderView['buyerCancel']> {
   if (order.state !== 'confirmed' || order.sold_by !== null || !lines.length) return null
-  if (!await useSetting('box-office.cancellations.by-buyer')) return null
-  const before = await useSetting('box-office.cancellations.until-before') as number
+  // Free tickets can always be handed back, until the performance starts: nothing is refunded, and
+  // the seats go to somebody else.
+  const free = order.total_minor === 0
+  if (!free && !await useSetting('box-office.cancellations.by-buyer')) return null
+  const before = free ? 0 : await useSetting('box-office.cancellations.until-before') as number
   let until = Number.POSITIVE_INFINITY
   for (const performanceId of new Set(lines.map(l => l.performance_id))) {
     const performance = await getPerformance(performanceId)
@@ -204,7 +215,7 @@ export async function buyerCancelTerms(order: Pick<OrderRow, 'state' | 'sold_by'
     until = Math.min(until, performance.startsAt - before * 1000) // not-policy: seconds to milliseconds
   }
   if (until <= nowMs()) return null
-  return { feeMinor: await useSetting('box-office.cancellations.fee') as number, until }
+  return { feeMinor: free ? 0 : await useSetting('box-office.cancellations.fee') as number, until }
 }
 
 /**
@@ -225,7 +236,8 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
     releaseAt: order.release_at,
     lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
     buyerCancel: await buyerCancelTerms(order, lines),
-    accountUnclaimed: order.account_id ? await isUnclaimed(order.account_id) : false,
+    // Only where the booking's email could carry the link that opens it, so the page never promises one that did not come.
+    accountUnclaimed: order.account_id ? await canSendClaimLink(order.account_id) : false,
   }
 }
 
