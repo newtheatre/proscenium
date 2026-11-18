@@ -24,7 +24,7 @@ const erase = (accountId: string) => inContext(async () => {
 })
 
 async function listScheme(file: string) {
-  const made = await req('POST', '/api/membership/lists', { name: `Union ${Math.random()}`, keyKind: 'reference', referenceLabel: 'Student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
+  const made = await req('POST', '/api/membership/lists', { name: `Union ${Math.random()}`, keyKind: 'reference', referenceLabel: 'Student ID', referenceNoun: 'student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
   const listId = made.body.listId as string
   expect((await req('POST', `/api/membership/lists/${listId}/import`, { file })).status).toBe(200)
   const id = await scheme()

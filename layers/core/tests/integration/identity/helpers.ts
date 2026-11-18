@@ -23,7 +23,7 @@ for (const [file, module] of Object.entries(files)) {
 export const handle = server(routes)
 
 /** A sign-in email as a test reads it: the address, and the link and code taken from its text. */
-export interface SignInMessage { address: string, subject: string, variables: { link: string, code: string } }
+export interface SignInMessage { address: string, subject: string, variables: { link: string, code: string }, text?: string }
 
 export const mailbox: SignInMessage[] = []
 
@@ -36,7 +36,7 @@ export async function useIdentity(): Promise<void> {
   setMailer(async (email) => {
     const link = /(https?:\/\/\S+\/sign-in\/link#[\w-]+)/.exec(email.text)?.[1] ?? ''
     const code = /\b(\d{6})\b/.exec(email.text)?.[1] ?? ''
-    mailbox.push({ address: email.to, subject: email.subject, variables: { link, code } })
+    mailbox.push({ address: email.to, subject: email.subject, variables: { link, code }, text: email.text })
     return {}
   })
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {

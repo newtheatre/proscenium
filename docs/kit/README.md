@@ -399,7 +399,8 @@ still reads it). Use it for a setting a feature of the other module needs, not t
 Durations may also be written `6mo` or `7y`; a month is 30 days and a year 365. `formatDuration`
 and the `DurationInput` component (a number and a unit, `v-model` in seconds, `min` and `max` as
 seconds or written durations) show a value in the largest unit that divides it exactly, and the
-control offers only units that can hold a value between the limits. A duration setting's label and
+control offers only units that can hold a value between the limits. A setting counted in days names
+its units, `units: ['week', 'day']`, so its control offers no hours or seconds. A duration setting's label and
 help never name a unit, since the control does; the conformance run checks.
 
 Every change is in `core_setting_changes`. `GET /api/core/settings/history` lists them newest first,

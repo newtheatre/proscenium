@@ -89,6 +89,10 @@ describe('recovering a lost passkey (ID-08)', () => {
     await deliver()
     for (const each of [mine, second]) expect(to(each).map(e => e.subject)).toEqual(['Your sign-in at The Test Theatre has changed'])
     expect(to(mine)[0]!.text).toContain('a recovery code, used to sign in')
+    // It says when, from what device, and what to do if it was not them (EM-10).
+    expect(to(mine)[0]!.text).toMatch(/When: .*\d/)
+    expect(to(mine)[0]!.text).toContain('From: ')
+    expect(to(mine)[0]!.text).toContain('remove anything you do not recognise')
     const options = await lost.post('/api/core/me/passkeys/options')
     await lost.post('/api/core/me/passkeys', { challengeId: options.body.challengeId, response: await new Authenticator().create(options.body.options) })
     await deliver()

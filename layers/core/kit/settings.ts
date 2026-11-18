@@ -2,7 +2,7 @@
 // limits and the ability needed to change it (Settings registry tab).
 import type { z } from 'zod'
 import { DeclarationError } from './refusal'
-import { formatDuration, isDuration, parseDuration } from './duration'
+import { DURATION_UNITS, formatDuration, isDuration, parseDuration, type DurationUnit } from './duration'
 import { catalogueValues, isCatalogue, type Catalogue } from './catalogues'
 
 export type Audience = 'public' | 'signed-in' | 'staff'
@@ -43,6 +43,8 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   /** A choice from one of the kit's fixed lists instead of options of its own (catalogues.ts). */
   catalogue?: Catalogue
   unit?: string
+  /** duration only: the units its control offers, such as days and weeks for a review period. */
+  units?: readonly DurationUnit[]
   record?: string
   schema?: z.ZodType
   of?: 'text' | 'choice'
@@ -81,7 +83,7 @@ export const setting = {
   /** Whole minor units in the theatre's currency. */
   money: <const O extends Common & WithDefault<number> & { min?: number, max?: number }>(o: O) => ({ kind: 'money', ...o }) as SettingEntry<Value<number, O>, 'money'> & O,
   /** Written '30m', '2h', '14d'; read as whole seconds. */
-  duration: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'duration', ...o }) as SettingEntry<Value<number, O>, 'duration'> & O,
+  duration: <const O extends Common & WithDefault<string> & { min?: string, max?: string, units?: readonly DurationUnit[] }>(o: O) => ({ kind: 'duration', ...o }) as SettingEntry<Value<number, O>, 'duration'> & O,
   /** HH:MM in the theatre's time zone; limits written the same way. */
   time: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
   text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number, multiline?: boolean }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
@@ -164,6 +166,7 @@ function checkEntry(key: string, entry: SettingEntry) {
   }
   if (entry.kind === 'duration') {
     for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !isDuration(entry[limit])) throw new DeclarationError(f(limit), 'a duration limit is written like 30m, 2h or 14d')
+    if (entry.units !== undefined && !(entry.units.length && entry.units.every(u => DURATION_UNITS.some(([unit]) => unit === u)))) throw new DeclarationError(f('units'), 'one or more units of time, such as day and week')
   }
   if (entry.default !== undefined && entry.default !== null) {
     const result = validateSettingValue(entry, entry.default)
