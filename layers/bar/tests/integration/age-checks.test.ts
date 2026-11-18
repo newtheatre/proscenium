@@ -221,3 +221,13 @@ describe('what the register shows', () => {
     setClock(NOW)
   })
 })
+
+describe('a refusal that stands', () => {
+  it('stands on the basket: an age-restricted drink cannot then be sold from it', async () => {
+    const key = 'age-8-basket-xxxxxxx'
+    expect((await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, variantId: stock.wine, reasonTermId: stock.reason, basketKey: key, scope: 'restricted' })).status).toBe(200)
+    const again = await till(key, [[stock.crisps, 1], [stock.wine, 1]], 720, 'not_needed')
+    expect(again.body.code).toBe('bar.age-check.refused-basket')
+    expect((await till(key, [[stock.crisps, 1]], 120)).status).toBe(200)
+  })
+})

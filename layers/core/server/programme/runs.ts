@@ -7,7 +7,7 @@
 // repeat. A run that stops part way can be finished or removed.
 import { sql, type SQL } from 'drizzle-orm'
 import { all, createUnit, first, isRefusal, newId, nowMs, refuse, TIME_ZONE_REMEDY, useSetting } from '#kit'
-import type { UnitView } from '#kit'
+import type { Actor, UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
 import { dayRule, operatingDayAt, type DayRule } from '../calendar'
@@ -34,7 +34,8 @@ export interface RunPattern {
 /** Local start times, HH:mm, on ISO weekdays (1 is Monday, 7 is Sunday). */
 export interface RunSlot { days: number[], times: string[] }
 
-export type Problem = 'past' | 'clash' | 'closed'
+/** `exists`: the production already has a performance at that time, so it is on the list already. */
+export type Problem = 'past' | 'exists' | 'clash' | 'closed'
 export interface PlannedPerformance { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: Problem | null, reason: string | null }
 
 export interface RunItem { startsAt: number, endsAt: number, doorsAt: number | null }
@@ -122,9 +123,11 @@ export async function planRun(productionId: string, pattern: RunPattern): Promis
   const from = planned[0]!.startsAt
   const to = Math.max(...planned.map(p => p.endsAt))
   const taken = space.exclusive
-    ? await all<{ title: string, starts_at: number, ends_at: number }>(`SELECT p.title, o.starts_at, o.ends_at FROM core_performances o JOIN core_productions p ON p.id = o.production_id
+    ? await all<{ production_id: string, title: string, starts_at: number, ends_at: number }>(`SELECT o.production_id, p.title, o.starts_at, o.ends_at FROM core_performances o JOIN core_productions p ON p.id = o.production_id
         WHERE o.space_id = ? AND o.state = 'scheduled' AND o.starts_at < ? AND o.ends_at > ?`, pattern.spaceId, to + gap, from - gap)
     : []
+  // The production's own performances at the same times, drafts included, in any space: adding the same run twice.
+  const own = new Set((await all<{ starts_at: number }>('SELECT starts_at FROM core_performances WHERE production_id = ? AND state IN (\'draft\', \'scheduled\') AND starts_at BETWEEN ? AND ?', productionId, from, to)).map(r => r.starts_at))
   const closures = (await closuresBetween(from, to, { spaceId: pattern.spaceId })).filter(c => c.blocksPerformances)
   const at = nowMs()
   planned.forEach((p, i) => {
@@ -133,6 +136,8 @@ export async function planRun(productionId: string, pattern: RunPattern): Promis
     const closure = closures.find(c => overlaps(c.startsAt, c.endsAt))
     const sibling = space.exclusive && planned.slice(0, i).some(o => !o.problem && overlaps(o.startsAt, o.endsAt, gap))
     if (p.startsAt <= at) Object.assign(p, { problem: 'past', reason: 'This time has passed.' })
+    else if (own.has(p.startsAt)) Object.assign(p, { problem: 'exists', reason: 'Already on the list.' })
+    else if (clash?.production_id === productionId) Object.assign(p, { problem: 'clash', reason: 'Another performance of this production is in the space then.' })
     else if (clash) Object.assign(p, { problem: 'clash', reason: `${clash.title} is already scheduled in this space then.` })
     else if (sibling) Object.assign(p, { problem: 'clash', reason: 'Another performance of this run is in the space then.' })
     else if (closure) Object.assign(p, { problem: 'closed', reason: `The space is closed then: ${closure.title}.` })
@@ -178,7 +183,7 @@ function announceScheduled(unit: UnitView, productionId: string, ids: string[]) 
  * C-04: saves the performances the person accepted. Within the limit, in the caller's unit, whole or
  * not at all. Over it, a run for the job, whose progress the console follows.
  */
-export async function createRun(unit: UnitView, productionId: string, input: RunInput): Promise<{ created: number } | { run: RunStatus }> {
+export async function createRun(unit: UnitView, productionId: string, input: RunInput): Promise<{ created: number, ids: string[] } | { run: RunStatus }> {
   const items = [...input.performances].sort((a, b) => a.startsAt - b.startsAt)
   checkItems(items)
   const day = await rule()
@@ -191,7 +196,7 @@ export async function createRun(unit: UnitView, productionId: string, input: Run
       announceScheduled(unit, productionId, ids)
     }
     unit.audit({ action: 'create', record: ['core.production', productionId], detail: { performances: items.length, scheduled: input.scheduled } })
-    return { created: items.length }
+    return { created: items.length, ids }
   }
   const id = newId('run')
   const at = nowMs()
@@ -202,6 +207,38 @@ export async function createRun(unit: UnitView, productionId: string, input: Run
   unit.audit({ action: 'create', record: ['core.production', productionId], detail: { run: id, performances: items.length, scheduled: input.scheduled } })
   unit.enqueue('core.create-run', { runId: id }, { dedupeKey: `${id}:0` })
   return { run: { id, total: items.length, done: 0, state: 'running', stopReason: null, scheduled: input.scheduled } }
+}
+
+const UNDO_WINDOW = 10 * MINUTE // not-policy: a little longer than the toast that offers Undo
+
+/**
+ * Undo for a run just added in one unit: its performances are removed again, drafts and scheduled
+ * alike, so the list is as it was. Only within a few minutes of adding them, only while none has
+ * been cancelled or moved on, and only when no module refuses (as for a cancel); anything that has
+ * come to depend on one (a sale, a bar opening) keeps it, and the whole undo is refused.
+ */
+export async function undoAdded(unit: UnitView, productionId: string, ids: string[], actor: Actor): Promise<{ removed: number }> {
+  const unique = [...new Set(ids)]
+  const list = JSON.stringify(unique)
+  const found = await all<{ id: string, state: string, created_at: number }>('SELECT id, state, created_at FROM core_performances WHERE production_id = ? AND id IN (SELECT value FROM json_each(?))', productionId, list)
+  const cutoff = nowMs() - UNDO_WINDOW
+  if (found.length !== unique.length || found.some(p => (p.state !== 'draft' && p.state !== 'scheduled') || p.created_at < cutoff)) {
+    refuse('core.run.undo-too-late', 'These performances have changed since they were added, so they cannot be removed in one go.', { status: 409, remedy: 'Delete or cancel them one by one.' })
+  }
+  const scheduled = found.filter(p => p.state === 'scheduled')
+  for (const p of scheduled) {
+    const refused = await firstRefusal({ record: { type: 'core.performance', id: p.id }, kind: 'cancel' }, actor)
+    if (refused) refuse(refused.code, refused.reason, { status: 409, ...(refused.link ? { remedy: refused.link } : {}) })
+  }
+  unit.add(sql`DELETE FROM core_performances WHERE production_id = ${productionId} AND state IN ('draft', 'scheduled') AND created_at >= ${cutoff} AND id IN (SELECT value FROM json_each(${list}))`)
+    .expect(unique.length, { code: 'core.run.undo-too-late', reason: 'These performances have changed since they were added, so they cannot be removed in one go.', remedy: 'Delete or cancel them one by one.' })
+  if (scheduled.length) {
+    syncProductionDates(unit, productionId)
+    // Anyone told they were scheduled is told they are gone.
+    unit.announce('core.performance.cancelled', scheduled.map(p => ({ payload: { performanceId: p.id, productionId, reason: 'other' }, record: ['core.performance', p.id] as const })))
+  }
+  unit.audit({ action: 'delete', record: ['core.production', productionId], detail: { performances: unique.length, undone: true } })
+  return { removed: unique.length }
 }
 
 async function runRow(productionId: string, runId: string): Promise<RunRow> {

@@ -2,11 +2,13 @@
      list is priced by hand, falling back to Standard where it has no price, or is a percentage off
      Standard with no prices of its own. A restricted list needs its own ability to choose at the till. -->
 <script setup lang="ts">
+import { priceListInput, priceListPatch } from '../../../../../../server/input'
+
 interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ lists: List[] }>('/api/bar/price-lists', { key: 'bar:price-lists' })
 
@@ -19,6 +21,8 @@ function describe(l: List): string {
 
 const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean, pricing: 'hand' | 'percent', percentOff: number | null } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+type FormRef = { setErrors: (errors: FieldError[]) => void }
+const formEl = useTemplateRef<FormRef>('formEl')
 const pricingItems = computed(() => [{ value: 'hand', label: t('bar.screens.lists.pricing-hand') }, { value: 'percent', label: t('bar.screens.lists.pricing-percent') }])
 function edit(l?: List) {
   refusal.value = null
@@ -26,12 +30,21 @@ function edit(l?: List) {
     ? { id: l.id, standard: l.standard, name: l.name, restricted: l.restricted, fallsBack: l.fallsBack, pricing: l.percentOff === null ? 'hand' : 'percent', percentOff: l.percentOff }
     : { id: null, standard: false, name: '', restricted: false, fallsBack: true, pricing: 'hand', percentOff: null }
 }
+const listBody = () => {
+  const f = form.value!
+  return f.standard
+    ? { name: f.name, restricted: f.restricted }
+    : { name: f.name, restricted: f.restricted, fallsBack: f.fallsBack, percentOff: f.pricing === 'percent' ? f.percentOff : null }
+}
+// A percentage list needs its percentage, which the schema cannot say on its own (null is "by hand").
+const validate = () => [
+  ...bodyErrors(form.value?.id ? priceListPatch : priceListInput, listBody()),
+  ...needs({ percentOff: !form.value?.standard && form.value?.pricing === 'percent' ? form.value.percentOff : true }),
+]
 async function save() {
   const f = form.value!
   refusal.value = null
-  const body = f.standard
-    ? { name: f.name, restricted: f.restricted }
-    : { name: f.name, restricted: f.restricted, fallsBack: f.fallsBack, percentOff: f.pricing === 'percent' ? f.percentOff : null }
+  const body = listBody()
   try {
     if (f.id) await $api(`/api/bar/price-lists/${f.id}` as string, { method: 'PATCH', body })
     else await $api('/api/bar/price-lists', { method: 'POST', body })
@@ -41,6 +54,7 @@ async function save() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    formEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function setActive(l: List, active: boolean) {
@@ -106,7 +120,9 @@ async function setActive(l: List, active: boolean) {
         <UForm
           v-if="form"
           id="bar-list"
+          ref="formEl"
           :state="form"
+          :validate="validate"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -160,6 +176,7 @@ async function setActive(l: List, active: boolean) {
         <UButton
           type="submit"
           form="bar-list"
+          loading-auto
           :label="t('bar.screens.save')"
         />
       </template>

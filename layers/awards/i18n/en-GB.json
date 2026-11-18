@@ -46,9 +46,9 @@
   "awards.screens.type.details": "Details",
   "awards.screens.type.name": "Name",
   "awards.screens.type.name-help": "What the award is called wherever it is shown, such as Fellowship.",
-  "awards.screens.type.key": "Short code",
-  "awards.screens.type.key-help": "Lower-case letters, numbers and hyphens, such as fellowship. Used in web addresses and imports.",
-  "awards.screens.type.key-fixed": "The short code cannot change once the award has been issued.",
+  "awards.screens.type.key": "Web address",
+  "awards.screens.type.key-help": "Lower-case letters, numbers and hyphens, such as fellowship. It picks this award out when you show its roll of honour on a page.",
+  "awards.screens.type.key-fixed": "The web address cannot change once the award has been issued.",
   "awards.screens.type.summary": "What it is for",
   "awards.screens.type.summary-help": "A sentence or two shown beside the award on the roll.",
   "awards.screens.type.ticket-benefit": "Holders may buy the award's ticket price",
@@ -86,6 +86,7 @@
   "awards.screens.awards.revoked": "Revoked",
   "awards.screens.awards.not-linked": "No account",
 
+  "awards.screens.issue.open-existing": "Open the award they hold",
   "awards.screens.issue.title": "Issue an award",
   "awards.screens.issue.help": "Record an award the committee has decided.",
   "awards.screens.issue.type": "Award",
@@ -150,8 +151,9 @@
   "awards.screens.import.title": "Import past awards",
   "awards.screens.import.help": "Records awards already given, from a file. Nobody is told.",
   "awards.screens.import.file": "Choose a CSV file",
-  "awards.screens.import.file-help": "One award a row: name, date or year awarded, what it was for, citation, email address. Only the name and the date are needed. A year alone is kept as 1 January.",
+  "awards.screens.import.file-help": "One award a row: name, date or year awarded, what it was for, citation, email address. Only the name and the date are needed. A year alone stays a year, and is shown as one.",
   "awards.screens.import.would-import": "{count} would be imported",
+  "awards.screens.import.would-import.one": "1 would be imported",
   "awards.screens.import.refused": "{count} would be left out:",
   "awards.screens.import.refused-line": "Line {line}: {reason}",
   "awards.screens.import.reasons.no-name": "no name",
@@ -163,6 +165,7 @@
   "awards.screens.import.reasons.already-recorded": "already recorded",
   "awards.screens.import.submit": "Import",
   "awards.screens.import.queued": "{count} awards are being imported",
+  "awards.screens.import.queued.one": "1 award is being imported",
   "awards.screens.import.queued-help": "They appear in the list over the next minute or so.",
 
   "awards.screens.link.title": "Link an account",
@@ -171,6 +174,9 @@
   "awards.screens.link.how-address": "By email address",
   "awards.screens.link.submit": "Link account",
   "awards.screens.link.linked-toast": "Account linked",
+  "awards.screens.link.merge": "Merge into their award",
+  "awards.screens.link.merged-toast": "Merged into their award",
+  "awards.screens.link.open-existing": "Open the award they hold",
 
   "awards.screens.account-tab.none": "No awards",
 
@@ -180,9 +186,12 @@
   "awards.forms.issue-award.nominee": "The person nominated",
   "awards.forms.issue-award.awarded-for": "What it is for",
   "awards.forms.issue-award.citation": "Citation",
+  "awards.forms.nomination-template.name": "Nomination for an award",
+  "awards.forms.nomination-template.description": "Asks who is nominated, what for and why. Giving the award issues it to the person named.",
 
   "awards.roll.title": "Roll of honour",
   "awards.roll.description": "The people the theatre has honoured.",
   "awards.roll.empty": "No awards are listed yet.",
-  "awards.roll.not-found": "There is nothing here."
+  "awards.roll.not-found": "There is nothing here.",
+  "awards.facts.type-holder.label": "Holds a current award of this type"
 }

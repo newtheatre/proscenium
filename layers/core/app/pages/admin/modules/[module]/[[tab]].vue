@@ -18,6 +18,9 @@ const highlight = computed(() => typeof route.query.setting === 'string' ? route
 const { data } = await useAPI<{ tabs: ModuleTabView[] }>(() => `/api/core/modules/${encodeURIComponent(module.value)}/tabs`, { key: `core:module-tabs:${module.value}` })
 const first = data.value?.tabs[0]
 if (route.path === moduleHome(module.value) && first && first.to !== route.path) await navigateTo({ path: first.to, query: route.query }, { replace: true })
+// "/settings" is where people expect a module's settings: when its page of settings lives at another address, go there.
+const settingsTab = data.value?.tabs.find(tab => tab.page)
+if (route.params.tab === 'settings' && !data.value?.tabs.some(tab => tab.to === route.path) && settingsTab) await navigateTo({ path: settingsTab.to, query: route.query }, { replace: true })
 const page = computed(() => data.value?.tabs.find(tab => tab.to === route.path)?.page)
 // Only About needs the catalogue's view (console staff in the settings window may not read it).
 const { data: modules } = await useAPI<{ modules: ModuleView[] }>('/api/core/modules', { key: 'core:modules', immediate: about.value })
