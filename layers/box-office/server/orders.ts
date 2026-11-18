@@ -10,7 +10,7 @@ const say = wordsFrom(catalogue)
 
 export interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, intent_id: string | null, confirm_email: string | null, confirm_name: string | null, admit_on_payment: number, sold_by: string | null }
 /** band_name is null when the production has one band, so there is no part of the house to name. */
-export interface LineRow { id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, type_name: string, type_kind: string, band_name: string | null }
+export interface LineRow { id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, type_name: string, type_kind: string, band_name: string | null, /** 1 for a pass's entry. */ pass_entry?: number }
 
 export const ORDER = 'SELECT id, reference, state, account_id, currency, total_minor, expires_at, release_at, intent_id, confirm_email, confirm_name, admit_on_payment, sold_by FROM box_office_orders'
 export const RAN_OUT = { code: 'box-office.basket.expired', reason: 'Your basket has run out, and the seats are back on sale.', remedy: 'Choose your tickets again.' }
@@ -32,7 +32,7 @@ export function liveLines(orderId: string): Promise<LineRow[]> {
   return all<LineRow>(
     // A pass entry is named by its pass, and a wheelchair space on a pass by both.
     `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor,
-        CASE WHEN y.name IS NULL THEN t.name WHEN t.managed_by = '${HIDDEN_TYPE}' THEN y.name ELSE y.name || ', ' || t.name END AS type_name, t.kind AS type_kind,
+        CASE WHEN y.name IS NULL THEN t.name WHEN t.managed_by = '${HIDDEN_TYPE}' THEN y.name ELSE y.name || ', ' || t.name END AS type_name, t.kind AS type_kind, (l.pass_redemption_id IS NOT NULL) AS pass_entry,
         CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name FROM box_office_order_lines l
       JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
       LEFT JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id LEFT JOIN box_office_passes p ON p.id = d.pass_id LEFT JOIN box_office_pass_types y ON y.id = p.pass_type_id
