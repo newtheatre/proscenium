@@ -201,7 +201,7 @@ export default defineModule({
       // What is kept of a ticket's price when it is cancelled and refunded less the fee.
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
-    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }],
+    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }, { id: 'box-office.order', file: 'order' }],
     'core.vocabulary': [{
       id: 'box-office.comp-reason',
       label: 'Reasons for complimentary tickets',
