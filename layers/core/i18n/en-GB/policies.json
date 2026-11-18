@@ -37,5 +37,8 @@
   "core.policies.versions.none": "No version has been recorded yet.",
   "core.policies.versions.from": "In force from {date}",
   "core.policies.versions.number": "Version {number}",
-  "core.policies.versions.old": "This is how the policy read at the time. It may have changed since."
+  "core.policies.versions.old": "This is how the policy read at the time. It may have changed since.",
+  "core.settings-sections.policies": "Policies",
+  "core.settings.policies.reviewed.label": "Policies that have been reviewed",
+  "core.settings.policies.reviewed.help": "The policies whose text a competent person has read for your theatre, by the last part of each address: privacy, terms, accessibility, visiting, tickets. Site readiness lists the rest."
 }

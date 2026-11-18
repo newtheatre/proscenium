@@ -113,3 +113,19 @@ describe('versions of a policy', () => {
     expect(await inContext(() => currentVersion('nonsense'))).toBeNull()
   })
 })
+
+describe('what the policies still lack (site readiness)', () => {
+  it('lists sections to write, facts to give and default text to review, until each is done', async () => {
+    const { policyReadiness } = await import('../../server/policies/readiness')
+    const before = await inContext(() => policyReadiness())
+    expect(before).toContainEqual({ kind: 'unwritten', name: 'Accessibility: How we tested this site', to: '/policies/accessibility', file: 'site/content/policies/accessibility/how-we-tested.md' })
+    expect(before).toContainEqual({ kind: 'setting', name: 'core.privacy.contact', key: 'core.privacy.contact', to: '/admin/privacy?setting=core.privacy.contact' })
+    expect(before.filter(i => i.kind === 'unreviewed').map(i => i.name)).toEqual(expect.arrayContaining(['Privacy notice', 'Terms of use']))
+    await set('core.privacy.contact', 'privacy@playhouse.example')
+    await set('core.policies.reviewed', ['privacy'])
+    const after = await inContext(() => policyReadiness())
+    expect(after.map(i => i.key)).not.toContain('core.privacy.contact')
+    expect(after.filter(i => i.kind === 'unreviewed').map(i => i.name)).not.toContain('Privacy notice')
+    await env.DB.prepare('DELETE FROM core_settings WHERE key = ?').bind('core.policies.reviewed').run()
+  })
+})

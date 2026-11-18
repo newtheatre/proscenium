@@ -363,8 +363,13 @@ of wording, of a quoted setting or of which modules are on each makes one. Versi
 `currentPolicyVersion('<policy>')` from `#modules/core` and stores the id, as the box office does on
 an order (`terms_version_id`) at checkout and when reserving.
 
-Not built yet: the version of the terms of use an account accepted, the Admin screen that lists
-unwritten and out-of-date sections, and packs of law for countries other than the UK.
+**Readiness.** Site readiness lists what the policies still lack
+(`layers/core/server/policies/readiness.ts`): sections only the theatre can write, replacements the
+default wording has moved on from, facts the text would state if they were set, and default text
+not yet named in `core.policies.reviewed`.
+
+Not built yet: the version of the terms of use an account accepted, and packs of law for countries
+other than the UK.
 
 ## External calls
 
