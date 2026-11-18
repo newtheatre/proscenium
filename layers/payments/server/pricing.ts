@@ -18,6 +18,12 @@ export async function priceSale(input: PricingInput): Promise<PricedSale> {
   return { items: input.items.map(i => ({ key: i.key, discountMinor: 0 })), applied: [], savings: [], stale: [] }
 }
 
+/** Whether a sale on this channel with no code could be priced below its list prices at all. Reads only. */
+export async function pricesWithoutCode(channel: PricingInput['channel']): Promise<boolean> {
+  const p = await pricer()
+  return p ? p.automatic(channel) : false
+}
+
 /** Writes a priced sale's savings into the unit; the id to keep on each item's line, by key. */
 export async function redeemSale(unit: UnitView, priced: PricedSale, owner: { kind: string, saleRef: string, refs: Record<string, string> }): Promise<Record<string, string>> {
   if (!priced.savings.length && !priced.stale.length) return {}

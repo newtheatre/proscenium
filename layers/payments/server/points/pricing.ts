@@ -50,6 +50,8 @@ export interface PricedSale {
 
 export interface Pricing {
   price: (input: PricingInput) => Promise<PricedSale>
+  /** Whether anything could take money off a sale on this channel with no code given, so a seller can skip pricing when nothing would. Reads only. */
+  automatic: (channel: PricingInput['channel']) => Promise<boolean>
   /**
    * Writes the savings into the unit, guarded so a promotion's last use is given once, and returns
    * the id of the first saving on each item, by key, for the seller to keep on its line. `refs` says,

@@ -4,7 +4,7 @@
 // claim does, so a seat given back gives its use back (contributions/promotions.target/ticket.ts).
 import { all, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
-import { describeSavings, moveSavings, priceSale, redeemSale, type PricedSale } from '#modules/payments'
+import { describeSavings, moveSavings, priceSale, pricesWithoutCode, redeemSale, type PricedSale } from '#modules/payments'
 
 export const TICKET_KIND = 'box-office.ticket'
 
@@ -27,6 +27,8 @@ export interface PricedTickets {
  */
 export async function priceTickets(performanceId: string, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], channel: 'online' | 'till', code?: string, preview = false): Promise<PricedTickets> {
   const typed = code?.trim()
+  // Most sales have no code and nothing that applies on its own: one read says so, and they sell at list prices.
+  if (!typed && !await pricesWithoutCode(channel)) return unpriced(lines.length)
   const [performance, reduced] = await Promise.all([getPerformance(performanceId), reducedTypes()])
   const priced = await priceSale({
     channel,

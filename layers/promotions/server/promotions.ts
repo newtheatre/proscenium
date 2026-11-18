@@ -235,6 +235,11 @@ interface Candidate { row: Row, code: CodeRow | null }
 
 const CODE_FIELDS = { promoCode: 'invalid' }
 
+/** Whether any promotion applies on its own on this channel (payments.pricing's automatic). Reads only. */
+export async function anyAutomatic(channel: PricingInput['channel']): Promise<boolean> {
+  return !!await first("SELECT 1 FROM promotions_promotions WHERE active = 1 AND trigger = 'automatic' AND channel IN ('all', ?) LIMIT 1", channel)
+}
+
 /** The promotions in play: those that start on their own, and those of the codes typed, judged now. */
 async function candidates(input: PricingInput, at: number): Promise<Candidate[]> {
   const channel = input.channel
