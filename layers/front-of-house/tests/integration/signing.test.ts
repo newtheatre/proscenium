@@ -187,7 +187,8 @@ describe('FH-09 and FH-17: what members see', () => {
     expect(mine.coming).toEqual([expect.objectContaining({ assignmentId: a, shiftId: id, state: 'confirmed', productionTitle: expect.stringContaining('Front of house show') })])
     expect(mine.minutesThisYear).toBe(0)
     const view = (await req('GET', `/api/front-of-house/shifts/${id}`, undefined, meg)).body
-    expect(view.mine).toEqual({ assignmentId: a, state: 'confirmed' })
+    expect(view.mine).toMatchObject({ assignmentId: a, state: 'confirmed', freeRelease: false })
+    expect(view.mine.calendar).toContain(`/api/front-of-house/assignments/${a}/calendar.ics?k=`)
     expect(view.people).toHaveLength(1)
     expect(view).toMatchObject({ productionTitle: expect.stringContaining('Front of house show'), venueName: expect.stringContaining('Front of house venue'), releaseNotice: 172800, coverFor: null })
     // Once Meg asks for cover inside the notice, another member sees the place to take.

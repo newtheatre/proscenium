@@ -13,6 +13,6 @@ export default defineRoute({
   input: z.object({}).strict(),
 }, async (_event, { record, unit }) => {
   const drafts = (await shiftsOf(record!.id!)).filter(s => s.state === 'draft')
-  publishShifts(unit.view(), drafts)
+  await publishShifts(unit.view(), drafts)
   return { published: drafts.length }
 })
