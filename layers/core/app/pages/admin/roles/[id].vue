@@ -77,7 +77,10 @@ const top = useTemplateRef<HTMLElement>('top')
 /** Takes the person to the first problem: the field, or the refusal at the top of the form. */
 function onError(event: FormErrorEvent) {
   // The first problem on the page, in reading order, not the order the schema lists its fields.
-  const fields = event.errors.map(e => e.id ? document.getElementById(e.id) : null).filter((el): el is HTMLElement => !!el)
+  // By the field's id where the form gives one, otherwise by its name within this form.
+  const find = (e: FormErrorEvent['errors'][number]) => (e.id ? document.getElementById(e.id) : null)
+    ?? (e.name ? document.querySelector<HTMLElement>(`#core-role [name="${CSS.escape(e.name)}"]`) : null)
+  const fields = event.errors.map(find).filter((el): el is HTMLElement => !!el)
   fields.sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
   const field = fields[0]
   if (!field) return
