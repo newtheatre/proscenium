@@ -75,21 +75,27 @@ const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: str
 const top = useTemplateRef<HTMLElement>('top')
 
 /** Takes the person to the first problem: the field, or the refusal at the top of the form. */
-function onError(event: FormErrorEvent) {
-  // The first problem on the page, in reading order, not the order the schema lists its fields.
-  // By the field's id where the form gives one, otherwise by its name within this form.
-  const find = (e: FormErrorEvent['errors'][number]) => (e.id ? document.getElementById(e.id) : null)
+// The first problem on the page, in reading order, not the order the schema lists its fields:
+// by the field's id where the form gives one, otherwise by its name within this form.
+function focusFirst(errors: { id?: string, name?: string }[]): boolean {
+  const find = (e: { id?: string, name?: string }) => (e.id ? document.getElementById(e.id) : null)
     ?? (e.name ? document.querySelector<HTMLElement>(`#core-role [name="${CSS.escape(e.name)}"]`) : null)
-  const fields = event.errors.map(find).filter((el): el is HTMLElement => !!el)
+  const fields = errors.map(find).filter((el): el is HTMLElement => !!el)
   fields.sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
   const field = fields[0]
-  if (!field) return
+  if (!field) return false
   field.scrollIntoView({ block: 'center', behavior: 'smooth' })
   field.focus({ preventScroll: true })
+  return true
 }
-async function showRefusal() {
+function onError(event: FormErrorEvent) {
+  // The form holds its fields disabled while it checks them; move once it has let them go.
+  setTimeout(() => focusFirst(event.errors))
+}
+/** A refusal about a field goes to the field; any other goes to the notice at the top. */
+async function showRefusal(fields: { name: string }[] = []) {
   await nextTick()
-  top.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  if (!focusFirst(fields)) top.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 }
 
 async function save() {
@@ -111,8 +117,9 @@ async function save() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-    formEl.value?.setErrors(fieldErrors(refusal.value))
-    await showRefusal()
+    const fields = fieldErrors(refusal.value)
+    formEl.value?.setErrors(fields)
+    await showRefusal(fields)
   }
   finally {
     saving.value = false
