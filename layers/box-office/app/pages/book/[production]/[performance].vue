@@ -5,7 +5,7 @@
      price the visitor is not signed in for can take a reference instead, such as a student ID: one
      box for each ticket, worded by Membership, shown only on that ticket type. -->
 <script setup lang="ts">
-interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, shape: string } }
+interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, field?: string, shape: string } }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string }
   production: { id: string, slug: string, title: string, subtitle: string | null }
@@ -81,10 +81,13 @@ function setReference(bandId: string, typeId: string, n: number, value: string) 
   const list = [...(references.value[keyOf(bandId, typeId)] ?? [])]
   list[n] = value
   references.value = { ...references.value, [keyOf(bandId, typeId)]: list }
+  if (referenceRefusal.value) refusal.value = null
 }
 const referencesMissing = computed(() => chosen.value.some(c => typing(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).filter(Boolean).length < c.quantity))
 const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && (!siteKey || !!challenge.value))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A refused reference is said beside the references typed; the notice at the top is for the rest.
+const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
 const busy = ref(false)
 
 async function hold() {
@@ -127,7 +130,7 @@ async function hold() {
             :title="t(`box-office.book.state.${data.state}`, { when: data.onSaleAt ? dateTime(data.onSaleAt) : '' })"
           />
           <template v-else>
-            <RefusalNotice :refusal="refusal" />
+            <RefusalNotice :refusal="referenceRefusal ? null : refusal" />
             <section
               v-for="band in data.bands"
               :key="band.bandId"
@@ -148,6 +151,7 @@ async function hold() {
                   :key="type.ticketTypeId"
                   :label="promoPrice(band.bandId, type.ticketTypeId) !== undefined ? t('box-office.book.type-with-code', { type: type.name, price: money(promoPrice(band.bandId, type.ticketTypeId)!, currency), was: money(type.amountMinor, currency) }) : t('box-office.book.type', { type: type.name, price: money(type.amountMinor, currency) })"
                   :help="typing(type) ? type.reference!.label : (type.unmet ?? type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
+                  :error="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)] ? referenceRefusal?.reason : undefined"
                 >
                   <div class="space-y-2">
                     <UInputNumber
@@ -162,7 +166,7 @@ async function hold() {
                         v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
                         :key="n"
                         :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
-                        :aria-label="t('box-office.book.reference', { label: type.reference!.label, n })"
+                        :aria-label="t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"
                         :placeholder="t('box-office.book.reference-placeholder', { n })"
                         autocomplete="off"
                         maxlength="64"
