@@ -10,7 +10,7 @@
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
-import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
+import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
 import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
@@ -263,11 +263,26 @@ export async function buyerCancelTerms(order: Pick<OrderRow, 'state' | 'sold_by'
 }
 
 /**
- * An order, for whoever holds the link from its message, in any state it reaches after the basket.
- * No sign-in, and no name or address shown.
+ * How a booking is opened: by the token in the link from its messages, or by its id for the signed-in
+ * person whose booking it is (through the account scope, so a booking on an account merged into
+ * theirs opens too). Anyone else gets what a wrong link gets, so an id tells them nothing.
  */
-export async function orderByLink(token: string): Promise<OrderView | null> {
-  const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ? AND state <> 'basket'`, await hashOf(token)) : null
+export type OrderKey = { token: string } | { orderId: string, accountId: string | null }
+
+async function orderFor(key: OrderKey): Promise<OrderRow | null> {
+  if ('token' in key) return key.token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ? AND state <> 'basket'`, await hashOf(key.token)) : null
+  if (!key.orderId || !key.accountId) return null
+  const own = await useDb().get<{ id: string }>(sql`SELECT id FROM box_office_orders
+    WHERE id = ${key.orderId} AND state <> 'basket' AND ${inAccountScope('account_id', key.accountId)}`)
+  return own ? await first<OrderRow>(`${ORDER} WHERE id = ?`, own.id) : null
+}
+
+/**
+ * An order, for whoever holds the link from its message or for its signed-in owner, in any state it
+ * reaches after the basket. No name or address shown.
+ */
+export async function orderByLink(key: OrderKey): Promise<OrderView | null> {
+  const order = await orderFor(key)
   if (!order) return null
   const lines = await liveLines(order.id)
   return {
@@ -288,14 +303,14 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
 }
 
 /**
- * Cancel or reduce a booking from its link (R-2): the seats go back on sale in the same batch. With
+ * Cancel or reduce a booking from its link, or by its signed-in owner (R-2): the seats go back on sale in the same batch. With
  * no lines named, the whole booking is cancelled. A reservation was not paid for, so nothing is
  * refunded. A paid booking can be cancelled here only on the terms of buyerCancelTerms, and the
  * price less the cancellation fee goes back the way it was paid.
  */
-export async function cancelFromLink(unit: UnitView, token: string, lineIds?: string[]): Promise<OrderView> {
-  const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ?`, await hashOf(token)) : null
-  if (!order || order.state === 'basket') refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
+export async function cancelFromLink(unit: UnitView, key: OrderKey, lineIds?: string[]): Promise<OrderView> {
+  const order = await orderFor(key)
+  if (!order) refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
   if (order.state === 'confirmed' && await buyerCancelTerms(order, await liveLines(order.id))) {
     const done = await cancelLines(unit, order.id, { lineIds, refund: 'less-fee', by: null, kind: 'customer' })
     const kept = (await liveLines(order.id)).filter(l => !lineIds || !lineIds.includes(l.id))
@@ -334,7 +349,7 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
     ? sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`
     : sql`UPDATE box_office_orders SET state = 'cancelled', total_minor = ${totalMinor}, cancelled_at = ${at}, release_at = NULL, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`)
     .expect(1, changed)
-  // By nobody the platform can name: whoever held the link.
+  // Recorded as the buyer's own, with no one named, however the booking was opened.
   const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: 'customer', lineIds: ids, feeMinor: 0, by: null }])
 
   unit.announce('box-office.order.cancelled', { orderId: order.id, cancellationId: cancellationId! }, { record: ['box-office.order', order.id] })

@@ -478,6 +478,8 @@
   "box-office.mine.ticket-code": "Code for ticket {n} of {count}: {label}",
   "box-office.mine.admitted": "Used",
   "box-office.mine.codes-in-email": "The codes for some of these tickets are only in your confirmation email.",
+  "box-office.mine.manage": "Manage",
+  "box-office.mine.manage-label": "Manage your booking for {show}, reference {reference}",
   "box-office.manage.due": "To pay at the box office: {amount}",
   "box-office.manage.paid-help": "To change or cancel a paid booking, contact the box office.",
   "box-office.manage.cancelled.one": "1 ticket cancelled. Its seat is back on sale.",
