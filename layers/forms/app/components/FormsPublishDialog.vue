@@ -108,7 +108,7 @@ async function publish() {
                   name="i-lucide-circle-alert"
                   class="mt-0.5 shrink-0 text-error"
                 />
-                <span><span class="font-medium">{{ formsProblemName(builder.definition.value, p.at, t) }}</span><br>{{ t(`forms.problems.${p.code}`, p.params ?? {}) }}</span>
+                <span><span class="font-medium">{{ formsProblemName(builder.definition.value, p.at, t) }}</span><br>{{ formsProblemWords(builder.definition.value, p, t) }}</span>
               </button>
             </li>
           </ul>

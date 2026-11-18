@@ -69,9 +69,18 @@ const fields = computed(() => form.value.mode === 'record')
 // Published but offered to nobody yet, and whether the live version is taking answers at all.
 const unshared = computed(() => !fields.value && form.value.liveVersion !== null && props.data.shared === false && form.value.status === 'live')
 const taking = computed(() => fields.value || (form.value.status === 'live' && !unshared.value))
+type Tone = 'neutral' | 'success' | 'info' | 'warning'
+const badges = computed<{ tone: Tone, label: string }[]>(() => [
+  form.value.liveVersion === null
+    ? { tone: 'neutral', label: t('forms.screens.status.draft') }
+    : { tone: taking.value ? 'success' : 'info', label: t(taking.value ? 'forms.screens.builder.version' : 'forms.screens.builder.version-only', { n: form.value.liveVersion }) },
+  ...(unshared.value ? [{ tone: 'warning' as const, label: t('forms.screens.builder.not-shared') }] : []),
+  ...(fields.value ? [{ tone: 'info' as const, label: t('forms.screens.fields.badge') }] : []),
+  ...(form.value.status === 'paused' || form.value.status === 'closed' || form.value.status === 'archived' ? [{ tone: form.value.status === 'paused' ? 'warning' as const : 'neutral' as const, label: t(`forms.screens.status.${form.value.status}`) }] : []),
+])
 const more = computed(() => [[
   ...(fields.value ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
-  { label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` },
+  ...(fields.value ? [] : [{ label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` }]),
   ...(form.value.liveVersion === null ? [] : [{ label: t('forms.screens.versions.title'), icon: 'i-lucide-history', to: `/console/forms/${form.value.id}/versions` }]),
 ], [
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
@@ -122,29 +131,19 @@ const reload = () => window.location.reload()
     :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }]"
   >
     <template #status>
-      <StatusBadge
-        :tone="form.liveVersion === null ? 'neutral' : taking ? 'success' : 'info'"
-        :label="form.liveVersion === null ? t('forms.screens.status.draft') : t(taking ? 'forms.screens.builder.version' : 'forms.screens.builder.version-only', { n: form.liveVersion })"
-      />
-      <StatusBadge
-        v-if="unshared"
-        tone="warning"
-        :label="t('forms.screens.builder.not-shared')"
-      />
-      <StatusBadge
-        v-if="fields"
-        tone="info"
-        :label="t('forms.screens.fields.badge')"
-      />
-      <StatusBadge
-        v-if="form.status === 'paused' || form.status === 'closed' || form.status === 'archived'"
-        :tone="form.status === 'paused' ? 'warning' : 'neutral'"
-        :label="t(`forms.screens.status.${form.status}`)"
-      />
+      <span class="hidden items-center gap-1.5 sm:contents">
+        <StatusBadge
+          v-for="b in badges"
+          :key="b.label"
+          :tone="b.tone"
+          :label="b.label"
+        />
+      </span>
     </template>
     <template #primary>
       <UButton
         v-if="unshared"
+        class="hidden sm:inline-flex"
         :label="t('forms.screens.link.share')"
         icon="i-lucide-share-2"
         color="neutral"
@@ -159,6 +158,15 @@ const reload = () => window.location.reload()
     </template>
     <template #toolbar>
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <!-- On a phone the badges sit here, so the header keeps room for the form's name. -->
+        <span class="flex w-full flex-wrap items-center gap-1.5 sm:hidden">
+          <StatusBadge
+            v-for="b in badges"
+            :key="b.label"
+            :tone="b.tone"
+            :label="b.label"
+          />
+        </span>
         <UFieldGroup>
           <UButton
             v-for="v in (['build', 'preview'] as const)"
@@ -216,7 +224,7 @@ const reload = () => window.location.reload()
                   class="mt-0.5 shrink-0"
                   :class="p.level === 'error' ? 'text-error' : 'text-warning'"
                 />
-                <span><span class="font-medium">{{ problemName(p.at) }}</span><br>{{ t(`forms.problems.${p.code}`, p.params ?? {}) }}</span>
+                <span><span class="font-medium">{{ problemName(p.at) }}</span><br>{{ formsProblemWords(builder.definition.value, p, t) }}</span>
               </button>
             </div>
           </template>

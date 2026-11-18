@@ -2,7 +2,7 @@
      from an exported file. -->
 <script setup lang="ts">
 interface Template { key: string, name: string, description: string | null, own: boolean, anonymous: boolean, questions: number }
-interface FormRow { id: string, slug: string, title: string, status: 'draft' | 'live' | 'paused' | 'closed' | 'archived', published: boolean }
+interface FormRow { id: string, slug: string, title: string, status: 'draft' | 'live' | 'paused' | 'closed' | 'archived', published: boolean, mode: 'submission' | 'record', responses: number | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -92,8 +92,26 @@ async function create() {
     refusal.value = toRefusal(e)
   }
 }
-const current = computed(() => (data.value?.forms ?? []).filter(f => f.status !== 'archived'))
-const archived = computed(() => (data.value?.forms ?? []).filter(f => f.status === 'archived'))
+const search = ref('')
+const matching = computed(() => {
+  const words = search.value.trim().toLowerCase()
+  return (data.value?.forms ?? []).filter(f => !words || f.title.toLowerCase().includes(words) || f.slug.includes(words))
+})
+const current = computed(() => matching.value.filter(f => f.status !== 'archived'))
+const archived = computed(() => matching.value.filter(f => f.status === 'archived'))
+// A set of custom fields is filled in on its record: it has no address, and nobody is sent it.
+const about = (f: FormRow) => [
+  f.mode === 'record' ? t('forms.screens.list.fields') : `/${f.slug}`,
+  f.mode !== 'record' && f.responses !== null && f.published ? t('forms.screens.responses.count', { count: f.responses }) : '',
+].filter(Boolean).join(' · ')
+const badge = (f: FormRow) => f.mode === 'record' && f.status === 'live' ? t('forms.screens.list.in-use') : t(`forms.screens.status.${f.status}`)
+// The template's name is offered as the form's, until the person writes their own.
+let offered = ''
+watch(() => state.template, () => {
+  if (state.title.trim() && state.title !== offered) return
+  offered = chosen.value ? nameOf(chosen.value) : ''
+  state.title = offered
+})
 const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'neutral', archived: 'neutral' } as const
 </script>
 
@@ -103,6 +121,11 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
     :description="t('forms.screens.list.help')"
   >
     <template #primary>
+      <SearchToggle
+        v-if="(data?.forms.length ?? 0) > 5"
+        v-model="search"
+        :label="t('forms.screens.list.search')"
+      />
       <UButton
         :label="t('forms.screens.list.new')"
         icon="i-lucide-plus"
@@ -120,6 +143,19 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
         icon="i-lucide-file-text"
         :title="t('forms.screens.list.empty')"
         :description="t('forms.screens.list.empty-help')"
+      >
+        <template #actions>
+          <UButton
+            :label="t('forms.screens.list.new')"
+            icon="i-lucide-plus"
+            @click="start"
+          />
+        </template>
+      </EmptyState>
+      <EmptyState
+        v-else-if="!matching.length"
+        icon="i-lucide-search"
+        :title="t('forms.screens.list.none-match')"
       />
       <RecordList
         v-else
@@ -129,13 +165,13 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
           v-for="f in current"
           :key="f.id"
           :to="`/console/forms/${f.id}`"
-          icon="i-lucide-file-text"
+          :icon="f.mode === 'record' ? 'i-lucide-list-plus' : 'i-lucide-file-text'"
           :name="f.title"
-          :description="`/${f.slug}`"
+          :description="about(f)"
         >
           <StatusBadge
             :tone="tone[f.status]"
-            :label="t(`forms.screens.status.${f.status}`)"
+            :label="badge(f)"
           />
         </RecordListItem>
       </RecordList>
@@ -149,9 +185,9 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
             v-for="f in archived"
             :key="f.id"
             :to="`/console/forms/${f.id}`"
-            icon="i-lucide-file-text"
+            :icon="f.mode === 'record' ? 'i-lucide-list-plus' : 'i-lucide-file-text'"
             :name="f.title"
-            :description="`/${f.slug}`"
+            :description="about(f)"
             muted
           />
         </RecordList>

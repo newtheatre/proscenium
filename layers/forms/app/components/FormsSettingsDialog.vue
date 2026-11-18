@@ -8,18 +8,38 @@ const open = defineModel<boolean>('open', { default: false })
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
-const state = reactive({ title: '', retentionDays: null as number | null, anonymous: false })
+const builder = useBuilder()
+const state = reactive({ title: '', retentionDays: null as number | null, anonymous: false, introduction: '', confirmation: '', submitLabel: '' })
+// Custom fields are filled in on their record: nobody is greeted, thanked or asked to send.
+const fields = computed(() => props.form.mode === 'record')
+// Kept in whole days; asked for as a number and a unit, so two years is not typed as 730.
+const DAY = 86_400 // not-policy: seconds in a day
+const retention = computed<number | null | undefined>({
+  get: () => state.retentionDays === null ? null : state.retentionDays * DAY,
+  set: (seconds) => { state.retentionDays = seconds === null || seconds === undefined ? null : Math.max(1, Math.round(seconds / DAY)) },
+})
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
 watch(open, (now) => {
   if (!now) return
-  Object.assign(state, { title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous })
+  const shown = builder.definition.value.presentation
+  Object.assign(state, { title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous, introduction: shown?.introduction ?? '', confirmation: shown?.confirmation ?? '', submitLabel: shown?.submitLabel ?? '' })
   refusal.value = null
 })
 async function save() {
   refusal.value = null
   try {
     await $api(`/api/forms/forms/${props.form.id}`, { method: 'PATCH', body: { title: state.title, retentionDays: state.retentionDays, ...(props.form.liveVersion === null ? { anonymous: state.anonymous } : {}) } })
+    // What people read before and after is part of the form itself: a change to the draft like any other, published with it.
+    const was = builder.definition.value.presentation
+    const words = { introduction: state.introduction.trim(), confirmation: state.confirmation.trim(), submitLabel: state.submitLabel.trim() }
+    if (!fields.value && (Object.keys(words) as (keyof typeof words)[]).some(k => (was?.[k] ?? '') !== words[k])) {
+      const presentation = Object.fromEntries(Object.entries({ ...was, ...words }).filter(([, v]) => v !== '' && v !== undefined)) as NonNullable<typeof was>
+      const { presentation: _old, ...rest } = builder.definition.value
+      const next = Object.keys(presentation).length ? { ...rest, presentation } : rest
+      builder.apply(next)
+      await builder.flush()
+    }
     open.value = false
     emit('saved')
   }
@@ -61,19 +81,50 @@ async function save() {
           :label="t('forms.screens.settings.retention')"
           :help="t('forms.screens.settings.retention-help')"
         >
-          <UFieldGroup>
-            <UInputNumber
-              v-model="state.retentionDays"
-              :min="1"
-              class="w-32"
-            />
-            <UBadge
-              color="neutral"
-              variant="outline"
-              :label="t('forms.screens.settings.days')"
-            />
-          </UFieldGroup>
+          <DurationInput
+            v-model="retention"
+            min="1d"
+            :units="['day', 'week', 'month', 'year']"
+            :label="t('forms.screens.settings.retention')"
+          />
         </UFormField>
+        <template v-if="!fields">
+          <UFormField
+            name="introduction"
+            :label="t('forms.screens.settings.introduction')"
+            :help="t('forms.screens.settings.introduction-help')"
+            :hint="t('forms.screens.details.optional')"
+          >
+            <UTextarea
+              v-model="state.introduction"
+              :rows="3"
+              autoresize
+            />
+          </UFormField>
+          <UFormField
+            name="confirmation"
+            :label="t('forms.screens.settings.confirmation')"
+            :help="t('forms.screens.settings.confirmation-help')"
+            :hint="t('forms.screens.details.optional')"
+          >
+            <UTextarea
+              v-model="state.confirmation"
+              :rows="2"
+              autoresize
+            />
+          </UFormField>
+          <UFormField
+            name="submitLabel"
+            :label="t('forms.screens.settings.submit-label')"
+            :hint="t('forms.screens.details.optional')"
+          >
+            <UInput
+              v-model="state.submitLabel"
+              maxlength="60"
+              :placeholder="t('forms.screens.fill.send')"
+            />
+          </UFormField>
+        </template>
         <UFormField
           name="anonymous"
           :help="t(form.liveVersion === null ? 'forms.screens.settings.anonymous-help' : 'forms.screens.settings.anonymous-fixed')"

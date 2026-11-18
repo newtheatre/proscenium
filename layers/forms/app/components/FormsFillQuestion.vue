@@ -237,7 +237,7 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       >
         <span class="text-sm text-muted">{{ t(`forms.screens.fill.address.${part}`) }}</span>
         <UInput
-          :class="part === 'postcode' ? 'w-40' : 'w-full'"
+          :class="part === 'postcode' ? 'w-40' : ''"
           :model-value="address[part] ?? ''"
           :autocomplete="AUTOCOMPLETE[part]"
           @update:model-value="setAddress(part, String($event))"

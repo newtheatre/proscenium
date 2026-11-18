@@ -141,6 +141,10 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
       key="asking"
       class="space-y-6"
     >
+      <MarkdownText
+        v-if="at === 0 && definition.presentation?.introduction"
+        :text="definition.presentation.introduction"
+      />
       <div v-if="evaluation.route.length > 1 || page.title || definition.pages.length > 1 || page.help">
         <p
           v-if="evaluation.route.length > 1"

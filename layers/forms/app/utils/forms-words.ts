@@ -23,13 +23,18 @@ export function formsQuestionName(q: Pick<Question, 'label'> | undefined): strin
 export function formsConditionSentence(condition: Condition, def: Definition): string {
   const questions = new Map(questionsOf(def).map(q => [q.question.id, q.question]))
   const calculations = new Map((def.calculations ?? []).map(c => [c.id, c.key]))
+  // An option with no wording yet is named by its place, never by its id.
+  const optionName = (about: Question | undefined, id: string): string => {
+    const at = about?.options?.findIndex(x => x.id === id) ?? -1
+    return about?.options?.[at]?.label.trim() || (at >= 0 ? translate('forms.screens.options.placeholder', { n: at + 1 }) : id)
+  }
   const operand = (o: Operand, about?: Question): string => {
     if ('answer' in o) return formsQuestionName(questions.get(o.answer))
     if ('calculation' in o) return calculations.get(o.calculation) ?? o.calculation
     if ('fact' in o) return o.fact
     if ('attribute' in o) return o.attribute
     if ('today' in o) return translate('forms.screens.logic.today')
-    if ('option' in o) return o.option === 'other' ? translate('forms.screens.options.other') : about?.options?.find(x => x.id === o.option)?.label || o.option
+    if ('option' in o) return o.option === 'other' ? translate('forms.screens.options.other') : optionName(about, o.option)
     if (typeof o.value === 'boolean') return translate(o.value ? 'forms.screens.logic.yes' : 'forms.screens.logic.no')
     return String(o.value)
   }
@@ -66,4 +71,14 @@ export function formsProblemName(def: Definition, at: string, t: (key: string, p
   if (found.kind === 'page') return found.page.title.trim() || t('forms.screens.builder.page-n', { n: found.pageIndex + 1 })
   const item = found.item
   return item.kind === 'question' ? formsQuestionName(item) : item.kind === 'group' ? item.label.trim() || t('forms.screens.builder.untitled-group') : t(`forms.screens.details.kind-${item.kind}`)
+}
+
+/** A problem in words. One about an option says which option. */
+export function formsProblemWords(def: Definition, p: { code: string, at: string, params?: Record<string, string> }, t: (key: string, params?: Record<string, unknown>) => string): string {
+  if (p.code === 'no-label' && p.params?.option) {
+    const found = find(def, p.at)
+    const options = found && found.kind !== 'page' && found.item.kind === 'question' ? found.item.options ?? [] : []
+    return t('forms.problems.option-no-label', { n: options.findIndex(o => o.id === p.params!.option) + 1 })
+  }
+  return t(`forms.problems.${p.code}`, p.params ?? {})
 }
