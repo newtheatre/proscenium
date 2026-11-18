@@ -111,9 +111,9 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
 }
 
 /** The panel's lines, for the till to show. Reads only. */
-export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number, quantity: number, item: string }[], amountMinor: number }> {
   const { lines, totalMinor } = await priced(parse(context.input))
-  return { lines: lines.map(l => ({ label: l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label, amountMinor: l.amountMinor })), amountMinor: totalMinor }
+  return { lines: lines.map(l => ({ label: l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label, amountMinor: l.amountMinor, quantity: l.quantity, item: l.label })), amountMinor: totalMinor }
 }
 
 const SALE_GONE = { code: 'bar.sale.not-open', reason: 'This bar sale is already being paid for, or has finished.', remedy: 'Start a new sale.' }

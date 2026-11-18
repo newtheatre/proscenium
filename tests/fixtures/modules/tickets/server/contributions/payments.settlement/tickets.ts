@@ -17,6 +17,8 @@ function entries(o: { amount_minor: number, deferred_minor: number, performance_
 
 export default {
   async settle(unit: UnitView, part: Part) {
+    // Who paid for which line of a split sale, for the till's test to see.
+    ;(globalThis as { ticketsSplits?: Part['splits'] }).ticketsSplits = part.splits
     unit.add({ sql: "UPDATE tickets_orders SET state = 'paid' WHERE id = ? AND state = 'held'", params: [part.record] })
       .expect(1, { code: 'tickets.order.gone', reason: 'This order is no longer held.' })
     const o = await order(part.record)

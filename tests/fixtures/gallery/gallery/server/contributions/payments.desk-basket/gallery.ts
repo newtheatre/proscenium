@@ -16,6 +16,6 @@ export default {
   },
   async summary(context: Pick<DeskContext, 'input'>) {
     const n = count(context)
-    return { lines: [{ label: `Programmes × ${n}`, amountMinor: n * PRICE }], amountMinor: n * PRICE }
+    return { lines: [{ label: `Programmes × ${n}`, amountMinor: n * PRICE, quantity: n, item: 'Programme' }], amountMinor: n * PRICE }
   },
 } satisfies DeskBasket
