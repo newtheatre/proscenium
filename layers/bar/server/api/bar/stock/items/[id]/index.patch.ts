@@ -1,7 +1,7 @@
 // Changes a stock item, or retires it (it then leaves every recipe and option). Never deleted.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { stockItemPatch, updateStockItem } from '../../../../stock'
+import { stockItemPatch, updateStockItem } from '../../../../../stock'
 
 export default defineRoute({
   ability: 'bar.stock.manage',
