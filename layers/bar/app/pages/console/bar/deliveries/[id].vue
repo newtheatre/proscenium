@@ -1,7 +1,8 @@
 <!-- A delivery (S9). A draft: where it goes, the supplier and the delivery note number, then a line per
      item with packs, loose units and the pack cost if it changed. Receiving it moves the stock in at
      once and is final; a mistake is put right by another delivery, by wastage or at the next count.
-     A received delivery is its record. "new" starts one. -->
+     A received delivery is its record. "new" starts one. A saved draft asks "Has the label changed?"
+     about items whose label is due a fresh look, for someone who records allergens. -->
 <script setup lang="ts">
 type Unit = 'each' | 'ml' | 'g'
 interface FormItem { id: string, name: string, baseUnit: Unit, packSize: number, packName: string, countUnitSize: number, costMinor: number | null }
@@ -21,7 +22,8 @@ const toast = useToast()
 
 const id = computed(() => route.params.id as string)
 const isNew = computed(() => id.value === 'new')
-const { data, status, error, refresh } = await useAPI<FormData & { delivery?: Delivery }>(
+interface LabelDue { stockItemId: string, name: string, checkedAt: number | null }
+const { data, status, error, refresh } = await useAPI<FormData & { delivery?: Delivery, canAllergens?: boolean, labelsDue?: LabelDue[] }>(
   () => isNew.value ? '/api/bar/stock/deliveries' : `/api/bar/stock/deliveries/${id.value}`,
   { key: `bar:delivery:${id.value}` },
 )
@@ -110,6 +112,13 @@ async function discard() {
   }
 }
 const validate = () => needs({ locationId: form.value.locationId })
+
+// Has the label changed? A due item's label is read again here, with the new stock to hand.
+const checking = ref<{ title: string, endpoint: string, contains: string[], mayContain: string[] } | null>(null)
+async function checkLabel(due: LabelDue) {
+  const read = await $api<{ answer: { contains: string[], mayContain: string[] } }>(`/api/bar/stock/items/${due.stockItemId}/allergens` as string)
+  checking.value = { title: t('bar.screens.choices.allergens-of', { name: due.name }), endpoint: `/api/bar/stock/items/${due.stockItemId}/allergens`, contains: read.answer.contains, mayContain: read.answer.mayContain }
+}
 const columns = computed(() => [
   { id: 'item', header: t('bar.screens.deliveries.item') },
   { id: 'packs', header: t('bar.screens.deliveries.packs') },
@@ -179,6 +188,29 @@ const title = computed(() => isNew.value
           @submit="run('receive')"
         >
           <RefusalNotice :refusal="refusal" />
+          <PageSection
+            v-if="d.labelsDue?.length"
+            :title="t('bar.screens.deliveries.labels-due')"
+            :description="t('bar.screens.deliveries.labels-due-help')"
+          >
+            <RecordList :label="t('bar.screens.deliveries.labels-due')">
+              <RecordListItem
+                v-for="due in d.labelsDue"
+                :key="due.stockItemId"
+                :name="due.name"
+                :description="due.checkedAt ? t('bar.screens.deliveries.last-checked', { when: dateTime(due.checkedAt) }) : t('bar.screens.deliveries.never-checked')"
+              >
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-clipboard-check"
+                  :label="t('bar.screens.product.check-label')"
+                  :aria-label="t('bar.screens.deliveries.check-label-of', { name: due.name })"
+                  @click="checkLabel(due)"
+                />
+              </RecordListItem>
+            </RecordList>
+          </PageSection>
           <PageSection :title="t('bar.screens.deliveries.details')">
             <div class="grid gap-4 sm:grid-cols-3">
               <UFormField
@@ -322,5 +354,11 @@ const title = computed(() => isNew.value
         />
       </div>
     </template>
+    <BarAllergenDialog
+      :target="checking"
+      :help="t('bar.screens.stock.allergens-help')"
+      @close="checking = null"
+      @saved="checking = null; refresh()"
+    />
   </PageFrame>
 </template>
