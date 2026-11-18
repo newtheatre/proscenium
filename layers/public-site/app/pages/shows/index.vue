@@ -11,11 +11,13 @@ interface Entry {
   category: { label: string } | null
   openedAt: number
   closedAt: number
+  lastStartsAt: number
   cancelled: boolean
   venues: string[]
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
   age: string | null
   hasEffects: boolean
+  hasWarnings: boolean
 }
 interface Archive {
   years: { year: number, count: number }[]
@@ -137,11 +139,12 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
                 :title="p.title"
                 :description="p.subtitle ?? (p.companyName ? t('public-site.production.presented-by', { company: p.companyName }) : undefined)"
                 :poster="p.poster"
-                :when="range(p.openedAt, p.closedAt)"
+                :when="range(p.openedAt, p.lastStartsAt)"
                 :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
                 :cancelled="p.cancelled"
                 :age="p.age"
                 :effects="p.hasEffects"
+                :warnings="p.hasWarnings"
               />
             </li>
           </ul>
