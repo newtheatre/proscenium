@@ -19,6 +19,8 @@ const props = defineProps<{
   units?: DurationUnit[]
   /** Fill the field's width, as in a grid of fields, instead of the usual fixed width. */
   block?: boolean
+  /** The number box's id, when the field's own id belongs to another control beside this one. */
+  id?: string
 }>()
 const model = defineModel<number | null | undefined>()
 
@@ -48,6 +50,8 @@ const ghost = computed(() => {
   const n = props.placeholder / unitSeconds(unit.value)
   return Number.isInteger(n) ? String(n) : undefined
 })
+// The unit has an id of its own: the field's id belongs to the number box, which its label names.
+const unitId = useId()
 const named = (part: string) => props.label ? `${props.label}: ${part}` : part
 
 // The count each unit allows inside the limits: from 60 to 86,400 seconds is 1 to 1,440 minutes.
@@ -76,6 +80,7 @@ function setUnit(value: DurationUnit) {
 <template>
   <UFieldGroup :class="block ? 'flex w-full' : undefined">
     <UInputNumber
+      :id="id"
       :model-value="count"
       :min="countMin"
       :max="countMax"
@@ -86,6 +91,7 @@ function setUnit(value: DurationUnit) {
       @update:model-value="setCount"
     />
     <USelect
+      :id="unitId"
       :model-value="unit"
       :items="items"
       value-key="value"
