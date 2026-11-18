@@ -59,7 +59,9 @@ const props = withDefaults(defineProps<{
   draftKey?: string
   /** Panel mode: whether the panel is open. */
   open?: boolean
-}>(), { description: undefined, open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
+  /** What the toast says once saved, such as "Production created". Default: "Saved". */
+  savedTitle?: string
+}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -179,7 +181,7 @@ async function onSubmit() {
     const result = await props.submit({ ...state }, version.value)
     saved.value = true
     discardDraft()
-    toast.add({ title: t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
+    toast.add({ title: props.savedTitle ?? t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
     emit('saved', result)
     if (panel.value) emit('update:open', false)
     else await (props.returnTo ? navigateTo(props.returnTo) : router.back())
