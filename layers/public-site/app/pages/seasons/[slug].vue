@@ -9,12 +9,14 @@ interface Production {
   summary: string | null
   category: { label: string } | null
   firstStartsAt: number | null
+  lastStartsAt: number | null
   lastEndsAt: number | null
   cancelled: boolean
   past: boolean
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
   age: string | null
   hasEffects: boolean
+  hasWarnings: boolean
 }
 interface Season {
   id: string
@@ -72,11 +74,12 @@ useHead(() => ({
               :title="p.title"
               :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
-              :when="p.firstStartsAt && p.lastEndsAt ? range(p.firstStartsAt, p.lastEndsAt) : t('public-site.season.dates-soon')"
+              :when="p.firstStartsAt && p.lastStartsAt ? range(p.firstStartsAt, p.lastStartsAt) : t('public-site.season.dates-soon')"
               :details="p.category?.label"
               :cancelled="p.cancelled"
               :age="p.age"
               :effects="p.hasEffects"
+              :warnings="p.hasWarnings"
             />
           </li>
         </ul>

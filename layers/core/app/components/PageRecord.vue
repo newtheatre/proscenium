@@ -4,7 +4,6 @@
      the owner's own tabs first, then tabs other modules add through `core.record-tab` (absent when
      the viewer may not open them or the module is off); and a history panel from the audit trail. -->
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
 export interface RecordTab { id: string, label: string }
@@ -72,7 +71,6 @@ const checks = computed(() => props.checklist ? checkList.value?.checks ?? [] : 
 const checksDone = computed(() => checks.value.filter(c => c.done).length)
 const hasAside = computed(() => !!slots.aside || checks.value.length > 0)
 const slots = useSlots()
-const phone = import.meta.client ? useMediaQuery('(max-width: 1023px)') : ref(false)
 
 const historyOpen = ref(false)
 const history = ref<{ at: number, who: string | null, kind: string, action: string, ability: string | null, detail: Record<string, unknown> }[] | null>(null)
@@ -105,6 +103,7 @@ const { te } = useT()
   <PageFrame
     :title="title"
     :trail="trail"
+    long-title
   >
     <template #status>
       <StatusBadge
@@ -133,6 +132,7 @@ const { te } = useT()
         color="neutral"
         variant="outline"
         :label="t('core.history.open')"
+        :ui="{ label: 'max-sm:sr-only' }"
         @click="historyOpen = true"
       />
       <RowActions
@@ -164,9 +164,10 @@ const { te } = useT()
         class="mb-4 lg:order-2"
         :aria-label="t('core.record.side-panel')"
       >
+        <!-- Both are drawn and CSS picks one, so the server and the browser draw the same markup. -->
         <UCollapsible
-          v-if="checks.length && phone"
-          class="mb-3"
+          v-if="checks.length"
+          class="mb-3 lg:hidden"
         >
           <UButton
             color="neutral"
@@ -182,20 +183,25 @@ const { te } = useT()
             />
           </template>
         </UCollapsible>
-        <template v-else>
+        <div :class="checks.length ? 'max-lg:hidden' : undefined">
           <slot name="aside" />
           <RecordChecks
             v-if="checks.length"
             :checks="checks"
             :title="checklistTitle ?? t('core.record.checklist')"
           />
-        </template>
+        </div>
       </aside>
       <div class="min-w-0 lg:order-1">
+        <!-- Page-level tabs look the same everywhere (a module's page in Admin, the settings window):
+             underlined, each label in full, scrolling sideways when they do not fit. -->
         <UTabs
           v-model="current"
           :items="items"
           :content="false"
+          variant="link"
+          :aria-label="t('core.record.tabs', { name: title })"
+          :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
           class="mb-4"
         />
         <div
