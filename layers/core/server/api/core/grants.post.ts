@@ -8,7 +8,8 @@ import { normaliseAddress } from '../../identity/accounts'
 import { findOrCreateAccount } from '../../identity/guests'
 import { createInvitation } from '../../identity/invitations'
 import { canSendEmail } from '../../notifications/send'
-import { createGrant } from '../../identity/roles'
+import { giveRole } from '../../identity/roles'
+import { roleNotice } from '../../identity/notices'
 import { scopeInput } from '../../identity/inputs'
 
 export default defineRoute({
@@ -26,14 +27,21 @@ export default defineRoute({
   }).strict().refine(i => !i.accountId !== !i.person, { message: 'give either accountId or person', path: ['accountId'] }),
 }, async (event, { input, unit, actor }) => {
   const { person, ...grant } = input
-  if (!person) return { id: await createGrant(unit, actor, { ...grant, accountId: input.accountId! }) }
+  if (!person) {
+    const given = await giveRole(unit, actor, { ...grant, accountId: input.accountId! })
+    await roleNotice(unit, input.accountId!, grant.roleId, { given: true, expiresAt: given.expiresAt })
+    return { id: given.id }
+  }
 
   const found = await findOrCreateAccount(unit, { address: person.address, name: person.name, origin: 'invite' })
   // A refusal here discards the unit, and with it the account just added to it.
   if (found.created) await requireAbility(actor, 'core.account.create')
   if (found.accountId === actor.accountId) refuse('core.grant.self', 'You cannot give yourself a role.', { status: 403, remedy: 'Ask someone else who can give roles.' })
-  const id = await createGrant(unit, actor, { ...grant, accountId: found.accountId }, { newAccount: found.created })
-  if (found.claimed) return { id, accountId: found.accountId, invited: false }
+  const { id, expiresAt } = await giveRole(unit, actor, { ...grant, accountId: found.accountId }, { newAccount: found.created })
+  if (found.claimed) {
+    await roleNotice(unit, found.accountId, grant.roleId, { given: true, expiresAt })
+    return { id, accountId: found.accountId, invited: false }
+  }
   const role = await first<{ name: string }>('SELECT name FROM core_roles WHERE id = ?', grant.roleId)
   const invitation = await createInvitation(unit, event, actor, { accountId: found.accountId, address: normaliseAddress(person.address), role: role!.name })
   if (await canSendEmail()) return { id, accountId: found.accountId, invited: true, emailed: true }
