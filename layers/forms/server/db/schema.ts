@@ -188,6 +188,12 @@ export const responses = defineTable('forms_responses', {
   updatedAt: col.updatedAt(),
   retentionDueAt: col.timestamp('retention_due_at'),
   anonymisedAt: col.timestamp('anonymised_at'),
+  // When the person was last reminded that it waits on them: an unfinished working copy left
+  // untouched, or a response returned for changes. A returned response counts as reminded only
+  // when this is later than the move that returned it, so each return earns one reminder.
+  remindedWaitingAt: col.timestamp('reminded_waiting_at'),
+  // When the person was reminded that the form closes soon. Once only.
+  remindedClosingAt: col.timestamp('reminded_closing_at'),
 }, {
   id: 'fres',
   realm: { column: 'realm' },
@@ -198,6 +204,7 @@ export const responses = defineTable('forms_responses', {
     index('forms_responses_form').on(t.formId, t.state, t.submittedAt),
     index('forms_responses_person').on(t.personId),
     index('forms_responses_retention').on(t.retentionDueAt),
+    index('forms_responses_waiting').on(t.state, t.stageKind),
     check('forms_responses_state', sql`${t.state} IN (${inList(RESPONSE_STATES)})`),
     check('forms_responses_stage', sql`${t.stageKind} IS NULL OR ${t.stageKind} IN (${inList(STAGE_KINDS)})`),
     check('forms_responses_realm', sql`${t.realm} IN (${inList(RESPONSE_REALMS)})`),
@@ -321,6 +328,8 @@ export const reviewAssignments = defineTable('forms_review_assignments', {
   comment: col.freeText(text('comment'), { erase: 'clear' }),
   submittedAt: col.timestamp('submitted_at'),
   createdAt: col.createdAt(),
+  // When the reviewer was reminded that their review is still owed. Once a round.
+  remindedAt: col.timestamp('reminded_at'),
 }, {
   id: 'fasg',
   realm: 'operational',

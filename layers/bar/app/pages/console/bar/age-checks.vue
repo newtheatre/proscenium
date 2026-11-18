@@ -3,9 +3,9 @@
      who signs the register may erase a description of a person refused. -->
 <script setup lang="ts">
 type Outcome = 'not_needed' | 'id_checked' | 'self_attested' | 'refused'
-interface Row { id: string, at: number, outlet: string, outcome: Outcome, reason: string | null, product: string | null, by: string, sale: string | null, description: string | null }
+interface Row { id: string, at: number, outlet: string, outcome: Outcome, reason: string | null, product: string | null, scope: 'restricted' | 'all' | null, idType: string | null, by: string, sale: string | null, description: string | null }
 interface Review { id: string, outlet: string | null, fromDay: string, toDay: string, refusals: number, by: string, at: number }
-interface Register { rows: Row[], reviews: Review[], outlets: { id: string, name: string }[], canReview: boolean, describing: boolean }
+interface Register { rows: Row[], reviews: Review[], outlets: { id: string, name: string }[], canReview: boolean, describing: boolean, ages: { minimum: number, challenge: number } }
 
 const { t } = useT()
 const route = useRoute()
@@ -41,6 +41,7 @@ const query = computed(() => ({
 const { data, status, error, refresh } = await useAPI<Register>('/api/bar/age-checks', { key: 'bar:age-checks', query })
 
 const outcomes: Outcome[] = ['refused', 'id_checked', 'not_needed', 'self_attested']
+const idTypeLabel = (id: string) => t(`bar.desk.id-types.${id}`)
 const outcomeLabel = (o: Outcome) => t(`bar.screens.age-checks.outcome.${o}`)
 const outletItems = computed(() => [{ value: ALL, label: t('bar.screens.age-checks.every-outlet') }, ...(data.value?.outlets ?? []).map(o => ({ value: o.id, label: o.name }))])
 const outcomeItems = computed(() => [{ value: ALL, label: t('bar.screens.age-checks.every-outcome') }, ...outcomes.map(o => ({ value: o, label: outcomeLabel(o) }))])
@@ -49,6 +50,7 @@ const columns = computed(() => [
   { id: 'at', header: t('bar.screens.age-checks.when') },
   { accessorKey: 'outlet', header: t('bar.screens.age-checks.outlet') },
   { id: 'outcome', header: t('bar.screens.age-checks.outcome-heading') },
+  { id: 'idType', header: t('bar.screens.age-checks.id-type') },
   { id: 'reason', header: t('bar.screens.age-checks.reason') },
   { id: 'product', header: t('bar.screens.age-checks.product') },
   { accessorKey: 'by', header: t('bar.screens.age-checks.by') },
@@ -125,6 +127,12 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
         @click="startSigning()"
       />
     </template>
+    <p
+      v-if="data"
+      class="mb-4 text-sm text-muted"
+    >
+      {{ t('bar.screens.age-checks.ages', { minimum: data.ages.minimum, challenge: data.ages.challenge }) }}
+    </p>
     <div class="mb-6 grid gap-4 sm:grid-cols-3">
       <UFormField :label="t('bar.screens.age-checks.days-filter')">
         <FieldDateRange v-model="range" />
@@ -180,15 +188,33 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
             </template>
             <template #outcome-cell="{ row }">
               <StatusBadge
-                :tone="row.original.outcome === 'refused' ? 'warning' : 'neutral'"
+                v-if="row.original.outcome === 'refused'"
+                tone="warning"
                 :label="outcomeLabel(row.original.outcome)"
               />
+              <UBadge
+                v-else
+                :color="row.original.outcome === 'id_checked' ? 'success' : 'neutral'"
+                icon="i-lucide-circle-check"
+                :label="outcomeLabel(row.original.outcome)"
+              />
+            </template>
+            <template #idType-cell="{ row }">
+              {{ row.original.idType ? idTypeLabel(row.original.idType) : '' }}
             </template>
             <template #reason-cell="{ row }">
               {{ row.original.reason ?? '' }}
             </template>
             <template #product-cell="{ row }">
-              {{ row.original.product ?? '' }}
+              <template v-if="row.original.scope === 'all'">
+                {{ t('bar.screens.age-checks.whole-sale') }}<span
+                  v-if="row.original.product"
+                  class="text-muted"
+                > · {{ row.original.product }}</span>
+              </template>
+              <template v-else>
+                {{ row.original.product ?? '' }}
+              </template>
             </template>
             <template #sale-cell="{ row }">
               {{ row.original.sale ?? t('bar.screens.age-checks.no-sale') }}

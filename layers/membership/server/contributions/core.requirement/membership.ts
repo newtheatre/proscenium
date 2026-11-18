@@ -102,12 +102,13 @@ export default defineRequirementSource({
   },
 
   async describe(refs) {
-    const out: Record<string, { label: string, presentable?: { label: string, shape: string } }> = {}
+    const out: Record<string, { label: string, presentable?: { label: string, field?: string, shape: string } }> = {}
     const presentableOf = async (scheme: Scheme) => {
       const list = await schemeList(scheme)
+      // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a sentence.
       return list?.keyKind === 'reference'
-        ? { label: `${scheme.name}? Enter your ${list.referenceLabel ?? 'reference'}`, shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
-        : { label: `${scheme.name}? Enter your member number`, shape: 'member-number' }
+        ? { label: `${scheme.name}: type your reference to get this price`, field: list.referenceLabel ?? 'Membership reference', shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
+        : { label: `${scheme.name}: type your member number to get this price`, field: 'Member number', shape: 'member-number' }
     }
     for (const ref of refs) {
       const id = schemeIdOf(ref)
@@ -117,7 +118,7 @@ export default defineRequirementSource({
         const taking = (await listSchemes(['open', 'closed'])).filter(s => s.acceptsReference)
         out[ref] = taking.length === 1
           ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
-          : taking.length ? { label: 'Members', presentable: { label: 'A member? Enter your membership reference', shape: 'reference' } } : { label: 'Members' }
+          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference to get this price', field: 'Membership reference', shape: 'reference' } } : { label: 'Members' }
         continue
       }
       const scheme = await getScheme(id)
@@ -185,7 +186,7 @@ export default defineRequirementSource({
             if (number === null && !shaped) {
               // V15: not well formed, so say what one looks like.
               const sample = lists[0]?.list
-              const reason = sample ? shapeText(sample.referenceLabel ?? 'reference', sample.referenceShape) : 'That is not a member number. It is the number on your membership card, such as M-412.'
+              const reason = sample ? shapeText(sample.referenceShape) : 'That is not a member number. It is the number on your membership card, such as M-412.'
               out.push({ account, ref: fullRef, verdict: 'not-met', reason, summary: 'Not a well-formed reference.' })
               continue
             }
@@ -203,8 +204,8 @@ export default defineRequirementSource({
           const reason = !list || typedValue === null
             ? 'We could not find a current membership for that number. Have a membership? Contact us.'
             : lists.some(l => wellFormed(l.list.referenceShape, typedValue))
-              ? `We could not find a membership for that ${list.referenceLabel ?? 'reference'}. Have a membership? Contact us.`
-              : shapeText(list.referenceLabel ?? 'reference', list.referenceShape)
+              ? 'We could not find a current membership with that reference. Have a membership? Contact us.'
+              : shapeText(list.referenceShape)
           out.push({ account, ref: fullRef, verdict: 'not-met', reason, help, summary: 'No current membership found for the reference given.' })
           continue
         }
