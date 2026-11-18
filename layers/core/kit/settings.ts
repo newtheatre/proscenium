@@ -18,6 +18,8 @@ interface Common {
   since?: string
   /** What the screen asks before saving: a written reason, or a second confirmation. */
   onChange?: 'reason' | 'confirm'
+  /** Another module this setting only applies while it is on, such as 'membership-fees'; the settings screens leave it out while that module is off. */
+  whenModule?: string
   /**
    * The address of a bespoke screen that manages this one setting, where only part of its group is
    * bespoke. Where it is shown is otherwise declared per group, in the manifest's settingGroups.
@@ -133,6 +135,7 @@ export function defineSettingRules(module: string, rules: SettingRule[]): { modu
 function checkEntry(key: string, entry: SettingEntry) {
   const f = (name: string) => `settings.${key}.${name}`
   if (!entry || !KINDS.includes(entry.kind as SettingKind)) throw new DeclarationError(f('kind'), 'declare a setting with setting.<kind>({...})')
+  if (entry.whenModule !== undefined && !KEBAB.test(entry.whenModule)) throw new DeclarationError(f('whenModule'), 'name the module the setting applies with as its kebab-case id')
   if (typeof entry.change !== 'string' || !entry.change) throw new DeclarationError(f('change'), 'every setting names the ability needed to change it')
   const audience = entry.audience ?? 'staff'
   if (!['public', 'signed-in', 'staff'].includes(audience)) throw new DeclarationError(f('audience'), "is 'public', 'signed-in' or 'staff'")

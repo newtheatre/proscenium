@@ -18,12 +18,14 @@ const input = z.object({
 export default defineRoute({ ability: 'forms.form.create', rateLimit: 'write', idempotent: true, input }, async (_event, { input, actor, unit }) => {
   const from = input.definition === undefined && input.template ? await startFrom(input.template) : null
   const definition = from ? from.definition : input.definition === undefined ? blankDefinition() : await parseOrRefuse(input.definition)
+  // A template made for custom fields makes a set of fields, and one made for sending a form to send.
+  const mode = from?.mode ?? input.mode
   const id = newId('frm')
   const slug = await freeSlug(input.title)
   const at = nowMs()
   unit.add({
     sql: 'INSERT OR IGNORE INTO forms_forms (id, slug, title, mode, status, anonymous, retention_days, template_key, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    params: [id, slug, input.title, input.mode, 'draft', from?.anonymous ? 1 : 0, input.mode === 'record' ? null : from?.retentionDays ?? null, from ? input.template! : null, actor.accountId, at],
+    params: [id, slug, input.title, mode, 'draft', from?.anonymous ? 1 : 0, mode === 'record' ? null : from?.retentionDays ?? null, from ? input.template! : null, actor.accountId, at],
   }).expect(1, { code: 'forms.form.slug-taken', reason: 'Another form was given this address at the same moment.', remedy: 'Try again.' })
   unit.add({
     sql: 'INSERT INTO forms_drafts (form_id, definition, format, edit_revision, edited_by, updated_at) VALUES (?, ?, ?, 0, ?, ?)',

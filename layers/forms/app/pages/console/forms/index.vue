@@ -1,7 +1,7 @@
-<!-- Forms (FB-201, FB-208): the forms this person may build, and New form: blank, from a template, or
-     from an exported file. -->
+<!-- Forms (FB-201, FB-208): the forms this person may build, and New form: blank, from a template
+     (forms', another module's or the theatre's own), or from an exported file. -->
 <script setup lang="ts">
-interface Template { key: string, name: string, description: string | null, own: boolean, anonymous: boolean, questions: number }
+interface Template { key: string, name: string, description: string | null, own: boolean, anonymous: boolean, questions: number, mode: 'submission' | 'record' | null }
 interface FormRow { id: string, slug: string, title: string, status: 'draft' | 'live' | 'paused' | 'closed' | 'archived', published: boolean, mode: 'submission' | 'record', responses: number | null }
 
 const { t } = useT()
@@ -28,7 +28,7 @@ const chosenHelp = computed(() => {
   const tpl = chosen.value
   if (!tpl) return t('forms.screens.templates.blank-help')
   const about = tpl.own ? tpl.description : t(tpl.description ?? '')
-  return [about, t('forms.screens.templates.questions', { count: tpl.questions }), tpl.anonymous ? t('forms.screens.templates.anonymous') : ''].filter(Boolean).join(' ')
+  return [about, t('forms.screens.templates.questions', { count: tpl.questions }), tpl.anonymous ? t('forms.screens.templates.anonymous') : '', tpl.mode === 'record' ? t('forms.screens.templates.record') : ''].filter(Boolean).join(' ')
 })
 async function loadTemplates() {
   try {
