@@ -73,7 +73,7 @@ describe('joining against a list', () => {
     const { id } = await listScheme()
     const student = person([])
     expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.code).toBe('membership.join.needs-reference')
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'Your University of Nottingham student ID is 8 digits.' })
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'That reference should be 8 digits.' })
     expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20000000' }, student)).body.code).toBe('membership.join.not-on-list')
     const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, student)
     expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ startsOn: '2026-11-17', endsOn: '2027-07-31', opensMembersArea: true })
@@ -104,7 +104,7 @@ describe('the member price by student ID', () => {
     const [unclaimed] = await typed('20123456')
     expect(unclaimed).toMatchObject({ verdict: 'met', evidence: entry!.id })
     expect(unclaimed).not.toHaveProperty('holderAccountId')
-    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'Your University of Nottingham student ID is 8 digits.' })
+    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'That reference should be 8 digits.' })
     expect((await typed('20000000'))[0]!.verdict).toBe('not-met')
 
     const student = person([])
@@ -114,7 +114,7 @@ describe('the member price by student ID', () => {
     expect((await inContext(() => requirements.check({ accounts: [null], refs: [ref], presented: [{ ref, evidence: entry!.id }], whenUnavailable: 'not-met' }), buyer))[0]!.verdict).toBe('met')
 
     const described = await inContext(() => requirements.describe([ref]), buyer)
-    expect(described[ref]!.presentable!.label).toBe(`${described[ref]!.label}? Enter your University of Nottingham student ID`)
+    expect(described[ref]!.presentable).toMatchObject({ label: `${described[ref]!.label}: type your reference to get this price`, field: 'University of Nottingham student ID' })
 
     const door = person(['membership.verification-list.check'])
     expect(await inContext(() => requirements.holder(ref, entry!.id), door)).toBe('Ada Lovelace')

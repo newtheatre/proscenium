@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string } }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -287,7 +287,7 @@ function clear() {
                   v-for="n in quantities[keyOf(row)]"
                   :key="n"
                   :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                  :aria-label="t('box-office.screens.panel.reference', { label: row.reference.label, n })"
+                  :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
                   :placeholder="t('box-office.screens.panel.reference-placeholder', { n })"
                   :disabled="locked"
                   autocomplete="off"

@@ -379,7 +379,7 @@ export interface DeskPerformance {
   state: string
   currency: string | null
   /** `reference`, on a member price: what the buyer may give instead of the seller checking by hand, worded by its source. */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string } }[]
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }[]
 }
 
 /**
