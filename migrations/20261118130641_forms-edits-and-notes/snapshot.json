@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "947f1380-9dfc-4353-afbc-06c4453789ef",
+  "id": "10bb091a-1a23-4286-8639-a751e2254cde",
   "prevIds": [
-    "52e866ed-737a-482d-87f2-d7944ab83e12"
+    "4de5caeb-cc87-46bb-9851-f9adfde926d3"
   ],
   "ddl": [
     {
@@ -10304,6 +10304,16 @@
       "table": "core_productions",
       "name": "capacity",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "usual_space_id",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -24310,6 +24320,21 @@
         "season_id"
       ],
       "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_usual_space_id_core_spaces_id_fk",
+      "columns": [
+        "usual_space_id"
+      ],
+      "tableTo": "core_spaces",
       "columnsTo": [
         "id"
       ],
