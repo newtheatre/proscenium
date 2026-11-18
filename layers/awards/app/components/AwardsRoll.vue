@@ -1,5 +1,5 @@
 <!-- The roll of honour, for the public page and a theatre's own pages: ::awards-roll in a content
-     file. Everybody holding a listed award, by award type; `type` takes one type's short code and
+     file. Everybody holding a listed award, by award type; `type` takes one type's web address and
      then shows that type alone, with no heading. The roll being off, or the module, shows nothing. -->
 <script setup lang="ts">
 interface Entry { id: string, name: string, awardedOn: string, awardedFor: string | null, citation: string | null, production: { title: string, slug: string } | null }
@@ -45,6 +45,7 @@ const year = (date: string) => date.slice(0, 4) // not-policy: the year of a dat
         >
           <p>
             <span class="font-medium">{{ a.name }}</span>
+            <span class="sr-only">, </span>
             <span class="ms-2 text-sm text-muted">{{ year(a.awardedOn) }}</span>
           </p>
           <p

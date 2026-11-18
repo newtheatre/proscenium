@@ -10,6 +10,7 @@ import addRun from '../../server/api/core/productions/[id]/performances/run.post
 import getRun from '../../server/api/core/productions/[id]/runs/[run]/index.get'
 import finishRun from '../../server/api/core/productions/[id]/runs/[run]/finish.post'
 import removeRun from '../../server/api/core/productions/[id]/runs/[run]/remove.post'
+import undoRun from '../../server/api/core/productions/[id]/performances/undo.post'
 import schedule from '../../server/api/core/performances/[id]/schedule.post'
 import createVenue from '../../server/api/core/venues/index.post'
 import createClosure from '../../server/api/core/closures/index.post'
@@ -25,6 +26,7 @@ const handle = server({
   'GET /api/core/productions/:id/performances': listPerformances,
   'POST /api/core/productions/:id/performances/plan': plan,
   'POST /api/core/productions/:id/performances/run': addRun,
+  'POST /api/core/productions/:id/performances/undo': undoRun,
   'GET /api/core/productions/:id/runs/:run': getRun,
   'POST /api/core/productions/:id/runs/:run/finish': finishRun,
   'POST /api/core/productions/:id/runs/:run/remove': removeRun,
@@ -110,7 +112,7 @@ describe('a run of performances', () => {
     expect(list).toHaveLength(200)
     const { status, body } = await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, performances: list })
     expect(status, JSON.stringify(body)).toBe(200)
-    expect(body).toEqual({ created: 200 })
+    expect(body).toEqual({ created: 200, ids: expect.any(Array) })
     expect(await count(s.productionId, 'scheduled')).toBe(200)
     expect(await rows("SELECT id FROM core_events WHERE name = 'core.performance.scheduled' AND payload LIKE ?", `%${s.productionId}%`)).toHaveLength(200)
 
@@ -126,9 +128,36 @@ describe('a run of performances', () => {
   it('can be added as drafts, which need no free space', async () => {
     const s = await stage()
     const list = keep(await planned(s, { from: '2028-09-01', to: '2028-09-03' }))
-    expect((await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, scheduled: false, performances: list }, scheduler)).body).toEqual({ created: 3 })
+    expect((await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, scheduled: false, performances: list }, scheduler)).body).toMatchObject({ created: 3 })
     expect(await count(s.productionId, 'draft')).toBe(3)
     expect(await rows("SELECT id FROM core_events WHERE name = 'core.performance.scheduled' AND payload LIKE ?", `%${s.productionId}%`)).toEqual([])
+  })
+
+  it('planned again marks the dates the production already has as on the list', async () => {
+    const s = await stage()
+    const list = keep(await planned(s, { from: '2028-11-01', to: '2028-11-03' }))
+    await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, scheduled: false, performances: list.slice(0, 1) })
+    await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, performances: list.slice(1) })
+    const again = await planned(s, { from: '2028-11-01', to: '2028-11-03' })
+    expect(again.map(p => p.problem)).toEqual(['exists', 'exists', 'exists'])
+    expect(again[0]!.reason).toBe('Already on the list.')
+  })
+
+  it('just added can be undone, drafts and scheduled alike', async () => {
+    const s = await stage()
+    const list = keep(await planned(s, { from: '2028-12-01', to: '2028-12-03' }))
+    const added = await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, performances: list })
+    expect(added.body.ids).toHaveLength(3)
+    const undone = await req('POST', `/api/core/productions/${s.productionId}/performances/undo`, { ids: added.body.ids })
+    expect(undone.status, JSON.stringify(undone.body)).toBe(200)
+    expect(undone.body).toEqual({ removed: 3 })
+    expect(await count(s.productionId)).toBe(0)
+    expect(await rows("SELECT id FROM core_events WHERE name = 'core.performance.cancelled' AND payload LIKE ?", `%${s.productionId}%`)).toHaveLength(3)
+    // Another production's performance is not this one's to undo.
+    const other = await stage()
+    const theirs = await req('POST', `/api/core/productions/${other.productionId}/performances/run`, { venueId: other.venueId, spaceId: other.spaceId, scheduled: false, performances: list })
+    expect((await req('POST', `/api/core/productions/${s.productionId}/performances/undo`, { ids: theirs.body.ids })).body.code).toBe('core.run.undo-too-late')
+    expect(await count(other.productionId)).toBe(3)
   })
 
   it('over the limit is made by the job in chunks, and a chunk made twice makes nothing twice', async () => {

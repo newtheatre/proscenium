@@ -6,7 +6,7 @@ import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { getPerformance } from '#modules/core'
 import { availability } from '../../../../../availability'
-import { appliesTo, discountOf, judgeCode } from '../../../../../promo-codes'
+import { appliesTo, discountOf, judgeCode, keptOff } from '../../../../../promo-codes'
 
 export default defineRoute({
   public: true,
@@ -17,8 +17,9 @@ export default defineRoute({
   const code = await judgeCode(input.code, performanceId)
   const performance = await getPerformance(performanceId)
   const found = await availability(performanceId)
+  const kept = await keptOff(code)
   const prices = found.bands.flatMap(b => b.prices
-    .filter(p => p.amountMinor > 0 && appliesTo(code, { productionId: performance.productionId, performanceId, ticketTypeId: p.ticketTypeId, bandId: b.bandId }))
+    .filter(p => p.amountMinor > 0 && appliesTo(code, { productionId: performance.productionId, performanceId, ticketTypeId: p.ticketTypeId, bandId: b.bandId }, kept))
     .map(p => ({ bandId: b.bandId, ticketTypeId: p.ticketTypeId, amountMinor: p.amountMinor - discountOf(code, p.amountMinor) })))
   return { code: code.code, effect: code.effect, value: code.value, maxPerOrder: code.maxPerOrder, prices }
 })

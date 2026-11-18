@@ -12,6 +12,7 @@ import confirmRoute from '../../server/api/payments/refunds/[id]/confirm.post'
 import approveRoute from '../../server/api/payments/refunds/[id]/approve.post'
 import listRoute from '../../server/api/payments/refunds.get'
 import reasonsRoute from '../../server/api/payments/refunds/decline-reasons.get'
+import handBackRoute from '../../server/api/payments/refunds/hand-back.get'
 import attentionRoute from '../../server/api/payments/attention.get'
 import attentionCount from '../../server/contributions/core.count/attention'
 import waitingCount from '../../server/contributions/core.count/refunds-waiting'
@@ -27,6 +28,7 @@ const handle = server({
   'POST /api/payments/refunds/:id/approve': approveRoute,
   'GET /api/payments/refunds': listRoute,
   'GET /api/payments/refunds/decline-reasons': reasonsRoute,
+  'GET /api/payments/refunds/hand-back': handBackRoute,
   'GET /api/payments/attention': attentionRoute,
 })
 
@@ -232,8 +234,15 @@ describe('cash handed back', () => {
     const sessionId = await commit(unit => openSession(unit.view(), { accountId: seller.accountId!, pointLabel: 'Desk', floatMinor: 1000 }))
     const paid = await paidInCash(1200, undefined, sessionId)
     const asked = await commit(unit => requestRefund(unit.view(), { partId: paid.ticketsPart, amountMinor: 1200, requestedBy: 'acc_n' }))
+    const toHandBack = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/payments/refunds/hand-back', { actor })).json() as { refunds: { id: string }[] }).refunds.map(r => r.id)
+    // Waiting for approval, it is not yet the seller's to hand back.
+    expect(await toHandBack(seller)).not.toContain(asked.refundId)
     await commit(unit => approveRefund(unit.view(), asked.refundId, 'acc_o'))
+    // Approved, it shows at the till for anyone who takes payments, and for no one else.
+    expect(await toHandBack(seller)).toContain(asked.refundId)
+    expect(await toHandBack(person([]))).toEqual([])
     expect((await call(handle, 'POST', `/api/payments/refunds/${asked.refundId}/confirm`, { actor: seller, body: {} })).status).toBe(200)
+    expect(await toHandBack(seller)).not.toContain(asked.refundId)
     expect(await entriesOf(`payments:refund:${asked.refundId}`)).toEqual([{ system_key: 'payments.cash', amount_minor: -1200 }, { system_key: 'tickets.income', amount_minor: 1200 }])
     expect(await inContext(async () => expectedCash((await getSession(sessionId))!))).toBe(1000)
   })

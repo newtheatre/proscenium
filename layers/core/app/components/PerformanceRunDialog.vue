@@ -4,10 +4,11 @@
 // preset fills the start times in: the space's usual one, else the theatre's. The show's defaults sit
 // behind one line, as on Add performance. Every performance the run would make is listed before
 // anything is saved: those that are past, clash or fall in a closure are left out, and any other can
-// be unticked. A long run is made by a job; the production's performances section follows it.
+// be unticked. A long run is made by a job; the production's performances section follows it. The
+// dates start from the day after the production's last performance, else its season.
 import { noOverrides, overrideErrors, rowSlots, slotRows, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides, type SlotRow } from '../utils/show-defaults'
 
-interface Planned { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: 'past' | 'clash' | 'closed' | null, reason: string | null }
+interface Planned { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: 'past' | 'exists' | 'clash' | 'closed' | null, reason: string | null }
 interface Space { value: string, label: string, venueId: string, runPresetId: string | null }
 interface Preset { id: string, name: string, slots: RunSlot[] }
 
@@ -18,9 +19,11 @@ const props = defineProps<{
   presets: Preset[]
   defaults: { usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
   defaultsIn: (spaceId: string) => ShowDefaultValues
+  /** The first and last date a new run starts from, as "2027-09-01", or null for none. */
+  suggested?: { start: string, end: string } | null
 }>()
 const open = defineModel<boolean>('open', { required: true })
-const emit = defineEmits<{ 'added': [answer: { created: number } | { run: { id: string, total: number } }], 'presets-changed': [] }>()
+const emit = defineEmits<{ 'added': [answer: { created: number, ids: string[] } | { run: { id: string, total: number } }], 'presets-changed': [] }>()
 
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
@@ -36,6 +39,18 @@ const busy = ref(false)
 const kept = computed(() => (planned.value ?? []).filter(p => !p.problem && p.keep))
 const marked = computed(() => (planned.value ?? []).filter(p => p.problem).length)
 const unticked = computed(() => (planned.value ?? []).filter(p => !p.problem && !p.keep).length)
+/** What the list adds, in a sentence; when it adds nothing, why. */
+const tally = computed(() => {
+  const list = planned.value ?? []
+  if (!list.length) return 'The pattern makes no performances on those dates. Change the pattern.'
+  if (list.every(p => p.problem === 'exists')) return t('core.counts.all-exist', { count: list.length })
+  if (list.every(p => p.problem)) return 'None of these can be added. Change the pattern to try other dates.'
+  const left = marked.value + unticked.value
+  const added = left ? `${kept.value.length} to add, ${left} left out.` : `${kept.value.length} to add.`
+  return kept.value.length ? `${added} Untick any you don't want.` : `${added} Tick the ones to add.`
+})
+/** Whether anything in the list could be added, ticked or not. */
+const addable = computed(() => (planned.value ?? []).some(p => !p.problem))
 const presetItems = computed(() => [{ value: NONE, label: 'No preset' }, ...props.presets.map(p => ({ value: p.id, label: p.name }))])
 const space = () => props.spaces.find(s => s.value === form.value.spaceId)
 const shown = computed(() => form.value.spaceId ? props.defaultsIn(form.value.spaceId) : null)
@@ -58,6 +73,7 @@ watch(open, (v) => {
   refusal.value = null
   planned.value = null
   overrides.value = noOverrides()
+  if (!form.value.dates.start && props.suggested) form.value.dates = { ...props.suggested }
   form.value.spaceId ||= props.spaces[0]?.value ?? ''
   form.value.scheduled = props.defaults.scheduleRuns
   usePreset(usualFor(form.value.spaceId))
@@ -104,7 +120,7 @@ async function add() {
   refusal.value = null
   busy.value = true
   try {
-    const answer = await $api<{ created: number } | { run: { id: string, total: number } }>(`/api/core/productions/${props.productionId}/performances/run` as string, {
+    const answer = await $api<{ created: number, ids: string[] } | { run: { id: string, total: number } }>(`/api/core/productions/${props.productionId}/performances/run` as string, {
       method: 'POST',
       body: {
         venueId: s.venueId,
@@ -118,6 +134,8 @@ async function add() {
       },
     })
     open.value = false
+    // The next run starts from after this one.
+    form.value.dates = { start: '', end: '' }
     emit('added', answer)
   }
   catch (e) {
@@ -161,7 +179,7 @@ async function savePreset() {
   <UModal
     v-model:open="open"
     title="Add a run"
-    description="Every performance the run would make is listed first. Any that are past, clash or fall in a closure are left out."
+    description="Every performance the run would make is listed first. Any that are past, already on the list, clash or fall in a closure are left out."
     :ui="{ content: 'sm:max-w-2xl' }"
   >
     <template #body>
@@ -232,9 +250,7 @@ async function savePreset() {
           class="space-y-2"
         >
           <p class="text-sm">
-            {{ kept.length }} to add<template v-if="marked + unticked">
-              , {{ marked + unticked }} left out
-            </template>. Untick any you don't want.
+            {{ tally }}
           </p>
           <div class="max-h-96 overflow-y-auto">
             <RecordList label="The performances this would add">
@@ -288,11 +304,12 @@ async function savePreset() {
         >
           <UButton
             label="Change the pattern"
-            color="neutral"
-            variant="outline"
+            :color="addable ? 'neutral' : undefined"
+            :variant="addable ? 'outline' : 'solid'"
             @click="planned = null"
           />
           <UButton
+            v-if="addable"
             type="submit"
             form="performance-run"
             :label="t('core.counts.add-performances', { count: kept.length })"

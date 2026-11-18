@@ -73,7 +73,8 @@ test.describe('as an administrator', () => {
     await page.getByRole('button', { name: 'Add entry' }).click()
     await expect(page.getByRole('dialog').getByLabel('Email address')).toBeVisible()
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Load a file' }).click()
-    await expect(page.getByRole('dialog').getByText('Choose a CSV file')).toBeVisible()
+    // The browser tests' site has no list key, so loading waits for one and the page says where to save it.
+    await expect(page.getByText('Lists cannot be used yet')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Load a file' })).toBeDisabled()
   })
 })

@@ -1,7 +1,8 @@
 <!-- One incident (Front of house specification, part 5, "Incident"): what happened, the people
      involved (welfare details behind Show), follow-up actions and the log. The primary action is
-     Close; a reviewer can also change the severity or category, add a person or an action, and
-     reopen a closed incident. Opening the page is audited. -->
+     Close, which says up front when an action is still open; the severity and category are changed
+     where they are shown, and a reviewer can add a person or an action, and reopen a closed
+     incident. Opening the page is audited. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -110,7 +111,7 @@ async function submit() {
   if (which === 'reopen') ok = await act('/reopen', { reason: reopenForm.value.reason.trim() }, t('front-of-house.incident.reopened'))
   if (which === 'review') {
     const f = reviewForm.value
-    ok = await act('/review', { severity: f.severity, categoryId: f.categoryId || null, comment: f.comment.trim() || null }, t('front-of-house.incident.reviewed'))
+    ok = await act('/review', { comment: f.comment.trim() || null }, t('front-of-house.incident.reviewed'))
   }
   if (which === 'person') {
     const f = personForm.value
@@ -151,7 +152,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   const d = data.value
   if (!d || d.state === 'closed') return []
   return [[
-    { label: t('front-of-house.incident.change-severity'), icon: 'i-lucide-gauge', onSelect: () => open('review') },
+    { label: t('front-of-house.incident.add-comment'), icon: 'i-lucide-message-square-plus', onSelect: () => open('review') },
     { label: t('front-of-house.incident.add-person'), icon: 'i-lucide-user-plus', onSelect: () => open('person') },
     { label: t('front-of-house.incident.add-action'), icon: 'i-lucide-list-plus', onSelect: () => open('action') },
   ]]
@@ -176,6 +177,14 @@ const logLine = (u: Update) => {
 }
 const timeline = computed(() => (data.value?.updates ?? []).map(u => ({ value: u.id, title: logLine(u), description: `${nameOf(u.authorId)} · ${dateTime(u.at)}`, icon: u.kind === 'comment' ? 'i-lucide-message-square' : 'i-lucide-history' })))
 const trail = computed(() => [{ label: t('front-of-house.navigation.incidents.label'), to: '/console/front-of-house/incidents' }])
+// Changed in place (IN-3): each saves on its own, and the log records it.
+async function setSeverity(severity: Severity) {
+  if (severity !== data.value?.severity) await act('/review', { severity }, t('front-of-house.incident.reviewed'))
+}
+async function setCategory(categoryId: string) {
+  if ((categoryId || null) !== data.value?.categoryId) await act('/review', { categoryId: categoryId || null }, t('front-of-house.incident.reviewed'))
+}
+const openActions = computed(() => (data.value?.actions ?? []).filter(a => a.state === 'open').length)
 const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dialog.${dialog.value}`) : '')
 </script>
 
@@ -202,6 +211,27 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
         <template #tab-incident>
           <div class="space-y-6">
             <RefusalNotice :refusal="refusal" />
+            <div
+              v-if="d.state !== 'closed'"
+              class="grid gap-4 sm:grid-cols-2"
+            >
+              <UFormField :label="t('front-of-house.incidents.column.severity')">
+                <USelect
+                  :model-value="d.severity"
+                  :items="severities"
+                  value-key="value"
+                  @update:model-value="v => setSeverity(v as Severity)"
+                />
+              </UFormField>
+              <UFormField :label="t('front-of-house.incident.category')">
+                <USelectMenu
+                  :model-value="d.categoryId ?? ''"
+                  :items="categoryItems"
+                  value-key="value"
+                  @update:model-value="v => setCategory(String(v ?? ''))"
+                />
+              </UFormField>
+            </div>
             <PageSection :title="t('front-of-house.incident.what-happened')">
               <div class="space-y-3">
                 <p class="whitespace-pre-line">
@@ -361,6 +391,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
             id="front-of-house-incident-dialog"
             class="space-y-4"
             :state="{ closeForm, reviewForm, reopenForm, personForm, actionForm }"
+            :validate="() => needs({ comment: dialog === 'review' ? reviewForm.comment : true })"
             novalidate
             @submit="submit"
           >
@@ -372,6 +403,14 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
               {{ t('front-of-house.incident.standing-line') }}
             </p>
             <template v-if="dialog === 'close'">
+              <UAlert
+                v-if="openActions"
+                color="warning"
+                variant="subtle"
+                icon="i-lucide-list-todo"
+                :title="t('front-of-house.incident.actions-still-open', { count: openActions })"
+                :description="t('front-of-house.incident.actions-still-open-help')"
+              />
               <UFormField
                 :label="t('front-of-house.incident.closing-note-label')"
                 required
@@ -396,21 +435,11 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
               </UFormField>
             </template>
             <template v-if="dialog === 'review'">
-              <UFormField :label="t('front-of-house.incidents.column.severity')">
-                <USelect
-                  v-model="reviewForm.severity"
-                  :items="severities"
-                  value-key="value"
-                />
-              </UFormField>
-              <UFormField :label="t('front-of-house.incident.category')">
-                <USelectMenu
-                  v-model="reviewForm.categoryId"
-                  :items="categoryItems"
-                  value-key="value"
-                />
-              </UFormField>
-              <UFormField :label="t('front-of-house.incident.comment')">
+              <UFormField
+                name="comment"
+                :label="t('front-of-house.incident.comment')"
+                required
+              >
                 <UTextarea
                   v-model="reviewForm.comment"
                   :rows="3"
@@ -473,6 +502,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
           <UButton
             type="submit"
             form="front-of-house-incident-dialog"
+            :disabled="dialog === 'close' && openActions > 0"
             :label="dialogTitle"
           />
         </template>
