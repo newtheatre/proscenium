@@ -192,7 +192,7 @@ async function letGoOtherBaskets(unit: UnitView, account: string, performanceId:
   const others = await all<{ id: string }>(
     `SELECT DISTINCT o.id FROM box_office_orders o JOIN box_office_order_lines l ON l.order_id = o.id
       WHERE o.state = 'basket' AND o.expires_at > ?1 AND l.performance_id = ?2 AND l.state = 'live'
-        AND l.ticket_type_id IN (SELECT value FROM json_each(?3)) AND l.requirement_account_id IN (${accountScopeSql('?4')})`,
+        AND l.ticket_type_id IN (SELECT value FROM json_each(?3)) AND l.requirement_account_id IN (${accountScopeSql('?4')})`, // not-policy: ?3 and ?4 are SQL parameter numbers
     at, performanceId, JSON.stringify([...new Set(typeIds)]), account)
   for (const other of others) {
     unit.add({ sql: "UPDATE box_office_orders SET state = 'expired', updated_at = ? WHERE id = ? AND state = 'basket'", params: [at, other.id] })
