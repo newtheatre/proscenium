@@ -209,6 +209,8 @@ export const responseDrafts = defineTable('forms_response_drafts', {
 }, {
   realm: 'audience',
   subject: { via: 'response_id' },
+  // An unsent working copy is nothing without its person: it goes altogether.
+  onErasure: 'delete-row',
   extra: t => [primaryKey({ columns: [t.responseId] })],
 })
 
