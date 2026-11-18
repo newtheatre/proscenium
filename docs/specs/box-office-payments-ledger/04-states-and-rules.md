@@ -334,7 +334,7 @@ Expected cash is the float, plus cash attempts, less cash refunds, in that sessi
 
 ## What is posted to the ledger, and when
 
-Positive is a debit, negative a credit. Account keys are `<module>.<key>`, declared by the module that posts to them (part 4, `finance.system-account`). `clearing` means `payments.cash` for cash and the provider account's `payments.card-clearing` otherwise.
+Positive is a debit, negative a credit. Account keys are `<module>.<key>`, declared by the module that posts to them (part 4, `finance.system-account`). `clearing` means `payments.cash` for cash, `payments.other` for money taken some other way, and the provider account's `payments.card-clearing` for cards.
 
 | Fact | Posted when | Written by | Entries |
 | --- | --- | --- | --- |
