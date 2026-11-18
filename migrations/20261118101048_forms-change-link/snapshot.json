@@ -5994,6 +5994,16 @@
     },
     {
       "table": "box_office_tickets",
+      "name": "door_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
       "name": "key_id",
       "type": "text",
       "notNull": true,
