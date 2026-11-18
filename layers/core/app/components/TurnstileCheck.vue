@@ -2,7 +2,8 @@
      token when it runs out, so a form never sends a stale one. Nuxt's Turnstile module loads the
      script, resets the check before it expires and removes it with the component. With no site key
      the check is quietly off, as it is on the server with no secret. The site key is the setting on
-     Admin > Sign-in, or NUXT_PUBLIC_TURNSTILE_SITE_KEY where that is unset.
+     Admin > Sign-in, or NUXT_PUBLIC_TURNSTILE_SITE_KEY where that is unset. A token is good for one
+     request: a page that sent one and was refused calls reset() (through a template ref) for a new one.
      A form sent before the check has passed waits for it with waitForToken(), rather than sending
      without a token and being refused. Such a form can pass `quiet`: the check then shows only when
      it needs the person to do something, and takes no room until then. -->
@@ -39,6 +40,13 @@ watch(token, (value) => {
   }
   emit('token', value)
 })
+const widget = useTemplateRef<{ reset: () => void }>('widget')
+/** Runs the check again, for a page whose request used up the token. Emits an empty token at once. */
+function reset() {
+  token.value = ''
+  failed.value = false
+  widget.value?.reset()
+}
 const options = {
   'response-field': false,
   ...(props.quiet ? { appearance: 'interaction-only' } : {}),
@@ -70,7 +78,7 @@ function waitForToken(): Promise<string> {
 }
 
 onBeforeUnmount(() => settle(''))
-defineExpose({ waitForToken })
+defineExpose({ reset, waitForToken })
 </script>
 
 <template>
@@ -78,6 +86,7 @@ defineExpose({ waitForToken })
     <!-- When quiet, out of the page's flow until the check asks for something: no empty block. -->
     <div :class="shown ? undefined : 'absolute'">
       <NuxtTurnstile
+        ref="widget"
         v-model="token"
         :site-key="siteKey"
         :options="options"

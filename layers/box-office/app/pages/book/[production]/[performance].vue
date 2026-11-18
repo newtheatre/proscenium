@@ -72,6 +72,7 @@ const companionAlone = computed(() => chosen.value.length > 0 && chosen.value.ev
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
 const siteKey = useRuntimeConfig().public.turnstile?.siteKey
 const challenge = ref('')
+const turnstile = useTemplateRef<{ reset: () => void }>('turnstile')
 // References typed for a type the visitor may have only by giving one, one for each ticket in turn.
 const references = ref<Record<string, string[]>>({})
 const typing = (type: TicketType) => !!type.unmet && !!type.reference
@@ -100,7 +101,8 @@ async function hold() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-    challenge.value = ''
+    // The token was used up by the refused hold: run the check again for a new one.
+    turnstile.value?.reset()
   }
   finally {
     busy.value = false
@@ -225,7 +227,10 @@ async function hold() {
             >
               {{ t('box-office.book.too-many', { count: data.maxPerOrder }) }}
             </p>
-            <TurnstileCheck @token="challenge = $event" />
+            <TurnstileCheck
+              ref="turnstile"
+              @token="challenge = $event"
+            />
             <UButton
               size="lg"
               :loading="busy"
