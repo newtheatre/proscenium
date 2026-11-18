@@ -234,6 +234,9 @@ describe('the link in the reservation message', () => {
     expect(seen.status, JSON.stringify(seen.body)).toBe(200)
     expect(seen.body).toMatchObject({ reference: done.body.reference, state: 'reserved', amountDueMinor: 3600 })
     expect(seen.body.lines).toHaveLength(3)
+    // What it is for leads the page; a reservation has no tickets yet.
+    expect(seen.body.show).toMatchObject({ title: expect.stringMatching(/^Box office show/), venue: expect.stringMatching(/^Box office venue/), cancelled: false })
+    expect(seen.body.tickets).toEqual([])
     // One band: no part of the house to name. With a second, each ticket says which part it is in.
     expect(seen.body.lines[0].band).toBeNull()
     expect((await req('POST', `/api/box-office/productions/${h.productionId}/bands`, { name: 'Wheelchair spaces' })).status).toBe(200)
