@@ -6,7 +6,7 @@
 <script setup lang="ts">
 type State = 'open' | 'awaiting_payment' | 'paid' | 'void'
 interface Reversal { id: string, state: 'requested' | 'succeeded' | 'failed', quantity: number, amountMinor: number, reason: string, stockOutcome: string, at: number }
-interface Line { id: string, label: string, quantity: number, unitMinor: number, amountMinor: number, reversedQuantity: number, reversedMinor: number, reversals: Reversal[] }
+interface Line { id: string, label: string, quantity: number, unitMinor: number, amountMinor: number, reversedQuantity: number, reversedMinor: number, packaged: boolean, reversals: Reversal[] }
 interface AgeCheck { outcome: 'not_needed' | 'id_checked' | 'self_attested' | 'refused', reason: string | null, product: string | null, scope: 'restricted' | 'all' | null, idType: string | null, at: number }
 interface Sale { id: string, reference: string, state: State, totalMinor: number, outlet: string, operatingDay: string, soldBy: string, at: number, paidAt: number | null, lines: Line[] }
 
@@ -35,7 +35,8 @@ function startRefund() {
   form.value = {
     lines: Object.fromEntries(data.value!.sale.lines.map(l => [l.id, { quantity: 0, goodwill: false, goodwillMinor: null }])),
     reasonTermId: undefined,
-    stockOutcome: 'returned',
+    // A poured drink cannot go back on the shelf, so nothing goes back unless someone says so.
+    stockOutcome: 'wasted',
   }
 }
 const amountOf = (l: Line) => {
@@ -45,7 +46,15 @@ const amountOf = (l: Line) => {
 }
 const total = computed(() => (data.value?.sale.lines ?? []).reduce((s, l) => s + amountOf(l), 0))
 const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ value: r.id, label: r.label })))
-const goodsItems = computed(() => (['returned', 'wasted', 'none'] as const).map(g => ({ value: g, label: t(`bar.screens.sale.goods.${g}`) })))
+// "Returned to stock" is offered only when everything being refunded is packaged: a can, a packet.
+const returnable = computed(() => {
+  const chosen = (data.value?.sale.lines ?? []).filter(l => (form.value?.lines[l.id]?.quantity ?? 0) > 0 && !form.value?.lines[l.id]?.goodwill)
+  return chosen.length > 0 && chosen.every(l => l.packaged)
+})
+const goodsItems = computed(() => (['returned', 'wasted', 'none'] as const).filter(g => g !== 'returned' || returnable.value).map(g => ({ value: g, label: t(`bar.screens.sale.goods.${g}`) })))
+watch(returnable, (can) => {
+  if (!can && form.value?.stockOutcome === 'returned') form.value.stockOutcome = 'wasted'
+})
 async function refund() {
   const f = form.value!
   refusal.value = null
@@ -211,6 +220,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
           </UFormField>
           <UFormField
             :label="t('bar.screens.sale.goods-label')"
+            :help="returnable ? undefined : t('bar.screens.sale.goods-help')"
             name="stockOutcome"
           >
             <USelect

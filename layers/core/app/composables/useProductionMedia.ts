@@ -31,7 +31,7 @@ export async function useProductionMedia(productionId: string) {
   const { $api } = useNuxtApp()
   const { toRefusal } = useRefusal()
   const { confirm } = useConfirm()
-  const toast = useToast()
+  const say = useRecordToast(`core.production:${productionId}`)
   const base = `/api/core/productions/${productionId}/media`
   const { data, status, error, refresh } = await useAPI<Media>(base, { key: `core:production:${productionId}:media` })
   const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -57,7 +57,7 @@ export async function useProductionMedia(productionId: string) {
       await fn()
       // The poster is a line of the page's readiness checklist.
       await Promise.all([refresh(), refreshNuxtData(`core:record-checks:core.production:${productionId}`)])
-      if (done) toast.add({ title: done, color: 'success', icon: 'i-lucide-circle-check' })
+      if (done) say({ title: done })
       return true
     }
     catch (e) {

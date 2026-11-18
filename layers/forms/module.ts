@@ -28,6 +28,8 @@ export default defineModule({
     'limits.response-size': setting.integer({ default: 256, min: 16, max: 1024, change, audience: 'staff' }),
     // The most responses one export holds.
     'limits.export-rows': setting.integer({ default: 5000, min: 100, max: 20000, change, audience: 'staff' }),
+    // The most files one response may hold across its file questions. Each file's size is core's document limit.
+    'limits.files-per-response': setting.integer({ default: 20, min: 1, max: 100, change, audience: 'staff' }),
     // Whether authors may write their own validation patterns (regular expressions).
     'builder.free-patterns': setting.boolean({ default: false, change, audience: 'staff' }),
     // Whether a form holding personal answers must say how long they are kept before it is published.
@@ -41,6 +43,8 @@ export default defineModule({
     'reminders.returned': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
     // How long a review in an open round may be outstanding before the reviewer is reminded, once.
     'reminders.review': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
+    // How long the emailed link for sending changes works, for somebody who answered signed out (R-19).
+    'changes.link-lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'staff' }),
   }),
   settingGroups: {
     limits: { advanced: true },
@@ -127,6 +131,10 @@ export default defineModule({
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
     // Responses are found by reference from the palette; the route answers only those the person may read.
     'core.search-source': [{ id: 'forms.responses', record: 'forms.response', ability: ['forms.response.read', 'forms.form.edit'], route: '/api/forms/search', shells: ['console'] }],
+    // File answers: held in core's store under their response, checked as any upload is, and read only
+    // by those forms lets read the response. Uploaded through forms' own route while answering, never core's.
+    'core.file-slot': [{ id: 'forms.answer-file', owner: 'forms.response', ability: 'forms.settings.manage', many: true, accepts: ['png' as const, 'jpeg' as const, 'webp' as const, 'pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: true }],
+    'core.file-access': [{ id: 'forms.response', file: 'response' }],
     // Core contributes to no module's point, so the sources for core's records are forms' own.
     'forms.source': [
       { id: 'forms.person', file: 'person' }, { id: 'forms.production', file: 'production' }, { id: 'forms.performance', file: 'performance' },
@@ -155,6 +163,11 @@ export default defineModule({
         wording: { 'en-GB': { subject: '{{ status }}: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is now: **{{ status }}**.\n\n[See your response]({{ link }})' } },
       },
       {
+        // Somebody who answered signed out is sent a fresh single-use link with each return (R-19).
+        id: 'forms.returned-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, link: 'sealed' as const },
+        wording: { 'en-GB': { subject: 'Changes needed: {{ form }}', body: '{{ theatre }} has sent your response to **{{ form }}** ({{ reference }}) back to you for changes.\n\n[See what is asked and make your changes]({{ link }})\n\nThe link is yours alone: do not pass it on. It works once, for sending your changes.' } },
+      },
+      {
         id: 'forms.status-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, status: text },
         wording: { 'en-GB': { subject: '{{ status }}: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is now: **{{ status }}**.\n\nIf you have a question about it, reply to {{ theatre }} and quote your reference.' } },
       },
@@ -174,6 +187,10 @@ export default defineModule({
       {
         id: 'forms.returned-reminder', ...notice, variables: { form: text, reference: text, link: text }, link: '/account/forms',
         wording: { 'en-GB': { subject: 'Still waiting for your changes: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is still back with you for changes.\n\n[See what is asked and make your changes]({{ link }})' } },
+      },
+      {
+        id: 'forms.returned-reminder-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, link: 'sealed' as const },
+        wording: { 'en-GB': { subject: 'Still waiting for your changes: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is still back with you for changes.\n\n[See what is asked and make your changes]({{ link }})\n\nThis link replaces the one we sent before, which no longer works. It is yours alone: do not pass it on.' } },
       },
       {
         id: 'forms.review-reminder', ...notice, variables: { form: text, link: text }, link: '/account/forms',

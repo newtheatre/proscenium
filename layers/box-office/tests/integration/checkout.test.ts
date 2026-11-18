@@ -88,6 +88,21 @@ describe('with no online payment provider', () => {
     expect(await count('SELECT count(*) AS n FROM payments_intent_parts WHERE owner_record = ?', b.orderId)).toBe(0)
   })
 
+  it('books a production only for people over an age once the buyer says everyone is', async () => {
+    const f = await house(4)
+    await free(f)
+    await rows('UPDATE core_productions SET age_min = 18, age_restricted = 1 WHERE id = ?', f.productionId)
+    const b = await basket(f, 1)
+    const refused = await checkout(b)
+    expect(refused.status).toBe(422)
+    expect(refused.body).toMatchObject({ code: 'box-office.order.age-not-confirmed', fields: { ageConfirmed: 'box-office.order.age-not-confirmed' } })
+    const reserving = await req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: 0, email: address() }, null, { 'x-basket-token': b.token })
+    expect(reserving.body).toMatchObject({ code: 'box-office.order.age-not-confirmed' })
+    const done = await req('POST', `/api/box-office/baskets/${b.orderId}/checkout`, { expectedTotalMinor: 0, email: address(), ageConfirmed: true }, null, { 'x-basket-token': b.token })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body.state).toBe('confirmed')
+  })
+
   it('never lets an order with nothing to pay rest reserved', async () => {
     const f = await house(4)
     await free(f)
@@ -144,13 +159,17 @@ describe('paying online', () => {
       .toEqual([{ amount_minor: -3600, performance_id: h.performanceId, production_id: h.productionId }])
     expect(await count("SELECT count(*) AS n FROM core_events WHERE name = 'box-office.order.confirmed' AND record_id = ?", b.orderId)).toBe(1)
 
-    // One ticket for each line. The buyer's message has the door codes; the database has only hashes.
+    // One ticket for each line. The buyer's message links to the page that shows the door codes and
+    // names each ticket by its number; it never carries a code itself.
     const tickets = await rows<{ code_hash: string, key_id: string, state: string, performance_id: string }>('SELECT t.code_hash, t.key_id, t.state, t.performance_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ?', b.orderId)
     expect(tickets).toHaveLength(3)
     const told = await mail('box-office.order-confirmed', b.orderId)
-    expect(told).toMatchObject({ reference: b.reference, tickets: '3 × Full price' })
+    expect(told).toMatchObject({ reference: b.reference, tickets: '3 × Full price', numbers: `${b.reference}-1, ${b.reference}-2, ${b.reference}-3` })
     expect(told.paid).toContain('36.00')
-    const codes = told.codes!.split('\n\n')
+    expect(JSON.stringify(told)).not.toContain('tkt.')
+    const page = (await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': told.link!.slice(told.link!.lastIndexOf('/') + 1) })).body
+    expect(page.tickets.map((t: { number: string }) => t.number)).toEqual([`${b.reference}-1`, `${b.reference}-2`, `${b.reference}-3`])
+    const codes = page.tickets.map((t: { doorCode: string }) => t.doorCode) as string[]
     expect(codes).toHaveLength(3)
     const everything = JSON.stringify(await rows('SELECT * FROM box_office_tickets')) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))
     for (const doorCode of codes) {

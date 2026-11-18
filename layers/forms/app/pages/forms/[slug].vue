@@ -45,6 +45,8 @@ const form = computed(() => data.value!)
 provide('forms:answering', slug)
 
 const responseId = ref(form.value.draft?.responseId ?? newResponseId())
+// File answers are uploaded into this response as they are chosen.
+provideFormsUploads(slug, responseId, place)
 const answers = ref<Answers>(form.value.draft?.answers ?? {})
 const pageId = ref<string | null>(form.value.draft?.pageId ?? null)
 const email = ref('')

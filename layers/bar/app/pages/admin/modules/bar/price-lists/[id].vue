@@ -12,7 +12,7 @@ const { t } = useT()
 const route = useRoute()
 const { $api } = useNuxtApp()
 const { money } = await useMoney()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ categories: Category[], lists: List[] }>('/api/bar/price-lists', { key: 'bar:price-lists' })
 const list = computed(() => data.value?.lists.find(l => l.id === String(route.params.id)))
@@ -30,6 +30,13 @@ function here(v: Variant): string {
 const raising = ref<{ by: 'percent' | 'amount', percent: number | null, amountMinor: number | null, categoryIds: string[], later: boolean, effectiveFrom: number | null } | null>(null)
 const preview = ref<{ variantId: string, oldMinor: number, newMinor: number }[] | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+type FormRef = { setErrors: (errors: FieldError[]) => void }
+const raiseEl = useTemplateRef<FormRef>('raiseEl')
+// What a raise needs: its percentage or amount, and its moment when it starts later.
+const validateRaise = () => {
+  const r = raising.value!
+  return needs({ percent: r.by === 'percent' ? r.percent : true, amountMinor: r.by === 'amount' ? r.amountMinor : true, effectiveFrom: r.later ? r.effectiveFrom : true })
+}
 const names = computed(() => new Map((data.value?.categories ?? []).flatMap(c => c.products.flatMap(p => p.variants.map(v => [v.id, sizeName(p, v)] as const)))))
 const categoryItems = computed(() => (data.value?.categories ?? []).filter(c => c.active).map(c => ({ value: c.id, label: c.name })))
 const byItems = computed(() => [{ value: 'percent', label: t('bar.screens.lists.raise.by-percent') }, { value: 'amount', label: t('bar.screens.lists.raise.by-amount') }])
@@ -59,6 +66,7 @@ async function send(previewOnly: boolean) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    raiseEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 watch(raiseBody, () => {
@@ -135,8 +143,9 @@ function onStandard(v: Variant): string {
         <UForm
           v-if="raising"
           id="bar-raise"
+          ref="raiseEl"
           :state="raising"
-          :validate="() => needs({ ...(raising?.by === 'percent' ? { percent: raising?.percent } : { amountMinor: raising?.amountMinor }), effectiveFrom: raising?.later ? raising?.effectiveFrom : true })"
+          :validate="validateRaise"
           class="space-y-4"
           novalidate
           @submit="send(!preview)"

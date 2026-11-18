@@ -14,12 +14,12 @@ export interface NotificationType {
   category: 'transactional' | 'optional'
   side: 'audience' | 'members'
   channels: ('email' | 'inbox')[]
-  /** The inbox item's link: a path inside the application that may use the type's variables. */
+  /** The inbox item's link and the email's button: a path inside the application that may use the type's variables. */
   link?: string
   lane?: 'prompt' | 'bulk'
   topic?: string
   variables: Record<string, VariableKind>
-  wording: Record<string, { subject: string, body: string }>
+  wording: Record<string, { subject: string, body: string, action?: string }>
 }
 
 export interface NotifyAddressOptions {
@@ -51,6 +51,12 @@ export async function sendingDomain(): Promise<string> {
     })
   }
   return domain
+}
+
+/** Whether email can be sent now: the sending domain is set and verified. */
+export async function canSendEmail(): Promise<boolean> {
+  const domain = await useSetting('core.notifications.sending-domain') as string | null
+  return !!domain && domain === await useSetting('core.notifications.verified-domain') as string | null
 }
 
 /** Who a topic's mail comes from: its routed sender, or the default built from the settings. */

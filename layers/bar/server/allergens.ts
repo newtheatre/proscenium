@@ -62,13 +62,16 @@ export async function allergenAnswers(): Promise<AllergenAnswers> {
 }
 
 /** Which stock items each size's recipe names (its fixed lines), and each option's own stock item. */
-export interface StockLinks { recipes: Map<string, string[]>, optionStock: Map<string, string> }
+export interface StockLinks { recipes: Map<string, string[]>, optionStock: Map<string, string>, choiceOnly: Set<string> }
 export async function stockLinks(): Promise<StockLinks> {
   const recipes = new Map<string, string[]>()
   for (const r of await all<{ variant_id: string, stock_item_id: string }>('SELECT variant_id, stock_item_id FROM bar_recipe_lines WHERE stock_item_id IS NOT NULL ORDER BY position, id'))
     recipes.set(r.variant_id, [...recipes.get(r.variant_id) ?? [], r.stock_item_id])
   const optionStock = new Map((await all<{ id: string, stock_item_id: string }>('SELECT id, stock_item_id FROM bar_choice_options WHERE stock_item_id IS NOT NULL')).map(o => [o.id, o.stock_item_id] as const))
-  return { recipes, optionStock }
+  // Sizes whose recipe is nothing but choice slots (a spirit and mixer): they have no label of their
+  // own, so their answer is whatever is picked.
+  const choiceOnly = new Set((await all<{ variant_id: string }>('SELECT variant_id FROM bar_recipe_lines GROUP BY variant_id HAVING max(stock_item_id IS NOT NULL) = 0')).map(r => r.variant_id))
+  return { recipes, optionStock, choiceOnly }
 }
 
 /** What several stock items add up to: anything any contains, and checked only when all are (the oldest check counts). */
@@ -87,10 +90,14 @@ export function combine(parts: (AllergenAnswer | undefined)[]): AllergenAnswer {
   return { contains: c, mayContain: ordered([...mayContain].filter(k => !contains.has(k))), checked, checkedAt: checked ? checkedAt : null }
 }
 
-/** A size's answer: worked out from the stock items its recipe names, or the product's own when it has none. */
+/**
+ * A size's answer: worked out from the stock items its recipe names, or the product's own when it has
+ * none. A size made only from choices has nothing of its own to check: its options answer for it.
+ */
 export function sizeAnswer(answers: AllergenAnswers, links: StockLinks, variantId: string, productId: string): AllergenAnswer | undefined {
   const items = links.recipes.get(variantId)
-  return items?.length ? combine(items.map(i => answers.stockItems.get(i))) : answers.products.get(productId)
+  if (items?.length) return combine(items.map(i => answers.stockItems.get(i)))
+  return answers.products.get(productId) ?? (links.choiceOnly?.has(variantId) ? combine([]) : undefined)
 }
 
 /** An option's answer: its stock item's when it has one, otherwise its own. */
