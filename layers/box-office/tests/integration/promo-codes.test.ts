@@ -158,6 +158,23 @@ describe('managing codes', () => {
     expect(listed.body.rows.find((r: { id: string }) => r.id === c.id)).toMatchObject({ used: 3, active: true })
   })
 
+  it('can be limited to one performance and one part of the house, listed with the production\'s', async () => {
+    const listed = await api('GET', '/api/box-office/promo-codes')
+    expect(listed.body.productions.find((p: { id: string }) => p.id === h.productionId)).toMatchObject({
+      performances: expect.arrayContaining([expect.objectContaining({ id: h.performanceId })]),
+      bands: expect.arrayContaining([expect.objectContaining({ id: h.bandId })]),
+    })
+    const c = await code({ effect: 'amount_off', value: 100, performanceId: h.performanceId, bandId: h.bandId })
+    const saved = (await api('GET', '/api/box-office/promo-codes')).body.rows.find((r: { id: string }) => r.id === c.id)
+    // A part of the house is its production's, so the code is for that production too.
+    expect(saved).toMatchObject({ productionId: h.productionId, performanceId: h.performanceId, bandId: h.bandId })
+    const b = await hold(h, c.code, 1)
+    expect(b.ok && b.totalMinor).toBe(1100)
+    const other = await house(5)
+    const wrong = await api('POST', '/api/box-office/promo-codes', { code: `TEST${++codes}`, effect: 'amount_off', value: 100, productionId: other.productionId, bandId: h.bandId })
+    expect(wrong.body.code).toBe('box-office.promo.scope')
+  })
+
   it('is closed to someone who does not manage codes', async () => {
     expect((await api('GET', '/api/box-office/promo-codes', undefined, person([]))).status).toBe(403)
   })

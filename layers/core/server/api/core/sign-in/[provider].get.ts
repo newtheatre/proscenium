@@ -9,7 +9,7 @@ import { safeNext } from '../../../identity/web'
 
 export default defineRoute({
   public: true,
-  rateLimit: 'sign-in',
+  rateLimit: 'sign-in-network',
   input: z.object({ next: z.string().max(512).optional(), login_hint: z.email().max(254).optional() }), // not-policy: a return path and an address are short
 }, async (event, { input }) => {
   const provider = providerById(getRouterParam(event, 'provider') ?? '')
