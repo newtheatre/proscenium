@@ -95,6 +95,8 @@ export const settings = defineSettings('core', {
   'rate-limits.public-form': setting.rate({ default: { count: 20, per: '10m' }, change, onChange: 'confirm' }),
   'rate-limits.export': setting.rate({ default: { count: 10, per: '1h' }, change, onChange: 'confirm' }),
   'rate-limits.presented-value': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
+  // Ordinary reading by signed-in staff, whose console pages each ask for many things (L15).
+  'rate-limits.staff': setting.rate({ default: { count: 3000, per: '1m' }, change, onChange: 'confirm' }),
 
   'retention.audit': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
   // How many rows a list shows when its address names no size (Foundations, 16 November).

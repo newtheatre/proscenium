@@ -3,8 +3,10 @@
      staff use them without Admin. The cog at the end of a page's navbar opens the tabs that belong to
      that page (?settings=<entry id>); an Admin address opened from the console, or a setting found by
      search, opens its module's (?settings=<module>). ?screen=<address in Admin> names the open
-     tab's screen. The screen is the same page Admin draws, rendered here for that address. -->
+     tab's screen. The screen is the same page Admin draws, rendered here for that address. On a
+     phone the window fills the screen and its tabs are a dropdown, so every tab can be reached. -->
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core'
 import { loadRouteLocation, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { resolveEntry } from '../../shared/navigation'
 
@@ -42,6 +44,13 @@ watch(screen, (value) => {
   if (import.meta.client && value && scope.value && route.query.screen !== value) navigateTo({ query: { ...route.query, screen: value, setting: undefined } }, { replace: true })
 }, { immediate: true })
 const choose = (to: string | number) => navigateTo({ query: { ...route.query, screen: String(to), setting: undefined } })
+const phone = useMediaQuery('(max-width: 639px)') // not-policy: Tailwind's sm breakpoint
+
+// A window with nothing this viewer may open is not offered (the cog is hidden); one reached by an
+// old link closes itself rather than stand empty.
+watch([tabs, status], ([list, now]) => {
+  if (import.meta.client && scope.value && now === 'success' && !list.length) closeModuleWindow(route.query)
+}, { immediate: true })
 </script>
 
 <template>
@@ -49,11 +58,19 @@ const choose = (to: string | number) => navigateTo({ query: { ...route.query, sc
     v-model:open="open"
     :title="name ? t('core.modules.window.title', { module: t(name) }) : ''"
     :description="t('core.modules.window.description')"
+    :fullscreen="phone"
     :ui="{ content: 'sm:max-w-3xl sm:h-[90vh]', body: 'space-y-4' }"
   >
     <template #body>
+      <USelect
+        v-if="items.length > 1 && phone"
+        :model-value="active"
+        :items="items"
+        :aria-label="t('core.modules.window.choose')"
+        @update:model-value="choose"
+      />
       <UTabs
-        v-if="items.length > 1"
+        v-else-if="items.length > 1"
         :model-value="active"
         :items="items"
         :content="false"

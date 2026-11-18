@@ -34,6 +34,8 @@ interface Answer {
     reasons: Option[]
     effects: { id: string, label: string }[]
     presets: { id: string, name: string, slots: RunSlot[] }[]
+    /** Whole days closed to performances, which the date fields grey out. */
+    closed?: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number }[]
   }
   defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
 }
@@ -47,8 +49,6 @@ const emit = defineEmits<{ changed: [] }>()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<Answer>(() => `/api/core/productions/${props.productionId}/performances`, { key: `core:production:${props.productionId}:performances` })
 const dates = useDates()
-// Whole-day closures that block performances grey out their days in the date fields; the server still decides.
-const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean }[] }>('/api/core/closures', { key: 'core:closures', lazy: true, server: false })
 const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -108,11 +108,11 @@ const open = ref(false)
 const form = ref({ spaceId: '', startsAt: null as number | null })
 const overrides = ref<ShowOverrides>(noOverrides())
 const shown = computed(() => form.value.spaceId && data.value ? defaultsIn(form.value.spaceId) : null)
-/** Whether a whole-day closure that blocks performances covers this day for the chosen space. */
+/** Whether a whole-day closure that blocks performances covers this day for the chosen space. The
+ *  closures come with the performances, so nobody needs the right to manage closures; the server still decides. */
 function closed(day: string): boolean {
   const space = spaces.value.find(x => x.value === form.value.spaceId)
-  return (closures.value?.rows ?? []).some(c => c.allDay && c.blocksPerformances
-    && (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
+  return (data.value?.options.closed ?? []).some(c => (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
     && dates.toLocal(c.startsAt).slice(0, 10) <= day && day <= dates.toLocal(c.endsAt - 1).slice(0, 10)) // not-policy: the length of a date
 }
 // Checked beside each field: a space, a start, and a booking link that is a web address.

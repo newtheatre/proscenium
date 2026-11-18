@@ -16,7 +16,9 @@ import type { Rate } from './settings'
 // sign-in-network counts what one network address asks of sign-in as a whole, generously, since a
 // theatre's bar or foyer puts many people behind one address; the strict sign-in class is then
 // counted per email address (and address plus network) inside the routes.
-export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'public-form', 'export', 'presented-value'] as const
+// staff is not declared by routes: a signed-in person who holds a role reads under it in place of
+// default, since one console page asks for many things and staff move quickly between them (L15).
+export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'public-form', 'export', 'presented-value', 'staff'] as const
 export type RateClass = typeof RATE_CLASSES[number]
 
 /** Classes counted in the shared store, shared by every instance. */
