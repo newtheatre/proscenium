@@ -10,6 +10,7 @@ import { listTerms } from '#modules/core'
 import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import { members } from '../../../../tests/fixtures/modules/seats/server/contributions/core.requirement/seats'
 import attendance from '../../server/contributions/front-of-house.report-section/attendance'
+import { doorCodesForOrder } from '../../server/tickets'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const steward = person(['box-office.ticket.admit'])
@@ -363,5 +364,31 @@ describe('checking a requirement again at entry', () => {
     expect(mine.body.overridable).toBeUndefined()
     const refused = await req('POST', `/api/box-office/performances/${own.h.performanceId}/door/override`, { ticketId: mine.body.ticketId, reasonTermId: reason }, supervisor)
     expect(refused.body.code).toBe('box-office.door.override-own')
+  })
+})
+
+describe('showing a ticket again', () => {
+  it('keeps the code sealed and signs it afresh, so the code shown later is admitted', async () => {
+    const h = await freeHouse(4)
+    const [issued] = await tickets(h, 1)
+    const stored = (await rows<{ door_code: string, order_id: string }>('SELECT t.door_code, l.order_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.performance_id = ?', h.performanceId))[0]!
+    const random = issued!.split('.')[2]!
+    // Sealed: the code part is not in the row as it is.
+    expect(stored.door_code).toBeTruthy()
+    expect(stored.door_code).not.toContain(random)
+    const shown = await inContext(() => doorCodesForOrder(stored.order_id))
+    expect(shown).toHaveLength(1)
+    expect(shown[0]).toMatchObject({ performanceId: h.performanceId, admitted: false })
+    expect(shown[0]!.doorCode!.split('.')[2]).toBe(random)
+    expect((await scan(h, shown[0]!.doorCode!)).body).toMatchObject({ result: 'admitted' })
+    expect((await inContext(() => doorCodesForOrder(stored.order_id)))[0]).toMatchObject({ admitted: true })
+  })
+
+  it('shows no code for a ticket issued before codes were kept', async () => {
+    const h = await freeHouse(4)
+    await tickets(h, 1)
+    await rows('UPDATE box_office_tickets SET door_code = NULL WHERE performance_id = ?', h.performanceId)
+    const orderId = (await rows<{ order_id: string }>('SELECT order_id FROM box_office_order_lines WHERE performance_id = ?', h.performanceId))[0]!.order_id
+    expect((await inContext(() => doorCodesForOrder(orderId)))[0]).toMatchObject({ doorCode: null })
   })
 })

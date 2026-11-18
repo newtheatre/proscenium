@@ -1,7 +1,7 @@
 // One order for staff (Box office specification, part 6, "Order"): its tickets with whether each was
 // admitted, its cancellations, and which of release, keep, cancel and refund the viewer may do.
 import { getRouterParam } from 'h3'
-import { all, can, defineRoute, first, refuse } from '#kit'
+import { all, can, defineRoute, first, refuse, useSetting } from '#kit'
 import { accountLabel, getPerformance, getProduction, getTerm } from '#modules/core'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
@@ -45,6 +45,8 @@ export default defineRoute({
     soldBy: order.sold_by ? await accountLabel(order.sold_by) : null,
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
     lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: l.requirement_evidence_id === 'pending' })),
+    // The fee kept on each ticket when a cancellation is refunded less the fee, so the dialogue can show the refund.
+    cancellationFeeMinor: await useSetting('box-office.cancellations.fee') as number,
     cancellations: await Promise.all(cancellations.map(async c => ({
       id: c.id, kind: c.kind, note: c.note, lineCount: (JSON.parse(c.line_ids) as string[]).length, refunded: !!c.refund_id, feeMinor: c.fee_minor,
       reason: c.reason_term_id ? (await getTerm(c.reason_term_id))?.label ?? null : null,

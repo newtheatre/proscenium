@@ -337,11 +337,11 @@ export default defineModule({
       lane: 'bulk' as const,
       topic: 'front-of-house.night-reports',
       link: '/console/front-of-house/night-reports/{{ performance }}',
-      variables: { show: 'text' as const, worked: 'text' as const, incidents: 'text' as const, performance: 'text' as const },
+      variables: { show: 'text' as const, worked: 'text' as const, incidents: 'text' as const, performance: 'text' as const, date: 'text' as const, link: 'url' as const },
       wording: {
         'en-GB': {
-          subject: 'Night report: {{ show }}',
-          body: 'The night report for **{{ show }}** has been signed off. People on shift: {{ worked }}. Incidents: {{ incidents }}.',
+          subject: 'Night report: {{ show }}, {{ date }}',
+          body: 'The night report for **{{ show }}** on {{ date }} has been signed off. People on shift: {{ worked }}. Incidents: {{ incidents }}.\n\n[Read the night report]({{ link }})',
         },
       },
     }, {
@@ -351,11 +351,11 @@ export default defineModule({
       channels: ['email' as const, 'inbox' as const],
       lane: 'bulk' as const,
       link: '/console/front-of-house/night-reports/{{ performance }}',
-      variables: { show: 'text' as const, performance: 'text' as const },
+      variables: { show: 'text' as const, performance: 'text' as const, date: 'text' as const, link: 'url' as const },
       wording: {
         'en-GB': {
-          subject: 'Night report not signed off: {{ show }}',
-          body: 'The night report for **{{ show }}** is still a draft. Please check who worked and sign it off.',
+          subject: 'Night report not signed off: {{ show }}, {{ date }}',
+          body: 'The night report for **{{ show }}** on {{ date }} is still a draft. Please check who worked and sign it off.\n\n[Open the night report]({{ link }})',
         },
       },
     }, {
