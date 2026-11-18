@@ -161,7 +161,8 @@ test('problems are listed and stop a form being published until they are fixed',
   await expect(page.getByText('New question')).toBeVisible()
   await axe(page)
   await page.getByRole('button', { name: 'Publish version 1' }).click()
-  await expect(page.getByText('Version 1 is live')).toBeVisible()
+  // Published is not shared: the builder says so until the form is given its link.
+  await expect(page.getByText('Not shared yet')).toBeVisible()
 })
 
 test('a form goes out as JSON and comes back in', async ({ page }) => {
