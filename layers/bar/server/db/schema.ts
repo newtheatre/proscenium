@@ -468,13 +468,15 @@ export const ALLERGEN_SOURCES = ['label', 'supplier', 'other'] as const
 /**
  * What a product, or a choice option, contains or may contain, as last recorded from its label. One
  * row per allergen named; an allergen with no row is not listed. Whether anything was checked at all is
- * bar_allergen_checks', so "nothing listed" and "not checked" never look the same. With stock, entries
- * move to stock items and products work theirs out; a product with no recipe keeps its own.
+ * bar_allergen_checks', so "nothing listed" and "not checked" never look the same. A stock item has
+ * entries too: a product made from stock works its answer out from its recipe, and a product with no
+ * recipe keeps its own.
  */
 export const allergenEntries = defineTable('bar_allergen_entries', {
   id: col.id(),
   productId: col.ref('bar_products', { nullable: true }),
   optionId: col.ref('bar_choice_options', { nullable: true }),
+  stockItemId: col.ref('bar_stock_items', { nullable: true }),
   allergen: col.public(text('allergen', { enum: ALLERGENS }).notNull()),
   level: col.public(text('level', { enum: ALLERGEN_LEVELS }).notNull()),
   createdAt: col.createdAt(),
@@ -485,7 +487,8 @@ export const allergenEntries = defineTable('bar_allergen_entries', {
   extra: t => [
     uniqueIndex('bar_allergen_entries_product').on(t.productId, t.allergen).where(sql`product_id IS NOT NULL`),
     uniqueIndex('bar_allergen_entries_option').on(t.optionId, t.allergen).where(sql`option_id IS NOT NULL`),
-    check('bar_allergen_entries_one', sql`(${t.productId} IS NULL) <> (${t.optionId} IS NULL)`),
+    uniqueIndex('bar_allergen_entries_stock_item').on(t.stockItemId, t.allergen).where(sql`stock_item_id IS NOT NULL`),
+    check('bar_allergen_entries_one', sql`(${t.productId} IS NOT NULL) + (${t.optionId} IS NOT NULL) + (${t.stockItemId} IS NOT NULL) = 1`),
     check('bar_allergen_entries_allergen', sql`${t.allergen} IN (${inList(ALLERGENS)})`),
     check('bar_allergen_entries_level', sql`${t.level} IN (${inList(ALLERGEN_LEVELS)})`),
   ],
@@ -513,6 +516,30 @@ export const allergenChecks = defineTable('bar_allergen_checks', {
     index('bar_allergen_checks_option').on(t.optionId, t.at),
     check('bar_allergen_checks_one', sql`(${t.productId} IS NULL) <> (${t.optionId} IS NULL)`),
     check('bar_allergen_checks_source', sql`${t.source} IN (${inList(ALLERGEN_SOURCES)})`),
+  ],
+})
+
+/**
+ * Each check of a stock item's label, kept like bar_allergen_checks. It is its own table because that
+ * one is append-only, so it cannot be rebuilt to take a third kind of subject.
+ */
+export const stockItemAllergenChecks = defineTable('bar_stock_item_allergen_checks', {
+  id: col.id(),
+  stockItemId: col.ref('bar_stock_items'),
+  source: col.internal(text('source', { enum: ALLERGEN_SOURCES }).notNull()),
+  contains: col.internal(text('contains').notNull()),
+  mayContain: col.internal(text('may_contain').notNull()),
+  by: col.account('by', { role: 'actor', onMerge: 'alias' }),
+  at: col.timestamp('at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bsac',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('bar_stock_item_allergen_checks_item').on(t.stockItemId, t.at),
+    check('bar_stock_item_allergen_checks_source', sql`${t.source} IN (${inList(ALLERGEN_SOURCES)})`),
   ],
 })
 
@@ -775,4 +802,4 @@ export const stocktakeLines = defineTable('bar_stocktake_lines', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels, deliveries, deliveryLines, stocktakes, stocktakeLines }
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItemAllergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels, deliveries, deliveryLines, stocktakes, stocktakeLines }

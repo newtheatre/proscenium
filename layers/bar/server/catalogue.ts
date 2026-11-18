@@ -5,7 +5,7 @@ import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#ki
 import { priceOn, nextChange, type ListRule, type PriceRow } from './pricing'
 import type { OUTLET_KINDS, TILL_LAYOUTS } from './db/schema'
 import { choiceGroups, groupsByProduct, priceGroups, type ChoiceGroup } from './choices'
-import { allergenAnswers, allergenSettings, tillAllergens, type ItemAllergens, type OptionAllergens } from './allergens'
+import { allergenAnswers, allergenSettings, stockLinks, tillAllergens, type ItemAllergens, type OptionAllergens } from './allergens'
 
 export const STANDARD = 'standard'
 
@@ -132,7 +132,7 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
   // Allergens ride on the menu, so the till's sheet works from what it loaded. Left off when switched off.
   const allergenSet = await allergenSettings()
   const productOfVariant = new Map(categories.flatMap(c => c.products.flatMap(p => p.variants.map(v => [v.id, p.id] as const))))
-  const al = allergenSet.enabled ? tillAllergens(await allergenAnswers(), priced, productOfVariant) : null
+  const al = allergenSet.enabled ? tillAllergens(await allergenAnswers(), await stockLinks(), priced, productOfVariant) : null
   return {
     outletId: outlet!.id,
     outlet: outlet!.name,
@@ -153,7 +153,7 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
         if (!priced) return []
         // The price the picks are added to: Standard's on a percentage list, which then takes its percentage off the whole.
         const base = percent ? priceOn(rows, v.id, rule(standardList!), std, at)?.amountMinor ?? priced.amountMinor : priced.amountMinor
-        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base, ...(al ? { allergens: al.product(p.id, p.groupIds) } : {}) }]
+        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base, ...(al ? { allergens: al.size(p.id, v.id, p.groupIds) } : {}) }]
       })),
     }))),
     groups: al ? priced.map(g => ({ ...g, options: g.options.map(o => ({ ...o, allergens: al.option(g.id, o.key) })) })) : priced,
