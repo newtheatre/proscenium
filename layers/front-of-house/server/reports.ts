@@ -223,7 +223,9 @@ export async function signOff(unit: UnitView, input: { performanceId: string, no
   unit.announce('front-of-house.night-report.signed-off', { performanceId: input.performanceId }, { record: ['core.performance', input.performanceId] })
   unit.audit({ action: 'state', record: ['core.performance', input.performanceId], detail: { to: 'signed_off', noShows: input.noShows.length } })
   if (await useSetting('front-of-house.night-report.auto-distribute') === true) {
-    const readers = await holdersOf('front-of-house.night-report.view', ['core.performance', input.performanceId] as const)
+    // Readers by role only: whoever holds view through tonight's shift facts (the lead who signed) has no
+    // console access once the night ends, so the link would only lead them to a refusal.
+    const readers = await holdersOf('front-of-house.night-report.view')
     if (readers.length) {
       const worked = snapshot.duties.reduce((n, d) => n + d.worked, 0)
       await notify(unit, 'front-of-house.night-report-ready', {

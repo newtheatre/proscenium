@@ -12,7 +12,7 @@
 import { stampTerms } from './terms'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
-import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress } from '#modules/core'
+import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress, placeName } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
@@ -221,7 +221,7 @@ export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<
     productionSlug: production.slug,
     startsAt: performance.startsAt,
     endsAt: performance.endsAt,
-    venue: `${performance.venueName}, ${performance.spaceName}`,
+    venue: await placeName(performance.spaceId) ?? performance.venueName,
     venueSlug: listed ? venue!.slug : null,
     address,
     cancelled: performance.state === 'cancelled',

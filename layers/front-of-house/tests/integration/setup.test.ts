@@ -126,6 +126,9 @@ describe('changing a shift', () => {
     expect(await rows('SELECT state FROM front_of_house_assignments WHERE shift_id = ?', id)).toEqual([{ state: 'released' }])
     expect(await notes('front-of-house.shift-cancelled', jo.accountId!)).toHaveLength(1)
     expect(await holds('front-of-house.rostered', jo)).toBe(false)
+    // The person's own list says the theatre cancelled it, not that they gave it up.
+    const mine = await req<{ givenUp: { shiftId: string, state: string }[] }>('GET', '/api/front-of-house/me/shifts', undefined, jo)
+    expect(mine.body.givenUp.find(x => x.shiftId === id)?.state).toBe('cancelled')
   })
 })
 
