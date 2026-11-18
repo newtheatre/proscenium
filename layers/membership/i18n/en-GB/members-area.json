@@ -1,0 +1,6 @@
+{
+  "membership.members-area.ended": "Your membership of {scheme} ended on {date}",
+  "membership.members-area.ended-help": "The members' area is for current members. Renew or join below to use it again.",
+  "membership.members-area.not-member": "The members' area is for members",
+  "membership.members-area.not-member-help": "Join a membership below to use it."
+}

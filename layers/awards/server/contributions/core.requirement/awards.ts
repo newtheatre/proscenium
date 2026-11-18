@@ -46,14 +46,20 @@ export default defineRequirementSource({
 
   async check(accountIds, refs) {
     const out: SourceAnswer[] = []
+    // Who a price is for, by the awards that qualify, so a holder of another award is not misled.
+    const types = await listTypes()
+    const names = (list: string[]) => list.length > 1 ? `${list.slice(0, -1).join(', ')} or ${list.at(-1)}` : list[0]
     for (const fullRef of refs) {
       const ref = typeIdOf(fullRef)
-      const gone = ref !== BENEFIT && !(await getType(ref))
+      const type = ref === BENEFIT ? null : types.find(t => t.id === ref) ?? null
+      const gone = ref !== BENEFIT && !type
+      const qualifying = ref === BENEFIT ? types.filter(t => t.state === 'active' && t.givesTicketBenefit).map(t => t.name) : [type?.name ?? '']
+      const forWhom = qualifying.length ? `This price is for holders of ${names(qualifying)}.` : 'This price is for holders of an award that carries a ticket price.'
       for (const account of accountIds) {
         const held = account ? await heldBy(account, ref) : []
         out.push(held.length
           ? { account, ref: fullRef, verdict: 'met', evidence: held[0]!.id, quantity: 1, summary: `${held[0]!.typeName}: current.` }
-          : { account, ref: fullRef, verdict: 'not-met', reason: gone ? 'This price is for an award that is no longer given.' : account ? 'This price is for holders of an award.' : 'This price is for holders of an award. Sign in if you hold one.', summary: 'Holds no such award.' })
+          : { account, ref: fullRef, verdict: 'not-met', reason: gone ? 'This price is for an award that is no longer given.' : account ? forWhom : `${forWhom} Sign in if you hold one.`, summary: 'Holds no such award.' })
       }
     }
     return out
