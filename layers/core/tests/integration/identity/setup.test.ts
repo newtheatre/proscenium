@@ -41,7 +41,8 @@ describe('first-run setup (ID-37)', () => {
     expect(saved).toEqual([{ key: 'core.locale.time-zone', value: '"Europe/Dublin"' }, { key: 'core.site.name', value: '"The Lyric"' }])
     const me = await browser.get('/api/core/me')
     expect(me.body).toMatchObject({ signedIn: true, session: { assurance: 'strong' }, passkeys: 1 })
-    expect(await rows('SELECT key, fixed FROM core_roles')).toEqual([{ key: 'owner', fixed: 1 }])
+    // The Owner, fixed, and core's preset roles, which the theatre owns from then on (FH-4).
+    expect(await rows('SELECT key, fixed FROM core_roles ORDER BY fixed DESC, key')).toEqual([{ key: 'owner', fixed: 1 }, { key: 'access-coordinator', fixed: 0 }])
     expect(await rows('SELECT account_id, granted_by FROM core_grants')).toEqual([{ account_id: ownerId, granted_by: ownerId }])
     expect(await rows('SELECT count(*) AS n FROM core_recovery_codes WHERE account_id = ?', ownerId)).toEqual([{ n: 10 }])
 

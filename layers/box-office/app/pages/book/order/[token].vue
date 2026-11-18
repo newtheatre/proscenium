@@ -43,7 +43,9 @@ const reserved = computed(() => order.value?.state === 'reserved')
 // The buyer's own cancellation of what they paid for, on the theatre's terms.
 const terms = computed(() => order.value?.state === 'confirmed' ? order.value.buyerCancel : null)
 const cancellable = computed(() => !!order.value?.lines.length && (reserved.value || !!terms.value))
-const words = computed(() => terms.value ? 'refund' : 'cancel')
+// Free tickets are handed back, not refunded.
+const free = computed(() => order.value?.state === 'confirmed' && order.value.totalMinor === 0)
+const words = computed(() => terms.value ? (free.value ? 'free' : 'refund') : 'cancel')
 const refunded = ref<number | null>(null)
 
 function refundFor(ids: string[]) {
@@ -63,7 +65,7 @@ async function cancel(all: boolean) {
   if (!order.value) return
   const ids = all ? order.value.lines.map(l => l.id) : chosen.value
   const count = ids.length
-  const paid = !!terms.value
+  const paid = !!terms.value && !free.value
   const back = paid ? refundFor(ids) : 0
   const ok = await confirm({
     verb: t('box-office.manage.cancel.verb'),
@@ -136,7 +138,7 @@ async function cancel(all: boolean) {
               <UBadge
                 color="neutral"
                 variant="subtle"
-                :label="t(`box-office.manage.state.${order.state}`)"
+                :label="free ? t('box-office.manage.state.free') : t(`box-office.manage.state.${order.state}`)"
               />
               <ul
                 v-if="lines.length"
@@ -148,7 +150,7 @@ async function cancel(all: boolean) {
                   class="flex justify-between py-2"
                 >
                   <span>{{ t('box-office.basket.line', { count: line.count, label: line.label }) }}</span>
-                  <span>{{ money(line.amountMinor, order.currency) }}</span>
+                  <span>{{ line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) }}</span>
                 </li>
               </ul>
               <p
@@ -170,7 +172,7 @@ async function cancel(all: boolean) {
                 v-if="terms"
                 class="text-sm text-muted"
               >
-                {{ terms.feeMinor > 0
+                {{ free ? t('box-office.manage.free.terms', { until: dateTime(terms.until) }) : terms.feeMinor > 0
                   ? t('box-office.manage.refund.terms', { until: dateTime(terms.until), fee: money(terms.feeMinor, order.currency) })
                   : t('box-office.manage.refund.terms-free', { until: dateTime(terms.until) }) }}
               </p>
@@ -186,7 +188,7 @@ async function cancel(all: boolean) {
                   v-for="(line, i) in order.lines"
                   :key="line.id"
                   :model-value="chosen.includes(line.id)"
-                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: kindOf(line), price: money(line.amountMinor, order.currency) })"
+                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: kindOf(line), price: line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) })"
                   @update:model-value="toggle(line.id, $event)"
                 />
               </fieldset>
@@ -197,7 +199,7 @@ async function cancel(all: boolean) {
                   variant="outline"
                   :loading="busy"
                   :disabled="!chosen.length || chosen.length === order.lines.length"
-                  :label="t('box-office.manage.cancel.button', { count: chosen.length || 0 })"
+                  :label="chosen.length ? t('box-office.manage.cancel.button', { count: chosen.length }) : t('box-office.manage.cancel.none')"
                   @click="cancel(false)"
                 />
                 <UButton

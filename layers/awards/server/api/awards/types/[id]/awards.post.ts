@@ -40,6 +40,10 @@ export default defineRoute({
   }
   if (accountId && actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId))
     refuse('awards.award.own', 'You cannot issue an award to your own account.', { status: 403, remedy: 'Ask somebody else who may issue awards.' })
+  if (accountId && type.onePerPerson) {
+    const held = await first<{ id: string }>(`SELECT id FROM awards_awards WHERE type_id = ?1 AND state = 'current' AND account_id IN (${accountScopeSql('?2')}) LIMIT 1`, type.id, accountId) // not-policy: numbered parameters
+    if (held) refuse('awards.award.already-held', `This person already holds ${type.name}.`, { status: 409, remedy: 'Open their award to correct it instead.', detail: { awardId: held.id } })
+  }
   if (input.productionId && !(await first('SELECT 1 FROM core_productions WHERE id = ?', input.productionId)))
     refuse('awards.award.no-production', 'There is no such production.', { status: 422, fields: { productionId: 'awards.award.no-production' } })
   const visibility = input.visibility ?? await startingVisibility(type, accountId, claimed)
