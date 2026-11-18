@@ -91,6 +91,7 @@ export const settings = defineSettings('core', {
   'rate-limits.default': setting.rate({ default: { count: 600, per: '1m' }, change, onChange: 'confirm' }),
   'rate-limits.write': setting.rate({ default: { count: 120, per: '1m' }, change, onChange: 'confirm' }),
   'rate-limits.sign-in': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
+  'rate-limits.sign-in-network': setting.rate({ default: { count: 200, per: '10m' }, change, onChange: 'confirm' }),
   'rate-limits.public-form': setting.rate({ default: { count: 20, per: '10m' }, change, onChange: 'confirm' }),
   'rate-limits.export': setting.rate({ default: { count: 10, per: '1h' }, change, onChange: 'confirm' }),
   'rate-limits.presented-value': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),

@@ -1,9 +1,11 @@
-// Templates (FB-208): a new form starts from a shipped template or one the theatre saved, and is
-// its own form from then on.
-import { beforeAll, describe, expect, it } from 'vitest'
-import { person, rows } from '../../../../tests/integration/helpers'
+// Templates (FB-208, FB-510): a new form starts from a shipped template, one another module ships
+// (forms.template) or one the theatre saved, and is its own form from then on.
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { useRegistry } from '#kit/registry'
+import { person, rows, setModule } from '../../../../tests/integration/helpers'
 import { account, author, definition, form, question, ready, req, save } from './stage'
-import { reviewWorkflow } from '../../shared/engine'
+import { checkDefinition, reviewWorkflow } from '../../shared/engine'
+import issueAward from '../../../awards/server/contributions/forms.outcome-action/issue-award'
 
 const keeper = person(['forms.form.create', 'forms.form.edit', 'forms.template.manage'], { name: 'Kit Keeper', reassertedAt: Date.UTC(2026, 10, 17, 12) })
 beforeAll(async () => {
@@ -49,7 +51,7 @@ describe('templates', () => {
     expect(saved.status, JSON.stringify(saved.body)).toBe(200)
     const list = await req('GET', '/api/forms/templates', undefined, keeper)
     expect(list.body.canManage).toBe(true)
-    expect(list.body.templates.at(-1)).toEqual({ key: saved.body.templateId, name: 'Sign-up', description: 'For workshops', own: true, anonymous: false, questions: 2 })
+    expect(list.body.templates.at(-1)).toEqual({ key: saved.body.templateId, name: 'Sign-up', description: 'For workshops', own: true, anonymous: false, questions: 2, mode: null, slots: [], module: null })
 
     // Changing the form afterwards changes nothing in the template.
     await save(formId, definition(question('name')), keeper)
@@ -66,5 +68,67 @@ describe('templates', () => {
     const back = await req('POST', '/api/forms/templates', gone.body.removed, keeper)
     expect(back.status, JSON.stringify(back.body)).toBe(200)
     expect((await req('GET', '/api/forms/templates', undefined, keeper)).body.templates.at(-1)).toMatchObject({ name: 'Sign-up', questions: 2 })
+  })
+})
+
+describe('templates other modules ship', () => {
+  type Listed = { key: string, mode: string | null, slots: string[], module: string | null }
+  const listed = async () => (await req('GET', '/api/forms/templates')).body.templates as Listed[]
+  let restore = () => {}
+  beforeAll(() => setModule('awards', true))
+  afterAll(async () => {
+    restore()
+    await setModule('awards', false)
+  })
+
+  it('offers them beside the shipped ones, with the mode and slots they suit, while their module is on', async () => {
+    const all = await listed()
+    expect(all.find(t => t.key === 'awards.nomination')).toMatchObject({ own: false, mode: 'submission', slots: ['awards.nomination'], module: 'awards', questions: 3 })
+    expect(all.find(t => t.key === 'gallery.show-fields')).toMatchObject({ mode: 'record', slots: ['gallery.show-fields'], module: 'gallery' })
+    // Shipped first, then the modules', then the theatre's own.
+    expect(all.findIndex(t => t.key === 'forms.feedback-survey')).toBeLessThan(all.findIndex(t => t.key === 'awards.nomination'))
+    // Every slot a template names is one a module declares.
+    const slots = new Set([...useRegistry().modules.values()].flatMap(m => ((m.manifest.contributes as Record<string, { id: string }[]> | undefined)?.['forms.slot'] ?? []).map(s => s.id)))
+    for (const t of all) for (const slot of t.slots) expect(slots.has(slot), `${t.key} names ${slot}`).toBe(true)
+
+    await setModule('awards', false)
+    try {
+      expect((await listed()).some(t => t.key === 'awards.nomination')).toBe(false)
+      expect((await req('POST', '/api/forms/forms', { title: 'Nominations', template: 'awards.nomination' })).body.code).toBe('forms.template.not-found')
+    }
+    finally {
+      await setModule('awards', true)
+    }
+  })
+
+  it('makes a copy in the template\'s mode, with the moves it carries', async () => {
+    const fields = await req('POST', '/api/forms/forms', { title: 'Show details', template: 'gallery.show-fields' })
+    expect(fields.status, JSON.stringify(fields.body)).toBe(200)
+    expect((await rows('SELECT mode, template_key FROM forms_forms WHERE id = ?', fields.body.formId))[0]).toEqual({ mode: 'record', template_key: 'gallery.show-fields' })
+
+    const made = await req('POST', '/api/forms/forms', { title: 'Long service nominations', template: 'awards.nomination' })
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    const def = await draftOf(made.body.formId)
+    expect(def.workflow.transitions.find((t: { key: string }) => t.key === 'approve').actions[0].action).toBe('awards.issue-award')
+    // Its action is wired as awards asks: the publish check, with awards' action offered, finds no error.
+    expect(checkDefinition(def, { actions: [issueAward], sources: ['core.person'] }).filter(p => p.level === 'error')).toEqual([])
+  })
+
+  it('leaves out one that fails the checks the shipped ones pass', async () => {
+    const entry = useRegistry().modules.get('forms')!
+    const before = { contributes: entry.manifest.contributes, handlers: entry.handlers.contributions }
+    const broken = { key: 'forms.broken', name: 'x', description: 'y', definition: { format: 1, pages: [{ id: 'page-1', title: '', items: [{ kind: 'question', id: 'q', key: 'q', type: 'text.short', label: '', dataClass: 'internal' }] }] } }
+    const stranger = { key: 'awards.not-mine', name: 'x', description: 'y', definition: { format: 1, pages: [] } }
+    ;(entry.manifest as any).contributes = { ...before.contributes, 'forms.template': [{ id: 'forms.broken', file: 'broken' }, { id: 'forms.stranger', file: 'stranger' }] }
+    ;(entry.handlers as any).contributions = { ...before.handlers, 'forms.template': { broken, stranger } }
+    restore = () => {
+      ;(entry.manifest as any).contributes = before.contributes
+      ;(entry.handlers as any).contributions = before.handlers
+    }
+    const keys = (await listed()).map(t => t.key)
+    expect(keys).not.toContain('forms.broken')
+    expect(keys).not.toContain('awards.not-mine')
+    expect(keys).toContain('awards.nomination')
+    restore()
   })
 })

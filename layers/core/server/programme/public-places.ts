@@ -96,6 +96,8 @@ export interface SeasonProduction {
   category: PublicTerm | null
   /** The first performance that is not a draft; null while it has none. */
   firstStartsAt: number | null
+  /** The last performance's start, on the same terms: a card's date range ends here. */
+  lastStartsAt: number | null
   lastEndsAt: number | null
   cancelled: boolean
   /** Worked out as on the production page: cancelled, or its last performance has ended. */
@@ -127,10 +129,12 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
   )
   if (!s || (s.state === 'archived' && !pastVisible)) return null
   const now = options.now ?? nowMs()
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, age_min: number | null, age_restricted: number, has_effects: number }>(
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, last_starts_at: number | null, age_min: number | null, age_restricted: number, has_effects: number, has_warnings: number }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.state, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
         p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
+        EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id) AS has_warnings,
         (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
+        (SELECT max(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS last_starts_at,
         (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
        FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id
       WHERE p.season_id = ? AND p.state IN ('published', 'cancelled') AND p.listed = 1
@@ -148,12 +152,14 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
       summary: r.summary,
       category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
       firstStartsAt: r.opened_at,
+      lastStartsAt: r.last_starts_at,
       lastEndsAt: r.closed_at,
       cancelled: r.state === 'cancelled',
       past,
       poster: images.get(r.id)!.poster,
       age: ageWording(r.age_min, !!r.age_restricted),
       hasEffects: !!r.has_effects,
+      hasWarnings: !!r.has_warnings,
     }
   })
   return {
@@ -166,4 +172,46 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
     archived: s.state === 'archived',
     productions: pastVisible ? productions : productions.filter(p => !p.past),
   }
+}
+
+/** A venue in brief, for the venues index and a production page's "Getting here": no spaces. */
+export interface PublicVenueSummary {
+  id: string
+  slug: string
+  name: string
+  address: PublicVenue['address']
+  gettingHere: string | null
+  /** The venue's own access features, not any space's. */
+  access: PublicFeature[]
+}
+
+/**
+ * Active venues in brief, by name: the ones given, or every one audiences go to (with a space that
+ * can hold a performance) when none are.
+ */
+export async function publicVenues(ids?: string[]): Promise<PublicVenueSummary[]> {
+  if (ids && !ids.length) return []
+  const rows = await all<Pick<VenueRow, 'id' | 'slug' | 'name' | 'address_lines' | 'locality' | 'postcode' | 'country' | 'getting_here'>>(
+    `SELECT v.id, v.slug, v.name, v.address_lines, v.locality, v.postcode, v.country, v.getting_here
+       FROM core_venues v
+      WHERE v.state = 'active'
+        AND ${ids ? 'v.id IN (SELECT value FROM json_each(?))' : 'EXISTS (SELECT 1 FROM core_spaces s WHERE s.venue_id = v.id AND s.state = \'active\' AND s.performable = 1)'}
+      ORDER BY lower(v.name), v.id`,
+    ...(ids ? [JSON.stringify(ids)] : []),
+  )
+  const features = rows.length
+    ? await all<{ venue_id: string, term_id: string, label: string, icon: string | null, note: string | null }>(
+        `SELECT a.venue_id, a.term_id, t.label, t.icon, a.note FROM core_place_access a JOIN core_terms t ON t.id = a.term_id
+          WHERE a.venue_id IN (SELECT value FROM json_each(?)) AND a.space_id IS NULL ORDER BY a.sort, t.sort`,
+        JSON.stringify(rows.map(r => r.id)),
+      )
+    : []
+  return rows.map(v => ({
+    id: v.id,
+    slug: v.slug,
+    name: v.name,
+    address: { lines: (v.address_lines ?? '').split('\n').map(l => l.trim()).filter(Boolean), locality: v.locality, postcode: v.postcode, country: v.country },
+    gettingHere: v.getting_here,
+    access: features.filter(f => f.venue_id === v.id).map(f => ({ termId: f.term_id, label: f.label, icon: f.icon, note: f.note })),
+  }))
 }

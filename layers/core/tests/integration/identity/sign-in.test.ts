@@ -157,10 +157,43 @@ describe('abuse (ID-10)', () => {
   })
 
   it('over the per-network limit, the kit refuses before anything is written', async () => {
-    const ask = () => new Browser().post('/api/core/sign-in/email', { address: address() }, { 'cf-turnstile-response': 'pass', 'x-forwarded-for': '198.51.100.7' })
-    for (let i = 0; i < 10; i++) await ask()
-    const over = await ask()
-    expect(over.status).toBe(429)
+    await setSetting('core.rate-limits.sign-in-network', { count: 10, per: 600 }) // not-policy: a small allowance to reach
+    try {
+      const ask = () => new Browser().post('/api/core/sign-in/email', { address: address() }, { 'cf-turnstile-response': 'pass', 'x-forwarded-for': '198.51.100.7' })
+      for (let i = 0; i < 10; i++) await ask()
+      const over = await ask()
+      expect(over.status).toBe(429)
+    }
+    finally {
+      await clearSetting('core.rate-limits.sign-in-network')
+    }
+  })
+
+  it('people sharing one network address can all open the sign-in page and sign in (SI-1)', async () => {
+    const network = { 'x-forwarded-for': '203.0.113.20' }
+    // Twenty people on the bar's Wi-Fi open the sign-in page, which asks for passkey options.
+    for (let i = 0; i < 20; i++) expect((await new Browser().post('/api/core/sign-in/passkey/options', {}, network)).status).toBe(200)
+    // Twelve of them then ask for a code and use it: more than the strict sign-in allowance, which
+    // is counted for each email address, not for the network.
+    for (let i = 0; i < 12; i++) {
+      const browser = new Browser()
+      const to = address()
+      const asked = await browser.post('/api/core/sign-in/email', { address: to }, { 'cf-turnstile-response': 'pass', ...network })
+      expect(asked.status).toBe(200)
+      await deliver()
+      const message = mailbox.find(m => m.address === to && m.variables.code)
+      const used = await browser.post('/api/core/sign-in/code', { address: to, code: message!.variables.code }, network)
+      expect(used.status).toBe(200)
+    }
+  })
+
+  it('wrong codes for one address from one network reach the strict limit (SI-1)', async () => {
+    const network = { 'x-forwarded-for': '203.0.113.21' }
+    const to = address()
+    const statuses = []
+    for (let i = 0; i < 11; i++) statuses.push((await new Browser().post('/api/core/sign-in/code', { address: to, code: '000000' }, network)).status)
+    expect(statuses.slice(0, 10).every(s => s === 422)).toBe(true)
+    expect(statuses[10]).toBe(429)
   })
 
   it('tokens are stored hashed: no row holds the link or the code', async () => {
