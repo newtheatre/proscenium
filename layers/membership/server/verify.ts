@@ -52,17 +52,19 @@ export function recordOutcome(unit: UnitView, membershipId: string, outcome: Out
   }).expect(1)
 }
 
-/** How a well-formed reference reads, for a message that says what one looks like (V15). */
-export function shapeText(label: string, shape: Shape | null): string {
-  if (!shape) return `Enter your ${label}.`
+/**
+ * How a well-formed reference reads, for a message that says what one looks like (V15). A list's
+ * label is a whole phrase (V13), the field's own name, so it is never set inside this sentence.
+ */
+export function shapeText(shape: Shape | null): string {
+  if (!shape) return 'Type your reference.'
   const length = shape.min === shape.max ? `${shape.min}` : `${shape.min} to ${shape.max}`
-  return `Your ${label} is ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
+  return `That reference should be ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
 }
 
 /** The entry that lets this account join, or a refusal saying why not. */
 export async function passList(list: ListRow, accountId: string, reference: string | null | undefined, day: string): Promise<ListPass> {
   const help = String(await useSetting('membership.help.link') ?? '') || undefined
-  const label = list.referenceLabel ?? 'reference'
   let entry: Awaited<ReturnType<typeof findEntry>> = null
   if (list.keyKind === 'email') {
     for (const address of await verifiedAddresses(accountId)) {
@@ -72,17 +74,17 @@ export async function passList(list: ListRow, accountId: string, reference: stri
     if (!entry) refuse('membership.join.not-on-list', 'We could not find a membership for any of your verified email addresses. Have a membership? Contact us.', { status: 422, remedy: help })
   }
   else {
-    if (!reference) refuse('membership.join.needs-reference', `Enter your ${label}.`, { status: 422, fields: { reference: 'membership.join.needs-reference' } })
+    if (!reference) refuse('membership.join.needs-reference', 'Type your reference.', { status: 422, fields: { reference: 'membership.join.needs-reference' } })
     if (!wellFormed(list.referenceShape, normalise('reference', reference!)))
-      refuse('membership.join.not-well-formed', shapeText(label, list.referenceShape), { status: 422, fields: { reference: 'membership.join.not-well-formed' } })
+      refuse('membership.join.not-well-formed', shapeText(list.referenceShape), { status: 422, fields: { reference: 'membership.join.not-well-formed' } })
     entry = await findEntry(list, reference!, day)
     // V15: the miss speaks of the membership, not the ID.
-    if (!entry) refuse('membership.join.not-on-list', `We could not find a membership for that ${label}. Have a membership? Contact us.`, { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
+    if (!entry) refuse('membership.join.not-on-list', 'We could not find a current membership with that reference. Have a membership? Contact us.', { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
   }
   if (entry!.usedBy) {
     const ours = await all<{ id: string }>(`SELECT id FROM membership_memberships WHERE id = ?1 AND account_id IN (${accountScopeSql('?2')})`, entry!.usedBy, accountId)
     // V4: somebody else claimed it. Staff settle that; the application queue is a later slice.
-    if (!ours.length) refuse('membership.join.entry-already-used', `That ${label} has already been used to join. Contact us and we will sort it out.`, { status: 409, remedy: help })
+    if (!ours.length) refuse('membership.join.entry-already-used', 'That reference has already been used to join. Contact us and we will sort it out.', { status: 409, remedy: help })
   }
   return { entryId: entry!.id, endsOn: entry!.endsOn }
 }

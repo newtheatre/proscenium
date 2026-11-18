@@ -3,6 +3,7 @@
 // contributed sections, closing shifts, the morning chase, and volunteer hours with their export.
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, setClock } from '#kit'
+import { listTerms } from '#modules/core'
 import { closeShifts } from '../../server/close'
 import { call, env, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { duty, handle, manager, performance, ready, req, setting, shift, shiftRow, MINUTE } from './stage'
@@ -163,5 +164,47 @@ describe('the console\'s night reports', () => {
     expect(report.performance).toEqual({ title: expect.stringContaining('Front of house show'), startsAt: n.p.startsAt })
     expect(report.can).toEqual({ write: false, signOff: false })
     expect(Object.keys(report.names)).toContain(report.signedOffBy)
+  })
+})
+
+describe('after sign-off, for the people of the night', () => {
+  it('keeps the report open to whoever led the night once their shift has ended, and not to the rest of the rota', async () => {
+    const n = await night()
+    const leadDuty = await duty('Duty manager', { isLead: true })
+    const leadShift = await shift(n.p.id, leadDuty, 1)
+    const dan = person(['front-of-house.shift.sign-up'])
+    expect((await req('POST', `/api/front-of-house/shifts/${leadShift}/sign-up`, {}, dan)).status).toBe(200)
+    // Before sign-off, the draft is for those holding the abilities only.
+    expect((await req('GET', `/api/front-of-house/performances/${n.p.id}/report`, undefined, dan)).status).toBe(403)
+    await req('POST', `/api/front-of-house/performances/${n.p.id}/report/sign-off`, {}, lead())
+    const read = await req('GET', `/api/front-of-house/performances/${n.p.id}/report`, undefined, dan)
+    expect(read.status, JSON.stringify(read.body)).toBe(200)
+    expect(read.body).toMatchObject({ state: 'signed_off', can: { write: false, signOff: false } })
+    expect((await req('GET', `/api/front-of-house/performances/${n.p.id}/report`, undefined, n.amy)).status).toBe(403)
+  })
+
+  it('says who was marked arrived, so sign-off can start from them', async () => {
+    const n = await night()
+    setClock(n.callAt)
+    expect((await req('POST', `/api/front-of-house/assignments/${n.a}/check-in`, {}, lead())).status).toBe(200)
+    const report = (await req('GET', `/api/front-of-house/performances/${n.p.id}/report`, undefined, lead())).body
+    expect(report.unresolved.people.map((p: any) => [p.assignmentId, p.arrived])).toEqual([[n.a, true], [n.b, false]])
+  })
+
+  it('names a checklist problem\'s reason and keeps its note out of the snapshot', async () => {
+    const n = await night()
+    const made = await req('POST', '/api/front-of-house/checklists', { name: `Bar ${Math.random()}`.slice(0, 20), moment: 'pre-show', items: [{ label: 'Fridge on' }] })
+    const listed = (await req('GET', '/api/front-of-house/checklists')).body.checklists.find((c: any) => c.id === made.body.checklistId)
+    const item = listed.items[0].id as string
+    const broken = (await inContext(() => listTerms('front-of-house.exception-reason'))).find(t => t.slug === 'broken')!
+    setClock(n.callAt)
+    const stewardCan = person(['front-of-house.checklist.complete'])
+    const entered = await req('PUT', `/api/front-of-house/performances/${n.p.id}/checklists/${made.body.checklistId}/items/${item}`, { outcome: 'exception', reasonCode: broken.id, reasonNote: 'Plug loose' }, stewardCan)
+    expect(entered.status, JSON.stringify(entered.body)).toBe(200)
+    await req('POST', `/api/front-of-house/performances/${n.p.id}/report/sign-off`, {}, lead())
+    const [row] = await rows<{ snapshot: string }>('SELECT snapshot FROM front_of_house_night_reports WHERE performance_id = ?', n.p.id)
+    expect(row!.snapshot).not.toContain('Plug loose')
+    const report = (await req('GET', `/api/front-of-house/performances/${n.p.id}/report`, undefined, lead())).body
+    expect(report.problems).toEqual({ [`${made.body.checklistId}:Fridge on`]: { reason: broken.label, note: 'Plug loose' } })
   })
 })
