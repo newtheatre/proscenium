@@ -2,7 +2,10 @@
      run is selling, a warning when performances are on sale while the production is still in draft,
      the seats for the whole run set once, the whole run put on sale at once, and each performance
      with where its sales stand. A night whose seats were changed on its own set-up keeps them (a
-     per-night override) and says so; it opens its set-up for anything else of its own. -->
+     per-night override) and says so; it opens its set-up for anything else of its own. A production
+     with one price throughout has at most one section, which is not named here: its seats are one
+     number and its prices one per ticket type. Splitting the house into sections is done on a
+     performance's set-up (show walkthrough, decision 4). -->
 <script setup lang="ts">
 const props = defineProps<{ recordId: string }>()
 const { t } = useT()
@@ -37,6 +40,28 @@ const describe = (row: ProductionTicketsRow) => [
   row.ownSeats ? t('box-office.production-tickets.own-seats') : null,
 ].filter(Boolean).join(' · ') || undefined
 
+// One price throughout: no more than one section, so none is named. With none yet, the seats are typed
+// into a box of their own, and the one section is made when they are saved.
+const sectioned = computed(() => (data.value?.sections.length ?? 0) > 1)
+const wholeSeats = ref(0)
+async function wholeHouse(): Promise<Record<string, number> | null> {
+  const d = data.value!
+  if (d.sections.length) return seats.value
+  refusal.value = null
+  try {
+    const typed = wholeSeats.value
+    await $api(`/api/box-office/productions/${encodeURIComponent(props.recordId)}/bands`, { method: 'POST', body: { name: t('box-office.setup.sections.whole-house'), kind: 'standard', sort: 0 } })
+    await refresh()
+    const only = data.value?.sections[0]
+    wholeSeats.value = 0
+    return only ? { [only.id]: typed } : null
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    return null
+  }
+}
+
 // The seats for the run: one number a section, for every night that follows the run.
 const seats = ref<Record<string, number>>({})
 watch(data, (d) => {
@@ -47,9 +72,11 @@ const ownCount = computed(() => coming.value.filter(p => p.ownSeats).length)
 const firstToCome = computed(() => coming.value[0] ?? data.value?.performances[0])
 
 interface RunResult { done: number, skipped: { performanceId: string, reason: string }[], performanceIds?: string[] }
-async function saveSeats(confirmOverVenue = false) {
+async function saveSeats(confirmOverVenue = false, typed?: Record<string, number>) {
+  const counts = typed ?? await wholeHouse()
+  if (!counts) return
   const d = data.value!
-  const pools = d.sections.map(s => ({ bandId: s.id, capacity: seats.value[s.id] ?? 0 }))
+  const pools = d.sections.map(s => ({ bandId: s.id, capacity: counts[s.id] ?? 0 }))
   const before = d.sections.map(s => ({ bandId: s.id, capacity: d.runSeats[s.id] ?? 0 }))
   refusal.value = null
   try {
@@ -66,7 +93,7 @@ async function saveSeats(confirmOverVenue = false) {
   }
   catch (e) {
     const r = toRefusal(e)
-    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return saveSeats(true)
+    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return saveSeats(true, counts)
     refusal.value = r
   }
 }
@@ -160,31 +187,27 @@ async function openRun() {
 
         <PageSection
           :title="t('box-office.production-tickets.run-seats.title')"
-          :description="ownCount ? t('box-office.production-tickets.run-seats.own', { count: ownCount }) : t('box-office.production-tickets.run-seats.description')"
+          :description="ownCount ? t('box-office.production-tickets.run-seats.own', { count: ownCount }) : t(sectioned ? 'box-office.production-tickets.run-seats.description' : 'box-office.production-tickets.run-seats.description-whole')"
         >
-          <p
-            v-if="!data.sections.length"
-            class="text-sm text-muted"
-          >
-            {{ t('box-office.production-tickets.run-seats.no-sections') }}
-            <ULink
-              v-if="firstToCome"
-              :to="`/console/box-office/performances/${encodeURIComponent(firstToCome.id)}`"
-            >
-              {{ t('box-office.production-tickets.open-set-up') }}
-            </ULink>
-          </p>
           <UForm
-            v-else
             class="space-y-4"
             :state="seats"
             novalidate
             @submit="saveSeats()"
           >
             <UFormField
+              v-if="!data.sections.length"
+              :label="t('box-office.setup.capacity.whole')"
+            >
+              <UInputNumber
+                v-model="wholeSeats"
+                :min="0"
+              />
+            </UFormField>
+            <UFormField
               v-for="s in data.sections"
               :key="s.id"
-              :label="s.name"
+              :label="sectioned ? s.name : t('box-office.setup.capacity.whole')"
             >
               <UInputNumber
                 v-model="seats[s.id]"
@@ -198,6 +221,15 @@ async function openRun() {
               />
             </div>
           </UForm>
+          <p
+            v-if="!sectioned && firstToCome"
+            class="mt-4 text-sm text-muted"
+          >
+            {{ t('box-office.setup.sections.split-help') }}
+            <ULink :to="`/console/box-office/performances/${encodeURIComponent(firstToCome.id)}#sections`">
+              {{ t('box-office.setup.sections.split') }}
+            </ULink>
+          </p>
           <template
             v-if="notOnSale"
             #footer
@@ -215,7 +247,7 @@ async function openRun() {
         <PageSection
           v-if="data.sections.length"
           :title="t('box-office.setup.prices.title')"
-          :description="t('box-office.production-tickets.run-prices.description')"
+          :description="t(sectioned ? 'box-office.production-tickets.run-prices.description' : 'box-office.production-tickets.run-prices.description-whole')"
         >
           <p
             v-if="!priced.length"
@@ -238,7 +270,10 @@ async function openRun() {
               :key="s.id"
               class="space-y-3"
             >
-              <legend class="font-medium">
+              <legend
+                v-if="sectioned"
+                class="font-medium"
+              >
                 {{ s.name }}
               </legend>
               <UFormField
@@ -246,7 +281,10 @@ async function openRun() {
                 :key="type.id"
               >
                 <template #label>
-                  <span class="sr-only">{{ s.name }}, </span>{{ type.name }}<span class="sr-only"> {{ t('box-office.production-tickets.price') }}</span>
+                  <span
+                    v-if="sectioned"
+                    class="sr-only"
+                  >{{ s.name }}, </span>{{ type.name }}<span class="sr-only"> {{ t('box-office.production-tickets.price') }}</span>
                 </template>
                 <FieldMoney v-model="prices[cell(s.id, type.id)]" />
               </UFormField>
