@@ -19,7 +19,10 @@ watch(data, (d) => {
   for (const fact of d?.facts ?? []) drafts[fact.name] = fact.abilities.map(a => a.ability)
 }, { immediate: true })
 
-const nameOf = (fact: Fact) => te(fact.label) ? t(fact.label) : fact.name
+// A fact a module has not named reads as its module and its words, never as a raw id (L13).
+const nameOf = (fact: Fact) => te(fact.label)
+  ? t(fact.label)
+  : `${te(`${fact.module}.module.name`) ? t(`${fact.module}.module.name`) : fact.module}: ${fact.name.slice(fact.module.length + 1).replace(/-/g, ' ')}`
 const confirmedOf = (fact: Fact) => fact.abilities.filter(a => a.confirmed).map(a => a.ability)
 const privileged = computed(() => new Set((data.value?.catalogue ?? []).filter(a => a.risk === 'privileged').map(a => a.name)))
 /** Privileged abilities ticked for this fact that the theatre has not confirmed yet. */

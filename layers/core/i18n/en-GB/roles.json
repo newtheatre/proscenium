@@ -55,6 +55,9 @@
   "core.facts.confirm-help": "They count only once confirmed, because they give control over other people or the theatre.",
   "core.facts.save": "Save",
   "core.facts.saved": "{fact} saved",
+  "core.facts.member.label": "Holds a standing, such as a membership",
+  "core.facts.access-scheme.label": "Accepted onto the access scheme",
+  "core.facts.production-team.label": "On the production's team",
   "core.sign-in-settings.title": "Sign-in",
   "core.roles.empty": "No roles yet",
   "core.roles.empty-help": "A role is a set of abilities, such as running the box office, that you give to people for a time."
