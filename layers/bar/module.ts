@@ -196,6 +196,7 @@ export default defineModule({
       { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: 'bar.sale.view', order: 15 },
       { id: 'bar.stock-levels', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stock', icon: 'i-lucide-package', ability: 'bar.stock.view', order: 25 },
       { id: 'bar.deliveries', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/deliveries', match: '/console/bar/deliveries', icon: 'i-lucide-truck', ability: 'bar.stock.receive', order: 26 },
+      { id: 'bar.stocktakes', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stocktakes', match: '/console/bar/stocktakes', icon: 'i-lucide-clipboard-list', ability: 'bar.stock.count', order: 27 },
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
       { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
       { id: 'bar.choices', menu: 'admin', group: 'modules', to: '/admin/modules/bar/choices', icon: 'i-lucide-list-checks', ability: 'bar.product.manage', order: 15 },
