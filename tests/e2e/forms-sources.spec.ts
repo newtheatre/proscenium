@@ -46,7 +46,7 @@ test('a question chooses from a source, and the preview searches it', async ({ p
   const answer = page.getByRole('button', { name: 'Which venue?' })
   await expect(answer).toBeVisible()
   await answer.click()
-  await expect(page.getByText('Type two letters or more.')).toBeVisible()
+  await expect(page.getByText('Type 2 letters or more.')).toBeVisible()
   await page.getByPlaceholder('Type a name').fill('zzzz')
   await expect(page.getByText('Nothing matches.')).toBeVisible()
   await page.keyboard.press('Escape')

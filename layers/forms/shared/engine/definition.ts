@@ -68,6 +68,7 @@ const question = z.strictObject({
   validation: z.array(rule).max(10).optional(),
   dataClass: z.enum(DATA_CLASSES),
   peopleInvolved: z.boolean().optional(),
+  openSearch: z.boolean().optional(),
 }) satisfies z.ZodType<Question>
 
 const group = z.strictObject({

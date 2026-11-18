@@ -135,6 +135,8 @@ export default defineModule({
   contributes: {
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }, { id: 'forms.template', file: 'template' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
+    // Responses are found by reference from the palette; the route answers only those the person may read.
+    'core.search-source': [{ id: 'forms.responses', record: 'forms.response', ability: ['forms.response.read', 'forms.form.edit'], route: '/api/forms/search', shells: ['console'] }],
     // File answers: held in core's store under their response, checked as any upload is, and read only
     // by those forms lets read the response. Uploaded through forms' own route while answering, never core's.
     'core.file-slot': [{ id: 'forms.answer-file', owner: 'forms.response', ability: 'forms.settings.manage', many: true, accepts: ['png' as const, 'jpeg' as const, 'webp' as const, 'pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: true }],

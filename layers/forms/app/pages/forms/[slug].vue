@@ -42,6 +42,7 @@ const at = computed(() => place.value ? `?place=${encodeURIComponent(place.value
 const { data, error, refresh } = await useAPI<Open>(() => `/api/forms/open/${encodeURIComponent(slug.value)}${at.value}`, { key: `forms:open:${slug.value}:${place.value}` })
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
 const form = computed(() => data.value!)
+provide('forms:answering', slug)
 
 const responseId = ref(form.value.draft?.responseId ?? newResponseId())
 // File answers are uploaded into this response as they are chosen.
@@ -149,7 +150,7 @@ async function send(kept: Answers): Promise<boolean> {
 <template>
   <PageFrame
     :title="form.title"
-    :description="form.about?.name ? `${t(form.about.label)} ${form.about.name}` : undefined"
+    :description="form.about?.name ? `${t(form.about.label)}: ${form.about.name}` : undefined"
     width="reading"
   >
     <EmptyState
