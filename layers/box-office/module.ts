@@ -48,6 +48,8 @@ export default defineModule({
     'comps.per-performance': setting.integer({ unset: true, min: 0, max: 1000, change, audience: 'staff' }),
     // The theatre's usual ticket preset, which a new show's tickets start from (show walkthrough, decision 2).
     'presets.usual': setting.custom({ schema: z.string().regex(/^tps_[2-7a-z]{26}$/), unset: true, change: 'box-office.pricing.manage', audience: 'staff' }),
+    // A date added to a run that is on sale goes on sale too, with the run's seats and prices (show walkthrough, decision 3).
+    'runs.open-new-dates': setting.boolean({ default: true, change, audience: 'staff' }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
@@ -141,6 +143,8 @@ export default defineModule({
       'core.performance.cancelled': 'follow-cancel',
       'core.performance.rescheduled': 'follow-reschedule',
       'core.performance.moved': 'follow-move',
+      // A newly scheduled performance takes its run's set-up, or its ticket preset, and goes on sale with the run.
+      'core.performance.scheduled': 'follow-schedule',
       'core.production.updated': 'follow-guidance',
     },
   },
