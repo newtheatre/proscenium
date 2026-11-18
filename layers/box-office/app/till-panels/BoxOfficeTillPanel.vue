@@ -11,7 +11,8 @@ interface OrderLine { id: string, performanceId: string, bandId: string, ticketT
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
 interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
 
-const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
+/** `settled`: the till payment just taken that this panel sold something in, until the next customer. */
+const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
 const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
 
 const { t } = useT()
@@ -204,6 +205,52 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   else if (order.value.state === 'reserved') void find(order.value.reference)
 })
 
+// After the sale (till proposal): what was made, with its reference and tickets, so the seller can
+// email them, admit the buyer, or open the booking, until the till moves on to the next customer.
+interface Sold { orderId: string, reference: string, buyer: string | null, performance: { id: string, title: string, startsAt: number } | null, lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[] }
+const sold = ref<Sold[]>([])
+const soldRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const emailTo = ref<Record<string, Buyer | undefined>>({})
+const soldBusy = ref<string | null>(null)
+async function loadSold(intent: string) {
+  try {
+    sold.value = (await $api<{ orders: Sold[] }>('/api/box-office/desk/sold', { query: { intent } })).orders
+  }
+  catch (e) {
+    soldRefusal.value = toRefusal(e)
+  }
+}
+watch(() => props.settled, (intent) => {
+  sold.value = []
+  emailTo.value = {}
+  soldRefusal.value = null
+  if (intent) void loadSold(intent)
+}, { immediate: true })
+const waitingIn = (o: Sold) => o.lines.filter(l => !l.admitted).length
+async function soldAction(o: Sold, fn: () => Promise<unknown>) {
+  soldBusy.value = o.orderId
+  soldRefusal.value = null
+  try {
+    await fn()
+    if (props.settled) await loadSold(props.settled)
+  }
+  catch (e) {
+    soldRefusal.value = toRefusal(e)
+  }
+  finally {
+    soldBusy.value = null
+  }
+}
+function emailSold(o: Sold) {
+  const to = emailTo.value[o.orderId]
+  if (!to) return
+  void soldAction(o, () => $api(`/api/box-office/desk/orders/${o.orderId}/send` as string, { method: 'POST', body: 'accountId' in to ? { accountId: to.accountId } : { email: to.email } }))
+}
+function admitSold(o: Sold) {
+  if (!o.performance) return
+  void soldAction(o, () => $api(`/api/box-office/performances/${o.performance!.id}/door/admit` as string, { method: 'POST', body: { orderId: o.orderId, count: waitingIn(o), deviceLabel: 'Desk' } }))
+}
+
 async function find(text = query.value) {
   if (!text.trim()) return
   busy.value = true
@@ -300,7 +347,103 @@ function clear() {
 
 <template>
   <div
-    v-if="exchange"
+    v-if="settled && sold.length"
+    class="space-y-4"
+  >
+    <RefusalNotice :refusal="soldRefusal" />
+    <div
+      v-for="o in sold"
+      :key="o.orderId"
+      class="space-y-3 rounded-lg border border-default p-4"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="text-lg font-semibold">
+          {{ t('box-office.screens.panel.order', { reference: o.reference }) }}
+        </h3>
+        <StatusBadge
+          tone="success"
+          :label="t('box-office.screens.panel.states.confirmed')"
+        />
+      </div>
+      <p
+        v-if="o.performance"
+        class="text-sm text-muted"
+      >
+        {{ o.performance.title }}, {{ dateTime(o.performance.startsAt) }}
+      </p>
+      <ul
+        class="divide-y divide-default"
+        :aria-label="t('box-office.screens.panel.sold.tickets')"
+      >
+        <li
+          v-for="line in o.lines"
+          :key="line.id"
+          class="flex items-center justify-between gap-2 py-1.5"
+        >
+          <span>{{ line.band ? t('box-office.screens.panel.sold.line', { band: line.band, type: line.ticketType }) : line.ticketType }}</span>
+          <span class="flex shrink-0 items-center gap-2">
+            <UBadge
+              v-if="line.admitted"
+              color="success"
+              variant="subtle"
+              :label="t('box-office.screens.panel.admitted')"
+            />
+            <span class="tabular-nums">{{ money(line.amountMinor) }}</span>
+          </span>
+        </li>
+      </ul>
+      <p
+        v-if="o.buyer"
+        class="flex items-center gap-2 text-sm"
+      >
+        <UIcon
+          name="i-lucide-mail-check"
+          class="size-4 text-success"
+        />{{ t('box-office.screens.panel.sold.emailed', { name: o.buyer }) }}
+      </p>
+      <UFormField
+        v-else
+        :label="t('box-office.screens.panel.sold.email')"
+        :help="t('box-office.screens.panel.sold.email-help')"
+      >
+        <div class="flex flex-wrap gap-2">
+          <BoxOfficeBuyerPicker
+            v-model="emailTo[o.orderId]"
+            :domains="data?.emailDomains ?? []"
+            :disabled="soldBusy === o.orderId"
+            class="min-w-64 flex-1"
+          />
+          <UButton
+            icon="i-lucide-send"
+            :label="t('box-office.screens.panel.sold.send')"
+            :loading="soldBusy === o.orderId"
+            :disabled="!emailTo[o.orderId]"
+            @click="emailSold(o)"
+          />
+        </div>
+      </UFormField>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          v-if="waitingIn(o) && o.performance"
+          icon="i-lucide-door-open"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.screens.panel.sold.admit', { count: waitingIn(o) })"
+          :loading="soldBusy === o.orderId"
+          @click="admitSold(o)"
+        />
+        <UButton
+          :to="`/console/box-office/orders/${o.orderId}`"
+          icon="i-lucide-external-link"
+          color="neutral"
+          variant="ghost"
+          :label="t('box-office.screens.panel.sold.open')"
+        />
+      </div>
+    </div>
+  </div>
+  <div
+    v-else-if="exchange"
     class="space-y-3 rounded-lg border border-default p-4"
   >
     <h3 class="font-medium">

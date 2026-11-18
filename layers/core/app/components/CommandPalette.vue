@@ -1,6 +1,7 @@
 <!-- The command palette (UI-09), opened with Ctrl or Cmd K from anywhere in the console. It lists
-     only screens the viewer may open (the navigation they were given), the common actions and
-     settings they may use, and records through each module's search source. Records look the same
+     only screens the viewer may open (the navigation they were given, and the set-up screens that
+     are tabs of a module's page in Admin), the common actions and settings they may use, and
+     records through each module's search source. Records look the same
      whatever their type: a title, the type's name beside it, the type's own address. It works by
      keyboard alone: type, arrow, Enter. -->
 <script setup lang="ts">
@@ -9,6 +10,7 @@ import { watchDebounced } from '@vueuse/core'
 import { matchSettings } from '../../shared/search'
 
 interface Palette {
+  screens: { id: string, labelKey: string, moduleKey: string, to: string, icon: string }[]
   sources: { id: string, record: string, route: string }[]
   actions: { id: string, to: string, icon: string, labelKey: string, keywordsKey?: string }[]
 }
@@ -25,7 +27,7 @@ const { data: navigation } = await useNavigation('console')
 const { data: adminNavigation } = has('admin') ? await useNavigation('admin') : { data: ref(null) }
 // Fetched when the palette is first opened, so a page that never opens it makes no extra requests.
 const { data: settingsIndex, execute: loadSettings } = useSettingsIndex({ immediate: false })
-const { data: palette, execute: loadPalette } = useAPI<Palette>('/api/core/palette', { key: 'core:palette', lazy: true, server: false, immediate: false, default: () => ({ sources: [], actions: [] }) })
+const { data: palette, execute: loadPalette } = useAPI<Palette>('/api/core/palette', { key: 'core:palette', lazy: true, server: false, immediate: false, default: () => ({ screens: [], sources: [], actions: [] }) })
 let loaded = false
 watch(open, (now) => {
   if (!now || loaded) return
@@ -42,13 +44,14 @@ watchDebounced(term, async (q) => {
   if (q.trim().length < 2 || !sources.length) return // not-policy: two letters before a search is sent
   searching.value = true
   try {
-    const out: Found[] = []
-    for (const source of sources) {
+    // Every type is asked at once; each answers in the order its sources were declared.
+    const answers = await Promise.all(sources.map(async (source) => {
       const { ids } = await $api<{ ids: string[] }>(source.route, { query: { q } }).catch(() => ({ ids: [] as string[] }))
-      if (!ids.length) continue
+      if (!ids.length) return []
       const { records: found } = await $api<{ records: Found[] }>('/api/core/records', { query: { type: source.record, ids: ids.join(',') } }).catch(() => ({ records: [] as Found[] }))
-      out.push(...found)
-    }
+      return found
+    }))
+    const out = answers.flat()
     // Only the latest question's answer is shown.
     if (term.value === q) records.value = out
   }
@@ -59,6 +62,11 @@ watchDebounced(term, async (q) => {
 
 const typeName = (type: string) => te(`${type.split('.')[0]}.records.${type.split('.').slice(1).join('.')}`) ? t(`${type.split('.')[0]}.records.${type.split('.').slice(1).join('.')}`) : type
 
+// Add a run belongs to a production: on a production's page it opens that production's Add a run.
+const route = useRoute()
+const production = computed(() => /^\/console\/programme\/productions\/([^/]+)$/.exec(route.path)?.[1])
+const actionTo = (a: Palette['actions'][number]) => a.id === 'core.add-run' && production.value ? `/console/programme/productions/${production.value}?tab=dates&run=1` : a.to
+
 const groups = computed(() => {
   const both = has('admin') && has('console')
   const screens = [
@@ -68,9 +76,13 @@ const groups = computed(() => {
     ...(adminNavigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup].map(i => ({
       id: `screen:${i.id}`, label: t(i.label), suffix: `${t('core.palette.shell.admin')}: ${t(g.label)}`, icon: i.icon, to: i.to,
     }))),
+    // From the console a module's screen opens in the settings window, so it is named after its module.
+    ...(palette.value?.screens ?? []).map(s => ({
+      id: `screen:${s.id}`, label: t(s.labelKey), suffix: has('admin') ? `${t('core.palette.shell.admin')}: ${t(s.moduleKey)}` : t(s.moduleKey), icon: s.icon, to: s.to,
+    })),
   ]
   const actions = (palette.value?.actions ?? []).map(a => ({
-    id: `action:${a.id}`, label: t(a.labelKey), suffix: a.keywordsKey ? t(a.keywordsKey) : undefined, icon: a.icon, to: a.to,
+    id: `action:${a.id}`, label: t(a.labelKey), suffix: a.keywordsKey ? t(a.keywordsKey) : undefined, icon: a.icon, to: actionTo(a),
   }))
   const out: CommandPaletteGroup<CommandPaletteItem>[] = [
     { id: 'screens', label: t('core.palette.screens'), items: screens },
@@ -95,5 +107,9 @@ const groups = computed(() => {
     :placeholder="t('core.palette.placeholder')"
     shortcut="meta_k"
     label-key="label"
-  />
+  >
+    <template #empty="{ searchTerm }">
+      {{ searching ? t('core.palette.searching') : searchTerm ? t('core.palette.empty', { term: searchTerm }) : '' }}
+    </template>
+  </UDashboardSearch>
 </template>

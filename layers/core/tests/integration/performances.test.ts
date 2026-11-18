@@ -20,6 +20,7 @@ import setEffects from '../../server/api/core/productions/[id]/effects.put'
 import impact from '../../server/api/core/performances/[id]/impact.get'
 import createVenue from '../../server/api/core/venues/index.post'
 import addSpace from '../../server/api/core/venues/[id]/spaces/index.post'
+import getVenue from '../../server/api/core/venues/[id]/index.get'
 import archiveVenue from '../../server/api/core/venues/[id]/archive.post'
 import archiveSpace from '../../server/api/core/venues/[id]/spaces/[space]/archive.post'
 import deleteSpace from '../../server/api/core/venues/[id]/spaces/[space]/index.delete'
@@ -56,6 +57,7 @@ const handle = server({
   'GET /api/core/performances/:id/impact': impact,
   'POST /api/core/venues': createVenue,
   'POST /api/core/venues/:id/spaces': addSpace,
+  'GET /api/core/venues/:id': getVenue,
   'POST /api/core/venues/:id/archive': archiveVenue,
   'POST /api/core/venues/:id/spaces/:space/archive': archiveSpace,
   'DELETE /api/core/venues/:id/spaces/:space': deleteSpace,
@@ -281,6 +283,10 @@ describe('performances', () => {
     await req('POST', `/api/core/performances/${id}/schedule`, {})
     expect((await req('POST', `/api/core/venues/${s.venueId}/spaces/${s.studio}/archive`, {})).body.code).toBe('core.place.in-use')
     expect((await req('POST', `/api/core/venues/${s.venueId}/archive`, {})).body.code).toBe('core.place.in-use')
+    // The venue's page lists what is keeping it from being archived.
+    const page = (await req('GET', `/api/core/venues/${s.venueId}`)).body as { upcoming: { id: string }[], theatreCountry: string }
+    expect(page.upcoming.map(p => p.id)).toEqual([id])
+    expect(page.theatreCountry).toMatch(/^[A-Z]{2}$/)
     await req('POST', `/api/core/performances/${id}/cancel`, { reasonTermId: await term('core.cancel-reason', 'other') })
     expect((await req('POST', `/api/core/venues/${s.venueId}/spaces/${s.studio}/archive`, {})).status).toBe(200)
   })

@@ -25,7 +25,9 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
-    await expect(page.getByText('Nothing needs attention')).toBeVisible()
+    // A new site's first steps, each a link to where it is done until it is.
+    await expect(page.getByText('Get your theatre ready')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Add a logo and colours' })).toHaveAttribute('href', '/admin/branding')
     await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('button', { name: 'Upkeep' }).click()
     await expect(page.getByRole('navigation', { name: 'Admin', exact: true })).toContainText('Advanced')
     await noViolations(page)
@@ -173,8 +175,9 @@ test.describe('staff who also run the console', () => {
 test.describe('a person with no admin ability', () => {
   test.use(as(person('Nia None', [grant('gallery.sample.view')])))
 
-  test('finds /admin is not there, and no menu entry for it', async ({ page }) => {
-    expect((await page.goto('/admin'))?.status()).toBe(404)
+  test('is told they have no access to /admin and whom to ask, and has no menu entry for it', async ({ page }) => {
+    expect((await page.goto('/admin'))?.status()).toBe(403)
+    await expect(page.getByText('Ask an Owner to give you a role that includes it.')).toBeVisible()
     await visit(page, '/console')
     await page.getByRole('button', { name: /Open the menu for Nia None/ }).first().click()
     await expect(page.getByRole('menuitem', { name: 'Admin', exact: true })).toHaveCount(0)
@@ -221,5 +224,28 @@ test.describe('keys typed into the app', () => {
     await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
     await expect(card.getByLabel('Turnstile secret key')).toHaveValue('')
     await expect(card.getByText('Not set').first()).toBeVisible()
+  })
+})
+
+test.describe('the Branding screen', () => {
+  test.use(as(siteOwner('Bea Brand', ['core.branding.edit'])))
+
+  test('offers logo uploads and a preview before saving, and hides what the system keeps', async ({ page }) => {
+    await visit(page, '/admin/branding')
+    await expect(page.getByRole('heading', { level: 1, name: 'Branding' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Upload a logo' })).toHaveCount(2)
+    await expect(page.getByText('Brand revision')).toHaveCount(0)
+    await expect(page.getByText('Set on the brand screen')).toHaveCount(0)
+    // Who may change the brand is said once for each section, not under every field.
+    await expect(page.getByText('Changed by people who can: Change the brand.')).toHaveCount(2)
+    await expect(page.getByRole('figure').filter({ hasText: 'Light' })).toBeVisible()
+    await page.getByRole('combobox', { name: 'Corners' }).click()
+    await page.getByRole('option', { name: 'Square' }).click()
+    await expect(page.getByText('1 change', { exact: true })).toBeVisible()
+    // Check once the menu has closed: while it is open the rest of the page is hidden from assistive tech.
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    // The email preview is a sandboxed frame that runs no scripts, so axe cannot enter it and would wait until the test times out.
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).exclude('iframe[title="Email preview"]').analyze()
+    expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
   })
 })

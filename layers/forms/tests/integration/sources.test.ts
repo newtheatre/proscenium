@@ -82,5 +82,10 @@ describe('people involved', () => {
     expect(assigned.find(a => a.reviewer_id === ann.accountId)).toMatchObject({ status: 'conflicted', conflict: 'automatic' })
     expect(assigned.find(a => a.reviewer_id === ben.accountId)).toMatchObject({ status: 'assigned', conflict: null })
     expect((await req('GET', '/api/forms/reviews', undefined, ann)).body.reviews).toEqual([])
+    // Somebody named who looks after the form cannot move or decide the response either, reviewer or not.
+    const own = (await send(slug, { nominee: chair.accountId }, member)).body.responseId
+    const refused = await req('POST', `/api/forms/forms/${formId}/responses/${own}/move`, { move: 'start_review' }, chair)
+    expect(refused.status).toBe(403)
+    expect(refused.body.code).toBe('forms.review.conflicted')
   })
 })

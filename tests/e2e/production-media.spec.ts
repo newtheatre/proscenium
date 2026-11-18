@@ -26,32 +26,40 @@ async function noViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
-const upload = (page: Page, part: 'side-poster' | 'photos', name: string, colour: [number, number, number]) =>
+const upload = (page: Page, part: 'poster' | 'photos', name: string, colour: [number, number, number]) =>
   page.locator(`section[aria-labelledby="${part}-heading"] input[type="file"]`).setInputFiles({ name, mimeType: 'image/png', buffer: png(60, 90, colour) })
 
-test('the poster is managed from the side panel beside every tab, and put back from the Media tab', async ({ page }) => {
+test('the poster is added and described on the Media tab, and the side panel beside every tab shows where it stands', async ({ page }) => {
   await visit(page, `/console/programme/productions/${productionId}?tab=details`)
   const side = page.getByRole('complementary', { name: 'About this record' })
-  // The readiness line links to the Media tab until a poster is in use.
+  // The readiness line links to the Media tab until a poster is in use; the side panel only says where it stands.
   await expect(side.getByRole('link', { name: 'A poster', exact: true })).toBeVisible()
-  await upload(page, 'side-poster', 'first.png', [180, 30, 40])
-  await side.getByRole('textbox', { name: /Describe the new poster/ }).fill('A red curtain')
-  await side.getByRole('button', { name: 'Use as the poster' }).click()
+  await expect(side.getByText('No poster yet.')).toBeVisible()
+  await expect(side.getByRole('textbox')).toHaveCount(0)
+  await side.getByRole('link', { name: 'Add on the Media tab' }).click()
+  await expect(page.getByRole('tab', { name: 'Media', selected: true })).toBeVisible()
+  const tab = page.getByRole('tabpanel')
+
+  await upload(page, 'poster', 'first.png', [180, 30, 40])
+  await expect(side.getByText('A new poster is waiting for its description.')).toBeVisible()
+  await tab.getByRole('textbox', { name: /Describe the poster/ }).fill('A red curtain')
+  await tab.getByRole('button', { name: 'Use as the poster' }).click()
   await expect(side.getByRole('img', { name: 'A red curtain' })).toBeVisible()
   await expect(side.getByRole('link', { name: 'A poster', exact: true })).toHaveCount(0)
   await expect(side.getByText('A poster', { exact: true })).toBeVisible()
 
-  await upload(page, 'side-poster', 'second.png', [30, 60, 180])
-  await side.getByRole('textbox', { name: /Describe the new poster/ }).fill('A blue sky')
-  await side.getByRole('button', { name: 'Use as the poster' }).click()
+  // Replacing it: the new one is described once, on the tab, and the old one's description is not repeated as a caption.
+  await upload(page, 'poster', 'second.png', [30, 60, 180])
+  await tab.getByRole('textbox', { name: /Describe the poster/ }).fill('A blue sky')
+  await tab.getByRole('button', { name: 'Use as the poster' }).click()
   await expect(side.getByRole('img', { name: 'A blue sky' })).toBeVisible()
   await expect(side.getByRole('img', { name: 'A red curtain' })).toHaveCount(0)
+  await expect(tab.getByText('A blue sky', { exact: true })).toHaveCount(0)
   await noViolations(page)
   await page.getByRole('tab', { name: 'Overview' }).click()
   await page.screenshot({ path: 'test-results/production-record.png' })
 
   await page.getByRole('tab', { name: 'Media' }).click()
-  const tab = page.getByRole('tabpanel')
   await tab.getByRole('button', { name: /Recently removed/ }).click()
   await tab.getByRole('button', { name: 'Put back' }).click()
   await expect(side.getByRole('img', { name: 'A red curtain' })).toBeVisible()

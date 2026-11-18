@@ -192,6 +192,9 @@ export const verificationLists = defineTable('membership_verification_lists', {
   uploadedAt: col.timestamp('uploaded_at').notNull(),
   // The whole phrase shown as the checkout field's label (rule V13), never a bare noun.
   referenceLabel: col.public(text('reference_label')),
+  // A short noun for sentences such as "That student ID is not on the list", so a message never
+  // splices the whole question in. Null on lists made before it existed: messages then say "reference".
+  referenceNoun: col.public(text('reference_noun')),
   // digits or letters-and-digits, with a length range, as JSON. Never a free pattern (rule V15).
   referenceShape: col.internal(text('reference_shape')),
   createdAt: col.createdAt(),

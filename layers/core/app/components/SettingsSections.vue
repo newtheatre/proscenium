@@ -7,7 +7,7 @@
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
 import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
-import { durationParts } from '../../kit/duration'
+import { durationParts, type DurationUnit } from '../../kit/duration'
 import { catalogueLabel, searchable, type CatalogueName } from '../../shared/choices'
 
 interface SettingView {
@@ -19,6 +19,7 @@ interface SettingView {
   labelKey: string
   helpKey: string
   unitKey?: string
+  units?: DurationUnit[]
   value: unknown
   default: unknown
   overridden: boolean
@@ -91,7 +92,8 @@ const problems = reactive<Record<string, string>>({})
 const saving = ref<string | null>(null)
 
 // "Changed" leaves only the settings that differ from their default, so a page of forty reads as a short list.
-const all = computed(() => (data.value?.settings ?? []).filter(s => !props.omit?.includes(s.key)))
+// A setting the system keeps (the brand's revision, a logo the Branding screen sets) is never drawn as a control.
+const all = computed(() => (data.value?.settings ?? []).filter(s => !s.managed && !props.omit?.includes(s.key)))
 const shown = computed(() => props.onlyChanged ? all.value.filter(s => s.overridden || resets[s.key]) : all.value)
 
 function load() {
@@ -315,6 +317,7 @@ onMounted(() => {
                   :model-value="draft[s.key]"
                   :min="durationLimit(s, 'min')"
                   :max="durationLimit(s, 'max')"
+                  :units="s.units"
                   :disabled="!s.canChange"
                   :label="t(s.labelKey)"
                   @update:model-value="onEdit(s, $event ?? null)"

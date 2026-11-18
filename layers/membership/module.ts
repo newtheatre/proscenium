@@ -137,6 +137,21 @@ export default defineModule({
     ],
     // Renewal reminders (R7 to R9): service messages about something the person holds.
     'core.notification-type': [{
+      // A new membership has started, by joining, an approved application, a paid fee or staff adding the person.
+      id: 'membership.welcome',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/account/membership',
+      variables: { scheme: 'text' as const, gives: 'text' as const, until: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Welcome to {{ scheme }}',
+          body: 'Welcome. You are now a member of **{{ scheme }}** at {{ theatre }}.\n\n{{ gives }}\n\n{{ until }} Your membership card is in your account: show it on your phone whenever you are asked for it.',
+          action: 'See my membership card',
+        },
+      },
+    }, {
       // P9: staff added the person to a scheme that requires payment and chose to send a link.
       id: 'membership.pay-link',
       category: 'transactional' as const,
