@@ -73,8 +73,6 @@ export async function judgePass(typed: string, performanceId: string, buyer: { c
     if (!buyer.account) refuse('box-office.pass.sign-in', 'That pass is in one person\'s name.', { status: 403, remedy: 'Sign in to use it, or bring it to the box office.', fields: field('sign-in') })
     if (!scope.includes(row.account_id!)) refuse('box-office.pass.not-yours', 'That pass is in someone else\'s name.', { status: 403, remedy: 'They can book with it themselves, or bring it to the box office.', fields: field('not-yours') })
   }
-  if (!row.paid_at && !row.reserve_unpaid && !own)
-    refuse('box-office.pass.unpaid', 'This pass is not paid for yet.', { status: 409, remedy: 'Pay for it first, online or at the box office.', fields: field('unpaid') })
   // A price only some people may buy, checked again where the pass says to: a lapsed membership stops it.
   if (row.recheck && row.requirement_refs && row.account_id) {
     const refs = JSON.parse(row.requirement_refs) as string[]

@@ -9,6 +9,7 @@
 // the reserving. That link holds a random token and nothing else: its hash is on the basket with
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
+import { assertMayReserve, passSalesMinor, sendNewPasses, settlePassSales } from './pass-sales'
 import { stampTerms } from './terms'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
@@ -135,6 +136,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   await stampTerms(unit, order.id)
   // An order with nothing to pay never rests reserved: it is confirmed and its tickets issued at once.
   if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith } })
+  await assertMayReserve(order.id)
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
   const words = await wordsFor(order, lines, order.total_minor)
@@ -164,6 +166,10 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
     WHERE state = 'held' AND displaced_for_id IS NULL AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
     .expect(lines.length, RAN_OUT)
   unit.add(sql`UPDATE box_office_holds SET kind = 'reservation', updated_at = ${at} WHERE order_id = ${order.id} AND kind = 'basket'`).expect(1, RAN_OUT)
+
+  // A pass bought with the reservation is the buyer's now, and paid for when the reservation is.
+  await sendNewPasses(unit, order, accountId, false)
+  settlePassSales(unit, order.id, accountId, false, at)
 
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
   const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
@@ -350,7 +356,8 @@ export async function cancelFromLink(unit: UnitView, key: OrderKey, lineIds?: st
   const at = nowMs()
   const ids = JSON.stringify(chosen.map(l => l.id))
   const kept = lines.filter(l => !chosen.includes(l))
-  const totalMinor = kept.reduce((sum, l) => sum + l.amount_minor, 0)
+  // A pass paid for with this reservation stays owed on it while any ticket does.
+  const totalMinor = kept.reduce((sum, l) => sum + l.amount_minor, 0) + (kept.length ? await passSalesMinor(order.id) : 0)
 
   unit.add(sql`UPDATE box_office_order_lines SET state = 'cancelled', updated_at = ${at}
     WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(chosen.length, changed)

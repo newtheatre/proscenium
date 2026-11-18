@@ -8,7 +8,7 @@ import { z } from 'zod'
 import type { BookingDoneOutcome } from '../../utils/booking'
 
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
-interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number, pass?: string }[], promo?: { code: string, savingMinor: number } | null }
+interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number, pass?: string }[], passSales?: { name: string, priceName: string, amountMinor: number, fresh: boolean, reserveUnpaid: boolean }[], promo?: { code: string, savingMinor: number } | null }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string, ageMin: number | null, ageRestricted: boolean }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string, unmet?: string }[] }[] }
 type Outcome
   = | (BookingDoneOutcome & { state: 'confirmed', totalMinor: number })
@@ -132,7 +132,9 @@ const lines = computed(() => {
     row.amountMinor += basket.value?.promo && !l.pass ? (l.listMinor ?? l.amountMinor) : l.amountMinor
     grouped.set(l.pass ? `pass ${l.pass} ${key}` : key, row)
   }
-  return [...grouped.values()]
+  // A pass paid for with this booking: bought here, or an earlier one still owed.
+  const sales = (basket.value?.passSales ?? []).map(s => ({ label: t(s.fresh ? 'box-office.basket.pass-sale' : 'box-office.basket.pass-owed', { name: s.name, price: s.priceName }), count: 1, amountMinor: s.amountMinor }))
+  return [...sales, ...grouped.values()]
 })
 const free = computed(() => basket.value?.totalMinor === 0)
 useSeoMeta({ title: () => (free.value ? t('box-office.basket.title-free') : t('box-office.basket.title')), robots: 'noindex' })
@@ -171,7 +173,8 @@ async function release() {
   }
 }
 const canPay = computed(() => free.value || page.value?.timing !== 'reserve')
-const canReserve = computed(() => !free.value && page.value?.timing !== 'pay-now' && basket.value?.state === 'basket')
+// A pass that must be paid for when it is bought cannot wait on a reservation.
+const canReserve = computed(() => !free.value && page.value?.timing !== 'pay-now' && basket.value?.state === 'basket' && (basket.value.passSales ?? []).every(s => s.reserveUnpaid))
 const detailsNeeded = computed(() => !viewer.value.signedIn)
 // A production only for people over an age: the buyer says everyone using the tickets is.
 const ageMin = computed(() => page.value?.production.ageRestricted ? page.value.production.ageMin : null)

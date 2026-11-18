@@ -11,10 +11,12 @@ import type { Destination, Part, Settlement } from '#modules/payments'
 import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
 import { exchangeOrder, isExchangeRecord, releaseExchange, settleExchange } from '../../exchange'
+import { passSalesMinor } from '../../pass-sales'
 import { liveLines, ORDER, type OrderRow } from '../../orders'
 import { deskReceiptLink } from '../../desk'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
+const PASS_INCOME = { key: 'box-office.pass-income' }
 
 export default {
   async settle(unit: UnitView, part: Part) {
@@ -27,7 +29,9 @@ export default {
     await confirmOrder(unit, { ...order, total_minor: part.amountMinor }, lines, { from: 'awaiting_payment', intentId: part.intentId })
     const totals = new Map<string, number>()
     for (const line of lines) totals.set(line.performance_id, (totals.get(line.performance_id) ?? 0) + line.amount_minor)
-    return tagged(DEFERRED, totals, -1)
+    // Money for a pass is income when it is paid, in a line of its own, not shared between performances.
+    const passMinor = await passSalesMinor(order.id)
+    return [...await tagged(DEFERRED, totals, -1), ...(passMinor ? [{ account: PASS_INCOME, amountMinor: -passMinor, performanceId: null }] : [])]
   },
 
   // The till's receipt carries a desk sale's tickets: the booking joins the buyer and the receipt links to it.

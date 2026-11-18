@@ -133,11 +133,9 @@ describe('a pass on a basket', () => {
     expect(await inContext(() => passesFor(a.performanceId, null))).toEqual({ accepted: true, mine: [] })
   })
 
-  it('not paid for reserves only where the pass allows it', async () => {
-    const strict = await issue(await passType({ reserveUnpaid: false }), { paid: false })
-    expect(await hold(a, [strict.code])).toMatchObject({ ok: false, code: 'box-office.pass.unpaid' })
-    const easy = await issue(await passType(), { paid: false })
-    expect((await hold(a, [easy.code])).ok).toBe(true)
+  it('not paid for brings what is owed for it onto the booking', async () => {
+    const owed = await issue(await passType(), { paid: false })
+    expect(await hold(a, [owed.code])).toMatchObject({ ok: true, totalMinor: 3500 })
   })
 
   it('is tried before anything is held', async () => {

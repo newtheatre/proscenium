@@ -263,6 +263,8 @@ export default defineModule({
     'finance.system-account': [
       { id: 'deferred-ticket-income', name: 'Deferred ticket income', kind: 'liability' },
       { id: 'ticket-income', name: 'Ticket income', kind: 'income' },
+      // What is paid for a pass, counted when it is paid and not shared between performances.
+      { id: 'pass-income', name: 'Pass income', kind: 'income' },
       // What is kept of a ticket's price when it is cancelled and refunded less the fee.
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
@@ -312,6 +314,21 @@ export default defineModule({
     ],
     // Messages to buyers. Each is about a booking the person made, so none can be switched off.
     'core.notification-type': [{
+      // A pass bought with a booking: its code, which is what makes its reservations.
+      id: 'box-office.pass-issued',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      lane: 'prompt' as const,
+      // The code makes reservations for whoever has it, so it is sealed.
+      variables: { pass: 'text' as const, price: 'text' as const, code: 'sealed' as const, paid: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your {{ pass }} for {{ theatre }}',
+          body: 'Here is your **{{ pass }}** ({{ price }}).\n\nYour pass code is **{{ code }}**\n\n{{ paid }}\n\nThe pass gives you one entry at each performance it covers. You still need to reserve: choose a performance on our website and add the pass with this code, or give the code at the box office. Bring your ticket on the night, not the pass.',
+        },
+      },
+    }, {
       // Once, to each person already on the access scheme when on-the-night sharing was switched on
       // for them. A notice about their own data, so nobody can unsubscribe from it.
       id: 'box-office.on-the-night-switched-on',

@@ -17,5 +17,7 @@ export default defineRoute({
     promoCode: z.string().trim().max(40).optional(), // not-policy: longer than any code
     // Passes, by their codes (BO-64): each gives one entry at no charge, in a wheelchair space where asked.
     passes: z.array(z.object({ code: z.string().trim().min(4).max(40), bandId: idSchema('band').optional(), wheelchair: z.boolean().optional() }).strict()).max(20).optional(), // not-policy: shape bounds
-  }).strict().refine(v => v.lines.length + (v.passes?.length ?? 0) > 0, 'Choose at least one ticket.'),
+    // Passes bought with this booking, each giving its first entry here.
+    buy: z.array(z.object({ passTypeId: idSchema('pty'), passPriceId: idSchema('ppr'), bandId: idSchema('band').optional(), wheelchair: z.boolean().optional() }).strict()).max(20).optional(), // not-policy: shape bounds
+  }).strict().refine(v => v.lines.length + (v.passes?.length ?? 0) + (v.buy?.length ?? 0) > 0, 'Choose at least one ticket.'),
 }, (_event, { input, unit }) => createBasket(unit.view(), input))

@@ -44,6 +44,8 @@ export interface IssueInput {
   issued?: boolean
   orderLineId?: string | null
   issuedBy: string | null
+  /** The id to give it, where the caller needs it before the pass is written. */
+  id?: string
   /** A code to keep, for a pass brought in from another system; a new one otherwise. */
   code?: string
 }
@@ -58,10 +60,10 @@ export async function issuePass(unit: UnitView, input: IssueInput): Promise<{ id
   if (!price) refuse('box-office.pass.price-not-found', 'That is not one of this pass\'s prices.', { status: 422, fields: { passPriceId: 'Choose a price.' } })
   // Only its holder may use it when the pass says so, or when its price is only for some people.
   const named = type.holder === 'named' || (type.holder === 'auto' && price.requirementRefs.length > 0)
-  if (named && !input.accountId) refuse('box-office.pass.holder-needed', `A ${type.name} at the ${price.name} price is in one person's name.`, { status: 422, remedy: 'Find the person it is for first.', fields: { accountId: 'Choose who it is for.' } })
+  if (named && !input.accountId && (input.issued ?? true)) refuse('box-office.pass.holder-needed', `A ${type.name} at the ${price.name} price is in one person's name.`, { status: 422, remedy: 'Find the person it is for first.', fields: { accountId: 'Choose who it is for.' } })
   const code = input.code ? normalisePassCode(input.code) : newPassCode()
   if (!/^[A-Z0-9]{4,16}$/.test(code)) refuse('box-office.pass.code-shape', 'A pass code is letters and numbers.', { status: 422, fields: { code: 'Letters and numbers only.' } }) // not-policy: the lengths a code staff choose may be
-  const id = newId('pass')
+  const id = input.id ?? newId('pass')
   const at = nowMs()
   const hash = await hashOf(code)
   unit.add(sql`INSERT INTO box_office_passes (id, pass_type_id, pass_price_id, order_line_id, account_id, named, code_hash, code, uses_total, once, amount_minor, currency, issued_at, paid_at, state, issued_by, created_at, updated_at)

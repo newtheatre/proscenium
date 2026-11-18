@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
+import { passSalesMinor } from './pass-sales'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
 import { signing } from '#kit/signing'
@@ -389,7 +390,7 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
     })))
     unit.expect(added.lines.length)
   }
-  const totalMinor = after.reduce((sum, l) => sum + l.amountMinor, 0)
+  const totalMinor = after.reduce((sum, l) => sum + l.amountMinor, 0) + await passSalesMinor(order.id)
   unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
   return { orderId: order.id, totalMinor, amountDueMinor: totalMinor }
 }
