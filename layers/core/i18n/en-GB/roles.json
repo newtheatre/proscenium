@@ -57,5 +57,9 @@
   "core.facts.saved": "{fact} saved",
   "core.sign-in-settings.title": "Sign-in",
   "core.roles.empty": "No roles yet",
-  "core.roles.empty-help": "A role is a set of abilities, such as running the box office, that you give to people for a time."
+  "core.roles.empty-help": "A role is a set of abilities, such as running the box office, that you give to people for a time.",
+  "core.facts.show-all": "Show every ability ({count} more)",
+  "core.facts.member.label": "Is a member: holds a standing now",
+  "core.facts.access-scheme.label": "Is on the access scheme",
+  "core.facts.production-team.label": "Is on the production's team"
 }

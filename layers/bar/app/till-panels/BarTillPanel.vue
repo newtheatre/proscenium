@@ -44,6 +44,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { toRefusal } = useRefusal()
+const { time } = useDates()
 const toast = useToast()
 
 const DEVICE_OUTLET = 'bar.till.outlet'
@@ -178,6 +179,9 @@ const { data: reasons } = await useAPI<{ terms: { id: string, label: string }[] 
 const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ value: r.id, label: r.label })))
 const refusing = ref<{ entry: Entry | null, scope: 'restricted' | 'all', description: string, from: 'prompt' | 'panel', pending: { entry: Entry | null, quantity: number } | null } | null>(null)
 const refusalProblem = ref<ReturnType<typeof toRefusal> | null>(null)
+// A refusal stands for the customer until the seller starts a new one (or their sale is paid): while it
+// does, nothing age-restricted can be added, so the prompt cannot be answered the other way a moment later.
+const refused = ref<{ at: number, reason: string } | null>(null)
 const saving = ref(false)
 const describe = (text: string) => menu.value?.ageCheck.description && text.trim() ? text.trim() : null
 const restrictedNames = computed(() => [...new Set([refusing.value?.entry, ...lines.value].flatMap(e => e?.restricted ? [label(e.item)] : []))].join(', '))
@@ -191,8 +195,10 @@ function refuseFromPrompt() {
   refusalProblem.value = null
 }
 function refuseFromPanel() {
+  // Only an age-restricted line is recorded as the product refused: a sale of soft drinks refused
+  // whole names no product.
   const first = lines.value.find(l => l.restricted) ?? null
-  refusing.value = { entry: first ?? lines.value[0] ?? null, scope: first ? 'restricted' : 'all', description: '', from: 'panel', pending: null }
+  refusing.value = { entry: first, scope: first ? 'restricted' : 'all', description: '', from: 'panel', pending: null }
   refusalProblem.value = null
 }
 function backToPrompt() {
@@ -213,7 +219,7 @@ async function refuse(reasonTermId: string) {
       method: 'POST',
       body: {
         outletId: menu.value.outletId,
-        variantId: r.entry?.item.variantId ?? null,
+        variantId: r.entry?.restricted ? r.entry.item.variantId : null,
         reasonTermId,
         description: describe(r.description),
         ...(carriesOn ? { basketKey: clientKey.value } : {}),
@@ -222,6 +228,7 @@ async function refuse(reasonTermId: string) {
     })
     refusing.value = null
     last.value = null
+    refused.value = { at: Date.now(), reason: reasonItems.value.find(x => x.value === reasonTermId)?.label ?? '' }
     if (carriesOn) {
       basket.value = new Map([...basket.value].filter(([, e]) => !e.restricted))
       answer.value = null
@@ -246,6 +253,10 @@ async function refuse(reasonTermId: string) {
 function set(entry: Entry, quantity: number) {
   if (props.locked) return
   const had = basket.value.get(entry.key)?.quantity ?? 0
+  if (quantity > had && entry.restricted && refused.value) {
+    toast.add({ id: 'bar-till-refused', title: t('bar.desk.refused.blocked'), description: t('bar.desk.refused.help'), color: 'error', icon: 'i-lucide-ban' })
+    return
+  }
   if (!had && needsPrompt(entry, quantity)) return
   const next = new Map(basket.value)
   if (quantity <= 0) next.delete(entry.key)
@@ -273,13 +284,22 @@ function clear() {
   send()
 }
 // The till empties every panel after a payment or when the sale is cleared: start a new basket,
-// with a new key.
-watch(() => props.modelValue, (value) => {
-  if (value === null && basket.value.size) {
+// with a new key. A paid sale (the till was locked while it was taken) ends the customer, and with
+// them any refusal; clearing the sale by hand does not.
+watch(() => [props.modelValue, props.locked] as const, ([value], [, wasLocked]) => {
+  if (value !== null) return
+  if (wasLocked) refused.value = null
+  if (basket.value.size) {
     clientKey.value = crypto.randomUUID()
     clear()
   }
 })
+/** The seller says the refused customer has gone: the refusal stops standing and a new basket starts. */
+function newCustomer() {
+  refused.value = null
+  clientKey.value = crypto.randomUUID()
+  clear()
+}
 
 // One tile a product. A product sold one way with nothing to choose is added by its tile; one with
 // several sizes opens the size window; one with choices opens the choice window, sizes at its top.
@@ -303,11 +323,28 @@ const tiles = (c: Category): Tile[] => {
 }
 const inSale = (tile: Tile) => lines.value.reduce((n, l) => n + (l.item.productId === tile.productId ? l.quantity : 0), 0)
 const sizing = ref<Tile | null>(null)
+/** A product that is age-restricted in every size cannot be added while a refusal stands. */
+const barred = (tile: Tile) => !!refused.value && tile.items.every(i => i.ageRestricted)
 
 // The choice window. The usual choice is picked already, so the common order is one more press.
 const SHORT = 6 // not-policy: how many options a group shows before "More"
 const choosing = ref<{ tile: Tile, item: Item, picks: Choice[], open: Record<string, boolean>, search: Record<string, string> } | null>(null)
-const defaults = (i: Item): Choice[] => groupsOf(i).flatMap(g => g.defaultKey && g.options.some(o => o.key === g.defaultKey) ? [{ groupId: g.id, key: g.defaultKey }] : [])
+/** What an option is recorded to hold of what the customer avoids. */
+const avoidedIn = (a: Allergens | undefined) => (a?.checked ? [...new Set([...a.contains, ...a.mayContain])].filter(k => avoid.value.includes(k)) : [])
+/**
+ * The usual choice of each group, picked already. One that holds something the customer avoids is
+ * never picked for them: a required group starts on the first option recorded free of it, or on
+ * nothing, so the seller picks; an optional one starts on nothing.
+ */
+const defaults = (i: Item): Choice[] => groupsOf(i).flatMap((g) => {
+  const usual = g.options.find(o => o.key === g.defaultKey)
+  if (!usual) return []
+  // Nor is anything age-restricted picked while a refusal stands.
+  const fits = (o: Option) => !avoidedIn(o.allergens).length && !(refused.value && o.ageRestricted)
+  if (fits(usual)) return [{ groupId: g.id, key: usual.key }]
+  const instead = g.required ? g.options.find(o => fits(o) && (!avoid.value.length || !!o.allergens?.checked)) : undefined
+  return instead ? [{ groupId: g.id, key: instead.key }] : []
+})
 function press(tile: Tile) {
   const first = tile.items[0]!
   if (tile.choices) choosing.value = { tile, item: first, picks: defaults(first), open: {}, search: {} }
@@ -426,27 +463,47 @@ function toggleAvoid(key: string) {
 }
 const names = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
 const hit = (keys: string[]) => keys.filter(k => !avoid.value.length || avoids(k))
-/** What to say of one product or option, against what the customer avoids (everything when nothing is picked). */
-function verdict(a: Allergens | undefined): { tone: 'error' | 'warning' | 'success' | 'neutral', text: string } {
-  if (!a || !a.checked) return { tone: 'neutral', text: t('bar.desk.allergens.not-checked') }
-  const contains = hit(a.contains)
-  const may = hit(a.mayContain)
-  if (contains.length) return { tone: 'error', text: [t('bar.desk.allergens.contains', { names: names(contains) }), may.length ? t('bar.desk.allergens.may-contain', { names: names(may) }) : ''].filter(Boolean).join(' ') }
-  if (may.length) return { tone: 'warning', text: t('bar.desk.allergens.may-contain', { names: names(may) }) }
-  if (a.dependsOnChoice) return { tone: 'warning', text: t('bar.desk.allergens.depends') }
-  return { tone: 'success', text: avoid.value.length ? t('bar.desk.allergens.none-of-these') : t('bar.desk.allergens.none') }
+type Tone = 'error' | 'warning' | 'success' | 'neutral'
+const TONE_ICONS: Record<Tone, string> = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-alert', success: 'i-lucide-check', neutral: 'i-lucide-circle-help' }
+/**
+ * What to say of a product, judged on every one of its sizes, against what the
+ * customer avoids (everything when nothing is picked). Something recorded in any size counts, and a
+ * size not checked leaves the product not checked.
+ */
+function verdict(list: (Allergens | undefined)[]): { tone: Tone, text: string, short: string } {
+  const checked = list.filter((a): a is Allergens => !!a?.checked)
+  const contains = [...new Set(checked.flatMap(a => hit(a.contains)))]
+  const may = [...new Set(checked.flatMap(a => hit(a.mayContain)))].filter(k => !contains.includes(k))
+  if (contains.length) return { tone: 'error', short: t('bar.desk.allergens.contains', { names: names(contains) }), text: [t('bar.desk.allergens.contains', { names: names(contains) }), may.length ? t('bar.desk.allergens.may-contain', { names: names(may) }) : ''].filter(Boolean).join(' ') }
+  if (may.length) return { tone: 'warning', short: t('bar.desk.allergens.may-contain', { names: names(may) }), text: t('bar.desk.allergens.may-contain', { names: names(may) }) }
+  if (!list.length || checked.length < list.length) return { tone: 'neutral', short: t('bar.desk.allergens.tile-not-checked'), text: t('bar.desk.allergens.not-checked') }
+  if (checked.some(a => a.dependsOnChoice)) return { tone: 'warning', short: t('bar.desk.allergens.tile-depends'), text: t('bar.desk.allergens.depends') }
+  return { tone: 'success', short: '', text: avoid.value.length ? t('bar.desk.allergens.none-of-these') : t('bar.desk.allergens.none') }
 }
 /** The products the sheet lists: those in view, or all of them from the front of the till. */
 const allergenRows = computed(() => {
   const inView = layout.value === 'folders' ? (subFolder.value ? [subFolder.value] : folder.value ? [folder.value, ...subsOf(folder.value)] : null) : current.value ? [current.value, ...subsOf(current.value)] : null
-  return (inView ?? cats.value).flatMap(c => tiles(c)).map(tile => ({ key: tile.key, name: tile.name, ...verdict(tile.items[0]?.allergens) }))
+  return (inView ?? cats.value).flatMap(c => tiles(c)).map(tile => ({ key: tile.key, name: tile.name, ...verdict(tile.items.map(i => i.allergens)) }))
 })
-/** In the choice window: an option that holds something the customer avoids says so. */
-function warns(o: Option): string | null {
-  if (!avoid.value.length || !o.allergens?.checked) return null
+/**
+ * While the customer's allergens are recorded, a tile says what it holds of them, so the sheet need
+ * not stay open: red for one that contains something they avoid, amber for one that may, depends on
+ * what is picked, or was never checked. Nothing is said of a tile with none of it recorded.
+ */
+function mark(tile: Tile): { tone: Tone, text: string, icon: string } | null {
+  if (!avoid.value.length || !hasAllergens.value) return null
+  const v = verdict(tile.items.map(i => i.allergens))
+  return v.tone === 'success' ? null : { tone: v.tone, text: v.short, icon: TONE_ICONS[v.tone] }
+}
+const RINGS: Record<Tone, string> = { error: 'ring-2 ring-error', warning: 'ring-2 ring-warning', neutral: 'ring-2 ring-warning', success: '' }
+const MARK_TEXT: Record<Tone, string> = { error: 'text-error', warning: 'text-warning', neutral: 'text-warning', success: '' }
+/** In the choice window: an option that holds something the customer avoids, or was never checked, says so. */
+function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
+  if (!avoid.value.length || !hasAllergens.value) return null
+  if (!o.allergens?.checked) return { tone: 'warning', text: t('bar.desk.allergens.tile-not-checked') }
   const contains = o.allergens.contains.filter(avoids)
   const may = o.allergens.mayContain.filter(avoids)
-  return contains.length ? t('bar.desk.allergens.contains', { names: names(contains) }) : may.length ? t('bar.desk.allergens.may-contain', { names: names(may) }) : null
+  return contains.length ? { tone: 'error', text: t('bar.desk.allergens.contains', { names: names(contains) }) } : may.length ? { tone: 'warning', text: t('bar.desk.allergens.may-contain', { names: names(may) }) } : null
 }
 </script>
 
@@ -496,6 +553,17 @@ function warns(o: Option): string | null {
       </div>
     </div>
 
+    <UAlert
+      v-if="refused"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-ban"
+      :title="refused.reason ? t('bar.desk.refused.title', { time: time(refused.at), reason: refused.reason }) : t('bar.desk.refused.title-plain', { time: time(refused.at) })"
+      :description="t('bar.desk.refused.help')"
+      :actions="[{ label: t('bar.desk.refused.new-customer'), color: 'neutral', variant: 'outline', icon: 'i-lucide-user-round-plus', onClick: newCustomer }]"
+      role="status"
+    />
+
     <template v-if="menu">
       <DefineTile v-slot="{ tile }">
         <UChip
@@ -510,22 +578,41 @@ function warns(o: Option): string | null {
             variant="outline"
             block
             class="flex-col items-stretch justify-between gap-1 border-s-4 text-start"
-            :class="[large ? 'min-h-20' : 'min-h-16', inSale(tile) ? 'bg-elevated' : '']"
+            :class="[large ? 'min-h-20' : 'min-h-16', inSale(tile) ? 'bg-elevated' : '', RINGS[mark(tile)?.tone ?? 'success']]"
             :style="edge(tile.colour)"
-            :disabled="locked"
+            :disabled="locked || barred(tile)"
             :aria-haspopup="tile.items.length > 1 || tile.choices ? 'dialog' : undefined"
             @click="press(tile)"
           >
             <span class="flex items-start justify-between gap-2 font-medium">
               <span class="min-w-0 break-words">{{ tile.name }}</span>
               <UBadge
-                v-if="tile.ageRestricted && menu.ageCheck.enabled"
+                v-if="barred(tile)"
+                color="error"
+                variant="subtle"
+                size="sm"
+                icon="i-lucide-ban"
+                :label="t('bar.desk.refused.tile')"
+              />
+              <UBadge
+                v-else-if="tile.ageRestricted && menu.ageCheck.enabled"
                 color="warning"
                 variant="subtle"
                 size="sm"
                 :label="String(menu.ageCheck.challengeAge)"
                 :aria-label="t('bar.desk.age-check')"
               />
+            </span>
+            <span
+              v-if="mark(tile)"
+              class="flex items-start gap-1 text-xs font-medium"
+              :class="MARK_TEXT[mark(tile)!.tone]"
+            >
+              <UIcon
+                :name="mark(tile)!.icon"
+                class="mt-px size-3.5 shrink-0"
+              />
+              <span class="min-w-0 break-words">{{ mark(tile)!.text }}</span>
             </span>
             <span class="flex items-baseline justify-between gap-2 text-sm font-normal text-muted">
               <span class="tabular-nums">{{ tile.items.length > 1 ? t('bar.desk.from', { amount: money(tile.fromMinor) }) : money(tile.fromMinor) }}</span>
@@ -854,36 +941,36 @@ function warns(o: Option): string | null {
                 color="neutral"
                 :variant="isPicked(g, o) ? 'solid' : 'outline'"
                 :aria-pressed="isPicked(g, o)"
+                :disabled="!!refused && o.ageRestricted && !isPicked(g, o)"
                 class="justify-between"
                 @click="toggle(g, o)"
               >
-                <span class="flex min-w-0 items-center gap-2 text-start">
-                  <span class="min-w-0 break-words">{{ o.label }}</span>
+                <span class="flex min-w-0 flex-col items-start gap-1 text-start">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="min-w-0 break-words">{{ o.label }}</span>
+                    <UBadge
+                      v-if="o.ageRestricted && menu?.ageCheck.enabled"
+                      color="warning"
+                      :variant="isPicked(g, o) ? 'solid' : 'subtle'"
+                      size="sm"
+                      :label="String(menu.ageCheck.challengeAge)"
+                      :aria-label="t('bar.desk.age-check')"
+                    />
+                  </span>
                   <UBadge
-                    v-if="o.ageRestricted && menu?.ageCheck.enabled"
-                    color="warning"
-                    :variant="isPicked(g, o) ? 'solid' : 'subtle'"
+                    v-if="warns(o)"
+                    :color="warns(o)!.tone"
+                    variant="solid"
                     size="sm"
-                    :label="String(menu.ageCheck.challengeAge)"
-                    :aria-label="t('bar.desk.age-check')"
+                    :icon="warns(o)!.tone === 'error' ? 'i-lucide-octagon-alert' : 'i-lucide-triangle-alert'"
+                    :label="warns(o)!.text"
+                    class="whitespace-normal"
                   />
                 </span>
                 <span
-                  v-if="warns(o) || o.deltaMinor"
-                  class="flex shrink-0 flex-col items-end text-sm"
-                >
-                  <span
-                    v-if="o.deltaMinor"
-                    class="tabular-nums"
-                  >{{ o.deltaMinor > 0 ? '+' : '−' }}{{ money(Math.abs(o.deltaMinor)) }}</span>
-                  <span
-                    v-if="warns(o)"
-                    class="flex items-center gap-1 text-xs"
-                  ><UIcon
-                    name="i-lucide-triangle-alert"
-                    class="size-3.5"
-                  />{{ warns(o) }}</span>
-                </span>
+                  v-if="o.deltaMinor"
+                  class="shrink-0 text-sm tabular-nums"
+                >{{ o.deltaMinor > 0 ? '+' : '−' }}{{ money(Math.abs(o.deltaMinor)) }}</span>
               </UButton>
               <UButton
                 v-if="g.options.length > SHORT && !choosing.open[g.id]"
@@ -928,12 +1015,13 @@ function warns(o: Option): string | null {
     >
       <template #body>
         <div class="grid gap-3">
+          <!-- Neither answer is the default: the seller looks, then presses one. -->
           <UButton
             size="xl"
             block
-            color="success"
-            variant="soft"
-            icon="i-lucide-check"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-user-round-check"
             class="min-h-14"
             :label="t('bar.desk.prompt.over')"
             @click="answerPrompt('not_needed')"
@@ -1001,6 +1089,12 @@ function warns(o: Option): string | null {
               { value: 'all', label: t('bar.desk.refusal.all'), description: t('bar.desk.refusal.all-help') },
             ]"
           />
+          <p
+            v-else-if="lines.length"
+            class="text-sm"
+          >
+            <span class="font-medium">{{ t('bar.desk.refusal.all') }}.</span> {{ t('bar.desk.refusal.all-only') }}
+          </p>
           <UFormField
             v-if="menu?.ageCheck.description"
             :label="t('bar.desk.refusal.description')"

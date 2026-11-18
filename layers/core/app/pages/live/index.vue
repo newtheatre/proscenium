@@ -1,50 +1,148 @@
-<!-- The Tonight hub: the live screens this person may open, one large tile each. The tiles are the
-     live menu's entries (core.navigation with menu 'live'), so a module that brings live screens
-     adds its own tile and nothing here names a module. -->
+<!-- The Tonight hub: tonight's performances, each with its start time and the figures other modules
+     give for it (core.tonight-figure: sold, in, taken at the tills), then the live screens this
+     person may open, one large tile each. The tiles are the live menu's entries (core.navigation with
+     menu 'live'), so a module that brings live screens adds its own tile and nothing here names a
+     module. Performances are those of the operating day, so a late show stays past midnight. -->
 <script setup lang="ts">
-const { t } = useT()
+interface Figure { id: string, label: string, value: string | number | null, state: 'ok' | 'attention' | 'unavailable', unit?: string, to?: string }
+interface Performance { id: string, title: string, label: string | null, startsAt: number, venue: string, figures: Figure[] }
+
+const CURRENCY = /^[A-Z]{3}$/ // not-policy: the shape of an ISO 4217 code
+
+const { t, te } = useT()
+const { time } = useDates()
 const { data: navigation } = await useNavigation('live')
 const tiles = computed(() => navigation.value?.items ?? [])
+const { data: tonight } = await useAPI<{ performances: Performance[] }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [] }) })
+const performances = computed(() => tonight.value?.performances ?? [])
+
+// A label is translated when the catalogue has it; a value whose unit is a currency is money in minor units.
+const labelOf = (text: string) => (te(text) ? t(text) : text)
+function valueOf(f: Figure): string {
+  if (f.value === null || f.state === 'unavailable') return t('core.live.figure-unavailable')
+  if (typeof f.value === 'number' && f.unit && CURRENCY.test(f.unit)) {
+    const format = new Intl.NumberFormat('en-GB', { style: 'currency', currency: f.unit })
+    return format.format(f.value / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2))
+  }
+  return f.unit ? `${f.value} ${f.unit}` : String(f.value)
+}
 </script>
 
 <template>
   <PageLive :title="t('core.live.title')">
-    <ul
-      v-if="tiles.length"
-      class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <li
-        v-for="tile in tiles"
-        :key="tile.id"
+    <div class="flex flex-col gap-6">
+      <section
+        v-if="tiles.length"
+        aria-labelledby="tonight-performances"
+        class="flex flex-col gap-3"
       >
-        <UButton
-          :to="tile.to"
-          :icon="tile.icon"
-          :label="t(tile.label)"
-          color="neutral"
-          variant="outline"
-          size="xl"
-          block
-          class="min-h-24 justify-start text-lg"
+        <h2
+          id="tonight-performances"
+          class="text-sm font-semibold text-muted"
         >
-          <template
-            v-if="tile.count"
-            #trailing
+          {{ t('core.live.performances') }}
+        </h2>
+        <ul
+          v-if="performances.length"
+          class="grid grid-cols-1 gap-3 lg:grid-cols-2"
+        >
+          <li
+            v-for="p in performances"
+            :key="p.id"
+            class="flex flex-col gap-3 rounded-lg border border-default p-4"
           >
-            <UBadge
-              :label="String(tile.count)"
-              size="lg"
-              class="ms-auto"
-            />
-          </template>
-        </UButton>
-      </li>
-    </ul>
-    <EmptyState
-      v-else
-      icon="i-lucide-moon"
-      :title="t('core.live.empty.title')"
-      :description="t('core.live.empty.description')"
-    />
+            <div class="flex items-baseline justify-between gap-3">
+              <span class="flex min-w-0 flex-col">
+                <strong class="truncate text-lg">{{ [p.title, p.label].filter(Boolean).join(', ') }}</strong>
+                <span class="text-sm text-muted">{{ p.venue }}</span>
+              </span>
+              <span class="shrink-0 text-2xl font-semibold tabular-nums">{{ time(p.startsAt) }}</span>
+            </div>
+            <dl
+              v-if="p.figures.length"
+              class="grid grid-cols-3 gap-2"
+            >
+              <div
+                v-for="f in p.figures"
+                :key="f.id"
+                class="flex flex-col"
+              >
+                <dt class="text-xs text-muted">
+                  {{ labelOf(f.label) }}
+                </dt>
+                <dd
+                  class="text-xl font-semibold tabular-nums"
+                  :class="f.state === 'attention' ? 'text-warning' : undefined"
+                >
+                  <ULink
+                    v-if="f.to"
+                    :to="f.to"
+                    :aria-label="`${labelOf(f.label)}: ${valueOf(f)}`"
+                    class="underline-offset-4 hover:underline"
+                  >
+                    {{ valueOf(f) }}
+                  </ULink>
+                  <template v-else>
+                    {{ valueOf(f) }}
+                  </template>
+                </dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+        <p
+          v-else
+          class="text-muted"
+        >
+          {{ t('core.live.no-performances') }}
+        </p>
+      </section>
+      <section
+        v-if="tiles.length"
+        aria-labelledby="tonight-screens"
+        class="flex flex-col gap-3"
+      >
+        <h2
+          id="tonight-screens"
+          class="text-sm font-semibold text-muted"
+        >
+          {{ t('core.live.screens') }}
+        </h2>
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <li
+            v-for="tile in tiles"
+            :key="tile.id"
+          >
+            <UButton
+              :to="tile.to"
+              :icon="tile.icon"
+              :label="t(tile.label)"
+              color="neutral"
+              variant="outline"
+              size="xl"
+              block
+              class="min-h-16 justify-start text-lg"
+            >
+              <template
+                v-if="tile.count"
+                #trailing
+              >
+                <UBadge
+                  :label="String(tile.count)"
+                  size="lg"
+                  class="ms-auto"
+                />
+              </template>
+            </UButton>
+          </li>
+        </ul>
+      </section>
+      <EmptyState
+        v-else
+        icon="i-lucide-moon"
+        :title="t('core.live.empty.title')"
+        :description="t('core.live.empty.description')"
+      />
+    </div>
   </PageLive>
 </template>
