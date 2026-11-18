@@ -249,6 +249,18 @@ export const factAbilities = defineTable('core_fact_abilities', {
 }, { realm: 'operational', extra: t => [primaryKey({ columns: [t.fact, t.ability, t.pinnedRecord] })] })
 
 /**
+ * The defaults a module brings (a fact's default abilities, a preset role) that have been offered
+ * to this site, one row each, so each is offered once: a role or mapping the theatre later removes
+ * is not made again when the module is switched back on or the defaults are checked after a deploy.
+ */
+export const moduleDefaults = defineTable('core_module_defaults', {
+  kind: col.internal(text('kind', { enum: ['fact', 'role'] }).notNull()),
+  key: col.internal(text('key').notNull()),
+  moduleId: col.internal(text('module_id').notNull()),
+  offeredAt: col.timestamp('offered_at').notNull(),
+}, { realm: 'operational', subject: 'none', extra: t => [primaryKey({ columns: [t.kind, t.key] })] })
+
+/**
  * A role given to an account. Append-only, so the history answers who could do what on any past
  * date: ending a grant is a row in core_grant_ends, and a renewal is a new grant.
  */
@@ -440,5 +452,5 @@ export const accessShares = defineTable('core_access_shares', {
 
 export const identityTables = {
   accounts, accountEmails, passkeys, authenticators, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
-  roles, roleAbilities, factAbilities, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
+  roles, roleAbilities, factAbilities, moduleDefaults, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
 }
