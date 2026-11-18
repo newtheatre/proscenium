@@ -10,10 +10,10 @@ const { day } = useDates()
 const { data, status, error, refresh } = await useAPI<{ lists: List[], keySet: boolean }>('/api/membership/lists', { key: 'membership:lists' })
 
 const open = ref(false)
-const form = reactive({ name: '', keyKind: 'reference' as List['keyKind'], referenceLabel: '', shapeKind: 'digits' as 'digits' | 'letters-and-digits', min: 8, max: 8, idempotency: '' })
+const form = reactive({ name: '', keyKind: 'reference' as List['keyKind'], referenceLabel: '', referenceNoun: '', shapeKind: 'digits' as 'digits' | 'letters-and-digits', min: 8, max: 8, idempotency: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function openAdd() {
-  Object.assign(form, { name: '', keyKind: 'reference', referenceLabel: '', shapeKind: 'digits', min: 8, max: 8, idempotency: crypto.randomUUID() })
+  Object.assign(form, { name: '', keyKind: 'reference', referenceLabel: '', referenceNoun: '', shapeKind: 'digits', min: 8, max: 8, idempotency: crypto.randomUUID() })
   refusal.value = null
   open.value = true
 }
@@ -24,7 +24,7 @@ async function create() {
     const made = await $api<{ listId: string }>('/api/membership/lists', {
       method: 'POST',
       headers: { 'idempotency-key': form.idempotency },
-      body: { name: form.name, keyKind: form.keyKind, referenceLabel: reference ? form.referenceLabel : null, referenceShape: reference ? { kind: form.shapeKind, min: form.min, max: Math.max(form.min, form.max) } : null },
+      body: { name: form.name, keyKind: form.keyKind, referenceLabel: reference ? form.referenceLabel : null, referenceNoun: reference ? form.referenceNoun.trim() || null : null, referenceShape: reference ? { kind: form.shapeKind, min: form.min, max: Math.max(form.min, form.max) } : null },
     })
     open.value = false
     await navigateTo(`/admin/modules/membership/lists/${made.listId}`)
@@ -129,10 +129,12 @@ const describe = (l: List) => [
           <MembershipListShape
             v-if="form.keyKind === 'reference'"
             v-model:label="form.referenceLabel"
+            v-model:noun="form.referenceNoun"
             v-model:kind="form.shapeKind"
             v-model:min="form.min"
             v-model:max="form.max"
             :label-error="refusal?.fields?.referenceLabel ? refusal.reason : undefined"
+            :noun-error="refusal?.fields?.referenceNoun ? refusal.reason : undefined"
           />
         </UForm>
       </template>

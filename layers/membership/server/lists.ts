@@ -13,6 +13,7 @@ export interface ListRow {
   entryCount: number
   validUntil: string | null
   referenceLabel: string | null
+  referenceNoun: string | null
   referenceShape: Shape | null
   uploadedAt: number
 }
@@ -20,12 +21,15 @@ export interface ListRow {
 /** What a well-formed reference looks like (V15). Never a free pattern. */
 export interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
 
-const LIST_COLUMNS = `id, name, key_kind AS keyKind, entry_count AS entryCount, valid_until AS validUntil, reference_label AS referenceLabel,
+const LIST_COLUMNS = `id, name, key_kind AS keyKind, entry_count AS entryCount, valid_until AS validUntil, reference_label AS referenceLabel, reference_noun AS referenceNoun,
   reference_shape AS referenceShape, uploaded_at AS uploadedAt`
 
 function toList(row: Record<string, unknown>): ListRow {
   return { ...row, referenceShape: row.referenceShape ? JSON.parse(String(row.referenceShape)) as Shape : null } as ListRow
 }
+
+/** The noun a sentence uses for the list's reference: "student ID", or "reference" on an older list. */
+export const nounOf = (list: Pick<ListRow, 'referenceNoun'>): string => list.referenceNoun ?? 'reference'
 
 export async function getList(id: string | undefined): Promise<ListRow | null> {
   if (!id) return null
