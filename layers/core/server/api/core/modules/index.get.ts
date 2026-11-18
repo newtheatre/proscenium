@@ -38,6 +38,8 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
       on: on.has(id),
       requires: [...(m.requires ?? [])],
       uses: [...(m.uses ?? [])],
+      // Modules that add to this one's points, such as Box office's figures on Front of house's board.
+      worksWith: [...registry.modules.values()].filter(o => o.manifest.id !== id && !(m.uses ?? []).includes(o.manifest.id) && Object.keys(o.manifest.contributes ?? {}).some(point => point in (m.points ?? {}))).map(o => o.manifest.id),
       requiredBy: [...registry.modules.values()].filter(o => o.manifest.requires?.includes(id)).map(o => o.manifest.id),
       alsoOn: on.has(id) ? [] : await requiredOff(id),
       secrets: Object.entries(m.secrets ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: isSet(env, name) })),
