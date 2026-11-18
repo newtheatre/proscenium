@@ -130,10 +130,11 @@ const summary = computed(() => [
             v-if="!run"
             label="Label"
             name="label"
+            help="A few words shown beside this performance's date on the website and in the box office, such as Press night or Relaxed."
           >
             <UInput
               v-model="model.label"
-              placeholder="Such as Relaxed"
+              placeholder="Such as Press night"
               maxlength="40"
             />
           </UFormField>
