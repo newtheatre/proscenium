@@ -1,13 +1,22 @@
 // The caller's own memberships for My membership (MEM-33): each with its scheme, dates and derived
 // status, their member number, and their open applications with what each is waiting on and, for a
 // fee, how much. Ended,
-// declined and expired rows are left to a later slice.
+// declined and expired rows are left to a later slice. Each membership whose renewal window is open
+// carries what renewing it asks for (its lengths and fees, and the reference where the check runs
+// again), from the scheme itself: a closed scheme is renewed but is not among the open schemes.
 import { all, defineRoute, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { derivedStatus } from '../../dates'
 import { memberNumber, todayOrNull } from '../../memberships'
 import { renewalWindow } from '../../renewal'
 import { charger } from '../../charge'
+import { listSetsEnd, schemeList } from '../../lists'
+import { getScheme, lengthOptions } from '../../schemes'
+
+interface Fee { amountMinor: number, currency: string }
+interface RenewAsks { options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, asksFor: string | null, endsByList: boolean, online: boolean }
+
+const RANK = { 'current': 0, 'in-grace': 0, 'upcoming': 1, 'lapsed': 2 } as const
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
   const accountId = actor.accountId!
@@ -28,6 +37,44 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     accountId,
   )
   const fees = await charger()
+  const quote = async (schemeId: string, optionId: string | null) => {
+    const q = fees && day ? await fees.priceFor(schemeId, optionId, 'renew', day) : null
+    return q ? { amountMinor: q.amountMinor, currency: q.currency } : null
+  }
+  // What renewing asks for, once per scheme.
+  const asks = new Map<string, RenewAsks | null>()
+  async function renewAsks(schemeId: string): Promise<RenewAsks | null> {
+    if (asks.has(schemeId)) return asks.get(schemeId)!
+    const scheme = await getScheme(schemeId)
+    let out: RenewAsks | null = null
+    if (scheme) {
+      const list = scheme.reverifyOnRenewal ? await schemeList(scheme) : null
+      const endsByList = await listSetsEnd(list)
+      const options = (await lengthOptions([scheme.id], true)).get(scheme.id)!
+      out = {
+        options: await Promise.all(options.map(async o => ({ id: o.id, name: o.name, fee: scheme.requiresPayment ? await quote(scheme.id, o.id) : null }))),
+        fee: scheme.requiresPayment && (endsByList || scheme.lengthRule === 'indefinite') ? await quote(scheme.id, null) : null,
+        asksFor: list?.keyKind === 'reference' ? list.referenceLabel : null,
+        endsByList,
+        online: !scheme.requiresPayment || !!fees,
+      }
+    }
+    asks.set(schemeId, out)
+    return out
+  }
+  const memberships = await Promise.all(rows.map(async (r) => {
+    // R1: when it may be renewed, and whether it is open now. R6: an archived scheme is not renewed.
+    const window = r.state === 'archived' || r.renewed ? null : renewalWindow(r.ends_on, { renewalOpensDays: r.renewal_opens_days, graceDays: r.grace_days })
+    const open = !!window && !!day && day >= window.opensOn && day <= window.closesOn
+    return {
+      id: r.id, schemeId: r.scheme_id, schemeName: r.scheme_name, side: r.side, length: r.option_name, startsOn: r.starts_on, endsOn: r.ends_on, mayEnd: !!r.holder_may_end,
+      renewal: window && day ? { ...window, open, ...(open ? { asks: await renewAsks(r.scheme_id) } : {}) } : null,
+      renewed: !!r.renewed,
+      status: day ? derivedStatus({ startsOn: r.starts_on, endsOn: r.ends_on }, r.grace_days, day) : 'upcoming' as const,
+    }
+  }))
+  // The one held now first, then the one that follows it, then any that have lapsed.
+  memberships.sort((a, b) => RANK[a.status] - RANK[b.status])
   return {
     number: await memberNumber(accountId),
     // Whether My membership offers the card (membership.card.show); the code itself comes from Box office.
@@ -37,15 +84,6 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
       const charge = await fees?.status(p.id) ?? null
       return { ...p, waiting: waitingOnStaff || !charge || charge.state !== 'open' ? 'staff' as const : 'payment' as const, charge }
     })),
-    memberships: rows.map(r => ({
-      id: r.id, schemeId: r.scheme_id, schemeName: r.scheme_name, side: r.side, length: r.option_name, startsOn: r.starts_on, endsOn: r.ends_on, mayEnd: !!r.holder_may_end,
-      // R1: when it may be renewed, and whether it is open now. R6: an archived scheme is not renewed.
-      renewal: (() => {
-        const window = r.state === 'archived' || r.renewed ? null : renewalWindow(r.ends_on, { renewalOpensDays: r.renewal_opens_days, graceDays: r.grace_days })
-        return window && day ? { ...window, open: day >= window.opensOn && day <= window.closesOn } : null
-      })(),
-      renewed: !!r.renewed,
-      status: day ? derivedStatus({ startsOn: r.starts_on, endsOn: r.ends_on }, r.grace_days, day) : 'upcoming',
-    })),
+    memberships,
   }
 })

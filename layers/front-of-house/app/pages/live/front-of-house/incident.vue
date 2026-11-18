@@ -1,10 +1,12 @@
 <!-- Report an incident (Front of house specification, part 5, "Live mode"; FH-27): three short steps,
-     what and where; when and what kind; first aid, emergency services and whether it is serious.
+     what happened (and what kind); when and where; what was done straight away, first aid, emergency
+     services and whether it is serious. The time is a day (today, or yesterday for something just
+     before midnight) and a clock time, both in the theatre's time zone whatever the phone's.
      People involved are added afterwards by whoever reviews it. Then "Sent"
      with its number. Sending needs a connection for now: while the device is offline the steps can
      be filled in but the send button waits, and says why. -->
 <script setup lang="ts">
-import { Time } from '@internationalized/date'
+import { CalendarDateTime, now as nowIn, Time, toZoned } from '@internationalized/date'
 import { useOnline } from '@vueuse/core'
 
 interface Board { performance: { id: string, title: string, startsAt: number, venueId: string } }
@@ -13,6 +15,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const online = useOnline()
+const { zone } = useDates()
 const route = useRoute()
 // Reported from a performance's board, the report is tied to that performance and its venue.
 const performanceId = typeof route.query.performance === 'string' ? route.query.performance : null
@@ -20,8 +23,10 @@ const board = performanceId
   ? (await useAPI<Board>(`/api/front-of-house/performances/${encodeURIComponent(performanceId)}/tonight`, { key: `front-of-house:board:${performanceId}` })).data
   : ref<Board | null>(null)
 
-const started = new Date()
-const at = shallowRef(new Time(started.getHours(), started.getMinutes()))
+const started = nowIn(zone.value)
+const at = shallowRef(new Time(started.hour, started.minute))
+const day = ref<'today' | 'yesterday'>('today')
+const days = computed(() => (['today', 'yesterday'] as const).map(value => ({ value, label: t(`front-of-house.live.incident.${value}`) })))
 const form = ref({ whatHappened: '', whereNote: '', kind: 'incident' as 'incident' | 'near_miss', immediateAction: '', firstAidGiven: false, emergencyServicesCalled: false, serious: false })
 const step = ref(0)
 const sent = ref<{ reference: string } | null>(null)
@@ -36,13 +41,22 @@ const steps = computed(() => [
   { title: t('front-of-house.live.incident.step-help'), icon: 'i-lucide-heart-pulse' },
 ])
 const kinds = computed(() => (['incident', 'near_miss'] as const).map(value => ({ value, label: t(`front-of-house.incident-kinds.${value}`) })))
-const canGo = computed(() => step.value !== 0 || form.value.whatHappened.trim().length > 0)
-
-/** Today at the clock time given; never later than now, since an incident cannot be in the future. */
+/** The day and clock time given, in the theatre's time zone. */
 function occurredAt(): number {
-  const d = new Date()
-  d.setHours(at.value.hour, at.value.minute, 0, 0)
-  return Math.min(d.getTime(), Date.now())
+  const base = nowIn(zone.value)
+  const d = day.value === 'yesterday' ? base.subtract({ days: 1 }) : base
+  return toZoned(new CalendarDateTime(d.year, d.month, d.day, at.value.hour, at.value.minute), zone.value).toDate().getTime()
+}
+// Only a time still to come is refused: something at 23:50 reported at 00:10 is yesterday's.
+const later = ref(false)
+watch([at, day], () => { later.value = false })
+const canGo = computed(() => step.value !== 0 || form.value.whatHappened.trim().length > 0)
+function next() {
+  if (step.value === 1 && occurredAt() > Date.now()) {
+    later.value = true
+    return
+  }
+  step.value++
 }
 
 async function send() {
@@ -114,8 +128,17 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           v-if="step === 0"
           class="space-y-4"
         >
+          <UFormField :label="t('front-of-house.live.incident.kind')">
+            <URadioGroup
+              v-model="form.kind"
+              :items="kinds"
+              size="xl"
+              variant="card"
+            />
+          </UFormField>
           <UFormField
             :label="t('front-of-house.live.incident.what')"
+            :help="t('front-of-house.live.incident.what-help')"
             required
           >
             <UTextarea
@@ -123,6 +146,33 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
               :maxlength="4000"
               :rows="5"
               autoresize
+              size="xl"
+            />
+          </UFormField>
+        </div>
+
+        <div
+          v-else-if="step === 1"
+          class="space-y-4"
+        >
+          <UFormField
+            :label="t('front-of-house.live.incident.day')"
+          >
+            <URadioGroup
+              v-model="day"
+              :items="days"
+              orientation="horizontal"
+              size="xl"
+              variant="card"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('front-of-house.live.incident.when')"
+            :help="t('front-of-house.live.incident.when-help')"
+            :error="later ? t('front-of-house.live.incident.later') : undefined"
+          >
+            <UInputTime
+              v-model="at"
               size="xl"
             />
           </UFormField>
@@ -136,26 +186,9 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
         </div>
 
         <div
-          v-else-if="step === 1"
+          v-else
           class="space-y-4"
         >
-          <UFormField :label="t('front-of-house.live.incident.kind')">
-            <URadioGroup
-              v-model="form.kind"
-              :items="kinds"
-              size="xl"
-              variant="card"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('front-of-house.live.incident.when')"
-            :help="t('front-of-house.live.incident.when-help')"
-          >
-            <UInputTime
-              v-model="at"
-              size="xl"
-            />
-          </UFormField>
           <UFormField :label="t('front-of-house.live.incident.done-straight-away')">
             <UTextarea
               v-model="form.immediateAction"
@@ -164,12 +197,6 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
               size="xl"
             />
           </UFormField>
-        </div>
-
-        <div
-          v-else
-          class="space-y-4"
-        >
           <USwitch
             v-model="form.firstAidGiven"
             size="xl"
@@ -218,7 +245,7 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           trailing-icon="i-lucide-arrow-right"
           :disabled="!canGo"
           :label="t('front-of-house.live.incident.continue')"
-          @click="step++"
+          @click="next"
         />
         <UButton
           v-else

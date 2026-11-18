@@ -147,6 +147,7 @@ export default defineModule({
     // The tills on a performance's operating day, for Front of house's board and night report.
     'front-of-house.tonight-figure': [{ id: 'payments.tills', file: 'tills' }],
     'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],
+    'core.tonight-figure': [{ id: 'payments.takings', file: 'takings' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
@@ -157,9 +158,22 @@ export default defineModule({
       // The combined till's tile on the Tonight hub.
       { id: 'payments.live-till', menu: 'live', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 20 },
     ],
+    // Titles and addresses for Payments' records, so the ledger can name where a posting came from.
+    'core.record-resolver': [
+      { id: 'payments.intent', file: 'intent' },
+      { id: 'payments.attempt', file: 'attempt' },
+      { id: 'payments.refund', file: 'refund' },
+      { id: 'payments.session', file: 'session' },
+      { id: 'payments.provider-account', file: 'provider-account' },
+    ],
     'core.count': [
       { id: 'payments.attention', file: 'attention' },
       { id: 'payments.refunds-waiting', file: 'refunds-waiting' },
+    ],
+    // On the console home for whoever can act on them: payments that need settling, and refunds to approve.
+    'core.home-card': [
+      { id: 'payments.attention', home: 'console', ability: 'payments.attempt.reconcile', component: 'PaymentsAttentionCard', urgency: 'today', count: 'payments.attention' },
+      { id: 'payments.refunds', home: 'console', ability: 'payments.refund.approve', component: 'PaymentsRefundsCard', urgency: 'today', count: 'payments.refunds-waiting' },
     ],
     'core.vocabulary': [{
       id: 'payments.refund-decline-reason',
