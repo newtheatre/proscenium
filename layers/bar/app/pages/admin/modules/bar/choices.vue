@@ -16,7 +16,7 @@ const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ groups: Group[], canAllergens: boolean, allergens: Record<string, Answer>, canStock: boolean, stockItems: { id: string, name: string }[], stockOf: Record<string, string> }>('/api/bar/choices', { key: 'bar:choices' })
+const { data, status, error, refresh } = await useAPI<{ groups: Group[], canAllergens: boolean, allergens: Record<string, Answer>, allergensFromStock: string[], canStock: boolean, stockItems: { id: string, name: string }[], stockOf: Record<string, string> }>('/api/bar/choices', { key: 'bar:choices' })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const sourceItems = computed(() => (['options', 'mixers'] as const).map(s => ({ value: s, label: t(`bar.screens.choices.sources.${s}`), description: t(`bar.screens.choices.sources.${s}-help`) })))
@@ -41,6 +41,7 @@ function describeOption(o: Option): string {
       : a.contains.length || a.mayContain.length
         ? [a.contains.length ? `${t('bar.screens.product.contains')}: ${named(a.contains)}` : null, a.mayContain.length ? `${t('bar.screens.product.may-contain')}: ${named(a.mayContain)}` : null].filter(Boolean).join(' · ')
         : t('bar.screens.product.none-listed'))
+    if (data.value.allergensFromStock.includes(o.optionId)) parts.push(t('bar.screens.choices.allergens-from-stock'))
   }
   return parts.filter(Boolean).join(' · ')
 }
@@ -209,7 +210,7 @@ async function saveAllergens() {
                 :label="t('bar.screens.choices.option-actions', { name: o.label })"
                 :items="[
                   { label: t('bar.screens.choices.edit-option'), icon: 'i-lucide-pencil', onSelect: () => editOption(g, o) },
-                  ...(data.canAllergens ? [{ label: t('bar.screens.product.check-label'), icon: 'i-lucide-clipboard-check', onSelect: () => editAllergens(o) }] : []),
+                  ...(data.canAllergens && !data.allergensFromStock.includes(o.optionId!) ? [{ label: t('bar.screens.product.check-label'), icon: 'i-lucide-clipboard-check', onSelect: () => editAllergens(o) }] : []),
                   { label: t('bar.screens.choices.retire-option'), icon: 'i-lucide-archive', onSelect: () => retireOption(o) },
                 ]"
               />
