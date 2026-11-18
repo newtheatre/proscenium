@@ -3,6 +3,7 @@
 // Publishing compares the draft with the field catalogue, refuses what the specification forbids
 // (a changed type, a lowered data class) and classes the rest as safe, caution or breaking.
 import { all, first, refuse, useSetting, type UnitView } from '#kit'
+import { sources } from './sources'
 import { DATA_CLASSES, FORMAT, checkDefinition, parseDefinition, publishable, questionsOf, type DataClass, type Definition, type Fault, type Limits, type Problem, type Question } from '../shared/engine'
 
 export interface FormRow {
@@ -157,7 +158,7 @@ function questionChanges(before: Question, after: Question): { what: string[], i
  */
 export async function planPublish(form: FormRow, draft: DraftRow): Promise<PublishPlan> {
   const definition = await parseOrRefuse(JSON.parse(draft.definition))
-  const problems = checkDefinition(definition, { allowRegex: await useSetting('forms.builder.free-patterns') as boolean })
+  const problems = checkDefinition(definition, { allowRegex: await useSetting('forms.builder.free-patterns') as boolean, sources: (await sources()).map(s => s.key) })
   const [fields, live] = await Promise.all([getFields(form.id), getVersion(form.liveVersionId)])
   const known = new Map(fields.map(f => [f.questionId, f]))
   const keys = new Map(fields.map(f => [f.key, f.questionId]))

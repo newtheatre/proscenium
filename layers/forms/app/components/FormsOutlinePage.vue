@@ -32,7 +32,7 @@ const wrong = computed(() => ids.value.some(id => builder.problemsAt.value.get(i
       <span class="w-4 shrink-0 text-xs tabular-nums text-muted">{{ number }}</span>
       <span
         class="truncate"
-        :class="page.title.trim() ? '' : 'text-dimmed'"
+        :class="page.title.trim() ? '' : 'text-muted'"
       >{{ name }}</span>
       <UIcon
         v-if="wrong"

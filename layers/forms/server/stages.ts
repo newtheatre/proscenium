@@ -29,7 +29,7 @@ export async function movesFor(def: Definition, response: ResponseRow, actor: Ac
   return staffMoves(def, response.stageKey, await mayDecide(actor, response.formId))
 }
 
-async function apply(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, move: Transition, actorId: string | null, at: number, note: string | null, reason?: string | null, revision: number, calculated?: string | null }): Promise<Stage> {
+async function apply(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, move: Transition, actorId: string | null, at: number, note: string | null, reason?: string | null, revision: number, calculated?: string | null, answers?: Answers }): Promise<Stage> {
   const to = stageOf(input.def, input.move.to)
   if (!to) return refuse('forms.stage.unknown', 'This move leads to a stage the form does not have.', { status: CONFLICT })
   const resend = input.revision !== input.response.currentRevision
@@ -41,7 +41,7 @@ async function apply(unit: UnitView, input: { form: FormRow, response: ResponseR
   }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
   recordMove(unit, { responseId: input.response.id, from: input.response.stageKey, to, transitionKey: input.move.key, revision: input.revision, actorId: input.actorId, at: input.at })
   if (stageOf(input.def, input.response.stageKey)?.review) closeRounds(unit, input.response.id, input.at)
-  await openRound(unit, { stage: to, formId: input.form.id, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at })
+  await openRound(unit, { def: input.def, stage: to, formId: input.form.id, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at, answers: input.answers })
   unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key, ...(decision ? { decision: to.kind } : {}) } })
   unit.announce('forms.response.moved', { responseId: input.response.id, formId: input.form.id, kind: to.kind, revision: input.revision }, { record: ['forms.response', input.response.id] })
   return to
@@ -76,7 +76,7 @@ export async function resubmit(unit: UnitView, input: { form: FormRow, response:
   refuseInvalid(evaluation)
   const revision = input.response.currentRevision + 1
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
-  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated })
+  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated, answers: evaluation.answers })
   const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   return to

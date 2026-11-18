@@ -2,7 +2,6 @@
      checks; a page's title and where it leads; a group's limits; a text block's words. -->
 <script setup lang="ts">
 import { CHOICE_TYPES, change, earlier, find, keyFrom } from '../../shared/builder/edit'
-import { CORE_SOURCES } from '../../shared/builder/sources'
 import { DATA_CLASSES, PATTERNS, QUESTION_TYPES, RULES_FOR, type Condition, type Content, type Ending, type Group, type Option, type Page, type Question, type QuestionType, type Route, type Rule, type RuleName } from '../../shared/engine'
 
 const { t } = useT()
@@ -42,7 +41,10 @@ function setType(type: QuestionType) {
     else Reflect.deleteProperty(q, 'options')
     if (!['choice.single', 'choice.multiple', 'choice.dropdown'].includes(type)) Reflect.deleteProperty(q, 'allowOther')
     if (!['choice.dropdown', 'record'].includes(type)) Reflect.deleteProperty(q, 'multiple')
-    if (type !== 'record') Reflect.deleteProperty(q, 'source')
+    if (type !== 'record') {
+      Reflect.deleteProperty(q, 'source')
+      Reflect.deleteProperty(q, 'peopleInvolved')
+    }
     if (type === 'rating') q.scale = { max: q.scale?.max ?? 5 } // not-policy: five stars to start from
     else if (type === 'scale') q.scale = { min: q.scale?.min ?? 1, max: q.scale?.max ?? 5 } // not-policy: one to five to start from
     else Reflect.deleteProperty(q, 'scale')
@@ -104,7 +106,8 @@ function editEnding(fn: (e: Ending) => void, field: string) {
   fn(target)
   builder.apply(next, `${id}:${field}`)
 }
-const sources = computed(() => CORE_SOURCES.map(s => ({ value: s as string, label: t(`forms.sources.${s}`) })))
+const sources = computed(() => builder.sources.value.map(s => ({ value: s.key, label: t(s.label) })))
+const ofPeople = computed(() => builder.sources.value.find(s => s.key === question.value?.source)?.people ?? false)
 const condition = (c: Condition | undefined) => c ? formsConditionSentence(c, def.value) : ''
 const text = (v: unknown) => String(v ?? '')
 </script>
@@ -190,6 +193,13 @@ const text = (v: unknown) => String(v ?? '')
           @update:model-value="setQ('source', $event as string)"
         />
       </UFormField>
+      <USwitch
+        v-if="question.type === 'record' && ofPeople"
+        :model-value="!!question.peopleInvolved"
+        :label="t('forms.screens.details.people-involved')"
+        :description="t('forms.screens.details.people-involved-help')"
+        @update:model-value="setQ('peopleInvolved', $event || undefined)"
+      />
       <div
         v-if="question.type === 'rating' || question.type === 'scale'"
         class="grid grid-cols-2 gap-3"

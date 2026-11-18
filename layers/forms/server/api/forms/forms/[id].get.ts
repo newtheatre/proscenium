@@ -3,6 +3,7 @@ import { getRouterParam } from 'h3'
 import { all, defineRoute, isRefusal, today } from '#kit'
 import { accountLabel } from '#modules/core'
 import type { Definition } from '../../../../shared/engine'
+import { sources } from '../../../sources'
 import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
 
 export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record }) => {
@@ -27,6 +28,8 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     // What has been published of each question: its type is fixed and its data class only rises.
     fields: fields.map(f => ({ questionId: f.questionId, key: f.key, type: f.type, dataClass: f.dataClass, retired: f.retiredInVersion !== null })),
     reviewers: { roles, people },
+    // Where a "record from a source" question may choose from, with the modules switched on now.
+    sources: (await sources()).map(s => ({ key: s.key, label: s.label, people: !!s.people })),
     versions: versions.map(v => ({ id: v.id, number: v.number, publishedAt: v.publishedAt, publishedBy: v.publishedBy, summary: JSON.parse(v.changeSummary) })),
   }
 })
