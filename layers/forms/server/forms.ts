@@ -208,6 +208,7 @@ export async function planPublish(form: FormRow, draft: DraftRow): Promise<Publi
   if (form.mode === 'record') {
     if (hasStages(definition)) refusals.push({ code: 'forms.publish.record-stages', reason: 'Custom fields cannot have stages. Remove the stages before publishing.' })
     for (const q of now.filter(q => q.dataClass === 'special')) refusals.push({ code: 'forms.publish.record-special', questionId: q.id, reason: `"${q.label}" asks for special-category information, which custom fields cannot hold yet.` })
+    for (const q of now.filter(q => q.type === 'file')) refusals.push({ code: 'forms.publish.record-files', questionId: q.id, reason: `"${q.label}" asks for a file, which custom fields cannot hold yet.` })
   }
   else if (form.retentionDays === null && now.some(q => PERSONAL.includes(q.dataClass)) && await useSetting('forms.retention.require-choice'))
     refusals.push({ code: 'forms.publish.retention-needed', reason: 'This form asks for personal answers, so say how long they are kept before publishing it.' })

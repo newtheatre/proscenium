@@ -1,4 +1,4 @@
-// A refusal is one body everywhere: { code, reason, remedy?, fields? }. This turns whatever a
+// A refusal is one body everywhere: { code, reason, remedy?, fields?, detail? }. This turns whatever a
 // failed request threw into that shape, and a key or a sentence into words for the screen.
 export interface RefusalView {
   status: number
@@ -6,6 +6,8 @@ export interface RefusalView {
   reason: string
   remedy?: string
   fields?: Record<string, string>
+  /** Facts to link to or act on, such as the id of the record in the way. */
+  detail?: Record<string, string>
 }
 
 const KEY = /^[a-z][a-z0-9-]*(\.[a-z0-9-]+){2,}$/
@@ -26,6 +28,7 @@ export function toRefusal(error: unknown): RefusalView {
     reason: phrase(data.reason) ?? (status === 0 ? translate('core.failed.offline') : translate('core.failed.reason')),
     remedy: phrase(data.remedy),
     fields: data.fields,
+    detail: data.detail,
   }
 }
 

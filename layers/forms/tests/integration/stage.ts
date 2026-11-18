@@ -16,12 +16,18 @@ import linkPut from '../../server/api/forms/forms/[id]/link.put'
 import openGet from '../../server/api/forms/open/[slug].get'
 import openDraftPut from '../../server/api/forms/open/[slug]/draft.put'
 import openSendPost from '../../server/api/forms/open/[slug]/responses.post'
+import openFilePost from '../../server/api/forms/open/[slug]/files/index.post'
+import openFileGet from '../../server/api/forms/open/[slug]/files/[file].get'
+import changeFilePost from '../../server/api/forms/changes/[token]/files/index.post'
+import changeFileGet from '../../server/api/forms/changes/[token]/files/[file].get'
 import responsesGet from '../../server/api/forms/forms/[id]/responses/index.get'
 import responseGet from '../../server/api/forms/forms/[id]/responses/[response].get'
 import responsesExport from '../../server/api/forms/forms/[id]/responses/export.get'
 import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
 import mineOnePut from '../../server/api/forms/mine/[id].put'
+import changesGet from '../../server/api/forms/changes/[token].get'
+import changesPut from '../../server/api/forms/changes/[token].put'
 import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
 import moveManyPost from '../../server/api/forms/forms/[id]/responses/move.post'
 import releasePost from '../../server/api/forms/forms/[id]/responses/[response]/release.post'
@@ -60,12 +66,18 @@ export const handle = server({
   'GET /api/forms/open/:slug': openGet,
   'PUT /api/forms/open/:slug/draft': openDraftPut,
   'POST /api/forms/open/:slug/responses': openSendPost,
+  'POST /api/forms/open/:slug/files': openFilePost,
+  'GET /api/forms/open/:slug/files/:file': openFileGet,
   'GET /api/forms/forms/:id/responses': responsesGet,
   'GET /api/forms/forms/:id/responses/export': responsesExport,
   'GET /api/forms/forms/:id/responses/:response': responseGet,
   'GET /api/forms/mine': mineGet,
   'GET /api/forms/mine/:id': mineOneGet,
   'PUT /api/forms/mine/:id': mineOnePut,
+  'GET /api/forms/changes/:token': changesGet,
+  'PUT /api/forms/changes/:token': changesPut,
+  'POST /api/forms/changes/:token/files': changeFilePost,
+  'GET /api/forms/changes/:token/files/:file': changeFileGet,
   'POST /api/forms/forms/:id/responses/move': moveManyPost,
   'POST /api/forms/forms/:id/responses/:response/move': movePost,
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,

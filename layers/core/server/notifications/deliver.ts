@@ -3,12 +3,12 @@
 // own small unit too, so one delivery's failure never undoes another's success. The provider's
 // message id is kept exactly as send() returns it, angle brackets included, because Cloudflare's
 // bounce and complaint events carry that same string (proof P-COM-3).
-import { all, createUnit, isRefusal, nowMs, openSpecial, useSetting } from '#kit'
+import { all, createUnit, isRefusal, nowMs, openSpecial, siteUrl, useSetting } from '#kit'
 import type { UnitView } from '#kit'
 import { addressesFor } from '../identity/addresses'
 import { brandTokens } from '../brand/theme'
 import { DOMAIN_CODES, MailError, useMailer } from './mailer'
-import { render } from './render'
+import { hasLink, linkPath, render, type VariableKind } from './render'
 import { sendingDomain, senderFor, theatreName } from './send'
 import { declaredType } from './notify'
 import { suppressedAddresses } from './suppression'
@@ -25,6 +25,26 @@ interface DueRow {
   locale: string
   payload: string | null
   sealed_variables: string | null
+}
+
+/** The button's words when a type's wording does not name them. */
+const DEFAULT_ACTION: Record<string, string> = { 'en-GB': 'Open it' }
+
+/**
+ * The button an email carries to what it is about: the type's link, made absolute on the site's
+ * address. None when the type has no link, when the wording already links somewhere, or while the
+ * site's address is not recorded (the message still goes, without the button).
+ */
+export async function actionFor(type: { link?: string, variables: Record<string, VariableKind> }, wording: { body: string, action?: string }, locale: string, values: Record<string, string>): Promise<{ label: string, url: string } | null> {
+  const path = linkPath(type.link, values)
+  if (!path || hasLink(wording.body, values, type.variables)) return null
+  try {
+    return { label: wording.action ?? DEFAULT_ACTION[locale] ?? DEFAULT_ACTION['en-GB']!, url: await siteUrl(path) }
+  }
+  catch (error) {
+    if (isRefusal(error)) return null
+    throw error
+  }
 }
 
 /** Codes that are the recipient's, not a fault: the delivery fails at once and is not retried. */
@@ -111,7 +131,9 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
     const { type } = found
     const wording = type.wording[row.locale] ?? type.wording['en-GB']!
     const values = { ...JSON.parse(row.payload!), ...(row.sealed_variables ? JSON.parse((await openSpecial(row.sealed_variables))!) : {}) }
-    const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, theatre, footer })
+    const locale = type.wording[row.locale] ? row.locale : 'en-GB'
+    const action = await actionFor(type, wording, locale, values)
+    const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, theatre, footer, action })
     const sender = (row.sender_key ? await senderByKey(row.sender_key, domain) : undefined) ?? await senderFor(type.topic ?? 'transactional', domain)
     try {
       const result = await useMailer()({ from: { name: sender.name, email: sender.email }, to: address, replyTo: sender.replyTo, ...message, headers: { 'X-Entity-Ref-ID': row.id } })

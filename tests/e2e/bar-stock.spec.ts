@@ -69,7 +69,11 @@ test('a delivery is drafted, then received into its location', async ({ page }) 
   await expect(page).toHaveURL(/\/console\/bar\/deliveries\/bdlv_/)
   await expect(page.getByText('Draft', { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: `Receive 1 lines into Cellar ${stamp}` }).click()
+  // Receiving is final, so it asks first, naming what arrives.
+  await page.getByRole('button', { name: `Receive 1 line into Cellar ${stamp}` }).click()
+  const confirmation = page.getByRole('dialog')
+  await expect(confirmation.getByText(`54 each Cola can ${stamp}`, { exact: false })).toBeVisible()
+  await confirmation.getByRole('button', { name: `Receive 1 line into Cellar ${stamp}` }).click()
   await expect(page.getByText(`Delivery received into Cellar ${stamp}.`).first()).toBeVisible()
   await expect(page.getByText('A received delivery is final.', { exact: false })).toBeVisible()
   await noViolations(page)

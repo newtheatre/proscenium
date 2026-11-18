@@ -70,12 +70,14 @@ test('a scheme\'s lengths start empty, are added from a window and withdrawn fro
   await expect(lengths.getByText('3 years', { exact: true })).toBeVisible()
 
   const details = page.locator('section', { has: page.getByRole('heading', { name: 'Details' }) })
-  const renewal = details.getByLabel('Days before the end renewal opens')
-  const grace = details.getByLabel('Days of grace')
-  const [a, b] = [await renewal.boundingBox(), await grace.boundingBox()]
+  // Renewal and grace are an even pair of number-plus-unit fields, each as wide as Name.
+  const renewal = details.getByLabel('Renewal opens before the end: How many')
+  const renewalUnit = details.getByLabel('Renewal opens before the end: Unit of time')
+  const grace = details.getByLabel('Grace after the end: How many')
+  const [a, b, u] = [await renewal.boundingBox(), await grace.boundingBox(), await renewalUnit.boundingBox()]
   expect(a && b && Math.abs(a.y - b.y) < 1 && Math.abs(a.width - b.width) < 1).toBe(true)
   const name = await details.getByLabel('Name').boundingBox()
-  expect(name && a && Math.abs(name.width - a.width) < 2).toBe(true)
+  expect(name && a && u && Math.abs(name.width - (u.x + u.width - a.x)) < 2).toBe(true)
   await shot(page, 'details', details)
   await noViolations(page)
 })

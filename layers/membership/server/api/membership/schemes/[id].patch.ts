@@ -4,7 +4,8 @@ import { getRouterParam } from 'h3'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { getList } from '../../../lists'
 import { charger } from '../../../charge'
-import { checkLengthRule, hasMemberships, requireScheme, schemeFields, verifierConfig } from '../../../schemes'
+import { convertCount } from '../../../dates'
+import { checkLengthRule, hasMemberships, lengthOptions, requireScheme, schemeFields, verifierConfig } from '../../../schemes'
 
 const COLUMN: Record<string, string> = {
   key: 'key', name: 'name', summary: 'summary', side: 'side', joinMode: 'join_mode', lengthRule: 'length_rule', fixedEndMonth: 'fixed_end_month',
@@ -32,6 +33,17 @@ export default defineRoute({
   if (input.requiresPayment && !scheme.requiresPayment && !(await charger())) refuseFeesOff()
   const merged = { ...scheme, ...input }
   if (input.lengthRule !== undefined || input.fixedEndMonth !== undefined || input.fixedEndDay !== undefined) checkLengthRule(merged)
+  // Lengths are a bare count in the rule's unit (months, or scheme years), so a change between the two
+  // restates each one (12 months becomes 1 year) or is refused. An indefinite scheme has no unit to restate in.
+  const converted: { id: string, count: number }[] = []
+  if (input.lengthRule !== undefined && input.lengthRule !== scheme.lengthRule) {
+    for (const option of (await lengthOptions([scheme.id])).get(scheme.id)!) {
+      const count = convertCount(scheme.lengthRule, input.lengthRule, option.count)
+      if (count === null)
+        refuse('membership.scheme.lengths-fixed', `The length "${option.name}" cannot be restated for that rule, so the rule cannot change while this scheme has it.`, { status: 409, remedy: 'Lengths are counted in months from the day it starts and in years to a set day each year, and cannot be removed. Make a new scheme with the rule you want.', fields: { lengthRule: 'membership.scheme.lengths-fixed' } })
+      converted.push({ id: option.id, count })
+    }
+  }
   // The verifier's configuration: the list it checks against, or the domains that pass.
   const verifier = input.verifier !== undefined ? input.verifier : scheme.verifier
   const config = input.listId !== undefined || input.verifier !== undefined || input.domains !== undefined
@@ -55,6 +67,7 @@ export default defineRoute({
     sql: `UPDATE OR IGNORE membership_schemes SET ${[...changed.map(k => `${COLUMN[k]} = ?`), ...(config ? ['verifier_config = ?'] : [])].join(', ')}, updated_at = ? WHERE id = ? AND state = ?`,
     params: [...changed.map(value), ...(config ? [configJson] : []), nowMs(), scheme.id, scheme.state],
   }).expect(1, { code: 'membership.scheme.changed', reason: 'The scheme was changed by somebody else, or its address is taken.', remedy: 'Reload it and try again.' })
+  for (const option of converted) unit.add({ sql: 'UPDATE membership_length_options SET count = ? WHERE id = ? AND scheme_id = ?', params: [option.count, option.id, scheme.id] })
   unit.audit({ action: 'update', record: ['membership.scheme', scheme.id], detail: { fields: config ? [...changed, 'verifier_config'] : changed } })
   return { schemeId: scheme.id }
 })
