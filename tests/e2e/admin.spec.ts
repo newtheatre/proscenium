@@ -162,6 +162,8 @@ test.describe('staff who also run the console', () => {
   test('the palette names the shell of each screen', async ({ page }) => {
     await visit(page, '/admin')
     await page.keyboard.press('Control+k')
+    // The palette takes the focus as it opens; typing sooner goes nowhere.
+    await expect(page.getByRole('dialog').getByRole('textbox')).toBeFocused()
     await page.keyboard.type('Advanced')
     await expect(page.getByRole('dialog').getByRole('option', { name: /Advanced/ }).first()).toBeVisible()
     await expect(page.getByRole('dialog')).toContainText('Admin')

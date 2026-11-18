@@ -116,11 +116,14 @@ test('questions move by dragging, sit side by side when dropped on an edge, and 
   await add(page, 'Short text', 'Last name')
   await add(page, 'Email address', 'Email')
   expect(await order(page)).toEqual(['First name', 'Last name', 'Email'])
+  // A grip pressed in the same instant as the last keystroke is not yet ready to be dragged.
+  await saved(page)
 
   await reorder(page, 'Email', 'First name')
   await expect.poll(() => order(page)).toEqual(['Email', 'First name', 'Last name'])
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect.poll(() => order(page)).toEqual(['First name', 'Last name', 'Email'])
+  await saved(page)
 
   // Dropped on the right-hand edge of another question, the two share a line.
   await drag(page, 'Last name', card(page, 'First name').first(), b => [b.x + b.width - 40, b.y + b.height / 2])
