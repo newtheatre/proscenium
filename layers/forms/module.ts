@@ -32,6 +32,15 @@ export default defineModule({
     'builder.free-patterns': setting.boolean({ default: false, change, audience: 'staff' }),
     // Whether a form holding personal answers must say how long they are kept before it is published.
     'retention.require-choice': setting.boolean({ default: true, change, audience: 'staff' }),
+    // Reminders. Each is a length of time, and nought sends none of that kind.
+    // How long an unfinished working copy sits untouched before its person is reminded, once.
+    'reminders.unfinished': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
+    // How long before a form closes a person with unfinished answers to it is reminded, once.
+    'reminders.closing': setting.duration({ default: '3d', min: '0m', max: '30d', change, audience: 'staff' }),
+    // How long a response returned for changes waits before its person is reminded, once each time it is returned.
+    'reminders.returned': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
+    // How long a review in an open round may be outstanding before the reviewer is reminded, once.
+    'reminders.review': setting.duration({ default: '7d', min: '0m', max: '60d', change, audience: 'staff' }),
   }),
   settingGroups: {
     limits: { advanced: true },
@@ -97,6 +106,8 @@ export default defineModule({
   tasks: {
     // Anonymises responses once the period their form keeps them for is up.
     'forms.sweep-retention': task({ dailyAt: '04:50' }),
+    // Reminds people of unfinished and returned responses, and reviewers of reviews still owed.
+    'forms.send-reminders': task({ dailyAt: '09:30' }),
   },
 
   events: {
@@ -154,6 +165,23 @@ export default defineModule({
       {
         id: 'forms.review-requested', ...notice, variables: { form: text, link: text }, link: '/account/forms',
         wording: { 'en-GB': { subject: 'A response to review: {{ form }}', body: 'You have been asked to review a response to **{{ form }}**.\n\n[Open it and give your review]({{ link }})' } },
+      },
+      // Reminders (forms.send-reminders): each goes once, and none once the thing it is about is done.
+      {
+        id: 'forms.unfinished-reminder', ...notice, variables: { form: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'Not finished yet: {{ form }}', body: 'You started answering **{{ form }}** but have not sent your answers yet. What you have written so far is kept.\n\n[Carry on where you left off]({{ link }})' } },
+      },
+      {
+        id: 'forms.closing-reminder', ...notice, variables: { form: text, closes: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'Closing soon: {{ form }}', body: '**{{ form }}** closes on {{ closes }}, and your answers have not been sent yet.\n\n[Finish and send them]({{ link }})' } },
+      },
+      {
+        id: 'forms.returned-reminder', ...notice, variables: { form: text, reference: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'Still waiting for your changes: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is still back with you for changes.\n\n[See what is asked and make your changes]({{ link }})' } },
+      },
+      {
+        id: 'forms.review-reminder', ...notice, variables: { form: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'A review still to give: {{ form }}', body: 'A response to **{{ form }}** is still waiting for your review.\n\n[Open it and give your review]({{ link }})' } },
       },
     ],
     'core.navigation': [

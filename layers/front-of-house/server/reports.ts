@@ -2,7 +2,8 @@
 // shift window of the performance and is a live view: nothing is copied until sign-off. Sign-off
 // resolves who worked, compiles the snapshot (no names, no free text), and tells those who read
 // reports. After it the row cannot change; a correction is an addendum.
-import { all, first, newId, nowMs, refuse, usePoint, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, refuse, siteUrl, theatreTimeZone, usePoint, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { getPerformance, holdersOf, notify } from '#modules/core'
 import { AUTHORITY_STATES, type NOTE_TOPICS } from './db/schema'
 import { reference } from './incidents'
@@ -17,7 +18,8 @@ const authority = AUTHORITY_STATES.map(s => `'${s}'`).join(', ')
 export interface Snapshot {
   timings: { kind: string, at: number }[]
   duties: { dutyId: string, duty: string, worked: number, noShows: number }[]
-  checklists: { checklistId: string, name: string, state: string, exceptions: { item: string, reasonCode: string | null }[] }[]
+  /** An exception names its entry, so the note written with it is read from the entry (the snapshot keeps no free text). */
+  checklists: { checklistId: string, name: string, state: string, exceptions: { entryId?: string, item: string, reasonCode: string | null, reason?: string | null }[] }[]
   incidents: { id: string, reference: string, kind: string, severity: string }[]
   sections: { id: string, label: string, lines: { label: string, value: string | number, unit?: string }[] | null }[]
 }
@@ -58,8 +60,9 @@ export async function compile(performanceId: string, outcomes?: { noShows: Set<s
   }
   const runs = await all<{ id: string, checklist_id: string, name: string, state: string }>(
     'SELECT r.id, r.checklist_id, c.name, r.state FROM front_of_house_checklist_runs r JOIN front_of_house_checklists c ON c.id = r.checklist_id WHERE r.performance_id = ? ORDER BY c.sort_order, c.name', performanceId)
-  const exceptions = await all<{ run_id: string, label: string, reason_code: string | null }>(
-    `SELECT e.run_id, e.label, e.reason_code FROM front_of_house_checklist_entries e JOIN front_of_house_checklist_runs r ON r.id = e.run_id
+  const exceptions = await all<{ id: string, run_id: string, label: string, reason_code: string | null, reason: string | null }>(
+    `SELECT e.id, e.run_id, e.label, e.reason_code, m.label AS reason FROM front_of_house_checklist_entries e JOIN front_of_house_checklist_runs r ON r.id = e.run_id
+       LEFT JOIN core_terms m ON m.id = e.reason_code
      WHERE r.performance_id = ? AND e.outcome = 'exception' ORDER BY e.created_at`, performanceId)
   const incidents = await all<{ id: string, year: number, number: number, kind: string, severity: string }>(
     'SELECT id, year, number, kind, severity FROM front_of_house_incidents WHERE performance_id = ? ORDER BY year, number', performanceId)
@@ -69,7 +72,7 @@ export async function compile(performanceId: string, outcomes?: { noShows: Set<s
   return {
     timings,
     duties: [...duties.values()],
-    checklists: runs.map(r => ({ checklistId: r.checklist_id, name: r.name, state: r.state, exceptions: exceptions.filter(e => e.run_id === r.id).map(e => ({ item: e.label, reasonCode: e.reason_code })) })),
+    checklists: runs.map(r => ({ checklistId: r.checklist_id, name: r.name, state: r.state, exceptions: exceptions.filter(e => e.run_id === r.id).map(e => ({ entryId: e.id, item: e.label, reasonCode: e.reason_code, reason: e.reason })) })),
     incidents: incidents.map(i => ({ id: i.id, reference: reference(i.year, i.number), kind: i.kind, severity: i.severity })),
     sections,
   }
@@ -97,7 +100,9 @@ export async function unresolved(performanceId: string) {
   const openRuns = await all<{ checklist_id: string }>('SELECT checklist_id FROM front_of_house_checklist_runs WHERE performance_id = ? AND state = \'open\'', performanceId)
   const recorded = new Set((await all<{ kind: string }>('SELECT kind FROM front_of_house_timings WHERE performance_id = ?', performanceId)).map(t => t.kind))
   return {
-    people: people.map(p => ({ assignmentId: p.id, accountId: p.account_id, state: p.state, duty: p.duty })),
+    // `arrived`: marked arrived on the board. Sign-off's form starts with everyone else named as not
+    // come once anyone has been marked arrived, so a night that used arrivals credits no one who never came.
+    people: people.map(p => ({ assignmentId: p.id, accountId: p.account_id, state: p.state, duty: p.duty, arrived: p.state === 'checked_in' })),
     openChecklists: openRuns.map(r => r.checklist_id),
     missingTimings: ['house_open', 'curtain_up', 'curtain_down', 'house_clear'].filter(k => !recorded.has(k)),
   }
@@ -110,16 +115,52 @@ export async function readReport(performanceId: string) {
         'SELECT * FROM front_of_house_night_report_notes WHERE report_id = ? ORDER BY created_at, rowid', report.id)
     : []
   const signed = report?.state === 'signed_off'
+  const snapshot = signed ? JSON.parse(report!.snapshot!) as Snapshot : await compile(performanceId)
   return {
     id: report?.id ?? null,
     performanceId,
     state: report?.state ?? 'draft',
     signedOffBy: report?.signed_off_by ?? null,
     signedOffAt: report?.signed_off_at ?? null,
-    report: signed ? JSON.parse(report!.snapshot!) as Snapshot : await compile(performanceId),
+    report: snapshot,
+    problems: await problemsOf(snapshot),
     unresolved: signed ? null : await unresolved(performanceId),
     notes: notes.map(n => ({ id: n.id, kind: n.kind, topic: n.topic, body: n.body, authorId: n.author_id, at: n.created_at })),
   }
+}
+
+/**
+ * What each checklist problem says, read now: the reason's label (a snapshot from before labels were
+ * kept names only the term) and the note written with it, keyed by checklist and item.
+ */
+async function problemsOf(snapshot: Snapshot): Promise<Record<string, { reason: string | null, note: string | null }>> {
+  const entries = snapshot.checklists.flatMap(c => c.exceptions.map(x => ({ key: `${c.checklistId}:${x.item}`, ...x })))
+  if (!entries.length) return {}
+  const ids = entries.map(x => x.entryId).filter((x): x is string => !!x)
+  const codes = entries.map(x => x.reasonCode).filter((x): x is string => !!x)
+  const notes = new Map((await all<{ id: string, reason_note: string | null }>('SELECT id, reason_note FROM front_of_house_checklist_entries WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(ids))).map(r => [r.id, r.reason_note]))
+  const labels = new Map((await all<{ id: string, label: string }>('SELECT id, label FROM core_terms WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(codes))).map(r => [r.id, r.label]))
+  return Object.fromEntries(entries.map(x => [x.key, {
+    reason: x.reason ?? (x.reasonCode ? labels.get(x.reasonCode) ?? null : null),
+    note: x.entryId ? notes.get(x.entryId) ?? null : null,
+  }]))
+}
+
+/**
+ * Whether the account may read a signed-off report without the abilities: it signed it, or it led
+ * that night (a lead duty on its rota). Signing off ends the shift that gave the abilities, so
+ * without this the person who has just signed would be refused their own report. Others on the
+ * rota are not given it: the report carries the night's takings.
+ */
+export async function readsSignedReport(performanceId: string, accountId: string): Promise<boolean> {
+  const row = await first<{ ok: number }>(
+    `SELECT 1 AS ok FROM front_of_house_night_reports r WHERE r.performance_id = ?1 AND r.state = 'signed_off'
+       AND (r.signed_off_by IN (${accountScopeSql('?2')}) OR EXISTS (
+         SELECT 1 FROM front_of_house_assignments a JOIN front_of_house_shifts s ON s.id = a.shift_id
+           JOIN front_of_house_duties d ON d.id = s.duty_id AND d.is_lead = 1
+          WHERE s.performance_id = ?1 AND a.account_id IN (${accountScopeSql('?2')}) AND a.state IN (${authority}, 'worked', 'no_show')))`,
+    performanceId, accountId)
+  return !!row
 }
 
 /** A note on the night, or an addendum once the report is signed off. */
@@ -187,13 +228,20 @@ export async function signOff(unit: UnitView, input: { performanceId: string, no
       const worked = snapshot.duties.reduce((n, d) => n + d.worked, 0)
       await notify(unit, 'front-of-house.night-report-ready', {
         to: readers,
-        variables: { show: performance.productionTitle, worked: String(worked), incidents: String(snapshot.incidents.length), performance: input.performanceId },
+        variables: { show: performance.productionTitle, worked: String(worked), incidents: String(snapshot.incidents.length), performance: input.performanceId, ...await reportWords(input.performanceId, performance.startsAt) },
         dedupeKey: `report:${input.performanceId}`,
       })
     }
     unit.add({ sql: 'UPDATE front_of_house_night_reports SET distributed_at = ? WHERE performance_id = ?', params: [at, input.performanceId] })
   }
   return { signedOff: true }
+}
+
+/** The night's date and the address of its report, for the messages about it. */
+async function reportWords(performanceId: string, startsAt: number): Promise<{ date: string, link: string }> {
+  const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
+  const date = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: await theatreTimeZone() }).format(startsAt)
+  return { date, link: await siteUrl(`/console/front-of-house/night-reports/${encodeURIComponent(performanceId)}`) }
 }
 
 /** A manager sets one person's outcome or corrects their minutes, after the night; audited. */
@@ -222,7 +270,7 @@ export async function chaseReports(unit: UnitView): Promise<number> {
     if (!managers.length) continue
     await notify(unit, 'front-of-house.night-report-unsigned', {
       to: managers,
-      variables: { show: performance.productionTitle, performance: d.performance_id },
+      variables: { show: performance.productionTitle, performance: d.performance_id, ...await reportWords(d.performance_id, performance.startsAt) },
       dedupeKey: `unsigned:${d.performance_id}:${new Date(nowMs()).toISOString().slice(0, 10)}`,
     })
     sent++

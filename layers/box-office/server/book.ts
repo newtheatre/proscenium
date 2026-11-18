@@ -28,7 +28,7 @@ export interface BookingPage {
      * `reference`: then the visitor may type one for each ticket instead, such as a student ID,
      * worded by the source ("NNT member? Enter your student ID").
      */
-    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, shape: string } }[]
+    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, field?: string, shape: string } }[]
   }[]
 }
 
@@ -44,7 +44,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   // What the visitor may have of each type with requirements, judged for them alone. A type whose
   // source is off is withheld; a companion type is shown only to someone it is for.
   const account = useContext().actor.accountId ?? null
-  const judged = new Map<string, { most?: number, unmet?: string, reference?: { label: string, shape: string } } | null>()
+  const judged = new Map<string, { most?: number, unmet?: string, reference?: { label: string, field?: string, shape: string } } | null>()
   for (const type of types.values()) {
     if (!type.requirementRefs.length) continue
     const answers = await requirements.check({ accounts: [account], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
