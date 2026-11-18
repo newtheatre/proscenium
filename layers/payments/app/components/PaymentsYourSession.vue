@@ -94,6 +94,8 @@ const saleAbout = (s: YourSale) => [time(s.at), s.state === 'succeeded' ? '' : t
       :description="t(`payments.screens.session.handoff.${handoff}-help`)"
     />
 
+    <PaymentsHandBack @changed="emit('changed')" />
+
     <PageSection
       :title="t('payments.screens.session.yours')"
       :description="data.session ? undefined : t('payments.screens.session.none-open')"

@@ -4,6 +4,7 @@
 // opened again with the token handed back here, which is stored only as its hash and stays the
 // browser's own through checkout.
 import { all, first, newId, nowMs, refuse, requirements, useContext, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { getPerformance } from '#modules/core'
 import { orderLines } from './db/schema'
 import { claimSeats } from './capacity'
@@ -119,7 +120,8 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const cap = sales.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number
   if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one order.`, { status: 422, remedy: 'For a larger group, ask the box office.' })
 
-  const { pool, lines, currency, guard } = await pricedLines(input.performanceId, input.lines, at, { channel: 'online', account: useContext().actor.accountId ?? null })
+  const account = useContext().actor.accountId ?? null
+  const { pool, lines, currency, guard } = await pricedLines(input.performanceId, input.lines, at, { channel: 'online', account })
   const typedCode = input.promoCode?.trim()
   const discounted = typedCode ? await applyCode(await judgeCode(typedCode, input.performanceId, at), input.performanceId, lines) : lines.map(() => null)
   const charged = lines.map((l, i) => l.amountMinor - (discounted[i]?.discountMinor ?? 0))
@@ -140,6 +142,9 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
     params: [orderId, reference, currency, totalMinor, await hashOf(token), expiresAt, at, at],
   })
   unit.add({ sql: "INSERT INTO box_office_holds (id, kind, order_id, created_at, updated_at) VALUES (?, 'basket', ?, ?, ?)", params: [holdId, orderId, at, at] })
+  // The buyer's own basket in another browser, holding tickets of a type with a limit for each
+  // holder, would count against this one until it lapses: starting again here lets it go (B18).
+  if (account) await letGoOtherBaskets(unit, account, input.performanceId, lines.filter(l => l.requirement?.accountId === account).map(l => l.ticketTypeId), at)
   const claimed = (await claimSeats(unit, { holdId, requests: input.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
   guard(unit)
   const redemptions = redeem(unit, orderId, discounted, claimed)
@@ -179,5 +184,24 @@ export async function basketByToken(orderId: string, token: string): Promise<Bas
     currency: order.currency,
     totalMinor: lapsed ? 0 : order.total_minor,
     lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, amountMinor: l.amount_minor })),
+  }
+}
+
+/**
+ * Lets go the buyer's other live baskets that hold tickets of these types for this performance under
+ * their own account, so a holder's limit is not used up by a basket they left in another browser. The
+ * seats go back on sale and that basket says it has run out, as one that lapsed does.
+ */
+async function letGoOtherBaskets(unit: UnitView, account: string, performanceId: string, typeIds: string[], at: number): Promise<void> {
+  if (!typeIds.length) return
+  const others = await all<{ id: string }>(
+    `SELECT DISTINCT o.id FROM box_office_orders o JOIN box_office_order_lines l ON l.order_id = o.id
+      WHERE o.state = 'basket' AND o.expires_at > ?1 AND l.performance_id = ?2 AND l.state = 'live'
+        AND l.ticket_type_id IN (SELECT value FROM json_each(?3)) AND l.requirement_account_id IN (${accountScopeSql('?4')})`, // not-policy: ?3 and ?4 are SQL parameter numbers
+    at, performanceId, JSON.stringify([...new Set(typeIds)]), account)
+  for (const other of others) {
+    unit.add({ sql: "UPDATE box_office_orders SET state = 'expired', updated_at = ? WHERE id = ? AND state = 'basket'", params: [at, other.id] })
+    unit.add({ sql: "UPDATE box_office_claims SET state = 'released', released_at = ?, release_reason = 'abandoned' WHERE state = 'held' AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ? AND kind = 'basket')", params: [at, other.id] })
+    unit.announce('box-office.order.expired', { orderId: other.id }, { record: ['box-office.order', other.id] })
   }
 }

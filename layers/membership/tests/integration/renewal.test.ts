@@ -42,12 +42,30 @@ describe('renewal', () => {
     expect((await req('POST', `/api/membership/mine/${id}/renew`, {}, who)).body.code).toBe('membership.renew.not-yet')
     setClock(at('2027-10-17'))
     const mine = (await req('GET', '/api/membership/mine', undefined, who)).body
-    expect(mine.memberships.find((m: { id: string }) => m.id === id).renewal).toEqual({ opensOn: '2027-10-17', closesOn: '2027-11-26', open: true })
+    expect(mine.memberships.find((m: { id: string }) => m.id === id).renewal).toMatchObject({ opensOn: '2027-10-17', closesOn: '2027-11-26', open: true, asks: { asksFor: null, endsByList: false, fee: null } })
     const renewed = await req('POST', `/api/membership/mine/${id}/renew`, {}, who)
     expect(renewed.body, JSON.stringify(renewed.body)).toMatchObject({ startsOn: '2027-11-17', endsOn: '2028-11-16', renewed: true, pending: false })
     expect((await req('POST', `/api/membership/mine/${id}/renew`, {}, who)).body.membershipId).toBe(renewed.body.membershipId)
     const [row] = await rows<{ origin: string, renews_id: string }>('SELECT origin, renews_id FROM membership_memberships WHERE id = ?', renewed.body.membershipId)
     expect(row).toEqual({ origin: 'renewed', renews_id: id })
+    // The one held now comes first; the renewal follows it.
+    const after = (await req('GET', '/api/membership/mine', undefined, who)).body.memberships
+    expect(after.map((m: { id: string, status: string }) => [m.id, m.status])).toEqual([[id, 'current'], [renewed.body.membershipId, 'upcoming']])
+  })
+
+  it('renews a closed scheme, with what renewing asks for coming from the membership itself', async () => {
+    setClock(NOV_17)
+    const schemeId = await scheme({ renewalOpensDays: 30, graceDays: 10 }, [12, 36])
+    await req('POST', `/api/membership/schemes/${schemeId}/state`, { to: 'open' })
+    const who = await applicant('Closed Renewer')
+    const options = (await req('GET', `/api/membership/schemes/${schemeId}`)).body.options as { id: string, count: number }[]
+    const joined = (await req('POST', `/api/membership/schemes/${schemeId}/join`, { lengthOptionId: options.find(o => o.count === 12)!.id }, who)).body
+    expect((await req('POST', `/api/membership/schemes/${schemeId}/state`, { to: 'closed' })).status).toBe(200)
+    setClock(at('2027-10-20'))
+    const mine = (await req('GET', '/api/membership/mine', undefined, who)).body
+    expect(mine.memberships[0].renewal.asks.options.map((o: { id: string }) => o.id)).toEqual(options.map(o => o.id))
+    const renewed = await req('POST', `/api/membership/mine/${joined.membershipId}/renew`, { lengthOptionId: options.find(o => o.count === 36)!.id }, who)
+    expect(renewed.body, JSON.stringify(renewed.body)).toMatchObject({ startsOn: '2027-11-17', endsOn: '2030-11-16', renewed: true })
   })
 
   it('starts today when renewed in grace, and is refused once grace is over', async () => {

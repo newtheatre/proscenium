@@ -10,7 +10,7 @@ import { useRegistry } from '#kit/registry'
 import { deliveries, inboxItems, notifications } from '../db/domain'
 import { addressesFor } from '../identity/addresses'
 import { brandTokens } from '../brand/theme'
-import { checkVariables, render } from './render'
+import { checkVariables, linkPath, render } from './render'
 import { suppressedAddresses } from './suppression'
 import { theatreName, type NotificationType } from './send'
 
@@ -56,13 +56,6 @@ async function dedupeHash(typeKey: string, key: string): Promise<string> {
 function recordOf(subject?: RecordRef): { type: string | null, id: string | null } {
   if (!subject) return { type: null, id: null }
   return Array.isArray(subject) ? { type: subject[0], id: subject[1] ?? null } : { type: (subject as any).type, id: (subject as any).id ?? null }
-}
-
-/** The inbox link: the type's path with its variables filled in, or nothing if it leaves the app. */
-function inboxLink(template: string | undefined, values: Record<string, string>): string | null {
-  if (!template) return null
-  const path = template.replace(/\{\{\s*([a-z][a-zA-Z0-9]*)\s*\}\}/g, (_, name: string) => encodeURIComponent(values[name] ?? '')) // not-policy: the variable syntax
-  return path.startsWith('/') && !path.startsWith('//') ? path : null
 }
 
 /**
@@ -196,7 +189,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
           side: type.side,
           title: message.subject.slice(0, 120), // not-policy: the column's bound
           body: message.text.trim().slice(0, 500) || null, // not-policy: the column's bound
-          link: inboxLink(type.link, r.values),
+          link: linkPath(type.link, r.values),
           expiresAt: at + keepFor * 1000, // not-policy: seconds to milliseconds
         }
       }))

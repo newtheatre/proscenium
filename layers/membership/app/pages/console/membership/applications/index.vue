@@ -26,7 +26,8 @@ async function decide() {
     await $api(`/api/membership/applications/${application.id}/decide` as string, { method: 'POST', body: { outcome, note: note.value.trim() || null } })
     toast.add({ title: t(`membership.screens.applications.done-${outcome}`, { name: application.accountName ?? '' }), color: 'success' })
     deciding.value = null
-    await refresh()
+    // The sidebar's count and the home card follow the decision.
+    await Promise.all([refresh(), refreshNuxtData(['core:navigation:console', 'core:home:console'])])
   }
   catch (e) {
     refusal.value = toRefusal(e)

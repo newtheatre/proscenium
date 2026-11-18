@@ -30,13 +30,14 @@ export default {
 
   /** What the award is and whether it is current: never the holder's name. */
   async resolve(code: string): Promise<{ headline: string, line: string, state: 'ok' | 'attention' } | null> {
-    const card = await first<{ name: string, state: string, awarded_on: string, benefit: number }>(
-      'SELECT t.name, a.state, a.awarded_on, t.gives_ticket_benefit AS benefit FROM awards_awards a JOIN awards_types t ON t.id = a.type_id WHERE a.id = ?',
+    const card = await first<{ name: string, state: string, awarded_on: string, awarded_precision: string, benefit: number }>(
+      'SELECT t.name, a.state, a.awarded_on, a.awarded_precision, t.gives_ticket_benefit AS benefit FROM awards_awards a JOIN awards_types t ON t.id = a.type_id WHERE a.id = ?',
       code,
     )
     if (!card) return null
+    const when = card.awarded_precision === 'year' ? card.awarded_on.slice(0, 4) : card.awarded_on // not-policy: the year of a date
     if (card.state !== 'current') return { headline: 'Award revoked', line: `${card.name}: this award is no longer held.`, state: 'attention' }
-    if (!card.benefit) return { headline: card.name, line: `${card.name}, awarded on ${card.awarded_on}: current, with no ticket price.`, state: 'attention' }
-    return { headline: card.name, line: `${card.name}, awarded on ${card.awarded_on}: current.`, state: 'ok' }
+    if (!card.benefit) return { headline: card.name, line: `${card.name}, awarded ${card.awarded_precision === 'year' ? 'in' : 'on'} ${when}: current, with no ticket price.`, state: 'attention' }
+    return { headline: card.name, line: `${card.name}, awarded ${card.awarded_precision === 'year' ? 'in' : 'on'} ${when}: current.`, state: 'ok' }
   },
 }

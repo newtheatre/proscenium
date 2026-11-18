@@ -73,6 +73,8 @@ describe('a production\'s statement (FIN-04)', () => {
     const body = JSON.parse(shown.text)
     expect(body.production).toMatchObject({ id: hamlet, title: 'Hamlet' })
     expect(body.lines).toEqual([expect.objectContaining({ code: 'tickets.income', salesMinor: 3500, refundsMinor: -500, otherMinor: 0, netMinor: 3000 })])
+    // And by performance; one no longer in the programme keeps its id and has no date.
+    expect(body.performances).toEqual([expect.objectContaining({ performanceId: `prf_${hamlet}`, startsAt: null, salesMinor: 3500, refundsMinor: -500, netMinor: 3000 })])
   })
 
   it('is readable with the ledger granted on that production only, and on no other', async () => {
