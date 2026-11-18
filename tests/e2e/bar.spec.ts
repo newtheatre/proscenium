@@ -139,11 +139,18 @@ test('refusing the age-restricted lines leaves the rest of the sale to carry on'
   await expect(page.getByText('Refusal recorded in the register', { exact: true })).toBeVisible()
   await expect(receipt.getByText(cola)).toBeVisible()
   await expect(receipt.getByText(lager)).toHaveCount(0)
+  // The refusal stands: the same customer cannot be served the lager a moment later.
+  await expect(page.getByText(/^Refused at .+: No ID$/)).toBeVisible()
+  await expect(tile(page, lager)).toBeDisabled()
 
-  // The whole sale, from the button above the tiles.
+  // The whole sale, from the button above the tiles: nothing in it needs an age check, so no product is named.
   await page.getByRole('button', { name: 'Refuse sale' }).click()
-  await page.getByRole('dialog', { name: 'Refuse sale' }).getByRole('button', { name: 'Already drunk' }).click()
+  const whole = page.getByRole('dialog', { name: 'Refuse sale' })
+  await expect(whole.getByText('so no product is recorded as refused')).toBeVisible()
+  await whole.getByRole('button', { name: 'Already drunk' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
+  await page.getByRole('button', { name: 'Start a new customer' }).click()
+  await expect(tile(page, lager)).toBeEnabled()
 })
 
 test('on a phone the sale is a bar at the foot with an undo, and opens as a sheet', async ({ page }) => {
