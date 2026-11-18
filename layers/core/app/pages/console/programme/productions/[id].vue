@@ -204,7 +204,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
 // The facts strip and the overview read the dates the Dates tab shows, by the same key.
 interface Dated { id: string, venueId: string, startsAt: number, endsAt: number, state: 'draft' | 'scheduled' | 'cancelled' | 'completed', label: string | null }
 const { data: dated } = await useAPI<{ performances: Dated[], options: { venues: { id: string, name: string }[] } }>(() => `${base.value}/performances`, { key: `core:production:${String(route.params.id)}:performances` })
-const { span, dateTime } = useDates()
+const { span, dateTime, day } = useDates()
 const venueName = (id: string) => dated.value?.options.venues.find(v => v.id === id)?.name ?? ''
 const performances = computed(() => dated.value?.performances ?? [])
 const running = computed(() => performances.value.filter(p => p.state === 'scheduled' || p.state === 'completed'))
