@@ -13,6 +13,7 @@ import type { FormRow, VersionRow } from './forms'
 import { openRound } from './review'
 import { tellReceived } from './notices'
 import { recordLabels } from './sources'
+import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
 
 // ---- the link ----
 
@@ -257,7 +258,10 @@ export interface Sending {
  */
 export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ reference: string }> {
   const def = JSON.parse(s.version.definition) as Definition
+  // Each file answer is read back from core's store first, so the engine checks what core holds; a file must have passed its check.
+  const fileProblems = await settleFileAnswers(def, s.answers, s.responseId)
   const evaluation = evaluate(def, s.answers, { today: await today() })
+  const fileIds = refuseFileProblems(def, evaluation.answers, fileProblems)
   refuseInvalid(evaluation)
 
   const personId = s.form.anonymous ? null : s.actor.accountId ?? null
@@ -292,6 +296,7 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
 
   const rows = await answerRows(def, evaluation.answers, s.responseId, 1)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
+  attachFileAnswers(unit, s.responseId, fileIds, s.at)
   recordMove(unit, { responseId: s.responseId, from: null, to: stage, transitionKey: SUBMIT, revision: 1, actorId: s.actor.accountId ?? null, at: s.at })
   await openRound(unit, { def, stage, formId: s.form.id, title: s.form.title, responseId: s.responseId, personId, revision: 1, at: s.at, answers: evaluation.answers })
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
@@ -365,7 +370,7 @@ export function toAnswers(def: Definition, stored: StoredAnswer[]): Answers {
 }
 
 /** An answer as one line of plain words, for a table cell or a CSV field. */
-export function words(answer: StoredAnswer, type: string | undefined, currency?: string): string {
+export function words(answer: StoredAnswer, type: string | undefined, currency?: string, fileLink?: (id: string) => string): string {
   if (answer.restricted) return ''
   if (answer.label !== null) return answer.label
   const v = answer.value
@@ -374,7 +379,8 @@ export function words(answer: StoredAnswer, type: string | undefined, currency?:
   // With a currency, money reads as money ("£12.50"); without, as a plain figure a spreadsheet can add up.
   if (typeof v === 'number') return type !== 'money' ? String(v) : currency ? moneyWords(v, currency) : (v / 100).toFixed(2) // not-policy: minor units to units
   if (typeof v === 'string') return v
-  if (Array.isArray(v)) return v.map(x => typeof x === 'string' ? x : x.name).join('; ')
+  // A file reads as its name, and in an export with the address to open it at.
+  if (Array.isArray(v)) return v.map(x => typeof x === 'string' ? x : fileLink ? `${x.name} (${fileLink(x.id)})` : x.name).join('; ')
   return [v.line1, v.line2, v.town, v.county, v.postcode, v.country].filter(Boolean).join(', ')
 }
 
@@ -441,11 +447,11 @@ export function columnsOf(fields: { questionId: string, key: string, label: stri
 }
 
 /** A response's answers as one cell per column. Entries of a repeating group share a cell. */
-export function cells(answers: StoredAnswer[], columns: Column[], currency?: string): Record<string, { text: string, restricted: boolean }> {
+export function cells(answers: StoredAnswer[], columns: Column[], currency?: string, fileLink?: (id: string) => string): Record<string, { text: string, restricted: boolean }> {
   const out: Record<string, { text: string, restricted: boolean }> = {}
   const type = new Map(columns.map(c => [c.questionId, c.type]))
   for (const a of answers) {
-    const text = words(a, type.get(a.questionId), currency)
+    const text = words(a, type.get(a.questionId), currency, fileLink)
     const cell = out[a.questionId]
     if (!cell) out[a.questionId] = { text, restricted: a.restricted }
     else if (!a.restricted && text) cell.text = cell.text ? `${cell.text} | ${text}` : text

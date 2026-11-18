@@ -67,3 +67,10 @@ export function formsProblemName(def: Definition, at: string, t: (key: string, p
   const item = found.item
   return item.kind === 'question' ? formsQuestionName(item) : item.kind === 'group' ? item.label.trim() || t('forms.screens.builder.untitled-group') : t(`forms.screens.details.kind-${item.kind}`)
 }
+
+/** A file's size as people read it: "820 KB", "2.4 MB". */
+export function formsFileSize(bytes: number): string {
+  const KB = 1024 // not-policy: unit of size
+  if (bytes < KB * KB) return translate('forms.screens.fill.file-kb', { n: Math.max(1, Math.round(bytes / KB)) })
+  return translate('forms.screens.fill.file-mb', { n: (bytes / KB / KB).toFixed(1) })
+}

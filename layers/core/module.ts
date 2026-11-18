@@ -41,12 +41,13 @@ export default defineModule({
     // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in
     // screen, not an entry; "Signing in" is where passkeys are kept.
     'core.navigation': [
-      // The inbox, one per side (C-30): My account's for the audience side, the members' area's for theirs.
+      // The one inbox (C-30, AC-2), with every side the person has: in My account, and in the members' area for a member.
       { id: 'core.inbox', menu: 'account', group: 'account', to: '/account/inbox', icon: 'i-lucide-inbox', ability: 'signed-in', order: 5, count: 'core.inbox-unread' },
-      { id: 'core.members-inbox', menu: 'members', to: '/members/inbox', icon: 'i-lucide-inbox', order: 90, count: 'core.inbox-unread-members' },
+      { id: 'core.members-inbox', menu: 'members', to: '/members/inbox', icon: 'i-lucide-inbox', order: 90, count: 'core.inbox-unread' },
       { id: 'core.account-details', menu: 'account', group: 'account', to: '/account/details', match: '/account/welcome', icon: 'i-lucide-user-round', ability: 'signed-in', order: 10 },
       { id: 'core.account-email', menu: 'account', group: 'account', to: '/account/email', icon: 'i-lucide-mail', ability: 'signed-in', order: 20, attention: 'core.unconfirmed-addresses' },
       { id: 'core.account-sign-in', menu: 'account', group: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
+      { id: 'core.account-notifications', menu: 'account', group: 'account', to: '/account/notifications', icon: 'i-lucide-bell', ability: 'signed-in', order: 40 },
       { id: 'core.account-data', menu: 'account', group: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },
       // Venues and their spaces are set up once, so they are a tab of Core's page, opened from the programme's cog.
       { id: 'core.venues', menu: 'admin', group: 'modules', to: '/admin/modules/core/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30, settingsIn: ['programme'] },

@@ -195,3 +195,36 @@ describe('FH-09 and FH-17: what members see', () => {
     expect((await req('GET', `/api/front-of-house/shifts/${id}`, undefined, volunteer())).body.coverFor).toBe(a)
   })
 })
+
+describe('FH-5: a duty kept for people with the experience or the role', () => {
+  it('lets only someone who has worked enough shifts, or holds the role, take the place', async () => {
+    const p = await performance()
+    const listed = await req('GET', '/api/front-of-house/duties')
+    const options = listed.body.requirementOptions.map((o: { value: string }) => o.value)
+    expect(options).toContain('front-of-house:worked-5')
+    expect(options.some((v: string) => v.startsWith('core.access-scheme:'))).toBe(false)
+    const id = await shift(p.id, await duty('Duty manager', { requirements: ['front-of-house:worked-1'] }))
+    const vera = volunteer()
+    const open = (await req('GET', '/api/front-of-house/open-shifts', undefined, vera)).body.shifts.find((s: any) => s.id === id)
+    expect(open).toMatchObject({ eligible: false, unmet: [{ ref: 'front-of-house:worked-1', label: 'Has worked at least 1 shift' }] })
+    expect((await req('POST', `/api/front-of-house/shifts/${id}/sign-up`, {}, vera)).body.code).toBe('front-of-house.not-eligible')
+
+    // Someone with a worked shift behind them may.
+    const old = volunteer()
+    const before = await shift((await performance()).id, await duty('Steward'))
+    const done = await req('POST', `/api/front-of-house/shifts/${before}/sign-up`, {}, old)
+    await env.DB.prepare('UPDATE front_of_house_assignments SET state = \'worked\' WHERE id = ?').bind(done.body.assignmentId).run()
+    const taken = await req('POST', `/api/front-of-house/shifts/${id}/sign-up`, {}, old)
+    expect(taken.status, JSON.stringify(taken.body)).toBe(200)
+
+    // A role, as core.role:<id>: met only while the person holds it site-wide.
+    const roleId = 'rol_dutymanagersonly000000000'
+    await env.DB.prepare('INSERT INTO core_roles (id, key, name, fixed, opens_members_area, needs_managed_identity, expiry_rule, created_at) VALUES (?, \'duty-managers-only\', \'Duty manager\', 0, 1, 0, \'none\', ?)').bind(roleId, Date.now()).run()
+    const gated = await shift(p.id, await duty('Head usher', { requirements: [`core.role:${roleId}`] }))
+    expect((await req('POST', `/api/front-of-house/shifts/${gated}/sign-up`, {}, vera)).body.code).toBe('front-of-house.not-eligible')
+    await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, \'Vera\', \'staff\', ?) ON CONFLICT DO NOTHING').bind(vera.accountId, Date.now()).run()
+    await env.DB.prepare('INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES (?, ?, ?, \'site\', ?, ?, ?)').bind('gra_dutymanagersonly00000000', vera.accountId, roleId, 0, vera.accountId, 0).run()
+    const now = await req('POST', `/api/front-of-house/shifts/${gated}/sign-up`, {}, vera)
+    expect(now.status, JSON.stringify(now.body)).toBe(200)
+  })
+})

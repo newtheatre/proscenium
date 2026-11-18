@@ -253,6 +253,11 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       :required="required"
       @update:model-value="model = $event === true ? true : undefined"
     />
+    <FormsFillFile
+      v-else-if="q.type === 'file'"
+      v-model="model"
+      :question="q"
+    />
     <FormsFillRecord
       v-else-if="q.type === 'record' && q.source"
       v-model="model"
@@ -262,7 +267,7 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       v-else
       class="rounded-md border border-dashed border-default px-3 py-2 text-sm text-muted"
     >
-      {{ t(q.type === 'file' ? 'forms.screens.fill.file-later' : 'forms.screens.fill.record-no-source') }}
+      {{ t('forms.screens.fill.record-no-source') }}
     </p>
     <UInput
       v-if="otherChosen"

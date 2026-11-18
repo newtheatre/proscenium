@@ -24,7 +24,7 @@ export interface StatementLine {
  * into sales, refunds and everything else. Income and deferred income read positive; a fee or other
  * cost tagged with the production reads negative. Money accounts are not tagged, so they never show.
  */
-export async function productionStatement(productionId: string): Promise<{ lines: StatementLine[] }> {
+export async function productionStatement(productionId: string): Promise<{ lines: StatementLine[], performances: PerformanceLine[] }> {
   const rows = await all<{ account_id: string, code: string, name: string, kind: string, currency: string, posting_kind: string, amount: number }>(
     `SELECT a.id AS account_id, a.code, a.name, a.kind, e.currency, p.kind AS posting_kind, sum(e.amount_minor) AS amount
       FROM finance_entries e JOIN finance_postings p ON p.id = e.posting_id JOIN finance_accounts a ON a.id = e.account_id
@@ -40,7 +40,34 @@ export async function productionStatement(productionId: string): Promise<{ lines
     line.netMinor += credit
     lines.set(key, line)
   }
-  return { lines: [...lines.values()] }
+  return { lines: [...lines.values()], performances: await performanceLines(productionId) }
+}
+
+export interface PerformanceLine { performanceId: string, currency: string, salesMinor: number, refundsMinor: number, otherMinor: number, netMinor: number }
+
+/**
+ * The same statement by performance: everything tagged with each of the production's performances,
+ * across accounts. Moving deferred income to income when a performance has happened nets to nothing,
+ * so a performance's net is what it took less what it gave back. Entries tagged with the production
+ * alone are left out here and still count in the totals by account.
+ */
+async function performanceLines(productionId: string): Promise<PerformanceLine[]> {
+  const rows = await all<{ performance_id: string, currency: string, posting_kind: string, amount: number }>(
+    `SELECT e.performance_id, e.currency, p.kind AS posting_kind, sum(e.amount_minor) AS amount
+      FROM finance_entries e JOIN finance_postings p ON p.id = e.posting_id
+      WHERE e.production_id = ? AND e.performance_id IS NOT NULL AND ${SEALED} GROUP BY e.performance_id, e.currency, p.kind`, productionId)
+  const lines = new Map<string, PerformanceLine>()
+  for (const r of rows) {
+    const key = `${r.performance_id}:${r.currency}`
+    const line = lines.get(key) ?? { performanceId: r.performance_id, currency: r.currency, salesMinor: 0, refundsMinor: 0, otherMinor: 0, netMinor: 0 }
+    const credit = -r.amount
+    if (r.posting_kind === 'sale') line.salesMinor += credit
+    else if (r.posting_kind === 'refund') line.refundsMinor += credit
+    else line.otherMinor += credit
+    line.netMinor += credit
+    lines.set(key, line)
+  }
+  return [...lines.values()]
 }
 
 /** Every production with entries in the ledger, with its income and deferred income, largest first. */
