@@ -1,6 +1,6 @@
-// The theatre's own choices for Who holds what's filters and for giving a role: its roles, with when
-// a grant of each ends and the modules it can be given for, and the modules a grant can reach. Role
-// names are not secret from someone who may read every grant.
+// The theatre's own choices for Who holds what's filters, for giving a role and for inviting
+// someone to one: its roles, with when a grant of each ends and the modules it can be given for,
+// and the modules a grant can reach. Role names are not secret from someone who may read every grant.
 import { asc, isNull } from 'drizzle-orm'
 import { all, can, defineRoute, useDb, useSetting } from '#kit'
 import { useRegistry } from '#kit/registry'
@@ -22,10 +22,13 @@ export default defineRoute({ ability: 'core.grant.read', rateLimit: 'default' },
       }))].sort()
   // Whether to offer giving, renewing and ending: the routes still check each grant.
   const manage = (await can(actor, 'core.grant.manage')).allowed
+  // Inviting someone new makes their account too.
+  const invite = manage && (await can(actor, 'core.account.create')).allowed
   return {
     roles: found.map(r => ({ id: r.id, name: r.name, owner: r.key === OWNER, expiryRule: r.expiryRule, expiryDays: r.expiryDays, modules: reach(r.id, r.key) })),
     modules: [...registry.modules.keys()],
     manage,
+    invite,
     yearEnd: await nextYearEnd(),
     allowNoExpiry: !!(await useSetting('core.grants.allow-no-expiry')),
   }

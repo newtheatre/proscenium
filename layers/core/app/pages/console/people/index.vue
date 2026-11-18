@@ -1,8 +1,9 @@
 <!-- Accounts (Identity Doc part 5, console People): everyone, searched by name or verified address
      and filtered by state. Unclaimed and erased accounts are hidden unless looked for, through the
-     state filter or the views. -->
+     state filter or the views. Someone who gives roles and adds people can invite someone from here. -->
 <script setup lang="ts">
 import { accountsList } from '../../../../shared/identity-lists'
+import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
 
 definePageMeta({ layout: 'console' })
 
@@ -37,6 +38,14 @@ const hiddenOf = (result: Record<string, unknown>) => {
   return (['unclaimed', 'anonymised'] as const).flatMap(view => hidden[view] ? [{ view, count: hidden[view]! }] : [])
 }
 
+// Inviting needs Who holds what's options, which only someone who reads grants may ask for.
+const { entries } = useViewer()
+const readsGrants = computed(() => entries('console').some(e => e.id === 'core.grants'))
+const { data: grantOptions, refresh: refreshOptions } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:grants:options', immediate: false })
+watch(readsGrants, (may) => { if (may) void refreshOptions() }, { immediate: true })
+const mayInvite = computed(() => readsGrants.value && !!grantOptions.value?.invite)
+const inviting = ref(false)
+
 const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased') : (row.name ?? t('core.people.unnamed'))
 </script>
 
@@ -49,6 +58,16 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     :row-to="(row: Row) => `/console/people/${encodeURIComponent(row.id)}`"
     :empty="{ title: t('core.people.empty.title'), description: t('core.people.empty.description'), icon: 'i-lucide-users' }"
   >
+    <template
+      v-if="mayInvite"
+      #primary
+    >
+      <UButton
+        icon="i-lucide-mail-plus"
+        :label="t('core.grants.invite.open')"
+        @click="inviting = true"
+      />
+    </template>
     <template #note="{ result }">
       <p
         v-if="hiddenOf(result).length"
@@ -86,5 +105,12 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     <template #cell-since="{ row }">
       {{ day(row.since) }}
     </template>
+    <GiveRoleDialog
+      v-if="mayInvite && grantOptions"
+      v-model:open="inviting"
+      :options="grantOptions"
+      invite
+      @changed="refreshNuxtData('core:list:/api/core/people')"
+    />
   </PageList>
 </template>

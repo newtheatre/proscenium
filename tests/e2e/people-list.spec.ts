@@ -94,6 +94,17 @@ test.describe('someone who gives roles', () => {
     await page.getByRole('button', { name: 'Give a role' }).click()
     await expect(page.getByRole('dialog').getByRole('heading', { name: `Give ${name} a role` })).toBeVisible()
   })
+
+  test('invites someone from Accounts by name, address and role', async ({ page }) => {
+    await visit(page, '/console/people')
+    await page.getByRole('button', { name: 'Invite someone' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Invite someone' })).toBeVisible()
+    for (const label of ['Name', 'Email address', 'Role']) await expect(dialog.getByText(label, { exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Send invitation' }).click()
+    await expect(dialog.getByText('This is needed.').first()).toBeVisible()
+    await noViolations(page)
+  })
 })
 
 test.describe('someone who handles data requests', () => {
