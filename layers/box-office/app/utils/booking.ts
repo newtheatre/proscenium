@@ -1,7 +1,8 @@
 // A booking as its link shows it (GET /api/box-office/orders/link), for the pages that show one:
 // Your booking, the confirmation screen and the screen after booking.
 
-export interface BookingLine { id: string, performanceId: string, ticketType: string, band: string | null, amountMinor: number }
+/** `unnamed` where there is one kind of ticket to book, so its name is left out as Choose tickets leaves it out. */
+export interface BookingLine { id: string, performanceId: string, ticketType: string, band: string | null, amountMinor: number, unnamed?: true }
 export interface BookingTicket { lineId: string, number: string, doorCode: string | null, admitted: boolean }
 export interface BookingShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
 export interface BookingView {
@@ -32,7 +33,10 @@ export interface BookingDoneOutcome {
 }
 
 /** A line's name: its part of the house, such as a wheelchair space, where the production has more than one. */
-export const bookingLineName = (l: Pick<BookingLine, 'band' | 'ticketType'>) => (l.band ? `${l.band}, ${l.ticketType}` : l.ticketType)
+export const bookingLineName = (l: Pick<BookingLine, 'band' | 'ticketType' | 'unnamed'>) => (l.unnamed ? '' : l.band ? `${l.band}, ${l.ticketType}` : l.ticketType)
+
+/** "2 × Full price", or "2 tickets" where the kind goes unnamed (an empty label). */
+export const ticketsLine = (t: ReturnType<typeof useT>['t'], count: number, label: string) => (label ? t('box-office.basket.line', { count, label }) : t('box-office.basket.tickets', { count }))
 
 /** The lines grouped by what they are, with how many and what they cost together. */
 export function groupedBookingLines(lines: readonly BookingLine[]): { label: string, count: number, amountMinor: number }[] {

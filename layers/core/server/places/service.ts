@@ -309,8 +309,12 @@ export async function listSpaces(query: { venueId?: string, managed?: boolean, p
 export async function placeName(spaceId: string): Promise<string | null> {
   const row = await first<{ space: string, venue: string }>('SELECT s.name AS space, v.name AS venue FROM core_spaces s JOIN core_venues v ON v.id = s.venue_id WHERE s.id = ?', spaceId)
   if (!row) return null
-  const same = (a: string, b: string) => a.trim().localeCompare(b.trim(), undefined, { sensitivity: 'accent' }) === 0
-  return same(row.space, row.venue) ? row.venue : `${row.space}, ${row.venue}`
+  return placeOf(row.space, row.venue)
+}
+
+/** A space and its venue as one name: "Studio, Trent Building", or the venue alone when the space shares its name. */
+export function placeOf(space: string, venue: string): string {
+  return space.trim().localeCompare(venue.trim(), undefined, { sensitivity: 'accent' }) === 0 ? venue : `${space}, ${venue}`
 }
 
 /** A statement predicate, like assertSpaceFree: true while the space is active and the theatre runs it. */

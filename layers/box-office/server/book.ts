@@ -3,7 +3,7 @@
 // and prices. It never says how many seats the house holds or how many are sold: a band is either
 // available or sold out.
 import { refuse, requirements, useContext, useSetting } from '#kit'
-import { getPerformance, getProduction, placeName } from '#modules/core'
+import { getPerformance, getProduction, placeName, placeOf } from '#modules/core'
 import { availability } from './availability'
 import { timingFor, type PaymentTiming } from './reservations'
 import { salesOf } from './setup'
@@ -71,7 +71,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   }
   const timing = await timingFor(performanceId)
   return {
-    performance: { id: performance.id, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? `${performance.spaceName}, ${performance.venueName}`, state: performance.state },
+    performance: { id: performance.id, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? placeOf(performance.spaceName, performance.venueName), state: performance.state },
     production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle, ageMin: production.ageMin, ageRestricted: production.ageRestricted && production.ageMin !== null },
     state: found.state,
     onSaleAt: found.onSaleAt,

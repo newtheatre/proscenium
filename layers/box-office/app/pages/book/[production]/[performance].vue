@@ -100,9 +100,12 @@ const price = (minor: number) => (minor === 0 ? t('box-office.book.free') : mone
 // The types the visitor can book now, in the theatre's order; then the ones they need something for
 // (a membership, the access scheme), under Other tickets.
 const groupsOf = (band: Page['bands'][number]) => ({ own: band.types.filter(type => !type.unmet), other: band.types.filter(type => !!type.unmet) })
+// The Other tickets heading goes over choices only: a line that just says how to qualify, such as
+// applying to the access scheme, reads as itself.
 const rowsOf = (band: Page['bands'][number]) => {
   const { own, other } = groupsOf(band)
-  return [...own.map(type => ({ type, otherStart: false })), ...other.map((type, i) => ({ type, otherStart: i === 0 && own.length > 0 }))]
+  const headed = own.length > 0 && other.some(type => typing(type))
+  return [...own.map(type => ({ type, otherStart: false })), ...other.map((type, i) => ({ type, otherStart: i === 0 && headed }))]
 }
 const allSoldOut = computed(() => !!data.value?.bands.length && data.value.bands.every(b => b.soldOut))
 // A link the source gives for someone who could qualify, which comes back here afterwards.

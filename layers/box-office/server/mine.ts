@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm'
 import { inAccountScope, nowMs, useDb } from '#kit'
 import { getPerformance, getProduction, placeName } from '#modules/core'
 import { liveLines } from './orders'
+import { lineKey, unnamedLines } from './line-names'
 import { doorCodesForOrders } from './tickets'
 
 export interface MyVisit {
@@ -31,6 +32,7 @@ export async function myBookings(accountId: string): Promise<{ upcoming: MyVisit
   const visits: MyVisit[] = []
   for (const order of orders) {
     const lines = await liveLines(order.id)
+    const unnamed = await unnamedLines(lines)
     for (const performanceId of new Set(lines.map(l => l.performance_id))) {
       const performance = await getPerformance(performanceId).catch(() => null)
       const production = performance ? await getProduction(performance.productionId).catch(() => null) : null
@@ -45,7 +47,8 @@ export async function myBookings(accountId: string): Promise<{ upcoming: MyVisit
         production: { title: production.title, slug: production.slug },
         tickets: lines.filter(l => l.performance_id === performanceId).map(l => ({
           lineId: l.id,
-          label: l.band_name ? `${l.band_name}, ${l.type_name}` : l.type_name,
+          // Empty where there is one kind to book, as Choose tickets shows it.
+          label: unnamed.has(lineKey(l)) ? '' : l.band_name ? `${l.band_name}, ${l.type_name}` : l.type_name,
           doorCode: codes.get(l.id)?.doorCode ?? null,
           admitted: codes.get(l.id)?.admitted ?? false,
         })),

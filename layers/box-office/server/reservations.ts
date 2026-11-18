@@ -20,6 +20,7 @@ import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
+import { lineKey, unnamedLines } from './line-names'
 import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { releaseTime, salesOf } from './setup'
 import { doorCodesForOrder, ticketNumbers } from './tickets'
@@ -193,7 +194,7 @@ export interface OrderView {
   amountDueMinor: number
   releaseAt: number | null
   /** band names the part of the house when the production has more than one, such as a wheelchair space. */
-  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, band: string | null, amountMinor: number }[]
+  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, band: string | null, amountMinor: number, unnamed?: true }[]
   /**
    * Whether the buyer may cancel paid tickets here, and on what terms: the fee kept from each ticket
    * and the last moment to do it. Null when they may not, and the box office changes the booking.
@@ -215,6 +216,12 @@ export interface OrderView {
 export interface OrderShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
 
 /** The performance an order's tickets are for (the first, where it has more than one). */
+/** A booking's lines as its pages show them; `unnamed` where there is one kind to book, as Choose tickets shows it. */
+async function lineViews(lines: LineRow[]): Promise<OrderView['lines']> {
+  const unnamed = await unnamedLines(lines)
+  return lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor, ...(unnamed.has(lineKey(l)) ? { unnamed: true } : {}) }))
+}
+
 export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<OrderShow | null> {
   if (!lines.length) return null
   const performance = await getPerformance(lines[0]!.performance_id)
@@ -303,7 +310,7 @@ export async function orderByLink(key: OrderKey): Promise<OrderView | null> {
     totalMinor: order.total_minor,
     amountDueMinor: order.state === 'reserved' || order.state === 'awaiting_payment' ? order.total_minor : 0,
     releaseAt: order.release_at,
-    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
+    lines: await lineViews(lines),
     buyerCancel: await buyerCancelTerms(order, lines),
     // Only where the booking's email could carry the link that opens it, so the page never promises one that did not come.
     accountUnclaimed: order.account_id ? await canSendClaimLink(order.account_id) : false,
@@ -332,7 +339,7 @@ export async function cancelFromLink(unit: UnitView, key: OrderKey, lineIds?: st
       totalMinor: done.totalMinor,
       amountDueMinor: 0,
       releaseAt: null,
-      lines: done.state === 'cancelled' ? [] : kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
+      lines: done.state === 'cancelled' ? [] : await lineViews(kept),
       buyerCancel: done.state === 'cancelled' ? null : await buyerCancelTerms(order, kept),
       // Read before the cancellation is written, so only the tickets kept are shown.
       tickets: done.state === 'cancelled' ? [] : await ticketsToShow(order, kept.map(l => l.id)),
@@ -385,7 +392,7 @@ export async function cancelFromLink(unit: UnitView, key: OrderKey, lineIds?: st
     totalMinor,
     amountDueMinor: totalMinor,
     releaseAt: kept.length ? order.release_at : null,
-    lines: kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
+    lines: await lineViews(kept),
     buyerCancel: null,
     show: await showOf(lines),
   }
