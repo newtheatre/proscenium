@@ -9,6 +9,8 @@
      number and its prices one per ticket type. The bands, called sections, appear once the house is
      split to price parts of it differently (show walkthrough, decision 4). -->
 <script setup lang="ts">
+// The Wheelchair space and the Access ticket take the lowest price the buyer can have, so neither is priced here.
+const ACCESS_TYPES = ['box-office.wheelchair', 'box-office.access']
 definePageMeta({ layout: 'console' })
 
 interface Band { id: string, name: string, kind: string, sort: number }
@@ -44,8 +46,8 @@ const { data, status, error, refresh } = await useAPI<Setup>(() => `/api/box-off
 const { data: types } = await useAPI<{ ticketTypes: TicketType[] }>('/api/box-office/ticket-types', { key: 'box-office:ticket-types', default: () => ({ ticketTypes: [] }) })
 // Complimentary tickets are issued by approving a request, never priced; a type whose module is off is
 // not sold; a Wheelchair space costs the lowest price the buyer can have, so it is not priced here.
-const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary' && type.managedBy !== 'box-office.wheelchair'))
-const wheelchairSold = computed(() => (types.value?.ticketTypes ?? []).some(type => type.active && type.available !== false && type.managedBy === 'box-office.wheelchair'))
+const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary' && !ACCESS_TYPES.includes(type.managedBy ?? '')))
+const wheelchairSold = computed(() => (types.value?.ticketTypes ?? []).some(type => type.active && type.available !== false && ACCESS_TYPES.includes(type.managedBy ?? '')))
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const base = computed(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/sales`)
