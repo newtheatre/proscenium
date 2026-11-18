@@ -236,7 +236,7 @@ describe('what\'s on (C-38)', () => {
     const { status, body } = await visit('/api/public-site/productions')
     expect(status).toBe(200)
     expect(body.productions.map((p: { id: string }) => p.id)).toEqual([sooner.id, later.id])
-    expect(body.productions[0]).toMatchObject({ nextStartsAt: Date.parse('2028-02-01T19:30:00Z'), lastEndsAt: Date.parse('2028-02-03T21:30:00Z'), venues: ['The Playhouse'] })
+    expect(body.productions[0]).toMatchObject({ nextStartsAt: Date.parse('2028-02-01T19:30:00Z'), lastStartsAt: Date.parse('2028-02-03T19:30:00Z'), lastEndsAt: Date.parse('2028-02-03T21:30:00Z'), venues: ['The Playhouse'], hasWarnings: false })
     expect(body.productions.map((p: { id: string }) => p.id)).not.toContain(undated.id)
   })
 })

@@ -3,7 +3,7 @@
 // code. The buyer gets the code inside a signed door code, `tkt.<key id>.<code>.<signature>`, which
 // a device can check with no connection; the database keeps only the hash of the code part.
 import { sql } from 'drizzle-orm'
-import { newId, nowMs, type UnitView } from '#kit'
+import { all, newId, nowMs, sealColumn, openColumn, type UnitView } from '#kit'
 import { signing } from '#kit/signing'
 import { scans, tickets } from './db/schema'
 import { hashOf } from './codes'
@@ -36,24 +36,12 @@ function base32(bytes: Uint8Array): string {
 export const signedPart = (kind: string, keyId: string, code: string) => `${kind}.${keyId}.${code}`
 
 /**
- * Adds a valid ticket for each line to the unit and returns the door codes, in the lines' order.
- * The codes exist only in what is returned: hand them to the buyer and keep them nowhere. With
- * `admit`, the buyer is at the desk: each ticket is admitted as it is issued, with its scan row,
- * exactly as the door would have written it.
- */
-/** A fresh door code: what the buyer is given, and what the ticket keeps of it. */
-async function freshCode(): Promise<{ keyId: string, codeHash: string, doorCode: string }> {
-  const code = base32(crypto.getRandomValues(new Uint8Array(CODE_BYTES)))
-  const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
-  return { keyId, codeHash: await hashOf(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}` }
-}
-
-/**
- * Issues tickets again with new door codes, so they can be sent to a buyer after the sale: the codes
- * they had were handed out once and kept nowhere. Only tickets not yet admitted are reissued; each
- * old one is voided as reissued, so a code shown before stops working. Returns the new codes.
+ * Issues tickets again with new door codes, for those issued before codes were kept, whose codes are
+ * only in a message nobody received. Only tickets not yet admitted are reissued; each old one is
+ * voided as reissued. Returns the new codes.
  */
 export async function reissueTickets(unit: UnitView, waiting: readonly { ticketId: string, line: { id: string, performance_id: string } }[]): Promise<string[]> {
+  if (!waiting.length) return []
   const at = nowMs()
   for (const w of waiting) {
     unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = 'reissued', updated_at = ${at} WHERE id = ${w.ticketId} AND state = 'valid' AND admitted_at IS NULL`)
@@ -62,10 +50,20 @@ export async function reissueTickets(unit: UnitView, waiting: readonly { ticketI
   return issueTickets(unit, waiting.map(w => w.line))
 }
 
+/**
+ * Adds a valid ticket for each line to the unit and returns the door codes, in the lines' order.
+ * The code part is kept sealed on the ticket, so the ticket can be shown again (`doorCodesForOrder`). With
+ * `admit`, the buyer is at the desk: each ticket is admitted as it is issued, with its scan row,
+ * exactly as the door would have written it.
+ */
 export async function issueTickets(unit: UnitView, lines: readonly { id: string, performance_id: string }[], admit?: { by: string, at: number }): Promise<string[]> {
-  const made = await Promise.all(lines.map(async line => ({ line, ...await freshCode(), scanId: admit ? newId('scan') : null })))
+  const made = await Promise.all(lines.map(async (line) => {
+    const code = base32(crypto.getRandomValues(new Uint8Array(CODE_BYTES)))
+    const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
+    return { line, keyId, codeHash: await hashOf(code), sealed: await sealColumn(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}`, scanId: admit ? newId('scan') : null }
+  }))
   const ids = unit.insertSet(tickets, made.map(m => ({
-    orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, keyId: m.keyId, state: 'valid', admittedAt: admit ? admit.at : null, admittedScanId: m.scanId,
+    orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, doorCode: m.sealed, keyId: m.keyId, state: 'valid', admittedAt: admit ? admit.at : null, admittedScanId: m.scanId,
   })))
   unit.expect(made.length, { code: 'box-office.ticket.not-issued', reason: 'The tickets could not be issued.' })
   // What a line met to be sold goes onto its ticket, so the door can check it again.
@@ -79,3 +77,36 @@ export async function issueTickets(unit: UnitView, lines: readonly { id: string,
   }
   return made.map(m => m.doorCode)
 }
+
+/** Signs a ticket's code part afresh with the current key: `tkt.<key id>.<code>.<signature>`. */
+async function signTicketCode(code: string): Promise<string> {
+  const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
+  return `${signedPart(TICKET_KIND, keyId, code)}.${signature}`
+}
+
+export interface ShownTicket { ticketId: string, lineId: string, performanceId: string, admitted: boolean, doorCode: string | null }
+
+/**
+ * The valid tickets of the given orders, each with its door code signed afresh, for showing the
+ * tickets again to whoever may already see the order (the booking link, the buyer signed in). The
+ * caller decides that. A ticket issued before codes were kept has `doorCode: null`: its code is only
+ * in the confirmation email.
+ */
+export async function doorCodesForOrders(orderIds: readonly string[]): Promise<ShownTicket[]> {
+  if (!orderIds.length) return []
+  const rows = await all<{ id: string, order_line_id: string, performance_id: string, admitted_at: number | null, door_code: string | null }>(
+    `SELECT t.id, t.order_line_id, t.performance_id, t.admitted_at, t.door_code FROM box_office_tickets t
+     JOIN box_office_order_lines l ON l.id = t.order_line_id
+     WHERE l.order_id IN (SELECT value FROM json_each(?)) AND l.state = 'live' AND t.state = 'valid'
+     ORDER BY l.created_at, l.id`, JSON.stringify(orderIds))
+  return Promise.all(rows.map(async r => ({
+    ticketId: r.id,
+    lineId: r.order_line_id,
+    performanceId: r.performance_id,
+    admitted: r.admitted_at !== null,
+    doorCode: r.door_code ? await signTicketCode(await openColumn(r.door_code) as string) : null,
+  })))
+}
+
+/** One order's tickets: see `doorCodesForOrders`. */
+export const doorCodesForOrder = (orderId: string) => doorCodesForOrders([orderId])

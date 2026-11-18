@@ -13,9 +13,11 @@ import { ensureOpening } from './openings'
 
 export const REASONS = 'bar.refusal-reason'
 
-export async function ageCheckSettings(): Promise<{ enabled: boolean, challengeAge: number, description: boolean, idTypes: readonly string[], refusalScope: true }> {
+export async function ageCheckSettings(): Promise<{ enabled: boolean, minimumAge: number, challengeAge: number, description: boolean, idTypes: readonly string[], refusalScope: true }> {
   return {
     enabled: await useSetting('bar.age-check.enabled') as boolean,
+    // The legal age: the till says it beside the challenge age, and the register shows it.
+    minimumAge: await useSetting('bar.age-check.minimum-age') as number,
     challengeAge: await useSetting('bar.age-check.challenge-age') as number,
     description: await useSetting('bar.age-check.description') as boolean,
     // The ID types the till may send with an ID check, and that a refusal takes a scope.
@@ -59,14 +61,23 @@ export async function recordRefusal(unit: UnitView, input: RefusalInput, by: str
     refuse('bar.age-check.description-off', 'This theatre does not keep a description of the person refused.', { status: 422, remedy: 'Leave the description empty.' })
   const outlet = await first<{ id: string }>('SELECT id FROM bar_outlets WHERE id = ? AND active = 1', input.outletId)
   if (!outlet) refuse('bar.outlet.unknown', 'That outlet is not selling.', { status: 409, remedy: 'Choose another outlet.' })
-  if (input.variantId && !await first('SELECT 1 FROM bar_variants WHERE id = ?', input.variantId))
-    refuse('bar.variant.unknown', 'There is no such product.', { status: 422 })
+  const variant = input.variantId
+    ? await first<{ restricted: number }>(
+        `SELECT (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS restricted
+         FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id WHERE v.id = ?`, input.variantId)
+    : null
+  if (input.variantId && !variant) refuse('bar.variant.unknown', 'There is no such product.', { status: 422 })
+  // The register names a product only where it needed the age check. A refusal of one that did not
+  // (a soft drink in a refused basket) is a refusal of the whole sale, and keeps no product.
+  const keepsProduct = !!variant && (!!variant.restricted || input.scope === 'restricted')
+  const variantId = keepsProduct ? input.variantId! : null
+  const scope = variant && !keepsProduct ? 'all' : input.scope ?? null
 
   const at = nowMs()
   const id = newId('bage')
   await ensureOpening(unit, input.outletId, by, at)
   unit.add(sql`INSERT INTO bar_age_checks (id, opening_id, sale_id, outcome, refusal_term, variant_id, basket_key, refusal_scope, description, by, at, created_at)
-    SELECT ${id}, o.id, NULL, 'refused', ${input.reasonTermId}, ${input.variantId ?? null}, ${input.basketKey ?? null}, ${input.scope ?? null}, ${description}, ${by}, ${at}, ${at}
+    SELECT ${id}, o.id, NULL, 'refused', ${input.reasonTermId}, ${variantId}, ${input.basketKey ?? null}, ${scope}, ${description}, ${by}, ${at}, ${at}
       FROM bar_openings o WHERE o.outlet_id = ${input.outletId} AND o.state = 'open' AND ${assertTerm(input.reasonTermId, REASONS)}`)
     .expect(1, { code: 'bar.age-check.bad-reason', reason: 'That reason is not on the list.', remedy: 'Choose a reason from the list.' })
   // The audit entry and the event say a refusal was recorded, never what the description says.
@@ -83,10 +94,21 @@ export interface RegisterRow {
   outcome: 'not_needed' | 'id_checked' | 'self_attested' | 'refused'
   reason: string | null
   product: string | null
+  /** 'all' when the whole sale was refused; the product, if any, is then one that needed the check. */
+  scope: 'restricted' | 'all' | null
+  idType: string | null
   by: string
   sale: string | null
   description: string | null
 }
+
+// Whether a variant's product needs the age check, by its own flag or its category's.
+const RESTRICTED = '(CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END)'
+const PRODUCT_NAME = "CASE WHEN v.id IS NULL THEN NULL WHEN v.name = 'Each' THEN p.name ELSE p.name || ', ' || v.name END"
+// A product is listed only where it was age-restricted (or the till said it was the restricted line), and always on an answer.
+const LISTED = `(a.outcome <> 'refused' OR coalesce(a.refusal_scope, '') = 'restricted' OR coalesce(${RESTRICTED}, 0) = 1)`
+/** The scope as shown: a refusal naming a product that needed no check was of the whole sale. */
+const SCOPE = `CASE WHEN a.outcome <> 'refused' THEN NULL WHEN a.refusal_scope = 'all' OR (v.id IS NOT NULL AND NOT ${LISTED}) THEN 'all' ELSE a.refusal_scope END`
 
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a local date's shape
 
@@ -103,7 +125,7 @@ const PAGE = 200 // not-policy: one screen of the register
 export async function register(filters: z.infer<typeof registerFilters>): Promise<RegisterRow[]> {
   const rows = await all<Omit<RegisterRow, 'by'> & { byId: string | null }>(
     `SELECT a.id, a.at, t.name AS outlet, a.outcome, term.label AS reason,
-            CASE WHEN v.id IS NULL THEN NULL WHEN v.name = 'Each' THEN p.name ELSE p.name || ', ' || v.name END AS product,
+            CASE WHEN ${LISTED} THEN ${PRODUCT_NAME} END AS product, ${SCOPE} AS scope, a.id_type AS idType,
             a.by AS byId, coalesce(s.reference, k.reference) AS sale, a.description
        FROM bar_age_checks a
        JOIN bar_openings o ON o.id = a.opening_id
@@ -111,6 +133,7 @@ export async function register(filters: z.infer<typeof registerFilters>): Promis
        LEFT JOIN core_terms term ON term.id = a.refusal_term
        LEFT JOIN bar_variants v ON v.id = a.variant_id
        LEFT JOIN bar_products p ON p.id = v.product_id
+       LEFT JOIN bar_categories c ON c.id = p.category_id
        LEFT JOIN bar_sales s ON s.id = a.sale_id
        LEFT JOIN bar_sales k ON k.client_key = a.basket_key
       WHERE (? IS NULL OR o.operating_day >= ?) AND (? IS NULL OR o.operating_day <= ?)
@@ -127,14 +150,15 @@ export async function register(filters: z.infer<typeof registerFilters>): Promis
 export interface Review { id: string, outlet: string | null, fromDay: string, toDay: string, refusals: number, by: string, at: number }
 
 /** A sale's age checks: the answer that let it through and any refusal made from its basket. */
-export async function checksForSale(saleId: string): Promise<{ outcome: RegisterRow['outcome'], reason: string | null, product: string | null, at: number }[]> {
+export async function checksForSale(saleId: string): Promise<{ outcome: RegisterRow['outcome'], reason: string | null, product: string | null, scope: RegisterRow['scope'], idType: string | null, at: number }[]> {
   return await all(
     `SELECT a.outcome, term.label AS reason,
-            CASE WHEN v.id IS NULL THEN NULL WHEN v.name = 'Each' THEN p.name ELSE p.name || ', ' || v.name END AS product, a.at
+            CASE WHEN ${LISTED} THEN ${PRODUCT_NAME} END AS product, ${SCOPE} AS scope, a.id_type AS idType, a.at
        FROM bar_age_checks a
        LEFT JOIN core_terms term ON term.id = a.refusal_term
        LEFT JOIN bar_variants v ON v.id = a.variant_id
        LEFT JOIN bar_products p ON p.id = v.product_id
+       LEFT JOIN bar_categories c ON c.id = p.category_id
       WHERE a.sale_id = ? OR a.basket_key = (SELECT client_key FROM bar_sales WHERE id = ?)
       ORDER BY a.at, a.id`,
     saleId, saleId,
@@ -196,4 +220,20 @@ export async function sweep(unit: UnitView): Promise<void> {
   const kept = await retentionSeconds(ageChecks)
   if (kept === null) return
   unit.add({ sql: 'UPDATE bar_age_checks SET description = NULL WHERE description IS NOT NULL AND at < ?', params: [nowMs() - kept * 1000] }) // not-policy: seconds to milliseconds
+}
+
+/**
+ * Whole days the register has gone without a signature past bar.age-check.review-every, or 0 when it
+ * is not overdue: nothing is overdue while the age check is off or nothing has been recorded since the
+ * last signature. With no signature yet, the clock starts at the first row.
+ */
+export async function overdueDays(): Promise<number> {
+  if (!await useSetting('bar.age-check.enabled')) return 0
+  const every = await useSetting('bar.age-check.review-every') as number
+  const row = await first<{ since: number | null, unsigned: number }>(
+    `SELECT coalesce((SELECT max(reviewed_at) FROM bar_register_reviews), (SELECT min(at) FROM bar_age_checks)) AS since,
+            (SELECT count(*) FROM bar_age_checks WHERE at > coalesce((SELECT max(reviewed_at) FROM bar_register_reviews), 0)) AS unsigned`)
+  if (!row?.since || !row.unsigned) return 0
+  const waited = Math.floor((nowMs() - row.since) / 1000) // not-policy: milliseconds to seconds
+  return waited >= every ? Math.floor(waited / 86400) : 0 // not-policy: seconds in a day
 }

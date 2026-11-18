@@ -280,7 +280,7 @@ describe('selling at the desk', () => {
     expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('box-office.promo.unknown')
   })
 
-  it('shows what was sold after the payment, and emails the tickets afterwards with new codes', async () => {
+  it('shows what was sold after the payment, and emails the tickets afterwards', async () => {
     const h = await house(4)
     const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] })
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
@@ -298,10 +298,9 @@ describe('selling at the desk', () => {
     expect(sent.status, JSON.stringify(sent.body)).toBe(200)
     expect((await order(o.orderId)).account_id).toBeTruthy()
     expect(await count("SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE 'box-office.order-confirmed%'", o.orderId)).toBe(1)
+    // The tickets keep their codes: the message carries them.
     const after = await rows<{ code_hash: string }>("SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? AND k.state = 'valid' ORDER BY k.id", o.orderId)
-    expect(await count("SELECT count(*) AS n FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? AND k.state = 'void' AND k.void_reason = 'reissued'", o.orderId)).toBe(2)
-    expect(after).toHaveLength(2)
-    expect(after.map(k => k.code_hash)).not.toEqual(expect.arrayContaining(before.map(k => k.code_hash)))
+    expect(after).toEqual(before)
     // Sent once: a second send is refused rather than sending different codes again.
     expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'other@example.org' }, seller, { 'idempotency-key': `send-${o.orderId}-2` })).body.code).toBe('box-office.desk.already-sent')
   })
