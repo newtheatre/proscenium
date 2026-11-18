@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "2c23bc10-7cae-4596-9854-f310224fccfa",
+  "id": "72b72604-a619-40c2-8288-3b55afeb014f",
   "prevIds": [
-    "55dde76c-8569-48d4-98a4-aacc65a9688f",
-    "c844b5b6-5ac9-44a6-9a42-b83cbdf5861a"
+    "6a0e2979-c746-4e79-b823-55dea128f7f5"
   ],
   "ddl": [
     {
@@ -840,6 +839,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "listing_pending",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
