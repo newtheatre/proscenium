@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // One production (C-02, C-03, C-09, C-23, C-24) as a record page (UI-12): tabs for its overview,
 // details, dates, credits, media and guidance (age, effects, content warnings), a facts strip, and a side panel that stays beside
-// every tab with the poster, managed in place, and what publishing still needs.
+// every tab with the poster, managed in place, and what publishing still needs. Publishing asks
+// first, showing where it will appear, or what is still to do; once published the side panel says so.
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { z } from 'zod'
 import { productionPatch } from '../../../../../server/programme/input'
@@ -38,7 +39,8 @@ interface Production {
   advisories: { termId: string, level: 'mentioned' | 'discussed' | 'depicted', levelAssumed: boolean, detail: string | null }[]
   effects: { termId: string, detail: string | null }[]
 }
-interface Answer { production: Production, needs: string[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[] } }
+interface Need { key: string, sentence: string, link: string }
+interface Answer { production: Production, needs: Need[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[] } }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -47,7 +49,7 @@ const base = computed(() => `/api/core/productions/${String(route.params.id)}`)
 const { data, status, error, refresh } = await useAPI<Answer>(base, { key: `core:production:${String(route.params.id)}` })
 const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
-const toast = useToast()
+const say = useRecordToast(`core.production:${String(route.params.id)}`)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const production = computed(() => data.value?.production)
 
@@ -63,7 +65,7 @@ async function run(fn: () => Promise<unknown>, done?: string, form?: { setErrors
   try {
     await fn()
     await reload()
-    if (done) toast.add({ title: done, color: 'success' })
+    if (done) say({ title: done })
     return true
   }
   catch (e) {
@@ -89,11 +91,18 @@ const details = reactive({
 // With nothing here selling tickets, every production is booked elsewhere (Matt, 2026-11-17).
 const sellsHere = computed(() => data.value?.sellsHere ?? true)
 const elsewhere = computed(() => !sellsHere.value || details.bookedElsewhere)
-// Checked as it will be sent, with the schema the route uses; booked elsewhere needs its link.
+// Checked as it will be sent, with the schema the route uses. A production ticked as booked elsewhere
+// needs its link; with nothing here selling tickets a draft saves without one, and only publishing
+// (and a published production) needs it.
+const linkNeeded = computed(() => elsewhere.value && (sellsHere.value || production.value?.state === 'published'))
 const detailsForm = useTemplateRef('detailsForm')
-const detailsSchema = computed(() => elsewhere.value
+const detailsSchema = computed(() => linkNeeded.value
   ? blankAsNull(productionPatch.extend({ externalBookingUrl: productionPatch.shape.externalBookingUrl.unwrap().unwrap() }))
-  : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
+  : elsewhere.value
+    ? blankAsNull(productionPatch)
+    : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
+// What an empty length stands for, said beside the field rather than only greyed inside it.
+const inherited = (own: number | null, theatre: number | undefined) => own === null && theatre !== undefined ? `${minutesInWords(theatre)} (theatre default)` : undefined
 const detailsFrom = (p: Production) => ({
   title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
   seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
@@ -113,11 +122,48 @@ const saveDetails = () => run(() => api('', 'PATCH', {
   runningMinutes: details.runningMinutes || null,
 }), 'Production saved', detailsForm.value)
 
-// Moves
-const publish = () => run(() => api('/publish', 'POST'), 'Production published')
+// Moves. Publishing opens a window first: what is still to do, or where the page will appear.
+const needs = computed(() => data.value?.needs ?? [])
+const publicPath = computed(() => `/whats-on/${production.value?.slug ?? ''}`)
+const publishing = ref(false)
+const publishBusy = ref(false)
+const { data: checkList } = useNuxtData<{ checks: { id: string, done: boolean, sentence: string, needed?: boolean }[] }>(`core:record-checks:core.production:${String(route.params.id)}`)
+const wanted = computed(() => (checkList.value?.checks ?? []).filter(c => c.needed === false && !c.done))
+async function publish() {
+  publishBusy.value = true
+  const done = await run(() => api('/publish', 'POST'))
+  publishBusy.value = false
+  // Something changed since the page was read: the window shows the list as it is now, in place of the refusal.
+  if (!done && refusal.value?.code === 'core.production.not-ready') {
+    refusal.value = null
+    await reload()
+    return
+  }
+  publishing.value = false
+  if (!done) return
+  say({
+    title: 'Production published',
+    duration: 10_000, // not-policy: the ten seconds Undo is offered for
+    actions: [
+      { label: 'View public page', icon: 'i-lucide-external-link', color: 'neutral', variant: 'outline', to: publicPath.value, target: '_blank' },
+      { label: t('core.undo.button'), icon: 'i-lucide-undo-2', color: 'neutral', variant: 'outline', onClick: () => { void run(() => api('/withdraw', 'POST'), 'Production withdrawn') } },
+    ],
+  })
+}
 async function withdraw() {
   if (!await confirm({ verb: 'Withdraw', thing: production.value!.title, consequence: 'It leaves the public site, with its dates, until you publish it again.', button: 'Withdraw' })) return
   await run(() => api('/withdraw', 'POST'), 'Production withdrawn')
+}
+async function duplicate() {
+  refusal.value = null
+  try {
+    const { id } = await $api<{ id: string }>(`${base.value}/duplicate` as string, { method: 'POST', body: {} })
+    say({ title: 'Production duplicated', description: 'Its dates, credits and images were not copied.' })
+    await navigateTo(`/console/programme/productions/${id}`)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
 }
 const cancelling = ref(false)
 async function restore() {
@@ -132,19 +178,22 @@ async function remove() {
 // The page: one likely next step for the state, the rest in the menu with the destructive last.
 const primary = computed(() => {
   const state = production.value?.state
-  if (state === 'draft' || state === 'withdrawn') return { label: state === 'draft' ? 'Publish' : 'Publish again', icon: 'i-lucide-globe' }
+  if (state === 'draft' || state === 'withdrawn') {
+    const n = needs.value.length
+    return { label: state === 'draft' ? 'Publish' : 'Publish again', icon: 'i-lucide-globe', hint: n ? `${n} ${n === 1 ? 'thing' : 'things'} to do before it can be published` : undefined }
+  }
   if (state === 'cancelled') return { label: 'Bring back', icon: 'i-lucide-undo-2' }
   return undefined
 })
 function onPrimary() {
   if (production.value?.state === 'cancelled') return restore()
-  return publish()
+  publishing.value = true
 }
 const actions = computed<DropdownMenuItem[][]>(() => {
   const p = production.value
   if (!p) return []
-  const groups: DropdownMenuItem[][] = []
-  if (p.state === 'published') groups.push([{ label: 'Withdraw', icon: 'i-lucide-eye-off', onSelect: () => { void withdraw() } }])
+  const groups: DropdownMenuItem[][] = [[{ label: 'Duplicate', icon: 'i-lucide-copy', onSelect: () => { void duplicate() } }]]
+  if (p.state === 'published') groups[0]!.push({ label: 'Withdraw', icon: 'i-lucide-eye-off', onSelect: () => { void withdraw() } })
   const destructive: DropdownMenuItem[] = []
   if (p.state === 'published' || p.state === 'withdrawn') destructive.push({ label: 'Cancel production', icon: 'i-lucide-calendar-x', color: 'error', onSelect: () => { cancelling.value = true } })
   if (p.state === 'draft' && !p.publishedAt) destructive.push({ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { void remove() } })
@@ -155,7 +204,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
 // The facts strip and the overview read the dates the Dates tab shows, by the same key.
 interface Dated { id: string, venueId: string, startsAt: number, endsAt: number, state: 'draft' | 'scheduled' | 'cancelled' | 'completed', label: string | null }
 const { data: dated } = await useAPI<{ performances: Dated[], options: { venues: { id: string, name: string }[] } }>(() => `${base.value}/performances`, { key: `core:production:${String(route.params.id)}:performances` })
-const { span, dateTime } = useDates()
+const { span, dateTime, day } = useDates()
 const venueName = (id: string) => dated.value?.options.venues.find(v => v.id === id)?.name ?? ''
 const performances = computed(() => dated.value?.performances ?? [])
 const running = computed(() => performances.value.filter(p => p.state === 'scheduled' || p.state === 'completed'))
@@ -206,10 +255,48 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       :tabs="tabs"
       :trail="[{ label: 'Productions', to: '/console/programme/productions' }]"
       checklist-title="Ready to publish?"
+      :checklist="production.state === 'draft' || production.state === 'withdrawn'"
       @primary="onPrimary"
     >
       <template #aside>
         <ProductionPoster :production-id="production.id" />
+        <section
+          v-if="production.state === 'published'"
+          aria-labelledby="published-heading"
+          class="space-y-3 rounded-lg border border-default p-4"
+        >
+          <h2
+            id="published-heading"
+            class="text-sm font-semibold text-highlighted"
+          >
+            Published
+          </h2>
+          <p
+            v-if="production.publishedAt"
+            class="text-sm"
+          >
+            First published on {{ day(production.publishedAt) }}.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              label="View public page"
+              icon="i-lucide-external-link"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :to="publicPath"
+              target="_blank"
+            />
+            <UButton
+              label="Withdraw"
+              icon="i-lucide-eye-off"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="withdraw()"
+            />
+          </div>
+        </section>
       </template>
 
       <template #tab-overview>
@@ -366,6 +453,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   label="Running time"
                   help="Including the intervals."
                   name="runningMinutes"
+                  :hint="inherited(details.runningMinutes, data?.theatre.runningMinutes)"
                 >
                   <MinutesInput
                     v-model="details.runningMinutes"
@@ -377,6 +465,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 <UFormField
                   label="Doors open before"
                   name="doorsBeforeMinutes"
+                  :hint="inherited(details.doorsBeforeMinutes, data?.theatre.doorsBeforeMinutes)"
                 >
                   <MinutesInput
                     v-model="details.doorsBeforeMinutes"
@@ -398,6 +487,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 <UFormField
                   label="Each interval"
                   name="intervalMinutes"
+                  :hint="inherited(details.intervalMinutes, data?.theatre.intervalMinutes)"
                 >
                   <MinutesInput
                     v-model="details.intervalMinutes"
@@ -438,7 +528,8 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 v-if="elsewhere"
                 label="Booking link"
                 name="externalBookingUrl"
-                required
+                :required="linkNeeded"
+                :help="linkNeeded ? undefined : 'Needed to publish. You can save the draft without it.'"
               >
                 <UInput
                   v-model="details.externalBookingUrl"
@@ -498,6 +589,73 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
         />
       </template>
     </PageRecord>
+    <UModal
+      v-if="production"
+      v-model:open="publishing"
+      :title="needs.length ? 'Not ready to publish yet' : `Publish ${production.title}?`"
+      :description="needs.length ? 'Publishing needs these first. Each link opens the place to put it right.' : 'It goes on the public site, where anyone can see it.'"
+    >
+      <template #body>
+        <div class="space-y-4 text-sm">
+          <ul
+            v-if="needs.length"
+            class="list-disc space-y-1 ps-5"
+          >
+            <li
+              v-for="n in needs"
+              :key="n.key"
+            >
+              <ULink
+                :to="n.link"
+                class="underline"
+                @click="publishing = false"
+              >
+                {{ n.sentence }}
+              </ULink>
+            </li>
+          </ul>
+          <template v-else>
+            <p>
+              Its page will be at
+              <ULink
+                :to="publicPath"
+                target="_blank"
+                class="underline"
+              >{{ publicPath }}</ULink>,
+              with its scheduled dates.
+            </p>
+            <div v-if="wanted.length">
+              <p>Not done yet, though it can be published without:</p>
+              <ul class="list-disc space-y-1 ps-5">
+                <li
+                  v-for="w in wanted"
+                  :key="w.id"
+                >
+                  {{ w.sentence }}
+                </li>
+              </ul>
+            </div>
+          </template>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            :label="needs.length ? 'Close' : 'Cancel'"
+            color="neutral"
+            variant="outline"
+            @click="publishing = false"
+          />
+          <UButton
+            v-if="!needs.length"
+            label="Publish"
+            icon="i-lucide-globe"
+            :loading="publishBusy"
+            @click="publish()"
+          />
+        </div>
+      </template>
+    </UModal>
     <ProductionCancelDialog
       v-if="production"
       v-model:open="cancelling"

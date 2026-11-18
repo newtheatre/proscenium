@@ -59,10 +59,44 @@ export interface RenderOptions {
   accent: string
   theatre: string
   footer?: string | null
+  /**
+   * The button that takes the reader to what the message is about: the type's `link`, made
+   * absolute. Left out when the wording already has a link of its own.
+   */
+  action?: { label: string, url: string } | null
+}
+
+// [label](target): the target is a variable or a literal https address.
+const LINK = /\[([^\]]+)\]\(([^)]+)\)/g
+
+/** A type's link with its variables filled in, or nothing if it would leave the app. */
+export function linkPath(template: string | undefined, values: Record<string, string>): string | null {
+  if (!template) return null
+  const path = template.replace(VARIABLE, (_, name: string) => encodeURIComponent(values[name] ?? ''))
+  return path.startsWith('/') && !path.startsWith('//') ? path : null
+}
+
+/** A paragraph that is nothing but one link becomes a button. */
+const LONE_LINK = /^\s*\[([^\]]+)\]\(([^)]+)\)\s*$/
+
+/** Whether the wording links anywhere, so a button from the type's link would repeat it. */
+export function hasLink(body: string, values: Record<string, string>, kinds: Record<string, VariableKind>): boolean {
+  for (const match of body.matchAll(LINK)) if (linkTarget(match[2]!, values)) return true
+  for (const match of body.matchAll(VARIABLE)) if (isLink(kinds[match[1]!]) && isSafeUrl(values[match[1]!] ?? '')) return true
+  return false
+}
+
+// A table-built button, the shape mail clients render most reliably, with the address underneath
+// as plain text for clients that strip buttons or for copying by hand.
+function button(label: string, target: string, accent: string): string {
+  const href = escapeHtml(target)
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 8px"><tr><td style="border-radius:6px;background:${accent}">`
+    + `<a href="${href}" style="display:inline-block;padding:12px 20px;border-radius:6px;color:#ffffff;font-weight:600;text-decoration:none">${label}</a></td></tr></table>`
+    + `<p style="margin:0 0 16px;font-size:13px;color:#57534e;word-break:break-all">${href}</p>`
 }
 
 /** Fills the wording. Plain-text and HTML bodies are built from the same parse, so they agree. */
-export function render(wording: { subject: string, body: string }, options: RenderOptions): Rendered {
+export function render(wording: { subject: string, body: string, action?: string }, options: RenderOptions): Rendered {
   const values: Record<string, string> = { ...options.values, theatre: options.theatre }
   const plain = (s: string) => s.replace(VARIABLE, (_, name: string) => values[name] ?? '')
   const subject = plain(wording.subject).replace(/[\r\n]+/g, ' ').trim()
@@ -74,7 +108,16 @@ export function render(wording: { subject: string, body: string }, options: Rend
   for (const paragraph of paragraphs) {
     textParts.push(inlineText(paragraph, values))
     inboxParts.push(inlineText(paragraph, values, false))
-    htmlParts.push(`<p style="margin:0 0 16px">${inlineHtml(paragraph, values, options)}</p>`)
+    const lone = paragraph.match(LONE_LINK)
+    const target = lone ? linkTarget(lone[2]!, values) : undefined
+    htmlParts.push(lone && target
+      ? button(fragment(lone[1]!, values, options), target, options.accent)
+      : `<p style="margin:0 0 16px">${inlineHtml(paragraph, values, options)}</p>`)
+  }
+  if (options.action && isSafeUrl(options.action.url)) {
+    const label = plain(options.action.label).trim()
+    textParts.push(`${label}: ${options.action.url}`)
+    htmlParts.push(button(escapeHtml(label), options.action.url, options.accent))
   }
   if (options.footer) {
     textParts.push(`--\n${options.footer}`)
@@ -89,9 +132,6 @@ export function render(wording: { subject: string, body: string }, options: Rend
   ].join('')
   return { subject, text: `${textParts.join('\n\n')}\n`, html, inbox: inboxParts.join('\n\n') }
 }
-
-// [label](target): the target is a variable or a literal https address.
-const LINK = /\[([^\]]+)\]\(([^)]+)\)/g
 
 function linkTarget(raw: string, values: Record<string, string>): string | undefined {
   const variable = raw.trim().match(/^\{\{\s*([a-z][a-zA-Z0-9]*)\s*\}\}$/) // not-policy: the variable syntax

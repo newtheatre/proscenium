@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { defineRoute, first, refuse, today } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { requireCharger } from '../../../../charge'
+import { listSetsEnd, schemeList } from '../../../../lists'
 import { chooseLength, writePaying } from '../../../../joining'
 import { writeActive, writePending } from '../../../../memberships'
 import { renewalStarts, renewalWindow } from '../../../../renewal'
@@ -44,8 +45,10 @@ export default defineRoute({
   if (scheme.requiresPayment) await requireCharger()
   const startsOn = renewalStarts(old!.ends_on!, day)
   const checked = scheme.reverifyOnRenewal ? await runVerifier(scheme, accountId, input.reference, day) : null
+  // D9: where the list checked again sets the end date, no length is asked for.
+  const endsByList = scheme.reverifyOnRenewal && await listSetsEnd(await schemeList(scheme))
   if (checked?.outcome === 'needs-staff') {
-    const option = await chooseLength(scheme, input.lengthOptionId)
+    const option = await chooseLength(scheme, input.lengthOptionId, false, endsByList)
     const membershipId = scheme.requiresPayment
       ? (await writePaying(unit, { scheme, accountId, lengthOptionId: option?.id ?? null, renewsId: id, verified: false, day })).membershipId
       : writePending(unit, { scheme, accountId, lengthOptionId: option?.id ?? null, renewsId: id })
@@ -54,7 +57,7 @@ export default defineRoute({
     return { membershipId, pending: true, renewed: true }
   }
   const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null } : null
-  const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId)
+  const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId, false, endsByList)
   if (scheme.requiresPayment) {
     const { membershipId, quote } = await writePaying(unit, { scheme, accountId, lengthOptionId: option?.id ?? null, renewsId: id, verified: true, day })
     if (pass) recordPass(unit, membershipId, accountId, pass)

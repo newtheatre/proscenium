@@ -5,6 +5,8 @@
 import { and, count, sql, type SQL } from 'drizzle-orm'
 import { getQuery } from 'h3'
 import { all, can, defineRoute, readListQuery, searchWords, useDb } from '#kit'
+import { accountLabel } from '#modules/core'
+import { performanceNames, sourceRecords } from '../../sources'
 import { postings } from '../../db/schema'
 import source from '../../lists/ledger'
 
@@ -31,15 +33,23 @@ export default defineRoute({ ability: 'finance.ledger.view', rateLimit: 'default
         'SELECT e.posting_id, e.account_id, a.code, a.name, e.amount_minor, e.currency, e.production_id, e.performance_id FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id WHERE e.posting_id IN (SELECT value FROM json_each(?)) ORDER BY e.id', JSON.stringify(found.map(p => p.id)))
     : []
   const canCorrect = (await can(actor, 'finance.posting.correct')).allowed
+  // Where each posting came from (an order, a payment, a till session), who posted it, and the
+  // performances its entries are for, by name rather than id.
+  const sources = await sourceRecords(found.map(p => ({ module: p.sourceModule, type: p.sourceType, id: p.sourceId })))
+  const performances = await performanceNames(lines.flatMap(l => l.performance_id ?? []))
+  const posters = new Map<string, string>()
+  for (const id of new Set(found.flatMap(p => p.postedBy ?? []))) posters.set(id, await accountLabel(id))
   const rows = found.map(p => ({
     id: p.id,
     kind: p.kind,
-    source: { module: p.sourceModule, type: p.sourceType, id: p.sourceId },
+    source: { module: p.sourceModule, type: p.sourceType, id: p.sourceId, ...sources.get(`${p.sourceType}:${p.sourceId}`) },
     reversesId: p.reversesId,
     periodId: p.periodId,
     occurredAt: p.occurredAt,
     postedAt: p.postedAt,
     postedBy: p.postedBy,
+    postedByName: p.postedBy ? posters.get(p.postedBy) ?? null : null,
+    performances: [...new Set(lines.filter(l => l.posting_id === p.id).flatMap(l => l.performance_id ?? []))].map(id => ({ id, title: performances.get(id)?.title ?? id, startsAt: performances.get(id)?.startsAt ?? null })),
     entries: lines.filter(l => l.posting_id === p.id).map(l => ({ accountId: l.account_id, code: l.code, name: l.name, amountMinor: l.amount_minor, currency: l.currency, productionId: l.production_id, performanceId: l.performance_id })),
     canReverse: canCorrect && !p.reversesId,
   }))

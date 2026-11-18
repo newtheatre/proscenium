@@ -27,6 +27,8 @@ const { data, error, refresh } = await useAPI<Own>(() => `/api/forms/mine/${enco
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
 const own = computed(() => data.value!)
 provide('forms:answering', computed(() => own.value.form.slug))
+// Files added while making changes go into the same response.
+provideFormsUploads(computed(() => own.value.form.slug), computed(() => own.value.response.id))
 
 const changing = ref(false)
 const answers = ref<Answers>({})

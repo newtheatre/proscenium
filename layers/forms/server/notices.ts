@@ -2,13 +2,16 @@
 // staff move it, and a request to each reviewer when a round opens. All are sent with core's
 // notify in the unit of the change itself, so a message goes exactly when the change holds.
 // Somebody who answered signed out is told by email alone, at the address they gave; an anonymous
-// form tells nobody, because it does not know who answered. Nothing anybody wrote is put in a
-// message: it says what happened and where to read the rest. A message that cannot be prepared is
-// logged and left out: the change it tells of still holds, because no answer should be lost to it.
+// form tells nobody, because it does not know who answered. Somebody signed out whose response is
+// returned for changes is sent a fresh single-use link to make them through (R-19). Nothing
+// anybody wrote is put in a message: it says what happened and where to read the rest. A message
+// that cannot be prepared is logged and left out: the change it tells of still holds, because no
+// answer should be lost to it.
 import { log, siteUrl, type UnitView } from '#kit'
 import { notify, notifyAddress } from '#modules/core'
 import type { Stage } from '../shared/engine'
 import { statusOf } from '../shared/engine'
+import { issueChangeLink } from './changes'
 
 interface About { id: string, reference: string, personId: string | null, respondentEmail: string | null }
 const record = (id: string) => ['forms.response', id] as const
@@ -41,8 +44,17 @@ export async function tellMoved(unit: UnitView, form: { title: string }, respons
   const dedupeKey = `moved:${response.id}:${move.key}:${move.at}`
   const variables = { form: form.title, reference: response.reference, status }
   await quietly('moved', response.id, async () => {
-    if (response.personId) await notify(unit, move.to.kind === 'returned' ? 'forms.returned' : 'forms.status', { to: response.personId, variables: { ...variables, link: await mine(response.id) }, subject: record(response.id), dedupeKey })
-    else if (response.respondentEmail) await notifyAddress(unit, 'forms.status-guest', { address: response.respondentEmail, variables, record: record(response.id), dedupeKey })
+    if (response.personId) {
+      await notify(unit, move.to.kind === 'returned' ? 'forms.returned' : 'forms.status', { to: response.personId, variables: { ...variables, link: await mine(response.id) }, subject: record(response.id), dedupeKey })
+    }
+    else if (response.respondentEmail && move.to.kind === 'returned') {
+      // Somebody signed out is sent a fresh link to make their changes through (R-19).
+      const link = await issueChangeLink(unit, response.id, move.at)
+      await notifyAddress(unit, 'forms.returned-guest', { address: response.respondentEmail, variables: { form: form.title, reference: response.reference, link }, record: record(response.id), dedupeKey })
+    }
+    else if (response.respondentEmail) {
+      await notifyAddress(unit, 'forms.status-guest', { address: response.respondentEmail, variables, record: record(response.id), dedupeKey })
+    }
   })
 }
 

@@ -5,6 +5,7 @@ import { normaliseOrigin, requestUrl } from '#kit/origin'
 import { clearTicket, readTicket, requireSetupNeeded, writeOwner } from '../../../identity/setup'
 import { digest, normaliseRecoveryCode } from '../../../identity/crypto'
 import { startSession } from '../../../identity/sessions'
+import { ensureModuleDefaults } from '../../../identity/defaults'
 
 export default defineRoute({
   public: true,
@@ -25,6 +26,13 @@ export default defineRoute({
   // The address setup ran on becomes the site's one origin, unless the Worker names it already.
   const origin = normaliseOrigin(requestUrl(event).origin)
   if (origin && !(await useSetting('core.site.origin'))) await changeSetting(unit, 'core.site.origin', origin, { confirm: true })
+  // The theatre's name and time zone, as asked on the first step.
+  if (ticket.theatre && !(await useSetting('core.site.name'))) await changeSetting(unit, 'core.site.name', ticket.theatre, { confirm: true })
+  if (ticket.timeZone && !(await useSetting('core.locale.time-zone'))) await changeSetting(unit, 'core.locale.time-zone', ticket.timeZone, { confirm: true })
   unit.afterCommit(() => clearTicket(event))
+  // Core is always on, so its roles and fact mappings are made with the site rather than on a switch.
+  unit.afterCommit(async () => {
+    await ensureModuleDefaults('core', accountId)
+  })
   return { next: '/' }
 })
