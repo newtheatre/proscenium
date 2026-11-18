@@ -113,7 +113,19 @@ async function elsewhere(performanceId: string): Promise<Pick<ScanOutcome, 'tick
   return { ticketPerformanceId: performanceId, ...ticketPerformance ? { ticketPerformance } : {} }
 }
 
-export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null }
+/**
+ * A scan made on a device that was offline (D2, box office review) carries the id the device gave it
+ * and the device's time; it was admitted there already, after the device checked the code's
+ * signature against its copy of the door list. The server admits it at that time and marks it
+ * offline. A requirement it cannot confirm now is marked unchecked rather than turned away, since
+ * the person is already in.
+ */
+export interface OfflineScan { id: string, scannedAt: number }
+
+export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null, offline?: OfflineScan }
+
+/** The device's time for an offline scan, never later than the server's. */
+const deviceTime = (offline: OfflineScan | undefined, now: number) => offline ? Math.min(offline.scannedAt, now) : now
 
 interface TicketRow { id: string, performance_id: string, state: 'valid' | 'void', void_reason: string | null, admitted_at: number | null }
 
@@ -123,13 +135,15 @@ const PARTS = 4 // not-policy: kind, key id, code and signature
 export async function scan(input: ScanInput): Promise<ScanOutcome> {
   const code = input.code.trim()
   const parts = code.split('.')
-  const at = nowMs()
+  const received = nowMs()
+  const at = deviceTime(input.offline, received)
+  const offline = input.offline ? 1 : 0
   const actor = useContext().actor.accountId ?? null
   const unit = createUnit()
-  const scanId = newId('scan')
+  const scanId = input.offline?.id ?? newId('scan')
   const row = (result: string, ticketId: string | null) => unit.view().add({
-    sql: 'INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0)',
-    params: [scanId, ticketId, input.performanceId, result, actor, input.deviceLabel ?? null, at, at],
+    sql: 'INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)',
+    params: [scanId, ticketId, input.performanceId, result, actor, input.deviceLabel ?? null, at, received, offline],
   })
   const recorded = async (outcome: Omit<ScanOutcome, 'scanId'>, ticketId: string | null = null): Promise<ScanOutcome> => {
     row(outcome.result, ticketId)
@@ -170,18 +184,18 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ...await elsewhere(ticket.performance_id) }, ticket.id)
   // A ticket already in is said so without asking again; one not yet in is checked before it is admitted.
   const checked = ticket.admitted_at === null ? await recheck(ticket.id, input.performanceId) : { verdict: 'met' as const }
-  if (checked.verdict === 'not-met') {
+  if (checked.verdict === 'not-met' && !input.offline) {
     const overridable = await mayOverride(ticket.id, input.performanceId)
     return recorded({ result: 'requirement_not_met', ticketId: ticket.id, requirement: { reason: checked.reason, ticketType: checked.ticketType }, ...overridable ? { overridable } : {} }, ticket.id)
   }
-  const unchecked = checked.verdict === 'unchecked' ? 1 : 0
+  const unchecked = checked.verdict === 'met' ? 0 : 1
 
   // One conditional update admits and stamps; the scan row reads the stamp to say whether it was the one.
-  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
+  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, received, ticket.id, input.performanceId] })
   unit.view().add({
     sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
-      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, CASE WHEN t.admitted_scan_id = ?1 THEN ?7 ELSE 0 END, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
-    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, unchecked],
+      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, CASE WHEN t.admitted_scan_id = ?1 THEN ?7 ELSE 0 END, ?3, ?4, ?5, ?8, ?9 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, unchecked, received, offline],
   })
   await unit.commit()
   const written = await first<{ result: 'admitted' | 'already_admitted' }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
@@ -230,7 +244,8 @@ export async function admitAnyway(input: AdmitAnywayInput): Promise<ScanOutcome>
   return { result: 'admitted', scanId, ticketId: ticket.id, booking }
 }
 
-export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null }
+/** `offline`: admitted on a device that was offline, with an id for each ticket it let in and the device's time. */
+export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null, offline?: { ids: string[], scannedAt: number } }
 
 /**
  * Admits tickets of one order from the door list, for a buyer with no phone and no printout (part 6,
@@ -245,18 +260,20 @@ export async function admitByName(input: AdmitByNameInput): Promise<{ admitted: 
     input.orderId, input.performanceId, input.count,
   )
   if (!waiting.length) return { admitted: 0, scanIds: [] }
-  const at = nowMs()
+  const received = nowMs()
+  const at = input.offline ? Math.min(input.offline.scannedAt, received) : received
+  const offline = input.offline ? 1 : 0
   const actor = useContext().actor.accountId ?? null
   const unit = createUnit()
   const scanIds: string[] = []
-  for (const ticket of waiting) {
-    const scanId = newId('scan')
+  for (const [n, ticket] of waiting.entries()) {
+    const scanId = input.offline?.ids[n] ?? newId('scan')
     scanIds.push(scanId)
-    unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
+    unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, received, ticket.id, input.performanceId] })
     unit.view().add({
       sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
-        SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
-      params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id],
+        SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?7, ?8 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+      params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, received, offline],
     })
   }
   await unit.commit()

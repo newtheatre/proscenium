@@ -162,6 +162,11 @@ async function endDate(role: RoleRow, given: number | null | undefined): Promise
  * guarded insert, so two requests at once make one grant.
  */
 export async function createGrant(unit: UnitView, actor: Actor, input: GrantInput, options: { endedGrant?: string, newAccount?: boolean } = {}): Promise<string> {
+  return (await giveRole(unit, actor, input, options)).id
+}
+
+/** createGrant, also answering when the grant ends, which the unit has not written yet. */
+export async function giveRole(unit: UnitView, actor: Actor, input: GrantInput, options: { endedGrant?: string, newAccount?: boolean } = {}): Promise<{ id: string, expiresAt: number | null }> {
   if (input.accountId === actor.accountId) refuse('core.grant.self', 'You cannot give yourself a role.', { status: 403, remedy: 'Ask someone else who can give roles.' })
   // An account made earlier in this unit is not in the database yet, and is live by definition.
   if (!options.newAccount) {
@@ -192,7 +197,7 @@ export async function createGrant(unit: UnitView, actor: Actor, input: GrantInpu
   }).expect(1, { code: 'core.grant.already-held', reason: 'This person already holds this role there.', remedy: 'Change the existing grant instead.' })
   unit.announce('core.grant.created', { grantId: id, accountId: input.accountId, roleId: role.id }, { record: ['core.grant', id] })
   unit.audit({ action: 'grant', record: ['core.grant', id], detail: { accountId: input.accountId, roleId: role.id, scope: scope.kind, ...(options.endedGrant ? { replaces: options.endedGrant } : {}) } })
-  return id
+  return { id, expiresAt }
 }
 
 export interface GrantRow { id: string, account_id: string, role_id: string, scope: Scope['kind'], scope_module: string | null, scope_type: string | null, scope_id: string | null, expires_at: number | null, role_key: string }

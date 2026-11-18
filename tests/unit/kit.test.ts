@@ -85,6 +85,11 @@ describe('settings', () => {
     expect(validateSettingValue(entries['box-office.holds.length'], '2h')).toMatchObject({ ok: false })
     expect(validateSettingValue(entries['box-office.holds.length'], '30m')).toEqual({ ok: true, value: 1800 })
   })
+  it('take a duration\'s units, which must be units of time', () => {
+    expect(defineSettings('core', { 'a.b': setting.duration({ default: '7d', units: ['week', 'day'], change: 'c' }) })['core.a.b']).toMatchObject({ units: ['week', 'day'] })
+    expect(() => defineSettings('core', { 'a.b': setting.duration({ default: '7d', units: ['fortnight'], change: 'c' } as never) })).toThrow(DeclarationError)
+    expect(() => defineSettings('core', { 'a.b': setting.duration({ default: '7d', units: [], change: 'c' }) })).toThrow(DeclarationError)
+  })
   it('take a choice from one of the kit\'s catalogues, checked against it', () => {
     const local = defineSettings('core', {
       'locale.time-zone': setting.choice({ unset: true, catalogue: 'time-zone', change: 'core.settings.manage' }),

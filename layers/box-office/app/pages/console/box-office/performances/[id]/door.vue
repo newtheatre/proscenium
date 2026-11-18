@@ -68,6 +68,13 @@ const trail = computed(() => [
         icon="i-lucide-maximize"
         :label="t('box-office.door.open-live')"
       />
+      <UButton
+        :to="`/live/door/${encodeURIComponent(id)}/print`"
+        icon="i-lucide-printer"
+        color="neutral"
+        variant="outline"
+        :label="t('box-office.live-door.print')"
+      />
     </template>
     <template #cell-buyer="{ row }">
       {{ nameOf(row) }}
