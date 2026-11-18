@@ -4,7 +4,7 @@
 // modules are on) are added by the platform to the same list.
 import { OTHER, PATTERNS } from './types'
 import { unreached } from './reach'
-import { isFinal } from './workflow'
+import { isDecision, isFinal } from './workflow'
 import type { Comparison, Condition, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
 import { calculationsRead } from './calculations'
 import { conditionsOf, questionsOf } from './definition'
@@ -21,6 +21,7 @@ export type ProblemCode
     | 'empty-condition' | 'no-questions'
     | 'stage-no-name' | 'stage-duplicate' | 'move-no-label' | 'move-duplicate' | 'move-unknown-stage' | 'move-nowhere'
     | 'returned-no-way-back' | 'stage-unreachable' | 'stage-dead-end'
+    | 'review-wrong-kind' | 'review-no-reviewers' | 'review-no-criteria' | 'criterion-no-label' | 'review-quorum' | 'reason-not-decision'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
@@ -216,6 +217,18 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       if (seen.has(stage.key)) error('stage-duplicate', `stage:${stage.key}`)
       seen.add(stage.key)
       if (!stage.name.trim()) error('stage-no-name', `stage:${stage.key}`)
+      const review = stage.review
+      if (!review) continue
+      const at = `stage:${stage.key}`
+      if (stage.kind !== 'in_review') error('review-wrong-kind', at)
+      const people = review.reviewers.people?.length ?? 0
+      if (!review.reviewers.role && !people) error('review-no-reviewers', at)
+      if (review.mode === 'scores') {
+        if (!review.criteria?.length) error('review-no-criteria', at)
+        else if (review.criteria.some(c => !c.label.trim())) error('criterion-no-label', at)
+      }
+      // A named panel smaller than the least number who must vote could never reach it.
+      else if (!review.reviewers.role && people < (review.quorum ?? 1)) error('review-quorum', at)
     }
     const moves = new Set<string>()
     for (const move of transitions) {
@@ -225,6 +238,7 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       if (!move.label.trim()) error('move-no-label', at)
       if (!seen.has(move.from) || !seen.has(move.to)) error('move-unknown-stage', at)
       else if (move.from === move.to) error('move-nowhere', at)
+      else if (move.needsReason && !isDecision(def, move)) error('reason-not-decision', at)
     }
     // Somebody sent back must be able to send their changes in again.
     for (const stage of stages) if (stage.kind === 'returned' && !transitions.some(t => t.from === stage.key && t.who === 'submitter' && seen.has(t.to))) error('returned-no-way-back', `stage:${stage.key}`)

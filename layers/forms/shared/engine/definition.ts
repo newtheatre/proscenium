@@ -2,13 +2,23 @@
 // Whether it makes sense to publish (a condition that points nowhere, a circle of calculations) is
 // `checkDefinition`'s job, so a draft may be saved while it still has problems.
 import { z } from 'zod'
-import { DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MOVERS, OPERATORS, OTHER, QUESTION_TYPES, RULES, STAGE_KINDS } from './types'
+import { DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
 import type { Condition, Definition, Expression, Group, Limits, Question } from './types'
 
 const id = z.string().regex(/^[\w-]{1,64}$/)
 const key = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)
 const text = z.string().max(4000)
 const literal = z.union([z.string().max(1000), z.number(), z.boolean()])
+
+const review = z.strictObject({
+  mode: z.enum(REVIEW_MODES),
+  reviewers: z.strictObject({ role: z.string().min(1).max(100).optional(), people: z.array(z.string().min(1).max(100)).max(40).optional() }),
+  criteria: z.array(z.strictObject({ id, label: z.string().max(200), max: z.number().int().min(1).max(100), weight: z.number().min(0).max(100).optional() })).max(20).optional(),
+  pass: z.enum(PASS_MARKS).optional(),
+  quorum: z.number().int().min(1).max(40).optional(),
+  open: z.boolean().optional(),
+  secret: z.boolean().optional(),
+})
 
 const operand = z.union([
   z.strictObject({ answer: id }),
@@ -101,8 +111,8 @@ const definition = z.strictObject({
   endings: z.array(z.strictObject({ id, title: z.string().max(300), message: text.optional(), submits: z.boolean() })).max(30).optional(),
   presentation: z.strictObject({ submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
   workflow: z.strictObject({
-    stages: z.array(z.strictObject({ key, name: z.string().max(100), kind: z.enum(STAGE_KINDS), status: z.string().max(100).optional() })).min(1).max(20),
-    transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS) })).max(60),
+    stages: z.array(z.strictObject({ key, name: z.string().max(100), kind: z.enum(STAGE_KINDS), status: z.string().max(100).optional(), review: review.optional() })).min(1).max(20),
+    transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS), needsReason: z.boolean().optional() })).max(60),
   }).optional(),
 }) satisfies z.ZodType<Definition>
 

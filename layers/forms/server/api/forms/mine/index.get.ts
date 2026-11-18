@@ -4,6 +4,7 @@ import { all, defineRoute } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import type { Definition, Workflow } from '../../../../shared/engine'
 import { resubmitMove, stageOf, statusOf } from '../../../../shared/engine'
+import { waitingFor } from '../../../review'
 
 interface Mine { stageKey: string | null, stageKind: string | null, stageNote: string | null, currentRevision: number, definition: string | null, responseId: string, reference: string, state: 'draft' | 'submitted', title: string, slug: string, open: number, submittedAt: number | null, updatedAt: number }
 
@@ -24,6 +25,8 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
      WHERE r.person_id IN (${accountScopeSql('?1')}) AND r.state IN ('draft', 'submitted')
      ORDER BY COALESCE(r.submitted_at, r.updated_at) DESC LIMIT 200`, actor.accountId) // not-policy: more than anyone has; the page is not paged
   return {
+    // What they are asked to review, which is never their own.
+    reviews: await waitingFor(actor.accountId!),
     drafts: rows.filter(r => r.state === 'draft').map(r => ({ responseId: r.responseId, title: r.title, slug: r.slug, open: !!r.open, updatedAt: r.updatedAt })),
     sent: rows.filter(r => r.state === 'submitted').map(r => ({ responseId: r.responseId, reference: r.reference, title: r.title, slug: r.slug, submittedAt: r.submittedAt, progress: progressOf(r) })),
   }

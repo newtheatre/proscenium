@@ -12,6 +12,8 @@ export interface BuilderData {
   form: BuilderForm
   draft: { definition: Definition, editRevision: number, editedBy: string | null, updatedAt: number }
   fields: PublishedField[]
+  /** For the stages editor: roles whose holders can review, and the names of people a stage names. */
+  reviewers?: { roles: { id: string, name: string }[], people: Record<string, string> }
   versions: { id: string, number: number, publishedAt: number }[]
 }
 export type SaveState = 'saved' | 'waiting' | 'saving' | 'stale' | 'failed'

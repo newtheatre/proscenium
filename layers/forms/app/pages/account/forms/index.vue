@@ -4,6 +4,7 @@
 <script setup lang="ts">
 interface Mine {
   drafts: { responseId: string, title: string, slug: string, open: boolean, updatedAt: number }[]
+  reviews: { assignmentId: string, title: string, reference: string, stage: string, mode: 'scores' | 'vote', status: 'assigned' | 'submitted', released: boolean }[]
   sent: { responseId: string, reference: string, title: string, slug: string, submittedAt: number, progress: { status: string, kind: string, canChange: boolean } | null }[]
 }
 const { t } = useT()
@@ -24,7 +25,7 @@ const { data, status, error, refresh } = await useAPI<Mine>('/api/forms/mine', {
       @retry="refresh()"
     >
       <EmptyState
-        v-if="!data?.drafts.length && !data?.sent.length"
+        v-if="!data?.drafts.length && !data?.sent.length && !data?.reviews.length"
         icon="i-lucide-file-text"
         :title="t('forms.screens.mine.none')"
         :description="t('forms.screens.mine.none-help')"
@@ -33,6 +34,28 @@ const { data, status, error, refresh } = await useAPI<Mine>('/api/forms/mine', {
         v-else
         class="space-y-8"
       >
+        <section
+          v-if="data.reviews.length"
+          class="space-y-2"
+        >
+          <h2 class="font-medium">
+            {{ t('forms.screens.mine.reviews') }}
+          </h2>
+          <RecordList :label="t('forms.screens.mine.reviews')">
+            <RecordListItem
+              v-for="r in data.reviews"
+              :key="r.assignmentId"
+              :to="`/account/forms/review/${r.assignmentId}`"
+              :name="r.title"
+              :description="t('forms.screens.mine.review-of', { reference: r.reference, stage: r.stage })"
+            >
+              <StatusBadge
+                :tone="r.status === 'submitted' ? 'success' : 'warning'"
+                :label="t(r.status === 'submitted' ? 'forms.screens.mine.review-done' : r.mode === 'vote' ? 'forms.screens.mine.review-vote' : 'forms.screens.mine.review-marks')"
+              />
+            </RecordListItem>
+          </RecordList>
+        </section>
         <section
           v-if="data.drafts.length"
           class="space-y-2"

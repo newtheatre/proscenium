@@ -7,8 +7,8 @@ import { account, definition, offered, publish, question, raw, ready, req, send 
 import type { Definition } from '../../shared/engine'
 import { reviewWorkflow } from '../../shared/engine'
 
-const mover = person(['forms.response.move'], { name: 'Mia Mover' })
-const second = person(['forms.response.move'], { name: 'Sol Second' })
+const mover = person(['forms.response.move', 'forms.response.decide'], { name: 'Mia Mover' })
+const second = person(['forms.response.move', 'forms.response.decide'], { name: 'Sol Second' })
 const reader = person(['forms.response.read'], { name: 'Rae Reader' })
 const exporter = person(['forms.response.export'], { name: 'Ed Exporter', reassertedAt: Date.UTC(2026, 10, 18, 12) })
 const member = person([], { name: 'Mo Member' })

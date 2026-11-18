@@ -26,7 +26,7 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
   const form = await requireForm(record!.id)
   const live = await getVersion(form.liveVersionId)
   const columns = columnsOf(await getFields(form.id), live ? JSON.parse(live.definition) as Definition : null)
-  const { rows, total } = await listResponses(form.id, { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage }, PAGE, (input.page - 1) * PAGE)
+  const { rows, total } = await listResponses(form.id, { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage, reader: actor.accountId ?? undefined }, PAGE, (input.page - 1) * PAGE)
   const answers = await readAnswers(rows.map(r => r.id), new Map(columns.map(c => [c.questionId, c.type])), false)
   const on = ['forms.form', form.id] as const
   // A response keeps the stages of its own version, so each row's stage is named by that version.

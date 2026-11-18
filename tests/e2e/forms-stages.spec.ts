@@ -5,7 +5,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
-const author = { kind: 'person', accountId: 'acc_formsauthor', name: 'Ada Author', assurance: 'strong', reassertedAt: Date.now(), grants: ['forms.form.create', 'forms.form.edit', 'forms.form.publish', 'forms.response.read', 'forms.response.move'].map(grant) }
+const author = { kind: 'person', accountId: 'acc_formsauthor', name: 'Ada Author', assurance: 'strong', reassertedAt: Date.now(), grants: ['forms.form.create', 'forms.form.edit', 'forms.form.publish', 'forms.response.read', 'forms.response.move', 'forms.response.decide'].map(grant) }
 const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 const member = { kind: 'person', accountId: `acc_stagesmember${run}`, name: 'Mo Member', assurance: 'strong', reassertedAt: Date.now(), grants: [] }
 test.use({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(author) }, viewport: { width: 1280, height: 900 } })
@@ -22,6 +22,10 @@ async function visit(page: Page, url: string) {
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
 }
 async function axe(page: Page) {
+  // A colour or a closing menu still in motion is not what the page settles to.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }

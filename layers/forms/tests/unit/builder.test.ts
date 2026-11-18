@@ -183,4 +183,24 @@ describe('stages', () => {
       'warning:stage-dead-end@stage:waiting', 'warning:stage-unreachable@stage:archive',
     ].sort())
   })
+  it('lists what is wrong with a review, and a reason asked for on a move that is no decision', () => {
+    const def = staged()
+    const flow = def.workflow!
+    flow.stages[0]!.review = { mode: 'vote', reviewers: { people: ['acc_a', 'acc_b'] }, quorum: 2 }
+    flow.stages[1]!.review = { mode: 'scores', reviewers: {}, criteria: [] }
+    flow.transitions.find(t => t.key === 'return')!.needsReason = true
+    expect(codes(def).sort()).toEqual([
+      'error:review-wrong-kind@stage:received', 'error:review-no-reviewers@stage:in_review', 'error:review-no-criteria@stage:in_review', 'error:reason-not-decision@move:return',
+    ].sort())
+    flow.stages[0]!.review = undefined
+    flow.stages[1]!.review = { mode: 'vote', reviewers: { people: ['acc_a'] }, quorum: 2 }
+    flow.transitions.find(t => t.key === 'return')!.needsReason = undefined
+    flow.transitions.find(t => t.key === 'decline')!.needsReason = true
+    expect(codes(def)).toEqual(['error:review-quorum@stage:in_review'])
+    flow.stages[1]!.review = { mode: 'scores', reviewers: { role: 'rol_panel' }, criteria: [{ id: 'c1', label: ' ', max: 5 }] }
+    expect(codes(def)).toEqual(['error:criterion-no-label@stage:in_review'])
+    flow.stages[1]!.review.criteria![0]!.label = 'The idea'
+    expect(codes(def)).toEqual([])
+    expect(parseDefinition(def).ok).toBe(true)
+  })
 })

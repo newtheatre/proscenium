@@ -7,6 +7,10 @@ import { MOVERS, STAGE_KINDS, reviewWorkflow } from '../../shared/engine'
 import type { Definition, Mover, Stage, StageKind, Transition, Workflow } from '../../shared/engine'
 
 const open = defineModel<boolean>('open', { default: false })
+const props = defineProps<{ reviewers?: { roles: { id: string, name: string }[], people: Record<string, string> } }>()
+// Names of people added in this sitting, beside those the form came with.
+const named = ref<Record<string, string>>({})
+const people = computed(() => ({ ...props.reviewers?.people, ...named.value }))
 const { t } = useT()
 const builder = useBuilder()
 const flow = computed<Workflow | null>(() => builder.definition.value.workflow?.stages.length ? builder.definition.value.workflow : null)
@@ -40,6 +44,7 @@ const setStage = (key: string, change: Partial<Stage>, merge?: string) => write(
   const stage = f.stages.find(s => s.key === key)!
   Object.assign(stage, change)
   if (!stage.status?.trim()) delete stage.status
+  if (!stage.review || stage.kind !== 'in_review') delete stage.review
 }, merge)
 const removeStage = (key: string) => write((f) => {
   f.stages = f.stages.filter(s => s.key !== key)
@@ -48,7 +53,14 @@ const removeStage = (key: string) => write((f) => {
 const shiftStage = (index: number, by: number) => write((f) => { f.stages.splice(index + by, 0, ...f.stages.splice(index, 1)) })
 
 const addMove = () => write((f) => { f.transitions.push({ key: fresh(f.transitions.map(m => m.key), 'move'), from: f.stages[0]!.key, to: (f.stages[1] ?? f.stages[0]!).key, label: '', who: 'staff' }) })
-const setMove = (key: string, change: Partial<Transition>, merge?: string) => write((f) => { Object.assign(f.transitions.find(m => m.key === key)!, change) }, merge)
+const setMove = (key: string, change: Partial<Transition>, merge?: string) => write((f) => {
+  const move = f.transitions.find(m => m.key === key)!
+  Object.assign(move, change)
+  const to = f.stages.find(s => s.key === move.to)?.kind
+  if (!move.needsReason || move.who !== 'staff' || (to !== 'approved' && to !== 'declined')) delete move.needsReason
+}, merge)
+/** A move staff make to an approved or declined stage is a decision, and may ask for a reason. */
+const decides = (move: Transition) => move.who === 'staff' && ['approved', 'declined'].includes(flow.value?.stages.find(s => s.key === move.to)?.kind ?? '')
 const removeMove = (key: string) => write((f) => { f.transitions = f.transitions.filter(m => m.key !== key) })
 
 const kinds = computed(() => STAGE_KINDS.map(value => ({ value, label: t(`forms.screens.stages.kind.${value}`) })))
@@ -151,6 +163,15 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
               >
                 {{ t('forms.screens.stages.first') }}
               </p>
+              <FormsStageReview
+                v-if="stage.kind === 'in_review'"
+                :stage="stage"
+                :n="i + 1"
+                :roles="reviewers?.roles ?? []"
+                :people="people"
+                @change="(review, merge) => setStage(stage.key, { review }, merge)"
+                @named="(id, name) => { named[id] = name }"
+              />
               <p
                 v-for="p in problemsAt(`stage:${stage.key}`)"
                 :key="p.code"
@@ -218,6 +239,12 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
                   @click="removeMove(move.key)"
                 />
               </div>
+              <UCheckbox
+                v-if="decides(move)"
+                :model-value="!!move.needsReason"
+                :label="t('forms.screens.stages.needs-reason')"
+                @update:model-value="setMove(move.key, { needsReason: $event === true })"
+              />
               <p
                 v-for="p in problemsAt(`move:${move.key}`)"
                 :key="p.code"

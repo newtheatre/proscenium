@@ -147,10 +147,45 @@ export interface Stage {
   key: string
   name: string
   kind: StageKind
+  /** Asks for review of each response that arrives. Only on a stage of the kind in_review. */
+  review?: Review
   /** What the person who sent the response is told its status is; the stage's name when left out. */
   status?: string
 }
-export interface Transition { key: string, from: string, to: string, label: string, who: Mover }
+export interface Transition {
+  key: string
+  from: string
+  to: string
+  label: string
+  who: Mover
+  /** A move to an approved or declined stage is a decision; this one cannot be made without a reason for the record. */
+  needsReason?: boolean
+}
+
+// ---- review (part 3, "Review rules"; change 1: a vote is a second kind of review) ----
+export const REVIEW_MODES = ['scores', 'vote'] as const
+export type ReviewMode = typeof REVIEW_MODES[number]
+export const PASS_MARKS = ['majority', 'two-thirds', 'unanimous'] as const
+export type PassMark = typeof PASS_MARKS[number]
+export const VOTES = ['for', 'against', 'abstain'] as const
+export type Vote = typeof VOTES[number]
+export interface Criterion { id: string, label: string, max: number, weight?: number }
+/** Who reviews, and how, the responses that reach a stage. */
+export interface Review {
+  mode: ReviewMode
+  /** The holders of a role, named people, or both. */
+  reviewers: { role?: string, people?: string[] }
+  /** Scores: what each reviewer marks, each from nought to its most. */
+  criteria?: Criterion[]
+  /** A vote: the share of the votes cast, for and against, that must be for. */
+  pass?: PassMark
+  /** A vote: the least number who must vote, abstentions included. */
+  quorum?: number
+  /** Reviewers see each other's reviews from the start. */
+  open?: boolean
+  /** A vote: nobody ever sees who voted which way, only the tally. */
+  secret?: boolean
+}
 /** A form's stages. A response starts in the first. A form with none has one stage, Received, which is closed. */
 export interface Workflow { stages: Stage[], transitions: Transition[] }
 

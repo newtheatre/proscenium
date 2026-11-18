@@ -3,11 +3,12 @@
 // on the server: it must be open from where the response is now, to this kind of mover, and nobody
 // moves their own response. The move, its history row, the audit entry and the event commit
 // together, and a second person making a move at the same moment is refused.
-import { all, refuse, today, type Actor, type UnitView } from '#kit'
+import { all, can, refuse, today, type Actor, type UnitView } from '#kit'
 import type { Answers, Definition, Stage, Transition } from '../shared/engine'
-import { evaluate, hasStages, movesFrom, resubmitMove, stageOf, statusOf, workflowOf } from '../shared/engine'
+import { evaluate, hasStages, isDecision, resubmitMove, staffMoves, stageOf, statusOf, workflowOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
+import { closeRounds, conflicted, openRound } from './review'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
 const CONFLICT = 409 // not-policy: HTTP status
@@ -17,33 +18,51 @@ export function stageIn(def: Definition, response: { stageKey: string | null, st
   return stageOf(def, response.stageKey) ?? { key: response.stageKey ?? '', name: response.stageKey ?? '', kind: (response.stageKind ?? 'closed') as Stage['kind'] }
 }
 
-/** The moves staff may make on this response now. None on a form without stages, and none on one's own response. */
+const mayDecide = async (actor: Actor, formId: string) => (await can(actor, 'forms.response.decide', ['forms.form', formId])).allowed
+
+/**
+ * The moves staff may make on this response now. None on a form without stages, none on one's own
+ * response or one they have a conflict on, and a decision only for somebody who may decide.
+ */
 export async function movesFor(def: Definition, response: ResponseRow, actor: Actor): Promise<Transition[]> {
-  if (response.state !== 'submitted' || await owns(response, actor)) return []
-  return movesFrom(def, response.stageKey, 'staff')
+  if (response.state !== 'submitted' || await owns(response, actor) || await conflicted(actor, response.id)) return []
+  return staffMoves(def, response.stageKey, await mayDecide(actor, response.formId))
 }
 
-function apply(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, move: Transition, actorId: string | null, at: number, note: string | null, revision: number, calculated?: string | null }): Stage {
+async function apply(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, move: Transition, actorId: string | null, at: number, note: string | null, reason?: string | null, revision: number, calculated?: string | null }): Promise<Stage> {
   const to = stageOf(input.def, input.move.to)
   if (!to) return refuse('forms.stage.unknown', 'This move leads to a stage the form does not have.', { status: CONFLICT })
   const resend = input.revision !== input.response.currentRevision
+  // A decision is dated and keeps its reason; any other move clears both, so they always speak of where the response is now.
+  const decision = isDecision(input.def, input.move)
   unit.add({
-    sql: `UPDATE forms_responses SET stage_key = ?2, stage_kind = ?3, stage_note = ?4, current_revision = ?5, updated_at = ?6, retention_due_at = ?7${resend ? ', calculated = ?10' : ''} WHERE id = ?1 AND state = 'submitted' AND stage_key IS ?8 AND current_revision = ?9`, // not-policy: numbered parameters
-    params: [input.response.id, to.key, to.kind, input.note, input.revision, input.at, retentionFrom(input.form, to.kind, input.at), input.response.stageKey, input.response.currentRevision, ...(resend ? [input.calculated ?? null] : [])],
+    sql: `UPDATE forms_responses SET stage_key = ?2, stage_kind = ?3, stage_note = ?4, current_revision = ?5, updated_at = ?6, retention_due_at = ?7, decided_at = ?10, decision_reason = ?11${resend ? ', calculated = ?12' : ''} WHERE id = ?1 AND state = 'submitted' AND stage_key IS ?8 AND current_revision = ?9`, // not-policy: numbered parameters
+    params: [input.response.id, to.key, to.kind, input.note, input.revision, input.at, retentionFrom(input.form, to.kind, input.at), input.response.stageKey, input.response.currentRevision, decision ? input.at : null, decision ? input.reason ?? null : null, ...(resend ? [input.calculated ?? null] : [])],
   }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
   recordMove(unit, { responseId: input.response.id, from: input.response.stageKey, to, transitionKey: input.move.key, revision: input.revision, actorId: input.actorId, at: input.at })
-  unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key } })
+  if (stageOf(input.def, input.response.stageKey)?.review) closeRounds(unit, input.response.id, input.at)
+  await openRound(unit, { stage: to, formId: input.form.id, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at })
+  unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key, ...(decision ? { decision: to.kind } : {}) } })
   unit.announce('forms.response.moved', { responseId: input.response.id, formId: input.form.id, kind: to.kind, revision: input.revision }, { record: ['forms.response', input.response.id] })
   return to
 }
 
-/** A move by staff (FB-403). `note` is what the person who sent the response is told with it. */
-export async function moveResponse(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, transitionKey: string, actor: Actor, note: string | null, at: number }): Promise<Stage> {
+/**
+ * A move by staff (FB-403). `note` is what the person who sent the response is told with it. A move
+ * to an approved or declined stage is a decision (FB-407): it needs the ability to decide, and its
+ * `reason` is kept for the record and never sent to the person.
+ */
+export async function moveResponse(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, transitionKey: string, actor: Actor, note: string | null, reason?: string | null, at: number }): Promise<Stage> {
   if (input.response.state !== 'submitted') return refuse('forms.stage.not-open', 'This response cannot be moved.', { status: CONFLICT })
   if (await owns(input.response, input.actor)) return refuse('forms.stage.own-response', 'You cannot move your own response.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
-  const move = movesFrom(input.def, input.response.stageKey, 'staff').find(t => t.key === input.transitionKey)
+  if (await conflicted(input.actor, input.response.id)) return refuse('forms.review.conflicted', 'You have a conflict of interest on this response, so you cannot move it.', { status: 403 }) // not-policy: HTTP status
+  const move = staffMoves(input.def, input.response.stageKey, true).find(t => t.key === input.transitionKey)
   if (!move) return refuse('forms.stage.not-open', 'This move is not open from where the response is now.', { status: CONFLICT, remedy: 'Open the response again to see where it is now.' })
-  return apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: input.note, revision: input.response.currentRevision })
+  if (isDecision(input.def, move)) {
+    if (!await mayDecide(input.actor, input.form.id)) return refuse('forms.decision.not-allowed', 'You cannot make this decision.', { status: 403, remedy: 'Ask somebody who decides on this form.' }) // not-policy: HTTP status
+    if (move.needsReason && !input.reason?.trim()) return refuse('forms.decision.no-reason', 'Give a reason for the record.', { status: 422, fields: { reason: 'forms.decision.no-reason' } }) // not-policy: HTTP status
+  }
+  return apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: input.note, reason: input.reason?.trim() || null, revision: input.response.currentRevision })
 }
 
 /**
@@ -57,7 +76,7 @@ export async function resubmit(unit: UnitView, input: { form: FormRow, response:
   refuseInvalid(evaluation)
   const revision = input.response.currentRevision + 1
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
-  const to = apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated })
+  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated })
   const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   return to
