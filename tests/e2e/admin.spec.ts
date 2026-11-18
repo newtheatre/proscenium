@@ -21,7 +21,7 @@ test.describe('a site owner with no console', () => {
 
   test('has the Admin mark, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
-    await expect(page).toHaveTitle(/^Admin/)
+    await expect(page).toHaveTitle(/^Overview · Admin · /)
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
@@ -129,7 +129,8 @@ test.describe('a site owner with no console', () => {
 
   test('a setting with a fixed set of values is a dropdown, searchable when the list is long', async ({ page }) => {
     await visit(page, '/admin/theatre')
-    const zone = page.getByRole('button', { name: 'Time zone' })
+    // Every dropdown, searchable or not, is a combobox to assistive technology.
+    const zone = page.getByRole('combobox', { name: 'Time zone' })
     await zone.click()
     await page.getByPlaceholder('Search…').fill('London')
     await expect(page.getByRole('option', { name: /^Europe\/London \(GMT/ })).toBeVisible()
@@ -139,13 +140,34 @@ test.describe('a site owner with no console', () => {
     await language.click()
     await expect(page.getByRole('option')).toHaveText(['British English'])
     await page.keyboard.press('Escape')
-    await expect(page.getByRole('button', { name: 'Currency' })).toContainText('GBP: British Pound')
+    await expect(page.getByRole('combobox', { name: 'Currency' })).toContainText('GBP: British Pound')
     await noViolations(page)
   })
 
   test('is not offered the console', async ({ page }) => {
     await visit(page, '/admin')
     expect((await page.goto('/console'))?.status()).toBe(404)
+  })
+})
+
+test.describe('the organisation\'s year end', () => {
+  test.use(as(siteOwner('Orla Org', ['core.organisation.edit'])))
+
+  test('is a day and a month, and saving it asks in plain words with a button that is not red', async ({ page }) => {
+    await visit(page, '/admin/theatre')
+    // The site's address was recorded by setup: there is no Reset to "not set" beside it.
+    await expect(page.getByRole('button', { name: "Reset The site's address to its default" })).toHaveCount(0)
+    const yearEnd = page.locator('[id="setting-core.organisation.year-end"]')
+    await yearEnd.getByRole('combobox', { name: 'Month' }).click()
+    await page.getByRole('option', { name: 'July' }).click()
+    await expect(yearEnd.getByRole('spinbutton', { name: 'Day' })).toHaveValue('31')
+    await page.getByRole('button', { name: 'Save organisation settings' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Save this change?')
+    await expect(dialog).toContainText(/Year end (is set to|goes from .+ to) 31 July\./)
+    await expect(dialog.getByRole('button', { name: 'Save the change' })).not.toHaveClass(/bg-error/)
+    await dialog.getByRole('button', { name: 'Save the change' }).click()
+    await expect(page.getByText('Saved 1 change', { exact: true }).first()).toBeVisible()
   })
 })
 
