@@ -2,7 +2,7 @@
 // decided, for an account, a new address or a name alone, and may correct or revoke it; the holder
 // sees theirs and chooses where each is listed; erasing a person takes theirs off the roll.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { env, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { eraseAccount } from '../../../core/server/identity/erasure'
 import unlisted from '../../server/contributions/core.account-notice/unlisted'
 import { awardType, holder, holds, issue, NOV_17, ready, req } from './stage'
@@ -69,15 +69,17 @@ describe('issuing an award', () => {
     const listed = (await req('GET', `/api/awards/awards?type=${type}`)).body.awards
     expect(listed.map((a: any) => [a.recipientName, a.linked])).toEqual([['Alan Turing', true], ['Peggy Ashcroft', false]])
     expect((await req('GET', `/api/awards/awards/${past}`)).body.award.accountId).toBeNull()
-    // Somebody who has never signed in is not put on the public roll for them; a name alone (a past award) is.
-    expect((await req('GET', `/api/awards/awards/${made.body.awardId}`)).body.award.visibility).toBe('hidden')
+    // Listed at once, whether or not the person has ever signed in (Matt, 2026-11-18), as is a name alone.
+    expect((await req('GET', `/api/awards/awards/${made.body.awardId}`)).body.award).toMatchObject({ visibility: 'public', listingPending: false })
     expect((await req('GET', `/api/awards/awards/${past}`)).body.award.visibility).toBe('public')
   })
 
-  it('asks a holder who had never signed in whether to list it, and lets staff list it for them', async () => {
+  it('asks the holder of an award held back under the old rule whether to list it, and lets staff list it for them', async () => {
     const type = await awardType({ defaultVisibility: 'members' })
     const first = await req('POST', `/api/awards/types/${type}/awards`, { awardedOn: '2026-11-17', recipientName: 'Mary Somerville', address: 'mary@example.org' })
     const second = await req('POST', `/api/awards/types/${await awardType()}/awards`, { awardedOn: '2026-11-17', recipientName: 'Mary Somerville', address: 'mary@example.org' })
+    // Before 2026-11-18 an award for somebody who had never signed in started off the roll, waiting for them.
+    await env.DB.prepare('UPDATE awards_awards SET visibility = \'hidden\', listing_pending = 1 WHERE id IN (?, ?)').bind(first.body.awardId, second.body.awardId).run()
     expect((await req('GET', `/api/awards/awards/${first.body.awardId}`)).body.award).toMatchObject({ visibility: 'hidden', listingPending: true, typeDefaultVisibility: 'members' })
     const mary = person([], { accountId: first.body.accountId })
     const asked = await inContext(() => unlisted.notices(mary), mary)
