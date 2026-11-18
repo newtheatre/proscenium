@@ -206,8 +206,12 @@ const payable = computed(() => !stale.value && !summing.value && !!summary.value
 const tabbed = computed(() => props.live && panels.value.length > 1)
 const tab = ref<string | undefined>(undefined)
 // The first tab is shown until the seller picks another, so the till never opens on an empty panel.
+// Another screen may open the till at a module's panel with `?panel=<module>`, such as the door
+// sending a reservation to be paid for.
 watch(panels, (now) => {
-  if (!now.some(p => p.id === tab.value)) tab.value = now[0]?.id
+  if (now.some(p => p.id === tab.value)) return
+  const asked = typeof route.query.panel === 'string' ? now.find(p => p.module === route.query.panel) : undefined
+  tab.value = (asked ?? now[0])?.id
 }, { immediate: true })
 const tabs = computed(() => panels.value.map((p) => {
   const own = receipts[p.id]?.lines
