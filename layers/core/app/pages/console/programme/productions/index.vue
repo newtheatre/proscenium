@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Productions (C-01): every production with when it is on, its next performance, where, and its
 // state; the season is a filter. "New production" starts a draft in a season, the one on now or
-// the next to come by default, and opens it.
+// the next to come by default, with its usual space, and opens it.
 import { productionInput } from '../../../../../server/programme/input'
 
 interface Row {
@@ -46,6 +46,10 @@ const likelySeason = computed(() => {
   return (now ?? next)?.id ?? NONE
 })
 
+// Its usual space: the only one there is, else the one its season's latest production used.
+const { data: placing } = await useAPI<{ spaces: { id: string, label: string }[], suggested: Record<string, string | null>, withoutSeason: string | null }>('/api/core/productions/space-options', { key: 'core:productions:space-options', default: () => ({ spaces: [], suggested: {}, withoutSeason: null }) })
+const likelySpace = computed(() => (likelySeason.value === NONE ? placing.value?.withoutSeason : placing.value?.suggested[likelySeason.value]) ?? NONE)
+
 // A short form, so it opens as a panel over the list, checked by the schema the server uses.
 const creating = ref(false)
 const fields = computed(() => [
@@ -54,10 +58,13 @@ const fields = computed(() => [
   ...(openSeasons.value.length
     ? [{ name: 'seasonId', label: 'Season', kind: 'select' as const, help: 'You can change it later on Details.', options: [...openSeasons.value.map(s => ({ value: s.id, label: s.name })), { value: NONE, label: 'No season' }] }]
     : []),
+  ...(placing.value?.spaces.length
+    ? [{ name: 'usualSpaceId', label: 'Usual space', kind: 'select' as const, help: 'Where it usually plays: adding dates starts there.', options: [...placing.value.spaces.map(s => ({ value: s.id, label: s.label })), { value: NONE, label: 'Not set' }] }]
+    : []),
 ])
 const create = (values: Record<string, unknown>) => $api<{ id: string }>('/api/core/productions', {
   method: 'POST',
-  body: { title: values.title, kind: values.kind, seasonId: !values.seasonId || values.seasonId === NONE ? null : values.seasonId },
+  body: { title: values.title, kind: values.kind, seasonId: !values.seasonId || values.seasonId === NONE ? null : values.seasonId, usualSpaceId: !values.usualSpaceId || values.usualSpaceId === NONE ? null : values.usualSpaceId },
 })
 const created = (result: unknown) => navigateTo(`/console/programme/productions/${(result as { id: string }).id}`)
 
@@ -142,7 +149,7 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
       saved-title="Production created"
       :schema="productionInput"
       :fields="fields"
-      :initial="{ title: '', kind: 'own', seasonId: likelySeason }"
+      :initial="{ title: '', kind: 'own', seasonId: likelySeason, usualSpaceId: likelySpace }"
       :submit="create"
       @saved="created"
     />

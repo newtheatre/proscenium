@@ -43,7 +43,7 @@ export default defineRoute({
     sellsHere(),
     closuresBetween(now - DAY, now + 400 * DAY), // not-policy: as far ahead as the Closures screen looks
   ])
-  const own = await first<{ doors_before_minutes: number | null, capacity: number | null }>('SELECT doors_before_minutes, capacity FROM core_productions WHERE id = ?', record!.id)
+  const own = await first<{ doors_before_minutes: number | null, capacity: number | null, usual_space_id: string | null }>('SELECT doors_before_minutes, capacity, usual_space_id FROM core_productions WHERE id = ?', record!.id)
   // The production's season's dates, which a new run's dates start from when it has none yet.
   const season = await first<{ starts_on: string, ends_on: string }>('SELECT s.starts_on, s.ends_on FROM core_productions p JOIN core_seasons s ON s.id = p.season_id WHERE p.id = ?', record!.id)
   const used = new Set(performances.flatMap(p => [p.venueId, p.spaceId]))
@@ -64,6 +64,6 @@ export default defineRoute({
       closed: closures.filter(c => c.allDay && c.blocksPerformances).map(c => ({ venueId: c.venueId, spaceId: c.spaceId, startsAt: c.startsAt, endsAt: c.endsAt })),
     },
     // The production's own (null where it has none) beside the theatre's, so a screen can say where a value comes from.
-    defaults: { ...defaults, productionDoorsBeforeMinutes: own?.doors_before_minutes ?? null, productionCapacity: own?.capacity ?? null, theatreDoorsBeforeMinutes: theatre.doorsBeforeMinutes, usualPreset, scheduleRuns, sellsHere: sells },
+    defaults: { ...defaults, productionDoorsBeforeMinutes: own?.doors_before_minutes ?? null, productionCapacity: own?.capacity ?? null, theatreDoorsBeforeMinutes: theatre.doorsBeforeMinutes, usualSpaceId: own?.usual_space_id ?? null, usualPreset, scheduleRuns, sellsHere: sells },
   }
 })

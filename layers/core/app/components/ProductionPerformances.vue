@@ -42,7 +42,7 @@ interface Answer {
     /** Whole days closed to performances, which the date fields grey out. */
     closed?: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number }[]
   }
-  defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
+  defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualSpaceId: string | null, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
 }
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
@@ -77,6 +77,8 @@ function defaultsIn(spaceId: string): ShowDefaultValues {
     externalBookingUrl: d.externalBookingUrl,
   }
 }
+// The production's usual space, when it is still one a date can be in: what a new date starts in.
+const usualSpace = () => spaces.value.find(s => s.value === data.value?.defaults.usualSpaceId)?.value
 const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?.label ?? 'A space no longer listed'
 /** Whether every performance is in the one space, which is then said once above the list. */
 const oneSpace = computed(() => new Set(performances.value.map(p => p.spaceId)).size === 1)
@@ -158,7 +160,7 @@ function checkPerformance() {
 function start(p: Performance | null) {
   refusal.value = null
   editing.value = p
-  form.value = { spaceId: p?.spaceId ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
+  form.value = { spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
   overrides.value = noOverrides()
   if (p) {
     // A performance shows as changed only where it differs from the show's defaults.
