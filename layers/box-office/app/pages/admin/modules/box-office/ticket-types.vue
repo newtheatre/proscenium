@@ -158,24 +158,29 @@ function onReorder({ id, from, to }: { id: string, from: number, to: number }) {
   saveOrder(type)
 }
 
-function move(type: TicketType, by: -1 | 1) {
+function move(type: TicketType, by: -1 | 1): Promise<void> {
   const from = ordered.value.findIndex(x => x.id === type.id)
   const to = from + by
-  if (from < 0 || to < 0 || to >= ordered.value.length) return
+  if (from < 0 || to < 0 || to >= ordered.value.length) return Promise.resolve()
   const next = [...ordered.value]
   next.splice(to, 0, next.splice(from, 1)[0]!)
   ordered.value = next
-  saveOrder(type)
+  return saveOrder(type)
 }
 
 async function onHandleKey(event: KeyboardEvent, type: TicketType) {
   const by = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
   if (!by) return
   event.preventDefault()
-  move(type, by)
-  // The row is drawn again in its new place: keep the keyboard on its handle.
+  // The row is drawn again in its new place, and again once the saved order comes back: keep the
+  // keyboard on its handle both times.
+  const keepFocus = () => document.querySelector<HTMLElement>(`[data-drag-handle="${type.id}"]`)?.focus()
+  const saving = move(type, by)
   await nextTick()
-  document.querySelector<HTMLElement>(`[data-drag-handle="${type.id}"]`)?.focus()
+  keepFocus()
+  await saving
+  await nextTick()
+  keepFocus()
 }
 
 function actions(type: TicketType): DropdownMenuItem[] {
