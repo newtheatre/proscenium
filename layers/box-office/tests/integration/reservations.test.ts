@@ -90,6 +90,10 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     expect(told).toMatchObject({ reference: b.reference, tickets: '2 × Full price', deskCode: done.body.deskCode })
     expect(told.amountDue).toContain('24.00')
     expect(tokenOf(told.link!)).toBe(done.body.token)
+    // With no site address recorded there is no link to open the account, so nothing promises one.
+    expect(told.account).toBeUndefined()
+    expect(done.body.accountLinkSent).toBe(false)
+    expect((await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': done.body.token })).body.accountUnclaimed).toBe(false)
     expect(o.link_token_hash).toBe(await hashOf(done.body.token))
     expect(o.desk_code_hash).toBe(await hashOf(done.body.deskCode))
     const stored = JSON.stringify(await rows('SELECT * FROM box_office_orders WHERE id = ?', b.orderId)) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))
@@ -264,5 +268,29 @@ describe('the link in the reservation message', () => {
     expect((await req('POST', '/api/box-office/orders/link/cancel', {}, null, link)).status).toBe(409)
     expect((await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': newId('ord') })).status).toBe(404)
     expect((await req('POST', '/api/box-office/orders/link/cancel', {}, null, {})).status).toBe(404)
+  })
+})
+
+describe('the link that opens a guest\'s account', () => {
+  beforeAll(async () => {
+    await set('box-office.reservations.confirm-email', false)
+    await set('core.site.origin', 'https://theatre.example')
+  })
+
+  it('comes in the reservation email, and asking again says truthfully what happened', async () => {
+    const h = await house(2)
+    const b = await basket(h, 1)
+    const done = await reserve(b, address())
+    expect(done.body).toMatchObject({ state: 'reserved', accountLinkSent: true })
+    const told = await mail('box-office.order-reserved', b.orderId)
+    expect(told.account).toMatch(/^https:\/\/theatre\.example\/sign-in\/link#/)
+    const link = { 'x-order-token': done.body.token as string }
+    expect((await req('GET', '/api/box-office/orders/link', undefined, null, link)).body.accountUnclaimed).toBe(true)
+    expect((await req('POST', '/api/box-office/orders/link/account', {}, null, link)).body).toEqual({ sent: true, outcome: 'sent' })
+
+    // Once the account has been opened, the page stops offering and the button says so.
+    await rows('UPDATE core_accounts SET first_signed_in_at = ? WHERE id = ?', NOV_16, (await order(b.orderId)).account_id)
+    expect((await req('GET', '/api/box-office/orders/link', undefined, null, link)).body.accountUnclaimed).toBe(false)
+    expect((await req('POST', '/api/box-office/orders/link/account', {}, null, link)).body).toEqual({ sent: true, outcome: 'claimed' })
   })
 })
