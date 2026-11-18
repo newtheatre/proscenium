@@ -3,6 +3,8 @@
      "Can be used as a mixer" by itself; the others list their own options, each with what it adds to
      the price, whether it needs an age check, and its allergens. -->
 <script setup lang="ts">
+import { groupInput, groupPatch, optionInput } from '../../../../../server/input'
+
 type Source = 'options' | 'mixers'
 type Pricing = 'included' | 'fixed' | 'own_price'
 interface Option { key: string, label: string, deltaMinor: number, ageRestricted: boolean, optionId: string | null }
@@ -14,11 +16,15 @@ const ALLERGENS = ['gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', '
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { money } = await useMoney()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ groups: Group[], canAllergens: boolean, allergens: Record<string, Answer>, allergensFromStock: string[], canStock: boolean, stockItems: { id: string, name: string }[], stockOf: Record<string, string> }>('/api/bar/choices', { key: 'bar:choices' })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+type FormRef = { setErrors: (errors: FieldError[]) => void }
+const groupEl = useTemplateRef<FormRef>('groupEl')
+const optionEl = useTemplateRef<FormRef>('optionEl')
+const labelEl = useTemplateRef<FormRef>('labelEl')
 const sourceItems = computed(() => (['options', 'mixers'] as const).map(s => ({ value: s, label: t(`bar.screens.choices.sources.${s}`), description: t(`bar.screens.choices.sources.${s}-help`) })))
 const pricingItems = computed(() => (['included', 'fixed', 'own_price'] as const).map(p => ({ value: p, label: t(`bar.screens.choices.pricing.${p}`) })))
 const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
@@ -55,20 +61,33 @@ function editGroup(g?: Group) {
     : { id: null, name: '', source: 'options', required: true, maxPicks: 1, defaultKey: 'none', mixerPricing: 'included', mixerFixedMinor: null, options: [] }
 }
 const defaultItems = computed(() => [{ value: 'none', label: t('bar.screens.choices.no-usual') }, ...(group.value?.options ?? []).map(o => ({ value: o.key, label: o.label }))])
+const groupBody = () => {
+  const g = group.value!
+  const mixer = g.source === 'mixers' ? { mixerPricing: g.mixerPricing, mixerFixedMinor: g.mixerPricing === 'fixed' ? g.mixerFixedMinor : null } : {}
+  const body = { name: g.name, required: g.required, maxPicks: g.maxPicks, ...mixer }
+  return g.id ? { ...body, defaultKey: g.defaultKey === 'none' ? null : g.defaultKey } : { ...body, source: g.source }
+}
+// A fixed mixer price needs its amount, which the schema cannot say on its own.
+function validateGroup(): FieldError[] {
+  const g = group.value!
+  return [
+    ...bodyErrors(g.id ? groupPatch : groupInput, groupBody()),
+    ...needs({ mixerFixedMinor: g.source === 'mixers' && g.mixerPricing === 'fixed' ? g.mixerFixedMinor : true }),
+  ]
+}
 async function saveGroup() {
   const g = group.value!
   refusal.value = null
-  const mixer = g.source === 'mixers' ? { mixerPricing: g.mixerPricing, mixerFixedMinor: g.mixerPricing === 'fixed' ? g.mixerFixedMinor : null } : {}
-  const body = { name: g.name, required: g.required, maxPicks: g.maxPicks, ...mixer }
   try {
-    if (g.id) await $api(`/api/bar/choices/${g.id}` as string, { method: 'PATCH', body: { ...body, defaultKey: g.defaultKey === 'none' ? null : g.defaultKey } })
-    else await $api('/api/bar/choices', { method: 'POST', body: { ...body, source: g.source } })
+    if (g.id) await $api(`/api/bar/choices/${g.id}` as string, { method: 'PATCH', body: groupBody() })
+    else await $api('/api/bar/choices', { method: 'POST', body: groupBody() })
     toast.add({ title: t('bar.screens.choices.saved'), color: 'success' })
     group.value = null
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    groupEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function setGroupActive(g: Group, active: boolean) {
@@ -90,10 +109,14 @@ function editOption(g: Group, o?: Option) {
     ? { groupId: g.id, id: o.optionId, name: o.label, deltaMinor: o.deltaMinor, ageRestricted: o.ageRestricted, stockItemId: data.value?.stockOf[o.optionId!] ?? 'none' }
     : { groupId: g.id, id: null, name: '', deltaMinor: null, ageRestricted: false, stockItemId: 'none' }
 }
+const optionBody = () => {
+  const o = option.value!
+  return { name: o.name, deltaMinor: o.deltaMinor ?? 0, ageRestricted: o.ageRestricted, ...(data.value?.canStock ? { stockItemId: o.stockItemId === 'none' ? null : o.stockItemId } : {}) }
+}
 async function saveOption() {
   const o = option.value!
   refusal.value = null
-  const body = { name: o.name, deltaMinor: o.deltaMinor ?? 0, ageRestricted: o.ageRestricted, ...(data.value?.canStock ? { stockItemId: o.stockItemId === 'none' ? null : o.stockItemId } : {}) }
+  const body = optionBody()
   try {
     if (o.id) await $api(`/api/bar/choice-options/${o.id}` as string, { method: 'PATCH', body })
     else await $api(`/api/bar/choices/${o.groupId}/options` as string, { method: 'POST', body })
@@ -103,6 +126,7 @@ async function saveOption() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    optionEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function retireOption(o: Option) {
@@ -117,7 +141,7 @@ async function retireOption(o: Option) {
 
 // An option's allergens, from its label: what it brings to the drink it is picked for.
 const allergenItems = computed(() => ALLERGENS.map(k => ({ value: k as string, label: t(`bar.allergen.${k}`) })))
-const sourceOfCheck = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(`bar.screens.product.sources.${s}`) })))
+const sourceOfCheck = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(s === 'label' ? 'bar.screens.product.sources.label-option' : `bar.screens.product.sources.${s}`) })))
 const label = ref<{ optionId: string, name: string, contains: string[], mayContain: string[], source: 'label' | 'supplier' | 'other' } | null>(null)
 function editAllergens(o: Option) {
   const a = data.value?.allergens[o.optionId!]
@@ -135,6 +159,7 @@ async function saveAllergens() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    labelEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 </script>
@@ -229,8 +254,10 @@ async function saveAllergens() {
         <UForm
           v-if="group"
           id="bar-choice"
+          ref="groupEl"
           novalidate
           :state="group"
+          :validate="validateGroup"
           class="space-y-4"
           @submit="saveGroup"
         >
@@ -306,6 +333,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-choice"
+          loading-auto
           :label="t('bar.screens.save')"
         />
       </template>
@@ -320,8 +348,10 @@ async function saveAllergens() {
         <UForm
           v-if="option"
           id="bar-choice-option"
+          ref="optionEl"
           novalidate
           :state="option"
+          :validate="() => bodyErrors(optionInput, optionBody())"
           class="space-y-4"
           @submit="saveOption"
         >
@@ -363,6 +393,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-choice-option"
+          loading-auto
           :label="t('bar.screens.save')"
         />
       </template>
@@ -377,6 +408,7 @@ async function saveAllergens() {
         <UForm
           v-if="label"
           id="bar-option-allergens"
+          ref="labelEl"
           novalidate
           :state="label"
           class="space-y-4"
@@ -420,6 +452,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-option-allergens"
+          loading-auto
           :label="t('bar.screens.product.allergens-record')"
         />
       </template>

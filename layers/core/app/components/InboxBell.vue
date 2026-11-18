@@ -1,14 +1,14 @@
-<!-- The shell's bell (C-30): the unread count of the shell's side, and the way to its inbox. Only
-     for someone signed in; the public shell and My account show the audience side, the members'
-     area the members' side. -->
+<!-- The shell's bell (C-30, AC-2): the unread count of the person's one inbox, every side they
+     have, and the way to it. Only for someone signed in; the members' area opens its own door to
+     the same inbox. -->
 <script setup lang="ts">
-const props = defineProps<{ side: 'audience' | 'members' }>()
+defineProps<{ side: 'audience' | 'members' }>()
 const { t } = useT()
-const { data } = await useAPI<{ signedIn: boolean, audience: number, members: number }>('/api/core/me/inbox/unread', {
+const { data } = await useAPI<{ signedIn: boolean, audience: number, members: number, total: number }>('/api/core/me/inbox/unread', {
   key: 'core:inbox-unread',
-  default: () => ({ signedIn: false, audience: 0, members: 0 }),
+  default: () => ({ signedIn: false, audience: 0, members: 0, total: 0 }),
 })
-const count = computed(() => data.value?.[props.side] ?? 0)
+const count = computed(() => data.value?.total ?? 0)
 const label = computed(() => count.value ? t('core.inbox.bell-unread', { count: count.value }) : t('core.inbox.bell'))
 </script>
 

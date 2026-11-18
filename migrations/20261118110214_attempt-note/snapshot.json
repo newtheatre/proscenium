@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "486eb833-2efb-4ff5-9a64-35b60d02ee34",
+  "id": "cc3d0c9f-96d8-44fa-a6a3-d9a4354a1092",
   "prevIds": [
-    "62da3a2b-ff65-4830-b2e4-70c5b78fff29",
-    "755704ac-0132-4dfe-b40e-9002eded73b0"
+    "274c2793-7965-4b1f-90f7-c25541e7b394"
   ],
   "ddl": [
     {
@@ -730,16 +729,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "awards_awards",
-      "name": "awarded_precision",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'day'",
       "generated": null,
       "entityType": "columns"
     },
@@ -5470,16 +5459,6 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "not_with_requirements",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -16795,16 +16774,6 @@
     },
     {
       "table": "membership_verification_lists",
-      "name": "reference_noun",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "membership_verification_lists",
       "name": "reference_shape",
       "type": "text",
       "notNull": false,
@@ -17097,6 +17066,16 @@
       "table": "payments_attempts",
       "name": "tendered_minor",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "note",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
