@@ -15,9 +15,9 @@ export type ProblemCode
   = | 'no-label' | 'no-options' | 'no-source' | 'unknown-source' | 'no-scale'
     | 'unknown-reference' | 'later-reference' | 'outside-group' | 'unknown-option' | 'unknown-fact'
     | 'wrong-comparison' | 'incomplete-comparison'
-    | 'unknown-target' | 'route-back' | 'circular'
+    | 'unknown-target' | 'unknown-page' | 'route-back' | 'circular'
     | 'wrong-rule' | 'unsafe-pattern' | 'not-a-number'
-    | 'never-reached' | 'never-shown' | 'required-never-shown'
+    | 'never-reached' | 'never-shown' | 'required-never-shown' | 'shown-before-answered'
     | 'empty-condition' | 'no-questions'
     | 'stage-no-name' | 'stage-duplicate' | 'move-no-label' | 'move-duplicate' | 'move-unknown-stage' | 'move-nowhere'
     | 'returned-no-way-back' | 'stage-unreachable' | 'stage-dead-end'
@@ -171,14 +171,33 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
     }
   })
 
-  // ---- calculations: what they read, and no circles ----
-  for (const c of def.calculations ?? []) checkExpression(c.expression, c.id, index)
-  function checkExpression(e: Expression, at: string, index: Index): void {
+  // ---- calculations: what they read, where they are shown, and no circles ----
+  const NUMERIC = new Set(['number', 'money', 'percent'])
+  for (const c of def.calculations ?? []) {
+    const shownOn = c.page === undefined ? null : index.pageOf.get(c.page)
+    checkExpression(c.expression, c.id, index, NUMERIC.has(c.type), shownOn ?? null)
+    if (c.page === undefined) continue
+    if (shownOn === undefined) error('unknown-page', c.id, { reference: c.page })
+    // Somebody answering reads it on its page, so it needs words of its own there.
+    if (!c.label?.trim()) error('no-label', c.id)
+  }
+  /**
+   * `numeric`: the value is used as a number, so an answer read here must be one. `shownOn`: the
+   * page the calculation is shown on, where an answer from a later page has not been given yet.
+   */
+  function checkExpression(e: Expression, at: string, index: Index, numeric: boolean, shownOn: number | null): void {
+    const later = (page: number, reference: string) => {
+      if (shownOn !== null && page > shownOn) problems.push({ level: 'warning', code: 'shown-before-answered', at, params: { reference } })
+    }
     if (!('fn' in e)) {
       if ('answer' in e) {
         const q = index.questions.get(e.answer)
         if (!q) error('unknown-reference', at, { reference: e.answer })
         else if (q.group) error('outside-group', at, { reference: e.answer })
+        else {
+          if (numeric && kindOfQuestion(q.question) !== 'number') error('not-a-number', at, { reference: e.answer })
+          later(q.page, e.answer)
+        }
       }
       else if ('calculation' in e && !index.calculations.has(e.calculation)) error('unknown-reference', at, { reference: e.calculation })
       return
@@ -186,6 +205,7 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
     if (e.fn === 'sum' || e.fn === 'count') {
       const g = index.groups.get(e.group)
       if (!g) return void error('unknown-reference', at, { reference: e.group })
+      later(g.page, e.group)
       if (e.fn === 'sum') {
         const q = g.group.items.find(i => i.id === e.of)
         if (!q) error('unknown-reference', at, { reference: e.of })
@@ -194,10 +214,12 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       return
     }
     if (e.fn === 'choose') {
-      checkExpression(e.then, at, index)
-      return checkExpression(e.else, at, index)
+      checkExpression(e.then, at, index, numeric, shownOn)
+      return checkExpression(e.else, at, index, numeric, shownOn)
     }
-    e.args.forEach(a => checkExpression(a, at, index))
+    // Arithmetic works on numbers; the other functions read dates and text as well.
+    const arithmetic = ['add', 'subtract', 'multiply', 'divide', 'round'].includes(e.fn)
+    e.args.forEach(a => checkExpression(a, at, index, arithmetic, shownOn))
   }
   const reads = new Map((def.calculations ?? []).map(c => [c.id, calculationsRead(c.expression)]))
   const state = new Map<string, 'open' | 'done'>()

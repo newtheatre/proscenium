@@ -33,6 +33,7 @@ onMounted(() => { mounted.value = true })
 const panel = computed({ get: () => !wide.value && builder.selected.value !== null, set: (open: boolean) => { if (!open) builder.selected.value = null } })
 const selectedName = computed(() => {
   const found = builder.selected.value ? find(builder.definition.value, builder.selected.value) : null
+  if (!found && builder.definition.value.calculations?.some(c => c.id === builder.selected.value)) return t('forms.screens.calculations.one')
   if (!found) return t(builder.selected.value ? 'forms.screens.endings.one' : 'forms.screens.details.title')
   if (found.kind === 'page') return t('forms.screens.details.kind-page')
   return t(`forms.screens.details.kind-${found.item.kind}`)
@@ -44,7 +45,10 @@ const problemName = (at: string) => {
   if (at.startsWith('stage:')) return flow?.stages.find(s => s.key === at.slice(6))?.name.trim() || t('forms.screens.stages.a-stage') // not-policy: the length of "stage:"
   if (at.startsWith('move:')) return flow?.transitions.find(m => m.key === at.slice(5))?.label.trim() || t('forms.screens.stages.a-move') // not-policy: the length of "move:"
   const found = find(builder.definition.value, at)
-  if (!found) return builder.definition.value.calculations?.find(c => c.id === at)?.key ?? at
+  if (!found) {
+    const calculation = builder.definition.value.calculations?.find(c => c.id === at)
+    return calculation ? calculation.label?.trim() || calculation.key : at
+  }
   if (found.kind === 'page') return found.page.title.trim() || t('forms.screens.builder.page-n', { n: found.pageIndex + 1 })
   const item = found.item
   return item.kind === 'question' ? formsQuestionName(item) : item.kind === 'group' ? item.label.trim() || t('forms.screens.builder.untitled-group') : t(`forms.screens.details.kind-${item.kind}`)

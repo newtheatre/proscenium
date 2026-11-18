@@ -2,7 +2,7 @@
 // Whether it makes sense to publish (a condition that points nowhere, a circle of calculations) is
 // `checkDefinition`'s job, so a draft may be saved while it still has problems.
 import { z } from 'zod'
-import { DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
+import { CALCULATION_TYPES, DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
 import type { Condition, Definition, Expression, Group, Limits, Question } from './types'
 
 const id = z.string().regex(/^[\w-]{1,64}$/)
@@ -107,7 +107,7 @@ const definition = z.strictObject({
     items: z.array(item).max(500),
     routes: z.array(z.strictObject({ when: condition, to: z.union([z.strictObject({ page: id }), z.strictObject({ ending: id })]) })).max(20).optional(),
   })).min(1),
-  calculations: z.array(z.strictObject({ id, key, type: z.enum(['number', 'money', 'date', 'text']), expression })).max(100).optional(),
+  calculations: z.array(z.strictObject({ id, key, type: z.enum(CALCULATION_TYPES), expression, label: z.string().max(300).optional(), page: id.optional() })).max(100).optional(),
   endings: z.array(z.strictObject({ id, title: z.string().max(300), message: text.optional(), submits: z.boolean() })).max(30).optional(),
   presentation: z.strictObject({ submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
   workflow: z.strictObject({

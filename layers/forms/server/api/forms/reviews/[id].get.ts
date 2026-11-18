@@ -4,7 +4,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute, refuse } from '#kit'
 import { getForm, getVersion } from '../../../forms'
-import { getResponse, readAnswers } from '../../../responses'
+import { getResponse, readAnswers, storedFigures } from '../../../responses'
 import { ownAssignment, ownReview, roundView } from '../../../review'
 import type { Definition } from '../../../../shared/engine'
 import { questionsOf, stageOf, withoutWorkflow } from '../../../../shared/engine'
@@ -28,6 +28,8 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     criteria: stage.review.criteria ?? [],
     definition: withoutWorkflow(definition),
     answers,
+    // The calculated values belong to the latest revision; a round opened on an earlier one shows none.
+    calculated: round.revision === response.currentRevision ? storedFigures(definition, response.calculated, false) : null,
     mine: ownReview(assignment),
     open: round.closedAt === null,
     released: round.releasedAt !== null,

@@ -9,6 +9,7 @@ const builder = useBuilder()
 const def = computed(() => builder.definition.value)
 const found = computed(() => builder.selected.value ? find(def.value, builder.selected.value) : null)
 const ending = computed(() => def.value.endings?.find(e => e.id === builder.selected.value))
+const calculation = computed(() => def.value.calculations?.find(c => c.id === builder.selected.value))
 const question = computed(() => found.value && found.value.kind !== 'page' && found.value.item.kind === 'question' ? found.value.item : null)
 const group = computed(() => found.value?.kind === 'item' && found.value.item.kind === 'group' ? found.value.item : null)
 const content = computed(() => found.value?.kind === 'item' && found.value.item.kind === 'content' ? found.value.item : null)
@@ -115,7 +116,7 @@ const text = (v: unknown) => String(v ?? '')
 <template>
   <div class="space-y-5">
     <p
-      v-if="!found && !ending"
+      v-if="!found && !ending && !calculation"
       class="text-sm text-muted"
     >
       {{ t('forms.screens.details.nothing') }}
@@ -527,6 +528,13 @@ const text = (v: unknown) => String(v ?? '')
         @click="addRoute"
       />
     </template>
+
+    <!-- A calculation -->
+    <FormsCalculationEditor
+      v-else-if="calculation"
+      :key="calculation.id"
+      :calculation="calculation"
+    />
 
     <!-- An ending -->
     <template v-else-if="ending">

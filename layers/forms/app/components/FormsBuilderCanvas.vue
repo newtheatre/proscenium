@@ -4,7 +4,8 @@
 <script setup lang="ts">
 import { DragDropProvider } from '@dnd-kit/vue'
 import { move } from '@dnd-kit/helpers'
-import { addItem, addPage, blankContent, blankGroup, blankQuestion, change, freshId, moveItem, movePage, pair, removePage } from '../../shared/builder/edit'
+import { addCalculation, addItem, addPage, blankContent, blankGroup, blankQuestion, calculationsOn, change, dependents, freshId, moveCalculation, moveItem, movePage, pair, removeCalculation, removePage } from '../../shared/builder/edit'
+import { formulaOf } from '../../shared/builder/formula'
 import type { Definition, Item, Page, Question, QuestionType } from '../../shared/engine'
 
 const { t } = useT()
@@ -122,6 +123,31 @@ function dropEnding(id: string) {
   }
   builder.apply(next)
 }
+// ---- calculations: listed in the outline, and each shown on its page as the line people will see ----
+const { figure, figureName } = useFormsFigures()
+const calculations = computed(() => def.value.calculations ?? [])
+const shownHere = computed(() => calculationsOn(def.value, page.value.id).map((c) => {
+  const formula = formulaOf(c.expression)
+  return { calculation: c, name: c.label?.trim() || t('forms.screens.calculations.untitled'), sentence: formula ? formsFormulaSentence(formula, def.value, (v, i) => c.type === 'money' && (i === 0 || ['add', 'subtract'].includes(formula.rows[i]!.op ?? '')) ? figure({ type: 'money' }, v) : String(v)) : t('forms.screens.calculations.written') }
+}))
+function newCalculation() {
+  const made = addCalculation(def.value, page.value.id)
+  builder.apply(made.def)
+  builder.select(made.id)
+}
+async function dropCalculation(id: string, name: string) {
+  const readers = dependents(def.value, id).length
+  if (readers && !(await confirm({ verb: t('forms.screens.builder.remove'), thing: `"${name}"`, consequence: t('forms.screens.calculations.remove-read', { count: readers }) }))) return
+  builder.apply(removeCalculation(def.value, id))
+}
+const calculationMenu = (id: string, i: number, name: string) => [
+  [
+    { label: t('forms.screens.builder.move-up'), icon: 'i-lucide-arrow-up', disabled: i === 0, onSelect: () => builder.apply(moveCalculation(def.value, id, -1)) },
+    { label: t('forms.screens.builder.move-down'), icon: 'i-lucide-arrow-down', disabled: i === calculations.value.length - 1, onSelect: () => builder.apply(moveCalculation(def.value, id, 1)) },
+  ],
+  [{ label: t('forms.screens.builder.remove'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => dropCalculation(id, name) }],
+]
+const calculationWrong = (id: string) => builder.problemsAt.value.get(id)?.some(p => p.level === 'error')
 const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(def.value, page.value.id, fn), `${page.value.id}:${field}`)
 </script>
 
@@ -199,6 +225,54 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
             @click="newEnding"
           />
         </div>
+        <div>
+          <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
+            {{ t('forms.screens.calculations.title') }}
+          </p>
+          <ul class="space-y-1">
+            <li
+              v-for="(c, i) in calculations"
+              :key="c.id"
+              class="flex items-center gap-1"
+            >
+              <UButton
+                class="min-w-0 flex-1 justify-start"
+                icon="i-lucide-calculator"
+                size="sm"
+                color="neutral"
+                :variant="builder.selected.value === c.id ? 'soft' : 'ghost'"
+                @click="builder.select(c.id)"
+              >
+                <span
+                  class="truncate"
+                  :class="c.label?.trim() ? '' : 'text-muted'"
+                >{{ c.label?.trim() || c.key }}</span>
+                <UIcon
+                  v-if="calculationWrong(c.id)"
+                  name="i-lucide-circle-alert"
+                  class="ms-auto shrink-0 text-error"
+                  :aria-label="t('forms.screens.problems.has')"
+                />
+              </UButton>
+              <UDropdownMenu :items="calculationMenu(c.id, i, figureName(c))">
+                <IconButton
+                  icon="i-lucide-ellipsis-vertical"
+                  size="sm"
+                  :label="t('forms.screens.builder.actions-for', { name: figureName(c) })"
+                />
+              </UDropdownMenu>
+            </li>
+          </ul>
+          <UButton
+            class="mt-2"
+            :label="t('forms.screens.calculations.add')"
+            icon="i-lucide-plus"
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            @click="newCalculation"
+          />
+        </div>
       </nav>
       <div
         ref="list"
@@ -236,6 +310,29 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
           :empty="t('forms.screens.builder.empty-page')"
           @add="add($event.kind, $event.into)"
         />
+
+        <button
+          v-for="c in shownHere"
+          :key="c.calculation.id"
+          type="button"
+          class="block w-full rounded-lg border border-dashed bg-elevated/40 p-3 text-left text-sm"
+          :class="builder.selected.value === c.calculation.id ? 'border-primary ring-1 ring-primary' : 'border-default'"
+          :data-calculation="c.calculation.id"
+          @click="builder.select(c.calculation.id)"
+        >
+          <span class="flex items-center justify-between gap-4">
+            <span class="flex items-center gap-2 font-medium">
+              <UIcon
+                name="i-lucide-calculator"
+                class="shrink-0 text-muted"
+              />
+              {{ c.name }}
+            </span>
+            <span class="text-xs text-muted">{{ t(`forms.screens.calculations.format-${c.calculation.type}`) }}</span>
+          </span>
+          <span class="mt-1 block text-muted">= {{ c.sentence }}</span>
+          <FormsProblemBadge :at="c.calculation.id" />
+        </button>
 
         <div class="flex flex-wrap items-center gap-2">
           <FormsAddMenu @add="add($event)" />

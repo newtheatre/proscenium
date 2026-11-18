@@ -11,6 +11,7 @@ interface Own {
   form: { title: string, slug: string }
   definition: Definition
   answers: ShownAnswer[]
+  calculated?: Record<string, string | number | null> | null
   values: Answers | null
   progress: { status: string, kind: string, note: string | null, canChange: boolean } | null
   today: string
@@ -119,6 +120,8 @@ async function send(kept: Answers): Promise<boolean> {
         v-else
         :definition="own.definition"
         :answers="own.answers"
+        :calculated="own.calculated"
+        placed-only
       />
     </div>
   </PageFrame>

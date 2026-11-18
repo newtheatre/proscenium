@@ -5,7 +5,8 @@ import { getRouterParam, setResponseHeader } from 'h3'
 import { z } from 'zod'
 import { defineRoute, refuse, requireAbility, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
-import { cells, columnsOf, listResponses, readAnswers, toCsv } from '../../../../../responses'
+import { cells, columnsOf, figureColumns, listResponses, readAnswers, storedFigures, toCsv } from '../../../../../responses'
+import { figureCell } from '../../../../../../shared/figures'
 import type { Definition } from '../../../../../../shared/engine'
 import { hasStages, stageOf } from '../../../../../../shared/engine'
 
@@ -29,6 +30,8 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   const staged = !!liveDef && hasStages(liveDef)
   const all = columnsOf(await getFields(form.id), liveDef)
   const columns = all.filter(c => special || c.dataClass !== 'special')
+  // The calculations follow the answers, under their export names; one worked out from special-category answers goes as they do.
+  const figures = figureColumns(liveDef).filter(c => special || !c.restricted)
   const filter = { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage, reader: actor.accountId ?? undefined }
   const most = await useSetting('forms.limits.export-rows') as number
 
@@ -40,7 +43,8 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
     const answers = await readAnswers(rows.map(r => r.id), types, special)
     for (const r of rows) {
       const row = cells(answers.get(r.id)!, columns)
-      lines.push([r.reference, new Date(r.submittedAt).toISOString(), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? '')])
+      const worked = figures.length ? storedFigures(liveDef!, r.calculated, true) ?? {} : {}
+      lines.push([r.reference, new Date(r.submittedAt).toISOString(), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? ''), ...figures.map(c => figureCell(c.type, worked[c.id]))])
     }
     if (rows.length < CHUNK) break
   }
@@ -48,5 +52,5 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   unit.audit({ action: 'export', record: ['forms.form', form.id], detail: { responses: lines.length, special } })
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
   setResponseHeader(event, 'content-disposition', `attachment; filename="${form.slug}-responses.csv"`)
-  return toCsv(['Reference', 'Sent', 'Version', 'From', ...(staged ? ['Stage'] : []), ...columns.map(c => c.retired ? `${c.key} (removed)` : c.key)], lines)
+  return toCsv(['Reference', 'Sent', 'Version', 'From', ...(staged ? ['Stage'] : []), ...columns.map(c => c.retired ? `${c.key} (removed)` : c.key), ...figures.map(c => c.key)], lines)
 })

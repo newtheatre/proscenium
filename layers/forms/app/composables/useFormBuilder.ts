@@ -106,7 +106,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
   /** Keeps the selection and the open page on things that still exist. */
   function settle() {
     const def = definition.value
-    if (selected.value && !find(def, selected.value) && !def.endings?.some(e => e.id === selected.value)) selected.value = null
+    if (selected.value && !find(def, selected.value) && !def.endings?.some(e => e.id === selected.value) && !def.calculations?.some(c => c.id === selected.value)) selected.value = null
     if (!def.pages.some(p => p.id === pageId.value)) pageId.value = def.pages[0]!.id
   }
   function apply(next: Definition, merge?: string) {
@@ -134,6 +134,9 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
     selected.value = id
     const found = id ? find(definition.value, id) : null
     if (found) pageId.value = found.page.id
+    // A calculation shown on a page opens that page, where its line is.
+    const shownOn = definition.value.calculations?.find(c => c.id === id)?.page
+    if (shownOn && definition.value.pages.some(p => p.id === shownOn)) pageId.value = shownOn
   }
 
   const problems = computed(() => checkDefinition(definition.value, { ...(data.sources ? { sources: data.sources.map(s => s.key) } : {}), ...(data.actions ? { actions: data.actions } : {}) }))

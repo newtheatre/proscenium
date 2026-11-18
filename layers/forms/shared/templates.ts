@@ -3,6 +3,7 @@
 // translation keys; what the questions say is the starting wording, which the theatre makes its own.
 import { FORMAT, type Definition, type Question } from './engine/types'
 import { reviewWorkflow } from './engine/workflow'
+import { expressionOf } from './builder/formula'
 
 export interface ShippedTemplate {
   key: string
@@ -55,7 +56,11 @@ const showProposal: Definition = {
     },
   ],
   calculations: [
-    { id: 'total', key: 'total', type: 'money', expression: { fn: 'add', args: [{ answer: 'rights' }, { answer: 'set' }, { answer: 'costume' }, { answer: 'other-costs' }] } },
+    // Shown on the budget page as it is filled in; a cost left blank counts as nothing.
+    {
+      id: 'total', key: 'total', type: 'money', label: 'Total budget', page: 'page-budget',
+      expression: expressionOf({ rows: ['rights', 'set', 'costume', 'other-costs'].map((answer, i) => (i ? { op: 'add' as const, term: { answer } } : { term: { answer } })), blankAsNothing: true }),
+    },
   ],
   workflow: reviewWorkflow({ received: 'Received', review: 'Being considered', returned: 'Returned for changes', approved: 'Accepted', declined: 'Not this time', start: 'Start considering', back: 'Return for changes', resubmit: 'Send changes', approve: 'Accept', decline: 'Decline' }),
 }

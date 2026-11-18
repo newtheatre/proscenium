@@ -3,10 +3,12 @@
 import { getRouterParam } from 'h3'
 import { defineRoute, refuse, today } from '#kit'
 import { getForm, getVersion } from '../../../forms'
-import { getResponse, owns, readAnswers, toAnswers } from '../../../responses'
+import { getResponse, owns, readAnswers, storedFigures, toAnswers } from '../../../responses'
 import type { Definition } from '../../../../shared/engine'
 import { questionsOf, withoutWorkflow } from '../../../../shared/engine'
 import { ownStatus } from '../../../stages'
+
+const pick = <T>(from: Record<string, T> | null, ids: Set<string>) => from && Object.fromEntries(Object.entries(from).filter(([id]) => ids.has(id)))
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
   const response = await getResponse(getRouterParam(event, 'id') ?? '')
@@ -24,6 +26,8 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     form: { title: form.title, slug: form.slug },
     definition: withoutWorkflow(definition),
     answers,
+    // The calculated values they were shown on the form's pages, as the server worked them out.
+    calculated: pick(storedFigures(definition, response.calculated, true), new Set((definition.calculations ?? []).filter(c => c.page !== undefined).map(c => c.id))),
     // Where it is now, in the words the form chose for the person, and whether it is back with them to change.
     progress,
     today: await today(),
