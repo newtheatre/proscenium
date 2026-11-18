@@ -108,6 +108,8 @@ export default defineModule({
     'payments.handle-webhook': job({ payload: z.object({ webhookEventId: z.string() }), retries: 8 }),
     // Asks the provider to send one approved refund, with its idempotency key. Retried while pending.
     'payments.send-refund': job({ payload: z.object({ refundId: z.string() }), retries: 8 }),
+    // The receipts of a till sale once it is paid, each person's in a unit of its own. Retried for any not sent.
+    'payments.till-receipts': job({ payload: z.object({ intentId: z.string() }), retries: 5 }),
   },
 
   // Provider keys are credentials (Matt, 17 November: keys are managed in the app, not in Cloudflare),

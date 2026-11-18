@@ -99,8 +99,9 @@ export async function refundEntries(orderId: string, refund: { id: string, amoun
   const cancellation = await first<{ line_ids: string }>('SELECT line_ids FROM box_office_cancellations WHERE refund_id = ?', refund.id)
   // A refund asked for with a cancellation is for that cancellation's lines. One asked for on its
   // own, from Payments' screens, is set against the order's cancelled lines first.
+  // A booking split off this one at the till was paid by this part, so its lines count as this booking's.
   const lines = await all<{ id: string, performance_id: string, amount_minor: number }>(
-    'SELECT id, performance_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = \'ticket\' ORDER BY (state = \'live\'), id', orderId)
+    'SELECT id, performance_id, amount_minor FROM box_office_order_lines WHERE kind = \'ticket\' AND (order_id = ?1 OR order_id IN (SELECT id FROM box_office_orders WHERE split_from_id = ?1 AND intent_id = (SELECT intent_id FROM box_office_orders WHERE id = ?1))) ORDER BY (state = \'live\'), id', orderId)
   const ids = cancellation ? new Set(JSON.parse(cancellation.line_ids) as string[]) : null
   const totals = spread(ids ? lines.filter(l => ids.has(l.id)) : lines, refund.amountMinor)
   if (!totals.size) return [{ account: DEFERRED, amountMinor: refund.amountMinor, performanceId: null }]
