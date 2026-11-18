@@ -40,7 +40,6 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
 // setup itself is drawn without the site's links or a way to sign in.
 const onSetup = computed(() => route.path === '/setup')
 const { data: setup } = await useAPI<{ needed: boolean }>('/api/core/setup', { key: 'core:setup' })
-const { viewer } = useViewer()
 const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value.signedIn)
 </script>
 
