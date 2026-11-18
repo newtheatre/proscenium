@@ -189,6 +189,21 @@ const description = computed(() => {
           autocomplete="email"
         />
       </UFormField>
+      <UAlert
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-mail-warning"
+        title="Nothing is emailed yet"
+        description="Until a sending domain is verified in Admin, under Email sending, the site sends no email, sign-in links included. Your passkey and recovery codes are how you get in until then."
+      />
+      <p class="text-sm text-muted">
+        A passkey signs you in with your fingerprint, face or screen lock instead of a password. If this device cannot make one, your browser offers to use your phone.
+        <ULink
+          to="https://passkeys.dev/"
+          target="_blank"
+          class="text-primary underline"
+        >What is a passkey?</ULink>
+      </p>
       <div class="flex flex-col gap-2">
         <UButton
           type="submit"

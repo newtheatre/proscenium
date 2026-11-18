@@ -59,6 +59,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
   if (answer.decision === 'refused') throw createError({ statusCode: 403, statusMessage: 'Not allowed', data: answer.refusal, fatal: true })
   if (answer.decision === 'redirect') return navigateTo(answer.to, { replace: true })
-  if (answer.decision === 'sign-in') return navigateTo({ path: '/sign-in', query: { next: to.fullPath } })
+  if (answer.decision === 'sign-in') {
+    // Before the first Owner is made there is nobody to sign in as: setup is the way in.
+    const setup = await useRequestFetch()<{ needed: boolean }>('/api/core/setup').catch(() => null)
+    if (setup?.needed) return navigateTo('/setup')
+    return navigateTo({ path: '/sign-in', query: { next: to.fullPath } })
+  }
   if (answer.decision === 'not-found') throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 })

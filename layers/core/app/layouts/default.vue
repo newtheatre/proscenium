@@ -23,12 +23,21 @@ const links = computed(() => [
   ...(navigation.value?.header ?? []),
 ].map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined, active: route.path === l.to || route.path.startsWith(`${l.to}/`) })))
 const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined })))
+// Until the first Owner is made the site has nothing to show: every page points to setup, and
+// setup itself is drawn without the site's links or a way to sign in.
+const onSetup = computed(() => route.path === '/setup')
+const { data: setup } = await useAPI<{ needed: boolean }>('/api/core/setup', { key: 'core:setup' })
+const { viewer } = useViewer()
+const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value.signedIn)
 </script>
 
 <template>
   <div>
     <SkipLink />
-    <UHeader :title="name">
+    <UHeader
+      :title="name"
+      :toggle="!onSetup"
+    >
       <template
         v-if="brand?.logo"
         #title
@@ -43,14 +52,20 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
         />
       </template>
       <UNavigationMenu
+        v-if="!onSetup"
         :items="links"
         :aria-label="t('core.public.navigation')"
       />
       <template #right>
-        <InboxBell side="audience" />
-        <AccountMenu />
+        <template v-if="!onSetup">
+          <InboxBell side="audience" />
+          <AccountMenu />
+        </template>
       </template>
-      <template #body>
+      <template
+        v-if="!onSetup"
+        #body
+      >
         <UNavigationMenu
           :items="links"
           orientation="vertical"
@@ -64,6 +79,19 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
       tabindex="-1"
       class="outline-none"
     >
+      <UContainer
+        v-if="setupNeeded && !onSetup"
+        class="pt-6"
+      >
+        <UAlert
+          color="info"
+          variant="subtle"
+          icon="i-lucide-wand-sparkles"
+          :title="t('core.public.setup-needed.title')"
+          :description="t('core.public.setup-needed.description')"
+          :actions="[{ label: t('core.public.setup-needed.action'), to: '/setup', trailingIcon: 'i-lucide-arrow-right' }]"
+        />
+      </UContainer>
       <slot />
     </UMain>
 

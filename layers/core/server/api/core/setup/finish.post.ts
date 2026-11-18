@@ -33,5 +33,5 @@ export default defineRoute({
     if (ticket.theatre.contactEmail) await changeSetting(unit, 'core.organisation.contact-email', ticket.theatre.contactEmail)
   }
   unit.afterCommit(() => clearTicket(event))
-  return { next: '/' }
+  return { next: '/admin' }
 })

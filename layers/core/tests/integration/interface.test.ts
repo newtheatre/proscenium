@@ -15,6 +15,7 @@ import settingsPut from '../../server/api/core/settings/index.put'
 import settingsSearch from '../../server/api/core/settings/index-search.get'
 import moduleTabs from '../../server/api/core/modules/[id]/tabs.get'
 import settingsWindow from '../../server/api/core/settings-window.get'
+import gettingReady from '../../server/api/core/getting-ready.get'
 import { resetRateLimits } from '#kit/ratelimit'
 import { useSetting } from '#kit/settings-store'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
@@ -34,6 +35,7 @@ const handle = server({
   'GET /api/core/settings/index': settingsSearch,
   'GET /api/core/modules/:id/tabs': moduleTabs,
   'GET /api/core/settings-window': settingsWindow,
+  'GET /api/core/getting-ready': gettingReady,
 })
 
 const staff = () => person(['gallery.sample.view', 'gallery.sample.manage'])
@@ -430,6 +432,20 @@ describe('home cards, record tabs and history (UI-12, UI-16)', () => {
     const { entries } = await get(path, person(['core.history.view']))
     expect(entries.map((e: { action: string }) => e.action)).toEqual(['update', 'create'])
     expect(entries[1].detail).toEqual({ field: 'name' })
+  })
+
+  it('gives Admin\'s overview "Get your theatre ready" and the email warning until they are settled', async () => {
+    const ids = async (actor: ReturnType<typeof person>) => (await get('/api/core/home?home=admin', actor)).cards.map((c: { id: string }) => c.id)
+    const settings = person(['core.settings.manage'])
+    const sender = person(['core.sender.manage'])
+    expect(await ids(settings)).toContain('core.getting-ready')
+    expect(await ids(sender)).not.toContain('core.getting-ready')
+    const { items } = await get('/api/core/getting-ready', settings)
+    expect(items.map((i: { id: string }) => i.id)).toEqual(['name', 'time-zone', 'email', 'branding', 'venue', 'modules', 'staff'])
+    expect(items.find((i: { id: string }) => i.id === 'time-zone').to).toBe('/admin/theatre?setting=core.locale.time-zone')
+    expect((await call(handle, 'GET', '/api/core/getting-ready', { actor: reader() })).status).toBe(403)
+    const verified = await inContext(() => useSetting('core.notifications.verified-domain'))
+    expect((await ids(sender)).includes('core.email-unverified')).toBe(!verified)
   })
 })
 
