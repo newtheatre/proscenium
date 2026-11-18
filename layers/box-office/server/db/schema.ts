@@ -309,6 +309,180 @@ export const promoRedemptions = defineTable('box_office_promo_redemptions', {
   ],
 })
 
+/**
+ * A pass as a product (BO-64; passes mock-up approved by Matt 2026-11-18): "Autumn Season Pass". A
+ * pass gives one entry at each performance it covers, the way a ticket is one entry, and is paid for
+ * once. It is not a ticket type and has no tie to one: it covers named productions, a season or
+ * everything between two dates, and has its own prices (box_office_pass_prices).
+ */
+export const passTypes = defineTable('box_office_pass_types', {
+  id: col.id(),
+  name: col.public(text('name').notNull()),
+  description: col.public(text('description')),
+  // What it covers: the productions in box_office_pass_shows, every production of a season, or every
+  // performance that starts between two moments.
+  covers: col.public(text('covers', { enum: ['productions', 'season', 'dates'] }).notNull().default('productions')),
+  seasonId: col.public(text('season_id')),
+  coversFrom: col.timestamp('covers_from'),
+  coversUntil: col.timestamp('covers_until'),
+  // One performance of each show, or any number of them. Never two entries at one performance.
+  perShow: col.public(text('per_show', { enum: ['once', 'any'] }).notNull().default('once')),
+  // The most entries a pass gives in all; null means as many as what it covers allows.
+  uses: col.public(integer('uses')),
+  // Who may use a pass's code: its named holder, anyone who has the code, or (auto) the holder when
+  // the price it was bought at is only for some people, and anyone otherwise.
+  holder: col.internal(text('holder', { enum: ['auto', 'named', 'open'] }).notNull().default('auto')),
+  // Whether a pass reserved and not yet paid for may make reservations.
+  reserveUnpaid: col.internal(integer('reserve_unpaid', { mode: 'boolean' }).notNull().default(true)),
+  // Whether who may buy a price is checked again each time the pass reserves, and not only when bought.
+  recheck: col.internal(integer('recheck', { mode: 'boolean' }).notNull().default(false)),
+  // Where it is sold, as a ticket type's channel.
+  channel: col.internal(text('channel', { enum: ['all', 'desk', 'online'] }).notNull().default('all')),
+  onSale: col.public(integer('on_sale', { mode: 'boolean' }).notNull().default(false)),
+  saleFrom: col.timestamp('sale_from'),
+  saleUntil: col.timestamp('sale_until'),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  currency: col.currency('currency').notNull(),
+  createdBy: col.account('created_by', { role: 'actor', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'pty',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('box_office_pass_types_name').on(sql`lower(${t.name})`),
+    check('box_office_pass_types_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('box_office_pass_types_covers', sql`${t.covers} IN ('productions', 'season', 'dates') AND (${t.covers} <> 'season' OR ${t.seasonId} IS NOT NULL) AND (${t.covers} <> 'dates' OR (${t.coversFrom} IS NOT NULL AND ${t.coversUntil} IS NOT NULL AND ${t.coversUntil} > ${t.coversFrom}))`),
+    check('box_office_pass_types_per_show', sql`${t.perShow} IN ('once', 'any')`),
+    check('box_office_pass_types_uses', sql`${t.uses} IS NULL OR ${t.uses} > 0`),
+    check('box_office_pass_types_holder', sql`${t.holder} IN ('auto', 'named', 'open')`),
+    check('box_office_pass_types_channel', sql`${t.channel} IN ('all', 'desk', 'online')`),
+  ],
+})
+
+/** A production a pass covers, when the pass covers named productions. By id only. */
+export const passShows = defineTable('box_office_pass_shows', {
+  id: col.id(),
+  passTypeId: col.ref('box_office_pass_types'),
+  productionId: col.public(text('production_id').notNull()),
+  createdAt: col.createdAt(),
+}, {
+  id: 'psh',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('box_office_pass_shows_one').on(t.passTypeId, t.productionId)],
+})
+
+/**
+ * One of a pass's own prices: a name, an amount and, when it is only for some people, the
+ * requirement references that say who (checked through the kit, as a ticket type's are).
+ */
+export const passPrices = defineTable('box_office_pass_prices', {
+  id: col.id(),
+  passTypeId: col.ref('box_office_pass_types'),
+  name: col.public(text('name').notNull()),
+  amountMinor: col.minor('amount_minor').notNull(),
+  // A JSON list of requirement references. Box office never reads inside one.
+  requirementRefs: col.internal(text('requirement_refs')),
+  proofNote: col.public(text('proof_note')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ppr',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('box_office_pass_prices_name').on(t.passTypeId, sql`lower(${t.name})`),
+    check('box_office_pass_prices_name_length', sql`length(${t.name}) BETWEEN 1 AND 60`),
+    check('box_office_pass_prices_amount', sql`${t.amountMinor} >= 0`),
+  ],
+})
+
+/**
+ * One pass somebody has. Its code makes reservations and admits nobody: the door scans the
+ * reservation's tickets. `uses_taken` is kept by the triggers on its redemptions and its CHECK is
+ * the allowance, so the last entry of a pass is given once.
+ */
+export const passes = defineTable('box_office_passes', {
+  id: col.id(),
+  passTypeId: col.ref('box_office_pass_types'),
+  passPriceId: col.ref('box_office_pass_prices'),
+  // The line that sold it; null for one issued by staff or brought in from another system.
+  orderLineId: col.ref('box_office_order_lines', { nullable: true }),
+  // The holder. Null for a pass sold at the desk to nobody in particular, which anyone with the code uses.
+  accountId: col.account('account_id', { role: 'subject', nullable: true }),
+  // Whether only the holder may use it, settled when it was issued.
+  named: col.internal(integer('named', { mode: 'boolean' }).notNull().default(false)),
+  codeHash: col.internal(text('code_hash').notNull()),
+  // The code itself, sealed with the core key, so the holder's pass page and staff can show it again.
+  code: col.internal(text('code'), { encrypted: true, erase: 'clear' }),
+  // Copied from the pass type when issued, so a later change to the type leaves this pass as sold.
+  usesTotal: col.internal(integer('uses_total')),
+  usesTaken: col.internal(integer('uses_taken').notNull().default(0)),
+  once: col.internal(integer('once', { mode: 'boolean' }).notNull().default(true)),
+  amountMinor: col.minor('amount_minor').notNull(),
+  currency: col.currency('currency').notNull(),
+  // When it became somebody's: its order was reserved or confirmed, or staff issued it. Null while it
+  // is only in a basket, where it works for that basket's own tickets and nothing else.
+  issuedAt: col.timestamp('issued_at'),
+  // Null while it is reserved and not yet paid for.
+  paidAt: col.timestamp('paid_at'),
+  state: col.internal(text('state', { enum: ['active', 'void'] }).notNull().default('active')),
+  issuedBy: col.account('issued_by', { role: 'actor', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'pass',
+  realm: 'audience',
+  subject: { account: 'account_id', unlinked: 'staff' },
+  onErasure: 'keep-row',
+  extra: t => [
+    uniqueIndex('box_office_passes_code').on(t.codeHash),
+    index('box_office_passes_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
+    index('box_office_passes_type').on(t.passTypeId, t.state),
+    uniqueIndex('box_office_passes_line').on(t.orderLineId).where(sql`order_line_id IS NOT NULL`),
+    check('box_office_passes_state', sql`${t.state} IN ('active', 'void')`),
+    check('box_office_passes_amount', sql`${t.amountMinor} >= 0`),
+    // The last-entry guarantee: the database refuses a redemption past the allowance.
+    check('box_office_passes_uses', sql`${t.usesTaken} >= 0 AND (${t.usesTotal} IS NULL OR ${t.usesTaken} <= ${t.usesTotal})`),
+    // A pass only its holder may use has a holder.
+    check('box_office_passes_named', sql`${t.named} = 0 OR ${t.accountId} IS NOT NULL`),
+  ],
+})
+
+/**
+ * One entry a pass gave: a ticket on a reservation. A live row counts against the pass; when its
+ * seat is released, so is the entry. The unique indexes are the rules no code path can break: a
+ * pass gives one entry at a performance, and one performance of a show when it is that kind.
+ */
+export const passRedemptions = defineTable('box_office_pass_redemptions', {
+  id: col.id(),
+  passId: col.ref('box_office_passes'),
+  productionId: col.internal(text('production_id').notNull()),
+  performanceId: col.internal(text('performance_id').notNull()),
+  orderId: col.internal(text('order_id').notNull()),
+  claimId: col.internal(text('claim_id').notNull()),
+  // Copied from the pass, so the index below can read it.
+  once: col.internal(integer('once', { mode: 'boolean' }).notNull().default(true)),
+  state: col.internal(text('state', { enum: ['live', 'released'] }).notNull().default('live')),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'pred',
+  realm: 'audience',
+  subject: { via: 'order_id' },
+  extra: t => [
+    uniqueIndex('box_office_pass_redemptions_performance').on(t.passId, t.performanceId).where(sql`state = 'live'`),
+    uniqueIndex('box_office_pass_redemptions_show').on(t.passId, t.productionId).where(sql`state = 'live' AND once = 1`),
+    index('box_office_pass_redemptions_order').on(t.orderId),
+    index('box_office_pass_redemptions_claim').on(t.claimId),
+    check('box_office_pass_redemptions_state', sql`${t.state} IN ('live', 'released')`),
+  ],
+})
+
 /** The capacity of one band at one performance. `claimed` is written only by the claims' triggers. */
 export const pools = defineTable('box_office_pools', {
   id: col.id(),
@@ -677,4 +851,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, promoCodes, promoRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, promoCodes, promoRedemptions, passTypes, passShows, passPrices, passes, passRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
