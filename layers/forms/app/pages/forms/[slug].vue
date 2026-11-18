@@ -108,15 +108,17 @@ watch([answers, pageId, email], () => {
 onBeforeUnmount(() => clearTimeout(timer))
 
 // ---- sending ----
+/** The address is asked for beside the form, so it is checked with each page rather than only at the end. */
+function emailGiven(): boolean {
+  emailError.value = undefined
+  if (!form.value.asksEmail || /^\S+@\S+\.\S+$/.test(email.value.trim())) return true
+  emailError.value = t('forms.screens.answer.email-needed')
+  nextTick(() => emailBox.value?.querySelector('input')?.focus())
+  return false
+}
 async function send(kept: Answers): Promise<boolean> {
   failure.value = null
-  emailError.value = undefined
-  if (form.value.asksEmail && !/^\S+@\S+\.\S+$/.test(email.value.trim())) {
-    emailError.value = t('forms.screens.answer.email-needed')
-    await nextTick()
-    emailBox.value?.querySelector('input')?.focus()
-    return false
-  }
+  if (!emailGiven()) return false
   clearTimeout(timer)
   try {
     const sent = await $api<{ reference: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/responses${at.value}` as string, {
@@ -225,6 +227,7 @@ async function send(kept: Answers): Promise<boolean> {
         :definition="form.definition"
         :context="{ today: form.today ?? '' }"
         :send="send"
+        :check="emailGiven"
         :start="pageId"
         @page="pageId = $event"
       >

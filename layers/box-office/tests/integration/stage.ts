@@ -11,6 +11,7 @@ import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post
 import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import bandsPost from '../../server/api/box-office/productions/[id]/bands/index.post'
 import bandsGet from '../../server/api/box-office/productions/[id]/bands/index.get'
+import productionTickets from '../../server/api/box-office/productions/[id]/tickets/index.get'
 import bandPatch from '../../server/api/box-office/productions/[id]/bands/[bandId].patch'
 import bandDelete from '../../server/api/box-office/productions/[id]/bands/[bandId].delete'
 import pricesPost from '../../server/api/box-office/productions/[id]/prices.post'
@@ -49,6 +50,8 @@ import liveTonight from '../../../core/server/api/core/live/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
+import deskSoldGet from '../../server/api/box-office/desk/sold.get'
+import deskSendPost from '../../server/api/box-office/desk/orders/[id]/send.post'
 import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
 import deskBuyersGet from '../../server/api/box-office/desk/buyers.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
@@ -75,6 +78,9 @@ import publishProduction from '../../../core/server/api/core/productions/[id]/pu
 import setProductionEffects from '../../../core/server/api/core/productions/[id]/effects.put'
 import setProductionAdvisories from '../../../core/server/api/core/productions/[id]/advisories.put'
 import editProduction from '../../../core/server/api/core/productions/[id]/index.patch'
+import copyToRunPost from '../../server/api/box-office/performances/[id]/sales/copy-to-run.post'
+import runSeatsPut from '../../server/api/box-office/productions/[id]/sales/seats.put'
+import openRunPost from '../../server/api/box-office/productions/[id]/sales/open.post'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -89,6 +95,7 @@ export const handle = server({
   'GET /api/box-office/ticket-types': ticketTypesGet,
   'POST /api/box-office/productions/:id/bands': bandsPost,
   'GET /api/box-office/productions/:id/bands': bandsGet,
+  'GET /api/box-office/productions/:id/tickets': productionTickets,
   'PATCH /api/box-office/productions/:id/bands/:bandId': bandPatch,
   'DELETE /api/box-office/productions/:id/bands/:bandId': bandDelete,
   'POST /api/box-office/productions/:id/prices': pricesPost,
@@ -116,6 +123,9 @@ export const handle = server({
   'POST /api/box-office/performances/:id/door/offline': doorOfflinePost,
   'POST /api/box-office/performances/:id/door/override': doorOverride,
   'POST /api/box-office/performances/:id/sales/copy': copyPost,
+  'POST /api/box-office/performances/:id/sales/copy-to-run': copyToRunPost,
+  'POST /api/box-office/productions/:id/sales/open': openRunPost,
+  'PUT /api/box-office/productions/:id/sales/seats': runSeatsPut,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
   'GET /api/box-office/door/tonight': doorTonight,
@@ -129,6 +139,8 @@ export const handle = server({
   'POST /api/box-office/orders/:id/amend': amendPost,
   'POST /api/box-office/orders/:id/split': splitPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/desk/sold': deskSoldGet,
+  'POST /api/box-office/desk/orders/:id/send': deskSendPost,
   'GET /api/box-office/desk/performances': deskPerformancesGet,
   'GET /api/box-office/desk/buyers': deskBuyersGet,
   'POST /api/box-office/orders/:id/exchange': exchangePost,

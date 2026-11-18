@@ -109,7 +109,7 @@ const definition = z.strictObject({
   })).min(1),
   calculations: z.array(z.strictObject({ id, key, type: z.enum(['number', 'money', 'date', 'text']), expression })).max(100).optional(),
   endings: z.array(z.strictObject({ id, title: z.string().max(300), message: text.optional(), submits: z.boolean() })).max(30).optional(),
-  presentation: z.strictObject({ submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
+  presentation: z.strictObject({ introduction: text.optional(), submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
   workflow: z.strictObject({
     stages: z.array(z.strictObject({ key, name: z.string().max(100), kind: z.enum(STAGE_KINDS), status: z.string().max(100).optional(), review: review.optional() })).min(1).max(20),
     transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS), needsReason: z.boolean().optional(), actions: z.array(z.strictObject({ id: key, action: z.string().min(1).max(100), map: z.record(z.string().max(100), z.string().max(100)) })).max(10).optional() })).max(60),

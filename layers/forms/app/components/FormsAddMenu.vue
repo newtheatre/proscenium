@@ -23,7 +23,7 @@ const items = computed(() => [
 <template>
   <UDropdownMenu
     :items="items"
-    :ui="{ content: 'max-h-96 overflow-y-auto' }"
+    :ui="{ content: 'w-[38rem] max-w-[calc(100vw-1rem)] max-h-[min(36rem,var(--reka-dropdown-menu-content-available-height))]', viewport: 'grid grid-cols-2 gap-x-1 divide-y-0 sm:grid-cols-3' }"
   >
     <UButton
       :label="label ?? t('forms.screens.builder.add')"

@@ -157,6 +157,12 @@ app's words, and says what the server would say for the same value.
 - **Show what the server refuses beside the field.** On a failed save,
   `form.value?.setErrors(fieldErrors(refusal))` (`useRefusal()`); `RefusalNotice` keeps the summary.
   `PageForm` does all of this itself.
+- **Field errors always; a summary only on a long form.** Every problem shows beside its field. A
+  form long enough to be a page adds a "Please check" summary at the top that links to each; a short
+  form in a panel or a dialogue shows the field errors alone.
+- **Submit verbs.** A record with a page of its own is made with "Create <thing>" (Create production,
+  Create venue, Create role); something added to a list is "Add <thing>" (Add season, Add space, Add
+  closure). Its toast says "<Thing> added", with Undo where the act can be reversed.
 - **Do not disable the save button until the form is valid.** Let it be pressed and say what is
   missing. A form with no schema of its own names what it needs with `needs()`:
   `:validate="() => needs({ name: form.name, note: paid ? form.note : true })"`, each key the
@@ -389,7 +395,8 @@ anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the 
 "Admin" mark at the start of every page's navbar that says where you are at every width (PageFrame
 draws it when the layout provides `ADMIN_SHELL`; there is no second bar, and below 1024 pixels the
 navbar's own menu button opens the drawer), a "Back to console" (or "Back to the site") row where the theatre's mark is,
-neutral buttons (the `admin-shell` class on `body` swaps the brand colour out), and a browser title
+the same primary colour as the console, so a control looks the same in either shell and in the
+console's settings window (the `admin-shell` class on `body` is kept as a hook), and a browser title
 that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
 
 - **Overview** at `/admin`: `PageHome` with `home="admin"`, cards from `core.home-card` with `home: 'admin'`.

@@ -23,7 +23,7 @@ for (const [file, module] of Object.entries(files)) {
 export const handle = server(routes)
 
 /** A sign-in email as a test reads it: the address, and the link and code taken from its text. */
-export interface SignInMessage { address: string, subject: string, variables: { link: string, code: string } }
+export interface SignInMessage { address: string, subject: string, variables: { link: string, code: string }, text?: string }
 
 export const mailbox: SignInMessage[] = []
 
@@ -36,7 +36,7 @@ export async function useIdentity(): Promise<void> {
   setMailer(async (email) => {
     const link = /(https?:\/\/\S+\/sign-in\/link#[\w-]+)/.exec(email.text)?.[1] ?? ''
     const code = /\b(\d{6})\b/.exec(email.text)?.[1] ?? ''
-    mailbox.push({ address: email.to, subject: email.subject, variables: { link, code } })
+    mailbox.push({ address: email.to, subject: email.subject, variables: { link, code }, text: email.text })
     return {}
   })
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -142,9 +142,12 @@ export async function reassert(browser: Browser, device: Authenticator) {
   return browser.post('/api/core/me/reassert', { challengeId: options.body.challengeId, response: await device.get(options.body.options) })
 }
 
+/** The theatre setup's second step describes. UTC keeps a test's times where they were before setup asked. */
+export const SETUP_THEATRE = { name: 'The Test Theatre', timeZone: 'UTC', country: 'GB' }
+
 /** Runs first-run setup in a browser and returns the Owner's account id. */
-export async function setUpOwner(browser: Browser, device: Authenticator, to = address(), theatre: { theatre?: string, timeZone?: string } = {}): Promise<string> {
-  const start = await browser.post('/api/core/setup/start', { name: 'Olive Owner', address: to, ...theatre })
+export async function setUpOwner(browser: Browser, device: Authenticator, to = address()): Promise<string> {
+  const start = await browser.post('/api/core/setup/start', { name: 'Olive Owner', address: to, theatre: SETUP_THEATRE })
   if (start.status !== 200) throw new Error(`setup start failed: ${JSON.stringify(start.body)}`)
   const passkey = await browser.post('/api/core/setup/passkey', { response: await device.create(start.body.options) })
   const finished = await browser.post('/api/core/setup/finish', { code: passkey.body.recoveryCodes[0] })

@@ -38,9 +38,17 @@ async function noViolations(page: Page) {
 }
 
 test.describe('a visitor who is not signed in', () => {
-  test('is sent to sign in and back to the address they asked for', async ({ page }) => {
+  // The browser tests' site has no Owner yet, so a shell sends a visitor to setup rather than to
+  // sign in; once there is one, it sends them to /sign-in?next=<the address>.
+  test('is sent to setup while the site has no Owner', async ({ page }) => {
     await visit(page, '/console/gallery/list?status=draft')
-    await expect(page).toHaveURL(/\/sign-in\?next=(%2F|\/)console(%2F|\/)gallery(%2F|\/)list(%3F|\?)status(%3D|=)draft/)
+    await expect(page).toHaveURL(/\/setup$/)
+    await expect(page.getByRole('link', { name: 'Sign in' })).toHaveCount(0)
+  })
+
+  test('sees a way to set the site up on the public pages', async ({ page }) => {
+    await visit(page, '/')
+    await expect(page.getByRole('link', { name: 'Set up the site' })).toHaveAttribute('href', '/setup')
   })
 
   test('sees the public shell, with the same footer and a Sign in button', async ({ page }) => {
@@ -92,11 +100,12 @@ test.describe('someone in the console without the ability for one screen', () =>
     await noViolations(page)
   })
 
-  test('is offered no settings they cannot change: no cog, and the module page in Admin does not exist for them', async ({ page }) => {
+  test('is offered no settings they cannot change: no cog, and the module page in Admin is refused', async ({ page }) => {
     await visit(page, '/console/gallery/list')
     await expect(page.getByRole('link', { name: 'Gallery settings' })).toHaveCount(0)
+    // Console staff are told Admin is not theirs and whom to ask, rather than that it does not exist.
     const response = await visit(page, '/admin/modules/gallery')
-    expect(response?.status()).toBe(404)
+    expect(response?.status()).toBe(403)
   })
 })
 

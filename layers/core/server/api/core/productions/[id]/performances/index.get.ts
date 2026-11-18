@@ -3,17 +3,21 @@
 // access features, cancel reasons and the production's staging effects. With them, what a new performance takes when it says nothing
 // (the production's defaults over the theatre's, each space's doors and capacity over those), the
 // run presets and which one each space starts from, whether anything here sells tickets, and the
-// season's dates.
+// season's dates. The whole days closed to performances come too, so the date fields can grey them
+// out for someone who may not manage closures (L40).
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
-import { defineRoute, first, useSetting } from '#kit'
+import { defineRoute, first, nowMs, useSetting } from '#kit'
 import { listPerformances, performanceDefaults, theatreDefaults } from '../../../../../programme/performances'
 import { listRunPresets, theatreRunPreset } from '../../../../../programme/run-presets'
 import { sellsHere } from '../../../../../programme/booking'
 import { listVenues } from '../../../../../places/service'
-import { openRuns } from '../../../../../programme/runs'
+import { closuresBetween } from '../../../../../places/closures'
+import { editableRuns, openRuns } from '../../../../../programme/runs'
 import { productionEffects } from '../../../../../programme/guidance'
 import { listTerms } from '../../../../../vocabularies/service'
+
+const DAY = 86_400_000 // not-policy: milliseconds in a day
 
 export default defineRoute({
   ability: 'core.production.view',
@@ -22,9 +26,11 @@ export default defineRoute({
   input: z.object({}),
 }, async (_event, { record }) => {
   const option = (t: { id: string, label: string, retired: boolean }) => ({ id: t.id, label: t.label, retired: t.retired })
-  const [performances, runs, venues, access, reasons, effects, defaults, theatre, presets, usualPreset, scheduleRuns, sells] = await Promise.all([
+  const now = nowMs()
+  const [performances, runs, editable, venues, access, reasons, effects, defaults, theatre, presets, usualPreset, scheduleRuns, sells, closures] = await Promise.all([
     listPerformances({ productionId: record!.id }),
     openRuns(record!.id),
+    editableRuns(record!.id),
     listVenues({ archived: true }),
     listTerms('core.access-feature', { includeRetired: true }),
     listTerms('core.cancel-reason'),
@@ -35,6 +41,7 @@ export default defineRoute({
     theatreRunPreset(),
     useSetting('core.programme.schedule-runs') as Promise<boolean>,
     sellsHere(),
+    closuresBetween(now - DAY, now + 400 * DAY), // not-policy: as far ahead as the Closures screen looks
   ])
   const own = await first<{ doors_before_minutes: number | null, capacity: number | null }>('SELECT doors_before_minutes, capacity FROM core_productions WHERE id = ?', record!.id)
   // The production's season's dates, which a new run's dates start from when it has none yet.
@@ -43,6 +50,8 @@ export default defineRoute({
   return {
     performances,
     runs,
+    // Runs added whole, with the pattern each was made from, which can be edited as a whole.
+    editableRuns: editable,
     season: season ? { startsOn: season.starts_on, endsOn: season.ends_on } : null,
     options: {
       venues: venues
@@ -52,6 +61,7 @@ export default defineRoute({
       reasons: reasons.map(option),
       effects: effects.map(e => ({ id: e.termId, label: e.label })),
       presets: presets.map(({ id, name, slots }) => ({ id, name, slots })),
+      closed: closures.filter(c => c.allDay && c.blocksPerformances).map(c => ({ venueId: c.venueId, spaceId: c.spaceId, startsAt: c.startsAt, endsAt: c.endsAt })),
     },
     // The production's own (null where it has none) beside the theatre's, so a screen can say where a value comes from.
     defaults: { ...defaults, productionDoorsBeforeMinutes: own?.doors_before_minutes ?? null, productionCapacity: own?.capacity ?? null, theatreDoorsBeforeMinutes: theatre.doorsBeforeMinutes, usualPreset, scheduleRuns, sellsHere: sells },

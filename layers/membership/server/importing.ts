@@ -92,7 +92,7 @@ export async function importShare(unit: UnitView, job: ImportJob): Promise<{ imp
     const { accountId } = await findOrCreateAccount(unit, { address: row.address, name: row.name ?? undefined, origin: 'staff' })
     const startsOn = row.startsOn ?? job.day
     const endsOn = row.endsOn ?? endsOnFor(scheme, startsOn, option?.count ?? 1)
-    await writeActive(unit, { scheme, accountId, origin: 'added', lengthOptionId: option?.id ?? null, count: option?.count ?? 1, startsOn, endsOn, addedBy: job.importedBy, note: null })
+    await writeActive(unit, { scheme, accountId, origin: 'added', lengthOptionId: option?.id ?? null, count: option?.count ?? 1, startsOn, endsOn, addedBy: job.importedBy, note: null, welcome: false })
     imported++
   }
   unit.audit({ action: 'create', record: ['membership.scheme', scheme.id], detail: { importId: job.importId, imported, skipped, at: nowMs() } })

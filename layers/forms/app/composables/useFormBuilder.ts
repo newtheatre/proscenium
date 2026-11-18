@@ -10,6 +10,8 @@ export interface PublishedField { questionId: string, key: string, type: string,
 export interface BuilderAction { key: string, label: string, slot: string | null, inputs: { key: string, label: string, required: boolean, types?: string[] }[] }
 export interface BuilderData {
   today: string | null
+  requireRetention?: boolean
+  shared?: boolean
   form: BuilderForm
   draft: { definition: Definition, editRevision: number, editedBy: string | null, updatedAt: number }
   fields: PublishedField[]

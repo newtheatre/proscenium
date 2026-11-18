@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { noOverrides, overrideErrors, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
+import { noOverrides, overrideErrors, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
 import { parseTime } from '@internationalized/date'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
@@ -27,9 +27,11 @@ interface Performance {
 }
 interface Option { id: string, label: string, retired: boolean }
 interface Run { id: string, total: number, done: number, state: 'running' | 'stopped' | 'done' | 'removing' | 'removed', stopReason: string | null, scheduled: boolean }
+interface EditableRun { id: string, venueId: string, spaceId: string, scheduled: boolean, pattern: { from: string, to: string, slots: RunSlot[], minutes?: number | null, doorsBeforeMinutes?: number | null }, count: number, performanceIds: string[] }
 interface Answer {
   performances: Performance[]
   runs: Run[]
+  editableRuns: EditableRun[]
   season: { startsOn: string, endsOn: string } | null
   options: {
     venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null, doorsBeforeMinutes: number | null, runPresetId: string | null }[] }[]
@@ -37,6 +39,8 @@ interface Answer {
     reasons: Option[]
     effects: { id: string, label: string }[]
     presets: { id: string, name: string, slots: RunSlot[] }[]
+    /** Whole days closed to performances, which the date fields grey out. */
+    closed?: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number }[]
   }
   defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
 }
@@ -50,8 +54,6 @@ const emit = defineEmits<{ changed: [] }>()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<Answer>(() => `/api/core/productions/${props.productionId}/performances`, { key: `core:production:${props.productionId}:performances` })
 const dates = useDates()
-// Whole-day closures that block performances grey out their days in the date fields; the server still decides.
-const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean }[] }>('/api/core/closures', { key: 'core:closures', lazy: true, server: false })
 const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -136,11 +138,11 @@ const open = ref(false)
 const form = ref({ spaceId: '', startsAt: null as number | null })
 const overrides = ref<ShowOverrides>(noOverrides())
 const shown = computed(() => form.value.spaceId && data.value ? defaultsIn(form.value.spaceId) : null)
-/** Whether a whole-day closure that blocks performances covers this day for the chosen space. */
+/** Whether a whole-day closure that blocks performances covers this day for the chosen space. The
+ *  closures come with the performances, so nobody needs the right to manage closures; the server still decides. */
 function closed(day: string): boolean {
   const space = spaces.value.find(x => x.value === form.value.spaceId)
-  return (closures.value?.rows ?? []).some(c => c.allDay && c.blocksPerformances
-    && (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
+  return (data.value?.options.closed ?? []).some(c => (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
     && dates.toLocal(c.startsAt).slice(0, 10) <= day && day <= dates.toLocal(c.endsAt - 1).slice(0, 10)) // not-policy: the length of a date
 }
 // Checked beside each field: a space, a start, and a booking link that is a web address.
@@ -454,6 +456,14 @@ async function saveBulkCancel() {
 
 // Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
 const addingRun = ref(false)
+// The palette's "Add a run" arrives with ?run=1: the window opens once there is a space to put it in.
+const runRoute = useRoute()
+watch(spaces, (list) => {
+  if (import.meta.server || runRoute.query.run !== '1' || !list.length) return
+  addingRun.value = true
+  const { run: _, ...rest } = runRoute.query
+  void navigateTo({ query: rest }, { replace: true })
+}, { immediate: true })
 const runs = computed(() => data.value?.runs ?? [])
 const moving = computed(() => runs.value.some(r => r.state === 'running' || r.state === 'removing'))
 let timer: ReturnType<typeof setInterval> | undefined
@@ -502,13 +512,30 @@ async function removeRun(r: Run) {
   await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/runs/${r.id}/remove` as string, { method: 'POST', body: {} }), 'Removing the run')
 }
 
+// Editing a whole run that was added in one go: its pattern, with what changes shown first.
+const editableRuns = computed(() => data.value?.editableRuns ?? [])
+const editingRun = ref<EditableRun | null>(null)
+const editRunOpen = ref(false)
+const runOf = (p: Performance) => editableRuns.value.find(r => r.performanceIds.includes(p.id)) ?? null
+function startEditRun(r: EditableRun) {
+  refusal.value = null
+  editingRun.value = r
+  editRunOpen.value = true
+}
+async function runEdited() {
+  await refresh()
+  emit('changed')
+}
+
 function actions(p: Performance) {
   const items = []
+  const inRun = selectable(p) ? runOf(p) : null
   if (p.state === 'draft') items.push({ label: 'Schedule', icon: 'i-lucide-calendar-check', onSelect: () => schedule(p) })
   if (p.state === 'draft' || p.state === 'scheduled') {
     items.push({ label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => start(p) })
     items.push({ label: 'Access', icon: 'i-lucide-accessibility', onSelect: () => startAccess(p) })
     if (productionEffects.value.length) items.push({ label: 'Staging effects', icon: 'i-lucide-zap-off', onSelect: () => startEffects(p) })
+    if (inRun) items.push({ label: 'Edit the run', icon: 'i-lucide-calendar-range', onSelect: () => startEditRun(inRun) })
   }
   if (p.state === 'scheduled') items.push({ label: 'Cancel', icon: 'i-lucide-calendar-x', color: 'error' as const, onSelect: () => startCancel(p) })
   if (p.state === 'cancelled' && p.startsAt > Date.now()) items.push({ label: 'Reinstate', icon: 'i-lucide-undo-2', onSelect: () => reinstate(p) })
@@ -558,8 +585,28 @@ function actions(p: Performance) {
     >
       Add a venue with a space that can hold performances first.
     </p>
+    <RecordList
+      v-if="editableRuns.length"
+      label="Runs"
+    >
+      <RecordListItem
+        v-for="r in editableRuns"
+        :key="r.id"
+        icon="i-lucide-calendar-range"
+        :name="`A run of ${r.count === 1 ? '1 performance' : `${r.count} performances`} to come`"
+        :description="`${dates.span(r.pattern.from, r.pattern.to)} · ${slotsInWords(r.pattern.slots)}`"
+      >
+        <UButton
+          label="Edit the run"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          @click="startEditRun(r)"
+        />
+      </RecordListItem>
+    </RecordList>
     <RefusalNotice
-      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun && !bulkTime.open && !bulkAccess.open && !bulkCancel.open"
+      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun && !bulkTime.open && !bulkAccess.open && !bulkCancel.open && !editRunOpen"
       :refusal="refusal"
     />
     <DataBoundary
@@ -1070,6 +1117,13 @@ function actions(p: Performance) {
       :suggested="suggestedRun"
       @added="added"
       @presets-changed="refresh()"
+    />
+    <PerformanceRunEditDialog
+      v-model:open="editRunOpen"
+      :production-id="productionId"
+      :run="editingRun"
+      :spaces="spaces"
+      @changed="runEdited"
     />
   </PageSection>
 </template>

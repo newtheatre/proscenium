@@ -3,6 +3,7 @@ import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { endGrant } from '../../../../identity/roles'
+import { roleNotice } from '../../../../identity/notices'
 
 export default defineRoute({
   ability: 'core.grant.manage',
@@ -10,6 +11,7 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({}),
 }, async (_event, { unit, actor, record }) => {
-  await endGrant(unit, actor, record!.id)
+  const grant = await endGrant(unit, actor, record!.id)
+  await roleNotice(unit, grant.account_id, grant.role_id, { given: false })
   return { id: record!.id, ended: true }
 })
