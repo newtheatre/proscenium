@@ -22,6 +22,7 @@
   "forms.abilities.form.edit.label": "Build and edit a form",
   "forms.abilities.form.publish.label": "Publish a form",
   "forms.abilities.settings.manage.label": "Change the forms settings",
+  "forms.abilities.template.manage.label": "Save and remove form templates",
   "forms.settings.limits.response-size.label": "Largest response, in kilobytes",
   "forms.settings.limits.response-size.help": "The most one person's answers may come to, whether sent or kept as a working copy.",
   "forms.settings.limits.export-rows.label": "Responses in one export",

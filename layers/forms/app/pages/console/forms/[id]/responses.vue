@@ -10,19 +10,19 @@ import type { ShownAnswer } from '../../../../components/FormsAnswers.vue'
 
 interface Column { questionId: string, key: string, label: string, type: string, dataClass: string, retired: boolean }
 interface Stage { key: string, name: string, kind: string }
-interface Row { id: string, reference: string, version: number, who: string | null, submittedAt: number, stage: { name: string, kind: string } | null, cells: Record<string, { text: string, restricted: boolean }> }
+interface Move { key: string, label: string, to: string, toKind: string, decision: boolean, needsReason: boolean }
+interface Row { id: string, reference: string, version: number, who: string | null, submittedAt: number, stage: { key: string | null, name: string, kind: string } | null, cells: Record<string, { text: string, restricted: boolean }> }
 interface Table {
   form: { id: string, title: string, slug: string, anonymous: boolean, status: string }
   columns: Column[]
   rows: Row[]
-  stages: Stage[]
+  stages: (Stage & { moves: Move[] })[]
   total: number
   page: number
   pageSize: number
   canExport: boolean
   canReadSpecial: boolean
 }
-interface Move { key: string, label: string, to: string, toKind: string, decision: boolean, needsReason: boolean }
 interface One {
   response: { id: string, reference: string, version: number, submittedAt: number, respondentEmail: string | null }
   definition: Definition
@@ -81,6 +81,7 @@ const typed = ref(view.value.value ?? '')
 watch(() => view.value.value, (v) => { typed.value = v ?? '' })
 
 const columns = computed(() => [
+  ...(canMoveMany.value ? [{ id: 'select', header: '' }] : []),
   { accessorKey: 'reference', header: t('forms.screens.responses.reference') },
   { accessorKey: 'sent', header: t('forms.screens.responses.sent') },
   ...(data.value?.stages.length ? [{ accessorKey: 'stage', header: t('forms.screens.responses.stage') }] : []),
@@ -171,10 +172,62 @@ function choose(move: Move) {
   note.value = ''
   reason.value = ''
   reasonError.value = undefined
+  many.value = false
   moving.value = move
 }
+// ---- one move on several responses ----
+// Rows are chosen by id and the choice is dropped when the rows change, so a move never reaches a
+// row that is no longer on screen. The moves offered are those of the stage every chosen row is in.
+const chosen = ref<Record<string, boolean>>({})
+watch(() => data.value?.rows, () => { chosen.value = {} })
+const canMoveMany = computed(() => (data.value?.stages ?? []).some(s => s.moves.length))
+const chosenRows = computed(() => (data.value?.rows ?? []).filter(r => chosen.value[r.id]))
+function choosing(id: string, on: boolean) {
+  const { [id]: _, ...rest } = chosen.value
+  chosen.value = on ? { ...rest, [id]: true } : rest
+}
+const allChosen = computed(() => chosenRows.value.length === 0 ? false : chosenRows.value.length === data.value!.rows.length ? true : 'indeterminate' as const)
+function chooseAll(on: boolean) {
+  chosen.value = on ? Object.fromEntries((data.value?.rows ?? []).map(r => [r.id, true])) : {}
+}
+const sharedMoves = computed(() => {
+  const keys = new Set(chosenRows.value.map(r => r.stage?.key ?? null))
+  return keys.size === 1 ? data.value?.stages.find(s => s.key === [...keys][0])?.moves ?? [] : null
+})
+const many = ref(false)
+function chooseMany(move: Move) {
+  choose(move)
+  many.value = true
+}
+async function moveMany() {
+  const picked = moving.value!
+  const ids = chosenRows.value.map(r => r.id)
+  sending.value = true
+  try {
+    const done = await $api<{ moved: number, skipped: { reference: string | null, reason: string }[] }>(`/api/forms/forms/${formId.value}/responses/move` as string, { method: 'POST', body: { responses: ids, move: picked.key, note: note.value.trim() || null, reason: reason.value.trim() || null } })
+    const left = done.skipped.map(s => s.reference ? `${s.reference}: ${s.reason}` : s.reason).join(' ')
+    toast.add({
+      title: done.moved ? t('forms.screens.responses.moved-many', { count: done.moved, stage: picked.to }) : t('forms.screens.responses.moved-none'),
+      description: done.skipped.length ? t('forms.screens.responses.left-many', { count: done.skipped.length, why: left }) : undefined,
+      color: done.skipped.length ? 'warning' : 'success',
+    })
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+  moving.value = null
+  sending.value = false
+  await refresh()
+}
 async function move() {
-  if (!moving.value || !one.value) return
+  if (!moving.value) return
+  if (many.value) {
+    reasonError.value = moving.value.needsReason && !reason.value.trim() ? t('forms.screens.responses.reason-needed') : undefined
+    if (!reasonError.value) await moveMany()
+    return
+  }
+  if (!one.value) return
   // A decision that must carry a reason says so beside the box, and nothing is sent without one.
   reasonError.value = moving.value.needsReason && !reason.value.trim() ? t('forms.screens.responses.reason-needed') : undefined
   if (reasonError.value) return
@@ -281,12 +334,54 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         v-else
         class="space-y-4"
       >
+        <div
+          v-if="chosenRows.length"
+          class="flex flex-wrap items-center gap-2"
+          role="group"
+          :aria-label="t('forms.screens.responses.chosen', { count: chosenRows.length })"
+        >
+          <span class="text-sm font-medium">{{ t('forms.screens.responses.chosen', { count: chosenRows.length }) }}</span>
+          <UButton
+            v-for="m in sharedMoves ?? []"
+            :key="m.key"
+            :label="m.label"
+            size="sm"
+            :color="m.toKind === 'declined' ? 'error' : 'neutral'"
+            variant="subtle"
+            @click="chooseMany(m)"
+          />
+          <span
+            v-if="!sharedMoves?.length"
+            class="text-sm text-muted"
+          >{{ t(sharedMoves ? 'forms.screens.responses.no-moves' : 'forms.screens.responses.mixed-stages') }}</span>
+          <UButton
+            :label="t('forms.screens.responses.choose-none')"
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            @click="chosen = {}"
+          />
+        </div>
         <UTable
           :data="rows"
           :columns="columns"
           :caption="t('forms.screens.responses.title')"
           :ui="{ td: 'max-w-64 truncate', th: 'max-w-64 truncate' }"
         >
+          <template #select-header>
+            <UCheckbox
+              :model-value="allChosen"
+              :aria-label="t('forms.screens.responses.choose-all')"
+              @update:model-value="chooseAll($event === true)"
+            />
+          </template>
+          <template #select-cell="{ row }">
+            <UCheckbox
+              :model-value="!!chosen[row.original.id]"
+              :aria-label="t('forms.screens.responses.choose', { reference: row.original.reference })"
+              @update:model-value="choosing(row.original.id, $event === true)"
+            />
+          </template>
           <template #reference-cell="{ row }">
             <UButton
               :label="row.original.reference"
@@ -488,7 +583,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
     <UModal
       v-model:open="moveOpen"
       :title="moving?.label"
-      :description="moving ? t('forms.screens.responses.move-help', { stage: moving.to }) : undefined"
+      :description="moving ? many ? t('forms.screens.responses.move-help-many', { count: chosenRows.length, stage: moving.to }) : t('forms.screens.responses.move-help', { stage: moving.to }) : undefined"
     >
       <template #body>
         <UFormField

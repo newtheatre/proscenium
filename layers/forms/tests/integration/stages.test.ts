@@ -177,3 +177,39 @@ describe('returning a response for changes', () => {
     expect(table.body.rows[0].cells.why.text).toContain('lighting desk')
   })
 })
+
+describe('one move on several responses', () => {
+  const many = (formId: string, body: Record<string, unknown>, actor = mover) => req('POST', `/api/forms/forms/${formId}/responses/move`, body, actor)
+
+  it('moves those that can take it, each with its own history and message, and names those it left', async () => {
+    const { formId, slug } = await offered(staged())
+    const ids: string[] = []
+    for (const who of [member, other, mover]) ids.push((await send(slug, { name: who.name }, who)).body.responseId)
+    const [first, secondId, own] = ids as [string, string, string]
+    await move(formId, secondId, 'start_review')
+    // The table offers each stage's moves, so the screen knows what the chosen rows share.
+    const table = await req('GET', `/api/forms/forms/${formId}/responses`, undefined, person(['forms.response.read', 'forms.response.move'], { name: 'Tab Table' }))
+    expect(table.body.stages[0].moves).toEqual([{ key: 'start_review', label: 'Start review', to: 'In review', toKind: 'in_review', decision: false, needsReason: false }])
+    expect(table.body.stages[1].moves.map((m: { key: string }) => m.key)).toEqual(['return'])
+    expect(table.body.rows[0].stage.key).toBeDefined()
+
+    const done = await many(formId, { responses: [first, secondId, own, 'fres_nothing', first], move: 'start_review', note: 'We have started.' })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body.moved).toBe(1)
+    expect(done.body.skipped).toHaveLength(3)
+    expect(done.body.skipped.map((s: { reason: string }) => s.reason).sort()).toEqual(['There is no response here.', 'This move is not open from where the response is now.', 'You cannot move your own response.'])
+    expect(await row(first)).toMatchObject({ stage_key: 'in_review', stage_note: 'We have started.' })
+    expect(await row(own)).toMatchObject({ stage_key: 'received' })
+    expect(await rows('SELECT transition_key FROM forms_stage_history WHERE response_id = ? ORDER BY at, id', first)).toEqual([{ transition_key: 'submit' }, { transition_key: 'start_review' }])
+  })
+
+  it('is refused whole when the mover may not decide, or for somebody who may not move at all', async () => {
+    const { formId, slug } = await offered(staged())
+    const id = (await send(slug, { name: 'Mo' }, member)).body.responseId
+    await move(formId, id, 'start_review')
+    expect((await many(formId, { responses: [id], move: 'approve' }, both)).body.code).toBe('forms.decision.not-allowed')
+    expect((await many(formId, { responses: [id], move: 'approve' }, reader)).status).toBe(403)
+    expect((await many(formId, { responses: [], move: 'approve' })).status).toBe(422)
+    expect((await many(formId, { responses: [id], move: 'approve' })).body).toEqual({ moved: 1, skipped: [] })
+  })
+})

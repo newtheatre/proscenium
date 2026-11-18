@@ -18,6 +18,8 @@ export interface BuilderData {
   /** Where a "record from a source" question may choose from now. */
   sources?: { key: string, label: string, people: boolean }[]
   actions?: BuilderAction[]
+  /** Whether this person may save the form as a template for the theatre. */
+  canSaveTemplate?: boolean
   versions: { id: string, number: number, publishedAt: number }[]
 }
 export type SaveState = 'saved' | 'waiting' | 'saving' | 'stale' | 'failed'

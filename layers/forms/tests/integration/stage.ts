@@ -23,6 +23,7 @@ import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
 import mineOnePut from '../../server/api/forms/mine/[id].put'
 import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
+import moveManyPost from '../../server/api/forms/forms/[id]/responses/move.post'
 import releasePost from '../../server/api/forms/forms/[id]/responses/[response]/release.post'
 import reviewsGet from '../../server/api/forms/reviews/index.get'
 import reviewGet from '../../server/api/forms/reviews/[id].get'
@@ -32,6 +33,14 @@ import sourceGet from '../../server/api/forms/sources/[source].get'
 import slotGet from '../../server/api/forms/slots/[slot]/[subject]/index.get'
 import slotPut from '../../server/api/forms/slots/[slot]/[subject]/[form].put'
 import slotDelete from '../../server/api/forms/slots/[slot]/[subject]/[form].delete'
+import templatesGet from '../../server/api/forms/templates/index.get'
+import templatesPost from '../../server/api/forms/templates/index.post'
+import templateDelete from '../../server/api/forms/templates/[id].delete'
+import versionsGet from '../../server/api/forms/forms/[id]/versions/index.get'
+import versionGet from '../../server/api/forms/forms/[id]/versions/[number].get'
+import recordGet from '../../server/api/forms/records/[slot]/[record]/index.get'
+import recordPut from '../../server/api/forms/records/[slot]/[record]/[form].put'
+import statusPost from '../../server/api/forms/forms/[id]/status.post'
 import runPost from '../../server/api/forms/forms/[id]/responses/[response]/actions/[run]/run.post'
 import type { Definition, Question } from '../../shared/engine'
 
@@ -55,9 +64,18 @@ export const handle = server({
   'GET /api/forms/mine': mineGet,
   'GET /api/forms/mine/:id': mineOneGet,
   'PUT /api/forms/mine/:id': mineOnePut,
+  'POST /api/forms/forms/:id/responses/move': moveManyPost,
   'POST /api/forms/forms/:id/responses/:response/move': movePost,
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,
   'GET /api/forms/sources/:source': sourceGet,
+  'POST /api/forms/forms/:id/status': statusPost,
+  'GET /api/forms/records/:slot/:record': recordGet,
+  'PUT /api/forms/records/:slot/:record/:form': recordPut,
+  'GET /api/forms/forms/:id/versions': versionsGet,
+  'GET /api/forms/forms/:id/versions/:number': versionGet,
+  'GET /api/forms/templates': templatesGet,
+  'POST /api/forms/templates': templatesPost,
+  'DELETE /api/forms/templates/:id': templateDelete,
   'GET /api/forms/slots/:slot/:subject': slotGet,
   'PUT /api/forms/slots/:slot/:subject/:form': slotPut,
   'DELETE /api/forms/slots/:slot/:subject/:form': slotDelete,

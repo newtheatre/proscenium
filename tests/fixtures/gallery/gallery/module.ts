@@ -24,8 +24,12 @@ export default defineModule({
     'demo.hold': setting.duration({ default: '15m', min: '5m', max: '1h', change: 'gallery.sample.manage' }),
   }),
   contributes: {
-    // A slot and an outcome action for the forms browser test.
-    'forms.slot': [{ id: 'gallery.show-feedback', subject: 'gallery.production', attach: 'gallery.sample.manage', label: 'gallery.forms.feedback.label' }],
+    // Slots and an outcome action for the forms browser tests.
+    'forms.slot': [
+      { id: 'gallery.show-feedback', subject: 'gallery.production', attach: 'gallery.sample.manage', label: 'gallery.forms.feedback.label' },
+      // Custom fields on every sample production, filled in on each one's page.
+      { id: 'gallery.show-fields', subject: 'gallery.production', attach: 'gallery.sample.manage', edit: 'gallery.sample.view', mode: 'record' as const, label: 'gallery.forms.fields.label', limit: 3 },
+    ],
     'forms.outcome-action': [{ id: 'gallery.note', file: 'note' }],
     'payments.desk-basket': [{ id: 'gallery' }],
     'payments.settlement': [{ id: 'gallery' }],

@@ -2,7 +2,7 @@
 definePageMeta({ layout: 'console' })
 const route = useRoute()
 const id = String(route.params.id)
-const tabs = [{ id: 'overview', label: 'Overview' }, { id: 'details', label: 'Details' }, { id: 'forms', label: 'Forms' }]
+const tabs = [{ id: 'overview', label: 'Overview' }, { id: 'details', label: 'Details' }, { id: 'forms', label: 'Forms' }, { id: 'fields', label: 'Custom fields' }]
 </script>
 
 <template>
@@ -28,6 +28,23 @@ const tabs = [{ id: 'overview', label: 'Overview' }, { id: 'details', label: 'De
         slot-id="gallery.show-feedback"
         :subject="id"
       />
+    </template>
+    <template #tab-fields>
+      <div class="space-y-10">
+        <FormsRecordFields
+          slot-id="gallery.show-fields"
+          :subject="id"
+        />
+        <section class="space-y-3">
+          <h3 class="font-medium">
+            Fields on every production
+          </h3>
+          <FormsSlotForms
+            slot-id="gallery.show-fields"
+            subject="*"
+          />
+        </section>
+      </div>
     </template>
   </PageRecord>
 </template>
