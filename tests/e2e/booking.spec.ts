@@ -82,7 +82,8 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page).toHaveURL(/\/book\/basket$/)
   await expect(page.getByRole('heading', { name: 'Check and pay' })).toBeVisible()
   await expect(page.getByText(/Held for \d+:\d\d/)).toBeVisible()
-  await expect(page.getByText(`2 × Online price ${stamp}`)).toBeVisible()
+  // Its only type goes unnamed here too, as on Choose tickets.
+  await expect(page.getByText('2 tickets', { exact: true })).toBeVisible()
   await page.getByLabel('Your name').fill('Online Buyer')
   await page.getByLabel('Email address').fill(`online.buyer.${stamp}@example.org`)
   await noViolations(page)
@@ -98,7 +99,7 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page.getByRole('heading', { name: 'Your booking' })).toBeVisible()
   await expect(page.getByText('To pay at the box office: £20.00')).toBeVisible()
   await noViolations(page)
-  await page.getByRole('checkbox', { name: /^Ticket 1:/ }).check()
+  await page.getByRole('checkbox', { name: /^Ticket 1, / }).check()
   await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel 1 ticket' }).click()
   await expect(page.getByText('1 ticket cancelled. Its seat is back on sale.')).toBeVisible()
@@ -147,7 +148,7 @@ test('a buyer cancels paid tickets from their link when the theatre allows it, a
   await expect(page.getByText('To change or cancel a paid booking, contact the box office.')).toHaveCount(0)
   await noViolations(page)
 
-  await page.getByRole('checkbox', { name: /^Ticket 1:/ }).check()
+  await page.getByRole('checkbox', { name: /^Ticket 1, / }).check()
   await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByText('£8.50 goes back to the card you paid with.', { exact: false })).toBeVisible()
