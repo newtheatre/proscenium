@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "b66571b7-cc11-4896-95ec-309ff217178a",
+  "id": "18e86aa8-c10c-4671-924e-04156f93fc6f",
   "prevIds": [
-    "274c2793-7965-4b1f-90f7-c25541e7b394"
+    "09873ea3-0c98-4887-ac7c-1429d6d4e52b"
   ],
   "ddl": [
     {
@@ -733,6 +733,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awarded_precision",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'day'",
       "generated": null,
       "entityType": "columns"
     },
@@ -5463,6 +5473,16 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_promo_codes",
+      "name": "not_with_requirements",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -12588,6 +12608,26 @@
     },
     {
       "table": "forms_action_runs",
+      "name": "record_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_action_runs",
+      "name": "record_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_action_runs",
       "name": "job_id",
       "type": "text",
       "notNull": false,
@@ -13499,6 +13539,26 @@
     {
       "table": "forms_responses",
       "name": "reminded_closing_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "change_token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "change_token_expires_at",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -17100,6 +17160,16 @@
       "table": "payments_attempts",
       "name": "tendered_minor",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "note",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -21189,6 +21259,20 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_change_token",
+      "columns": [
+        {
+          "value": "change_token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "change_token_hash IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },

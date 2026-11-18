@@ -6,17 +6,19 @@
 // - an unfinished working copy on a form that closes within `reminders.closing` (a copy due both
 //   on the same day is sent only this one);
 // - a response returned for changes and not sent back within `reminders.returned`, once for each
-//   time it is returned;
+//   time it is returned; somebody who answered signed out is sent a fresh link with it (R-19);
 // - a review in an open round still not given after `reminders.review`.
 // Nothing is sent once the thing it is about is done: the answers sent, the form paused or closed,
 // the response moved on, the round closed. A working copy kept by somebody signed out lives on
 // their device, so nobody knows to remind them. A returned response can be sent back after its form
 // closes, so a closing date is no reason to remind about one.
 import { all, siteUrl, theatreTimeZone, useSetting, type UnitView } from '#kit'
-import { notify } from '#modules/core'
+import { notify, notifyAddress } from '#modules/core'
+import { issueChangeLink } from './changes'
 
 const SECOND = 1000 // not-policy: settings are whole seconds
 const BATCH = 200 // not-policy: one run's share, to keep the unit small; the next run takes the rest
+const GUESTS = 8 // not-policy: each email to an address is its own few statements, so a run takes a unit's share and the next the rest
 
 type ReminderSetting = 'forms.reminders.unfinished' | 'forms.reminders.closing' | 'forms.reminders.returned' | 'forms.reminders.review'
 const lengthOf = async (key: ReminderSetting) => (Number(await useSetting(key) ?? 0)) * SECOND
@@ -110,6 +112,20 @@ async function returned(unit: UnitView, at: number): Promise<number> {
   return rows.length
 }
 
+/**
+ * The same for somebody who answered signed out: a fresh link to make their changes through
+ * (R-19), which replaces the one sent with the return, so a link that has run out is renewed once.
+ */
+async function returnedGuests(unit: UnitView, at: number): Promise<number> {
+  const rows = (await returnedDue(at, true)).slice(0, GUESTS)
+  for (const r of rows) {
+    const link = await issueChangeLink(unit, r.id, at)
+    await notifyAddress(unit, 'forms.returned-reminder-guest', { address: r.respondentEmail!, variables: { form: r.title, reference: r.reference, link }, record: ['forms.response', r.id], dedupeKey: `returned:${r.id}:${r.returnedAt}` })
+  }
+  markReturnedReminded(unit, rows.map(r => r.id), at)
+  return rows.length
+}
+
 /** Reviews in open rounds, not yet given, asked for at least `reminders.review` ago. A reviewer with a conflict owes none. */
 async function reviews(unit: UnitView, at: number): Promise<number> {
   const after = await lengthOf('forms.reminders.review')
@@ -129,5 +145,5 @@ async function reviews(unit: UnitView, at: number): Promise<number> {
 
 /** Sends every reminder that is due. Returns how many were sent. Safe to run any number of times. */
 export async function sendReminders(unit: UnitView, at: number): Promise<number> {
-  return await unfinished(unit, at) + await returned(unit, at) + await reviews(unit, at)
+  return await unfinished(unit, at) + await returned(unit, at) + await returnedGuests(unit, at) + await reviews(unit, at)
 }

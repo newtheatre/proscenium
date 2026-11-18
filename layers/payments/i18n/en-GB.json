@@ -42,6 +42,7 @@
   "payments.abilities.refund.approve.label": "Approve or decline a refund someone else asked for",
   "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records",
   "payments.figures.tills": "Tills open",
+  "payments.figures.takings": "Taken at the tills",
   "payments.report.tills": "Tills",
   "payments.report.unknown-till": "Till at an unknown place",
   "payments.report.sessions-closed": "Till sessions closed",

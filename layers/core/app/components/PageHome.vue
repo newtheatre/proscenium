@@ -17,7 +17,10 @@ const { data } = await useAPI<{ cards: Card[], starters: { id: string, to: strin
 // A component no one answers to is left out rather than breaking the page.
 const cards = computed(() => (data.value?.cards ?? []).flatMap((c) => {
   const component = resolveComponent(c.component)
-  return typeof component === 'string' ? [] : [{ ...c, component }]
+  if (typeof component !== 'string') return [{ ...c, component }]
+  // A card a module names but no `app/home-cards` file answers to would otherwise vanish without a trace.
+  if (import.meta.dev) console.warn(`[home] The card "${c.id}" names the component "${c.component}", which is not registered. Put it in a layer's app/home-cards folder.`)
+  return []
 }))
 const bands = computed(() => (['overdue', 'today', 'info'] as const)
   .map(urgency => ({ urgency, cards: cards.value.filter(c => c.urgency === urgency) }))

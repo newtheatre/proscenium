@@ -27,6 +27,8 @@
   "forms.settings.limits.response-size.help": "The most one person's answers may come to, whether sent or kept as a working copy.",
   "forms.settings.limits.export-rows.label": "Responses in one export",
   "forms.settings.limits.export-rows.help": "The most responses one CSV export holds. A larger set is exported in parts, by date.",
+  "forms.settings.limits.files-per-response.label": "Files in one response",
+  "forms.settings.limits.files-per-response.help": "The most files one response can hold across all its file questions. How large each file may be is the site's limit for documents.",
   "forms.abilities.response.read.label": "Read a form's responses, except restricted answers",
   "forms.abilities.response.export.label": "Export a form's responses",
   "forms.abilities.response.read-special.label": "Open restricted answers",
@@ -44,5 +46,8 @@
   "forms.settings.reminders.returned.label": "Remind about changes asked for after",
   "forms.settings.reminders.returned.help": "How long a response sent back for changes waits before its person is reminded, once each time it is sent back. Nought sends no reminder.",
   "forms.settings.reminders.review.label": "Remind reviewers after",
-  "forms.settings.reminders.review.help": "How long a review may be outstanding before the reviewer is reminded, once each round. Nought sends no reminder."
+  "forms.settings.reminders.review.help": "How long a review may be outstanding before the reviewer is reminded, once each round. Nought sends no reminder.",
+  "forms.settings-sections.changes": "Changes by email",
+  "forms.settings.changes.link-lifetime.label": "How long a link to send changes works",
+  "forms.settings.changes.link-lifetime.help": "Somebody who answered without signing in is emailed a link when their response is sent back for changes. It works once, for this long."
 }

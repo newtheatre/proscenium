@@ -16,6 +16,7 @@ import setEffects from '../../server/api/core/productions/[id]/effects.put'
 import publish from '../../server/api/core/productions/[id]/publish.post'
 import withdraw from '../../server/api/core/productions/[id]/withdraw.post'
 import deleteProduction from '../../server/api/core/productions/[id]/index.delete'
+import duplicateProduction from '../../server/api/core/productions/[id]/duplicate.post'
 import { productionBySlug } from '../../server/services'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
@@ -38,6 +39,7 @@ const handle = server({
   'POST /api/core/productions/:id/publish': publish,
   'POST /api/core/productions/:id/withdraw': withdraw,
   'DELETE /api/core/productions/:id': deleteProduction,
+  'POST /api/core/productions/:id/duplicate': duplicateProduction,
 })
 const admin = person(['core.production.create', 'core.production.publish', 'core.season.manage'])
 const viewer = person(['core.production.view'])
@@ -117,14 +119,18 @@ describe('productions', () => {
     const id = await production()
     const refused = await req('POST', `/api/core/productions/${id}/publish`)
     expect(refused.status).toBe(422)
-    expect(refused.body.reason).toBe('To publish, the production needs a summary, a category, its staging effects, or confirmation that it has none, its content warnings, or confirmation that it has none, a booking link, as nothing here sells tickets.')
-    expect((await read(id)).needs).toEqual(['a summary', 'a category', 'its staging effects, or confirmation that it has none', 'its content warnings, or confirmation that it has none', 'a booking link, as nothing here sells tickets'])
+    expect(refused.body).toMatchObject({ code: 'core.production.not-ready', reason: 'This production needs 5 more things before it can be published.' })
+    expect(refused.body.remedy).toBe('Still to do: a summary; a category; staging effects listed, or none confirmed; content warnings listed, or none confirmed; a booking link, as nothing here sells tickets.')
+    // The page's "Ready to publish?" lines that stop publishing are the same list, in the same words.
+    const needs = (await read(id)).needs
+    expect(needs.map((n: { key: string }) => n.key)).toEqual(['summary', 'category', 'effects', 'advisories', 'booking'])
+    expect(needs[4]).toEqual({ key: 'booking', sentence: 'A booking link, as nothing here sells tickets', link: `/console/programme/productions/${id}?tab=details` })
 
     await req('PATCH', `/api/core/productions/${id}`, { summary: 'Short.', categoryTermId: await term('core.production-category', 'comedy'), externalBookingUrl: BOOKING })
     const strobe = await term('core.advisory', (await rows<{ slug: string }>("SELECT slug FROM core_terms WHERE vocabulary_key = 'core.advisory' LIMIT 1"))[0]!.slug)
     expect((await req('PUT', `/api/core/productions/${id}/advisories`, { advisories: [{ termId: strobe, level: 'discussed', detail: 'In act two' }] })).status).toBe(200)
     // Content warnings alone are half the answer: the effects still need listing or confirming as none.
-    expect((await req('POST', `/api/core/productions/${id}/publish`)).body.reason).toBe('To publish, the production needs its staging effects, or confirmation that it has none.')
+    expect((await req('POST', `/api/core/productions/${id}/publish`)).body).toMatchObject({ reason: 'This production needs 1 more thing before it can be published.', remedy: 'Still to do: staging effects listed, or none confirmed.' })
     await req('PATCH', `/api/core/productions/${id}`, { effectsConfirmedNone: true })
     expect((await req('POST', `/api/core/productions/${id}/publish`)).status).toBe(200)
     expect((await read(id)).production).toMatchObject({ state: 'published' })
@@ -175,6 +181,19 @@ describe('productions', () => {
     expect((await req('DELETE', `/api/core/productions/${id}`)).body.code).toBe('core.production.not-deletable')
     const draft = await production()
     expect((await req('DELETE', `/api/core/productions/${draft}`)).status).toBe(200)
+  })
+
+  it('duplicate as a new draft with the details and guidance, but not the season, state or web address', async () => {
+    const season = (await req('POST', '/api/core/seasons', { name: 'Duplicating season', startsOn: '2027-01-01', endsOn: '2027-06-30' })).body.id
+    const id = await production({ title: 'Twelfth Night', seasonId: season })
+    await ready(id)
+    await req('POST', `/api/core/productions/${id}/publish`)
+    const copied = await req('POST', `/api/core/productions/${id}/duplicate`)
+    expect(copied.status).toBe(200)
+    const { production: copy, needs } = await read(copied.body.id)
+    expect(copy).toMatchObject({ title: 'Twelfth Night (copy)', slug: 'twelfth-night-copy', state: 'draft', seasonId: null, summary: 'A play about a play.', effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING, publishedAt: null })
+    expect(needs).toEqual([])
+    expect((await req('POST', `/api/core/productions/${id}/duplicate`, {}, viewer)).status).toBe(403)
   })
 
   it('list with search and filters', async () => {

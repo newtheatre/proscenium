@@ -1,12 +1,14 @@
-<!-- One side's inbox (C-30; core part 6): messages newest first, unread ones marked. Opening one
-     marks it read and follows its link, which always stays inside the application. "Mark all read",
-     and archive with Undo; the archived ones are a tab away. Used by My account's Inbox (audience)
-     and the members' area's (members), never mixed. -->
+<!-- The one inbox (C-30, AC-2; core part 6): messages newest first, unread ones marked, from every
+     side the person has. A member can narrow it to the members' side or to bookings and account.
+     Opening one marks it read and follows its link, which always stays inside the application.
+     "Mark all read", and archive with Undo; the archived ones are a tab away. Used by My account's
+     Inbox and the members' area's, which are the same messages and the same count. -->
 <script setup lang="ts">
 import type { InboxItem, InboxPage } from '../../server/notifications/inbox'
 
-const props = defineProps<{ side: 'audience' | 'members' }>()
 const { t } = useT()
+const { has } = useViewer()
+const route = useRoute()
 const { $api } = useNuxtApp()
 const { brief } = useDates()
 const { toRefusal } = useRefusal()
@@ -18,9 +20,19 @@ const views = computed(() => [
   { value: 'current', label: t('core.inbox.current') },
   { value: 'archived', label: t('core.inbox.archived') },
 ])
+// A member sees both sides together and may narrow them; anyone else has only the audience side.
+const member = computed(() => has('members'))
+type Shown = 'all' | 'audience' | 'members'
+const asked = route.query.side
+const side = ref<Shown>(asked === 'audience' || asked === 'members' ? asked : 'all')
+const sides = computed(() => [
+  { value: 'all', label: t('core.inbox.side-all') },
+  { value: 'members', label: t('core.inbox.side-members') },
+  { value: 'audience', label: t('core.inbox.side-audience') },
+])
 const { data, status, error, refresh } = await useAPI<InboxPage>('/api/core/me/inbox', {
-  key: `core:inbox:${props.side}`,
-  query: computed(() => ({ side: props.side, archived: view.value === 'archived' ? '1' : '0' })),
+  key: 'core:inbox',
+  query: computed(() => ({ side: member.value ? side.value : 'all', archived: view.value === 'archived' ? '1' : '0' })),
 })
 // Older messages fetched with "Show older", after the first page.
 const older = ref<InboxItem[]>([])
@@ -32,11 +44,11 @@ watch(data, (page) => {
 const items = computed(() => [...(data.value?.items ?? []), ...older.value])
 
 // The bell and the menu's count follow what happens here.
-const recount = () => Promise.all([refreshNuxtData('core:inbox-unread'), refreshNuxtData(`core:navigation:${props.side === 'members' ? 'members' : 'account'}`)])
+const recount = () => Promise.all([refreshNuxtData('core:inbox-unread'), refreshNuxtData('core:navigation:members'), refreshNuxtData('core:navigation:account')])
 
 async function showOlder() {
   try {
-    const page = await $api<InboxPage>('/api/core/me/inbox', { query: { side: props.side, archived: view.value === 'archived' ? '1' : '0', before: items.value.at(-1)?.id } })
+    const page = await $api<InboxPage>('/api/core/me/inbox', { query: { side: member.value ? side.value : 'all', archived: view.value === 'archived' ? '1' : '0', before: items.value.at(-1)?.id } })
     older.value.push(...page.items)
     more.value = page.more
   }
@@ -61,7 +73,7 @@ async function open(item: InboxItem) {
 
 async function readAll() {
   try {
-    await $api('/api/core/me/inbox/read-all', { method: 'POST', body: { side: props.side } })
+    await $api('/api/core/me/inbox/read-all', { method: 'POST', body: { side: member.value ? side.value : 'all' } })
     toast.add({ title: t('core.inbox.all-read'), color: 'success' })
     await Promise.all([refresh(), recount()])
   }
@@ -85,14 +97,24 @@ async function setArchived(item: InboxItem, archived: boolean) {
 <template>
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <UTabs
-        v-model="view"
-        :items="views"
-        :content="false"
-        size="sm"
-        variant="link"
-        :aria-label="t('core.inbox.which')"
-      />
+      <div class="flex flex-wrap items-center gap-3">
+        <UTabs
+          v-model="view"
+          :items="views"
+          :content="false"
+          size="sm"
+          variant="link"
+          :aria-label="t('core.inbox.which')"
+        />
+        <USelect
+          v-if="member"
+          v-model="side"
+          :items="sides"
+          size="sm"
+          class="w-48"
+          :aria-label="t('core.inbox.side')"
+        />
+      </div>
       <UButton
         v-if="view === 'current' && (data?.unread ?? 0) > 0"
         :label="t('core.inbox.read-all')"

@@ -17,6 +17,7 @@ export default defineRoute({
   return {
     answer: await answerFor({ productId: record!.id }),
     history: await allergenHistory({ productId: record!.id }),
+    choiceOnly: variants.filter(v => links.choiceOnly.has(v.id)).map(v => v.id),
     sizes: variants.filter(v => links.recipes.get(v.id)?.length).map(v => ({
       variantId: v.id,
       name: v.name,
