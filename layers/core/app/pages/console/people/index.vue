@@ -38,20 +38,16 @@ const hiddenOf = (result: Record<string, unknown>) => {
   return (['unclaimed', 'anonymised'] as const).flatMap(view => hidden[view] ? [{ view, count: hidden[view]! }] : [])
 }
 
-// Inviting needs Who holds what's options, which only someone who reads grants may ask for.
-const { entries } = useViewer()
-const readsGrants = computed(() => entries('console').some(e => e.id === 'core.grants'))
-// Its own key: Who holds what asks the same address with a default, and the two must not share an answer.
-const { data: grantOptions, refresh: refreshOptions } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:people:grant-options', immediate: false })
-if (readsGrants.value) await refreshOptions()
-watch(readsGrants, (may) => { if (may && !grantOptions.value) void refreshOptions() })
-const mayInvite = computed(() => readsGrants.value && !!grantOptions.value?.invite)
+// Inviting needs Who holds what's options, which only someone who reads grants may ask for: for
+// anyone else the answer is a refusal, and there is nothing to offer.
+const { $api } = useNuxtApp()
+const { data: grantOptions } = await useAsyncData('core:people:grant-options', () => $api<GrantOptions>('/api/core/grants/options').catch(() => null))
+const mayInvite = computed(() => !!grantOptions.value?.invite)
 const inviting = ref(false)
 // ?invite=1 (the command palette's Invite someone) opens the dialogue once the page knows the viewer
 // may invite; the flag is then dropped, so going back or reloading does not open it again.
-onMounted(async () => {
+onMounted(() => {
   if (route.query.invite === undefined) return
-  if (readsGrants.value && !grantOptions.value) await refreshOptions()
   if (mayInvite.value) inviting.value = true
   void navigateTo({ query: { ...route.query, invite: undefined } }, { replace: true })
 })

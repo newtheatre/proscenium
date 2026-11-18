@@ -81,7 +81,7 @@ test.describe('someone who gives roles', () => {
     await page.getByRole('button', { name: 'Give a role' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: 'Give a role' })).toBeVisible()
-    await expect(dialog.getByText('Person')).toBeVisible()
+    await expect(dialog.getByText('Person', { exact: true })).toBeVisible()
     await expect(dialog.getByText('Role', { exact: true })).toBeVisible()
     // Pressing the button says what is missing, beside each field.
     await dialog.getByRole('button', { name: 'Give role' }).click()
