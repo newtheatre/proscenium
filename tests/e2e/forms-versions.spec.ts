@@ -75,6 +75,6 @@ test('published versions are listed, read as they were, and one is made the draf
   await visit(page, builder)
   await expect(page.getByText('Your name?').first()).toBeVisible()
   await expect(page.getByText('Have you been before?')).toHaveCount(0)
-  await expect(page.getByText('Version 2', { exact: true })).toBeVisible()
-  await expect(page.getByText('Not shared yet')).toBeVisible()
+  await expect(page.getByText('Version 2', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Not shared yet').first()).toBeVisible()
 })
