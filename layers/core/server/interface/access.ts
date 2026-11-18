@@ -2,7 +2,7 @@
 // a signed-out visitor is sent to sign in and back; a signed-in person with no business in the
 // shell is told the page does not exist; someone in the shell who lacks this screen's ability is
 // told why and what would let them through. A hidden link is tidiness; this is enforcement.
-import type { Actor } from '#kit'
+import { useSetting, type Actor } from '#kit'
 import { moduleTabOf, resolveEntry, shellOf, SHELL_PREFIXES } from '../../shared/navigation'
 import { declaredEntries, holds, mayOpen } from './navigation'
 import { isEntitled, isSignedIn } from './viewer'
@@ -14,6 +14,17 @@ export type AccessDecision
     | { decision: 'redirect', to: string }
     | { decision: 'refused', refusal: { code: string, reason: string, remedy?: string } }
 
+/**
+ * Where a signed-in person who is not a member goes from the members' area, while the area is on:
+ * the account entry a module marks forNonMembers (My membership, which says when theirs ended and
+ * how to renew or join). With no such entry, "not found" as before.
+ */
+async function notAMember(): Promise<AccessDecision> {
+  if (!(await useSetting('core.members-area.enabled'))) return { decision: 'not-found' }
+  const way = (await declaredEntries()).find(e => e.menu === 'account' && e.forNonMembers)
+  return way ? { decision: 'redirect', to: `${way.to}?from=members` } : { decision: 'not-found' }
+}
+
 export async function decideAccess(actor: Actor, path: string): Promise<AccessDecision> {
   const shell = shellOf(path)
   if (!shell) return { decision: 'allow' }
@@ -22,12 +33,14 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
   if (isHome) {
     // A shell's home belongs to the shell: whoever is entitled to it may open it.
     if (!isSignedIn(actor)) return { decision: 'sign-in' }
-    return (await isEntitled(actor, shell)) ? { decision: 'allow' } : { decision: 'not-found' }
+    if (await isEntitled(actor, shell)) return { decision: 'allow' }
+    return shell === 'members' ? notAMember() : { decision: 'not-found' }
   }
   const entries = (await declaredEntries()).filter(e => e.menu === shell)
   const entry = resolveEntry(entries, path)
   if (!entry) return { decision: 'not-found' }
   if (!isSignedIn(actor)) return { decision: 'sign-in' }
+  if (shell === 'members' && !(await isEntitled(actor, shell))) return notAMember()
   if (!(await isEntitled(actor, shell))) {
     // A tab of a module's page in Admin opens for console staff who may use it in the console's
     // settings window, which draws the same screen; a link or bookmark to it lands there.

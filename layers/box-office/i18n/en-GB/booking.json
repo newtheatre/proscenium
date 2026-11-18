@@ -1,0 +1,7 @@
+{
+  "box-office.book.add": "Add a {type} ticket",
+  "box-office.book.remove": "Remove a {type} ticket",
+  "box-office.book.most.one": "One per person.",
+  "box-office.book.most.other": "Up to {count} per person.",
+  "box-office.book.sign-in": "Sign in"
+}

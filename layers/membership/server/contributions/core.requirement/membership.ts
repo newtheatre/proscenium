@@ -33,6 +33,31 @@ async function survivor(accountId: string): Promise<string> {
 }
 
 const matches = (ref: string, m: Held) => ref === ANY || m.schemeId === ref
+const MINE = '/account/membership'
+
+/** The last day of the latest membership of this account that has lapsed (past its end and grace), for a reference. */
+async function lastLapsed(accountId: string, ref: string, day: string): Promise<string | null> {
+  const row = await first<{ endsOn: string }>(
+    `SELECT m.ends_on AS endsOn FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id
+      WHERE m.account_id IN (${accountScopeSql('?1')}) AND m.state = 'active' AND m.ends_on IS NOT NULL
+        AND date(m.ends_on, '+' || s.grace_days || ' days') < ?2 ${ref === ANY ? '' : 'AND m.scheme_id = ?'}
+      ORDER BY m.ends_on DESC LIMIT 1`,
+    accountId, day, ...(ref === ANY ? [] : [ref]),
+  )
+  return row?.endsOn ?? null
+}
+
+/** Whether somebody could join a scheme this reference counts, themselves, now. */
+async function mayJoin(ref: string, scheme: Scheme | null): Promise<boolean> {
+  const schemes = ref === ANY ? await listSchemes(['open']) : scheme?.state === 'open' ? [scheme] : []
+  return schemes.some(s => s.joinMode === 'apply')
+}
+
+/** A day written out for a sentence, in the theatre's language: "1 October 2026". */
+async function longDate(day: string): Promise<string> {
+  const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.parse(`${day}T00:00:00Z`))
+}
 
 interface Entry { id: string, endsOn: string | null, usedBy: string | null }
 
@@ -209,11 +234,19 @@ export default defineRequirementSource({
           out.push({ account, ref: fullRef, verdict: 'not-met', reason, help, summary: 'No current membership found for the reference given.' })
           continue
         }
+        if (ref !== ANY && (!scheme || scheme.state === 'archived')) {
+          out.push({ account, ref: fullRef, verdict: 'not-met', reason: 'This price is for a membership that is no longer offered.', summary: 'Not a member.' })
+          continue
+        }
+        // A signed-in person is told why and where to put it right: renew what lapsed, or join.
+        const ended = account ? await lastLapsed(account, ref, day) : null
+        const joinable = account && !ended ? await mayJoin(ref, scheme) : false
         out.push({
           account,
           ref: fullRef,
           verdict: 'not-met',
-          reason: ref !== ANY && (!scheme || scheme.state === 'archived') ? 'This price is for a membership that is no longer offered.' : 'This price is for members.',
+          reason: ended ? `Your membership ended on ${await longDate(ended)}.` : 'This price is for members.',
+          ...(ended ? { remedy: { label: 'Renew', to: MINE } } : joinable ? { remedy: { label: 'Join', to: MINE } } : {}),
           summary: 'Not a member.',
         })
       }
