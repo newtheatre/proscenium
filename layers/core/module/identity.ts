@@ -153,8 +153,9 @@ export const identityEvents = {
 export const identityJobs = {
   // The link and code travel sealed with a key derived from CORE_SESSION_KEY, never in clear.
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
-  // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
-  'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
+  // One stage of the erasure for one request (ID-16); each stage queues the next. Safe to repeat: a
+  // stage already run writes nothing.
+  'core.run-erasure': job({ payload: z.object({ requestId: z.string(), stage: z.number().int().min(0).optional(), pass: z.number().int().min(0).optional() }), lane: 'prompt' }),
   // Stage two of a merge (part 4, Merge): `start` queues one chain per module, each `module` step is
   // one unit (a handler, or a share of the module's move columns), and `finish` sets completed_at
   // once nothing is left. Every step is safe to repeat.

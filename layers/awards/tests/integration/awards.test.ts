@@ -2,7 +2,6 @@
 // decided, for an account, a new address or a name alone, and may correct or revoke it; the holder
 // sees theirs and chooses where each is listed; erasing a person takes theirs off the roll.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createUnit } from '#kit'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { eraseAccount } from '../../../core/server/identity/erasure'
 import { awardType, holder, holds, issue, NOV_17, ready, req } from './stage'
@@ -123,9 +122,7 @@ describe('the holder', () => {
     const ada = await holder('Ada Gone')
     const id = await issue(type, { accountId: ada.accountId, citation: 'For everything.' })
     await inContext(async () => {
-      const unit = createUnit()
-      await eraseAccount(unit.view(), ada.accountId!)
-      await unit.commit()
+      await eraseAccount(ada.accountId!)
     })
     const [row] = await rows<{ visibility: string, recipient_name: string, citation: string | null }>('SELECT visibility, recipient_name, citation FROM awards_awards WHERE id = ?', id)
     expect(row!.visibility).toBe('hidden')
