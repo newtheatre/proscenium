@@ -283,6 +283,18 @@ describe('selling at the desk', () => {
     expect((await till({ ...input, accountId: 'acc_nobody' })).body.code).toBe('box-office.desk.no-address')
   })
 
+  it('marks a companion ticket, which is named for the access scheme member it goes with', async () => {
+    // Tomorrow, so it is in the desk's list.
+    const h = await house(3, { startsAt: nowMs() + 86_400_000 })
+    await inContext(async () => (await import('../../server/ticket-types')).ensureManagedTicketTypes())
+    const [companion] = await rows<{ id: string }>("SELECT id FROM box_office_ticket_types WHERE managed_by = 'box-office.companion'")
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: companion!.id, amountMinor: 0 }] })).status).toBe(200)
+    const desk = await req('GET', '/api/box-office/desk/performances', undefined, seller)
+    const rowsOf = desk.body.performances.find((p: { performanceId: string }) => p.performanceId === h.performanceId).rows as { ticketTypeId: string, holder?: true, companion?: true }[]
+    expect(rowsOf.find(r => r.ticketTypeId === companion!.id)).toMatchObject({ holder: true, companion: true })
+    expect(rowsOf.find(r => r.ticketTypeId === h.fullId)).not.toHaveProperty('companion')
+  })
+
   it('takes a promo code the buyer gives, on the dearest tickets first, and gives its uses back when the payment is cancelled', async () => {
     const h = await house(5)
     const code = 'DESK' + h.performanceId.slice(-6).toUpperCase()

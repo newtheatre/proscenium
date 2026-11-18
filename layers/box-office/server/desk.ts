@@ -427,7 +427,7 @@ export interface DeskPerformance {
    * `reference`, on a member price: what the buyer may give instead of the seller checking by hand,
    * worded by its source. `holder`: each ticket is for someone who qualifies, named at the till.
    */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }[]
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }[]
 }
 
 /**
@@ -448,8 +448,10 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
   const sold = new Map((await all<{ performance_id: string, state: string }>("SELECT performance_id, state FROM box_office_performance_sales WHERE state <> 'draft'")).map(r => [r.performance_id, r.state]))
   const coming = (await listPerformances({ state: 'scheduled', from: at - until, to: at + AHEAD })).filter(p => sold.has(p.id) && p.startsAt + until > at).slice(0, MOST)
   // An online-only type is not offered at the desk.
-  const kinds = await all<{ id: string, name: string, requirement_refs: string | null }>("SELECT id, name, requirement_refs FROM box_office_ticket_types WHERE channel <> 'online'")
+  const kinds = await all<{ id: string, name: string, kind: string, requirement_refs: string | null }>("SELECT id, name, kind, requirement_refs FROM box_office_ticket_types WHERE channel <> 'online'")
   const names = new Map(kinds.map(t => [t.id, t.name]))
+  // A companion ticket is named for the person on the access scheme it goes with, not the companion.
+  const companions = new Set(kinds.filter(t => t.kind === 'companion').map(t => t.id))
   // A member price can take the buyer's reference, such as a student ID, typed by the seller in place of checking by hand.
   const refsOf = new Map(kinds.map(t => [t.id, t.requirement_refs ? JSON.parse(t.requirement_refs) as string[] : []]))
   const described = await requirements.describe([...new Set([...refsOf.values()].flat())])
@@ -464,7 +466,7 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       currency: available.currency,
       rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map((x) => {
         const reference = referenceOf(x.ticketTypeId)
-        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}), ...(refsOf.get(x.ticketTypeId)?.length ? { holder: true as const } : {}) }
+        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}), ...(refsOf.get(x.ticketTypeId)?.length ? { holder: true as const } : {}), ...(companions.has(x.ticketTypeId) ? { companion: true as const } : {}) }
       })),
     }
   }))
