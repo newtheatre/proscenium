@@ -55,7 +55,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
   catch (error) {
     const status = (error as { statusCode?: number }).statusCode ?? 503
-    throw createError({ statusCode: status, statusMessage: 'This page could not be checked', fatal: true })
+    // Too many requests is its own page, which says to wait and offers to try again.
+    throw createError({ statusCode: status, statusMessage: status === 429 ? 'Too many requests' : 'This page could not be checked', fatal: true })
   }
   if (answer.decision === 'refused') throw createError({ statusCode: 403, statusMessage: 'Not allowed', data: answer.refusal, fatal: true })
   if (answer.decision === 'redirect') return navigateTo(answer.to, { replace: true })

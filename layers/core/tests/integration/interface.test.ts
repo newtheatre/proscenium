@@ -232,6 +232,9 @@ describe("core's settings", () => {
     // A module id is every tab of that module, for an Admin address opened from the console.
     expect((await window('core', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core', '/admin/modules/core/people', '/admin/modules/core/seasons', '/admin/modules/core/run-presets', '/admin/modules/core/venues', '/admin/modules/core/closures'])
     expect((await call(handle, 'GET', '/api/core/settings-window?for=nothing.here', { actor: everything })).status).toBe(404)
+    // A producer who may change none of it gets no tabs, so the console shows no cog (L39).
+    const producer = person(['core.production.create', 'core.production.publish', 'core.performance.schedule'])
+    expect((await window('core.productions', producer)).tabs).toEqual([])
   })
 
   it('have no console page of their own: each group is on one page, mostly in Admin', async () => {
@@ -268,8 +271,10 @@ describe('Admin (R-33)', () => {
   it('opens to a person who holds the ability of an admin entry, and is not found for anyone else', async () => {
     expect((await decide('/admin', admin())).decision).toBe('allow')
     expect((await decide('/admin/advanced', admin())).decision).toBe('allow')
-    expect((await decide('/admin', staff())).decision).toBe('not-found')
-    expect((await decide('/admin/advanced', staff())).decision).toBe('not-found')
+    // Console staff are told they have no access, and whom to ask, rather than that it does not exist.
+    expect(await decide('/admin', staff())).toEqual({ decision: 'refused', refusal: expect.objectContaining({ code: 'core.access.no-admin' }) })
+    expect(await decide('/admin/advanced', staff())).toEqual({ decision: 'refused', refusal: expect.objectContaining({ code: 'core.access.no-admin' }) })
+    expect((await decide('/admin/advanced', audience())).decision).toBe('not-found')
     expect((await decide('/admin')).decision).toBe('sign-in')
   })
 
@@ -473,8 +478,9 @@ describe('Admin in the viewer (R-33)', () => {
     expect(await sides(audience())).not.toContain('admin')
   })
 
-  it('answers /admin as a missing page to someone with no admin ability', async () => {
-    expect((await decide('/admin', staff())).decision).toBe('not-found')
+  it('answers /admin as a missing page to someone with no admin ability, and as no access to console staff', async () => {
+    expect((await decide('/admin', audience())).decision).toBe('not-found')
+    expect((await decide('/admin', staff())).decision).toBe('refused')
     expect((await decide('/admin', person(['core.settings.manage']))).decision).toBe('allow')
   })
 })

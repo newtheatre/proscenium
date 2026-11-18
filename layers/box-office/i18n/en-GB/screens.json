@@ -165,7 +165,7 @@
   "box-office.order.cancel.line-used": "Used at the door, so it cannot be cancelled.",
   "box-office.order.cancel.refund.amount": "{amount} goes back for {count} tickets.",
   "box-office.order.cancel.refund.amount.one": "{amount} goes back for 1 ticket.",
-  "box-office.navigation.performances.label": "Performances",
+  "box-office.navigation.performances.label": "Ticket set-up",
   "box-office.navigation.ticket-types.label": "Ticket types",
   "box-office.performances.description": "Performances still to come, with their sales.",
   "box-office.performances.empty.title": "No performances to come",

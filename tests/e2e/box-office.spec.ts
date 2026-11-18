@@ -307,7 +307,7 @@ test.describe('the box office console', () => {
     await page.keyboard.press('Escape')
 
     await visit(page, '/console/box-office/performances')
-    await expect(page.getByRole('heading', { level: 1, name: 'Performances' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Ticket set-up' })).toBeVisible()
     await noViolations(page)
 
     await visit(page, `/console/box-office/performances/${performanceId}`)

@@ -175,8 +175,9 @@ test.describe('staff who also run the console', () => {
 test.describe('a person with no admin ability', () => {
   test.use(as(person('Nia None', [grant('gallery.sample.view')])))
 
-  test('finds /admin is not there, and no menu entry for it', async ({ page }) => {
-    expect((await page.goto('/admin'))?.status()).toBe(404)
+  test('is told they have no access to /admin and whom to ask, and has no menu entry for it', async ({ page }) => {
+    expect((await page.goto('/admin'))?.status()).toBe(403)
+    await expect(page.getByText('Ask an Owner to give you a role that includes it.')).toBeVisible()
     await visit(page, '/console')
     await page.getByRole('button', { name: /Open the menu for Nia None/ }).first().click()
     await expect(page.getByRole('menuitem', { name: 'Admin', exact: true })).toHaveCount(0)
