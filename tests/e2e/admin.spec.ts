@@ -162,7 +162,7 @@ test.describe('the organisation\'s year end', () => {
     await page.getByRole('button', { name: 'Save organisation settings' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Save this change?')
-    await expect(dialog).toContainText(/Year end (is not set yet\. It will be|goes from .+ to) 31 July\./)
+    await expect(dialog).toContainText(/Year end (is set to|goes from .+ to) 31 July\./)
     await expect(dialog.getByRole('button', { name: 'Save the change' })).not.toHaveClass(/bg-error/)
     await dialog.getByRole('button', { name: 'Save the change' }).click()
     await expect(page.getByText('Saved 1 change', { exact: true }).first()).toBeVisible()
