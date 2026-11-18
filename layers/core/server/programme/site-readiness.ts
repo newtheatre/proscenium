@@ -3,6 +3,7 @@
 // venues with no access recorded, and productions the content warnings migration left unfinished.
 // Each item says where it is put right. The theatre's own pages are the public site's to read.
 import { all, useSetting } from '#kit'
+import { policyReadiness, type PolicyReadinessItem } from '../policies/readiness'
 
 export interface ReadinessItem {
   /** What the line is about: a production's title, a venue's name; absent for the brand's own. */
@@ -21,6 +22,8 @@ export interface CoreReadiness {
   levelsAssumed: ReadinessItem[]
   /** Published productions with no answer on staging effects. */
   effectsUnanswered: ReadinessItem[]
+  /** What the policies (/policies) still lack: sections to write, facts to give, default text to review. */
+  policies: PolicyReadinessItem[]
 }
 
 const BRANDING = '/admin/branding'
@@ -63,5 +66,6 @@ export async function coreReadiness(): Promise<CoreReadiness> {
     venues: venues.map(v => ({ name: v.name, to: `/admin/modules/core/venues/${v.id}` })),
     levelsAssumed: levelsAssumed.map(production('advisories')),
     effectsUnanswered: effectsUnanswered.map(production('advisories')),
+    policies: await policyReadiness(),
   }
 }

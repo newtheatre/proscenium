@@ -138,6 +138,10 @@ export default defineModule({
       { id: 'membership.member-fields', subject: 'membership.membership', attach: 'membership.scheme.manage', edit: 'membership.membership.fields', mode: 'record' as const, label: 'membership.forms.member-fields.label', limit: 1 },
     ],
     // Membership's lines of the privacy notice's "what we hold" table (/policies/privacy).
+    // The terms a person agrees to by joining. Their text is content/policies/membership/*.md.
+    'core.policy': [
+      { id: 'membership', title: 'Membership terms', summary: 'Joining, how long membership lasts, leaving, and how members are asked to behave.', order: 18, kind: 'terms', accepted: 'joining' },
+    ],
     'core.privacy-record': [
       { id: 'membership.memberships', holds: 'Your membership: its kind, its dates and your membership number', why: 'To run your membership', basis: 'To carry out our contract with you', keptFor: 'While you are a member', order: 150 },
       { id: 'membership.ended', holds: 'Memberships that have ended', why: 'To answer questions about past membership', basis: 'Our legitimate interests in keeping an accurate record of who our members were', keptFor: 'membership.retention.ended-after', order: 160 },

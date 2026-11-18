@@ -29,5 +29,16 @@
   "core.settings.privacy.data-location.label": "Where the database is kept",
   "core.settings.privacy.data-location.help": "In words, such as the European Union. Quoted in the privacy notice; left empty, the notice does not name a place.",
   "core.settings.accounts.minimum-age.label": "Youngest age for an account",
-  "core.settings.accounts.minimum-age.help": "Stated in the terms of use and the privacy notice. It is not checked when someone signs up."
+  "core.settings.accounts.minimum-age.help": "Stated in the terms of use and the privacy notice. It is not checked when someone signs up.",
+  "core.policies.versions.link": "Earlier versions",
+  "core.policies.versions.title": "{policy}: versions",
+  "core.policies.versions.description": "Each version of this policy that has been in force, newest first.",
+  "core.policies.versions.current": "Read the current version",
+  "core.policies.versions.none": "No version has been recorded yet.",
+  "core.policies.versions.from": "In force from {date}",
+  "core.policies.versions.number": "Version {number}",
+  "core.policies.versions.old": "This is how the policy read at the time. It may have changed since.",
+  "core.settings-sections.policies": "Policies",
+  "core.settings.policies.reviewed.label": "Policies that have been reviewed",
+  "core.settings.policies.reviewed.help": "The policies whose text a competent person has read for your theatre, by the last part of each address: privacy, terms, accessibility, visiting, tickets. Site readiness lists the rest."
 }

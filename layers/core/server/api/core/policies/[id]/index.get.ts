@@ -2,7 +2,7 @@
 // the page to draw. Which sections apply is decided here, from what is switched on and set today.
 import { getRouterParam } from 'h3'
 import { defineRoute, refuse } from '#kit'
-import { resolvePolicy, sectionPath } from '../../../policies/service'
+import { resolvePolicy, sectionPath } from '../../../../policies/service'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (event) => {
   const resolved = await resolvePolicy(getRouterParam(event, 'id') ?? '')

@@ -6,6 +6,7 @@
 import { sql } from 'drizzle-orm'
 import { first, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
 import { findOrCreateAccount } from '#modules/core'
+import { stampTerms } from './terms'
 import { collect, methodsFor, refreshIntent, startAttempt, type StartResult } from '#modules/payments'
 import { basketByToken, type BasketView } from './baskets'
 import { hashOf } from './codes'
@@ -65,6 +66,7 @@ export async function startCheckout(unit: UnitView, input: CheckoutInput): Promi
   if (!signedIn && !input.email) refuse('box-office.checkout.email-needed', 'We need an email address to send your tickets to.', { status: 422, fields: { email: 'required' } })
   const found = signedIn ? null : await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
   const accountId = found ? found.accountId : actor.accountId!
+  await stampTerms(unit, order.id)
 
   if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith: found?.madeWith } })
 

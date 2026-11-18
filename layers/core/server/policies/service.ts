@@ -4,9 +4,12 @@
 import { formatSetting, isEnabled, useSetting, usePoint } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
-import { sections as allSections, sitePolicies } from '#policies'
 import { allHold, readConditions, renderPolicy, selectSections, type PolicyContext, type PolicySection, type PolicyTable, type PolicyValue } from '../../shared/policies'
 import type { PolicyFact } from '../points/policy-fact'
+
+// The bundle is written by `bun run generate`, which itself loads server files that reach this one, so
+// it is read when first needed and not when this file is loaded.
+export const policyBundle = () => import('#policies')
 
 export type PolicyKind = 'notice' | 'terms' | 'rules' | 'statement'
 export interface Policy {
@@ -25,6 +28,7 @@ interface PolicyDecl { id: string, title: string, summary?: string, order: numbe
 /** Every policy a switched-on module declares, and the theatre's own, in footer order. */
 export async function listPolicies(): Promise<Policy[]> {
   const declared = (await usePoint<PolicyDecl>('core.policy')).map(c => ({ ...c.value, module: c.module }))
+  const { sitePolicies } = await policyBundle()
   const own = sitePolicies.filter(p => !declared.some(d => d.id === p.id)).map(p => ({ id: p.id, title: p.title, order: p.order, kind: p.kind, module: 'site' }))
   return [...declared, ...own].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 }
@@ -122,6 +126,7 @@ export async function resolvePolicy(id: string, context?: PolicyContext): Promis
   const policy = (await listPolicies()).find(p => p.id === id)
   if (!policy) return null
   const ctx = context ?? await policyContext()
+  const { sections: allSections } = await policyBundle()
   const selected = selectSections(allSections, id, ctx)
   const revised = selected.sections.map(s => s.revised).filter((d): d is string => !!d).sort().pop() ?? null
   return { policy, ...selected, context: ctx, revised }

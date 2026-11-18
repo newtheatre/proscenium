@@ -132,6 +132,8 @@ export default defineModule({
   tasks: {
     'core.prune-history': task({ dailyAt: '04:00' }),
     'core.rotate-signing-keys': task({ dailyAt: '03:30' }),
+    // Writes a version of each policy whose text reads differently from the last one recorded.
+    'core.record-policy-versions': task({ every: '1h' }),
     'core.search-rebuild': task({ dailyAt: '04:30' }),
     ...identity.identityTasks,
     ...domain.tasks,

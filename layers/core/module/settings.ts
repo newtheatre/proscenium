@@ -24,6 +24,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'site': on('theatre'),
   'organisation': on('theatre'),
   'complaints': on('theatre'),
+  'policies': on('theatre'),
   'visiting': on('theatre'),
   'locale': on('theatre'),
   // Branding is to become a bespoke screen; until it is, its groups are drawn on a generated page there.

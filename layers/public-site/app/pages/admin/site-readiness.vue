@@ -36,6 +36,15 @@ const sections = computed<Section[]>(() => {
     },
     { id: 'components', lines: r.components.map(c => ({ id: `${c.path}:${c.tag}`, name: c.name, description: t('public-site.readiness.components.line', { tag: c.tag, module: nameOf(c.module), file: c.file }), to: `/admin/modules/${c.module}` })) },
     { id: 'settings', lines: r.settings.map(s => ({ id: `${s.path}:${s.key}`, name: settingLabel(s.key), description: t('public-site.readiness.settings.line', { page: s.name }), to: s.to })) },
+    {
+      id: 'policies',
+      lines: r.policies.map((p, n) => ({
+        id: `${p.kind}-${n}`,
+        name: p.kind === 'setting' ? settingLabel(p.key ?? '') : p.name,
+        description: t(`public-site.readiness.policies.${p.kind}`, { file: p.file ?? '' }),
+        to: p.to,
+      })),
+    },
     { id: 'venues', lines: r.venues.map(v => ({ id: v.to, name: v.name ?? '', description: t('public-site.readiness.venues.line'), to: v.to })) },
     {
       id: 'productions',

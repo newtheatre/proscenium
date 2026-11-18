@@ -9,6 +9,7 @@
 // the reserving. That link holds a random token and nothing else: its hash is on the basket with
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
+import { stampTerms } from './terms'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
 import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress, placeName } from '#modules/core'
@@ -130,6 +131,7 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
 async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean, madeWith?: { address: string } | null): Promise<Reserved | Confirmed> {
+  await stampTerms(unit, order.id)
   // An order with nothing to pay never rests reserved: it is confirmed and its tickets issued at once.
   if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith } })
   const at = nowMs()

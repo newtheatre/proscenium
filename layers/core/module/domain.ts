@@ -29,6 +29,9 @@ export const settings = defineSettings('core', {
   'organisation.law': setting.text({ default: 'England and Wales', maxLength: 60, change: organisation, audience: 'public', quotable: true }),
   // What the policies promise and the house rules say (/policies). Each is quoted by the text, so
   // the page and the practice cannot drift apart; changing one changes what the policy says.
+  // The policies whose default text a competent person has read for this theatre, by their ids
+  // (privacy, terms). Site readiness lists each policy that is not here.
+  'policies.reviewed': setting.list({ default: [], of: 'text', maxLength: 60, change: organisation, onChange: 'confirm' }),
   'complaints.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change: organisation, audience: 'public', quotable: true }),
   'visiting.latecomers': setting.choice({ default: 'suitable-break', options: ['suitable-break', 'not-admitted', 'staff-decide'], change: organisation, audience: 'public' }),
   // Children under this age come with an adult. 0 says nothing about it.
