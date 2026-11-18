@@ -83,6 +83,24 @@ describe('holding a scheme', () => {
     expect(mine.memberships).toMatchObject([{ schemeName: 'Student member', length: '36 months', status: 'current' }])
   })
 
+  it('restates the lengths when the rule changes between months and scheme years, and refuses what cannot be', async () => {
+    const id = await scheme({}, [12, 36])
+    const fixed = await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'fixed', fixedEndMonth: 7, fixedEndDay: 31 })
+    expect(fixed.status, JSON.stringify(fixed.body)).toBe(200)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.options.map((o: any) => o.count)).toEqual([1, 3])
+    const back = await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'rolling', fixedEndMonth: null, fixedEndDay: null })
+    expect(back.status, JSON.stringify(back.body)).toBe(200)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.options.map((o: any) => o.count)).toEqual([12, 36])
+
+    // 6 months is not a whole number of scheme years; nothing is changed.
+    const odd = await scheme({}, [6])
+    const refused = await req('PATCH', `/api/membership/schemes/${odd}`, { lengthRule: 'fixed', fixedEndMonth: 7, fixedEndDay: 31 })
+    expect(refused.body.code).toBe('membership.scheme.lengths-fixed')
+    expect((await req('GET', `/api/membership/schemes/${odd}`)).body.scheme.lengthRule).toBe('rolling')
+    // Indefinite has no unit to restate them in.
+    expect((await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'indefinite' })).body.code).toBe('membership.scheme.lengths-fixed')
+  })
+
   it('gives a supporters\' scheme its benefits and never the members\' area (MEM-07)', async () => {
     const id = await scheme({ side: 'audience', lengthRule: 'indefinite' }, [])
     await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
