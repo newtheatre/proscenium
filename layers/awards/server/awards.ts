@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
+import { isUnclaimed } from '#modules/core'
 import type { SOURCES } from './db/schema'
 import { VISIBILITIES } from './db/schema'
 import type { AwardType } from './types'
@@ -86,6 +87,15 @@ export const awardFields = z.object({
   decisionNote: z.string().trim().max(500).nullable(), // not-policy: a reference, not minutes
   visibility: z.enum(VISIBILITIES),
 })
+
+/**
+ * Where a new award is listed when nobody has said: the type's choice, except for somebody who has
+ * never signed in (`claimed` says so when the caller has just found or made the account), whose award waits unlisted until they choose (or staff correct it), so a person
+ * who never signs in is not put on the public roll for them.
+ */
+export async function startingVisibility(type: AwardType, accountId: string | null, claimed?: boolean): Promise<typeof VISIBILITIES[number]> {
+  return accountId && type.defaultVisibility !== 'hidden' && !(claimed ?? !await isUnclaimed(accountId)) ? 'hidden' : type.defaultVisibility
+}
 
 export interface NewAward {
   type: AwardType
