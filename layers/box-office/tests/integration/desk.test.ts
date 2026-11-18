@@ -4,7 +4,7 @@
 // issues the tickets, admits them and posts the sale in one batch and failure leaves the
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, nowMs, setClock } from '#kit'
 import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
@@ -55,6 +55,25 @@ beforeAll(async () => {
   })
   cash = (await rows<{ id: string }>("SELECT id FROM payments_provider_accounts WHERE provider = 'cash'"))[0]!.id
   for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
+})
+
+describe('a till session opened by a sale', () => {
+  const spaceOf = async (h: House) => (await rows<{ space_id: string }>('SELECT space_id FROM core_performances WHERE id = ?', h.performanceId))[0]!.space_id
+  const fresh = () => person(['payments.session.open', 'box-office.order.view', 'box-office.order.sell'])
+  const opening = (h: House, actor: ReturnType<typeof person>, spaceId?: string) => req('POST', '/api/payments/till/session', { spaceId, panels: [{ basket: 'box-office', input: { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] } }] }, actor)
+
+  it('opens at the space of tonight\'s performance when the device has no place', async () => {
+    const tonight = await house(4, { startsAt: nowMs() + 60_000 })
+    const opened = await opening(tonight, fresh())
+    expect(opened.body, JSON.stringify(opened.body)).toMatchObject({ opened: true, session: { spaceId: await spaceOf(tonight) } })
+  })
+
+  it('keeps the device\'s own place, and says nothing for a performance on another day', async () => {
+    const tonight = await house(4, { startsAt: nowMs() + 60_000 })
+    const later = await house(4)
+    expect((await opening(tonight, fresh(), await spaceOf(later))).body.session.spaceId).toBe(await spaceOf(later))
+    expect((await opening(later, fresh())).body.session.spaceId).not.toBe(await spaceOf(later))
+  })
 })
 
 describe('a reservation at the desk', () => {

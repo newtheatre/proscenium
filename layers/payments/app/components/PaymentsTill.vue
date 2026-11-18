@@ -74,7 +74,9 @@ onMounted(() => { nextPlace.value = deviceSpace() ?? session.value?.defaultSpace
 /** Opens the seller's session if none is open, at this device's place. True once one is. */
 async function ensureSession(): Promise<boolean> {
   if (open.value) return true
-  await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace() } })
+  // The sale goes too, so a sale for tonight's performance opens the session at its space when this
+  // device has no place of its own.
+  await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace(), panels: filled.value } })
   await refreshSession()
   return open.value
 }
