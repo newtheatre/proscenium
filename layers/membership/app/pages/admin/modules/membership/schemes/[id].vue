@@ -488,6 +488,7 @@ async function addMember() {
               >
                 <DurationInput
                   v-model="rolloverWindow"
+                  block
                   :label="t('membership.screens.scheme.rollover')"
                   min="0d"
                   max="180d"
@@ -501,6 +502,7 @@ async function addMember() {
               >
                 <DurationInput
                   v-model="renewalWindow"
+                  block
                   :label="t('membership.screens.scheme.renewal-opens')"
                   min="0d"
                   max="180d"
@@ -512,6 +514,7 @@ async function addMember() {
               >
                 <DurationInput
                   v-model="graceWindow"
+                  block
                   :label="t('membership.screens.scheme.grace')"
                   min="0d"
                   max="90d"
