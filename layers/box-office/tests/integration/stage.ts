@@ -51,6 +51,7 @@ import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import sessionGet from '../../../payments/server/api/payments/session.get'
 import intentCancelPost from '../../../payments/server/api/payments/intents/[id]/cancel.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
+import homeGet from '../../../core/server/api/core/home.get'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
 import orderAccountPost from '../../server/api/box-office/orders/link/account.post'
 import exchangePost from '../../server/api/box-office/orders/[id]/exchange.post'
@@ -143,6 +144,7 @@ export const handle = server({
   'GET /api/payments/session': sessionGet,
   'POST /api/payments/intents/:id/cancel': intentCancelPost,
   'POST /api/payments/till/summary': tillSummaryPost,
+  'GET /api/core/home': homeGet,
 })
 
 export const manager = person(['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage'])
