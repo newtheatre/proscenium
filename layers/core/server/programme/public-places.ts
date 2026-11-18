@@ -96,6 +96,8 @@ export interface SeasonProduction {
   category: PublicTerm | null
   /** The first performance that is not a draft; null while it has none. */
   firstStartsAt: number | null
+  /** The last performance's start, on the same terms: a card's date range ends here. */
+  lastStartsAt: number | null
   lastEndsAt: number | null
   cancelled: boolean
   /** Worked out as on the production page: cancelled, or its last performance has ended. */
@@ -127,10 +129,12 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
   )
   if (!s || (s.state === 'archived' && !pastVisible)) return null
   const now = options.now ?? nowMs()
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, age_min: number | null, age_restricted: number, has_effects: number }>(
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, last_starts_at: number | null, age_min: number | null, age_restricted: number, has_effects: number, has_warnings: number }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.state, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
         p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
+        EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id) AS has_warnings,
         (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
+        (SELECT max(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS last_starts_at,
         (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
        FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id
       WHERE p.season_id = ? AND p.state IN ('published', 'cancelled') AND p.listed = 1
@@ -148,12 +152,14 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
       summary: r.summary,
       category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
       firstStartsAt: r.opened_at,
+      lastStartsAt: r.last_starts_at,
       lastEndsAt: r.closed_at,
       cancelled: r.state === 'cancelled',
       past,
       poster: images.get(r.id)!.poster,
       age: ageWording(r.age_min, !!r.age_restricted),
       hasEffects: !!r.has_effects,
+      hasWarnings: !!r.has_warnings,
     }
   })
   return {

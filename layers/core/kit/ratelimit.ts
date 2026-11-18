@@ -13,11 +13,14 @@ import { nowMs } from './clock'
 import type { Rate } from './settings'
 
 // presented-value counts checks that carry a value a person typed (a membership number, a code).
-export const RATE_CLASSES = ['default', 'write', 'sign-in', 'public-form', 'export', 'presented-value'] as const
+// sign-in-network counts what one network address asks of sign-in as a whole, generously, since a
+// theatre's bar or foyer puts many people behind one address; the strict sign-in class is then
+// counted per email address (and address plus network) inside the routes.
+export const RATE_CLASSES = ['default', 'write', 'sign-in', 'sign-in-network', 'public-form', 'export', 'presented-value'] as const
 export type RateClass = typeof RATE_CLASSES[number]
 
 /** Classes counted in the shared store, shared by every instance. */
-export const SHARED_RATE_CLASSES: ReadonlySet<string> = new Set(['sign-in', 'public-form', 'presented-value'])
+export const SHARED_RATE_CLASSES: ReadonlySet<string> = new Set(['sign-in', 'sign-in-network', 'public-form', 'presented-value'])
 
 export interface RateDecision {
   allowed: boolean

@@ -7,7 +7,7 @@
 type State = 'open' | 'awaiting_payment' | 'paid' | 'void'
 interface Reversal { id: string, state: 'requested' | 'succeeded' | 'failed', quantity: number, amountMinor: number, reason: string, stockOutcome: string, at: number }
 interface Line { id: string, label: string, quantity: number, unitMinor: number, amountMinor: number, reversedQuantity: number, reversedMinor: number, reversals: Reversal[] }
-interface AgeCheck { outcome: 'not_needed' | 'id_checked' | 'self_attested' | 'refused', reason: string | null, product: string | null, at: number }
+interface AgeCheck { outcome: 'not_needed' | 'id_checked' | 'self_attested' | 'refused', reason: string | null, product: string | null, scope: 'restricted' | 'all' | null, idType: string | null, at: number }
 interface Sale { id: string, reference: string, state: State, totalMinor: number, outlet: string, operatingDay: string, soldBy: string, at: number, paidAt: number | null, lines: Line[] }
 
 const { t } = useT()
@@ -72,6 +72,12 @@ async function refund() {
   }
 }
 const checkName = (c: AgeCheck) => [t(`bar.screens.age-checks.outcome.${c.outcome}`), c.reason].filter(Boolean).join(': ')
+const checkDetail = (c: AgeCheck) => [
+  c.scope === 'all' ? t('bar.screens.age-checks.whole-sale') : null,
+  c.product,
+  c.idType ? `${t('bar.screens.age-checks.id-type')}: ${t(`bar.desk.id-types.${c.idType}`)}` : null,
+  dateTime(c.at),
+].filter(Boolean).join(' · ')
 const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, { amount: money(r.amountMinor), count: r.quantity, reason: r.reason, when: dateTime(r.at) })
 </script>
 
@@ -132,7 +138,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
               v-for="(c, i) in data.ageChecks"
               :key="i"
               :name="checkName(c)"
-              :description="[c.product, dateTime(c.at)].filter(Boolean).join(' · ')"
+              :description="checkDetail(c)"
               to="/console/bar/age-checks"
             />
           </RecordList>
