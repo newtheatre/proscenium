@@ -36,7 +36,7 @@ export default defineModule({
     'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
-    'reservations.release-before': setting.duration({ default: '10m', unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'reservations.release-before': setting.duration({ default: '10m', min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Buyers cancelling their own paid tickets from the booking link; shipped off (Matt, question 6).
     'cancellations.by-buyer': setting.boolean({ default: false, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'cancellations.until-before': setting.duration({ default: '24h', min: '0m', max: '30d', change, audience: 'public', quotable: true }),
