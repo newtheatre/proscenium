@@ -186,7 +186,9 @@ test.describe('on a phone, in dark mode', () => {
 
   test('has one header with one menu button, and the drawer opens from it', async ({ page }) => {
     await visit(page, '/admin')
-    await expect(page.locator('#main').getByText('Admin', { exact: true })).toBeVisible()
+    // The Admin mark gives way to the page's own name on a phone.
+    await expect(page.locator('#main').getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.locator('#main').getByText('Admin', { exact: true }).first()).toBeHidden()
     const toggle = page.getByRole('button', { name: 'Open sidebar' })
     await expect(toggle).toHaveCount(1)
     await toggle.click()

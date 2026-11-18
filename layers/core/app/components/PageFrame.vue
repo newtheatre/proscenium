@@ -119,12 +119,18 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
             :label="t('core.admin.mark')"
             color="neutral"
             variant="subtle"
+            class="max-sm:hidden"
           />
           <template v-if="nearest">
             <UBreadcrumb
               :items="parents"
               :aria-label="t('core.trail.label')"
               class="max-sm:hidden"
+            />
+            <UIcon
+              name="i-lucide-chevron-right"
+              aria-hidden="true"
+              class="size-4 shrink-0 text-muted max-sm:hidden"
             />
             <IconButton
               :to="nearest.to"

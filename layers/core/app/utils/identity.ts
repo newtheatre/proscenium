@@ -1,6 +1,7 @@
 // Calls to identity's routes from the minimal sign-in screens. Refusals come back as values, so a
 // page shows the reason and remedy the server wrote rather than a generic error.
 import { browserSupportsWebAuthnAutofill, startAuthentication, startRegistration } from '@simplewebauthn/browser'
+import { safeNext } from '../../shared/next'
 
 /** Set by "Not now" on the passkey offer. The server reads it by the same name. */
 export const PASSKEY_LATER_COOKIE = 'proscenium-passkey-later'
@@ -65,9 +66,9 @@ export async function addMyPasskey(label?: string): Promise<Answer<{ passkeyId: 
   return callIdentity('/api/core/me/passkeys', { challengeId: options.data.challengeId, response: made.data, label })
 }
 
-/** A return path on this site only, from `?next=`. */
+/** A return path on this site only, from `?next=`: the same rule the server applies when signing in. */
 export function nextPath(value: unknown): string | undefined {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : undefined
+  return safeNext(value) ?? undefined
 }
 
 /**

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { noOverrides, overrideErrors, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
+import { noOverrides, overrideErrors, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
 import { parseTime } from '@internationalized/date'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
@@ -27,9 +27,11 @@ interface Performance {
 }
 interface Option { id: string, label: string, retired: boolean }
 interface Run { id: string, total: number, done: number, state: 'running' | 'stopped' | 'done' | 'removing' | 'removed', stopReason: string | null, scheduled: boolean }
+interface EditableRun { id: string, venueId: string, spaceId: string, scheduled: boolean, pattern: { from: string, to: string, slots: RunSlot[], minutes?: number | null, doorsBeforeMinutes?: number | null }, count: number, performanceIds: string[] }
 interface Answer {
   performances: Performance[]
   runs: Run[]
+  editableRuns: EditableRun[]
   season: { startsOn: string, endsOn: string } | null
   options: {
     venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null, doorsBeforeMinutes: number | null, runPresetId: string | null }[] }[]
@@ -504,13 +506,30 @@ async function removeRun(r: Run) {
   await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/runs/${r.id}/remove` as string, { method: 'POST', body: {} }), 'Removing the run')
 }
 
+// Editing a whole run that was added in one go: its pattern, with what changes shown first.
+const editableRuns = computed(() => data.value?.editableRuns ?? [])
+const editingRun = ref<EditableRun | null>(null)
+const editRunOpen = ref(false)
+const runOf = (p: Performance) => editableRuns.value.find(r => r.performanceIds.includes(p.id)) ?? null
+function startEditRun(r: EditableRun) {
+  refusal.value = null
+  editingRun.value = r
+  editRunOpen.value = true
+}
+async function runEdited() {
+  await refresh()
+  emit('changed')
+}
+
 function actions(p: Performance) {
   const items = []
+  const inRun = selectable(p) ? runOf(p) : null
   if (p.state === 'draft') items.push({ label: 'Schedule', icon: 'i-lucide-calendar-check', onSelect: () => schedule(p) })
   if (p.state === 'draft' || p.state === 'scheduled') {
     items.push({ label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => start(p) })
     items.push({ label: 'Access', icon: 'i-lucide-accessibility', onSelect: () => startAccess(p) })
     if (productionEffects.value.length) items.push({ label: 'Staging effects', icon: 'i-lucide-zap-off', onSelect: () => startEffects(p) })
+    if (inRun) items.push({ label: 'Edit the run', icon: 'i-lucide-calendar-range', onSelect: () => startEditRun(inRun) })
   }
   if (p.state === 'scheduled') items.push({ label: 'Cancel', icon: 'i-lucide-calendar-x', color: 'error' as const, onSelect: () => startCancel(p) })
   if (p.state === 'cancelled' && p.startsAt > Date.now()) items.push({ label: 'Reinstate', icon: 'i-lucide-undo-2', onSelect: () => reinstate(p) })
@@ -560,8 +579,28 @@ function actions(p: Performance) {
     >
       Add a venue with a space that can hold performances first.
     </p>
+    <RecordList
+      v-if="editableRuns.length"
+      label="Runs"
+    >
+      <RecordListItem
+        v-for="r in editableRuns"
+        :key="r.id"
+        icon="i-lucide-calendar-range"
+        :name="`A run of ${r.count === 1 ? '1 performance' : `${r.count} performances`} to come`"
+        :description="`${dates.span(r.pattern.from, r.pattern.to)} · ${slotsInWords(r.pattern.slots)}`"
+      >
+        <UButton
+          label="Edit the run"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          @click="startEditRun(r)"
+        />
+      </RecordListItem>
+    </RecordList>
     <RefusalNotice
-      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun && !bulkTime.open && !bulkAccess.open && !bulkCancel.open"
+      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun && !bulkTime.open && !bulkAccess.open && !bulkCancel.open && !editRunOpen"
       :refusal="refusal"
     />
     <DataBoundary
@@ -1072,6 +1111,13 @@ function actions(p: Performance) {
       :suggested="suggestedRun"
       @added="added"
       @presets-changed="refresh()"
+    />
+    <PerformanceRunEditDialog
+      v-model:open="editRunOpen"
+      :production-id="productionId"
+      :run="editingRun"
+      :spaces="spaces"
+      @changed="runEdited"
     />
   </PageSection>
 </template>
