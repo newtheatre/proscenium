@@ -152,6 +152,12 @@ export interface Stage {
   /** What the person who sent the response is told its status is; the stage's name when left out. */
   status?: string
 }
+/**
+ * Something another module does when a response takes a move (forms.outcome-action), such as
+ * issuing the award a nomination was for. `map` says which question's answer fills each thing the
+ * action asks for.
+ */
+export interface ActionUse { id: string, action: string, map: Record<string, string> }
 export interface Transition {
   key: string
   from: string
@@ -160,6 +166,8 @@ export interface Transition {
   who: Mover
   /** A move to an approved or declined stage is a decision; this one cannot be made without a reason for the record. */
   needsReason?: boolean
+  /** What other modules do once a response has taken this move. Each runs once. */
+  actions?: ActionUse[]
 }
 
 // ---- review (part 3, "Review rules"; change 1: a vote is a second kind of review) ----

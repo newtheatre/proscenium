@@ -111,7 +111,7 @@ export const RESPONSE_REALMS = ['audience', 'members'] as const
 export const ASSIGNMENT_STATUSES = ['assigned', 'submitted', 'conflicted'] as const
 export const CONFLICTS = ['declared', 'automatic'] as const
 export const VOTES = ['for', 'against', 'abstain'] as const
-/** The slot a standalone link occupies. Slots other modules declare come with slice 6. */
+/** The slot a standalone link occupies. The others are declared by modules, through forms.slot. */
 export const LINK_SLOT = 'forms.link'
 
 /** Where a form is offered: a link of its own, or (later) a slot another module declares. */
@@ -335,4 +335,38 @@ export const reviewAssignments = defineTable('forms_review_assignments', {
   ],
 })
 
-export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments }
+export const RUN_STATES = ['waiting', 'done', 'skipped'] as const
+
+/**
+ * One outcome action asked of another module by one move of one response (FB-506). It waits until
+ * its job has run it; the job marks it done in the same unit as the action's own writes.
+ */
+export const actionRuns = defineTable('forms_action_runs', {
+  id: col.id(),
+  responseId: col.ref('forms_responses'),
+  formId: col.ref('forms_forms'),
+  moveKey: col.internal(text('move_key').notNull()),
+  // The action's place on the move, and the action itself, as the response's own version had them.
+  useId: col.internal(text('use_id').notNull()),
+  actionKey: col.internal(text('action_key').notNull()),
+  // Which question fills each of the action's inputs: ids only.
+  map: col.internal(text('map').notNull()),
+  revision: col.internal(integer('revision').notNull()),
+  actorId: col.account('actor_id', { role: 'actor', nullable: true }),
+  state: col.internal(text('state', { enum: RUN_STATES }).notNull().default('waiting')),
+  // Why it was skipped. Never anybody's words.
+  detail: col.internal(text('detail')),
+  jobId: col.internal(text('job_id')),
+  createdAt: col.createdAt(),
+  finishedAt: col.timestamp('finished_at'),
+}, {
+  id: 'frun',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('forms_action_runs_response').on(t.responseId, t.createdAt),
+    check('forms_action_runs_state', sql`${t.state} IN (${inList(RUN_STATES)})`),
+  ],
+})
+
+export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns }

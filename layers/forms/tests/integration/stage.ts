@@ -29,6 +29,10 @@ import reviewGet from '../../server/api/forms/reviews/[id].get'
 import reviewPut from '../../server/api/forms/reviews/[id].put'
 import conflictPost from '../../server/api/forms/reviews/[id]/conflict.post'
 import sourceGet from '../../server/api/forms/sources/[source].get'
+import slotGet from '../../server/api/forms/slots/[slot]/[subject]/index.get'
+import slotPut from '../../server/api/forms/slots/[slot]/[subject]/[form].put'
+import slotDelete from '../../server/api/forms/slots/[slot]/[subject]/[form].delete'
+import runPost from '../../server/api/forms/forms/[id]/responses/[response]/actions/[run]/run.post'
 import type { Definition, Question } from '../../shared/engine'
 
 export const handle = server({
@@ -54,6 +58,10 @@ export const handle = server({
   'POST /api/forms/forms/:id/responses/:response/move': movePost,
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,
   'GET /api/forms/sources/:source': sourceGet,
+  'GET /api/forms/slots/:slot/:subject': slotGet,
+  'PUT /api/forms/slots/:slot/:subject/:form': slotPut,
+  'DELETE /api/forms/slots/:slot/:subject/:form': slotDelete,
+  'POST /api/forms/forms/:id/responses/:response/actions/:run/run': runPost,
   'GET /api/forms/reviews': reviewsGet,
   'GET /api/forms/reviews/:id': reviewGet,
   'PUT /api/forms/reviews/:id': reviewPut,

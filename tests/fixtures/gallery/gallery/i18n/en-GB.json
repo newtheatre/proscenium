@@ -32,5 +32,8 @@
   "gallery.navigation.choices.label": "Sample choices",
   "gallery.desk.label": "Gallery programmes",
   "gallery.desk.amount": "Programmes sold",
-  "gallery.navigation.live.label": "Sample door"
+  "gallery.navigation.live.label": "Sample door",
+  "gallery.forms.feedback.label": "Feedback on",
+  "gallery.forms.note.label": "Note it against the show",
+  "gallery.forms.note.title": "What to note"
 }

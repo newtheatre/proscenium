@@ -2,10 +2,11 @@
 // and that it is theirs; it is sealed whole before it is stored. A person has one working copy per
 // form: a second device carries on with the first one's.
 import { getRouterParam } from 'h3'
+import { placeIn, placeOf } from '../../../../slots'
 import { z } from 'zod'
 import { defineRoute, idSchema, nowMs, refuse } from '#kit'
 import { getFormBySlug } from '../../../../forms'
-import { answersLimit, draftOf, getLink, getResponse, refuseShut, shut, writeDraft } from '../../../../responses'
+import { answersLimit, draftOf, getResponse, refuseShut, shut, writeDraft } from '../../../../responses'
 import type { Answers } from '../../../../../shared/engine'
 
 const input = z.object({
@@ -16,7 +17,7 @@ const input = z.object({
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input }, async (event, { input, actor, unit }) => {
   const form = await getFormBySlug(getRouterParam(event, 'slug'))
-  const link = form ? await getLink(form.id) : null
+  const link = form ? await placeOf(form, placeIn(event)) : null
   if (!form || !link || !form.liveVersionId) return refuse('forms.form.not-found', 'There is no form here.', { status: 404 })
   // An anonymous form keeps nothing that says who is answering, so it keeps no working copy either.
   if (form.anonymous) return refuse('forms.draft.anonymous', 'An anonymous form is answered in one sitting.', { status: 409 })

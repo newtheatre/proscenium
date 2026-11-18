@@ -36,6 +36,8 @@ interface One {
   history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null }[]
   review: (ReviewResult & { stage: string, mode: 'scores' | 'vote', open: boolean, released: boolean, conflicted: number, canRelease: boolean }) | null
   decision: { at: number, reason: string | null } | null
+  about: { slot: string, label: string, name: string | null } | null
+  actions: { id: string, action: string, label: string | null, state: 'waiting' | 'done' | 'skipped' | 'failed', detail: string | null, at: number, canRunAgain: boolean }[]
 }
 
 definePageMeta({ layout: 'console' })
@@ -125,6 +127,21 @@ watch(openId, (id) => {
 }, { immediate: true })
 const revisionItems = computed(() => Array.from({ length: one.value?.revisions ?? 0 }, (_, i) => ({ value: i + 1, label: t(i + 1 === one.value!.revisions ? 'forms.screens.responses.revision-latest' : 'forms.screens.responses.revision-n', { n: i + 1 }) })).reverse())
 const revision = computed({ get: () => one.value?.revision, set: (n: number | undefined) => { load(revealed.value, n) } })
+
+// ---- what other modules were asked to do ----
+async function runAgain(runId: string) {
+  if (!one.value) return
+  try {
+    await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/actions/${runId}/run` as string, { method: 'POST', body: {} })
+    toast.add({ title: t('forms.screens.actions.queued'), color: 'success' })
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+  await load()
+}
+const runTone = { waiting: 'info', done: 'success', skipped: 'neutral', failed: 'danger' } as const
 
 // ---- releasing its reviews to the panel ----
 const releasing = ref(false)
@@ -315,6 +332,15 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             :description="data?.canReadSpecial ? t('forms.screens.responses.restricted-open') : t('forms.screens.responses.restricted-shut')"
             :actions="data?.canReadSpecial ? [{ label: t('forms.screens.responses.reveal'), color: 'neutral', variant: 'outline', loading: opening, onClick: () => { load(true) } }] : undefined"
           />
+          <p
+            v-if="one.about"
+            class="text-sm"
+          >
+            <span class="font-medium">{{ t(one.about.label) }}</span>
+            <template v-if="one.about.name">
+              {{ ' ' }}{{ one.about.name }}
+            </template>
+          </p>
           <section
             v-if="one.stage"
             class="space-y-3"
@@ -379,6 +405,45 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             <span class="font-medium">{{ t('forms.screens.responses.reason-kept') }}</span>
             {{ one.decision.reason }}
           </p>
+          <section
+            v-if="one.actions.length"
+            class="space-y-2"
+          >
+            <h3 class="text-sm font-medium text-muted">
+              {{ t('forms.screens.actions.title') }}
+            </h3>
+            <ul class="space-y-2 text-sm">
+              <li
+                v-for="run in one.actions"
+                :key="run.id"
+                class="space-y-1"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium">{{ run.label ? t(run.label) : run.action }}</span>
+                  <StatusBadge
+                    :tone="runTone[run.state]"
+                    :label="t(`forms.screens.actions.state.${run.state}`)"
+                  />
+                  <UButton
+                    v-if="run.canRunAgain"
+                    color="neutral"
+                    variant="outline"
+                    size="xs"
+                    :label="t('forms.screens.actions.run-again')"
+                    @click="runAgain(run.id)"
+                  />
+                </div>
+                <span
+                  v-if="run.state === 'failed' && run.detail"
+                  class="block text-muted"
+                >{{ run.detail }}</span>
+                <span
+                  v-else-if="run.state === 'skipped'"
+                  class="block text-muted"
+                >{{ t('forms.screens.actions.skipped-slot') }}</span>
+              </li>
+            </ul>
+          </section>
           <UFormField
             v-if="one.revisions > 1"
             :label="t('forms.screens.responses.revision')"
