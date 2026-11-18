@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "521ef1ad-30e9-4b9d-a49f-7758a8b2c028",
+  "id": "947f1380-9dfc-4353-afbc-06c4453789ef",
   "prevIds": [
-    "18e86aa8-c10c-4671-924e-04156f93fc6f"
+    "52e866ed-737a-482d-87f2-d7944ab83e12"
   ],
   "ddl": [
     {
@@ -9632,6 +9632,16 @@
     },
     {
       "table": "core_performance_runs",
+      "name": "pattern",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -16913,6 +16923,16 @@
     {
       "table": "membership_verification_lists",
       "name": "reference_label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_verification_lists",
+      "name": "reference_noun",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
