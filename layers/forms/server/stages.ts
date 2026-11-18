@@ -11,6 +11,7 @@ import type { FormRow } from './forms'
 import { queueActions } from './actions'
 import { tellMoved } from './notices'
 import { closeRounds, conflicted, openRound } from './review'
+import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
 const CONFLICT = 409 // not-policy: HTTP status
@@ -80,13 +81,16 @@ export async function moveResponse(unit: UnitView, input: { form: FormRow, respo
 export async function resubmit(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, actor: Actor, answers: Answers, at: number }): Promise<Stage> {
   const move = input.response.state === 'submitted' ? resubmitMove(input.def, input.response.stageKey) : undefined
   if (!move) return refuse('forms.response.not-returned', 'This response is not open for changes.', { status: CONFLICT })
+  const fileProblems = await settleFileAnswers(input.def, input.answers, input.response.id)
   const evaluation = evaluate(input.def, input.answers, { today: await today() })
+  const fileIds = refuseFileProblems(input.def, evaluation.answers, fileProblems)
   refuseInvalid(evaluation)
   const revision = input.response.currentRevision + 1
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
   const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated, answers: evaluation.answers })
   const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
+  attachFileAnswers(unit, input.response.id, fileIds, input.at)
   return to
 }
 
