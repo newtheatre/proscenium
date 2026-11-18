@@ -237,6 +237,8 @@ test.describe('the Branding screen', () => {
     await page.getByRole('combobox', { name: 'Corners' }).click()
     await page.getByRole('option', { name: 'Square' }).click()
     await expect(page.getByText('1 change', { exact: true })).toBeVisible()
+    // Check once the menu has closed: while it is open the rest of the page is hidden from assistive tech.
+    await expect(page.getByRole('listbox')).toHaveCount(0)
     await noViolations(page)
   })
 })
