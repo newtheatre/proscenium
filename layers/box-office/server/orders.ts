@@ -1,7 +1,8 @@
 // What the order services share: the order and its live ticket lines as they are read, and the
 // words a message uses for them.
 import { all, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
-import { getPerformance, getProduction, getVenue } from '#modules/core'
+import { getPerformance, getProduction, getVenue, placeOf } from '#modules/core'
+import { lineKey, unnamedLines } from './line-names'
 import catalogue from '../i18n/en-GB.json'
 
 const say = wordsFrom(catalogue)
@@ -40,17 +41,20 @@ export async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow
   const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
   const timeZone = await theatreTimeZone()
   const counts = new Map<string, number>()
+  const unnamed = await unnamedLines(lines)
   for (const line of lines) {
-    // Named with its part of the house where the production has more than one, such as a wheelchair space.
-    const name = line.band_name ? `${line.band_name}, ${line.type_name}` : line.type_name
+    // Named with its part of the house where the production has more than one, such as a wheelchair
+    // space; not named at all where there is one kind to book, as Choose tickets shows it.
+    const name = unnamed.has(lineKey(line)) ? '' : line.band_name ? `${line.band_name}, ${line.type_name}` : line.type_name
     counts.set(name, (counts.get(name) ?? 0) + 1)
   }
+  const said = [...counts].map(([name, count]) => name ? `${count} × ${name}` : count === 1 ? '1 ticket' : `${count} tickets`).join(', ')
   return {
     show: production.title,
     when: new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone }).format(performance.startsAt),
-    tickets: [...counts].map(([name, count]) => `${count} × ${name}`).join(', '),
+    tickets: said,
     /** The tickets, with the age every holder must be where the production is age-restricted, for the messages that carry the tickets. */
-    ticketsWithAge: [...counts].map(([name, count]) => `${count} × ${name}`).join(', ')
+    ticketsWithAge: said
       + (production.ageRestricted && production.ageMin !== null ? `. Everyone using these tickets must be ${production.ageMin} or over; ID may be checked.` : ''),
     amount: new Intl.NumberFormat(locale, { style: 'currency', currency: order.currency }).format(amountMinor / 100), // not-policy: minor units to units; every currency sold here has two decimals
     timeOf: (at: number) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(at),
@@ -68,9 +72,8 @@ export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors
   const space = venue.spaces.find(s => s.id === performance.spaceId)
   const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
   const timeZone = await theatreTimeZone()
-  const same = performance.spaceName.trim().localeCompare(venue.name.trim(), undefined, { sensitivity: 'accent' }) === 0
   const address = [venue.addressLines?.replace(/\s*\n\s*/g, ', '), venue.locality, venue.postcode].filter(Boolean).join(', ')
-  const place = same ? venue.name : `${performance.spaceName}, ${venue.name}`
+  const place = placeOf(performance.spaceName, venue.name)
   const notes = [venue.accessInfo, space?.accessInfo].map(n => n?.trim()).filter(Boolean)
   return {
     where: address ? `${place}, ${address}` : place,

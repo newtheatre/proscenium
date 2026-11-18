@@ -139,7 +139,7 @@ async function cancel(all: boolean) {
                   v-for="(line, i) in order.lines"
                   :key="line.id"
                   :model-value="chosen.includes(line.id)"
-                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: kindOf(line), price: line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) })"
+                  :label="t(kindOf(line) ? 'box-office.manage.cancel.line' : 'box-office.manage.cancel.line-plain', { n: i + 1, type: kindOf(line), price: line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) })"
                   @update:model-value="toggle(line.id, $event)"
                 />
               </fieldset>

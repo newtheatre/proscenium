@@ -102,7 +102,7 @@ function addToCalendar() {
           :key="line.label"
           class="flex justify-between gap-4 py-2"
         >
-          <span>{{ t('box-office.basket.line', { count: line.count, label: line.label }) }}</span>
+          <span>{{ ticketsLine(t, line.count, line.label) }}</span>
           <span>{{ price(line.amountMinor) }}</span>
         </li>
         <li class="flex justify-between gap-4 py-2 font-semibold">
