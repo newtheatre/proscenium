@@ -10,8 +10,8 @@
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
-import { first, inAccountScope, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
-import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, notify, notifyAddress } from '#modules/core'
+import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
+import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
@@ -20,6 +20,7 @@ import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
 import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
+import { doorCodesForOrder, ticketNumbers } from './tickets'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
 
@@ -193,6 +194,52 @@ export interface OrderView {
   buyerCancel: { feeMinor: number, until: number } | null
   /** The buyer has never signed in, so the page may offer to open their account. Says nothing else about them. */
   accountUnclaimed?: boolean
+  /**
+   * A confirmed booking's valid tickets, each with its door code to be shown as a QR code, and the
+   * number a person reads off it. doorCode is null for a ticket issued before codes were kept: its
+   * code is only in the confirmation email.
+   */
+  tickets?: ShownOrderTicket[]
+  /** What the booking is for: null only for an order with no ticket lines ever. */
+  show?: OrderShow | null
+}
+
+/** What the booking is for, so a page can lead with it. venueSlug is set when the venue has a public page. */
+export interface OrderShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
+
+/** The performance an order's tickets are for (the first, where it has more than one). */
+export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<OrderShow | null> {
+  if (!lines.length) return null
+  const performance = await getPerformance(lines[0]!.performance_id)
+  const production = await getProduction(performance.productionId)
+  const venue = await getVenue(performance.venueId).catch(() => null)
+  const listed = !!venue && !venue.archived && await isEnabled('public-site')
+  const address = venue ? [venue.addressLines?.replace(/\n+/g, ', '), venue.locality, venue.postcode].filter(Boolean).join(', ') || null : null
+  return {
+    title: production.title,
+    productionSlug: production.slug,
+    startsAt: performance.startsAt,
+    endsAt: performance.endsAt,
+    venue: `${performance.venueName}, ${performance.spaceName}`,
+    venueSlug: listed ? venue!.slug : null,
+    address,
+    cancelled: performance.state === 'cancelled',
+  }
+}
+
+export interface ShownOrderTicket { lineId: string, number: string, doorCode: string | null, admitted: boolean }
+
+// A cancelled order has no live lines: what it was for is still its lines'.
+function everyLine(orderId: string): Promise<{ performance_id: string }[]> {
+  return all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY id LIMIT 1", orderId) // not-policy: the first is enough
+}
+
+/** The tickets of a confirmed order to show to whoever may see it, with their numbers, in the order they were made. */
+export async function ticketsToShow(order: Pick<OrderRow, 'id' | 'reference' | 'state'>, keep?: readonly string[]): Promise<ShownOrderTicket[]> {
+  if (order.state !== 'confirmed') return []
+  const shown = (await doorCodesForOrder(order.id)).filter(t => !keep || keep.includes(t.lineId)).sort((a, b) => (a.lineId < b.lineId ? -1 : 1))
+  const numbers = await ticketNumbers(order, shown.map(t => t.lineId))
+  return shown.map((t, i) => ({ lineId: t.lineId, number: numbers[i]!, doorCode: t.doorCode, admitted: t.admitted }))
 }
 
 /**
@@ -238,6 +285,8 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
     buyerCancel: await buyerCancelTerms(order, lines),
     // Only where the booking's email could carry the link that opens it, so the page never promises one that did not come.
     accountUnclaimed: order.account_id ? await canSendClaimLink(order.account_id) : false,
+    tickets: await ticketsToShow(order),
+    show: await showOf(lines.length ? lines : await everyLine(order.id)),
   }
 }
 
@@ -263,6 +312,9 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
       releaseAt: null,
       lines: done.state === 'cancelled' ? [] : kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
       buyerCancel: done.state === 'cancelled' ? null : await buyerCancelTerms(order, kept),
+      // Read before the cancellation is written, so only the tickets kept are shown.
+      tickets: done.state === 'cancelled' ? [] : await ticketsToShow(order, kept.map(l => l.id)),
+      show: await showOf(await liveLines(order.id)),
     }
   }
   if (order.state !== 'reserved')
@@ -312,5 +364,6 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
     releaseAt: kept.length ? order.release_at : null,
     lines: kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
     buyerCancel: null,
+    show: await showOf(lines),
   }
 }

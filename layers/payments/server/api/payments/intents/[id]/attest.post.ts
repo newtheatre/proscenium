@@ -13,6 +13,7 @@ export default defineRoute({
     method: z.enum(['cash', 'card_attested', 'other_attested']),
     amountMinor: z.number().int().positive().optional(),
     tenderedMinor: z.number().int().positive().optional(),
+    note: z.string().max(200).optional(), // not-policy: the column's limit
     succeeded: z.boolean().optional(),
   }).strict(),
 }, async (event, { input }) => attest({ intentId: getRouterParam(event, 'id') ?? '', ...input }))

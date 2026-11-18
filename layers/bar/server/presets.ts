@@ -2,10 +2,10 @@
 // November). A preset holds what a kind of product usually has: its sizes with their measures, the
 // choices it asks, whether it is a mixer, and an age check override. Never a name, a price or stock.
 // Built-in presets live in code; the theatre's own are saved from the window.
-import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { addProduct, addVariant } from './catalogue'
 import { setMixer, setProductGroups } from './choices'
+import type { PresetInput, PresetPatch, SetupInput } from './input'
 
 export interface PresetSize { name: string, measure: string | null }
 export interface Preset {
@@ -27,9 +27,11 @@ const builtIn = (key: string, sizes: PresetSize[], extra: Partial<Preset> = {}):
 
 export const BUILT_IN_PRESETS: Preset[] = [
   builtIn('can', [size('Each', '1 can or bottle')]),
-  builtIn('draught', [size('Pint', '568 ml'), size('Half', '284 ml')]),
-  builtIn('wine', [size('125ml', '125 ml'), size('175ml', '175 ml'), size('250ml', '250 ml'), size('Bottle', '750 ml')]),
-  builtIn('spirit', [size('Single', '25 ml'), size('Double', '50 ml')], { groupNames: ['Spirit', 'Mixer'] }),
+  // Draught, wine and spirits need the age check whatever category they sit in; the window still
+  // lets one product say otherwise (an alcohol-free gin among the spirits).
+  builtIn('draught', [size('Pint', '568 ml'), size('Half', '284 ml')], { ageRestricted: true }),
+  builtIn('wine', [size('125ml', '125 ml'), size('175ml', '175 ml'), size('250ml', '250 ml'), size('Bottle', '750 ml')], { ageRestricted: true }),
+  builtIn('spirit', [size('Single', '25 ml'), size('Double', '50 ml')], { groupNames: ['Spirit', 'Mixer'], ageRestricted: true }),
   builtIn('jug', [size('Jug')]),
   builtIn('hot', [size('Each', '1 serving')], { groupNames: ['Milk'] }),
   builtIn('snack', [size('Each', '1 pack')]),
@@ -37,33 +39,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
   builtIn('blank', [size('Each')]),
 ]
 
-const MAX_SIZES = 8 // not-policy: more sizes than any drink has, inside a unit's statement cap
-const MAX_GROUPS = 10 // not-policy: more choices than any drink asks
-const id = z.string().min(1).max(64) // not-policy: an id's length
-const name = z.string().trim().min(1).max(80) // not-policy: a name's bounds
-const sizeInput = z.object({ name, measure: z.string().trim().max(40).nullable().optional() }).strict() // not-policy: a measure's bound
-const amount = z.number().int().min(0).max(1_000_000) // not-policy: a bound on a typed price
-
-export const presetInput = z.object({
-  name,
-  sizes: z.array(sizeInput).min(1).max(MAX_SIZES),
-  groupIds: z.array(id).max(MAX_GROUPS).default([]),
-  ageRestricted: z.boolean().nullable().default(null),
-  mixer: z.boolean().default(false),
-}).strict()
-export type PresetInput = z.infer<typeof presetInput>
-
-/** What Add a product sends: the product, one row per size with its Standard price, and its choices. */
-export const setupInput = z.object({
-  categoryId: id,
-  name,
-  ageRestricted: z.boolean().nullable().default(null),
-  sizes: z.array(z.object({ name, amountMinor: amount.nullable().optional() }).strict()).min(1).max(MAX_SIZES),
-  groupIds: z.array(id).max(MAX_GROUPS).default([]),
-  mixer: z.boolean().default(false),
-}).strict()
-  .refine(v => new Set(v.sizes.map(s => s.name.toLowerCase())).size === v.sizes.length, { message: 'Each size needs its own name.', path: ['sizes'] })
-export type SetupInput = z.infer<typeof setupInput>
+export { presetInput, presetPatch, setupInput, type PresetInput, type SetupInput } from './input'
 
 /** The built-ins, then the theatre's own in use, by name. */
 export async function presets(): Promise<Preset[]> {
@@ -108,6 +84,20 @@ export async function retirePreset(unit: UnitView, presetId: string): Promise<vo
   unit.add({ sql: 'UPDATE bar_product_presets SET active = 0, updated_at = ? WHERE id = ?', params: [at, presetId] })
   unit.add({ sql: 'UPDATE bar_categories SET usual_preset = NULL, updated_at = ? WHERE usual_preset = ?', params: [at, presetId] })
   unit.audit({ action: 'update', record: ['bar.product-preset', presetId], detail: { active: false } })
+}
+
+/** Renames one of the theatre's presets, or brings a retired one back (the Undo of a delete). */
+export async function updatePreset(unit: UnitView, presetId: string, input: PresetPatch): Promise<void> {
+  const row = await first<{ name: string, active: number }>('SELECT name, active FROM bar_product_presets WHERE id = ?', presetId)
+  if (!row) refuse('bar.preset.unknown', 'That preset does not exist.', { status: 404 })
+  const name = input.name ?? row!.name
+  const active = input.active === undefined ? !!row!.active : input.active
+  unit.add({
+    sql: `UPDATE bar_product_presets SET name = ?, active = ?, updated_at = ?
+          WHERE id = ? AND (? = 0 OR NOT EXISTS (SELECT 1 FROM bar_product_presets WHERE active = 1 AND lower(name) = lower(?) AND id <> ?))`,
+    params: [name, active ? 1 : 0, nowMs(), presetId, active ? 1 : 0, name, presetId],
+  }).expect(1, { code: 'bar.preset.name-taken', reason: 'Another preset has that name.', remedy: 'Pick another name.' })
+  unit.audit({ action: 'update', record: ['bar.product-preset', presetId], ...(input.active === undefined ? {} : { detail: { active: input.active } }) })
 }
 
 /**

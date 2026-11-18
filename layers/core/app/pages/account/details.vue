@@ -1,4 +1,5 @@
-<!-- Your details (ID-11; identity spec part 6): the name, the name the person goes by and pronouns.
+<!-- Your details (ID-11; identity spec part 6): the name, the name the person goes by and pronouns,
+     and for a member their emergency contacts (ID-17).
      Everything that shows the person reads the account, so after saving the app's data is fetched
      again and the header shows the new name at once. -->
 <script setup lang="ts">
@@ -104,6 +105,7 @@ async function save() {
           :label="t('core.me.details.save')"
         />
       </UForm>
+      <MyEmergencyContacts class="mt-8" />
     </DataBoundary>
   </PageFrame>
 </template>

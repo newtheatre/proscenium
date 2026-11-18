@@ -424,6 +424,18 @@ export async function companionsFor(accountId: string): Promise<number> {
 }
 
 /**
+ * The companions asked for in an application or change still waiting to be decided, as the
+ * wheelchair space is while it waits (wheelchairFor): nought for a rejected one, with the scheme
+ * off, or where companions wait to be verified (core.access-scheme.companions-need-verified).
+ */
+export async function companionsPending(accountId: string): Promise<number> {
+  if (!await schemeEnabled() || await useSetting('core.access-scheme.companions-need-verified')) return 0
+  const row = await profileOf(accountId)
+  if (!row || row.status === 'rejected') return 0
+  return (await openApp(row.pending))?.companions ?? 0
+}
+
+/**
  * The scheme's part of the hourly sweep: a rejected application goes after keep-rejected; an
  * accepted one past its review date is asked to confirm, twice, a reply-within apart, and then goes
  * to the reviewers' queue while staying in force.
