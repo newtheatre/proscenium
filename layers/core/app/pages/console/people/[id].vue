@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { RefusalView } from '../../../utils/refusal'
+import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
 
 definePageMeta({ layout: 'console' })
 
@@ -49,7 +50,14 @@ const { data: held, refresh: refreshGrants } = await useAPI<{ grants: Grant[] }>
   immediate: false,
   default: () => ({ grants: [] }),
 })
-watch(() => person.value?.actions.grants, (may) => { if (may) void refreshGrants() }, { immediate: true })
+const { data: grantOptions, refresh: refreshOptions } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:grants:options', immediate: false })
+watch(() => person.value?.actions.grants, (may) => {
+  if (!may) return
+  void refreshGrants()
+  void refreshOptions()
+}, { immediate: true })
+const giving = ref(false)
+const mayGive = computed(() => !!grantOptions.value?.manage && !!person.value && !person.value.anonymised && !person.value.disabled && !person.value.mergedInto)
 const liveGrants = computed(() => (held.value?.grants ?? []).filter(g => !g.endedAt))
 
 const state = computed(() => {
@@ -279,6 +287,18 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
               v-if="p.actions.grants"
               :title="t('core.person.roles.title')"
             >
+              <template
+                v-if="mayGive"
+                #actions
+              >
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-user-plus"
+                  :label="t('core.grants.give.open')"
+                  @click="giving = true"
+                />
+              </template>
               <p
                 v-if="!liveGrants.length"
                 class="text-sm text-muted"
@@ -420,6 +440,14 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
           </div>
         </template>
       </PageRecord>
+
+      <GiveRoleDialog
+        v-if="mayGive && grantOptions"
+        v-model:open="giving"
+        :options="grantOptions"
+        :person="{ id: p.id, name: title }"
+        @changed="refreshGrants()"
+      />
 
       <UModal
         v-model:open="disabling"

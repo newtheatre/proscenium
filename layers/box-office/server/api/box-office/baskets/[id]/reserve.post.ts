@@ -14,6 +14,8 @@ export default defineRoute({
     expectedTotalMinor: z.number().int().min(0),
     email: z.string().trim().email().max(254).optional(), // not-policy: the longest address the mail standards allow
     name: z.string().trim().min(1).max(120).optional(), // not-policy: shape bound
+    // That everyone using the tickets is old enough, for a production only for people over an age.
+    ageConfirmed: z.boolean().optional(),
   }).strict(),
 }, async (event, { input, unit }) => {
   await fromRequest(event)

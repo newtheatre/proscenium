@@ -57,11 +57,11 @@ describe('importing awards', () => {
 
     expect((await send(type, file, false)).body).toMatchObject({ queued: 3 })
     await deliver()
-    const imported = await rows('SELECT recipient_name AS name, awarded_on AS awardedOn, awarded_for AS awardedFor, citation, source, account_id IS NOT NULL AS linked FROM awards_awards WHERE type_id = ? AND source = \'import\' ORDER BY awarded_on', type)
+    const imported = await rows('SELECT recipient_name AS name, awarded_on AS awardedOn, awarded_precision AS precision, awarded_for AS awardedFor, citation, source, account_id IS NOT NULL AS linked FROM awards_awards WHERE type_id = ? AND source = \'import\' ORDER BY awarded_on', type)
     expect(imported).toEqual([
-      { name: 'Peggy Ashcroft', awardedOn: '1998-01-01', awardedFor: 'Front of house', citation: 'For forty years, and counting.', source: 'import', linked: 0 },
-      { name: 'Known Fellow', awardedOn: '2004-06-01', awardedFor: null, citation: null, source: 'import', linked: 1 },
-      { name: 'New Fellow', awardedOn: '2010-06-01', awardedFor: 'Lighting', citation: null, source: 'import', linked: 1 },
+      { name: 'Peggy Ashcroft', awardedOn: '1998-01-01', precision: 'year', awardedFor: 'Front of house', citation: 'For forty years, and counting.', source: 'import', linked: 0 },
+      { name: 'Known Fellow', awardedOn: '2004-06-01', precision: 'day', awardedFor: null, citation: null, source: 'import', linked: 1 },
+      { name: 'New Fellow', awardedOn: '2010-06-01', precision: 'day', awardedFor: 'Lighting', citation: null, source: 'import', linked: 1 },
     ])
     expect(await rows('SELECT account_id FROM awards_awards WHERE type_id = ? AND recipient_name = ?', type, 'Known Fellow')).toEqual([{ account_id: known.accountId }])
     // Each import announces the award like any other; no message goes to the holder.
