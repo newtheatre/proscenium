@@ -194,7 +194,7 @@ describe('reserving with no confirmation asked for', () => {
     const [performance] = await rows<{ starts_at: number }>('SELECT starts_at FROM core_performances WHERE id = ?', h.performanceId)
     expect(done.body.releaseAt).toBe(performance!.starts_at - 1800 * 1000)
     expect((await order(done.body.orderId)).release_at).toBe(done.body.releaseAt)
-    await set('box-office.reservations.release-before', null)
+    await set('box-office.reservations.release-before', 600) // the default, ten minutes
   })
 
   it('keeps to the most tickets in one reservation', async () => {
