@@ -190,6 +190,9 @@ export const promoCodes = defineTable('box_office_promo_codes', {
   used: col.internal(integer('used').notNull().default(0)),
   // Tickets one order may have at the code's price; null means every eligible ticket in it.
   maxPerOrder: col.internal(integer('max_per_order')),
+  // When set, the code leaves alone ticket types that carry a requirement (a membership, proof or a
+  // concession), so it does not stack on a price already reduced for who the buyer is.
+  notWithRequirements: col.internal(integer('not_with_requirements', { mode: 'boolean' }).notNull().default(false)),
   validFrom: col.timestamp('valid_from'),
   validUntil: col.timestamp('valid_until'),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),

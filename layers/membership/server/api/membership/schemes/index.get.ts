@@ -3,7 +3,7 @@
 // shows the fee for joining at each length, and says when it cannot be joined online (S5).
 import { defineRoute, useSetting } from '#kit'
 import { charger } from '../../../charge'
-import { schemeList } from '../../../lists'
+import { listSetsEnd, schemeList } from '../../../lists'
 import { todayOrNull } from '../../../memberships'
 import { lengthOptions, listSchemes } from '../../../schemes'
 
@@ -12,10 +12,13 @@ export default defineRoute({ public: true, rateLimit: 'default' }, async (_event
   const schemes = await listSchemes(['open'])
   const options = await lengthOptions(schemes.map(s => s.id), true)
   // A scheme that checks a list of references asks for one when somebody joins, in the list's words.
+  // D9: where the list's entries carry end dates, no length is asked for.
   const asks = new Map<string, string | null>()
+  const endsByList = new Set<string>()
   for (const s of schemes) {
     const list = s.verifier ? await schemeList(s) : null
     asks.set(s.id, list?.keyKind === 'reference' ? list.referenceLabel : null)
+    if (await listSetsEnd(list)) endsByList.add(s.id)
   }
   const fees = await charger()
   const day = await todayOrNull()
@@ -28,6 +31,7 @@ export default defineRoute({ public: true, rateLimit: 'default' }, async (_event
       requiresPayment: s.requiresPayment,
       online: !s.requiresPayment || !!fees,
       asksFor: asks.get(s.id) ?? null,
+      endsByList: endsByList.has(s.id),
     }))),
   }
 })

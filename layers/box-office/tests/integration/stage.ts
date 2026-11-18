@@ -43,6 +43,7 @@ import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.p
 import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
 import doorTonight from '../../server/api/box-office/door/tonight.get'
+import liveTonight from '../../../core/server/api/core/live/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
@@ -54,6 +55,7 @@ import intentCancelPost from '../../../payments/server/api/payments/intents/[id]
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import homeGet from '../../../core/server/api/core/home.get'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
+import orderAccountPost from '../../server/api/box-office/orders/link/account.post'
 import exchangePost from '../../server/api/box-office/orders/[id]/exchange.post'
 import reportsSalesGet from '../../server/api/box-office/reports/sales.get'
 import reportsSalesCsv from '../../server/api/box-office/reports/sales.csv.get'
@@ -113,10 +115,12 @@ export const handle = server({
   'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
   'GET /api/box-office/door/tonight': doorTonight,
+  'GET /api/core/live/tonight': liveTonight,
   'GET /api/box-office/orders/:id': orderGet,
   'POST /api/box-office/orders/:id/release': releasePost,
   'POST /api/box-office/orders/:id/keep': keepPost,
   'POST /api/box-office/orders/link/cancel': orderCancelPost,
+  'POST /api/box-office/orders/link/account': orderAccountPost,
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'POST /api/box-office/orders/:id/split': splitPost,

@@ -44,7 +44,7 @@ describe('the inbox', () => {
     expect(titles(body)).toEqual(['Newer', 'Older'])
     expect(body).toMatchObject({ unread: 2, more: false })
     expect(body.items[0]).toMatchObject({ body: 'About Newer', link: '/account/access', read: false, archived: false })
-    expect((await req(reader, 'GET', '/api/core/me/inbox/unread')).body).toEqual({ signedIn: true, audience: 2, members: 0 })
+    expect((await req(reader, 'GET', '/api/core/me/inbox/unread')).body).toEqual({ signedIn: true, audience: 2, members: 0, total: 2 })
   })
 
   it('marks a message read when it is opened, once, and all of them at once', async () => {
@@ -97,5 +97,8 @@ describe('the inbox', () => {
     const reader = person([])
     await message(reader, 'Members only', { side: 'members' })
     expect((await req(reader, 'GET', '/api/core/me/inbox?side=members')).status).toBe(404)
+    // The one inbox shows such a person only the audience side.
+    await message(reader, 'Booking')
+    expect(titles((await req(reader, 'GET', '/api/core/me/inbox?side=all')).body)).toEqual(['Booking'])
   })
 })

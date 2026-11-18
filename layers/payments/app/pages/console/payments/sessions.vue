@@ -5,7 +5,8 @@
      allowed to. Search finds sessions by who opened them. Sessions that handled no cash, as where the
      theatre takes none, leave the cash columns empty and stay out of the chart. The seller's own
      session sits above the list ("Your session"); someone who may sell but not see everyone's
-     sessions sees only that. -->
+     sessions sees only that. Where the theatre takes no cash and no recent session held any, the cash
+     columns are left out, and Your session shows only to someone with a session to look after. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { sessionsList } from '../../../../shared/lists'
@@ -25,6 +26,14 @@ const mayViewAll = computed(() => !!yours.value?.mayViewAll)
 const { data: recent, refresh: refreshRecent } = await useAPI<{ sessions: Row[] }>('/api/payments/sessions/recent', { key: 'payments:sessions-recent', default: () => ({ sessions: [] }), immediate: mayViewAll.value })
 const tillName = (r: Row) => [r.place ?? t('payments.screens.session.unknown-place'), r.pointLabel].filter(Boolean).join(' · ')
 
+// Cash columns only where cash is taken now, or a recent session still held some.
+const CASH_COLUMNS = new Set(['expected', 'counted', 'difference'])
+const cashShown = computed(() => !!yours.value?.cashTaken || (recent.value?.sessions ?? []).some(s => s.handlesCash))
+// Above everyone's sessions, Your session is for someone selling: a session open or being counted,
+// or the till's hand-off coming back here. Someone who only reviews the tills is not shown an empty one.
+const route = useRoute()
+const showYours = computed(() => !!yours.value?.mayOpen && (!mayViewAll.value || !!yours.value.session || !!yours.value.awaiting.length || !!yours.value.waiting.length || !!route.query.attempt))
+
 const list = computed(() => ({
   ...sessionsList,
   filters: {
@@ -32,7 +41,7 @@ const list = computed(() => ({
     opened: { ...sessionsList.filters.opened, label: t('payments.screens.sessions.opened'), presets: sessionsList.filters.opened.presets.map(p => ({ value: p.value, label: t(`payments.screens.sessions.presets.${p.value}`) })) },
   },
   sorts: { opened: { ...sessionsList.sorts.opened, label: t('payments.screens.sessions.opened') } },
-  columns: Object.fromEntries(Object.entries(sessionsList.columns).map(([key, c]) => [key, { ...c, label: t(`payments.screens.sessions.column.${key}`) }])),
+  columns: Object.fromEntries(Object.entries(sessionsList.columns).filter(([key]) => cashShown.value || !CASH_COLUMNS.has(key)).map(([key, c]) => [key, { ...c, label: t(`payments.screens.sessions.column.${key}`) }])),
   views: Object.fromEntries(Object.entries(sessionsList.views).map(([key, v]) => [key, { ...v, label: t(`payments.screens.sessions.view.${key}`) }])),
 }))
 
@@ -88,9 +97,21 @@ async function changed() {
     :row-actions="rowActions"
     :empty="{ title: t('payments.screens.sessions.empty'), description: t('payments.screens.sessions.empty-help'), icon: 'i-lucide-receipt' }"
   >
+    <template
+      v-if="yours?.mayOpen && !showYours"
+      #primary
+    >
+      <UButton
+        to="/live/till"
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-shopping-basket"
+        :label="t('payments.screens.session.open-till')"
+      />
+    </template>
     <template #before>
       <PaymentsYourSession
-        v-if="yours?.mayOpen"
+        v-if="showYours && yours"
         class="mb-6"
         :data="yours"
         @changed="changed"

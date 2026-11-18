@@ -1,10 +1,20 @@
 <!-- A titled part of a page: its heading, an optional line of explanation, actions beside the
      heading, the content, and an optional footer for the section's own buttons. Every page divides
-     itself with this, so headings are one size and one level everywhere. -->
+     itself with this, so headings are one size and one level everywhere. Content that renders nothing
+     (a list behind a v-if) leaves no empty band between the heading and the footer. -->
 <script setup lang="ts">
+import { Comment, Fragment, Text, type VNode } from 'vue'
+
 defineProps<{ title: string, description?: string }>()
-defineSlots<{ default?: () => unknown, actions?: () => unknown, footer?: () => unknown }>()
+const slots = defineSlots<{ default?: () => VNode[], actions?: () => unknown, footer?: () => unknown }>()
 const id = useId()
+function filled(nodes: VNode[]): boolean {
+  return nodes.some(n => n.type === Comment
+    ? false
+    : n.type === Fragment
+      ? Array.isArray(n.children) && filled(n.children as VNode[])
+      : n.type !== Text || !!String(n.children).trim())
+}
 </script>
 
 <template>
@@ -32,7 +42,12 @@ const id = useId()
         <slot name="actions" />
       </div>
     </template>
-    <slot />
+    <template
+      v-if="slots.default && filled(slots.default())"
+      #default
+    >
+      <slot />
+    </template>
     <template
       v-if="$slots.footer"
       #footer

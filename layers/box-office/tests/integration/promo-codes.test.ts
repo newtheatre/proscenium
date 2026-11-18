@@ -139,6 +139,23 @@ describe('a promo code', () => {
     expect(await hold(h, concessionOnly.code, 1)).toMatchObject({ code: 'box-office.promo.no-tickets' })
   })
 
+  it('set "not with member or concession prices", leaves alone the types that need proof or a membership', async () => {
+    const c = await code({ effect: 'percent_off', value: 2000, notWithRequirements: true })
+    expect((await api('GET', '/api/box-office/promo-codes')).body.rows.find((r: { id: string }) => r.id === c.id)).toMatchObject({ notWithRequirements: true })
+    const b = await hold(h, c.code, 1, 1)
+    expect(b.ok && b.totalMinor).toBe(960 + 800)
+    expect(await used(c.id)).toBe(1)
+    expect(await hold(h, c.code, 0, 2)).toEqual({ ok: false, code: 'box-office.promo.no-tickets' })
+    const preview = await api('GET', `/api/box-office/book/performances/${h.performanceId}/promo?code=${c.code}`, undefined, undefined)
+    expect(preview.body.prices.some((p: { ticketTypeId: string }) => p.ticketTypeId === h.concessionId)).toBe(false)
+    expect(preview.body.prices).toEqual(expect.arrayContaining([{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 960 }]))
+    // Off by default: a code made without it still stacks, as before.
+    const plain = await code({ effect: 'percent_off', value: 2000 })
+    expect((await api('GET', '/api/box-office/promo-codes')).body.rows.find((r: { id: string }) => r.id === plain.id)).toMatchObject({ notWithRequirements: false })
+    const both = await hold(h, plain.code, 1, 1)
+    expect(both.ok && both.totalMinor).toBe(960 + 640)
+  })
+
   it('is previewed for a buyer with the prices it gives', async () => {
     const c = await code({ effect: 'amount_off', value: 300, maxPerOrder: 2 })
     const preview = await api('GET', `/api/box-office/book/performances/${h.performanceId}/promo?code=${c.code.toLowerCase()}`, undefined, undefined)
