@@ -69,6 +69,23 @@ export async function slotForms(slotId: string, subjectId: string, actor: Actor)
 }
 
 /**
+ * Whether a published form attached to one record in a submission slot decides its responses: its
+ * live version has an approved stage. A host that waits on a decision (membership approval, say)
+ * asks this before it lets the record open. Writes nothing.
+ */
+export async function slotDecides(slotId: string, subjectId: string): Promise<boolean> {
+  const slot = await slotIn(slotId, 'submission')
+  for (const place of await attachedTo(slot.id, subjectId)) {
+    const form = await getForm(place.formId)
+    const version = form ? await getVersion(form.liveVersionId) : null
+    if (!form || !version || form.status === 'draft' || form.status === 'archived') continue
+    const definition = JSON.parse(version.definition) as Definition
+    if (definition.workflow?.stages.some(s => s.kind === 'approved')) return true
+  }
+  return false
+}
+
+/**
  * Sends a response to a form attached to the host's record, in the host's unit of work, with every
  * check POST /api/forms/open/:slug/responses makes: the engine runs again on the answers, hidden
  * answers are dropped, what is wrong is refused by path, the place's dates, cap and one each hold,

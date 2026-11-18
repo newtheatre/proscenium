@@ -15,6 +15,8 @@ export interface OfferedScheme {
   requiresPayment: boolean
   online: boolean
   asksFor: string | null
+  /** Joining asks the scheme's application form (MEM-12). */
+  applicationForm?: boolean
 }
 
 /** A fee in the theatre's way of writing money. */
