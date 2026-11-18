@@ -23,9 +23,15 @@ export async function missingSecrets(provider: PaymentProvider, accountId = ''):
   return missing
 }
 
-/** The ledger account money taken by `method` on `providerAccountId` lands in first. */
+/**
+ * The ledger account money taken by `method` on `providerAccountId` lands in first. Card clearing holds
+ * card money only, because reconciliation waits for the provider to pay out what it holds; money taken
+ * some other way goes to payments.other.
+ */
 export function clearingFor(method: Method, providerAccountId: string): { key: string, scope?: string } {
-  return method === 'cash' ? { key: 'payments.cash' } : { key: 'payments.card-clearing', scope: providerAccountId }
+  if (method === 'cash') return { key: 'payments.cash' }
+  if (method === 'other_attested') return { key: 'payments.other' }
+  return { key: 'payments.card-clearing', scope: providerAccountId }
 }
 
 export interface MethodOffer { providerAccountId: string, provider: string, label: string, method: Method, mode: 'live' | 'test' }

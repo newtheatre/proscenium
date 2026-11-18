@@ -8,7 +8,7 @@ import { providerById } from '../../../../identity/providers'
 
 export default defineRoute({
   public: true,
-  rateLimit: 'sign-in',
+  rateLimit: 'sign-in-network',
   input: z.object({ code: z.string().max(2048).optional(), state: z.string().max(200).optional(), error: z.string().max(200).optional() }), // not-policy: lengths providers' values fit in
 }, async (event, { input, unit }) => {
   const provider = providerById(getRouterParam(event, 'provider') ?? '')
