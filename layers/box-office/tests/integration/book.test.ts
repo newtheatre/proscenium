@@ -41,6 +41,13 @@ describe('the public booking page', () => {
     expect(page.body.bands[0].soldOut).toBe(false)
     expect(page.body.bands[0].types.map((t: { amountMinor: number }) => t.amountMinor).sort((a: number, b: number) => a - b)).toEqual([800, 1200])
     expect(JSON.stringify(page.body)).not.toMatch(/capacity|"free"|claimed/)
+    expect(page.body.production).toMatchObject({ ageMin: null, ageRestricted: false })
+  })
+
+  it('carries the production\'s age guidance', async () => {
+    await rows('UPDATE core_productions SET age_min = 18, age_restricted = 1 WHERE id = ?', h.productionId)
+    expect((await read(h)).body.production).toMatchObject({ ageMin: 18, ageRestricted: true })
+    await rows('UPDATE core_productions SET age_min = NULL, age_restricted = 0 WHERE id = ?', h.productionId)
   })
 
   it('says a band is sold out when its last seat is held', async () => {

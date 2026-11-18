@@ -161,11 +161,13 @@ describe('the production page\'s "Ready to publish?" checklist', () => {
     const checks = async () => (await json(send('GET', `/api/core/record-checks?record=core.production&id=${id}`, { actor: viewer }))).body.checks
     const before = await checks()
     expect(before.map((c: { sentence: string, done: boolean }) => [c.sentence, c.done])).toEqual([
-      ['A summary', false], ['A category', false], ['Staging effects listed, or none confirmed', false], ['Content warnings listed, or none confirmed', false], ['A poster', false], ['A scheduled performance', false],
+      ['A summary', false], ['A category', false], ['Staging effects listed, or none confirmed', false], ['Content warnings listed, or none confirmed', false], ['A booking link, as nothing here sells tickets', false], ['A poster', false], ['A scheduled performance', false],
     ])
-    expect(before[4].link).toBe(`/console/programme/productions/${id}?tab=media`)
+    // The lines publishing needs say so; the poster and a date are only wanted.
+    expect(before.map((c: { needed: boolean }) => c.needed)).toEqual([true, true, true, true, true, false, false])
+    expect(before[5].link).toBe(`/console/programme/productions/${id}?tab=media`)
     await use(id, await ready(id, 'poster'))
-    expect((await checks())[4]).toMatchObject({ sentence: 'A poster', done: true })
+    expect((await checks())[5]).toMatchObject({ sentence: 'A poster', done: true })
     // Someone who may not see productions gets no lines.
     expect((await json(send('GET', `/api/core/record-checks?record=core.production&id=${id}`, { actor: person([]) }))).body.checks).toEqual([])
   })

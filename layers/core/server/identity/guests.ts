@@ -22,6 +22,8 @@ export interface FindOrCreateInput {
 export interface FoundAccount {
   accountId: string
   created: boolean
+  /** For an account made now: the address it was made with, which the caller's unit has not written yet. */
+  madeWith?: { address: string } | null
   /** The address belongs to somebody who has signed in; the caller shows the typist nothing about them. */
   claimed: boolean
 }
@@ -58,10 +60,10 @@ export async function findOrCreateAccount(unit: UnitView, input: FindOrCreateInp
       const created = createUnclaimed(unit, input, row.id)
       unit.add({ sql: 'UPDATE core_account_emails SET account_id = ? WHERE id = ? AND verified_at IS NULL', params: [created, row.id] })
         .expect(1, { code: 'core.account.address-changed', reason: 'That address was verified a moment ago.', remedy: 'Try again.' })
-      return { accountId: created, created: true, claimed: false }
+      return { accountId: created, created: true, claimed: false, madeWith: { address: row.address } }
     }
   }
-  return { accountId: createUnclaimed(unit, { ...input, address }), created: true, claimed: false }
+  return { accountId: createUnclaimed(unit, { ...input, address }), created: true, claimed: false, madeWith: address ? { address } : null }
 }
 
 /** Makes the account, with a new address row, or pointing at an existing row the caller moves to it. */
