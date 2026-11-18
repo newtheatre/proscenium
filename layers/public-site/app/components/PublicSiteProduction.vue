@@ -20,6 +20,13 @@ interface Performance {
   effectsOff: string[]
   booking: Booking | null
 }
+interface VenueSummary {
+  id: string
+  slug: string
+  name: string
+  address: { lines: string[], locality: string | null, postcode: string | null, country: string | null }
+  access: { termId: string, label: string, icon: string | null, note: string | null }[]
+}
 interface Production {
   id: string
   slug: string
@@ -45,6 +52,8 @@ interface Production {
   poster: Image | null
   photos: Image[]
   performances: Performance[]
+  /** Absent from an answer cached before venues were added. */
+  venues?: VenueSummary[]
   price: PriceSummaryView | null
 }
 
@@ -74,12 +83,23 @@ const length = computed(() => {
   const parts = [hours ? t('public-site.production.hours', { count: hours }) : '', minutes ? t('public-site.production.minutes', { count: minutes }) : ''].filter(Boolean).join(' ')
   return p.intervalCount ? t('public-site.production.with-intervals', { length: parts, count: p.intervalCount }) : parts
 })
-const facts = computed(() => [venues.value.join(', '), length.value, production.value?.ageGuidance].filter(Boolean).join(' · '))
+// Each venue's name links to its page where the venue is public; the rest of the line follows.
+const places = computed(() => {
+  const known = new Map((production.value?.venues ?? []).map(v => [v.id, v]))
+  const seen = new Map<string, { name: string, slug: string | null }>()
+  for (const p of production.value?.performances ?? []) if (!seen.has(p.venue.id)) seen.set(p.venue.id, { name: p.venue.name, slug: known.has(p.venue.id) ? p.venue.slug : null })
+  return [...seen.values()]
+})
+const facts = computed(() => [length.value, production.value?.ageGuidance].filter(Boolean).join(' · '))
+const addressOf = (v: VenueSummary) => [...v.address.lines, [v.address.locality, v.address.postcode].filter(Boolean).join(' ')].filter(Boolean).join(', ')
 const eyebrow = computed(() => [production.value?.season?.name, production.value?.category?.label].filter(Boolean).join(' · '))
 
 // Every public date, cancelled ones struck through. With one date, its action shows at the top too.
 const dates = computed(() => production.value?.performances ?? [])
 const only = computed(() => (dates.value.length === 1 && dates.value[0]!.state === 'scheduled' ? dates.value[0] : null))
+// The dates and tickets panel: beside the story from lg, sticky; on a phone, after the guidance, with
+// a button by the title that jumps to it.
+const hasPanel = computed(() => !!production.value && (dates.value.length > 0 || !production.value.past || (production.value.venues?.length ?? 0) > 0))
 const where = (p: Performance) => venues.value.length > 1 || p.space.name !== p.venue.name ? `${p.space.name}, ${p.venue.name}` : ''
 const credits = computed(() => {
   const sections = new Map<string, { section: string, people: { id: string, creditedName: string, role: string }[] }>()
@@ -132,65 +152,84 @@ useHead(() => {
 <template>
   <UContainer v-if="production">
     <UPage>
-      <!-- Without a poster the text takes the whole width rather than leaving an empty column. -->
-      <div :class="['grid gap-8 py-8', production.poster ? 'md:grid-cols-[minmax(0,18rem)_1fr]' : 'max-w-3xl']">
-        <div v-if="production.poster">
-          <img
-            :src="production.poster.url"
-            :alt="production.poster.alt"
-            :width="production.poster.width ?? undefined"
-            :height="production.poster.height ?? undefined"
-            class="aspect-[2/3] w-full rounded-lg border border-default object-cover"
-          >
-        </div>
+      <div :class="['grid gap-8 py-8', hasPanel ? 'lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]' : '']">
+        <div class="min-w-0 space-y-6 lg:col-start-1">
+          <!-- Without a poster the text takes the whole width rather than leaving an empty column. -->
+          <div :class="['grid gap-6', production.poster ? 'sm:grid-cols-[minmax(0,14rem)_1fr]' : '']">
+            <div v-if="production.poster">
+              <img
+                :src="production.poster.url"
+                :alt="production.poster.alt"
+                :width="production.poster.width ?? undefined"
+                :height="production.poster.height ?? undefined"
+                class="aspect-[2/3] w-full max-w-72 rounded-lg border border-default object-cover"
+              >
+            </div>
 
-        <div class="min-w-0 space-y-6">
-          <header class="space-y-2">
-            <p
-              v-if="eyebrow"
-              class="text-sm text-muted"
-            >
-              {{ eyebrow }}
-            </p>
-            <h1 class="text-3xl font-bold text-highlighted sm:text-4xl">
-              {{ production.title }}
-            </h1>
-            <p
-              v-if="production.subtitle"
-              class="text-lg"
-            >
-              {{ production.subtitle }}
-            </p>
-            <UBadge
-              v-if="production.state === 'cancelled'"
-              color="error"
-              variant="subtle"
-              :label="t('public-site.production.cancelled')"
-            />
-            <MarkdownText
-              v-if="production.summary"
-              :text="production.summary"
-            />
-            <p
-              v-if="production.companyName"
-              class="text-sm text-muted"
-            >
-              {{ t('public-site.production.presented-by', { company: production.companyName }) }}
-            </p>
-            <p
-              v-if="facts"
-              class="text-sm text-muted"
-            >
-              {{ facts }}
-            </p>
-            <PublicSiteBookingButton
-              v-if="only"
-              :booking="only.booking"
-              :when="dateTime(only.startsAt)"
-              size="lg"
-              class="justify-start pt-2"
-            />
-          </header>
+            <header class="min-w-0 space-y-2">
+              <p
+                v-if="eyebrow"
+                class="text-sm text-muted"
+              >
+                {{ eyebrow }}
+              </p>
+              <h1 class="text-3xl font-bold text-highlighted sm:text-4xl">
+                {{ production.title }}
+              </h1>
+              <p
+                v-if="production.subtitle"
+                class="text-lg"
+              >
+                {{ production.subtitle }}
+              </p>
+              <UBadge
+                v-if="production.state === 'cancelled'"
+                color="error"
+                variant="subtle"
+                :label="t('public-site.production.cancelled')"
+              />
+              <MarkdownText
+                v-if="production.summary"
+                :text="production.summary"
+              />
+              <p
+                v-if="production.companyName"
+                class="text-sm text-muted"
+              >
+                {{ t('public-site.production.presented-by', { company: production.companyName }) }}
+              </p>
+              <p
+                v-if="places.length || facts"
+                class="text-sm text-muted"
+              >
+                <span
+                  v-for="(v, i) in places"
+                  :key="v.name"
+                ><ULink
+                  v-if="v.slug"
+                  :to="`/venues/${v.slug}`"
+                  class="text-default underline underline-offset-2 hover:text-primary"
+                >{{ v.name }}</ULink><span v-else>{{ v.name }}</span><span v-if="i < places.length - 1">, </span></span><span v-if="places.length && facts"> · </span>{{ facts }}
+              </p>
+              <div class="flex flex-wrap items-center gap-3 pt-2 lg:hidden">
+                <PublicSiteBookingButton
+                  v-if="only"
+                  :booking="only.booking"
+                  :when="dateTime(only.startsAt)"
+                  :company="production.companyName"
+                  size="lg"
+                  class="justify-start"
+                />
+                <UButton
+                  v-else-if="dates.length"
+                  to="#dates"
+                  :label="t('public-site.production.dates-and-tickets')"
+                  trailing-icon="i-lucide-arrow-down"
+                  size="lg"
+                />
+              </div>
+            </header>
+          </div>
 
           <section
             v-if="production.effects.length"
@@ -238,7 +277,7 @@ useHead(() => {
 
           <UCollapsible
             v-if="production.advisories.length || production.contentNote"
-            class="rounded-lg border border-default"
+            class="group rounded-lg border border-default"
           >
             <UButton
               color="neutral"
@@ -246,6 +285,7 @@ useHead(() => {
               block
               class="justify-between px-4 py-3"
               trailing-icon="i-lucide-chevron-down"
+              :ui="{ trailingIcon: 'transition-transform duration-200 group-data-[state=open]:rotate-180' }"
               :label="t('public-site.production.advisories', { count: production.advisories.length })"
             />
             <template #content>
@@ -254,32 +294,40 @@ useHead(() => {
                   <li
                     v-for="a in production.advisories"
                     :key="a.termId"
+                    class="flex items-start justify-between gap-2"
                   >
-                    <div class="flex items-start justify-between gap-2">
-                      <details
-                        v-if="a.detail"
-                        class="min-w-0"
+                    <UCollapsible
+                      v-if="a.detail"
+                      class="group/warning min-w-0 flex-1"
+                    >
+                      <UButton
+                        color="neutral"
+                        variant="link"
+                        class="p-0 text-start text-default"
+                        trailing-icon="i-lucide-chevron-down"
+                        :ui="{ trailingIcon: 'transition-transform duration-200 group-data-[state=open]/warning:rotate-180' }"
+                        :aria-label="t('public-site.production.warning-detail', { label: a.label })"
                       >
-                        <summary class="cursor-pointer">
-                          <span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span>
-                        </summary>
+                        <span><span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span></span>
+                      </UButton>
+                      <template #content>
                         <p class="mt-1 text-sm text-muted">
                           {{ a.detail }}
                         </p>
-                      </details>
-                      <span
-                        v-else
-                        class="min-w-0"
-                      ><span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span></span>
-                      <IconButton
-                        :icon="tell.has(a.termId) ? 'i-lucide-bell-ring' : 'i-lucide-bell'"
-                        :label="t(tell.has(a.termId) ? 'public-site.production.tell-remove' : 'public-site.production.tell-add', { label: a.label })"
-                        :aria-pressed="tell.has(a.termId)"
-                        :variant="tell.has(a.termId) ? 'soft' : 'ghost'"
-                        size="xs"
-                        @click="tell.toggle(a.termId)"
-                      />
-                    </div>
+                      </template>
+                    </UCollapsible>
+                    <span
+                      v-else
+                      class="min-w-0 flex-1"
+                    ><span class="font-medium">{{ a.label }}</span><span v-if="a.level"> · {{ t(`public-site.production.level-${a.level}`) }}</span></span>
+                    <IconButton
+                      :icon="tell.has(a.termId) ? 'i-lucide-bell-ring' : 'i-lucide-bell'"
+                      :label="t(tell.has(a.termId) ? 'public-site.production.tell-remove' : 'public-site.production.tell-add', { label: a.label })"
+                      :aria-pressed="tell.has(a.termId)"
+                      :variant="tell.has(a.termId) ? 'soft' : 'ghost'"
+                      size="xs"
+                      @click="tell.toggle(a.termId)"
+                    />
                   </li>
                 </ul>
                 <p class="text-xs text-muted">
@@ -321,82 +369,153 @@ useHead(() => {
               {{ t('public-site.production.no-warnings') }}
             </p>
           </template>
+        </div>
 
-          <section
-            v-if="dates.length"
-            aria-labelledby="dates-heading"
-          >
-            <h2
-              id="dates-heading"
-              class="mb-2 text-lg font-semibold text-highlighted"
+        <aside
+          v-if="hasPanel"
+          id="dates"
+          class="min-w-0 scroll-mt-24 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+        >
+          <div class="space-y-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:rounded-lg lg:border lg:border-default lg:p-4">
+            <section
+              v-if="dates.length"
+              aria-labelledby="dates-heading"
             >
-              {{ t('public-site.production.dates') }}
-            </h2>
-            <p
-              v-if="production.price"
-              class="mb-2 text-sm"
-            >
-              {{ priceSummary(production.price, t) }}
-            </p>
-            <ul class="divide-y divide-default border-y border-default">
-              <li
-                v-for="p in dates"
-                :key="p.id"
-                class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
+              <h2
+                id="dates-heading"
+                class="mb-2 text-lg font-semibold text-highlighted"
               >
-                <div class="min-w-0 space-y-1">
-                  <p :class="p.state === 'cancelled' ? 'text-muted line-through' : 'font-medium'">
-                    <time :datetime="new Date(p.startsAt).toISOString()">{{ dateTime(p.startsAt) }}</time>
-                    <span v-if="p.label"> · {{ p.label }}</span>
-                  </p>
-                  <p
-                    v-if="where(p) || (p.doorsAt && p.state === 'scheduled')"
-                    class="text-sm text-muted"
-                  >
-                    {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
-                  </p>
-                  <p
-                    v-if="p.effectsOff.length && p.state === 'scheduled'"
-                    class="text-sm"
-                  >
-                    {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
-                  </p>
-                  <ul
-                    v-if="p.access.length"
-                    class="flex flex-wrap gap-1"
-                    :aria-label="t('public-site.production.access')"
-                  >
-                    <li
-                      v-for="a in p.access"
-                      :key="a.termId"
+                {{ t('public-site.production.dates-and-tickets') }}
+              </h2>
+              <p
+                v-if="production.price"
+                class="mb-2 text-sm"
+              >
+                {{ priceSummary(production.price, t) }}
+              </p>
+              <ul class="divide-y divide-default border-y border-default">
+                <li
+                  v-for="p in dates"
+                  :key="p.id"
+                  class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
+                >
+                  <div class="min-w-0 space-y-1">
+                    <p :class="p.state === 'cancelled' ? 'text-muted line-through' : 'font-medium'">
+                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dateTime(p.startsAt) }}</time>
+                      <span v-if="p.label"> · {{ p.label }}</span>
+                    </p>
+                    <p
+                      v-if="where(p) || (p.doorsAt && p.state === 'scheduled')"
+                      class="text-sm text-muted"
                     >
-                      <UBadge
-                        color="neutral"
-                        variant="outline"
-                        :label="a.detail ? `${a.label}: ${a.detail}` : a.label"
-                      />
-                    </li>
-                  </ul>
-                </div>
-                <span
-                  v-if="p.state === 'cancelled'"
-                  class="text-sm font-medium"
-                >{{ t('public-site.production.date-cancelled') }}</span>
-                <PublicSiteBookingButton
-                  v-else-if="p.state === 'scheduled'"
-                  :booking="p.booking"
-                  :when="dateTime(p.startsAt)"
-                />
-              </li>
-            </ul>
-          </section>
-          <p
-            v-else-if="!production.past"
-            class="text-muted"
-          >
-            {{ t('public-site.production.dates-soon') }}
-          </p>
+                      {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
+                    </p>
+                    <p
+                      v-if="p.effectsOff.length && p.state === 'scheduled'"
+                      class="text-sm"
+                    >
+                      {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
+                    </p>
+                    <ul
+                      v-if="p.access.length"
+                      class="flex flex-wrap gap-1"
+                      :aria-label="t('public-site.production.access')"
+                    >
+                      <li
+                        v-for="a in p.access"
+                        :key="a.termId"
+                      >
+                        <UBadge
+                          color="neutral"
+                          variant="outline"
+                          :label="a.detail ? `${a.label}: ${a.detail}` : a.label"
+                        />
+                      </li>
+                    </ul>
+                  </div>
+                  <span
+                    v-if="p.state === 'cancelled'"
+                    class="text-sm font-medium"
+                  >{{ t('public-site.production.date-cancelled') }}</span>
+                  <PublicSiteBookingButton
+                    v-else-if="p.state === 'scheduled'"
+                    :booking="p.booking"
+                    :when="dateTime(p.startsAt)"
+                    :company="production.companyName"
+                  />
+                </li>
+              </ul>
+            </section>
+            <p
+              v-else-if="!production.past"
+              class="text-muted"
+            >
+              {{ t('public-site.production.dates-soon') }}
+            </p>
 
+            <section
+              v-if="production.venues?.length"
+              aria-labelledby="venue-heading"
+              class="space-y-3"
+            >
+              <h2
+                id="venue-heading"
+                class="text-lg font-semibold text-highlighted"
+              >
+                {{ t('public-site.production.venue-heading') }}
+              </h2>
+              <div
+                v-for="v in production.venues"
+                :key="v.id"
+                class="space-y-2"
+              >
+                <p>
+                  <ULink
+                    :to="`/venues/${v.slug}`"
+                    class="font-medium text-highlighted underline underline-offset-2 hover:text-primary"
+                  >
+                    {{ v.name }}
+                  </ULink>
+                </p>
+                <p
+                  v-if="addressOf(v)"
+                  class="text-sm text-muted"
+                >
+                  {{ addressOf(v) }}
+                </p>
+                <ul
+                  v-if="v.access.length"
+                  class="flex flex-wrap gap-1"
+                  :aria-label="t('public-site.venue.access')"
+                >
+                  <li
+                    v-for="a in v.access"
+                    :key="a.termId"
+                  >
+                    <UBadge
+                      :label="a.label"
+                      :icon="a.icon ?? 'i-lucide-check'"
+                      color="neutral"
+                      variant="outline"
+                      size="sm"
+                    />
+                  </li>
+                </ul>
+                <UButton
+                  :to="`/venues/${v.slug}`"
+                  :label="t('public-site.production.venue-more', { venue: v.name })"
+                  trailing-icon="i-lucide-arrow-right"
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  class="px-0"
+                />
+              </div>
+            </section>
+          </div>
+        </aside>
+
+        <div class="min-w-0 space-y-6 lg:col-start-1">
           <section
             v-if="production.description?.trim()"
             aria-labelledby="about-heading"

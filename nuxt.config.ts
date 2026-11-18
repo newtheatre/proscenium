@@ -106,5 +106,7 @@ export default defineNuxtConfig({
     },
   },
   eslint: { config: { stylistic: true } },
-  icon: { fallbackToApi: false, serverBundle: 'local', clientBundle: { scan: true } },
+  // Icons named in TypeScript (a module's menu entries, groups and cards in module.ts) are scanned too:
+  // with no fallback to the Iconify API, an icon left out of the bundle would not show at all.
+  icon: { fallbackToApi: false, serverBundle: 'local', clientBundle: { scan: { globInclude: ['**/*.{vue,ts,jsx,tsx,md,mdc,mdx,yml,yaml}'] } } },
 })

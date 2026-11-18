@@ -13,7 +13,7 @@ const active = computed(() => (data.value?.types ?? []).filter(x => x.state === 
 const archived = computed(() => (data.value?.types ?? []).filter(x => x.state === 'archived'))
 const describe = (x: AwardType) => [t('awards.screens.types.holders', { count: x.holders }), x.givesTicketBenefit ? t('awards.screens.types.with-benefit') : null].filter(Boolean).join(' · ')
 
-const blank = (): TypeForm => ({ name: '', key: '', summary: '', givesTicketBenefit: false, onePerPerson: true, defaultVisibility: 'public' })
+const blank = (): TypeForm => ({ name: '', key: '', summary: '', givesTicketBenefit: false, onePerPerson: false, defaultVisibility: 'public' })
 const open = ref(false)
 const form = ref<TypeForm>(blank())
 const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')

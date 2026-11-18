@@ -5,7 +5,7 @@
 type Topic = 'audience' | 'building' | 'show' | 'staffing' | 'other'
 interface Report {
   state: 'draft' | 'signed_off'
-  unresolved: { people: { assignmentId: string, accountId: string, state: string, duty: string }[], openChecklists: string[], missingTimings: string[] } | null
+  unresolved: { people: { assignmentId: string, accountId: string, state: string, duty: string, arrived: boolean }[], openChecklists: string[], missingTimings: string[] } | null
   notes: { id: string, kind: 'note' | 'addendum', topic: Topic, body: string, authorId: string, at: number }[]
   names: Record<string, string>
   performance: { title: string, startsAt: number } | null
@@ -16,6 +16,7 @@ const { t } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
+const { confirm } = useConfirm()
 const { time } = useDates()
 const route = useRoute()
 const id = computed(() => String(route.params.performance))
@@ -23,6 +24,14 @@ const base = computed(() => `/api/front-of-house/performances/${encodeURICompone
 const { data, status, error, refresh } = await useAPI<Report>(() => base.value, { key: `front-of-house:report:${id.value}` })
 
 const noShows = ref<string[]>([])
+// Once anyone has been marked arrived, the rest start as not come, so nobody who never came is
+// credited by default. Set once per load, so a refresh after a note keeps the lead's changes.
+let seeded = false
+watch(() => data.value?.unresolved?.people, (people) => {
+  if (!people || seeded) return
+  seeded = true
+  noShows.value = people.some(p => p.arrived) ? people.filter(p => !p.arrived).map(p => p.assignmentId) : []
+}, { immediate: true })
 const note = ref({ topic: 'other' as Topic, body: '' })
 const busy = ref<'note' | 'sign-off' | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -46,6 +55,7 @@ async function addNote() {
 }
 async function signOff() {
   refusal.value = null
+  if (!(await confirm({ verb: t('front-of-house.report.confirm-verb'), thing: t('front-of-house.report.confirm-thing'), consequence: noShows.value.length ? t('front-of-house.report.confirm-consequence', { count: noShows.value.length }) : t('front-of-house.report.confirm-consequence-all'), button: t('front-of-house.report.sign-off') }))) return
   busy.value = 'sign-off'
   try {
     await write(`${base.value}/sign-off`, { method: 'POST', body: { noShows: noShows.value } })
@@ -128,7 +138,7 @@ const context = computed(() => data.value?.performance ? [data.value.performance
                 size="xl"
                 variant="card"
                 :legend="t('front-of-house.live.who-did-not-come-help')"
-                :items="d.unresolved.people.map(p => ({ value: p.assignmentId, label: `${d.names[p.accountId] ?? ''} (${p.duty})` }))"
+                :items="d.unresolved.people.map(p => ({ value: p.assignmentId, label: `${d.names[p.accountId] ?? ''} (${p.duty})`, description: t(p.arrived ? 'front-of-house.report.arrived' : 'front-of-house.report.not-marked-arrived') }))"
               />
             </section>
           </template>
