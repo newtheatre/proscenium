@@ -28,7 +28,7 @@ interface Scheme {
   requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, endsByList: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -136,6 +136,25 @@ const actions = computed(() => {
   if (s.state === 'draft') out.push({ label: t('membership.screens.scheme.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove })
   return out
 })
+
+// The join page (MEM-10): its address to copy, and a poster with a QR code of it to print.
+const { data: brand } = await useBrand()
+const joinLink = computed(() => scheme.value ? `${useRequestURL().origin}/join/${scheme.value.key}` : '')
+const copiedLink = ref(false)
+async function copyJoinLink() {
+  await navigator.clipboard.writeText(joinLink.value)
+  copiedLink.value = true
+  setTimeout(() => { copiedLink.value = false }, 2000) // not-policy: how long the button says it copied
+}
+async function downloadPoster() {
+  const s = scheme.value!
+  try {
+    await downloadMembershipPoster(membershipPosterSvg({ theatre: brand.value?.name ?? t('core.public.default-name'), title: t('membership.join.title', { scheme: s.name }), summary: s.summary, url: joinLink.value, scan: t('membership.join.poster-scan') }), `${s.key}-join-poster.png`)
+  }
+  catch (e) {
+    toast.add({ title: t('membership.join.poster-failed'), description: (e as Error).message, color: 'error' })
+  }
+}
 
 // Adding and importing members: the windows are shared with Console > Members, and offered the schemes this viewer may use.
 const { data: choices, refresh: refreshChoices } = await useAPI<{ schemes: MembershipSchemeChoice[] }>('/api/membership/members/schemes', { key: 'membership:members:schemes', default: () => ({ schemes: [] }) })
@@ -308,7 +327,7 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 v-for="o in offeredOptions"
                 :key="o.id"
                 :name="o.name"
-                :description="exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
+                :description="data?.endsByList ? t('membership.screens.lengths.ends-by-list') : exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
               >
                 <RowActions
                   :items="optionActions(o)"
@@ -343,6 +362,39 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
           :title="t('membership.screens.lengths.title')"
           :description="t('membership.screens.lengths.indefinite')"
         />
+
+        <PageSection
+          v-if="scheme.joinMode === 'apply' && scheme.state !== 'archived'"
+          :title="t('membership.join.admin-title')"
+          :description="t(scheme.state === 'open' ? 'membership.join.admin-help' : 'membership.join.admin-help-not-open')"
+        >
+          <UFormField :label="t('membership.join.admin-link')">
+            <UFieldGroup class="flex">
+              <UInput
+                :model-value="joinLink"
+                readonly
+                class="min-w-0 flex-1 font-mono"
+              />
+              <UButton
+                color="neutral"
+                variant="outline"
+                :icon="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'"
+                :label="copiedLink ? t('membership.join.copied') : t('membership.join.copy')"
+                @click="copyJoinLink"
+              />
+            </UFieldGroup>
+          </UFormField>
+          <template #actions>
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-qr-code"
+              :label="t('membership.join.poster')"
+              loading-auto
+              @click="downloadPoster"
+            />
+          </template>
+        </PageSection>
 
         <PageSection
           :title="t('membership.screens.scheme.details')"
