@@ -143,8 +143,8 @@ export async function reassert(browser: Browser, device: Authenticator) {
 }
 
 /** Runs first-run setup in a browser and returns the Owner's account id. */
-export async function setUpOwner(browser: Browser, device: Authenticator, to = address()): Promise<string> {
-  const start = await browser.post('/api/core/setup/start', { name: 'Olive Owner', address: to })
+export async function setUpOwner(browser: Browser, device: Authenticator, to = address(), theatre: { theatre?: string, timeZone?: string } = {}): Promise<string> {
+  const start = await browser.post('/api/core/setup/start', { name: 'Olive Owner', address: to, ...theatre })
   if (start.status !== 200) throw new Error(`setup start failed: ${JSON.stringify(start.body)}`)
   const passkey = await browser.post('/api/core/setup/passkey', { response: await device.create(start.body.options) })
   const finished = await browser.post('/api/core/setup/finish', { code: passkey.body.recoveryCodes[0] })

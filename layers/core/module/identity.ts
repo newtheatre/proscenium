@@ -584,5 +584,6 @@ export const identityContributions = {
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },
     { id: 'core.owner-recovery', file: 'owner-recovery' },
     { id: 'core.merges', file: 'merges' },
+    { id: 'core.privacy-contact', file: 'privacy-contact' },
   ],
 }
