@@ -58,6 +58,11 @@ const performance = computed(() => performances.value.find(p => p.performanceId 
 const choices = computed(() => performances.value.map(p => ({ value: p.performanceId, label: `${p.title}, ${dateTime(p.startsAt)}` })))
 const quantities = ref<Record<string, number>>({})
 const keyOf = (row: { bandId: string, ticketTypeId: string }) => `${row.bandId} ${row.ticketTypeId}`
+function setQuantity(row: PerformanceRow, value: number | null | undefined) {
+  const n = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
+  const { [keyOf(row)]: _, ...others } = quantities.value
+  quantities.value = n > 0 ? { ...others, [keyOf(row)]: n } : others
+}
 // A member's references, typed for each ticket of a member price.
 const references = ref<Record<string, string[]>>({})
 function setReference(row: PerformanceRow, n: number, value: string) {
@@ -276,11 +281,13 @@ function clear() {
             :help="t('box-office.screens.panel.left', { count: row.free })"
           >
             <div class="space-y-2">
+              <!-- Shown as 0 rather than empty: from an empty box, the first + would only fill in 0 (T1). -->
               <UInputNumber
-                v-model="quantities[keyOf(row)]"
+                :model-value="quantities[keyOf(row)] ?? 0"
                 :min="0"
                 :max="row.free"
                 :disabled="locked"
+                @update:model-value="setQuantity(row, $event)"
               />
               <template v-if="row.reference && (quantities[keyOf(row)] ?? 0) > 0">
                 <UInput
