@@ -6,7 +6,8 @@ import { first, newId, nowMs, refuse, useSetting, siteUrl, type Actor, type Unit
 import { countAgainstRate } from '#kit/ratelimit'
 import { addressRow, accountById, isUsable, normaliseAddress } from './accounts'
 import { digest, normaliseRecoveryCode, randomToken } from './crypto'
-import { credentialNotice } from './notices'
+import { BY_STAFF, credentialNotice } from './notices'
+import { deviceLabel } from './web'
 import { startSession } from './sessions'
 
 /** Where a recovery session goes: the page that enrols a passkey. */
@@ -30,7 +31,7 @@ export async function useRecoveryCode(unit: UnitView, event: H3Event, input: { a
   unit.add({ sql: 'UPDATE core_recovery_codes SET used_at = ? WHERE id = ? AND used_at IS NULL', params: [nowMs(), code.id] }).expect(1, WRONG)
   await startSession(unit, event, { accountId: account.id, methods: ['recovery'], assurance: 'basic' })
   unit.audit({ action: 'sign-in', record: ['core.account', account.id], detail: { method: 'recovery-code' } })
-  await credentialNotice(unit, account.id, 'recovery-used')
+  await credentialNotice(unit, account.id, 'recovery-used', deviceLabel(event))
   return { next: ENROL_PATH }
 }
 
@@ -55,7 +56,7 @@ export async function issueEnrolmentLink(unit: UnitView, event: H3Event, actor: 
     params: [newId('tok', { random: true }), await digest('link', token), accountId, actor.accountId ?? null, at, expiresAt],
   })
   unit.audit({ action: 'create', ability: 'core.account.recover', record: ['core.account', accountId] })
-  await credentialNotice(unit, accountId, 'enrolment-link')
+  await credentialNotice(unit, accountId, 'enrolment-link', BY_STAFF)
   return { link: await siteUrl(`/sign-in/link#${token}`), expiresAt }
 }
 

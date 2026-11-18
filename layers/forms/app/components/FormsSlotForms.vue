@@ -59,13 +59,23 @@ watch(open, (now) => {
 async function saved() {
   adding.value = undefined
   await refresh()
+  await refreshFields()
 }
+/** Custom fields drawn on this page come from the same slot: what is attached has changed, so they are read again. */
+async function refreshFields() {
+  if (!fields.value) return
+  const keys = Object.keys(useNuxtApp().payload.data).filter(k => k.startsWith(`forms:record:${props.slotId}:`))
+  if (keys.length) await refreshNuxtData(keys)
+}
+// Somebody who may fill in fields but not attach them is shown nothing here, rather than a refusal.
+const shut = computed(() => !!error.value && toRefusal(error.value).status === 403) // not-policy: HTTP status
 async function detach(form: Attached) {
   refusal.value = null
   try {
     await $api(`${at.value}/${form.formId}` as string, { method: 'DELETE', body: {} })
     toast.add({ title: t(fields.value ? 'forms.screens.fields.detached' : 'forms.screens.slot.detached'), color: 'success' })
     await refresh()
+    await refreshFields()
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -75,7 +85,10 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div
+    v-if="!shut"
+    class="space-y-3"
+  >
     <RefusalNotice :refusal="refusal ?? (error ? toRefusal(error) : null)" />
     <template v-if="data">
       <p
@@ -142,6 +155,18 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
         :label="t(fields ? 'forms.screens.fields.add' : 'forms.screens.slot.add')"
         :help="choices.length ? undefined : t('forms.screens.slot.nothing-published')"
       >
+        <template
+          v-if="!choices.length"
+          #help
+        >
+          {{ t('forms.screens.slot.nothing-published') }}
+          <ULink
+            to="/console/forms"
+            class="underline"
+          >
+            {{ t('forms.screens.slot.go-to-forms') }}
+          </ULink>
+        </template>
         <USelectMenu
           v-model="adding"
           value-key="value"

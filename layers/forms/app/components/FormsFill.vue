@@ -11,6 +11,8 @@ const props = defineProps<{
   sendLabel?: string
   /** Stores the answers. Resolves false when it could not, and the person stays where they are. */
   send?: (answers: Answers) => Promise<boolean>
+  /** Something the page asks beside the form, checked with every Continue. False keeps the person where they are. */
+  check?: () => boolean
   /** The page to open on, for someone coming back to answers they had started. */
   start?: string | null
 }>()
@@ -55,13 +57,16 @@ async function deliver(): Promise<boolean> {
 }
 async function next() {
   if (sending.value) return
+  // What the page asks beside the form is checked in the same pass as this page's answers, and keeps the focus it took.
+  const beside = props.check?.() ?? true
   if (Object.keys(issuesOnPage(props.definition, evaluation.value, pageId.value)).length) {
     checked.value = true
     // The first answer that needs attention takes the focus.
     await nextTick()
-    top.value?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid] input, [data-invalid] textarea, [data-invalid] button')?.focus()
+    if (beside) top.value?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid] input, [data-invalid] textarea, [data-invalid] button')?.focus()
     return
   }
+  if (!beside) return
   const step = nextStep(evaluation.value, pageId.value)
   if ('page' in step) return go(() => { pageId.value = step.page })
   if ('ending' in step) {
@@ -106,7 +111,7 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
 <template>
   <div
     ref="top"
-    class="scroll-mt-4 space-y-6"
+    class="scroll-mt-24 space-y-6"
   >
     <div
       v-if="ended"
@@ -136,7 +141,11 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
       key="asking"
       class="space-y-6"
     >
-      <div>
+      <MarkdownText
+        v-if="at === 0 && definition.presentation?.introduction"
+        :text="definition.presentation.introduction"
+      />
+      <div v-if="evaluation.route.length > 1 || page.title || definition.pages.length > 1 || page.help">
         <p
           v-if="evaluation.route.length > 1"
           class="text-sm text-muted"
@@ -212,7 +221,10 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
           :id="`answer-${item.id}`"
           class="scroll-mt-4 space-y-3"
         >
-          <legend class="font-medium">
+          <legend
+            class="font-medium"
+            :class="(item.min ?? 0) > 0 ? `after:ms-0.5 after:text-error after:content-['*']` : ''"
+          >
             {{ item.label }}
           </legend>
           <p
@@ -288,9 +300,10 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
           </dd>
         </div>
       </dl>
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
         <UButton
           v-if="at > 0"
+          class="justify-center"
           :label="t('forms.screens.fill.back')"
           icon="i-lucide-arrow-left"
           color="neutral"
@@ -301,6 +314,8 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
         <UButton
           :label="last ? sendLabel ?? definition.presentation?.submitLabel ?? t('forms.screens.fill.send') : t('forms.screens.fill.continue')"
           :trailing-icon="last ? undefined : 'i-lucide-arrow-right'"
+          size="lg"
+          class="justify-center"
           :loading="sending"
           @click="next"
         />

@@ -4,7 +4,7 @@
 // issues the tickets, admits them and posts the sale in one batch and failure leaves the
 // reservation intact; and tickets are sold to somebody at the desk with nobody's details taken.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, nowMs, setClock } from '#kit'
 import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
@@ -55,6 +55,25 @@ beforeAll(async () => {
   })
   cash = (await rows<{ id: string }>("SELECT id FROM payments_provider_accounts WHERE provider = 'cash'"))[0]!.id
   for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
+})
+
+describe('a till session opened by a sale', () => {
+  const spaceOf = async (h: House) => (await rows<{ space_id: string }>('SELECT space_id FROM core_performances WHERE id = ?', h.performanceId))[0]!.space_id
+  const fresh = () => person(['payments.session.open', 'box-office.order.view', 'box-office.order.sell'])
+  const opening = (h: House, actor: ReturnType<typeof person>, spaceId?: string) => req('POST', '/api/payments/till/session', { spaceId, panels: [{ basket: 'box-office', input: { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] } }] }, actor)
+
+  it('opens at the space of tonight\'s performance when the device has no place', async () => {
+    const tonight = await house(4, { startsAt: nowMs() + 60_000 })
+    const opened = await opening(tonight, fresh())
+    expect(opened.body, JSON.stringify(opened.body)).toMatchObject({ opened: true, session: { spaceId: await spaceOf(tonight) } })
+  })
+
+  it('keeps the device\'s own place, and says nothing for a performance on another day', async () => {
+    const tonight = await house(4, { startsAt: nowMs() + 60_000 })
+    const later = await house(4)
+    expect((await opening(tonight, fresh(), await spaceOf(later))).body.session.spaceId).toBe(await spaceOf(later))
+    expect((await opening(later, fresh())).body.session.spaceId).not.toBe(await spaceOf(later))
+  })
 })
 
 describe('a reservation at the desk', () => {
@@ -115,6 +134,9 @@ describe('a reservation at the desk', () => {
     expect(again.status, JSON.stringify(again.body)).toBe(200)
     expect(await payCash(again.body.intentId)).toMatchObject({ settled: true })
     expect(await tickets(r.orderId)).toEqual([{ state: 'valid', admitted_at: null, admitted_scan_id: null }])
+    // Your session lists the sale by the booking's reference, linked to the order.
+    const mine = await req('GET', '/api/payments/session', undefined, seller)
+    expect(mine.body.sales.find((x: { intentId: string }) => x.intentId === again.body.intentId)).toMatchObject({ state: 'succeeded', owners: [{ module: 'box-office', reference: r.reference, to: `/console/box-office/orders/${r.orderId}` }] })
   })
 
   it('is found by the buyer\'s name, with who booked and for what, soonest first', async () => {
@@ -278,6 +300,38 @@ describe('selling at the desk', () => {
     await commit(unit => cancelIntent(unit.view(), sale.body.intentId))
     expect(await count('SELECT used AS n FROM box_office_promo_codes WHERE code = ?', code)).toBe(0)
     expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('box-office.promo.unknown')
+  })
+
+  it('shows what was sold after the payment, and emails the tickets afterwards', async () => {
+    const h = await house(4)
+    const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect((await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, seller)).body.orders).toEqual([])
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const sold = await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, seller)
+    expect(sold.status, JSON.stringify(sold.body)).toBe(200)
+    expect(sold.body.orders).toEqual([expect.objectContaining({ reference: expect.any(String), buyer: null, performance: expect.objectContaining({ id: h.performanceId }) })])
+    const o = sold.body.orders[0]
+    expect(o.lines).toEqual([expect.objectContaining({ ticketType: 'Full price', amountMinor: 1200, admitted: false }), expect.objectContaining({ admitted: false })])
+    const before = await rows<{ code_hash: string }>('SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? ORDER BY k.id', o.orderId)
+
+    // Printed at the till: each ticket with its show, type, number and the code the door scans.
+    const printed = await req('GET', `/api/box-office/desk/orders/${o.orderId}/tickets`, undefined, seller)
+    expect(printed.status, JSON.stringify(printed.body)).toBe(200)
+    expect(printed.body.reference).toBe(o.reference)
+    expect(printed.body.tickets).toEqual([1, 2].map(n => expect.objectContaining({ number: `${o.reference}-${n}`, ticketType: 'Full price', holder: null, admitted: false, doorCode: expect.stringMatching(/^tkt\./), startsAt: o.performance.startsAt })))
+    expect((await req('GET', `/api/box-office/desk/orders/${o.orderId}/tickets`, undefined, onlooker)).status).toBe(403)
+
+    expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'after@example.org' }, onlooker, { 'idempotency-key': `send-${o.orderId}-x` })).status).toBe(403)
+    const sent = await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'After.Sale@Example.org' }, seller, { 'idempotency-key': `send-${o.orderId}` })
+    expect(sent.status, JSON.stringify(sent.body)).toBe(200)
+    expect((await order(o.orderId)).account_id).toBeTruthy()
+    expect(await count("SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE 'box-office.order-confirmed%'", o.orderId)).toBe(1)
+    // The tickets keep their codes: the message links to the booking, which shows them.
+    const after = await rows<{ code_hash: string }>("SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? AND k.state = 'valid' ORDER BY k.id", o.orderId)
+    expect(after).toEqual(before)
+    // Sent once: a second send is refused rather than sending different codes again.
+    expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'other@example.org' }, seller, { 'idempotency-key': `send-${o.orderId}-2` })).body.code).toBe('box-office.desk.already-sent')
   })
 
   it('keeps a code set "not with member or concession prices" off the concession at the till', async () => {

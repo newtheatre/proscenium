@@ -6,7 +6,7 @@ import { getQuery, type H3Event } from 'h3'
 import { all, first, newId, refuse, requireAbility, siteUrl, usePoint, type Actor, type UnitView } from '#kit'
 import type { FormRow } from './forms'
 import { LINK_SLOT } from './db/schema'
-import { PLACE, getLink, type LinkRow, type StoredPlace } from './responses'
+import { PLACE, getLink, shut, type LinkRow, type StoredPlace } from './responses'
 import { sourceOf } from './sources'
 
 export interface FormsSlot {
@@ -140,4 +140,30 @@ export async function aboutOf(response: { placementId: string, subjectType: stri
   if (!slot) return null
   const source = await sourceOf(slot.source)
   return { slot: slot.id, label: slot.label, name: source ? (await source.labels([response.subjectId]))[response.subjectId] ?? null : null }
+}
+
+export interface OpenHere { subjectId: string, name: string | null, formId: string, title: string, address: string, closesAt: number | null }
+const MOST_OPEN = 50 // not-policy: more than one screen offers
+
+/**
+ * The forms in a slot this person could answer now, across its records or on one of them: for a
+ * module's own screens to offer ("Nominate somebody"). One that is paused, not yet open, closed,
+ * full, for people signed in when they are not, or already answered by them is left out.
+ */
+export async function openIn(slot: FormsSlot, actor: Actor, at: number, subjectId?: string): Promise<OpenHere[]> {
+  if (modeOf(slot) === 'record') return []
+  const rows = await all<StoredPlace & { title: string, slug: string, formStatus: string, anonymous: number, liveVersionId: string | null }>(
+    `SELECT ${PLACE.split(', ').map(c => `p.${c}`).join(', ')}, f.title, f.slug, f.status AS formStatus, f.anonymous, f.live_version_id AS liveVersionId
+     FROM forms_placements p JOIN forms_forms f ON f.id = p.form_id
+     WHERE p.slot_key = ?1 AND p.status = 'active' AND f.status = 'live' AND f.live_version_id IS NOT NULL AND (?2 IS NULL OR p.subject_id = ?2)
+     ORDER BY p.created_at, p.id LIMIT ${MOST_OPEN}`, slot.id, subjectId ?? null)
+  const source = await sourceOf(slot.source)
+  const names = source && rows.length ? await source.labels([...new Set(rows.map(r => r.subjectId).filter((id): id is string => !!id))]) : {}
+  const out: OpenHere[] = []
+  for (const r of rows) {
+    const link = { ...r, onePerPerson: !!r.onePerPerson }
+    if (!r.subjectId || await shut({ status: r.formStatus } as FormRow, link, actor, at)) continue
+    out.push({ subjectId: r.subjectId, name: names[r.subjectId] ?? null, formId: r.formId, title: r.title, address: `/forms/${r.slug}?place=${r.id}`, closesAt: r.closesAt })
+  }
+  return out
 }

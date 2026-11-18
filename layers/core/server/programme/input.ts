@@ -35,6 +35,7 @@ const productionFields = z.object({
   intervalMinutes: z.number().int().min(0).max(120).nullable(), // not-policy: a sane ceiling on one interval
   doorsBeforeMinutes: z.number().int().min(0).max(180).nullable(), // not-policy: the doors setting's ceiling
   capacity: z.number().int().min(1).max(100_000).nullable(), // not-policy: a sane ceiling on a house
+  usualSpaceId: z.string().min(1).nullable(),
   externalBookingUrl: z.string().trim().url().startsWith('https://').max(2000).nullable(), // not-policy: an address's bound
   creditsPublic: z.boolean(),
   listed: z.boolean(),
@@ -119,7 +120,38 @@ export const runPresetInput = z.object({
   slots: runSlots,
 })
 
+/** What a run was made from, kept with it so it can be edited (the space is the run's own). */
+export const storedPattern = z.object({
+  from: z.string().regex(DATE_ONLY),
+  to: z.string().regex(DATE_ONLY),
+  slots: runSlots,
+  minutes: z.number().int().min(1).max(1440).nullable().optional(), // not-policy: at most a day long
+  doorsBeforeMinutes: z.number().int().min(0).max(180).nullable().optional(), // not-policy: the doors setting's ceiling
+})
+
+/** A run's new pattern, and how many changes the person saw, so a stale preview is refused. */
+export const runEditInput = z.object({
+  venueId: z.string().min(1),
+  spaceId: z.string().min(1),
+  pattern: storedPattern,
+  seen: z.object({ add: z.number().int().min(0), move: z.number().int().min(0), remove: z.number().int().min(0) }),
+})
+
+const reverseTimes = z.object({ startsAt: z.number().int().positive(), endsAt: z.number().int().positive(), doorsAt: z.number().int().positive().nullable() })
+/** What an edit of a run changed, as the edit answered it, to put back. */
+export const runEditUndoInput = z.object({
+  added: z.array(z.string().min(1)).max(5000), // not-policy: a run's own ceiling
+  moved: z.array(reverseTimes.extend({ id: z.string().min(1), venueId: z.string().min(1), spaceId: z.string().min(1) })).max(5000), // not-policy: a run's own ceiling
+  cancelled: z.array(z.string().min(1)).max(5000), // not-policy: a run's own ceiling
+  deleted: z.array(reverseTimes).max(5000), // not-policy: a run's own ceiling
+  venueId: z.string().min(1),
+  spaceId: z.string().min(1),
+  pattern: storedPattern,
+})
+
 export const runInput = z.object({
+  /** The pattern the person planned, kept with the run so it can be edited later. */
+  pattern: storedPattern.optional(),
   venueId: z.string().min(1),
   spaceId: z.string().min(1),
   scheduled: z.boolean().default(true),

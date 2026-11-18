@@ -166,6 +166,10 @@ describe('paying online', () => {
     const told = await mail('box-office.order-confirmed', b.orderId)
     expect(told).toMatchObject({ reference: b.reference, tickets: '3 × Full price', numbers: `${b.reference}-1, ${b.reference}-2, ${b.reference}-3` })
     expect(told.paid).toContain('36.00')
+    // Where to go, when the doors open and what to ask about access (EM-7).
+    expect(told.where).toBeTruthy()
+    expect(told.doors).toMatch(/\d/)
+    expect(told.access).toBeTruthy()
     expect(JSON.stringify(told)).not.toContain('tkt.')
     const page = (await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': told.link!.slice(told.link!.lastIndexOf('/') + 1) })).body
     expect(page.tickets.map((t: { number: string }) => t.number)).toEqual([`${b.reference}-1`, `${b.reference}-2`, `${b.reference}-3`])

@@ -36,6 +36,18 @@ describe('the member price', () => {
     expect((await check(holder, { accounts: [m.accountId], refs: [`membership:${other}`], whenUnavailable: 'not-met' }))[0]).toMatchObject({ verdict: 'not-met', reason: 'This price is for members.' })
   })
 
+  it('tells a lapsed member when it ended and to renew, and anyone else where to join', async () => {
+    const id = await openScheme()
+    const lapsed = await addMember(id, { startsOn: '2025-01-01', endsOn: '2025-12-31' })
+    const [ended] = await check(person([], { accountId: lapsed.accountId }), { accounts: [lapsed.accountId], refs: [`membership:${id}`], whenUnavailable: 'not-met' })
+    expect(ended).toMatchObject({ verdict: 'not-met', reason: 'Your membership ended on 31 December 2025.', remedy: { label: 'Renew', to: '/account/membership' } })
+    const other = await openScheme()
+    const [none] = await check(person([], { accountId: lapsed.accountId }), { accounts: [lapsed.accountId], refs: [`membership:${other}`], whenUnavailable: 'not-met' })
+    expect(none).toMatchObject({ verdict: 'not-met', reason: 'This price is for members.', remedy: { label: 'Join', to: '/account/membership' } })
+    const [signedOut] = await check(person([]), { accounts: [null], refs: [`membership:${other}`], whenUnavailable: 'not-met' })
+    expect(signedOut!.remedy).toBeUndefined()
+  })
+
   it('needs membership.card.check to ask about somebody else, and is withheld while the module is off', async () => {
     const id = await openScheme()
     const m = await addMember(id)

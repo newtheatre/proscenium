@@ -26,6 +26,7 @@ import responsesExport from '../../server/api/forms/forms/[id]/responses/export.
 import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
 import mineOnePut from '../../server/api/forms/mine/[id].put'
+import mineWithdraw from '../../server/api/forms/mine/[id]/withdraw.post'
 import changesGet from '../../server/api/forms/changes/[token].get'
 import changesPut from '../../server/api/forms/changes/[token].put'
 import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
@@ -37,6 +38,9 @@ import reviewPut from '../../server/api/forms/reviews/[id].put'
 import conflictPost from '../../server/api/forms/reviews/[id]/conflict.post'
 import sourceGet from '../../server/api/forms/sources/[source].get'
 import slotGet from '../../server/api/forms/slots/[slot]/[subject]/index.get'
+import search from '../../server/api/forms/search.get'
+import movePreview from '../../server/api/forms/forms/[id]/responses/[response]/preview.get'
+import slotOpen from '../../server/api/forms/slots/[slot]/open.get'
 import slotPut from '../../server/api/forms/slots/[slot]/[subject]/[form].put'
 import slotDelete from '../../server/api/forms/slots/[slot]/[subject]/[form].delete'
 import templatesGet from '../../server/api/forms/templates/index.get'
@@ -72,6 +76,7 @@ export const handle = server({
   'GET /api/forms/mine': mineGet,
   'GET /api/forms/mine/:id': mineOneGet,
   'PUT /api/forms/mine/:id': mineOnePut,
+  'POST /api/forms/mine/:id/withdraw': mineWithdraw,
   'GET /api/forms/changes/:token': changesGet,
   'PUT /api/forms/changes/:token': changesPut,
   'POST /api/forms/changes/:token/files': changeFilePost,
@@ -88,6 +93,9 @@ export const handle = server({
   'GET /api/forms/templates': templatesGet,
   'POST /api/forms/templates': templatesPost,
   'DELETE /api/forms/templates/:id': templateDelete,
+  'GET /api/forms/slots/:slot/open': slotOpen,
+  'GET /api/forms/search': search,
+  'GET /api/forms/forms/:id/responses/:response/preview': movePreview,
   'GET /api/forms/slots/:slot/:subject': slotGet,
   'PUT /api/forms/slots/:slot/:subject/:form': slotPut,
   'DELETE /api/forms/slots/:slot/:subject/:form': slotDelete,

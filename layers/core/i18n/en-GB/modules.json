@@ -89,5 +89,6 @@
   "core.modules.about.screens": "Screens it adds",
   "core.modules.window.title": "{module} settings",
   "core.modules.window.description": "The same settings and set-up screens as in Admin.",
-  "core.modules.window.none": "There are no settings here you can change"
+  "core.modules.window.none": "There are no settings here you can change",
+  "core.modules.window.choose": "Which settings to show"
 }

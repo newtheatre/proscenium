@@ -2,7 +2,7 @@
 // venue, one space or everything. Performances are placed by their stored operating day, so a show
 // at 00:30 sits with the evening before; a closure carries the first and last operating day it
 // touches, so an all-day closure covers whole days in the theatre's zone.
-import { all, refuse } from '#kit'
+import { all, refuse, TIME_ZONE_REMEDY } from '#kit'
 import { closuresBetween, type Closure } from '../places/closures'
 import { dayBounds, dayRule, operatingDayAt } from '../calendar'
 import type { PerformanceState } from './performances'
@@ -45,7 +45,7 @@ interface Row {
 
 /** Everything on the calendar from one operating day to another, both included. */
 export async function calendarBetween(fromDay: string, toDay: string, scope: { venueId?: string, spaceId?: string } = {}): Promise<CalendarWindow> {
-  const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
+  const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
   const where = ['f.operating_day BETWEEN ? AND ?']
   const params: unknown[] = [fromDay, toDay]
   if (scope.spaceId) {

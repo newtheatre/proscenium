@@ -8,13 +8,17 @@
 import { and, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
+import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
-import { entitle } from './entitlement'
+import { entitle, holderVerdict } from './entitlement'
+import { signing } from '#kit/signing'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
-import { hashOf, newReference } from './codes'
+import { hashOf, newReference, randomToken } from './codes'
+import { sendTickets } from './confirm'
+import { DOOR_CODE_PURPOSE, doorCodesForOrder, signedPart, ticketNumbers } from './tickets'
+import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
@@ -26,7 +30,8 @@ import { salesOf } from './setup'
 const DESK_HOLD = 30 * 60_000 // not-policy: as long as the till keeps a payment open; Payments ends the hold, not this time
 
 // `references`: a buyer's student IDs or member numbers, typed by the seller in place of checking by hand.
-const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500), references: z.array(z.string().max(64)).max(500).optional() }).strict() // not-policy: the setting's own ceiling; the longest reference any list holds
+// `holders`: the account named for each ticket of a type with requirements, found by card or by name.
+const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500), references: z.array(z.string().max(64)).max(500).optional(), holders: z.array(z.string().max(64)).max(500).optional() }).strict() // not-policy: the setting's own ceiling; the longest reference any list holds
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
@@ -82,6 +87,23 @@ async function deskSale(input: SaleInput, at: number) {
 async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], at: number): Promise<(Discounted | null)[]> {
   if (!input.promoCode) return lines.map(() => null)
   return applyCode(await judgeCode(input.promoCode, input.performanceId, at), input.performanceId, lines)
+}
+
+/**
+ * Where the panel's sale happens, for a till session it opens: the space of the performance it is
+ * for, when that performance is today (tonight's show); otherwise it says nothing. Reads only.
+ */
+export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<string | null> {
+  const input = panelInput(context.input)
+  const performanceId = 'sale' in input
+    ? input.sale.performanceId
+    : 'reservation' in input
+      ? (await first<{ performance_id: string }>('SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND performance_id IS NOT NULL LIMIT 1', input.reservation.orderId))?.performance_id
+      : input.exchange.performanceId
+  if (!performanceId) return null
+  const performance = await getPerformance(performanceId).catch(() => null)
+  if (!performance?.spaceId) return null
+  return await operatingDayOf(performance.startsAt) === await operatingDayOf(nowMs()) ? performance.spaceId : null
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
@@ -296,9 +318,11 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   const sellable = await sellableTypes()
   if (retype.some(r => sellable.get(r.ticketTypeId)?.kind === 'complimentary' || !sellable.has(r.ticketTypeId)))
     refuse('box-office.price.none', 'That kind of ticket is not sold for this part of the house.', { status: 422 })
-  const retyped = retype.length ? await entitle(performanceId, retype.map(r => ({ ticketTypeId: r.ticketTypeId })), sellable, { channel: 'desk', account: null }) : null
+  // A ticket that needs its holder named is the booking's buyer's.
+  const holder = order.account_id ? await canonicalAccount(order.account_id) : null
+  const retyped = retype.length ? await entitle(performanceId, retype.map(r => ({ ticketTypeId: r.ticketTypeId })), sellable, { channel: 'desk', account: holder }) : null
   retyped?.guard(unit)
-  const added = add.length ? await pricedLines(performanceId, add, at, { channel: 'desk', account: null }) : null
+  const added = add.length ? await pricedLines(performanceId, add, at, { channel: 'desk', account: holder }) : null
   added?.guard(unit)
   const after = [...kept, ...(added?.lines ?? []).map(l => ({ typeId: l.ticketTypeId, amountMinor: l.amountMinor }))]
   if (!after.length) refuse('box-office.desk.nothing-left', 'That would leave nothing on the reservation.', { status: 422, remedy: 'Release the reservation instead.' })
@@ -393,8 +417,11 @@ export interface DeskPerformance {
   startsAt: number
   state: string
   currency: string | null
-  /** `reference`, on a member price: what the buyer may give instead of the seller checking by hand, worded by its source. */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }[]
+  /**
+   * `reference`, on a member price: what the buyer may give instead of the seller checking by hand,
+   * worded by its source. `holder`: each ticket is for someone who qualifies, named at the till.
+   */
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }[]
 }
 
 /**
@@ -431,8 +458,170 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       currency: available.currency,
       rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map((x) => {
         const reference = referenceOf(x.ticketTypeId)
-        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}) }
+        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}), ...(refsOf.get(x.ticketTypeId)?.length ? { holder: true as const } : {}) }
       })),
     }
   }))
+}
+
+export interface DeskSold {
+  orderId: string
+  reference: string
+  /** Who the tickets were sent to, as Identity names them; null for a sale with nobody's details. */
+  buyer: string | null
+  performance: { id: string, title: string, startsAt: number } | null
+  lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[]
+}
+
+/**
+ * What a till payment bought from Box office, for the panel shown after the sale (till proposal,
+ * "after the sale"): each booking it paid for, with its reference, tickets and whether each is in.
+ */
+export async function deskSold(intentId: string): Promise<DeskSold[]> {
+  // An order this payment bought, or one whose exchange to dearer tickets it paid the difference on.
+  const paid = await all<{ id: string, reference: string, account_id: string | null }>(
+    `SELECT id, reference, account_id FROM box_office_orders
+      WHERE (intent_id = ?1 OR id IN (SELECT order_id FROM box_office_exchanges WHERE intent_id = ?1)) AND state = 'confirmed' ORDER BY created_at`, intentId)
+  return Promise.all(paid.map(async (order) => {
+    const lines = await all<{ id: string, performance_id: string, band_name: string | null, type_name: string, amount_minor: number, admitted_at: number | null }>(
+      `SELECT l.id, l.performance_id, CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name,
+          t.name AS type_name, l.amount_minor, k.admitted_at
+        FROM box_office_order_lines l JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
+        LEFT JOIN box_office_tickets k ON k.order_line_id = l.id AND k.state = 'valid'
+        WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, order.id)
+    const performance = lines[0] ? { id: lines[0].performance_id, ...await showOf(lines[0].performance_id) } : null
+    return {
+      orderId: order.id,
+      reference: order.reference,
+      buyer: order.account_id ? await accountLabel(order.account_id) : null,
+      performance,
+      lines: lines.map(l => ({ id: l.id, band: l.band_name, ticketType: l.type_name, amountMinor: l.amount_minor, admitted: l.admitted_at !== null })),
+    }
+  }))
+}
+
+/**
+ * Emails the tickets of a desk sale made with nobody's details, when the buyer asks after paying.
+ * The order joins the account for the address, or the person picked, as if given at the sale, and
+ * the message links to the booking, which shows the tickets' codes. Once an order has a buyer this is
+ * refused: it was sent to them already.
+ */
+export async function sendDeskTickets(unit: UnitView, orderId: string, to: { email?: string, accountId?: string }): Promise<{ buyer: string }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (order.state !== 'confirmed') refuse('box-office.desk.not-sold', 'These tickets are not paid for yet.', { status: 409 })
+  if (order.account_id) refuse('box-office.desk.already-sent', 'These tickets were sent to the buyer already.', { status: 409, remedy: 'Send them again from the booking\'s page.' })
+  const lines = await liveLines(order.id)
+  if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  await requireAbility(useContext().actor, 'box-office.order.sell', ['core.performance', lines[0]!.performance_id])
+  const accountId = to.accountId ? await pickedBuyer(to.accountId) : (await findOrCreateAccount(unit, { address: to.email!, origin: 'guest' })).accountId
+  const token = randomToken()
+  const at = nowMs()
+  unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${at}
+    WHERE id = ${order.id} AND state = 'confirmed' AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
+  await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}` })
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
+  return { buyer: await accountLabel(accountId) }
+}
+
+export interface PrintedTicket {
+  lineId: string
+  /** The short number a person reads off it, `K7MPQ2XR-1`. */
+  number: string
+  production: string
+  startsAt: number
+  venue: string
+  /** The part of the house, where the show has more than one. */
+  band: string | null
+  ticketType: string
+  /** Who it was named for, for a ticket of a type with requirements. */
+  holder: string | null
+  /** What the door scans; null for a ticket issued before codes were kept. */
+  doorCode: string | null
+  admitted: boolean
+}
+
+/**
+ * A paid booking's tickets to print at the till (T3, "print"): each with its show, seats, type,
+ * holder, number and the door code to scan. Asks the sell ability of the booking's performance, as
+ * emailing them does, since the printout is the tickets themselves.
+ */
+export async function deskPrintable(orderId: string): Promise<{ reference: string, tickets: PrintedTicket[] }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (order.state !== 'confirmed') refuse('box-office.desk.not-sold', 'These tickets are not paid for yet.', { status: 409 })
+  const lines = await all<{ id: string, performance_id: string, band_name: string | null, type_name: string, requirement_account_id: string | null }>(
+    `SELECT l.id, l.performance_id, CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name,
+        t.name AS type_name, l.requirement_account_id
+      FROM box_office_order_lines l JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
+      WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, order.id)
+  if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  for (const performanceId of new Set(lines.map(l => l.performance_id)))
+    await requireAbility(useContext().actor, 'box-office.order.sell', ['core.performance', performanceId])
+  const codes = new Map((await doorCodesForOrder(order.id)).map(k => [k.lineId, k]))
+  const numbers = await ticketNumbers(order, lines.map(l => l.id))
+  const shows = new Map<string, { production: string, startsAt: number, venue: string }>()
+  for (const performanceId of new Set(lines.map(l => l.performance_id))) {
+    const performance = await getPerformance(performanceId)
+    shows.set(performanceId, { production: performance.productionTitle, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}` })
+  }
+  const tickets = await Promise.all(lines.map(async (l, i) => ({
+    lineId: l.id,
+    number: numbers[i]!,
+    ...shows.get(l.performance_id)!,
+    band: l.band_name,
+    ticketType: l.type_name,
+    holder: l.requirement_account_id ? await accountLabel(l.requirement_account_id) : null,
+    doorCode: codes.get(l.id)?.doorCode ?? null,
+    admitted: codes.get(l.id)?.admitted ?? false,
+  })))
+  return { reference: order.reference, tickets }
+}
+
+export interface DeskHolder {
+  accountId: string
+  /** Who they are, as Identity names them, so the seller can see they have the right person. */
+  label: string
+  /** Whether they may have this ticket: met by their account, or not, with the source's words. */
+  met: boolean
+  reason: string | null
+  /** Whether this seller may sell it to them anyway, having checked by hand. */
+  mayOverride: boolean
+}
+
+/**
+ * The holder named for a ticket of a type with requirements, at the till (Matt, 17 November): by a
+ * card scanned, such as a membership card, whose module says whose it is, or a person found by name.
+ * Says whether they qualify, so the seller knows before taking payment; the sale checks again.
+ */
+export async function deskHolder(input: { performanceId: string, ticketTypeId: string, code?: string, accountId?: string }): Promise<DeskHolder> {
+  const actor = useContext().actor
+  await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.performanceId])
+  const type = (await sellableTypes()).get(input.ticketTypeId)
+  if (!type || !type.requirementRefs.length) refuse('box-office.ticket-type.not-found', 'That kind of ticket does not need its holder named.', { status: 422 })
+  let found: string | null = null
+  if (input.code) {
+    const parts = input.code.trim().split('.')
+    const kind = parts.length === 4 ? await doorCodeKind(parts[0]!) : null // not-policy: kind, key id, code and signature
+    const [k, keyId, random, signature] = parts as [string, string, string, string]
+    if (!kind?.holder || !await signing.verify(DOOR_CODE_PURPOSE, keyId, signedPart(k, keyId, random), signature))
+      refuse('box-office.desk.card-unknown', 'That is not a card we can read for this.', { status: 422, remedy: 'Find them by name instead.', fields: { holder: 'unknown' } })
+    found = await kind.holder(random)
+    if (!found) refuse('box-office.desk.card-unknown', 'That card is not known.', { status: 422, remedy: 'Find them by name instead.', fields: { holder: 'unknown' } })
+  }
+  else if (input.accountId) {
+    found = input.accountId
+  }
+  else {
+    refuse('box-office.desk.bad-input', 'Scan their card or find them by name.', { status: 422 })
+  }
+  const accountId = await canonicalAccount(found!)
+  const verdict = await holderVerdict(input.performanceId, type, accountId)
+  return {
+    accountId,
+    label: await accountLabel(accountId),
+    met: !!verdict.met,
+    reason: verdict.met ? null : verdict.reason ?? (verdict.unavailable ? `${type.name} tickets cannot be checked just now.` : `This person does not qualify for ${type.name} tickets, as far as we can tell.`),
+    mayOverride: !verdict.met && (await can(actor, 'box-office.ticket-type.override-requirement', ['core.performance', input.performanceId])).allowed,
+  }
 }

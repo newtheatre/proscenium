@@ -45,6 +45,15 @@ async function chosen(actor: Actor, panels: PanelInput[]) {
   })
 }
 
+/** Where the filled panels say the sale happens: the first that names a space, else null. Reads only. */
+export async function tillSpace(actor: Actor, panels: PanelInput[]): Promise<string | null> {
+  for (const { panel, input } of await chosen(actor, panels)) {
+    const space = await panel.value.space?.({ input }).catch(() => null)
+    if (space) return space
+  }
+  return null
+}
+
 /** What the filled panels add up to, for display. Reads only. */
 export async function tillSummary(actor: Actor, panels: PanelInput[]) {
   const out = []

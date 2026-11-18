@@ -4,7 +4,7 @@
 <script setup lang="ts">
 interface Mine {
   drafts: { responseId: string, title: string, slug: string, open: boolean, updatedAt: number }[]
-  reviews: { assignmentId: string, title: string, reference: string, stage: string, mode: 'scores' | 'vote', status: 'assigned' | 'submitted', released: boolean }[]
+  reviews: { assignmentId: string, title: string, reference: string, about: string | null, first: string | null, stage: string, mode: 'scores' | 'vote', status: 'assigned' | 'submitted', released: boolean }[]
   sent: { responseId: string, reference: string, title: string, slug: string, submittedAt: number, progress: { status: string, kind: string, canChange: boolean } | null }[]
 }
 const { t } = useT()
@@ -46,8 +46,8 @@ const { data, status, error, refresh } = await useAPI<Mine>('/api/forms/mine', {
               v-for="r in data.reviews"
               :key="r.assignmentId"
               :to="`/account/forms/review/${r.assignmentId}`"
-              :name="r.title"
-              :description="t('forms.screens.mine.review-of', { reference: r.reference, stage: r.stage })"
+              :name="[r.about, r.first].filter(Boolean).join(': ') || r.title"
+              :description="[r.about || r.first ? r.title : '', t('forms.screens.mine.review-of', { reference: r.reference, stage: r.stage })].filter(Boolean).join(' · ')"
             >
               <StatusBadge
                 :tone="r.status === 'submitted' ? 'success' : 'warning'"

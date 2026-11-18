@@ -323,6 +323,8 @@ export const productions = defineTable('core_productions', {
   intervalMinutes: col.public(integer('interval_minutes')),
   doorsBeforeMinutes: col.internal(integer('doors_before_minutes')),
   capacity: col.internal(integer('capacity')),
+  // The space it usually plays in: what adding a run or a performance offers first. Each date keeps its own.
+  usualSpaceId: col.internal(text('usual_space_id').references(() => spaces.id, { onDelete: 'set null' })),
   externalBookingUrl: col.public(text('external_booking_url')),
   creditsPublic: col.internal(integer('credits_public', { mode: 'boolean' }).notNull()),
   state: col.internal(text('state').notNull().default('draft')),
@@ -617,6 +619,8 @@ export const performanceRuns = defineTable('core_performance_runs', {
   done: col.internal(integer('done').notNull().default(0)),
   state: col.internal(text('state').notNull().default('running')),
   stopReason: col.internal(text('stop_reason')),
+  /** The pattern the run was made from (dates, start times, space, running time), as JSON, so it can be edited. */
+  pattern: col.internal(text('pattern')),
   createdAt: col.createdAt(),
   updatedAt: col.internal(integer('updated_at').notNull()),
 }, {

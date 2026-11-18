@@ -3,7 +3,7 @@
 // may read them and asks for them.
 import { getRouterParam, setResponseHeader } from 'h3'
 import { z } from 'zod'
-import { defineRoute, refuse, requireAbility, siteUrl, useSetting } from '#kit'
+import { defineRoute, refuse, requireAbility, siteUrl, theatreTimeZone, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
 import { cells, columnsOf, listResponses, readAnswers, toCsv } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
@@ -32,6 +32,10 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   const filter = { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage, reader: actor.accountId ?? undefined }
   const most = await useSetting('forms.limits.export-rows') as number
 
+  // Times read as the theatre's clock does, in a shape a spreadsheet takes as a date and time.
+  const zone = await theatreTimeZone().catch(() => null)
+  const clock = zone ? new Intl.DateTimeFormat('sv-SE', { timeZone: zone, dateStyle: 'short', timeStyle: 'medium' }) : null
+  const sentAt = (at: number) => clock ? clock.format(at) : new Date(at).toISOString()
   const lines: string[][] = []
   // Files are named with the address that opens them, for somebody who may read the responses.
   const files = await siteUrl('/files/')
@@ -42,8 +46,8 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
     if (total > most) return refuse('forms.export.too-many', `This would export ${total} responses, and one export holds ${most}.`, { status: 422, remedy: 'Narrow the dates and export in parts.' })
     const answers = await readAnswers(rows.map(r => r.id), types, special)
     for (const r of rows) {
-      const row = cells(answers.get(r.id)!, columns, fileLink)
-      lines.push([r.reference, new Date(r.submittedAt).toISOString(), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? '')])
+      const row = cells(answers.get(r.id)!, columns, undefined, fileLink)
+      lines.push([r.reference, sentAt(r.submittedAt), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? '')])
     }
     if (rows.length < CHUNK) break
   }

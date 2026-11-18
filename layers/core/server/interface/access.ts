@@ -1,8 +1,10 @@
 // The guard for addresses under a shell's prefix (UI-07, UI-08). One rule, in this order:
 // a signed-out visitor is sent to sign in and back; a signed-in person with no business in the
 // shell is told the page does not exist; someone in the shell who lacks this screen's ability is
-// told why and what would let them through. A hidden link is tidiness; this is enforcement.
-import type { Actor } from '#kit'
+// told why and what would let them through. Staff in the console who follow a link into Admin are
+// told they have no access and whom to ask, rather than that the page does not exist (L41): Admin's
+// screens are no secret to them. A hidden link is tidiness; this is enforcement.
+import { useSetting, type Actor } from '#kit'
 import { moduleTabOf, resolveEntry, shellOf, SHELL_PREFIXES } from '../../shared/navigation'
 import { declaredEntries, holds, mayOpen } from './navigation'
 import { isEntitled, isSignedIn } from './viewer'
@@ -13,6 +15,21 @@ export type AccessDecision
     | { decision: 'not-found' }
     | { decision: 'redirect', to: string }
     | { decision: 'refused', refusal: { code: string, reason: string, remedy?: string } }
+
+/** Console staff who are not in Admin: the address exists, they may not open it, and an Owner can help. */
+const NO_ADMIN: AccessDecision = { decision: 'refused', refusal: { code: 'core.access.no-admin', reason: 'core.access.no-admin.reason', remedy: 'core.access.no-admin.remedy' } }
+const staffInAdmin = async (actor: Actor, shell: string) => shell === 'admin' && await isEntitled(actor, 'console')
+
+/**
+ * Where a signed-in person who is not a member goes from the members' area, while the area is on:
+ * the account entry a module marks forNonMembers (My membership, which says when theirs ended and
+ * how to renew or join). With no such entry, "not found" as before.
+ */
+async function notAMember(): Promise<AccessDecision> {
+  if (!(await useSetting('core.members-area.enabled'))) return { decision: 'not-found' }
+  const way = (await declaredEntries()).find(e => e.menu === 'account' && e.forNonMembers)
+  return way ? { decision: 'redirect', to: `${way.to}?from=members` } : { decision: 'not-found' }
+}
 
 /**
  * Someone whose only work is in live mode, such as a steward who may only admit, who comes to the
@@ -31,12 +48,14 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
     // A shell's home belongs to the shell: whoever is entitled to it may open it.
     if (!isSignedIn(actor)) return { decision: 'sign-in' }
     if (await isEntitled(actor, shell)) return { decision: 'allow' }
-    return (await toTonight(actor, shell)) ?? { decision: 'not-found' }
+    if (shell === 'members') return notAMember()
+    return (await toTonight(actor, shell)) ?? ((await staffInAdmin(actor, shell)) ? NO_ADMIN : { decision: 'not-found' })
   }
   const entries = (await declaredEntries()).filter(e => e.menu === shell)
   const entry = resolveEntry(entries, path)
   if (!entry) return { decision: 'not-found' }
   if (!isSignedIn(actor)) return { decision: 'sign-in' }
+  if (shell === 'members' && !(await isEntitled(actor, shell))) return notAMember()
   if (!(await isEntitled(actor, shell))) {
     // A tab of a module's page in Admin opens for console staff who may use it in the console's
     // settings window, which draws the same screen; a link or bookmark to it lands there.
@@ -44,7 +63,7 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
     if (module && holds(await mayOpen(actor, entry)) && (await isEntitled(actor, 'console'))) {
       return { decision: 'redirect', to: `/console?settings=${module}&screen=${encodeURIComponent(path)}` }
     }
-    return (await toTonight(actor, shell)) ?? { decision: 'not-found' }
+    return (await toTonight(actor, shell)) ?? ((await staffInAdmin(actor, shell)) ? NO_ADMIN : { decision: 'not-found' })
   }
   const result = await mayOpen(actor, entry)
   // A screen opens for anyone who holds its ability, as the menu shows it to them. Confirming it is

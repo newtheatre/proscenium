@@ -25,6 +25,8 @@ const address = ref('')
 const shared = ref(false)
 const count = ref(0)
 const published = ref(true)
+/** What a move does only where the form is attached to a record, which this link is not. */
+const elsewhere = ref<string[]>([])
 const loading = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
@@ -38,11 +40,12 @@ watch(open, async (now) => {
     const got = props.place
       ? await $api<{ attached: (Link & { formId: string, address: string })[] }>(at.value).then((there) => {
           const link = there.attached.find(a => a.formId === props.formId) ?? null
-          return { link, address: link?.address ?? '', published: true }
+          return { link, address: link?.address ?? '', published: true, elsewhere: [] as string[] }
         })
-      : await $api<{ link: Link | null, address: string, published: boolean }>(`/api/forms/forms/${props.formId}/link` as string)
+      : await $api<{ link: Link | null, address: string, published: boolean, elsewhere: string[] }>(`/api/forms/forms/${props.formId}/link` as string)
     address.value = got.address
     published.value = got.published
+    elsewhere.value = got.elsewhere
     shared.value = got.link !== null
     count.value = got.link?.responseCount ?? 0
     Object.assign(state, got.link
@@ -96,6 +99,14 @@ async function save() {
         @submit="save"
       >
         <RefusalNotice :refusal="refusal" />
+        <UAlert
+          v-if="elsewhere.length"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          :title="t('forms.screens.link.elsewhere')"
+          :description="t('forms.screens.link.elsewhere-help', { what: elsewhere.map(key => t(key)).join(', ') })"
+        />
         <UFormField
           v-if="!place || shared"
           :label="t('forms.screens.link.address')"

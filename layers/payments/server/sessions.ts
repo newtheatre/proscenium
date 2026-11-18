@@ -15,6 +15,7 @@ import { accountScopeSql } from '#kit/accounts'
 import { getSpace, listSpaces, placeName } from '#modules/core'
 import { postEntries } from '#modules/finance'
 import { labelsOf } from './people'
+import { describeOwners } from './owners'
 
 export interface SessionRow { id: string, point_label: string, space_id: string | null, closed_how: 'hand' | 'quiet' | null, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
 
@@ -249,15 +250,23 @@ export async function takingsIn(sessionId: string): Promise<{ method: string, am
 const RECENT_SALES = 10 // not-policy: how many of a session's sales its card lists
 
 /** The session's latest sales, newest first: when, how much, how it was paid and how it ended. */
-export async function salesIn(sessionId: string): Promise<{ intentId: string, at: number, amountMinor: number, currency: string, state: string, methods: string[], notes: string[] }[]> {
+export async function salesIn(sessionId: string): Promise<{ intentId: string, at: number, amountMinor: number, currency: string, state: string, methods: string[], notes: string[], owners: { module: string, reference: string | null, to: string | null }[] }[]> {
   const intents = await all<{ id: string, created_at: number, amount_minor: number, currency: string, state: string }>(
     'SELECT id, created_at, amount_minor, currency, state FROM payments_intents WHERE session_id = ? ORDER BY created_at DESC LIMIT ?', sessionId, RECENT_SALES)
   if (!intents.length) return []
   const attempts = await all<{ intent_id: string, method: string, note: string | null }>(
     "SELECT intent_id, method, note FROM payments_attempts WHERE state = 'succeeded' AND intent_id IN (SELECT value FROM json_each(?)) ORDER BY started_at", JSON.stringify(intents.map(i => i.id)))
+  // What each sale was for, as its owners name their records (an order's reference, linked to it).
+  const parts = await all<{ intent_id: string, owner_module: string, owner_record: string }>(
+    'SELECT intent_id, owner_module, owner_record FROM payments_intent_parts WHERE intent_id IN (SELECT value FROM json_each(?)) ORDER BY id', JSON.stringify(intents.map(i => i.id)))
+  const described = await describeOwners(parts.map(p => ({ module: p.owner_module, record: p.owner_record })))
   return intents.map((i) => {
     const mine = attempts.filter(a => a.intent_id === i.id)
-    return { intentId: i.id, at: i.created_at, amountMinor: i.amount_minor, currency: i.currency, state: i.state, methods: [...new Set(mine.map(a => a.method))], notes: mine.flatMap(a => (a.note ? [a.note] : [])) }
+    const owners = parts.filter(p => p.intent_id === i.id).map((p) => {
+      const o = described.get(`${p.owner_module}:${p.owner_record}`)
+      return { module: p.owner_module, reference: o?.reference ?? null, to: o?.to ?? null }
+    })
+    return { intentId: i.id, at: i.created_at, amountMinor: i.amount_minor, currency: i.currency, state: i.state, methods: [...new Set(mine.map(a => a.method))], notes: mine.flatMap(a => (a.note ? [a.note] : [])), owners }
   })
 }
 

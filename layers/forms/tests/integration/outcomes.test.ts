@@ -22,10 +22,15 @@ const issue: OutcomeAction = {
   label: 'forms.test.issue',
   slot: 'forms.test-slot',
   inputs: [{ key: 'name', label: 'forms.test.name', required: true, types: ['text.short'] }, { key: 'why', label: 'forms.test.why' }],
+  async preview(call) {
+    return { lines: [{ label: 'forms.test.name', value: call.input.name?.text ?? '' }], warnings: call.input.why ? [] : ['No reason was given.'], ...(call.input.name?.text === 'Nobody' ? { blocked: 'Nobody can be given this.' } : {}) }
+  },
   async run(unit, call) {
     if (failing) throw new Error('The award could not be issued')
     calls.push(call)
     unit.audit({ action: 'update', record: ['forms.response', call.response.id], detail: { issued: call.runId } })
+    // What it made: here the form itself, which has a resolver, stands in for an award.
+    return { record: ['forms.form', call.response.formId] }
   },
 }
 
@@ -101,6 +106,29 @@ describe('attaching a form to a record', () => {
     expect((await req('PUT', at(subject, b.formId), TERMS, keeper)).body.code).toBe('forms.slot.full')
   })
 
+  it('tells a module which of a slot\'s forms the person looking could answer now', async () => {
+    const subject = newId('ven')
+    const other = newId('ven')
+    const a = await published(nomination(), 'Nominate somebody')
+    const b = await published(definition(question('name')), 'Open to all')
+    const here = (who: ReturnType<typeof person> | null, q = '') => req('GET', `/api/forms/slots/forms.test-slot/open${q}`, undefined, who)
+    const { placementId } = (await req('PUT', at(subject, a.formId), TERMS, keeper)).body
+    expect((await req('PUT', at(other, b.formId), OPEN, keeper)).status).toBe(200)
+
+    const mine = await here(member, `?subject=${subject}`)
+    expect(mine.status, JSON.stringify(mine.body)).toBe(200)
+    expect(mine.body.open).toEqual([expect.objectContaining({ subjectId: subject, formId: a.formId, title: 'Nominate somebody', address: `/forms/${a.slug}?place=${placementId}` })])
+    expect((await here(member)).body.open.map((f: any) => f.formId)).toEqual(expect.arrayContaining([a.formId, b.formId]))
+    // Somebody signed out is offered only what anyone may answer.
+    const out = (await here(null)).body.open.filter((f: any) => [subject, other].includes(f.subjectId))
+    expect(out.map((f: any) => f.formId)).toEqual([b.formId])
+    // A paused one is not offered.
+    expect((await req('PUT', at(subject, a.formId), { ...TERMS, status: 'paused' }, keeper)).status).toBe(200)
+    expect((await here(member, `?subject=${subject}`)).body.open).toEqual([])
+    expect((await here(member, '')).status).toBe(200)
+    expect((await req('GET', '/api/forms/slots/nowhere.slot/open', undefined, member)).status).toBe(404)
+  })
+
   it('is answered at its own place, on its own terms, and each response keeps the record it is about', async () => {
     const [venue] = await rows<{ id: string }>('INSERT INTO core_venues (id, name, state, created_at) VALUES (?, \'The Studio\', \'active\', 0) RETURNING id', newId('ven')).catch(() => [{ id: newId('ven') }])
     const { formId, slug } = await published(nomination())
@@ -159,6 +187,12 @@ describe('an action on a move', () => {
     calls.length = 0
     await move(formId, responseId, 'start_review')
     expect(await runs(responseId)).toEqual([])
+    // Whoever is about to approve is shown what approving would do, and asking changes nothing.
+    const preview = (key: string, who = decider) => req('GET', `/api/forms/forms/${formId}/responses/${responseId}/preview?move=${key}`, undefined, who)
+    expect((await preview('approve')).body.previews).toEqual([{ action: 'forms.test-issue', label: 'forms.test.issue', lines: [{ label: 'forms.test.name', value: 'Ann Awarded' }], warnings: [] }])
+    expect((await preview('decline')).body.previews).toEqual([])
+    expect((await preview('approve', member)).status).toBe(403)
+    expect(await runs(responseId)).toEqual([])
     const approved = await move(formId, responseId, 'approve')
     expect(approved.status, JSON.stringify(approved.body)).toBe(200)
     expect(await runs(responseId)).toMatchObject([{ state: 'waiting', action_key: 'forms.test-issue' }])
@@ -176,6 +210,8 @@ describe('an action on a move', () => {
     expect(calls[0]!.response.decidedAt).not.toBeNull()
     const [run] = await runs(responseId)
     expect(run).toMatchObject({ state: 'done', id: calls[0]!.runId })
+    // What the action made is linked from the response, as its own module names it.
+    expect((await req('GET', `/api/forms/forms/${formId}/responses/${responseId}`, undefined, decider)).body.actions[0].record).toMatchObject({ type: 'forms.form', id: formId, to: `/console/forms/${formId}` })
     // The same message delivered again, and the job run by hand again, do nothing more.
     sent.push(...jobs)
     await deliver()

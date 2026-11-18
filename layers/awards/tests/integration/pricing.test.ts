@@ -24,8 +24,8 @@ beforeAll(async () => {
 
 describe('the fellow\'s price', () => {
   it('is met by account for a current holder, one ticket, and ends when the award is revoked', async () => {
-    const fellowship = await awardType({ givesTicketBenefit: true })
-    const commendation = await awardType()
+    const fellowship = await awardType({ name: 'Pricing Fellowship', givesTicketBenefit: true })
+    const commendation = await awardType({ name: 'Pricing Commendation' })
     const fellow = await holder('A Fellow')
     const commended = await holder('Somebody Commended')
     const id = await issue(fellowship, { accountId: fellow.accountId })
@@ -36,7 +36,10 @@ describe('the fellow\'s price', () => {
     expect(any).toMatchObject({ verdict: 'met', evidence: id })
     const [other, benefit] = await check(commended, { accounts: [commended.accountId!], refs: [`awards:${commendation}`, 'awards:benefit'], whenUnavailable: 'not-met' })
     expect(other!.verdict).toBe('met')
-    expect(benefit).toMatchObject({ verdict: 'not-met', reason: 'This price is for holders of an award.' })
+    // The reason names the awards that qualify, never the commendation the person holds.
+    expect(benefit).toMatchObject({ verdict: 'not-met' })
+    expect(benefit!.reason).toMatch(/^This price is for holders of .*Pricing Fellowship.*\.$/)
+    expect(benefit!.reason).not.toContain('Pricing Commendation')
 
     expect((await req('POST', `/api/awards/awards/${id}/revoke`, { reason: 'Issued in error' })).status).toBe(200)
     expect((await check(fellow, { accounts: [fellow.accountId!], refs: ['awards:benefit'], whenUnavailable: 'not-met' }))[0]!.verdict).toBe('not-met')

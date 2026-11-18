@@ -4,7 +4,7 @@
 <script setup lang="ts">
 interface WaitingFee { chargeId: string, membershipId: string, accountName: string | null, schemeName: string, lengthName: string | null, amountMinor: number, currency: string, appliedAt: number, beingPaid: boolean }
 
-const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
+const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
 const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
 
 const { t } = useT()

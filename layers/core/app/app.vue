@@ -5,6 +5,10 @@ const { data: brand } = await useBrand()
 const site = computed(() => brand.value?.name ?? t('core.public.default-name'))
 // Nuxt UI's own words and its date and time controls follow the theatre's language.
 const locale = useUiLocale()
+// In live mode the foot of the screen holds the actions that matter most (report an incident, the
+// emergency card), so a toast comes in at the top, one at a time, and goes sooner.
+const route = useRoute()
+const toaster = computed(() => route.path === '/live' || route.path.startsWith('/live/') ? { position: 'top-center' as const, max: 1, duration: 3000 } : {}) // not-policy: how long a live toast stays
 useHead({ titleTemplate: title => title && title !== site.value ? `${title} · ${site.value}` : site.value })
 // Until the theatre says its site is ready, every page asks search engines to stay away (C-42).
 const { data: settings } = await usePublicSettings()
@@ -12,7 +16,10 @@ useSeoMeta({ robots: () => settings.value?.['public-site.search.hidden']?.value 
 </script>
 
 <template>
-  <UApp :locale="locale">
+  <UApp
+    :locale="locale"
+    :toaster="toaster"
+  >
     <NuxtLoadingIndicator />
     <!-- Reads each new page title to screen readers after a client-side navigation. -->
     <NuxtRouteAnnouncer />

@@ -35,7 +35,7 @@ function pick(v: unknown) {
 </script>
 
 <template>
-  <UInputDate
+  <FieldDateParts
     v-model="value"
     :min-value="minValue"
     :max-value="maxValue"
@@ -66,5 +66,5 @@ function pick(v: unknown) {
         </template>
       </UPopover>
     </template>
-  </UInputDate>
+  </FieldDateParts>
 </template>
