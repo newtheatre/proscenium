@@ -20,6 +20,7 @@ const fill = useTemplateRef<{ restart: () => void }>('fill')
 const publishing = ref(false)
 const json = ref(false)
 const settings = ref(false)
+const sharing = ref(false)
 
 // Beside the canvas on a laptop; a panel that slides over it on anything narrower.
 const wide = useMediaQuery('(min-width: 1280px)')
@@ -57,12 +58,17 @@ onMounted(() => window.addEventListener('beforeunload', leaving))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', leaving))
 
 const more = computed(() => [[
+  { label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } },
+  { label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` },
+], [
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
   { label: t('forms.screens.json.title'), icon: 'i-lucide-braces', onSelect: () => { json.value = true } },
 ]])
 function published(number: number) {
   toast.add({ title: t('forms.screens.publish.done', { n: number }), color: 'success' })
   emit('changed')
+  // A form published for the first time is in front of nobody yet: offer to share it.
+  if (form.value.liveVersion === null) sharing.value = true
 }
 const saveWords = computed(() => t(`forms.screens.save.${builder.state.value}`))
 const reload = () => window.location.reload()
@@ -270,6 +276,11 @@ const reload = () => window.location.reload()
       v-model:open="json"
       :form-id="form.id"
       :slug="form.slug"
+    />
+    <FormsLinkDialog
+      v-model:open="sharing"
+      :form-id="form.id"
+      :anonymous="form.anonymous"
     />
     <FormsSettingsDialog
       v-model:open="settings"

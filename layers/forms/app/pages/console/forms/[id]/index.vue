@@ -2,7 +2,7 @@
      of whatever is selected beside it. Every change saves itself. Problems are listed as the author
      works, Preview fills the draft in without keeping anything, and Publish states its impact. -->
 <script setup lang="ts">
-import type { BuilderData } from '../../../composables/useFormBuilder'
+import type { BuilderData } from '../../../../composables/useFormBuilder'
 
 const route = useRoute()
 const id = String(route.params.id)
