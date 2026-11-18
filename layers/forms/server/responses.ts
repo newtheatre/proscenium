@@ -1,0 +1,388 @@
+// Answering a form and reading what was answered (form builder specification, parts 2 and 3;
+// FB-301 to FB-304, FB-401, FB-402, FB-601). A form is offered on a link (a placement), a person
+// keeps an unsent working copy, and sending stores the response and one row per answer in one unit
+// of work. The server never trusts what the browser worked out: it runs the engine again on the
+// answers, drops what logic hides, and refuses what is not valid.
+import { all, first, linkTokens, openSpecial, refuse, sealSpecial, today, useSetting, type Actor, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
+import type { Answers, DataClass, Definition, Entry, Evaluation, Question, Value } from '../shared/engine'
+import { OTHER, evaluate, isEmpty, otherKey, questionsOf } from '../shared/engine'
+import { answers as answersTable } from './db/schema'
+import type { FormRow, VersionRow } from './forms'
+
+// ---- the link ----
+
+export interface LinkRow {
+  id: string
+  formId: string
+  audience: 'anyone' | 'signed_in'
+  opensAt: number | null
+  closesAt: number | null
+  responseCap: number | null
+  responseCount: number
+  onePerPerson: boolean
+  status: 'active' | 'paused' | 'ended'
+}
+type Stored<T, K extends keyof T> = Omit<T, K> & Record<K, number>
+
+/** The form's own link, if it has been given one. A form is offered nowhere until it is. */
+export async function getLink(formId: string): Promise<LinkRow | null> {
+  const row = await first<Stored<LinkRow, 'onePerPerson'>>(
+    `SELECT id, form_id AS formId, audience, opens_at AS opensAt, closes_at AS closesAt, response_cap AS responseCap, response_count AS responseCount, one_per_person AS onePerPerson, status
+     FROM forms_placements WHERE form_id = ? AND slot_key = 'forms.link' AND subject_type IS NULL`, formId)
+  return row ? { ...row, onePerPerson: !!row.onePerPerson } : null
+}
+
+/** Why a form cannot be answered just now, in the order a person would want to hear it. */
+export type Shut = 'paused' | 'not-yet' | 'closed' | 'full' | 'sign-in' | 'answered'
+
+export const REASONS: Record<Shut, { reason: string, remedy?: string }> = {
+  'paused': { reason: 'This form is not taking answers at the moment.' },
+  'not-yet': { reason: 'This form has not opened yet.', remedy: 'Come back when it opens.' },
+  'closed': { reason: 'This form has closed.' },
+  'full': { reason: 'This form has had all the responses it can take.' },
+  'sign-in': { reason: 'This form is for people with an account.', remedy: 'Sign in, then open the form again.' },
+  'answered': { reason: 'You have already answered this form.' },
+}
+
+/** The first thing in the way of this person answering now, or null. `ownId` is a response of theirs that does not count against them. */
+export async function shut(form: FormRow, link: LinkRow, actor: Actor, at: number, ownId?: string): Promise<Shut | null> {
+  if (form.status !== 'live' || link.status !== 'active') return 'paused'
+  if (link.opensAt !== null && at < link.opensAt) return 'not-yet'
+  if (link.closesAt !== null && at >= link.closesAt) return 'closed'
+  if (link.audience === 'signed_in' && !actor.accountId) return 'sign-in'
+  if (link.onePerPerson && actor.accountId) {
+    const theirs = await first<{ id: string }>(`SELECT id FROM forms_responses WHERE placement_id = ?1 AND state = 'submitted' AND person_id IN (${accountScopeSql('?2')})`, link.id, actor.accountId)
+    if (theirs && theirs.id !== ownId) return 'answered'
+  }
+  if (link.responseCap !== null && link.responseCount >= link.responseCap) return 'full'
+  return null
+}
+
+export function refuseShut(why: Shut): never {
+  const { reason, remedy } = REASONS[why]
+  return refuse(`forms.link.${why}`, reason, { status: why === 'sign-in' ? 401 : 409, ...(remedy ? { remedy } : {}) }) // not-policy: HTTP statuses
+}
+
+// ---- a response ----
+
+export interface ResponseRow {
+  id: string
+  reference: string
+  formId: string
+  versionId: string
+  placementId: string
+  personId: string | null
+  respondentEmail: string | null
+  state: 'draft' | 'awaiting_payment' | 'submitted' | 'withdrawn'
+  stageKind: string | null
+  currentRevision: number
+  submittedAt: number | null
+  createdAt: number
+}
+const RESPONSE = 'id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_kind AS stageKind, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
+export const getResponse = (id: string) => first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE id = ?`, id)
+
+/** Whether a response is this person's: by account, across any merged into it. A signed-out response is nobody's to come back to. */
+export async function owns(response: ResponseRow, actor: Actor): Promise<boolean> {
+  if (!actor.accountId || !response.personId) return false
+  return !!await first(`SELECT 1 AS yes WHERE ?1 IN (${accountScopeSql('?2')})`, response.personId, actor.accountId)
+}
+
+/** The person's unsent working copy on this link, if they have one. */
+export async function draftOf(link: LinkRow, actor: Actor): Promise<{ response: ResponseRow, answers: Answers, pageId: string | null } | null> {
+  if (!actor.accountId) return null
+  const response = await first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE placement_id = ?1 AND state = 'draft' AND person_id IN (${accountScopeSql('?2')}) ORDER BY created_at DESC LIMIT 1`, link.id, actor.accountId)
+  if (!response) return null
+  const kept = await first<{ answersCipher: string, pageId: string | null }>('SELECT answers_cipher AS answersCipher, page_id AS pageId FROM forms_response_drafts WHERE response_id = ?', response.id)
+  const plain = kept ? await openSpecial(kept.answersCipher) : null
+  return { response, answers: plain ? JSON.parse(plain) as Answers : {}, pageId: kept?.pageId ?? null }
+}
+
+const REFERENCE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // not-policy: letters and digits nobody mistakes for each other
+const REFERENCE_LENGTH = 8 // not-policy: short enough to read out, long enough not to be guessed in passing
+export function newReference(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(REFERENCE_LENGTH))
+  return [...bytes].map(b => REFERENCE_LETTERS[b % REFERENCE_LETTERS.length]).join('')
+}
+
+/** The key that holds one response each: the account, or a keyed hash of the address given. */
+export async function uniqueKeyOf(link: LinkRow, accountId: string | undefined, email: string | null): Promise<string | null> {
+  if (!link.onePerPerson) return null
+  if (accountId) return accountId
+  // The kit's keyed hash, so the address itself is never the key.
+  return email ? `email:${await linkTokens.hash(`forms.one-each:${email}`)}` : null
+}
+
+/** The largest working copy or set of answers taken, in bytes. */
+export async function answersLimit(): Promise<number> {
+  return (await useSetting('forms.limits.response-size') as number) * 1024 // not-policy: kilobytes to bytes
+}
+
+/** Keeps a signed-in person's working copy, sealed. Nothing is checked but that it is theirs. */
+export async function writeDraft(unit: UnitView, input: { existing: ResponseRow | null, responseId: string, form: FormRow, link: LinkRow, accountId: string, answers: Answers, pageId: string | null, at: number }): Promise<void> {
+  const sealed = await sealSpecial(JSON.stringify(input.answers))
+  if (!input.existing) {
+    unit.add({
+      sql: 'INSERT INTO forms_responses (id, reference, form_id, version_id, placement_id, realm, person_id, state, current_revision, is_test, created_at, updated_at) VALUES (?, ?, ?, ?, ?, \'audience\', ?, \'draft\', 0, 0, ?, ?)',
+      params: [input.responseId, newReference(), input.form.id, input.form.liveVersionId, input.link.id, input.accountId, input.at, input.at],
+    }).expect(1)
+  }
+  else {
+    unit.add({ sql: 'UPDATE forms_responses SET updated_at = ? WHERE id = ? AND state = \'draft\'', params: [input.at, input.responseId] }).expect(1)
+  }
+  unit.add({
+    sql: 'INSERT INTO forms_response_drafts (response_id, answers_cipher, page_id, updated_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (response_id) DO UPDATE SET answers_cipher = ?2, page_id = ?3, updated_at = ?4',
+    params: [input.responseId, sealed, input.pageId, input.at],
+  })
+}
+
+// ---- answers as rows ----
+
+interface AnswerRow {
+  responseId: string
+  revision: number
+  questionId: string
+  repeatIndex: number
+  dataClass: DataClass
+  valueText: string | null
+  valueNumber: number | null
+  valueJson: string | null
+  otherText: string | null
+  valueCipher: string | null
+  labelSnapshot: string | null
+}
+
+const optionWords = (q: Question, id: string, other: unknown): string => id === OTHER ? (typeof other === 'string' && other.trim() ? other.trim() : 'Other') : q.options?.find(o => o.id === id)?.label ?? id
+
+/** The words of what was chosen, so a renamed or removed option still reads as it did. */
+function snapshot(q: Question, value: Value, other: unknown): string | null {
+  if (!q.type.startsWith('choice.')) return null
+  if (typeof value === 'string') return optionWords(q, value, other)
+  if (Array.isArray(value)) return (value as string[]).map(v => optionWords(q, v, other)).join('; ')
+  return null
+}
+
+async function rowOf(base: Pick<AnswerRow, 'responseId' | 'revision'>, q: Question, repeatIndex: number, value: Value, other: unknown): Promise<AnswerRow | null> {
+  if (isEmpty(value)) return null
+  const row: AnswerRow = { ...base, questionId: q.id, repeatIndex, dataClass: q.dataClass, valueText: null, valueNumber: null, valueJson: null, otherText: null, valueCipher: null, labelSnapshot: null }
+  const otherText = typeof other === 'string' && other.trim() ? other.trim() : null
+  // A special-category answer is held only sealed (FB-601): nothing of it sits in a readable column.
+  if (q.dataClass === 'special') return { ...row, valueCipher: await sealSpecial(JSON.stringify({ value, other: otherText, label: snapshot(q, value, other) })) }
+  if (typeof value === 'string') row.valueText = value
+  else if (typeof value === 'number') row.valueNumber = value
+  else if (typeof value === 'boolean') row.valueNumber = value ? 1 : 0
+  else row.valueJson = JSON.stringify(value)
+  return { ...row, otherText, labelSnapshot: snapshot(q, value, other) }
+}
+
+/** One row per answered question, and per entry of a repeating group. Hidden answers are already gone. */
+export async function answerRows(def: Definition, kept: Answers, responseId: string, revision: number): Promise<AnswerRow[]> {
+  const out: AnswerRow[] = []
+  const base = { responseId, revision }
+  for (const { question: q, group } of questionsOf(def)) {
+    if (!group) {
+      const row = await rowOf(base, q, 0, kept[q.id] as Value, kept[otherKey(q.id)])
+      if (row) out.push(row)
+      continue
+    }
+    const entries = Array.isArray(kept[group.id]) ? kept[group.id] as Entry[] : []
+    for (const [i, entry] of entries.entries()) {
+      const row = await rowOf(base, q, i, entry[q.id], entry[otherKey(q.id)])
+      if (row) out.push(row)
+    }
+  }
+  return out
+}
+
+/** Refuses answers the engine finds wrong, naming each path so the page can put the words beside it. */
+export function refuseInvalid(evaluation: Evaluation): void {
+  if (evaluation.ending && !evaluation.ending.submits)
+    refuse('forms.response.ends-unsent', 'These answers lead to an ending that sends nothing.', { status: 422 }) // not-policy: HTTP status
+  if (evaluation.valid) return
+  const fields = Object.fromEntries(Object.entries(evaluation.issues).map(([path, issues]) => [path, `forms.issues.${issues[0]!.rule}`]))
+  refuse('forms.response.invalid', 'Some answers need attention.', { status: 422, fields }) // not-policy: HTTP status
+}
+
+export interface Sending {
+  responseId: string
+  form: FormRow
+  version: VersionRow
+  link: LinkRow
+  actor: Actor
+  email: string | null
+  answers: Answers
+  /** The person's own working copy this sends, if it is one. */
+  draft: ResponseRow | null
+  at: number
+}
+
+/**
+ * Stores a response: the count against the cap, the response, its answers, the audit entry and the
+ * event, together or not at all (FB-302). The cap and one response each are held by the statements
+ * themselves, so two people sending at the same moment cannot both take the last place (FB-301).
+ */
+export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ reference: string }> {
+  const def = JSON.parse(s.version.definition) as Definition
+  const evaluation = evaluate(def, s.answers, { today: await today() })
+  refuseInvalid(evaluation)
+
+  const personId = s.form.anonymous ? null : s.actor.accountId ?? null
+  const email = s.form.anonymous || personId ? null : s.email
+  const uniqueKey = await uniqueKeyOf(s.link, personId ?? undefined, email)
+  const reference = s.draft?.reference ?? newReference()
+  const retentionDue = s.form.retentionDays === null ? null : s.at + s.form.retentionDays * 86_400_000 // not-policy: milliseconds in a day
+  const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
+
+  unit.add({
+    sql: 'UPDATE forms_placements SET response_count = response_count + 1 WHERE id = ?1 AND status = \'active\' AND (response_cap IS NULL OR response_count < response_cap) AND (opens_at IS NULL OR opens_at <= ?2) AND (closes_at IS NULL OR closes_at > ?2)',
+    params: [s.link.id, s.at],
+  }).expect(1, { code: 'forms.link.full', reason: REASONS.full.reason })
+
+  const once = { code: 'forms.link.answered', reason: REASONS.answered.reason }
+  const taken = 'EXISTS (SELECT 1 FROM forms_responses WHERE placement_id = ?2 AND unique_key = ?3 AND id <> ?1)'
+  if (s.draft) {
+    unit.add({
+      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = 'received', stage_kind = 'closed', current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7 WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, s.version.id, calculated, s.at, retentionDue],
+    }).expect(1, once)
+    unit.add({ sql: 'DELETE FROM forms_response_drafts WHERE response_id = ?', params: [s.responseId] })
+  }
+  else {
+    unit.add({
+      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', 'received', 'closed', 1, ?9, 0, ?10, ?10, ?10, ?11 WHERE NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue],
+    }).expect(1, once)
+  }
+
+  const rows = await answerRows(def, evaluation.answers, s.responseId, 1)
+  if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
+  unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
+  unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
+  return { reference }
+}
+
+// ---- reading answers back ----
+
+export interface StoredAnswer {
+  questionId: string
+  repeatIndex: number
+  dataClass: DataClass
+  /** True when the answer is special-category and was not opened. */
+  restricted: boolean
+  value: Value
+  other: string | null
+  /** The words to show: the chosen options as they read when it was sent, or the value itself. */
+  label: string | null
+}
+
+interface AnswerRecord { responseId: string, questionId: string, repeatIndex: number, dataClass: DataClass, valueText: string | null, valueNumber: number | null, valueJson: string | null, otherText: string | null, valueCipher: string | null, labelSnapshot: string | null }
+
+async function unpack(row: AnswerRecord, type: string | undefined, open: boolean): Promise<StoredAnswer> {
+  const base = { questionId: row.questionId, repeatIndex: row.repeatIndex, dataClass: row.dataClass }
+  if (row.valueCipher !== null) {
+    if (!open) return { ...base, restricted: true, value: null, other: null, label: null }
+    const held = JSON.parse((await openSpecial(row.valueCipher))!) as { value: Value, other: string | null, label: string | null }
+    return { ...base, restricted: false, value: held.value, other: held.other, label: held.label }
+  }
+  const truth = type === 'yesno' || type === 'consent'
+  const value: Value = row.valueJson !== null ? JSON.parse(row.valueJson) as Value : row.valueNumber !== null ? (truth ? row.valueNumber === 1 : row.valueNumber) : row.valueText
+  return { ...base, restricted: false, value, other: row.otherText, label: row.labelSnapshot }
+}
+
+/**
+ * The current answers of some responses, by response. `open` says whether special-category answers
+ * are opened; when it is false they come back marked restricted and nothing is decrypted.
+ */
+export async function readAnswers(responseIds: string[], types: Map<string, string>, open: boolean): Promise<Map<string, StoredAnswer[]>> {
+  const out = new Map<string, StoredAnswer[]>(responseIds.map(id => [id, []]))
+  if (!responseIds.length) return out
+  // One parameter however many responses: D1 allows a hundred bound values and no more.
+  const rows = await all<AnswerRecord>(
+    `SELECT a.response_id AS responseId, a.question_id AS questionId, a.repeat_index AS repeatIndex, a.data_class AS dataClass, a.value_text AS valueText, a.value_number AS valueNumber, a.value_json AS valueJson, a.other_text AS otherText, a.value_cipher AS valueCipher, a.label_snapshot AS labelSnapshot
+     FROM forms_answers a JOIN forms_responses r ON r.id = a.response_id AND r.current_revision = a.revision
+     WHERE a.response_id IN (SELECT value FROM json_each(?)) ORDER BY a.response_id, a.question_id, a.repeat_index`, JSON.stringify(responseIds))
+  for (const row of rows) out.get(row.responseId)!.push(await unpack(row, types.get(row.questionId), open))
+  return out
+}
+
+/** An answer as one line of plain words, for a table cell or a CSV field. */
+export function words(answer: StoredAnswer, type: string | undefined): string {
+  if (answer.restricted) return ''
+  if (answer.label !== null) return answer.label
+  const v = answer.value
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (typeof v === 'number') return type === 'money' ? (v / 100).toFixed(2) : String(v) // not-policy: minor units to units
+  if (typeof v === 'string') return v
+  if (Array.isArray(v)) return v.map(x => typeof x === 'string' ? x : x.name).join('; ')
+  return [v.line1, v.line2, v.town, v.county, v.postcode, v.country].filter(Boolean).join(', ')
+}
+
+// ---- the responses of a form ----
+
+export interface ResponseFilter { from?: number, to?: number, questionId?: string, value?: string }
+export interface ListedResponse { id: string, reference: string, versionNumber: number, personId: string | null, personName: string | null, respondentEmail: string | null, submittedAt: number }
+
+function where(formId: string, filter: ResponseFilter): { sql: string, params: unknown[] } {
+  const parts = ['r.form_id = ?', 'r.state = \'submitted\'']
+  const params: unknown[] = [formId]
+  if (filter.from !== undefined) {
+    parts.push('r.submitted_at >= ?')
+    params.push(filter.from)
+  }
+  if (filter.to !== undefined) {
+    parts.push('r.submitted_at < ?')
+    params.push(filter.to)
+  }
+  if (filter.questionId !== undefined && filter.value !== undefined) {
+    // A plain answer by its value; one of several choices by its place in the list. Sealed answers are never matched.
+    parts.push('EXISTS (SELECT 1 FROM forms_answers a WHERE a.response_id = r.id AND a.revision = r.current_revision AND a.question_id = ? AND (a.value_text = ? OR CAST(a.value_number AS TEXT) = ? OR EXISTS (SELECT 1 FROM json_each(a.value_json) j WHERE j.value = ?)))')
+    params.push(filter.questionId, filter.value, filter.value, filter.value)
+  }
+  return { sql: parts.join(' AND '), params }
+}
+
+/** Sent responses, newest first, with how many there are in all under the same filter. */
+export async function listResponses(formId: string, filter: ResponseFilter, limit: number, offset: number): Promise<{ rows: ListedResponse[], total: number }> {
+  const w = where(formId, filter)
+  const total = (await first<{ n: number }>(`SELECT COUNT(*) AS n FROM forms_responses r WHERE ${w.sql}`, ...w.params))!.n
+  const rows = await all<ListedResponse>(
+    `SELECT r.id, r.reference, v.number AS versionNumber, r.person_id AS personId, a.name AS personName, r.respondent_email AS respondentEmail, r.submitted_at AS submittedAt
+     FROM forms_responses r JOIN forms_versions v ON v.id = r.version_id LEFT JOIN core_accounts a ON a.id = r.person_id
+     WHERE ${w.sql} ORDER BY r.submitted_at DESC, r.id DESC LIMIT ? OFFSET ?`, ...w.params, limit, offset)
+  return { rows, total }
+}
+
+export interface Column { questionId: string, key: string, label: string, type: string, dataClass: DataClass, retired: boolean }
+
+/** One column per question the form has ever had: the live version's in its order, then the retired ones (FB-401). */
+export function columnsOf(fields: { questionId: string, key: string, label: string, type: string, dataClass: DataClass, retiredInVersion: number | null }[], live: Definition | null): Column[] {
+  const place = new Map((live ? questionsOf(live) : []).map(({ question }, i) => [question.id, i]))
+  const column = (f: typeof fields[number]): Column => ({ questionId: f.questionId, key: f.key, label: f.label, type: f.type, dataClass: f.dataClass, retired: f.retiredInVersion !== null || !place.has(f.questionId) })
+  const all = fields.map(column)
+  const order = (c: Column) => place.get(c.questionId) ?? Number.MAX_SAFE_INTEGER
+  return [...all.filter(c => !c.retired).sort((a, b) => order(a) - order(b)), ...all.filter(c => c.retired).sort((a, b) => a.key.localeCompare(b.key))]
+}
+
+/** A response's answers as one cell per column. Entries of a repeating group share a cell. */
+export function cells(answers: StoredAnswer[], columns: Column[]): Record<string, { text: string, restricted: boolean }> {
+  const out: Record<string, { text: string, restricted: boolean }> = {}
+  const type = new Map(columns.map(c => [c.questionId, c.type]))
+  for (const a of answers) {
+    const text = words(a, type.get(a.questionId))
+    const cell = out[a.questionId]
+    if (!cell) out[a.questionId] = { text, restricted: a.restricted }
+    else if (!a.restricted && text) cell.text = cell.text ? `${cell.text} | ${text}` : text
+  }
+  return out
+}
+
+/** Rows as CSV. A cell a spreadsheet would run as a formula is written as text. */
+export function toCsv(header: string[], rows: string[][]): string {
+  const cell = (value: string): string => {
+    const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  }
+  return `${[header, ...rows].map(r => r.map(cell).join(',')).join('\r\n')}\r\n`
+}

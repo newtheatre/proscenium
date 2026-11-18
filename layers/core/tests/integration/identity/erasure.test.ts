@@ -3,10 +3,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createUnit } from '#kit/unit'
 import { useRegistry } from '#kit/registry'
 import type { TableMeta } from '#kit/db'
-import { Browser, deliver, env, goStale, grantDirectly, leaveIdentity, reassert, reset, setSetting, clearSetting, signInByEmail, staff, unclaimedAccount, useIdentity } from './helpers'
+import { Browser, deliver, emailSignIn, env, goStale, tokenOf, grantDirectly, leaveIdentity, reassert, reset, setSetting, clearSetting, signInByEmail, staff, unclaimedAccount, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
-import { eraseAccount, erasurePlan } from '../../../server/identity/erasure'
+import { eraseAccount, eraseStage, erasurePlan } from '../../../server/identity/erasure'
 import { exportPlan } from '../../../server/identity/export'
 import review from '../../../server/tasks/review-data-requests'
 
@@ -132,12 +132,7 @@ describe('asking for erasure (ID-16)', () => {
     await env.DB.prepare('UPDATE core_data_requests SET not_before = 1 WHERE id = ?').bind(id).run()
     await runReview()
     const before = await rows('SELECT * FROM core_accounts WHERE id = ?', accountId)
-    const again = await inContext(async () => {
-      const unit = createUnit()
-      const result = await eraseAccount(unit, accountId)
-      await unit.commit()
-      return result
-    })
+    const again = await inContext(async () => eraseAccount(accountId))
     expect(again).toBeNull()
     expect(await rows('SELECT * FROM core_accounts WHERE id = ?', accountId)).toEqual(before)
   })
@@ -149,9 +144,7 @@ describe('asking for erasure (ID-16)', () => {
     // core_inbox_items.account_id is alias: the row keeps the merged-away id it was written with.
     await env.DB.prepare('INSERT INTO core_inbox_items (id, account_id, side, title, expires_at, created_at) VALUES (?, ?, \'audience\', \'Your tickets\', ?, ?)').bind('inb_aaaaaaaaaaaaaaaaaaaaaaaaaa', merged, Date.now() + 86_400_000, Date.now()).run()
     await inContext(async () => {
-      const unit = createUnit()
-      await eraseAccount(unit, survivor)
-      await unit.commit()
+      await eraseAccount(survivor)
     })
     expect(await rows('SELECT id FROM core_inbox_items WHERE account_id = ?', merged)).toEqual([])
     expect(await rows<{ id: string, anonymised: number }>('SELECT id, anonymised_at IS NOT NULL AS anonymised FROM core_accounts WHERE id IN (?, ?) ORDER BY id', survivor, merged)).toEqual(
@@ -166,9 +159,7 @@ describe('asking for erasure (ID-16)', () => {
     await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, link_hash, created_at) VALUES (?, ?, 1, ?, \'Pat Person\', \'h4sh\', ?)').bind('sl_aaaaaaaaaaaaaaaaaaaaaaaaab', performanceId, accountId, Date.now()).run()
     expect(exportPlan().find(t => t.table === 'seats_ledger')?.columns).not.toContain('link_hash')
     await inContext(async () => {
-      const unit = createUnit()
-      await eraseAccount(unit, accountId)
-      await unit.commit()
+      await eraseAccount(accountId)
     })
     expect(await rows('SELECT buyer_name, link_hash FROM seats_ledger WHERE id = ?', 'sl_aaaaaaaaaaaaaaaaaaaaaaaaab')).toEqual([{ buyer_name: 'Former member', link_hash: null }])
   })
@@ -201,6 +192,54 @@ describe('asking for erasure (ID-16)', () => {
     await grantDirectly(other.accountId, [], { roleId: ownerRole })
     await runReview()
     expect(await rows('SELECT state FROM core_data_requests WHERE id = ?', id)).toEqual([{ state: 'done' }])
+  })
+})
+
+describe('erasure in stages', () => {
+  it('runs as a chain of units that each stay inside the statement limit, however many tables it reaches', async () => {
+    const { browser, accountId, mine } = await person()
+    const id = await askAndConfirm(browser, mine)
+    await env.DB.prepare('UPDATE core_data_requests SET not_before = 1 WHERE id = ?').bind(id).run()
+    await setSetting('core.units.statement-limit', 20)
+    try {
+      await runReview()
+    }
+    finally {
+      await clearSetting('core.units.statement-limit')
+    }
+    expect(await rows('SELECT state FROM core_data_requests WHERE id = ?', id)).toEqual([{ state: 'done' }])
+    const stages = await rows<{ n: number }>('SELECT count(*) AS n FROM core_jobs WHERE name = \'core.run-erasure\' AND json_extract(payload, \'$.requestId\') = ? AND state = \'done\'', id)
+    expect(stages[0]!.n).toBeGreaterThan(3)
+    const [account] = await rows<any>('SELECT name, anonymised_at, disabled_at, disabled_reason FROM core_accounts WHERE id = ?', accountId)
+    expect(account).toMatchObject({ name: null, disabled_at: null, disabled_reason: null })
+    expect(account.anonymised_at).toBeGreaterThan(0)
+  })
+
+  it('locks the person out from the first stage, and a stalled run starts again at the next review', async () => {
+    const { browser, accountId, mine } = await person()
+    const id = await askAndConfirm(browser, mine)
+    await env.DB.prepare('UPDATE core_data_requests SET state = \'running\' WHERE id = ?').bind(id).run()
+    // The first two stages run, then the chain stops, as if its job had died.
+    for (const stage of [0, 1]) {
+      await inContext(async () => {
+        const unit = createUnit()
+        await eraseStage(unit, accountId, stage)
+        await unit.commit()
+      })
+    }
+    expect(await rows('SELECT disabled_reason, anonymised_at FROM core_accounts WHERE id = ?', accountId)).toEqual([{ disabled_reason: 'erasing', anonymised_at: null }])
+    expect((await browser.get('/api/core/me')).body.signedIn).toBe(false)
+    const { message } = await emailSignIn(new Browser(), mine)
+    expect(message ? (await new Browser().post('/api/core/sign-in/link', { token: tokenOf(message) })).body.code : 'core.account.disabled').toBe('core.account.disabled')
+    // Staff cannot undo the lock part-way.
+    const desk = await staff()
+    await grantDirectly(desk.accountId, ['core.account.disable'])
+    expect((await desk.browser.post(`/api/core/accounts/${accountId}/enable`, {})).body.code).toBe('core.account.erasing')
+    sent.length = 0
+    await runReview()
+    expect(await rows('SELECT state FROM core_data_requests WHERE id = ?', id)).toEqual([{ state: 'done' }])
+    expect(await rows('SELECT disabled_reason, anonymised_at IS NOT NULL AS gone FROM core_accounts WHERE id = ?', accountId)).toEqual([{ disabled_reason: null, gone: 1 }])
+    expect(to(mine).map(e => e.subject)).toEqual(['Your account at The Test Theatre has been erased'])
   })
 })
 
