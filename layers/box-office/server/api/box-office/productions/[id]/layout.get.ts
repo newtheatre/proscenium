@@ -5,6 +5,7 @@ import { getRouterParam } from 'h3'
 import { all, defineRoute } from '#kit'
 import { getProduction, listPerformances, placeName } from '#modules/core'
 import { listLayouts, runChoice } from '../../../../layouts'
+import { listBands } from '../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
@@ -20,6 +21,8 @@ export default defineRoute({
   return {
     layouts: layouts.map(l => ({ ...l, spaceName: names.get(l.spaceId) ?? null })),
     choice: await runChoice(production.id),
+    // The production's seating sections, any of which a space's seats may come from.
+    sections: (await listBands(production.id)).filter(b => b.kind === 'standard').map(b => ({ id: b.id, name: b.name })),
     ownCount: own[0]?.n ?? 0,
   }
 })

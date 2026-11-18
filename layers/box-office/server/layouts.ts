@@ -20,7 +20,7 @@ import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#ki
 import { getPerformance, getSpace } from '#modules/core'
 import { layoutInput, wheelchairChoice } from './input'
 
-export interface SeatingLayout { id: string, spaceId: string, name: string, seats: number | null, wheelchairSpaces: number, seatsPerSpace: number, usual: boolean }
+export interface SeatingLayout { id: string, spaceId: string, name: string, seats: number | null, wheelchairSpaces: number, seatsPerSpace: number, seatsSection: string | null, usual: boolean }
 
 export { layoutInput, wheelchairChoice }
 export type LayoutInput = z.output<typeof layoutInput>
@@ -34,8 +34,8 @@ export const WHEELCHAIR_BAND = 'Wheelchair spaces'
 const NAME_TAKEN = { code: 'box-office.layout.name-taken', reason: 'This space already has a layout with that name.', fields: { name: 'Choose a different name.' } }
 const NOT_FOUND = { code: 'box-office.layout.not-found', reason: 'There is no such seating layout.' }
 
-interface Row { id: string, space_id: string, name: string, seats: number | null, wheelchair_spaces: number, seats_per_space: number, usual: number }
-const toLayout = (r: Row): SeatingLayout => ({ id: r.id, spaceId: r.space_id, name: r.name, seats: r.seats, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, usual: !!r.usual })
+interface Row { id: string, space_id: string, name: string, seats: number | null, wheelchair_spaces: number, seats_per_space: number, seats_section: string | null, usual: number }
+const toLayout = (r: Row): SeatingLayout => ({ id: r.id, spaceId: r.space_id, name: r.name, seats: r.seats, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, seatsSection: r.seats_section, usual: !!r.usual })
 
 export async function listLayouts(spaceId?: string): Promise<SeatingLayout[]> {
   const rows = spaceId
@@ -59,18 +59,18 @@ export async function usualLayout(spaceId: string | null): Promise<SeatingLayout
  * What gives a performance its wheelchair spaces: a layout of its space, or numbers typed in (Matt
  * 2026-11-17, 21:58: a show picks a layout or types its own numbers, and one performance can override).
  */
-export interface Arrangement { layout: SeatingLayout | null, spaces: number, seatsEach: number }
+export interface Arrangement { layout: SeatingLayout | null, spaces: number, seatsEach: number, seatsBandId?: string | null }
 export type ArrangementFrom = 'performance' | 'run' | 'usual'
 /** A run's choice, or a performance's own: a layout, or numbers. */
-export interface Choice { layoutId: string | null, wheelchairSpaces: number | null, seatsPerSpace: number | null }
+export interface Choice { layoutId: string | null, wheelchairSpaces: number | null, seatsPerSpace: number | null, seatsBandId?: string | null }
 
 const fromLayout = (layout: SeatingLayout): Arrangement => ({ layout, spaces: layout.wheelchairSpaces, seatsEach: layout.seatsPerSpace })
-interface ChoiceRow { layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null }
-const toChoice = (r: ChoiceRow): Choice => ({ layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space })
+interface ChoiceRow { layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null, seats_band_id: string | null }
+const toChoice = (r: ChoiceRow): Choice => ({ layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, seatsBandId: r.seats_band_id })
 
 /** The run's choice for a production, or null when each space's usual layout is used. */
 export async function runChoice(productionId: string): Promise<Choice | null> {
-  const row = await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space FROM box_office_run_layouts WHERE production_id = ?', productionId)
+  const row = await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space, seats_band_id FROM box_office_run_layouts WHERE production_id = ?', productionId)
   return row ? toChoice(row) : null
 }
 
@@ -87,9 +87,9 @@ export async function arrangementFor(performanceId: string, options: { run?: Cho
       const layout = await getLayout(c.layoutId)
       return layout && layout.spaceId === performance.spaceId ? fromLayout(layout) : null
     }
-    return c.wheelchairSpaces === null ? null : { layout: null, spaces: c.wheelchairSpaces, seatsEach: c.seatsPerSpace ?? 0 }
+    return c.wheelchairSpaces === null ? null : { layout: null, spaces: c.wheelchairSpaces, seatsEach: c.seatsPerSpace ?? 0, seatsBandId: c.seatsBandId ?? null }
   }
-  const own = options.ignoreOwn ? null : await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space FROM box_office_performance_sales WHERE performance_id = ? AND layout_own = 1', performanceId)
+  const own = options.ignoreOwn ? null : await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space, seats_band_id FROM box_office_performance_sales WHERE performance_id = ? AND layout_own = 1', performanceId)
   const mine = own ? await resolve(toChoice(own)) : null
   if (mine) return { arrangement: mine, from: 'performance' }
   const run = await resolve(options.run !== undefined ? options.run : await runChoice(performance.productionId))
@@ -143,6 +143,23 @@ async function wheelchairBand(unit: UnitView, productionId: string): Promise<str
   return id
 }
 
+/**
+ * The seating section of a production a wheelchair space's seats come from: the one chosen with the
+ * numbers, or the one a layout names, by name. Null means the first seating section.
+ */
+async function seatsBandOf(productionId: string, arrangement: Arrangement): Promise<string | null> {
+  const section = arrangement.layout ? arrangement.layout.seatsSection : null
+  if (section) return (await first<{ id: string }>("SELECT id FROM box_office_bands WHERE production_id = ? AND kind = 'standard' AND lower(name) = lower(?)", productionId, section))?.id ?? null
+  if (!arrangement.layout && arrangement.seatsBandId) return (await first<{ id: string }>("SELECT id FROM box_office_bands WHERE production_id = ? AND kind = 'standard' AND id = ?", productionId, arrangement.seatsBandId))?.id ?? null
+  return null
+}
+
+/** Refuses a section that is not one of the production's seating sections. */
+async function checkSection(productionId: string, bandId: string | null | undefined): Promise<void> {
+  if (bandId && !(await first("SELECT 1 FROM box_office_bands WHERE production_id = ? AND kind = 'standard' AND id = ?", productionId, bandId)))
+    refuse('box-office.band.not-found', 'That section is not one of this production\'s seating sections.', { status: 422, fields: { seatsBandId: 'Choose a section from the list.' } })
+}
+
 const bookedSpaces = async (performanceId: string) => (await first<{ claimed: number | null }>(
   'SELECT max(o.claimed) AS claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind = \'wheelchair\'', performanceId))?.claimed ?? 0
 
@@ -160,9 +177,11 @@ export async function applyArrangement(unit: UnitView, performanceId: string, ar
   const spaces = layout ? null : arrangement.spaces
   const each = layout ? null : arrangement.seatsEach
   const own = !!options.own
-  unit.add(sql`INSERT INTO box_office_performance_sales (id, performance_id, seating, state, layout_id, wheelchair_spaces, seats_per_space, layout_own, created_at, updated_at)
-    VALUES (${newId('sale')}, ${performanceId}, 'general', 'draft', ${layout?.id ?? null}, ${spaces}, ${each}, ${own}, ${at}, ${at})
-    ON CONFLICT (performance_id) DO UPDATE SET layout_id = excluded.layout_id, wheelchair_spaces = excluded.wheelchair_spaces, seats_per_space = excluded.seats_per_space, layout_own = excluded.layout_own, updated_at = excluded.updated_at`)
+  const seatsBandId = await seatsBandOf(performance.productionId, arrangement)
+  unit.add(sql`INSERT INTO box_office_performance_sales (id, performance_id, seating, state, layout_id, wheelchair_spaces, seats_per_space, layout_own, seats_band_id, created_at, updated_at)
+    VALUES (${newId('sale')}, ${performanceId}, 'general', 'draft', ${layout?.id ?? null}, ${spaces}, ${each}, ${own}, ${seatsBandId}, ${at}, ${at})
+    ON CONFLICT (performance_id) DO UPDATE SET layout_id = excluded.layout_id, wheelchair_spaces = excluded.wheelchair_spaces, seats_per_space = excluded.seats_per_space, layout_own = excluded.layout_own,
+      seats_band_id = excluded.seats_band_id, updated_at = excluded.updated_at`)
 
   const existing = await first<{ band_id: string, claimed: number }>(
     'SELECT o.band_id, o.claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind = \'wheelchair\' ORDER BY b.sort, b.name LIMIT 1', performanceId)
@@ -193,11 +212,11 @@ export async function applyArrangement(unit: UnitView, performanceId: string, ar
  * performance keeps what it has.
  */
 export async function reapply(unit: UnitView, performanceId: string, options: { strict?: boolean, create?: boolean, run?: Choice | null, ignoreOwn?: boolean, seats?: boolean } = {}): Promise<void> {
-  const sales = await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
+  const sales = await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space, seats_band_id FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
   if (!sales && !options.create) return
   const { arrangement, from } = await arrangementFor(performanceId, options)
   if (!arrangement) {
-    if (sales) unit.add(sql`UPDATE box_office_performance_sales SET layout_id = NULL, wheelchair_spaces = NULL, seats_per_space = NULL, layout_own = 0, updated_at = ${nowMs()}
+    if (sales) unit.add(sql`UPDATE box_office_performance_sales SET layout_id = NULL, wheelchair_spaces = NULL, seats_per_space = NULL, seats_band_id = NULL, layout_own = 0, updated_at = ${nowMs()}
       WHERE performance_id = ${performanceId} AND (layout_id IS NOT NULL OR wheelchair_spaces IS NOT NULL OR layout_own = 1)`)
     return
   }
@@ -229,7 +248,7 @@ export type ChoiceInput = z.output<typeof wheelchairChoice>
 
 async function choiceOf(input: ChoiceInput): Promise<{ choice: Choice | null, layout: SeatingLayout | null }> {
   if (input.use === 'inherit') return { choice: null, layout: null }
-  if (input.use === 'numbers') return { choice: { layoutId: null, wheelchairSpaces: input.wheelchairSpaces, seatsPerSpace: input.seatsPerSpace }, layout: null }
+  if (input.use === 'numbers') return { choice: { layoutId: null, wheelchairSpaces: input.wheelchairSpaces, seatsPerSpace: input.seatsPerSpace, seatsBandId: input.seatsBandId ?? null }, layout: null }
   const layout = await getLayout(input.layoutId)
   if (!layout) refuse(NOT_FOUND.code, NOT_FOUND.reason, { status: 422, fields: { layoutId: 'Choose a layout from the list.' } })
   return { choice: { layoutId: layout.id, wheelchairSpaces: null, seatsPerSpace: null }, layout }
@@ -244,9 +263,10 @@ export async function setRunChoice(unit: UnitView, productionId: string, input: 
   const { choice } = await choiceOf(input)
   const at = nowMs()
   if (choice) {
-    unit.add(sql`INSERT INTO box_office_run_layouts (id, production_id, layout_id, wheelchair_spaces, seats_per_space, created_at, updated_at)
-      VALUES (${newId('runl')}, ${productionId}, ${choice.layoutId}, ${choice.wheelchairSpaces}, ${choice.seatsPerSpace}, ${at}, ${at})
-      ON CONFLICT (production_id) DO UPDATE SET layout_id = excluded.layout_id, wheelchair_spaces = excluded.wheelchair_spaces, seats_per_space = excluded.seats_per_space, updated_at = excluded.updated_at`)
+    await checkSection(productionId, choice.seatsBandId)
+    unit.add(sql`INSERT INTO box_office_run_layouts (id, production_id, layout_id, wheelchair_spaces, seats_per_space, seats_band_id, created_at, updated_at)
+      VALUES (${newId('runl')}, ${productionId}, ${choice.layoutId}, ${choice.wheelchairSpaces}, ${choice.seatsPerSpace}, ${choice.seatsBandId ?? null}, ${at}, ${at})
+      ON CONFLICT (production_id) DO UPDATE SET layout_id = excluded.layout_id, wheelchair_spaces = excluded.wheelchair_spaces, seats_per_space = excluded.seats_per_space, seats_band_id = excluded.seats_band_id, updated_at = excluded.updated_at`)
   }
   else unit.add(sql`DELETE FROM box_office_run_layouts WHERE production_id = ${productionId}`)
   for (const performanceId of await coming({ productionId })) await reapply(unit, performanceId, { strict: true, run: choice })
@@ -260,7 +280,8 @@ export async function setRunChoice(unit: UnitView, productionId: string, input: 
 export async function setPerformanceChoice(unit: UnitView, performanceId: string, input: ChoiceInput): Promise<void> {
   const { choice, layout } = await choiceOf(input)
   if (!choice) return reapply(unit, performanceId, { strict: true, create: true, ignoreOwn: true })
-  const arrangement: Arrangement = layout ? fromLayout(layout) : { layout: null, spaces: choice.wheelchairSpaces!, seatsEach: choice.seatsPerSpace! }
+  await checkSection((await getPerformance(performanceId)).productionId, choice.seatsBandId)
+  const arrangement: Arrangement = layout ? fromLayout(layout) : { layout: null, spaces: choice.wheelchairSpaces!, seatsEach: choice.seatsPerSpace!, seatsBandId: choice.seatsBandId ?? null }
   await applyArrangement(unit, performanceId, arrangement, { own: true, seats: true })
 }
 
@@ -285,11 +306,11 @@ export async function createLayout(unit: UnitView, input: LayoutInput): Promise<
   const isFirst = !(await first('SELECT 1 FROM box_office_seating_layouts WHERE space_id = ?', input.spaceId))
   const id = newId('lay')
   const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_seating_layouts (id, space_id, name, seats, wheelchair_spaces, seats_per_space, usual, created_at, updated_at)
-    SELECT ${id}, ${input.spaceId}, ${input.name}, ${input.seats}, ${input.wheelchairSpaces}, ${input.seatsPerSpace}, ${isFirst}, ${at}, ${at}
+  unit.add(sql`INSERT INTO box_office_seating_layouts (id, space_id, name, seats, wheelchair_spaces, seats_per_space, seats_section, usual, created_at, updated_at)
+    SELECT ${id}, ${input.spaceId}, ${input.name}, ${input.seats}, ${input.wheelchairSpaces}, ${input.seatsPerSpace}, ${input.seatsSection ?? null}, ${isFirst}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_seating_layouts WHERE space_id = ${input.spaceId} AND lower(name) = lower(${input.name}))`).expect(1, NAME_TAKEN)
   unit.audit({ action: 'create', record: ['core.space', input.spaceId], detail: { layoutId: id } })
-  if (isFirst) await applyUsual(unit, { id, ...input, usual: true })
+  if (isFirst) await applyUsual(unit, { id, ...input, seatsSection: input.seatsSection ?? null, usual: true })
   return id
 }
 
@@ -302,9 +323,9 @@ export async function updateLayout(unit: UnitView, id: string, input: LayoutInpu
   if (!before) refuse(NOT_FOUND.code, NOT_FOUND.reason, { status: 404 })
   if (input.spaceId !== before.spaceId) refuse('box-office.layout.space-fixed', 'A layout stays with its space.', { status: 422, fields: { spaceId: 'Add a new layout to the other space instead.' } })
   await refuseTakenName(before.spaceId, input.name, id)
-  unit.add(sql`UPDATE box_office_seating_layouts SET name = ${input.name}, seats = ${input.seats}, wheelchair_spaces = ${input.wheelchairSpaces}, seats_per_space = ${input.seatsPerSpace}, updated_at = ${nowMs()}
+  unit.add(sql`UPDATE box_office_seating_layouts SET name = ${input.name}, seats = ${input.seats}, wheelchair_spaces = ${input.wheelchairSpaces}, seats_per_space = ${input.seatsPerSpace}, seats_section = ${input.seatsSection ?? null}, updated_at = ${nowMs()}
     WHERE id = ${id} AND NOT EXISTS (SELECT 1 FROM box_office_seating_layouts WHERE space_id = ${before.spaceId} AND lower(name) = lower(${input.name}) AND id <> ${id})`).expect(1, NAME_TAKEN)
-  const after: SeatingLayout = { ...before, ...input }
+  const after: SeatingLayout = { ...before, ...input, seatsSection: input.seatsSection ?? null }
   for (const performanceId of await coming({ layoutId: id })) {
     const { from } = await arrangementFor(performanceId)
     await applyArrangement(unit, performanceId, fromLayout(after), { own: from === 'performance' })
@@ -351,17 +372,29 @@ export async function relayout(unit: UnitView, performanceId: string): Promise<v
 
 /**
  * A performance's wheelchair pool and what booking one space does: `units` seats taken from
- * `seatPoolId`, and until `keepUntil` the seats of every unsold space kept back from ordinary sale.
+ * `seatPoolId` (the section chosen, else the band's displaced one, else the first seating section),
+ * and until `keepUntil` the seats of every unsold space kept back from ordinary sale.
  * With numbers typed in, each space takes the seats they say. Without either, a wheelchair band
  * takes seats only where it names a displaced band (the specification's set-up by hand).
  */
-export interface Displacement { performanceId: string, wheelchairPoolId: string, seatPoolId: string | null, units: number, keepUntil: number | null }
+export interface Displacement {
+  performanceId: string
+  wheelchairPoolId: string
+  seatPoolId: string | null
+  units: number
+  /** Until when seats are kept back now: null when nothing is, or staff let them go early. */
+  keepUntil: number | null
+  /** When staff let the kept seats go early, and until when they would otherwise have been kept. */
+  releasedAt: number | null
+  wouldKeepUntil: number | null
+}
 
 export async function displacementsFor(poolIds: string[]): Promise<Displacement[]> {
   if (!poolIds.length) return []
-  const rows = await all<{ performance_id: string, wheelchair_pool: string, seat_pool: string | null, layout_id: string | null, seats_per_space: number | null, own_each: number | null, displaces_band_id: string | null, displaces_units: number }>(
-    `SELECT w.performance_id, w.id AS wheelchair_pool, s.layout_id, l.seats_per_space, s.seats_per_space AS own_each, b.displaces_band_id, b.displaces_units,
-        coalesce((SELECT p.id FROM box_office_pools p WHERE p.performance_id = w.performance_id AND p.band_id = b.displaces_band_id),
+  const rows = await all<{ performance_id: string, wheelchair_pool: string, seat_pool: string | null, layout_id: string | null, seats_per_space: number | null, own_each: number | null, displaces_band_id: string | null, displaces_units: number, released_at: number | null }>(
+    `SELECT w.performance_id, w.id AS wheelchair_pool, s.layout_id, l.seats_per_space, s.seats_per_space AS own_each, b.displaces_band_id, b.displaces_units, s.kept_released_at AS released_at,
+        coalesce((SELECT p.id FROM box_office_pools p WHERE p.performance_id = w.performance_id AND p.band_id = s.seats_band_id),
+          (SELECT p.id FROM box_office_pools p WHERE p.performance_id = w.performance_id AND p.band_id = b.displaces_band_id),
           (SELECT p.id FROM box_office_pools p JOIN box_office_bands sb ON sb.id = p.band_id WHERE p.performance_id = w.performance_id AND sb.kind = 'standard' ORDER BY sb.sort, sb.name LIMIT 1)) AS seat_pool
       FROM box_office_pools w JOIN box_office_bands b ON b.id = w.band_id AND b.kind = 'wheelchair'
         LEFT JOIN box_office_performance_sales s ON s.performance_id = w.performance_id
@@ -374,6 +407,45 @@ export async function displacementsFor(poolIds: string[]): Promise<Displacement[
   return rows.map((r) => {
     const units = r.layout_id ? (r.seats_per_space ?? 0) : r.own_each !== null ? r.own_each : (r.displaces_band_id ? r.displaces_units : 0)
     const seatPoolId = units > 0 ? r.seat_pool : null
-    return { performanceId: r.performance_id, wheelchairPoolId: r.wheelchair_pool, seatPoolId, units: seatPoolId ? units : 0, keepUntil: seatPoolId && keepFor > 0 ? starts.get(r.performance_id)! - keepFor : null }
+    const wouldKeepUntil = seatPoolId && keepFor > 0 ? starts.get(r.performance_id)! - keepFor : null
+    return { performanceId: r.performance_id, wheelchairPoolId: r.wheelchair_pool, seatPoolId, units: seatPoolId ? units : 0, keepUntil: r.released_at === null ? wouldKeepUntil : null, releasedAt: r.released_at, wouldKeepUntil }
   })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Letting the kept seats go early
+
+const NOTHING_KEPT = { code: 'box-office.layout.nothing-kept', reason: 'No seats are being kept back for wheelchair spaces at this performance now.' }
+
+async function planOf(performanceId: string): Promise<Displacement | undefined> {
+  const pools = await all<{ id: string }>('SELECT id FROM box_office_pools WHERE performance_id = ?', performanceId)
+  return (await displacementsFor(pools.map(p => p.id))).find(d => d.performanceId === performanceId)
+}
+
+/**
+ * Puts the seats kept back for unbooked wheelchair spaces on general sale now, before the keep-back
+ * time: for a house that knows no one else needs a space tonight. Audited, with who did it.
+ */
+export async function releaseKept(unit: UnitView, performanceId: string, accountId: string | null): Promise<void> {
+  const plan = await planOf(performanceId)
+  const at = nowMs()
+  if (!plan || plan.keepUntil === null || at >= plan.keepUntil) refuse(NOTHING_KEPT.code, NOTHING_KEPT.reason, { status: 409 })
+  unit.add(sql`UPDATE box_office_performance_sales SET kept_released_at = ${at}, kept_released_by = ${accountId}, updated_at = ${at} WHERE performance_id = ${performanceId} AND kept_released_at IS NULL`).expect(1, NOTHING_KEPT)
+  unit.audit({ action: 'update', record: ['core.performance', performanceId], detail: { keptSeats: 'released' } })
+}
+
+/**
+ * Undoes an early release: the seats of the spaces still unbooked are kept back again until the
+ * keep-back time. Seats sold in between stay sold; only what is still free is kept.
+ */
+export async function keepAgain(unit: UnitView, performanceId: string): Promise<void> {
+  const plan = await planOf(performanceId)
+  const at = nowMs()
+  if (!plan || plan.releasedAt === null) refuse('box-office.layout.not-released', 'The kept seats at this performance have not been let go early.', { status: 409 })
+  if (plan.wouldKeepUntil === null || at >= plan.wouldKeepUntil) refuse('box-office.layout.keep-over', 'The keep-back time has passed, so these seats are on general sale anyway.', { status: 409 })
+  const spaces = await first<{ free: number }>('SELECT capacity - claimed AS free FROM box_office_pools WHERE id = ?', plan.wheelchairPoolId)
+  if (!spaces?.free) refuse('box-office.layout.all-booked', 'Every wheelchair space is booked, so there are no seats to keep back.', { status: 409 })
+  unit.add(sql`UPDATE box_office_performance_sales SET kept_released_at = NULL, kept_released_by = NULL, updated_at = ${at} WHERE performance_id = ${performanceId} AND kept_released_at IS NOT NULL`)
+    .expect(1, { code: 'box-office.layout.not-released', reason: 'The kept seats at this performance have not been let go early.' })
+  unit.audit({ action: 'update', record: ['core.performance', performanceId], detail: { keptSeats: 'kept' } })
 }

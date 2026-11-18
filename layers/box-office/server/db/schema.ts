@@ -24,6 +24,12 @@ export const performanceSales = defineTable('box_office_performance_sales', {
   seatsPerSpace: col.internal(integer('seats_per_space')),
   // Whether the layout or numbers are this performance's own, overriding its run's choice.
   layoutOwn: col.internal(integer('layout_own', { mode: 'boolean' }).notNull().default(false)),
+  // The section a wheelchair space's seats come from, as worked out from the layout or chosen with
+  // the numbers. Null means the production's first seating section.
+  seatsBandId: col.internal(text('seats_band_id')),
+  // Seats kept back for unbooked wheelchair spaces, let go before the keep-back time by staff.
+  keptReleasedAt: col.timestamp('kept_released_at'),
+  keptReleasedBy: col.account('kept_released_by', { role: 'actor', nullable: true }),
   state: col.public(text('state', { enum: ['draft', 'on_sale', 'paused', 'closed'] }).notNull().default('draft')),
   onSaleAt: col.timestamp('on_sale_at'),
   // Null means the setting's default before curtain.
@@ -182,6 +188,9 @@ export const seatingLayouts = defineTable('box_office_seating_layouts', {
   seats: col.internal(integer('seats')),
   wheelchairSpaces: col.internal(integer('wheelchair_spaces').notNull().default(0)),
   seatsPerSpace: col.internal(integer('seats_per_space').notNull().default(2)),
+  // The section of a show here the seats come from, by name, since sections are each production's
+  // own. Null, or a name a production has no section by, means its first seating section.
+  seatsSection: col.internal(text('seats_section')),
   usual: col.internal(integer('usual', { mode: 'boolean' }).notNull().default(false)),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
@@ -208,6 +217,8 @@ export const runLayouts = defineTable('box_office_run_layouts', {
   layoutId: col.internal(text('layout_id')),
   wheelchairSpaces: col.internal(integer('wheelchair_spaces')),
   seatsPerSpace: col.internal(integer('seats_per_space')),
+  // With numbers, the section the seats come from; null means the first seating section.
+  seatsBandId: col.internal(text('seats_band_id')),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
