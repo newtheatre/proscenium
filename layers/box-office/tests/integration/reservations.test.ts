@@ -279,11 +279,14 @@ describe('the link that opens a guest\'s account', () => {
 
   it('comes in the reservation email, and asking again says truthfully what happened', async () => {
     const h = await house(2)
+    // An age-restricted production says so with the tickets.
+    await rows('UPDATE core_productions SET age_min = 18, age_restricted = 1 WHERE id = ?', h.productionId)
     const b = await basket(h, 1)
     const done = await reserve(b, address())
     expect(done.body).toMatchObject({ state: 'reserved', accountLinkSent: true })
     const told = await mail('box-office.order-reserved', b.orderId)
     expect(told.account).toMatch(/^https:\/\/theatre\.example\/sign-in\/link#/)
+    expect(told.tickets).toBe('1 × Full price. Everyone using these tickets must be 18 or over; ID may be checked.')
     const link = { 'x-order-token': done.body.token as string }
     expect((await req('GET', '/api/box-office/orders/link', undefined, null, link)).body.accountUnclaimed).toBe(true)
     expect((await req('POST', '/api/box-office/orders/link/account', {}, null, link)).body).toEqual({ sent: true, outcome: 'sent' })
