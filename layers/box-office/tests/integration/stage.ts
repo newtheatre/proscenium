@@ -51,6 +51,10 @@ import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import deskSoldGet from '../../server/api/box-office/desk/sold.get'
+import deskIssuePost from '../../server/api/box-office/desk/issue.post'
+import deskPassGet from '../../server/api/box-office/desk/pass.get'
+import deskPassesGet from '../../server/api/box-office/desk/passes.get'
+import passTypesPost from '../../server/api/box-office/pass-types/index.post'
 import deskSendPost from '../../server/api/box-office/desk/orders/[id]/send.post'
 import deskTicketsGet from '../../server/api/box-office/desk/orders/[id]/tickets.get'
 import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
@@ -142,6 +146,10 @@ export const handle = server({
   'POST /api/box-office/orders/:id/split': splitPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
   'GET /api/box-office/desk/sold': deskSoldGet,
+  'POST /api/box-office/desk/issue': deskIssuePost,
+  'GET /api/box-office/desk/pass': deskPassGet,
+  'GET /api/box-office/desk/passes': deskPassesGet,
+  'POST /api/box-office/pass-types': passTypesPost,
   'POST /api/box-office/desk/orders/:id/send': deskSendPost,
   'GET /api/box-office/desk/orders/:id/tickets': deskTicketsGet,
   'GET /api/box-office/desk/performances': deskPerformancesGet,

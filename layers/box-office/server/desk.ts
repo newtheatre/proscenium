@@ -9,16 +9,16 @@ import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
-import type { DeskContext } from '#modules/payments'
-import { passSalesMinor } from './pass-sales'
-import { pricedLines, type BasketLineInput } from './baskets'
+import type { DeskContext, SummaryLine } from '#modules/payments'
+import { owedHere, passOwing, passSalesMinor, passSalesOn } from './pass-sales'
+import { planOrder, pricedLines, writeOrder, type BasketLineInput, type OrderPlan } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
 import { signing } from '#kit/signing'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { carryPassEntries } from './pass-entries'
 import { hashOf, newReference, randomToken } from './codes'
-import { sendTickets } from './confirm'
+import { confirmOrder, sendTickets } from './confirm'
 import { siteUrl } from './links'
 import { DOOR_CODE_PURPOSE, doorCodesForOrder, signedPart, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
@@ -26,7 +26,7 @@ import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
-import { applyCode, judgeCode, normaliseCode, redeem, type Discounted } from './promo-codes'
+import { normaliseCode } from './promo-codes'
 import { availability } from './availability'
 import { salesOf } from './setup'
 
@@ -39,9 +39,28 @@ const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.n
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
 // `promoCode`, as the buyer gave it (BO-17): applied as it is online, to the dearest tickets first.
-const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional(), email: z.email().max(254).optional(), accountId: z.string().min(1).max(64).optional(), promoCode: z.string().trim().min(1).max(40).optional() }).strict() // not-policy: more kinds of ticket than any performance sells; the longest address; an id; longer than any code
-  .refine(sale => !(sale.email && sale.accountId), { message: 'A sale goes to an address or a person, not both.' })
 const id = z.string().min(1).max(64) // not-policy: shape bound
+// A pass's code as typed or scanned: an imported pass keeps its old system's longer code as well.
+const passCode = z.string().trim().min(1).max(500) // not-policy: shape bound, longer than any old system's pass code
+// `passes`: each gives one entry (BO-64). `buy`: passes sold here, each with its first entry here
+// unless `entry` is false, and its holder when the seller picked one. `collect`: passes whose money
+// is still owed, paid for here on their own.
+const passAsk = z.object({ code: passCode, bandId: id.optional(), wheelchair: z.boolean().optional() }).strict()
+const passBuy = z.object({ passTypeId: id, passPriceId: id, bandId: id.optional(), wheelchair: z.boolean().optional(), entry: z.boolean().optional(), accountId: id.optional(), email: z.email().max(254).optional() }).strict() // not-policy: the longest address
+  .refine(b => !(b.accountId && b.email), { message: 'A pass is held by a person or an address, not both.' })
+const saleInput = z.object({
+  performanceId: z.string(),
+  lines: z.array(line).max(50), // not-policy: more kinds of ticket than any performance sells
+  passes: z.array(passAsk).max(50).optional(), // not-policy: more passes than one group brings
+  buy: z.array(passBuy).max(20).optional(), // not-policy: more passes than one sale sells
+  collect: z.array(passCode).max(20).optional(), // not-policy: as many as `buy`
+  admit: z.boolean().optional(),
+  email: z.email().max(254).optional(), // not-policy: the longest address
+  accountId: id.optional(),
+  promoCode: z.string().trim().min(1).max(40).optional(), // not-policy: longer than any code
+}).strict()
+  .refine(sale => !(sale.email && sale.accountId), { message: 'A sale goes to an address or a person, not both.' })
+  .refine(sale => sale.lines.length || sale.passes?.length || sale.buy?.length || sale.collect?.length, { message: 'There is nothing in the sale.' })
 const exchangeInput = z.object({
   exchange: z.object({
     orderId: id,
@@ -72,24 +91,48 @@ async function reservation(orderId: string): Promise<{ order: OrderRow, lines: L
   return { order, lines: await liveLines(order.id) }
 }
 
-async function deskSale(input: SaleInput, at: number) {
-  const sales = await salesOf(input.performanceId)
-  if (!sales || sales.state === 'draft') refuse('box-office.sales.none', 'This performance is not set up for sale.', { status: 404 })
-  // Paused stops new sales at the desk as it does online. Closed is only online sales having ended.
-  if (sales.state === 'paused') refuse('box-office.sales.paused', 'Sales are paused for this performance.', { status: 409 })
-  const performance = await getPerformance(input.performanceId)
-  const until = performance.startsAt + (await useSetting('box-office.sales.desk-until-after') as number) * 1000 // not-policy: seconds to milliseconds
-  if (performance.state !== 'scheduled' || at >= until) refuse('box-office.sales.closed', 'Sales have closed for this performance.', { status: 409 })
-  const quantity = input.lines.reduce((sum, l) => sum + l.quantity, 0)
-  const cap = await useSetting('box-office.orders.desk-seat-cap') as number
-  if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one desk order.`, { status: 422 })
-  return pricedLines(input.performanceId, input.lines, at, { channel: 'desk', account: null })
+/** Whether a sale holds anything for its performance, rather than only passes sold or paid for on their own. */
+const forPerformance = (input: SaleInput) => input.lines.length > 0 || !!input.passes?.length || !!input.buy?.some(b => b.entry !== false)
+
+/** The desk sale planned: its tickets, its passes' entries, and what is paid for passes. Reads only. */
+async function deskSale(input: SaleInput, at: number): Promise<OrderPlan> {
+  if (forPerformance(input)) {
+    const sales = await salesOf(input.performanceId)
+    if (!sales || sales.state === 'draft') refuse('box-office.sales.none', 'This performance is not set up for sale.', { status: 404 })
+    // Paused stops new sales at the desk as it does online. Closed is only online sales having ended.
+    if (sales.state === 'paused') refuse('box-office.sales.paused', 'Sales are paused for this performance.', { status: 409 })
+    const performance = await getPerformance(input.performanceId)
+    const until = performance.startsAt + (await useSetting('box-office.sales.desk-until-after') as number) * 1000 // not-policy: seconds to milliseconds
+    if (performance.state !== 'scheduled' || at >= until) refuse('box-office.sales.closed', 'Sales have closed for this performance.', { status: 409 })
+    const quantity = input.lines.reduce((sum, l) => sum + l.quantity, 0) + (input.passes?.length ?? 0) + (input.buy ?? []).filter(b => b.entry !== false).length
+    const cap = await useSetting('box-office.orders.desk-seat-cap') as number
+    if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one desk order.`, { status: 422 })
+  }
+  const plan = await planOrder({ performanceId: input.performanceId, lines: input.lines, promoCode: input.promoCode, passes: input.passes, buy: input.buy }, { channel: 'desk', account: null }, at)
+  // A pass paid for on its own: what it owes is collected here, unless a live booking already waits to.
+  const collecting = await owedHere(await Promise.all((input.collect ?? []).map(code => passOwing(code))), at)
+  const owed = [...plan.owed]
+  for (const o of collecting) {
+    if (owed.some(x => x.pass.passId === o.pass.passId)) continue
+    owed.push(o)
+  }
+  const extra = owed.slice(plan.owed.length).reduce((sum, o) => sum + o.pass.owedMinor, 0)
+  if (input.collect?.length && !extra)
+    refuse('box-office.pass.owed-elsewhere', 'That pass is to be paid for with a reservation already.', { status: 409, remedy: 'Find the reservation and take payment for it.', fields: { pass: 'owed-elsewhere' } })
+  return { ...plan, owed, totalMinor: plan.totalMinor + extra }
 }
 
-/** What the sale's promo code takes off each ticket, if it has one: refused, saying why, when the code cannot be used. */
-async function deskDiscounts(input: SaleInput, lines: readonly { bandId: string, ticketTypeId: string, amountMinor: number }[], at: number): Promise<(Discounted | null)[]> {
-  if (!input.promoCode) return lines.map(() => null)
-  return applyCode(await judgeCode(input.promoCode, input.performanceId, at), input.performanceId, lines)
+/** The till's lines for a planned sale: each ticket, each pass's entry, then each pass sold or paid for. */
+function saleLines(plan: OrderPlan, names: Map<string, string>, code: string): SummaryLine[] {
+  const tickets: SummaryLine[] = plan.lines.map((l, i) => {
+    const pass = plan.entryOf[i]
+    if (pass) return { label: `${names.get(l.ticketTypeId) && l.priceId ? `${names.get(l.ticketTypeId)}, ` : ''}${pass.name} entry`, amountMinor: 0 }
+    return { label: plan.discounted[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: plan.charged[i]! }
+  })
+  // Each pass sold is a line of its own with a key, so a split sale says who paid for it: it is theirs.
+  const sold = plan.planned.map((p, i) => ({ label: `${p.judged.name}, ${p.judged.priceName}`, amountMinor: p.amountMinor, key: `pass:${i}` }))
+  const owed = plan.owed.map(o => ({ label: `${o.pass.name}, ${o.pass.priceName} (owed)`, amountMinor: o.pass.owedMinor, key: `owed:${o.pass.passId}` }))
+  return [...tickets, ...sold, ...owed]
 }
 
 /**
@@ -110,23 +153,19 @@ export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<st
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
-export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: SummaryLine[], amountMinor: number }> {
   const input = panelInput(context.input)
   if ('exchange' in input) {
     const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
     return exchangeDifference(orderId, target)
   }
-  let lines: { label: string, amountMinor: number }[]
+  let lines: SummaryLine[]
   if ('reservation' in input) {
     lines = (await reservation(input.reservation.orderId)).lines.map(l => ({ label: l.type_name, amountMinor: l.amount_minor }))
   }
   else {
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
-    const at = nowMs()
-    const priced = (await deskSale(input.sale, at)).lines
-    const discounts = await deskDiscounts(input.sale, priced, at)
-    const code = normaliseCode(input.sale.promoCode ?? '')
-    lines = priced.map((l, i) => ({ label: discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor - (discounts[i]?.discountMinor ?? 0) }))
+    lines = saleLines(await deskSale(input.sale, nowMs()), names, normaliseCode(input.sale.promoCode ?? ''))
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
@@ -142,7 +181,8 @@ export function deskNarrow(input: unknown, lines: { line: number, quantity: numb
   if (!('sale' in parsed)) return null
   const sale = parsed.sale
   // A promo code takes off the dearest tickets of the whole sale, so splitting it could change the price: one booking.
-  if (sale.promoCode) return null
+  // So is a sale with passes in it: who paid for each pass is told at settle, and it becomes theirs.
+  if (sale.promoCode || sale.passes?.length || sale.buy?.length || sale.collect?.length) return null
   const tickets = sale.lines.flatMap((l, at) => Array.from({ length: l.quantity }, (_, n) => ({ at, n })))
   const picked = new Set<number>()
   for (const l of lines) {
@@ -189,36 +229,76 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   }
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
-  const { pool, lines, currency, guard } = await deskSale(input.sale, at)
-  const discounts = await deskDiscounts(input.sale, lines, at)
-  const charged = lines.map((l, i) => l.amountMinor - (discounts[i]?.discountMinor ?? 0))
-  const totalMinor = charged.reduce((sum, amount) => sum + amount, 0)
-  if (totalMinor <= 0) refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })
-  const orderId = newId('ord')
-  const holdId = newId('hold')
-  const expiresAt = at + DESK_HOLD
-  // An anonymous sale: nobody's details are taken unless the buyer wants the tickets sent. Then the
-  // order belongs to the account for that address, made unclaimed if there is none, exactly as a
-  // phone reservation does, and the confirmation goes there. The till is told nothing about them. An
-  // order starts as a basket and moves on in the same batch, as one bought online does.
-  const accountId = input.sale.accountId
-    ? await pickedBuyer(input.sale.accountId)
-    : input.sale.email ? (await findOrCreateAccount(unit, { address: input.sale.email, origin: 'guest' })).accountId : null
-  unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, expires_at, keep, created_at, updated_at)
-    VALUES (${orderId}, ${newReference()}, 'desk', 'basket', ${accountId}, 0, ${currency}, ${totalMinor}, ${expiresAt}, 0, ${at}, ${at})`)
-  unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${orderId}, ${actor.accountId ?? null}, ${at}, ${at})`)
-  const claimed = (await claimSeats(unit, { holdId, requests: input.sale.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
-  guard(unit)
-  const redemptions = redeem(unit, orderId, discounts, claimed)
-  unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: discounts[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
-    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null,
-  })))
-  unit.expect(lines.length)
+  const plan = await deskSale(input.sale, at)
+  if (plan.totalMinor <= 0) {
+    if (plan.entryOf.some(Boolean)) refuse('box-office.desk.issue-instead', 'There is nothing to pay for these entries.', { status: 422, remedy: 'Book them from the box office panel, without the till.' })
+    refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })
+  }
+  const { order: { id: orderId } } = await writeDeskOrder(unit, input.sale, plan, at, at + DESK_HOLD)
   unit.add(sql`UPDATE box_office_orders SET state = 'awaiting_payment', session_id = ${context.sessionId}, sold_by = ${actor.accountId ?? null}, admit_on_payment = ${input.sale.admit ? 1 : 0}, updated_at = ${at}
     WHERE id = ${orderId} AND state = 'basket'`).expect(1)
-  unit.add(sql`UPDATE box_office_holds SET kind = 'payment', updated_at = ${at} WHERE id = ${holdId} AND kind = 'basket'`).expect(1)
-  return { owner: { module: 'box-office', record: orderId }, amountMinor: totalMinor }
+  unit.add(sql`UPDATE box_office_holds SET kind = 'payment', updated_at = ${at} WHERE order_id = ${orderId} AND kind = 'basket'`).expect(1)
+  return { owner: { module: 'box-office', record: orderId }, amountMinor: plan.totalMinor }
+}
+
+/**
+ * Writes a planned desk sale as a basket: its order, hold, seats, lines and passes. An anonymous
+ * sale: nobody's details are taken unless the buyer wants the tickets sent. Then the order belongs
+ * to the account for that address, made unclaimed if there is none, exactly as a phone reservation
+ * does, and the confirmation goes there. The till is told nothing about them. An order starts as a
+ * basket and moves on in the same batch, as one bought online does.
+ */
+async function writeDeskOrder(unit: UnitView, sale: SaleInput, plan: OrderPlan, at: number, expiresAt: number): Promise<{ order: OrderRow, lineIds: string[] }> {
+  const actor = useContext().actor
+  const holdId = newId('hold')
+  const order: OrderRow = {
+    id: newId('ord'), reference: newReference(), state: 'basket', account_id: await deskBuyer(unit, sale), currency: plan.currency, total_minor: plan.totalMinor, expires_at: expiresAt,
+    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
+  }
+  unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, sold_by, expires_at, keep, created_at, updated_at)
+    VALUES (${order.id}, ${order.reference}, 'desk', 'basket', ${order.account_id}, 0, ${order.currency}, ${order.total_minor}, ${order.sold_by}, ${expiresAt}, 0, ${at}, ${at})`)
+  unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${order.id}, ${actor.accountId ?? null}, ${at}, ${at})`)
+  // A pass's holder given by address is the account for it, made unclaimed if there is none.
+  // Each address once, and the buyer's own address is the buyer.
+  const made = new Map<string, string>(sale.email && order.account_id ? [[sale.email.toLowerCase(), order.account_id]] : [])
+  for (const p of plan.planned) {
+    const address = p.buy.email?.toLowerCase()
+    if (!address || p.judged.accountId) continue
+    if (!made.has(address)) made.set(address, (await findOrCreateAccount(unit, { address, origin: 'guest' })).accountId)
+    p.judged.accountId = made.get(address)!
+  }
+  const lineIds = await writeOrder(unit, plan, { orderId: order.id, holdId, expiresAt, issuedBy: actor.accountId ?? null }, at)
+  return { order, lineIds }
+}
+
+async function deskBuyer(unit: UnitView, sale: SaleInput): Promise<string | null> {
+  if (sale.accountId) return pickedBuyer(sale.accountId)
+  return sale.email ? (await findOrCreateAccount(unit, { address: sale.email, origin: 'guest' })).accountId : null
+}
+
+const FREE_HOLD = 60_000 // not-policy: the batch confirms the order it opens; the expiry only has to be in the future
+
+/**
+ * A desk sale with nothing to pay, such as a pass's entry for tonight (BO-64): booked and its
+ * tickets issued at once, with no payment, and admitted if the holder is going in now.
+ */
+export async function issueDeskSale(unit: UnitView, input: unknown): Promise<{ orderId: string, reference: string }> {
+  const actor = useContext().actor
+  const parsed = panelInput(input)
+  if (!('sale' in parsed)) refuse('box-office.desk.bad-input', 'The box office panel was not filled in properly.', { status: 422 })
+  const sale = parsed.sale
+  await requireAbility(actor, 'box-office.order.sell', ['core.performance', sale.performanceId])
+  const at = nowMs()
+  const plan = await deskSale(sale, at)
+  if (plan.totalMinor > 0) refuse('box-office.desk.to-pay', 'There is something to pay for this sale.', { status: 409, remedy: 'Take payment for it at the till.' })
+  const { order, lineIds } = await writeDeskOrder(unit, sale, plan, at, at + FREE_HOLD)
+  const types = new Map((await all<{ id: string, name: string, kind: string }>('SELECT id, name, kind FROM box_office_ticket_types')).map(t => [t.id, t]))
+  const lines: LineRow[] = plan.lines.map((l, i) => ({
+    id: lineIds[i]!, performance_id: plan.performanceId, band_id: l.bandId, ticket_type_id: l.ticketTypeId, amount_minor: 0,
+    type_name: plan.entryOf[i] && !l.priceId ? plan.entryOf[i]!.name : types.get(l.ticketTypeId)?.name ?? '', type_kind: types.get(l.ticketTypeId)?.kind ?? 'standard', band_name: null, pass_entry: plan.entryOf[i] ? 1 : 0,
+  }))
+  await confirmOrder(unit, order, lines, { from: 'basket', ...(sale.admit && actor.accountId ? { admitBy: actor.accountId } : {}) })
+  return { orderId: order.id, reference: order.reference }
 }
 
 /** Puts the till's payment on the order or exchange just prepared, so settling and releasing know it from any other. */
@@ -515,6 +595,8 @@ export interface DeskSold {
   buyer: string | null
   performance: { id: string, title: string, startsAt: number } | null
   lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[]
+  /** Passes sold or paid for: their codes, to hand over when nobody was named to send them to. */
+  passes: { name: string, priceName: string, code: string | null, holder: string | null }[]
 }
 
 /**
@@ -529,7 +611,7 @@ export async function deskSold(intentId: string): Promise<DeskSold[]> {
   return Promise.all(paid.map(async (order) => {
     const lines = await all<{ id: string, performance_id: string, band_name: string | null, type_name: string, amount_minor: number, admitted_at: number | null }>(
       `SELECT l.id, l.performance_id, CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name,
-          t.name AS type_name, l.amount_minor, k.admitted_at
+          COALESCE(CASE WHEN l.price_id IS NULL THEN (SELECT y.name || ' entry' FROM box_office_pass_redemptions d JOIN box_office_passes p ON p.id = d.pass_id JOIN box_office_pass_types y ON y.id = p.pass_type_id WHERE d.id = l.pass_redemption_id) END, t.name) AS type_name, l.amount_minor, k.admitted_at
         FROM box_office_order_lines l JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
         LEFT JOIN box_office_tickets k ON k.order_line_id = l.id AND k.state = 'valid'
         WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, order.id)
@@ -540,6 +622,7 @@ export async function deskSold(intentId: string): Promise<DeskSold[]> {
       buyer: order.account_id ? await accountLabel(order.account_id) : null,
       performance,
       lines: lines.map(l => ({ id: l.id, band: l.band_name, ticketType: l.type_name, amountMinor: l.amount_minor, admitted: l.admitted_at !== null })),
+      passes: await Promise.all((await passSalesOn(order.id)).map(async p => ({ name: p.name, priceName: p.priceName, code: p.code, holder: p.accountId ? await accountLabel(p.accountId) : null }))),
     }
   }))
 }

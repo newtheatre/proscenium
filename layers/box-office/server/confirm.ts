@@ -36,6 +36,10 @@ export interface ConfirmOptions {
   account?: { id: string, signedIn: boolean, madeWith?: { address: string } | null }
   /** Whether a message can link to the site: false where no request is at hand to take the address from. */
   link?: boolean
+  /** Issued at the desk with nothing to pay and the buyer standing there: admitted by this seller. */
+  admitBy?: string
+  /** Who holds each new pass on the order, by pass, where that is not the buyer: whoever paid for it in a split sale. */
+  passHolders?: ReadonlyMap<string, string>
 }
 
 const GONE = { code: 'box-office.order.gone', reason: 'This order is no longer waiting to be confirmed.', remedy: 'Start the booking again.' }
@@ -59,15 +63,16 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
     .expect(lines.length, options.from === 'basket' ? RAN_OUT : GONE)
 
   // Its passes are the buyer's and paid for: those bought with it, and any earlier one collected here.
-  await sendNewPasses(unit, order, accountId, true)
-  settlePassSales(unit, order.id, accountId, true, at)
+  await sendNewPasses(unit, order, accountId, true, options.passHolders)
+  settlePassSales(unit, order.id, accountId, true, at, options.passHolders)
 
   // Paid at the desk with the buyer standing there: admitted in the same batch, by whoever sold it.
-  const doorCodes = await issueTickets(unit, lines, options.from === 'awaiting_payment' && order.admit_on_payment && order.sold_by ? { by: order.sold_by, at } : undefined)
+  const doorCodes = await issueTickets(unit, lines, options.admitBy ? { by: options.admitBy, at } : options.from === 'awaiting_payment' && order.admit_on_payment && order.sold_by ? { by: order.sold_by, at } : undefined)
   const performanceIds = [...new Set(lines.map(l => l.performance_id))]
   unit.announce('box-office.order.confirmed', { orderId: order.id, performanceIds }, { record: ['box-office.order', order.id] })
   // An anonymous desk sale has nobody to write to: the seller hands over the tickets, or sends them afterwards.
-  const accountLinkSent = accountId ? await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}`, madeWith: options.account?.madeWith }) : false
+  // A pass sold on its own has no tickets: its own message has gone.
+  const accountLinkSent = accountId && lines.length ? await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}`, madeWith: options.account?.madeWith }) : false
   return { state: 'confirmed', orderId: order.id, reference: order.reference, currency: order.currency, totalMinor: order.total_minor, doorCodes, accountLinkSent, token }
 }
 
