@@ -1,10 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "3f8e9edd-8316-4bff-b9b3-34c4041cb16a",
+  "id": "f63e76e8-2b83-4c0e-b8dd-bd3854bdafcb",
   "prevIds": [
-    "274c2793-7965-4b1f-90f7-c25541e7b394",
-    "bed55595-6575-4b72-b9da-cc58e83359ba"
+    "62da3a2b-ff65-4830-b2e4-70c5b78fff29",
+    "755704ac-0132-4dfe-b40e-9002eded73b0"
   ],
   "ddl": [
     {
@@ -730,6 +730,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awarded_precision",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'day'",
       "generated": null,
       "entityType": "columns"
     },
@@ -5460,6 +5470,16 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_promo_codes",
+      "name": "not_with_requirements",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
