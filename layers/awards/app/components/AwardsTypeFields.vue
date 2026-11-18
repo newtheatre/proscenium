@@ -48,12 +48,12 @@ const visibilities = computed(() => (['public', 'members', 'hidden'] as const).m
       maxlength="500"
     />
   </UFormField>
-  <UCheckbox
+  <USwitch
     v-model="form.givesTicketBenefit"
     :label="t('awards.screens.type.ticket-benefit')"
     :description="t('awards.screens.type.ticket-benefit-help')"
   />
-  <UCheckbox
+  <USwitch
     v-model="form.onePerPerson"
     :label="t('awards.screens.type.one-per-person')"
     :description="t('awards.screens.type.one-per-person-help')"
