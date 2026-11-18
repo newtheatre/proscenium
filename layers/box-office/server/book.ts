@@ -58,7 +58,9 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     const answers = await requirements.check({ accounts: [account], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
     const met = answers.find(a => a.verdict === 'met' && !a.unavailable)
     if (met) judged.set(type.id, { most: met.quantity ?? type.maxPerHolder })
-    else if (answers.every(a => a.unavailable) || type.kind === 'companion') judged.set(type.id, null)
+    // A type that is not for this visitor at all (the source gives no reason, such as the Access
+    // ticket for a wheelchair user, who has the Wheelchair space) is left out too.
+    else if (answers.every(a => a.unavailable) || type.kind === 'companion' || !answers.some(a => a.reason)) judged.set(type.id, null)
     else {
       const described = await requirements.describe(type.requirementRefs)
       const reference = type.requirementRefs.map(ref => described[ref]?.presentable).find(Boolean)

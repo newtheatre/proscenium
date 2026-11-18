@@ -455,6 +455,74 @@ describe('a wheelchair space', () => {
   })
 })
 
+describe('an access ticket', () => {
+  /** Someone signed in who has applied to the access scheme with the given need, accepted when `decided`. */
+  async function onScheme(need: 'wheelchair-stays' | 'wheelchair-transfers', decided = true) {
+    const holder = person([])
+    await rows('INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, \'Access User\', \'self\', ?, ?)', holder.accountId, NOV_16, NOV_16)
+    const [term] = await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.access-need' AND slug = ?", need)
+    const scheme = await import('../../../core/server/identity/access-scheme')
+    await inContext(async () => {
+      const unit = createUnit()
+      await scheme.apply(unit.view(), holder, holder.accountId!, { needs: [{ term: term!.id }], companions: 0 })
+      await unit.commit()
+    }, holder)
+    if (decided) {
+      const reviewer = person(['core.access-scheme.review'])
+      await inContext(async () => {
+        const unit = createUnit()
+        await scheme.decide(unit.view(), reviewer, holder.accountId!, { action: 'accept' })
+        await unit.commit()
+      }, reviewer)
+    }
+    return holder
+  }
+  const offered = async (h: House, actor: ReturnType<typeof person>) => {
+    const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, actor)
+    expect(page.status, JSON.stringify(page.body)).toBe(200)
+    return page.body.bands[0].types as { name: string, amountMinor: number, most?: number, unmet?: string }[]
+  }
+
+  it('is kept by Box office and costs someone on the scheme the lowest price open to everyone', async () => {
+    const h = await house(20)
+    const access = await managed('box-office.access')
+    expect(access).toMatchObject({ name: 'Access', requirementRefs: ['core.access-scheme:seat'] })
+    const bought = await buy(h, access.id, 1, await onScheme('wheelchair-transfers'))
+    expect(bought.ok, JSON.stringify(bought)).toBe(true)
+    const [line] = await rows<{ amount_minor: number, requirement_evidence_id: string | null }>('SELECT amount_minor, requirement_evidence_id FROM box_office_order_lines WHERE order_id = ?', (bought as { orderId: string }).orderId)
+    expect(line).toEqual({ amount_minor: 800, requirement_evidence_id: null })
+    // An application still waiting is enough, flagged for staff, as for a wheelchair space.
+    const waiting = await buy(h, access.id, 1, await onScheme('wheelchair-transfers', false))
+    expect(waiting.ok, JSON.stringify(waiting)).toBe(true)
+    expect((await rows<{ e: string }>('SELECT requirement_evidence_id AS e FROM box_office_order_lines WHERE order_id = ?', (waiting as { orderId: string }).orderId))[0]!.e).toBe('pending')
+  })
+
+  it('is the one of the two each person sees: a wheelchair user has the wheelchair space, everyone else on the scheme the access ticket', async () => {
+    const h = await house(20)
+    const access = await managed('box-office.access')
+    const wheelchair = await managed('box-office.wheelchair')
+    const seated = await onScheme('wheelchair-transfers')
+    const rolling = await onScheme('wheelchair-stays')
+    expect(await buy(h, wheelchair.id, 1, seated)).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    expect(await buy(h, access.id, 1, rolling)).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    expect(await buy(h, access.id, 1, person([]))).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    await publish(h)
+
+    const names = (types: { name: string }[]) => types.map(t => t.name)
+    const forSeated = await offered(h, seated)
+    expect(names(forSeated)).toContain('Access')
+    expect(names(forSeated)).not.toContain('Wheelchair space')
+    expect(forSeated.find(t => t.name === 'Access')).toMatchObject({ amountMinor: 800, most: 1 })
+    const forRolling = await offered(h, rolling)
+    expect(names(forRolling)).toContain('Wheelchair space')
+    expect(names(forRolling)).not.toContain('Access')
+    // Someone not on the scheme is invited to apply for a wheelchair space only.
+    const forOthers = await offered(h, person([]))
+    expect(names(forOthers)).not.toContain('Access')
+    expect(forOthers.find(t => t.name === 'Wheelchair space')).toMatchObject({ unmet: 'Need a wheelchair space? Apply to the access scheme.' })
+  })
+})
+
 describe('where a type is sold', () => {
   it('keeps a box office only type off the booking page and online baskets, and an online only type off the desk', async () => {
     const h = await house(20)
