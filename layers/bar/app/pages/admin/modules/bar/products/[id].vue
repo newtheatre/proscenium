@@ -16,6 +16,7 @@ const { money } = await useMoney()
 const { dateTime } = useDates()
 const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
+const { offer } = useUndo()
 const id = computed(() => String(route.params.id))
 interface RecipeLine { id: string, stockItemId: string | null, choiceGroupId: string | null, quantity: number }
 interface StockItem { id: string, name: string, baseUnit: 'each' | 'ml' | 'g' }
@@ -73,6 +74,7 @@ async function save() {
 async function setActive(active: boolean) {
   try {
     await patch({ active })
+    offer(active ? t('bar.screens.product.restored') : t('bar.screens.product.retired'), () => patch({ active: !active }))
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
@@ -108,6 +110,10 @@ async function setSizeActive(v: Variant, active: boolean) {
   try {
     await $api(`/api/bar/variants/${v.id}` as string, { method: 'PATCH', body: { active } })
     await refresh()
+    offer(active ? t('bar.screens.product.size-restored', { name: v.name }) : t('bar.screens.product.size-retired', { name: v.name }), async () => {
+      await $api(`/api/bar/variants/${v.id}` as string, { method: 'PATCH', body: { active: !active } })
+      await refresh()
+    })
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
@@ -127,10 +133,20 @@ const priceBody = () => {
 const validatePrice = () => [...bodyErrors(priceInput, priceBody()), ...needs({ effectiveFrom: pricing.value?.later ? pricing.value.effectiveFrom : true })]
 async function savePrice() {
   refusal.value = null
+  const p = pricing.value!
+  // A price set from now that replaced the list's own can be undone by setting the old one again.
+  const was = priceOf(p.variant, p.list)
+  const undoable = !p.later && was?.from === 'list'
   try {
     await $api('/api/bar/prices', { method: 'POST', body: priceBody() })
     pricing.value = null
-    toast.add({ title: t('bar.screens.product.price-saved'), color: 'success' })
+    const back = { variantId: p.variant.id, priceListId: p.list.id, amountMinor: was?.amountMinor ?? null }
+    offer(t('bar.screens.product.price-saved'), undoable
+      ? async () => {
+        await $api('/api/bar/prices', { method: 'POST', body: back })
+        await refresh()
+      }
+      : undefined)
     await refresh()
   }
   catch (e) {
@@ -292,11 +308,12 @@ function planned(v: Variant, l: List): string | null {
             />
           </template>
           <FactStrip
+            class="max-sm:grid-cols-1! lg:grid-cols-4!"
             :facts="[
               { label: t('bar.screens.products.category'), value: data.categories.find(c => c.id === data!.product.categoryId)?.name ?? '' },
               { label: t('bar.screens.product.age-check'), value: (data.product.ageRestricted ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no')) + (data.product.ageFromCategory ? ` ${t('bar.screens.product.from-category')}` : '') },
               { label: t('bar.screens.product.choices'), value: groupNames || t('bar.screens.product.no-choices') },
-              { label: t('bar.screens.product.mixer'), value: isMixer ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no') },
+              { label: t('bar.screens.product.mixer'), value: isMixer ? t('bar.screens.product.mixer-yes') : t('bar.screens.product.mixer-no') },
             ]"
           />
         </PageSection>
@@ -347,12 +364,15 @@ function planned(v: Variant, l: List): string | null {
         </PageSection>
 
         <PageSection
-          v-for="v in data.product.variants"
+          v-for="v in data.product.variants.filter(x => x.active || !x.mixerMeasure)"
           :key="v.id"
           :title="v.active ? v.name : t('bar.screens.products.retired-name', { name: v.name })"
-          :description="v.barcode ? t('bar.screens.product.barcode-is', { barcode: v.barcode }) : undefined"
+          :description="v.mixerMeasure ? t('bar.screens.product.mixer-measure-help') : v.barcode ? t('bar.screens.product.barcode-is', { barcode: v.barcode }) : undefined"
         >
-          <template #actions>
+          <template
+            v-if="!v.mixerMeasure"
+            #actions
+          >
             <RowActions
               :label="t('bar.screens.product.size-actions', { name: v.name })"
               :items="[
@@ -363,7 +383,10 @@ function planned(v: Variant, l: List): string | null {
               ]"
             />
           </template>
-          <RecordList :label="t('bar.screens.product.prices-of', { name: v.name })">
+          <RecordList
+            v-if="!v.mixerMeasure || data.canStock"
+            :label="t('bar.screens.product.prices-of', { name: v.name })"
+          >
             <RecordListItem
               v-if="data.canStock"
               :name="t('bar.screens.product.recipe')"
@@ -379,7 +402,7 @@ function planned(v: Variant, l: List): string | null {
               />
             </RecordListItem>
             <RecordListItem
-              v-for="l in data.lists"
+              v-for="l in v.mixerMeasure ? [] : data.lists"
               :key="l.id"
               :name="l.name"
               :description="[shown(v, l), planned(v, l)].filter(Boolean).join(' · ')"

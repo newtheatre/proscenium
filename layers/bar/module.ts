@@ -8,6 +8,8 @@ import { ability, defineAbilities, defineModule, defineRecords, defineSettings, 
 import { tables } from './server/db/schema'
 
 const change = 'bar.settings.manage'
+// Reviews, re-checks and keeping records are counted in days: their controls offer no hours or seconds.
+const DAYS = ['week', 'day'] as const
 
 export default defineModule({
   id: 'bar',
@@ -24,11 +26,11 @@ export default defineModule({
     'age-check.minimum-age': setting.integer({ default: 18, min: 16, max: 25, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'age-check.challenge-age': setting.integer({ default: 25, min: 18, max: 30, change, audience: 'public', quotable: true }),
     'age-check.description': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
-    'age-check.review-every': setting.duration({ default: '7d', min: '1d', max: '90d', change, audience: 'staff' }),
-    'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
+    'age-check.review-every': setting.duration({ default: '7d', min: '1d', max: '90d', units: DAYS, change, audience: 'staff' }),
+    'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', units: DAYS, change, audience: 'staff', onChange: 'confirm' }),
     // Allergens (tab 10, approved 17 November): the till's sheet, the public chart, and how often a label is read again.
     'allergens.enabled': setting.boolean({ default: true, change, audience: 'staff' }),
-    'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', change, audience: 'staff' }),
+    'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', units: DAYS, change, audience: 'staff' }),
     'allergens.statement': setting.text({ default: '', maxLength: 400, multiline: true, change, audience: 'public' }),
     'allergens.publish': setting.boolean({ default: true, change, audience: 'staff' }),
     // Stocktakes (tab 3, "A stocktake"): whether counters see the expected level, and how small a
