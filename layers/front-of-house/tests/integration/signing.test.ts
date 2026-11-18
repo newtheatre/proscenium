@@ -223,7 +223,7 @@ describe('FH-5: a duty kept for people with the experience or the role', () => {
     const gated = await shift(p.id, await duty('Head usher', { requirements: [`core.role:${roleId}`] }))
     expect((await req('POST', `/api/front-of-house/shifts/${gated}/sign-up`, {}, vera)).body.code).toBe('front-of-house.not-eligible')
     await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, \'Vera\', \'staff\', ?) ON CONFLICT DO NOTHING').bind(vera.accountId, Date.now()).run()
-    await env.DB.prepare('INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES (?, ?, ?, \'site\', ?, ?, ?)').bind('gra_dutymanagersonly00000000', vera.accountId, roleId, Date.now() - 1000, vera.accountId, Date.now()).run()
+    await env.DB.prepare('INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES (?, ?, ?, \'site\', ?, ?, ?)').bind('gra_dutymanagersonly00000000', vera.accountId, roleId, 0, vera.accountId, 0).run()
     const now = await req('POST', `/api/front-of-house/shifts/${gated}/sign-up`, {}, vera)
     expect(now.status, JSON.stringify(now.body)).toBe(200)
   })
