@@ -108,6 +108,9 @@ export const PLACEMENT_STATUSES = ['active', 'paused', 'ended'] as const
 export const RESPONSE_STATES = ['draft', 'awaiting_payment', 'submitted', 'withdrawn'] as const
 export const STAGE_KINDS = ['pending', 'in_review', 'returned', 'approved', 'declined', 'closed'] as const
 export const RESPONSE_REALMS = ['audience', 'members'] as const
+export const ASSIGNMENT_STATUSES = ['assigned', 'submitted', 'conflicted'] as const
+export const CONFLICTS = ['declared', 'automatic'] as const
+export const VOTES = ['for', 'against', 'abstain'] as const
 /** The slot a standalone link occupies. Slots other modules declare come with slice 6. */
 export const LINK_SLOT = 'forms.link'
 
@@ -172,6 +175,8 @@ export const responses = defineTable('forms_responses', {
   currentRevision: col.internal(integer('current_revision').notNull().default(0)),
   // What staff wrote to the person with the latest move, such as what to change; gone when they send again.
   stageNote: col.freeText(text('stage_note'), { erase: 'clear' }),
+  /** Why the last decision was made, for the record. Never shown to the person who sent the response. */
+  decisionReason: col.freeText(text('decision_reason'), { erase: 'clear' }),
   // The account id, or a keyed hash of the address, where the placement allows one response each.
   uniqueKey: col.personal(text('unique_key'), { erase: 'clear' }),
   // What the form's calculations came to when it was sent.
@@ -278,4 +283,56 @@ export const stageHistory = defineTable('forms_stage_history', {
   ],
 })
 
-export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory }
+/**
+ * One round of review: a response's stay in a stage that asks for review (FB-405). A response that
+ * comes back to the stage starts a new round. Reviews are private until the round is released.
+ */
+export const reviewRounds = defineTable('forms_review_rounds', {
+  id: col.id(),
+  responseId: col.ref('forms_responses'),
+  formId: col.ref('forms_forms'),
+  stageKey: col.internal(text('stage_key').notNull()),
+  revision: col.internal(integer('revision').notNull()),
+  openedAt: col.timestamp('opened_at').notNull(),
+  releasedAt: col.timestamp('released_at'),
+  releasedBy: col.account('released_by', { role: 'actor', nullable: true }),
+  closedAt: col.timestamp('closed_at'),
+}, {
+  id: 'frnd',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [index('forms_review_rounds_response').on(t.responseId, t.openedAt)],
+})
+
+/**
+ * One reviewer's place in a round, and their review: marks against the criteria or a vote, and a
+ * comment. A reviewer with a conflict of interest keeps the row, marked, and holds no review (FB-406).
+ */
+export const reviewAssignments = defineTable('forms_review_assignments', {
+  id: col.id(),
+  roundId: col.ref('forms_review_rounds'),
+  responseId: col.ref('forms_responses'),
+  formId: col.ref('forms_forms'),
+  reviewerId: col.account('reviewer_id', { role: 'actor' }),
+  status: col.internal(text('status', { enum: ASSIGNMENT_STATUSES }).notNull().default('assigned')),
+  conflict: col.internal(text('conflict', { enum: CONFLICTS })),
+  vote: col.internal(text('vote', { enum: VOTES })),
+  scores: col.personal(text('scores'), { erase: 'clear' }),
+  comment: col.freeText(text('comment'), { erase: 'clear' }),
+  submittedAt: col.timestamp('submitted_at'),
+  createdAt: col.createdAt(),
+}, {
+  id: 'fasg',
+  realm: 'operational',
+  subject: { via: 'response_id' },
+  extra: t => [
+    uniqueIndex('forms_review_assignments_one').on(t.roundId, t.reviewerId),
+    index('forms_review_assignments_reviewer').on(t.reviewerId, t.status),
+    index('forms_review_assignments_response').on(t.responseId),
+    check('forms_review_assignments_status', sql`${t.status} IN (${inList(ASSIGNMENT_STATUSES)})`),
+    check('forms_review_assignments_conflict', sql`${t.conflict} IS NULL OR ${t.conflict} IN (${inList(CONFLICTS)})`),
+    check('forms_review_assignments_vote', sql`${t.vote} IS NULL OR ${t.vote} IN (${inList(VOTES)})`),
+  ],
+})
+
+export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments }

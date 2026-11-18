@@ -9,6 +9,7 @@ import type { Answers, DataClass, Definition, Entry, Evaluation, Question, Stage
 import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questionsOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow, VersionRow } from './forms'
+import { openRound } from './review'
 
 // ---- the link ----
 
@@ -80,9 +81,11 @@ export interface ResponseRow {
   stageNote: string | null
   currentRevision: number
   submittedAt: number | null
+  decidedAt: number | null
+  decisionReason: string | null
   createdAt: number
 }
-const RESPONSE = 'id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
+const RESPONSE = 'decided_at AS decidedAt, decision_reason AS decisionReason, id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
 export const getResponse = (id: string) => first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE id = ?`, id)
 
 /** Whether a response is this person's: by account, across any merged into it. A signed-out response is nobody's to come back to. */
@@ -274,6 +277,7 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const rows = await answerRows(def, evaluation.answers, s.responseId, 1)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   recordMove(unit, { responseId: s.responseId, from: null, to: stage, transitionKey: SUBMIT, revision: 1, actorId: s.actor.accountId ?? null, at: s.at })
+  await openRound(unit, { stage, formId: s.form.id, responseId: s.responseId, personId, revision: 1, at: s.at })
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
   unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
   return { reference }
@@ -358,7 +362,15 @@ export function words(answer: StoredAnswer, type: string | undefined): string {
 
 // ---- the responses of a form ----
 
-export interface ResponseFilter { from?: number, to?: number, questionId?: string, value?: string, stage?: string }
+export interface ResponseFilter {
+  from?: number
+  to?: number
+  questionId?: string
+  value?: string
+  stage?: string
+  /** The account reading: responses they have a conflict of interest on are left out (FB-406). */
+  reader?: string
+}
 export interface ListedResponse { id: string, reference: string, versionId: string, stageKey: string | null, stageKind: string | null, versionNumber: number, personId: string | null, personName: string | null, respondentEmail: string | null, submittedAt: number }
 
 function where(formId: string, filter: ResponseFilter): { sql: string, params: unknown[] } {
@@ -375,6 +387,10 @@ function where(formId: string, filter: ResponseFilter): { sql: string, params: u
   if (filter.stage !== undefined) {
     parts.push('r.stage_key = ?')
     params.push(filter.stage)
+  }
+  if (filter.reader !== undefined) {
+    parts.push('NOT EXISTS (SELECT 1 FROM forms_review_assignments c JOIN core_accounts me ON me.id = ? WHERE c.response_id = r.id AND c.status = \'conflicted\' AND (c.reviewer_id = me.id OR c.reviewer_id = me.merged_into_id OR c.reviewer_id IN (SELECT id FROM core_accounts WHERE merged_into_id = COALESCE(me.merged_into_id, me.id))))')
+    params.push(filter.reader)
   }
   if (filter.questionId !== undefined && filter.value !== undefined) {
     // A plain answer by its value; one of several choices by its place in the list. Sealed answers are never matched.

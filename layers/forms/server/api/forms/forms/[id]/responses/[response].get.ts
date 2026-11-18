@@ -7,8 +7,9 @@ import { can, defineRoute, refuse, requireAbility } from '#kit'
 import { getVersion, requireForm } from '../../../../../forms'
 import { getResponse, readAnswers } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
-import { hasStages, questionsOf, stageOf } from '../../../../../../shared/engine'
+import { hasStages, isDecision, questionsOf, stageOf } from '../../../../../../shared/engine'
 import { changedIn, historyOf, movesFor, stageIn } from '../../../../../stages'
+import { refuseConflicted, roundView } from '../../../../../review'
 
 const input = z.object({ reveal: z.enum(['1']).optional(), revision: z.coerce.number().int().min(1).optional() })
 
@@ -16,6 +17,7 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
   const form = await requireForm(record!.id)
   const response = await getResponse(getRouterParam(event, 'response') ?? '')
   if (!response || response.formId !== form.id || response.state !== 'submitted') return refuse('forms.response.not-found', 'There is no response here.', { status: 404 })
+  await refuseConflicted(actor, response.id)
   const version = (await getVersion(response.versionId))!
   const definition = JSON.parse(version.definition) as Definition
   const open = input.reveal === '1'
@@ -30,6 +32,8 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
   const staged = hasStages(definition)
   const stage = stageIn(definition, response)
   const mayMove = staged && (await can(actor, 'forms.response.move', ['forms.form', form.id])).allowed
+  const chair = staged && (await can(actor, 'forms.response.decide', ['forms.form', form.id])).allowed
+  const round = staged ? await roundView(definition, response.id, chair ? 'chair' : 'reader') : null
   return {
     response: { id: response.id, reference: response.reference, version: version.number, submittedAt: response.submittedAt, personId: response.personId, respondentEmail: response.respondentEmail },
     definition,
@@ -40,7 +44,10 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
     // The questions whose answers differ from the revision before this one.
     changed: await changedIn(response.id, revision),
     stage: staged ? { key: stage.key, name: stage.name, kind: stage.kind, note: response.stageNote } : null,
-    moves: mayMove ? (await movesFor(definition, response, actor)).map(t => ({ key: t.key, label: t.label, to: stageOf(definition, t.to)?.name ?? t.to, toKind: stageOf(definition, t.to)?.kind ?? 'closed' })) : [],
+    moves: mayMove ? (await movesFor(definition, response, actor)).map(t => ({ key: t.key, label: t.label, to: stageOf(definition, t.to)?.name ?? t.to, toKind: stageOf(definition, t.to)?.kind ?? 'closed', decision: isDecision(definition, t), needsReason: !!t.needsReason })) : [],
+    // The round of review the response is in or was last in: how far it has got, and its result once released.
+    review: round ? { ...round, canRelease: chair && round.open && !round.released } : null,
+    decision: response.decidedAt !== null ? { at: response.decidedAt, reason: chair ? response.decisionReason : null } : null,
     history: staged ? await historyOf(definition, response.id) : [],
   }
 })

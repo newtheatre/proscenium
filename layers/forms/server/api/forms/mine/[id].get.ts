@@ -5,7 +5,7 @@ import { defineRoute, refuse, today } from '#kit'
 import { getForm, getVersion } from '../../../forms'
 import { getResponse, owns, readAnswers, toAnswers } from '../../../responses'
 import type { Definition } from '../../../../shared/engine'
-import { questionsOf } from '../../../../shared/engine'
+import { questionsOf, withoutWorkflow } from '../../../../shared/engine'
 import { ownStatus } from '../../../stages'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
@@ -22,7 +22,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     values: progress?.canChange ? toAnswers(definition, answers) : null,
     response: { id: response.id, reference: response.reference, submittedAt: response.submittedAt },
     form: { title: form.title, slug: form.slug },
-    definition,
+    definition: withoutWorkflow(definition),
     answers,
     // Where it is now, in the words the form chose for the person, and whether it is back with them to change.
     progress,

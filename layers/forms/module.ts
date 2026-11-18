@@ -49,6 +49,8 @@ export default defineModule({
     'response.read': ability({ on: 'forms.form', owner: 'grants', audit: false }),
     // Moving a response between its form's stages; never one's own response (a guard in the service).
     'response.move': ability({ on: 'forms.form', owner: 'grants', implies: ['response.read'] }),
+    // Approving or declining, and releasing a round of reviews to its panel (FB-405, FB-407).
+    'response.decide': ability({ on: 'forms.form', owner: 'grants', implies: ['response.move'] }),
     'response.export': ability({ on: 'forms.form', risk: 'privileged', implies: ['response.read'] }),
     // Opening special-category answers. Every reveal is recorded.
     'response.read-special': ability({ on: 'forms.form', risk: 'privileged', audit: 'read', implies: ['response.read'] }),

@@ -5,7 +5,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
-const author = { kind: 'person', accountId: 'acc_formsauthor', name: 'Ada Author', assurance: 'strong', reassertedAt: Date.now(), grants: ['forms.form.create', 'forms.form.edit', 'forms.form.publish', 'forms.response.read', 'forms.response.move'].map(grant) }
+const author = { kind: 'person', accountId: 'acc_formsauthor', name: 'Ada Author', assurance: 'strong', reassertedAt: Date.now(), grants: ['forms.form.create', 'forms.form.edit', 'forms.form.publish', 'forms.response.read', 'forms.response.move', 'forms.response.decide'].map(grant) }
 const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 const member = { kind: 'person', accountId: `acc_stagesmember${run}`, name: 'Mo Member', assurance: 'strong', reassertedAt: Date.now(), grants: [] }
 test.use({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(author) }, viewport: { width: 1280, height: 900 } })

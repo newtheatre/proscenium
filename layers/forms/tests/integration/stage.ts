@@ -23,6 +23,11 @@ import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
 import mineOnePut from '../../server/api/forms/mine/[id].put'
 import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
+import releasePost from '../../server/api/forms/forms/[id]/responses/[response]/release.post'
+import reviewsGet from '../../server/api/forms/reviews/index.get'
+import reviewGet from '../../server/api/forms/reviews/[id].get'
+import reviewPut from '../../server/api/forms/reviews/[id].put'
+import conflictPost from '../../server/api/forms/reviews/[id]/conflict.post'
 import type { Definition, Question } from '../../shared/engine'
 
 export const handle = server({
@@ -46,6 +51,11 @@ export const handle = server({
   'GET /api/forms/mine/:id': mineOneGet,
   'PUT /api/forms/mine/:id': mineOnePut,
   'POST /api/forms/forms/:id/responses/:response/move': movePost,
+  'POST /api/forms/forms/:id/responses/:response/release': releasePost,
+  'GET /api/forms/reviews': reviewsGet,
+  'GET /api/forms/reviews/:id': reviewGet,
+  'PUT /api/forms/reviews/:id': reviewPut,
+  'POST /api/forms/reviews/:id/conflict': conflictPost,
 })
 
 export const NOV_17 = Date.UTC(2026, 10, 17, 12)

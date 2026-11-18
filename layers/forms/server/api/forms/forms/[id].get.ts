@@ -1,6 +1,8 @@
 // A form for its builder: the form, its draft and the versions published so far.
 import { getRouterParam } from 'h3'
-import { defineRoute, isRefusal, today } from '#kit'
+import { all, defineRoute, isRefusal, today } from '#kit'
+import { accountLabel } from '#modules/core'
+import type { Definition } from '../../../../shared/engine'
 import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
 
 export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record }) => {
@@ -12,12 +14,19 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     throw error
   })
   const live = versions.find(v => v.id === form.liveVersionId)
+  const definition = JSON.parse(draft.definition) as Definition
+  // For the stages editor: the roles a stage's reviewers can be the holders of, and the names of the people it names.
+  const named = [...new Set((definition.workflow?.stages ?? []).flatMap(s => s.review?.reviewers.people ?? []))]
+  const people: Record<string, string> = {}
+  for (const id of named) people[id] = await accountLabel(id)
+  const roles = await all<{ id: string, name: string }>('SELECT id, name FROM core_roles WHERE archived_at IS NULL ORDER BY fixed DESC, name')
   return {
     today: day,
     form: { id: form.id, slug: form.slug, title: form.title, mode: form.mode, status: form.status, anonymous: form.anonymous, retentionDays: form.retentionDays, retentionDeclinedDays: form.retentionDeclinedDays, liveVersion: live?.number ?? null, createdAt: form.createdAt, archivedAt: form.archivedAt },
-    draft: { definition: JSON.parse(draft.definition), editRevision: draft.editRevision, editedBy: await accountName(draft.editedBy), updatedAt: draft.updatedAt },
+    draft: { definition, editRevision: draft.editRevision, editedBy: await accountName(draft.editedBy), updatedAt: draft.updatedAt },
     // What has been published of each question: its type is fixed and its data class only rises.
     fields: fields.map(f => ({ questionId: f.questionId, key: f.key, type: f.type, dataClass: f.dataClass, retired: f.retiredInVersion !== null })),
+    reviewers: { roles, people },
     versions: versions.map(v => ({ id: v.id, number: v.number, publishedAt: v.publishedAt, publishedBy: v.publishedBy, summary: JSON.parse(v.changeSummary) })),
   }
 })

@@ -29,7 +29,7 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   const staged = !!liveDef && hasStages(liveDef)
   const all = columnsOf(await getFields(form.id), liveDef)
   const columns = all.filter(c => special || c.dataClass !== 'special')
-  const filter = { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage }
+  const filter = { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage, reader: actor.accountId ?? undefined }
   const most = await useSetting('forms.limits.export-rows') as number
 
   const lines: string[][] = []

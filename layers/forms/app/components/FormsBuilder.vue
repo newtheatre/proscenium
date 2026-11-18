@@ -288,7 +288,10 @@ const reload = () => window.location.reload()
       :form-id="form.id"
       :anonymous="form.anonymous"
     />
-    <FormsStagesDialog v-model:open="stages" />
+    <FormsStagesDialog
+      v-model:open="stages"
+      :reviewers="data.reviewers"
+    />
     <FormsSettingsDialog
       v-model:open="settings"
       :form="form"

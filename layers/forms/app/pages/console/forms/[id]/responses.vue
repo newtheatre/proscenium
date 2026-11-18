@@ -4,6 +4,7 @@
      who may open it asks to, and each time is recorded. -->
 <script setup lang="ts">
 import { parseDate, toZoned } from '@internationalized/date'
+import type { ReviewResult } from '../../../../components/FormsReviewResult.vue'
 import type { Definition } from '../../../../../shared/engine'
 import type { ShownAnswer } from '../../../../components/FormsAnswers.vue'
 
@@ -21,7 +22,7 @@ interface Table {
   canExport: boolean
   canReadSpecial: boolean
 }
-interface Move { key: string, label: string, to: string, toKind: string }
+interface Move { key: string, label: string, to: string, toKind: string, decision: boolean, needsReason: boolean }
 interface One {
   response: { id: string, reference: string, version: number, submittedAt: number, respondentEmail: string | null }
   definition: Definition
@@ -33,6 +34,8 @@ interface One {
   stage: (Stage & { note: string | null }) | null
   moves: Move[]
   history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null }[]
+  review: (ReviewResult & { stage: string, mode: 'scores' | 'vote', open: boolean, released: boolean, conflicted: number, canRelease: boolean }) | null
+  decision: { at: number, reason: string | null } | null
 }
 
 definePageMeta({ layout: 'console' })
@@ -123,20 +126,44 @@ watch(openId, (id) => {
 const revisionItems = computed(() => Array.from({ length: one.value?.revisions ?? 0 }, (_, i) => ({ value: i + 1, label: t(i + 1 === one.value!.revisions ? 'forms.screens.responses.revision-latest' : 'forms.screens.responses.revision-n', { n: i + 1 }) })).reverse())
 const revision = computed({ get: () => one.value?.revision, set: (n: number | undefined) => { load(revealed.value, n) } })
 
+// ---- releasing its reviews to the panel ----
+const releasing = ref(false)
+async function release() {
+  if (!one.value) return
+  releasing.value = true
+  try {
+    await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/release` as string, { method: 'POST' })
+    toast.add({ title: t('forms.screens.review.released'), color: 'success' })
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+  releasing.value = false
+  await load()
+}
+
 // ---- moving it to another stage ----
 const moving = ref<Move | null>(null)
 const note = ref('')
 const sending = ref(false)
 const moveOpen = computed({ get: () => !!moving.value, set: (v: boolean) => { if (!v) moving.value = null } })
+const reason = ref('')
+const reasonError = ref<string | undefined>()
 function choose(move: Move) {
   note.value = ''
+  reason.value = ''
+  reasonError.value = undefined
   moving.value = move
 }
 async function move() {
   if (!moving.value || !one.value) return
+  // A decision that must carry a reason says so beside the box, and nothing is sent without one.
+  reasonError.value = moving.value.needsReason && !reason.value.trim() ? t('forms.screens.responses.reason-needed') : undefined
+  if (reasonError.value) return
   sending.value = true
   try {
-    await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/move` as string, { method: 'POST', body: { move: moving.value.key, note: note.value.trim() || null } })
+    await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/move` as string, { method: 'POST', body: { move: moving.value.key, note: note.value.trim() || null, reason: reason.value.trim() || null } })
     toast.add({ title: t('forms.screens.responses.moved', { reference: one.value.response.reference, stage: moving.value.to }), color: 'success' })
     moving.value = null
   }
@@ -315,6 +342,43 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               {{ t('forms.screens.responses.note-sent', { note: one.stage.note }) }}
             </p>
           </section>
+          <section
+            v-if="one.review"
+            class="space-y-3 rounded-md border border-default p-3"
+            :aria-label="t('forms.screens.review.title')"
+          >
+            <h3 class="text-sm font-medium text-muted">
+              {{ t('forms.screens.review.in-stage', { stage: one.review.stage }) }}
+            </h3>
+            <FormsReviewResult
+              :result="one.review"
+              :mode="one.review.mode"
+              :released="one.review.released"
+            />
+            <p
+              v-if="one.review.conflicted"
+              class="text-sm text-muted"
+            >
+              {{ t('forms.screens.review.conflicts', { n: one.review.conflicted }) }}
+            </p>
+            <UButton
+              v-if="one.review.canRelease"
+              :label="t('forms.screens.review.release')"
+              icon="i-lucide-eye"
+              size="sm"
+              color="neutral"
+              variant="outline"
+              :loading="releasing"
+              @click="release"
+            />
+          </section>
+          <p
+            v-if="one.decision?.reason"
+            class="text-sm"
+          >
+            <span class="font-medium">{{ t('forms.screens.responses.reason-kept') }}</span>
+            {{ one.decision.reason }}
+          </p>
           <UFormField
             v-if="one.revisions > 1"
             :label="t('forms.screens.responses.revision')"
@@ -362,6 +426,20 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
       :description="moving ? t('forms.screens.responses.move-help', { stage: moving.to }) : undefined"
     >
       <template #body>
+        <UFormField
+          v-if="moving?.decision"
+          class="mb-4"
+          :label="t('forms.screens.responses.reason')"
+          :help="t('forms.screens.responses.reason-help')"
+          :hint="moving.needsReason ? undefined : t('forms.screens.details.optional')"
+          :error="reasonError"
+        >
+          <UTextarea
+            v-model="reason"
+            :rows="3"
+            autoresize
+          />
+        </UFormField>
         <UFormField
           :label="t('forms.screens.responses.note')"
           :help="t('forms.screens.responses.note-help')"
