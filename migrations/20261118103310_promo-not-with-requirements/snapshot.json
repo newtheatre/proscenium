@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "bbe84602-7a48-4092-bc0b-d2eaa2dbd2cb",
+  "id": "755704ac-0132-4dfe-b40e-9002eded73b0",
   "prevIds": [
     "274c2793-7965-4b1f-90f7-c25541e7b394"
   ],
@@ -5459,6 +5459,16 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_promo_codes",
+      "name": "not_with_requirements",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -16765,16 +16775,6 @@
     {
       "table": "membership_verification_lists",
       "name": "reference_label",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "membership_verification_lists",
-      "name": "reference_noun",
       "type": "text",
       "notNull": false,
       "autoincrement": false,

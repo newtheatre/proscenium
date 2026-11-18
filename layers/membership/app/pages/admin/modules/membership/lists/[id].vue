@@ -6,10 +6,10 @@
 import { z } from 'zod'
 
 interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
-interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null, referenceLabel: string | null, referenceNoun: string | null, referenceShape: Shape | null, uploadedAt: number }
-interface Detail { list: List, schemes: { id: string, name: string }[] }
+interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null, referenceLabel: string | null, referenceNoun: string | null, referenceShape: Shape | null, uploadedAt: number, loaded: boolean }
+interface Detail { list: List, schemes: { id: string, name: string }[], keySet: boolean }
 interface Loaded { loaded: number, wouldLoad?: number, refused: { line: number, reason: string }[] }
-interface Checked { found: boolean, current?: boolean, endsOn?: string | null, name?: string | null, claimed?: boolean }
+interface Checked { found: boolean, malformed?: boolean, shape?: Shape | null, current?: boolean, endsOn?: string | null, name?: string | null, claimed?: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -103,6 +103,17 @@ const checkSchema = z.object({ checking: z.string().trim().min(1).max(254) }) //
 async function check() {
   checked.value = await $api<Checked>(`${base.value}/check` as string, { method: 'POST', body: { value: checking.value } })
 }
+const checkedDescription = computed(() => {
+  const c = checked.value
+  if (!c) return undefined
+  if (c.malformed) return c.shape ? t(`membership.screens.list.malformed-${c.shape.kind}`, { min: c.shape.min, max: c.shape.max }) : undefined
+  if (!c.found) return undefined
+  return [
+    c.name ? t('membership.screens.list.name-is', { name: c.name }) : t('membership.screens.list.no-name'),
+    c.endsOn ? t(c.current ? 'membership.screens.list.ends' : 'membership.screens.list.ended', { date: day(c.endsOn) }) : '',
+    c.claimed ? t('membership.screens.list.claimed') : '',
+  ].filter(Boolean).join(' ')
+})
 watch(checking, () => {
   checked.value = null
 })
@@ -150,7 +161,7 @@ const facts = computed(() => {
     { label: t('membership.screens.list.fact-holds'), value: t(`membership.screens.lists.kinds.${l.keyKind}`) },
     { label: t('membership.screens.list.fact-entries'), value: String(l.entryCount) },
     ...(l.validUntil ? [{ label: t('membership.screens.list.valid-until'), value: day(l.validUntil) }] : []),
-    { label: t('membership.screens.list.fact-loaded'), value: l.uploadedAt ? day(new Date(l.uploadedAt)) : t('membership.screens.list.fact-never') },
+    { label: t('membership.screens.list.fact-loaded'), value: l.loaded ? day(new Date(l.uploadedAt)) : t('membership.screens.list.fact-never') },
     { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme') },
   ]
 })
@@ -175,6 +186,7 @@ const facts = computed(() => {
       <UButton
         icon="i-lucide-upload"
         :label="t('membership.screens.list.load')"
+        :disabled="!data?.keySet"
         @click="loading = true"
       />
       <RowActions
@@ -193,6 +205,23 @@ const facts = computed(() => {
         v-if="data && list"
         class="space-y-6"
       >
+        <UAlert
+          v-if="!data.keySet"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-key-round"
+          :title="t('membership.screens.lists.no-key')"
+        >
+          <template #description>
+            {{ t('membership.screens.list.no-key-here') }}
+            <ULink
+              to="/admin/modules/membership/lists"
+              class="font-medium underline"
+            >
+              {{ t('membership.screens.list.no-key-link') }}
+            </ULink>
+          </template>
+        </UAlert>
         <FactStrip :facts="facts" />
 
         <PageSection
@@ -229,11 +258,11 @@ const facts = computed(() => {
           </UForm>
           <UAlert
             v-if="checked"
-            :color="checked.found && checked.current ? 'success' : 'neutral'"
+            :color="checked.found && checked.current ? 'success' : checked.malformed ? 'warning' : 'neutral'"
             variant="subtle"
             :icon="checked.found && checked.current ? 'i-lucide-circle-check' : 'i-lucide-circle-x'"
-            :title="!checked.found ? t('membership.screens.list.not-on') : checked.current ? t('membership.screens.list.on') : t('membership.screens.list.on-ended')"
-            :description="checked.found ? [checked.name ? t('membership.screens.list.name-is', { name: checked.name }) : t('membership.screens.list.no-name'), checked.endsOn ? t('membership.screens.list.ends', { date: day(checked.endsOn) }) : '', checked.claimed ? t('membership.screens.list.claimed') : ''].filter(Boolean).join(' ') : undefined"
+            :title="checked.malformed ? t('membership.screens.list.malformed') : !checked.found ? t('membership.screens.list.not-on') : checked.current ? t('membership.screens.list.on') : t('membership.screens.list.on-ended')"
+            :description="checkedDescription"
           />
         </PageSection>
 
@@ -241,6 +270,7 @@ const facts = computed(() => {
           <UForm
             id="membership-list-details"
             :state="details"
+            :validate="() => listErrors({ name: details.name, referenceLabel: list?.keyKind === 'reference' ? details.referenceLabel : undefined })"
             class="space-y-4"
             novalidate
             @submit="saveDetails"
