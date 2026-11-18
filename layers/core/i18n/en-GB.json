@@ -541,6 +541,7 @@
   "core.credentials.remove": "Remove",
   "core.credentials.replace-action": "Replace",
   "core.credentials.cancel": "Cancel",
+  "core.credentials.generate": "Generate",
   "core.credentials.title": "Keys",
   "core.credentials.description": "Kept encrypted and never shown again once saved. A key set as a Worker secret in Cloudflare is used until one is saved here.",
   "core.credentials.save": "Save keys",

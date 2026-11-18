@@ -7,6 +7,7 @@ const props = defineProps<{ module: string, view: ModuleView | undefined }>()
 const { t } = useT()
 const { nameOf, listOf, screensOf } = useModuleWords()
 const screens = computed(() => props.view ? screensOf(props.view) : [])
+const version = computed(() => props.view ? [props.view.since, ...(props.view.stability === 'stable' ? [] : [t(`core.modules.stability.${props.view.stability}`).toLocaleLowerCase('en-GB')])].join(', ') : '')
 const needed = (n: 'always' | 'when-used' | 'optional') => t(`core.modules.about.needed.${n}`)
 </script>
 
@@ -39,11 +40,7 @@ const needed = (n: 'always' | 'when-used' | 'optional') => t(`core.modules.about
         <dt class="text-muted">
           {{ t('core.modules.about.since') }}
         </dt>
-        <dd>
-          {{ view.since }}<template v-if="view.stability !== 'stable'">
-            , {{ t(`core.modules.stability.${view.stability}`).toLocaleLowerCase('en-GB') }}
-          </template>
-        </dd>
+        <dd>{{ version }}</dd>
       </dl>
       <p
         v-if="view.stability === 'experimental'"

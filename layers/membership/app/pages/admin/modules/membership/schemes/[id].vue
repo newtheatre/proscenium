@@ -301,6 +301,13 @@ async function addMember() {
                 :key="item.code"
               >
                 {{ t(`membership.screens.checklist.${item.code}`) }}
+                <ULink
+                  v-if="item.code === 'verifier'"
+                  to="/admin/modules/membership/lists"
+                  class="font-medium underline"
+                >
+                  {{ t('membership.screens.scheme.list-manage') }}
+                </ULink>
               </li>
             </ul>
           </template>
