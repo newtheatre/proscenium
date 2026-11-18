@@ -39,8 +39,13 @@ const countryItems = computed(() => (setup.value?.countries ?? [])
   .map(c => ({ value: c, label: catalogueLabel('country', c, language.value) }))
   .sort((a, b) => a.label.localeCompare(b.label, language.value)))
 
+// Each step is a form the page handles itself: pressed before the page has woken up, its button would
+// submit natively and reload setup with everything typed lost. So it waits until the page is live.
+const live = ref(false)
+
 // The browser's own zone and region are the likeliest answers, so they come chosen.
 onMounted(() => {
+  live.value = true
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   if (!theatre.timeZone && zone && setup.value?.timeZones?.includes(zone)) theatre.timeZone = zone
   const region = navigator.languages?.map(l => l.split('-')[1]?.toUpperCase()).find(r => r && setup.value?.countries?.includes(r))
@@ -127,6 +132,7 @@ const description = computed(() => {
       <UButton
         type="submit"
         block
+        :disabled="!live"
         trailing-icon="i-lucide-arrow-right"
       >
         Next
@@ -195,6 +201,7 @@ const description = computed(() => {
           block
           icon="i-lucide-key-round"
           :loading="busy"
+          :disabled="!live"
         >
           Make my passkey
         </UButton>
