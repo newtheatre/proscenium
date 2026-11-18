@@ -115,7 +115,7 @@ async function noViolations(page: Page) {
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
 
-async function payCash(page: Page, amount: string) {
+async function payCash(page: Page, amount: string, afterSale?: () => Promise<void>) {
   await cash(page).click()
   await expect(page.getByText(`Still to pay: ${amount}`)).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
@@ -123,6 +123,7 @@ async function payCash(page: Page, amount: string) {
   await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
   // The sale stays on screen, with its booking, until the next customer.
   await expect(page.getByRole('heading', { name: /^Booking / })).toBeVisible()
+  await afterSale?.()
   await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 }
@@ -143,7 +144,25 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await page.getByRole('checkbox', { name: 'Admit now' }).check()
   await expect(payButton(page, '£24.00')).toBeEnabled()
   await noViolations(page)
-  await payCash(page, '£24.00')
+  await payCash(page, '£24.00', async () => {
+    // The tickets print from the sale: a page of their own, one ticket to a block, each with its code.
+    const reference = (await page.getByRole('heading', { name: /^Booking / }).textContent())!.replace(/^Booking /, '').trim()
+    const [printout] = await Promise.all([page.waitForEvent('popup'), page.getByRole('link', { name: 'Print tickets' }).click()])
+    await expect(printout.getByRole('heading', { level: 1, name: `Tickets for ${reference}` })).toBeVisible()
+    const tickets = printout.getByRole('list', { name: 'Tickets' }).getByRole('listitem')
+    await expect(tickets).toHaveCount(2)
+    await expect(tickets.first()).toContainText('The Desk Show')
+    await expect(tickets.first()).toContainText(typeName)
+    await expect(tickets.first()).toContainText(`Booking ${reference}`)
+    await expect(printout.getByRole('img', { name: `Ticket code ${reference}-1` })).toBeVisible()
+    await expect(printout.getByRole('img', { name: `Ticket code ${reference}-2` })).toBeVisible()
+    await noViolations(printout)
+    // On paper only the tickets show: the buttons stay on screen.
+    await printout.emulateMedia({ media: 'print' })
+    await expect(printout.getByRole('button', { name: 'Print' })).toBeHidden()
+    await expect(tickets).toHaveCount(2)
+    await printout.close()
+  })
   // Back for the next customer, the panel shows what is left after the sale without a reload.
   await expect(tile).toBeVisible()
   await expect(left).toHaveText(`${before - 2} left`)

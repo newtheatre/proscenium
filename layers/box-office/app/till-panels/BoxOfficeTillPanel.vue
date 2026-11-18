@@ -516,6 +516,14 @@ function clear() {
           @click="admitSold(o)"
         />
         <UButton
+          :to="`/console/box-office/orders/${o.orderId}/print`"
+          target="_blank"
+          icon="i-lucide-printer"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.screens.panel.sold.print')"
+        />
+        <UButton
           :to="`/console/box-office/orders/${o.orderId}`"
           icon="i-lucide-external-link"
           color="neutral"

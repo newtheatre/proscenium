@@ -315,6 +315,13 @@ describe('selling at the desk', () => {
     expect(o.lines).toEqual([expect.objectContaining({ ticketType: 'Full price', amountMinor: 1200, admitted: false }), expect.objectContaining({ admitted: false })])
     const before = await rows<{ code_hash: string }>('SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? ORDER BY k.id', o.orderId)
 
+    // Printed at the till: each ticket with its show, type, number and the code the door scans.
+    const printed = await req('GET', `/api/box-office/desk/orders/${o.orderId}/tickets`, undefined, seller)
+    expect(printed.status, JSON.stringify(printed.body)).toBe(200)
+    expect(printed.body.reference).toBe(o.reference)
+    expect(printed.body.tickets).toEqual([1, 2].map(n => expect.objectContaining({ number: `${o.reference}-${n}`, ticketType: 'Full price', holder: null, admitted: false, doorCode: expect.stringMatching(/^tkt\./), startsAt: o.performance.startsAt })))
+    expect((await req('GET', `/api/box-office/desk/orders/${o.orderId}/tickets`, undefined, onlooker)).status).toBe(403)
+
     expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'after@example.org' }, onlooker, { 'idempotency-key': `send-${o.orderId}-x` })).status).toBe(403)
     const sent = await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'After.Sale@Example.org' }, seller, { 'idempotency-key': `send-${o.orderId}` })
     expect(sent.status, JSON.stringify(sent.body)).toBe(200)
