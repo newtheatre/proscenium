@@ -14,8 +14,12 @@ import { entitle, type Buyer, type Requirement } from './entitlement'
 import { applyCode, judgeCode, redeem } from './promo-codes'
 import { sellableTypes, soldOn } from './ticket-types'
 
-/** `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs for a member price. */
-export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[] }
+/**
+ * `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs
+ * for a member price. `holders`, at the desk: the account named for each ticket in turn, found by
+ * their card or by name, for a type with requirements.
+ */
+export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[], holders?: string[] }
 /** `promoCode`, as the buyer typed it (BO-17). */
 export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string }
 
@@ -66,10 +70,11 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
   const each = asked.flatMap(l => Array.from({ length: l.quantity }, (_, n) => {
     const p = lowered.get(`${l.bandId} ${l.ticketTypeId}`) ?? price.get(`${l.bandId} ${l.ticketTypeId}`)!
     const reference = l.references?.[n]?.trim() || undefined
-    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor, ...(reference ? { reference } : {}) }
+    const holder = buyer.channel === 'desk' ? l.holders?.[n] || undefined : undefined
+    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor, ...(reference ? { reference } : {}), ...(holder ? { holder } : {}) }
   }))
   const entitled = await entitle(performanceId, each, types, buyer)
-  const lines = each.map(({ reference: _typed, ...l }, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
+  const lines = each.map(({ reference: _typed, holder: _named, ...l }, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
   return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
 }
 

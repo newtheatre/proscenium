@@ -23,6 +23,11 @@ export default {
     return card?.id ?? null
   },
 
+  /** The award's holder, for the till, which then checks the ticket's requirement against their account. */
+  async holder(code: string): Promise<string | null> {
+    return (await first<{ account_id: string }>('SELECT account_id FROM awards_awards WHERE id = ?', code))?.account_id ?? null
+  },
+
   /** What the award is and whether it is current: never the holder's name. */
   async resolve(code: string): Promise<{ headline: string, line: string, state: 'ok' | 'attention' } | null> {
     const card = await first<{ name: string, state: string, awarded_on: string, benefit: number }>(
