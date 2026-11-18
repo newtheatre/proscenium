@@ -30,7 +30,8 @@ const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: Location[], currency: string, categories: { id: string, name: string }[], venues: Venue[] }>('/api/bar/stock', { key: 'bar:stock' })
+type Answer = { contains: string[], mayContain: string[], checked: boolean, checkedAt: number | null }
+const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: Location[], currency: string, categories: { id: string, name: string }[], venues: Venue[], canAllergens: boolean, allergens: Record<string, Answer> }>('/api/bar/stock', { key: 'bar:stock' })
 
 const unitItems = computed(() => (['each', 'ml', 'g'] as const).map(u => ({ value: u, label: t(`bar.screens.stock.units.${u}`) })))
 const categoryItems = computed(() => [{ value: 'none', label: t('bar.screens.stock.no-category') }, ...(data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name }))])
@@ -49,9 +50,23 @@ function amount(item: Item, quantity: number): string {
   return t('bar.screens.stock.counted', { count: number(quantity / item.countUnitSize), base })
 }
 const locationName = (id: string) => data.value?.locations.find(l => l.id === id)?.name ?? ''
+const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
+// What the label says, for someone who records allergens: products made from the item answer with it.
+function allergenText(i: Item): string | null {
+  if (!data.value?.canAllergens) return null
+  const a = data.value.allergens[i.id]
+  if (!a?.checked) return t('bar.screens.product.allergens-unchecked')
+  if (!a.contains.length && !a.mayContain.length) return t('bar.screens.product.none-listed')
+  return [a.contains.length ? `${t('bar.screens.product.contains')}: ${named(a.contains)}` : null, a.mayContain.length ? `${t('bar.screens.product.may-contain')}: ${named(a.mayContain)}` : null].filter(Boolean).join(' · ')
+}
 function describeItem(i: Item): string {
   const where = i.levels.filter(l => l.quantity !== 0).map(l => `${locationName(l.locationId)} ${amount(i, l.quantity)}`)
-  return [t('bar.screens.stock.pack', { size: number(i.packSize, 0), unit: t(`bar.screens.stock.units.${i.baseUnit}`), pack: i.packName }), ...where].join(' · ')
+  return [t('bar.screens.stock.pack', { size: number(i.packSize, 0), unit: t(`bar.screens.stock.units.${i.baseUnit}`), pack: i.packName }), ...where, allergenText(i)].filter(Boolean).join(' · ')
+}
+const checking = ref<{ title: string, endpoint: string, contains: string[], mayContain: string[] } | null>(null)
+function checkLabel(i: Item) {
+  const a = data.value?.allergens[i.id]
+  checking.value = { title: t('bar.screens.choices.allergens-of', { name: i.name }), endpoint: `/api/bar/stock/items/${i.id}/allergens`, contains: a?.contains ?? [], mayContain: a?.mayContain ?? [] }
 }
 
 const item = ref<{ id: string | null, name: string, categoryId: string, baseUnit: Unit, packSize: number | null, packName: string, countUnitSize: number | null, costMinor: number | null, reorderLevel: number | null, weighed: boolean, fullWeightG: number | null, emptyWeightG: number | null, moved: boolean } | null>(null)
@@ -168,6 +183,7 @@ async function setActive(path: string, active: boolean) {
                 :label="t('bar.screens.stock.item-actions', { name: i.name })"
                 :items="[
                   { label: t('bar.screens.stock.edit-item'), icon: 'i-lucide-pencil', onSelect: () => editItem(i) },
+                  ...(data.canAllergens ? [{ label: t('bar.screens.product.check-label'), icon: 'i-lucide-clipboard-check', onSelect: () => checkLabel(i) }] : []),
                   i.active
                     ? { label: t('bar.screens.stock.retire-item'), icon: 'i-lucide-archive', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, false) }
                     : { label: t('bar.screens.stock.restore-item'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, true) },
@@ -454,5 +470,11 @@ async function setActive(path: string, active: boolean) {
         />
       </template>
     </UModal>
+    <BarAllergenDialog
+      :target="checking"
+      :help="t('bar.screens.stock.allergens-help')"
+      @close="checking = null"
+      @saved="checking = null; refresh()"
+    />
   </PageFrame>
 </template>
