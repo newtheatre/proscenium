@@ -30,8 +30,9 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
       ORDER BY m.starts_on DESC, m.id`,
     accountId,
   )
-  const pending = await all<{ id: string, schemeId: string, schemeName: string, appliedAt: number, expiresAt: number | null, waitingOnStaff: number }>(
-    `SELECT m.id, m.scheme_id AS schemeId, s.name AS schemeName, m.created_at AS appliedAt, m.expires_at AS expiresAt, (m.needs_verification = 1 AND m.verified_at IS NULL) AS waitingOnStaff
+  const pending = await all<{ id: string, schemeId: string, schemeName: string, appliedAt: number, expiresAt: number | null, waitingOnStaff: number, reason: string | null }>(
+    `SELECT m.id, m.scheme_id AS schemeId, s.name AS schemeName, m.created_at AS appliedAt, m.expires_at AS expiresAt, (m.needs_verification = 1 AND m.verified_at IS NULL) AS waitingOnStaff,
+            (SELECT v.reason FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC, v.id DESC LIMIT 1) AS reason
        FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id
       WHERE m.account_id IN (${accountScopeSql('?1')}) AND m.state = 'pending' ORDER BY m.created_at`,
     accountId,

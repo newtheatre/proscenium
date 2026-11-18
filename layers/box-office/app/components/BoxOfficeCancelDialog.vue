@@ -55,7 +55,14 @@ async function cancel() {
     })
     open.value = false
     emit('cancelled', { refund: result?.refund ?? null })
-    toast.add({ title: t('box-office.order.cancel.done'), color: 'success' })
+    // Say what happens to the money, so a refund waiting for approval is not missed.
+    const refund = result?.refund
+    const amount = refund ? money(refund.amountMinor, props.currency) : ''
+    toast.add({
+      title: t(props.paid ? 'box-office.order.cancel.done' : 'box-office.order.cancel.reservation-done'),
+      description: refund ? t(refund.state === 'requested' ? 'box-office.order.cancel.refund-waiting' : 'box-office.order.cancel.refund-approved', { amount }) : undefined,
+      color: 'success',
+    })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -66,8 +73,8 @@ async function cancel() {
 <template>
   <UModal
     v-model:open="open"
-    :title="t('box-office.order.cancel.title')"
-    :description="t('box-office.order.cancel.description', { reference })"
+    :title="t(paid ? 'box-office.order.cancel.title' : 'box-office.order.cancel.reservation-title')"
+    :description="t(paid ? 'box-office.order.cancel.description' : 'box-office.order.cancel.reservation-description', { reference })"
   >
     <template #body>
       <UForm
@@ -133,7 +140,7 @@ async function cancel() {
       <UButton
         type="submit"
         form="box-office-cancel"
-        :label="t('box-office.order.cancel.button')"
+        :label="t(paid ? 'box-office.order.cancel.button' : 'box-office.order.cancel.reservation-title')"
         color="error"
       />
     </template>

@@ -3,7 +3,7 @@
      priced by hand are set from each product's page, or raised together, with a preview of old and new. -->
 <script setup lang="ts">
 interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null }
-interface Variant { id: string, name: string, active: boolean, prices: VariantPrice[] }
+interface Variant { id: string, name: string, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, name: string, active: boolean, variants: Variant[] }
 interface Category { id: string, name: string, active: boolean, products: Product[] }
 interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
@@ -19,7 +19,8 @@ const list = computed(() => data.value?.lists.find(l => l.id === String(route.pa
 const standard = computed(() => data.value?.lists.find(l => l.standard))
 const trail = computed(() => [{ label: t('bar.navigation.price-lists.label'), to: '/admin/modules/bar/price-lists' }])
 
-const sizeName = (p: Product, v: Variant) => p.variants.length === 1 && v.name === 'Each' ? p.name : `${p.name}, ${v.name}`
+// The mixer measure is priced by the Mixer choices, never on a list, so it is not shown.
+const sizeName = (p: Product, v: Variant) => p.variants.filter(x => !x.mixerMeasure).length === 1 && v.name === 'Each' ? p.name : `${p.name}, ${v.name}`
 function here(v: Variant): string {
   const p = v.prices.find(x => x.listId === list.value?.id)
   if (!p || p.amountMinor === null) return t('bar.screens.product.not-sold')
@@ -116,7 +117,7 @@ function onStandard(v: Variant): string {
               :key="p.id"
             >
               <RecordListItem
-                v-for="v in p.variants.filter(v => v.active)"
+                v-for="v in p.variants.filter(v => v.active && !v.mixerMeasure)"
                 :key="v.id"
                 :to="`/admin/modules/bar/products/${p.id}`"
                 :name="sizeName(p, v)"
