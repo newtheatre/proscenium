@@ -22,11 +22,14 @@ export type ProblemCode
     | 'stage-no-name' | 'stage-duplicate' | 'move-no-label' | 'move-duplicate' | 'move-unknown-stage' | 'move-nowhere'
     | 'returned-no-way-back' | 'stage-unreachable' | 'stage-dead-end'
     | 'review-wrong-kind' | 'review-no-reviewers' | 'review-no-criteria' | 'criterion-no-label' | 'review-quorum' | 'reason-not-decision'
+    | 'unknown-action' | 'action-unmapped' | 'action-wrong-question'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
   /** Sources that modules switched on now contribute. Left out, sources are not checked. */
   sources?: readonly string[]
+  /** Outcome actions that modules switched on now contribute, with what each asks for. Left out, actions are not checked. */
+  actions?: readonly { key: string, inputs: readonly { key: string, required?: boolean, types?: readonly string[] }[] }[]
   /** Facts declared now. Left out, facts are not checked. */
   facts?: readonly string[]
   attributes?: readonly string[]
@@ -239,6 +242,20 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       if (!seen.has(move.from) || !seen.has(move.to)) error('move-unknown-stage', at)
       else if (move.from === move.to) error('move-nowhere', at)
       else if (move.needsReason && !isDecision(def, move)) error('reason-not-decision', at)
+      for (const use of move.actions ?? []) {
+        const action = options.actions?.find(a => a.key === use.action)
+        if (options.actions && !action) error('unknown-action', at, { action: use.action })
+        for (const input of action?.inputs ?? []) {
+          const mapped = use.map[input.key]
+          if (!mapped) {
+            if (input.required) error('action-unmapped', at, { action: use.action, input: input.key })
+            continue
+          }
+          // An answer inside a repeating group is many answers, so it cannot fill one input.
+          const found = questionsOf(def).find(q => q.question.id === mapped)
+          if (!found || found.group || (input.types && !input.types.includes(found.question.type))) error('action-wrong-question', at, { action: use.action, input: input.key })
+        }
+      }
     }
     // Somebody sent back must be able to send their changes in again.
     for (const stage of stages) if (stage.kind === 'returned' && !transitions.some(t => t.from === stage.key && t.who === 'submitter' && seen.has(t.to))) error('returned-no-way-back', `stage:${stage.key}`)

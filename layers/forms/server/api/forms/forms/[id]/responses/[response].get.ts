@@ -10,6 +10,8 @@ import type { Definition } from '../../../../../../shared/engine'
 import { hasStages, isDecision, questionsOf, stageOf } from '../../../../../../shared/engine'
 import { changedIn, historyOf, movesFor, stageIn } from '../../../../../stages'
 import { refuseConflicted, roundView } from '../../../../../review'
+import { runsOf } from '../../../../../actions'
+import { aboutOf } from '../../../../../slots'
 
 const input = z.object({ reveal: z.enum(['1']).optional(), revision: z.coerce.number().int().min(1).optional() })
 
@@ -49,5 +51,9 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
     review: round ? { ...round, canRelease: chair && round.open && !round.released } : null,
     decision: response.decidedAt !== null ? { at: response.decidedAt, reason: chair ? response.decisionReason : null } : null,
     history: staged ? await historyOf(definition, response.id) : [],
+    // The record the response is about, when it was answered where the form is attached to one.
+    about: await aboutOf(response),
+    // What other modules were asked to do by its moves. Somebody who decides may run a failed one again.
+    actions: (await runsOf(response.id)).map(r => ({ ...r, canRunAgain: chair && r.state === 'failed' })),
   }
 })

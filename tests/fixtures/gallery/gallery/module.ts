@@ -11,7 +11,7 @@ export default defineModule({
   stability: 'experimental',
   switchable: false,
   // The till's browser test sells through a gallery panel when Payments and Finance are on.
-  uses: ['finance', 'payments'],
+  uses: ['finance', 'payments', 'forms'],
   abilities: defineAbilities('gallery', {
     'sample.view': ability(),
     'sample.manage': ability(),
@@ -24,6 +24,9 @@ export default defineModule({
     'demo.hold': setting.duration({ default: '15m', min: '5m', max: '1h', change: 'gallery.sample.manage' }),
   }),
   contributes: {
+    // A slot and an outcome action for the forms browser test.
+    'forms.slot': [{ id: 'gallery.show-feedback', subject: 'gallery.production', attach: 'gallery.sample.manage', label: 'gallery.forms.feedback.label' }],
+    'forms.outcome-action': [{ id: 'gallery.note', file: 'note' }],
     'payments.desk-basket': [{ id: 'gallery' }],
     'payments.settlement': [{ id: 'gallery' }],
     'finance.system-account': [{ id: 'income', name: 'Gallery income', kind: 'income' }],

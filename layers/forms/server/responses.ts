@@ -24,14 +24,20 @@ export interface LinkRow {
   responseCount: number
   onePerPerson: boolean
   status: 'active' | 'paused' | 'ended'
+  /** `forms.link` for the form's own link, or the slot another module declared. */
+  slotKey: string
+  /** The record the answers are about, when the form is attached to one. */
+  subjectType: string | null
+  subjectId: string | null
 }
 type Stored<T, K extends keyof T> = Omit<T, K> & Record<K, number>
+export type StoredPlace = Stored<LinkRow, 'onePerPerson'>
+export const PLACE = 'id, form_id AS formId, audience, opens_at AS opensAt, closes_at AS closesAt, response_cap AS responseCap, response_count AS responseCount, one_per_person AS onePerPerson, status, slot_key AS slotKey, subject_type AS subjectType, subject_id AS subjectId'
 
 /** The form's own link, if it has been given one. A form is offered nowhere until it is. */
 export async function getLink(formId: string): Promise<LinkRow | null> {
   const row = await first<Stored<LinkRow, 'onePerPerson'>>(
-    `SELECT id, form_id AS formId, audience, opens_at AS opensAt, closes_at AS closesAt, response_cap AS responseCap, response_count AS responseCount, one_per_person AS onePerPerson, status
-     FROM forms_placements WHERE form_id = ? AND slot_key = 'forms.link' AND subject_type IS NULL`, formId)
+    `SELECT ${PLACE} FROM forms_placements WHERE form_id = ? AND slot_key = 'forms.link' AND subject_type IS NULL`, formId)
   return row ? { ...row, onePerPerson: !!row.onePerPerson } : null
 }
 
@@ -74,6 +80,8 @@ export interface ResponseRow {
   formId: string
   versionId: string
   placementId: string
+  subjectType: string | null
+  subjectId: string | null
   personId: string | null
   respondentEmail: string | null
   state: 'draft' | 'awaiting_payment' | 'submitted' | 'withdrawn'
@@ -86,7 +94,7 @@ export interface ResponseRow {
   decisionReason: string | null
   createdAt: number
 }
-const RESPONSE = 'decided_at AS decidedAt, decision_reason AS decisionReason, id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
+const RESPONSE = 'subject_type AS subjectType, subject_id AS subjectId, decided_at AS decidedAt, decision_reason AS decisionReason, id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
 export const getResponse = (id: string) => first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE id = ?`, id)
 
 /** Whether a response is this person's: by account, across any merged into it. A signed-out response is nobody's to come back to. */
@@ -130,8 +138,8 @@ export async function writeDraft(unit: UnitView, input: { existing: ResponseRow 
   const sealed = await sealSpecial(JSON.stringify(input.answers))
   if (!input.existing) {
     unit.add({
-      sql: 'INSERT INTO forms_responses (id, reference, form_id, version_id, placement_id, realm, person_id, state, current_revision, is_test, created_at, updated_at) VALUES (?, ?, ?, ?, ?, \'audience\', ?, \'draft\', 0, 0, ?, ?)',
-      params: [input.responseId, newReference(), input.form.id, input.form.liveVersionId, input.link.id, input.accountId, input.at, input.at],
+      sql: 'INSERT INTO forms_responses (id, reference, form_id, version_id, placement_id, subject_type, subject_id, realm, person_id, state, current_revision, is_test, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, \'audience\', ?, \'draft\', 0, 0, ?, ?)',
+      params: [input.responseId, newReference(), input.form.id, input.form.liveVersionId, input.link.id, input.link.subjectType, input.link.subjectId, input.accountId, input.at, input.at],
     }).expect(1)
   }
   else {
@@ -274,8 +282,8 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   }
   else {
     unit.add({
-      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', ?12, ?13, 1, ?9, 0, ?10, ?10, ?10, ?11 WHERE NOT ${taken}`, // not-policy: numbered parameters
-      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue, stage.key, stage.kind],
+      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at, subject_type, subject_id) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', ?12, ?13, 1, ?9, 0, ?10, ?10, ?10, ?11, ?14, ?15 WHERE NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue, stage.key, stage.kind, s.link.subjectType, s.link.subjectId],
     }).expect(1, once)
   }
 

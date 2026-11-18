@@ -4,6 +4,7 @@ import { all, defineRoute, isRefusal, today } from '#kit'
 import { accountLabel } from '#modules/core'
 import type { Definition } from '../../../../shared/engine'
 import { sources } from '../../../sources'
+import { actionList } from '../../../actions'
 import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
 
 export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record }) => {
@@ -30,6 +31,8 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     reviewers: { roles, people },
     // Where a "record from a source" question may choose from, with the modules switched on now.
     sources: (await sources()).map(s => ({ key: s.key, label: s.label, people: !!s.people })),
+    // What other modules can do when a response takes a move, for the stages editor.
+    actions: await actionList(),
     versions: versions.map(v => ({ id: v.id, number: v.number, publishedAt: v.publishedAt, publishedBy: v.publishedBy, summary: JSON.parse(v.changeSummary) })),
   }
 })

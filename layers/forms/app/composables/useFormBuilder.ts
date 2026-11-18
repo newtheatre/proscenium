@@ -7,6 +7,7 @@ import { find } from '../../shared/builder/edit'
 
 export interface BuilderForm { id: string, slug: string, title: string, mode: string, status: string, anonymous: boolean, retentionDays: number | null, retentionDeclinedDays: number | null, liveVersion: number | null, archivedAt: number | null }
 export interface PublishedField { questionId: string, key: string, type: string, dataClass: string, retired: boolean }
+export interface BuilderAction { key: string, label: string, slot: string | null, inputs: { key: string, label: string, required: boolean, types?: string[] }[] }
 export interface BuilderData {
   today: string | null
   form: BuilderForm
@@ -16,6 +17,7 @@ export interface BuilderData {
   reviewers?: { roles: { id: string, name: string }[], people: Record<string, string> }
   /** Where a "record from a source" question may choose from now. */
   sources?: { key: string, label: string, people: boolean }[]
+  actions?: BuilderAction[]
   versions: { id: string, number: number, publishedAt: number }[]
 }
 export type SaveState = 'saved' | 'waiting' | 'saving' | 'stale' | 'failed'
@@ -35,6 +37,8 @@ export interface FormBuilder {
   problemsAt: ComputedRef<Map<string, Problem[]>>
   published: ComputedRef<Map<string, PublishedField>>
   sources: ComputedRef<{ key: string, label: string, people: boolean }[]>
+  /** What other modules can do when a response takes a move. */
+  actions: ComputedRef<BuilderAction[]>
   canUndo: ComputedRef<boolean>
   canRedo: ComputedRef<boolean>
   /** Replaces the definition. Edits with the same `merge` name close together are one undo step. */
@@ -130,7 +134,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
     if (found) pageId.value = found.page.id
   }
 
-  const problems = computed(() => checkDefinition(definition.value, data.sources ? { sources: data.sources.map(s => s.key) } : {}))
+  const problems = computed(() => checkDefinition(definition.value, { ...(data.sources ? { sources: data.sources.map(s => s.key) } : {}), ...(data.actions ? { actions: data.actions } : {}) }))
   const problemsAt = computed(() => {
     const map = new Map<string, Problem[]>()
     for (const p of problems.value) map.set(p.at, [...(map.get(p.at) ?? []), p])
@@ -140,6 +144,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
     definition, revision, state, failure, selected, pageId, problems, problemsAt,
     published: computed(() => new Map(fields().map(f => [f.questionId, f]))),
     sources: computed(() => data.sources ?? []),
+    actions: computed(() => data.actions ?? []),
     canUndo: computed(() => past.value.length > 0),
     canRedo: computed(() => future.value.length > 0),
     apply,

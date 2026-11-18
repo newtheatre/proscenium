@@ -112,7 +112,7 @@ const definition = z.strictObject({
   presentation: z.strictObject({ submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
   workflow: z.strictObject({
     stages: z.array(z.strictObject({ key, name: z.string().max(100), kind: z.enum(STAGE_KINDS), status: z.string().max(100).optional(), review: review.optional() })).min(1).max(20),
-    transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS), needsReason: z.boolean().optional() })).max(60),
+    transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS), needsReason: z.boolean().optional(), actions: z.array(z.strictObject({ id: key, action: z.string().min(1).max(100), map: z.record(z.string().max(100), z.string().max(100)) })).max(10).optional() })).max(60),
   }).optional(),
 }) satisfies z.ZodType<Definition>
 

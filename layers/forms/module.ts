@@ -2,7 +2,7 @@
 // with logic, versions and, where a form wants one, a workflow. Always on, as the specification
 // decides. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, point, setting } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting } from '#kit'
 import { STAGE_KINDS } from './shared/engine/types'
 import { tables } from './server/db/schema'
 
@@ -62,12 +62,34 @@ export default defineModule({
   points: {
     // Somewhere a "record from a source" question chooses from: search, labels, and who may look.
     'forms.source': point({ kind: 'code', contract: 'source' }),
+    // A place on another module's record where a form can be attached, such as a nomination for an award.
+    'forms.slot': point({
+      kind: 'data',
+      schema: z.object({
+        id: z.string(),
+        // The record type a response there is about, and the ability needed on the record to attach a form.
+        subject: z.string(),
+        attach: z.string(),
+        label: z.string(),
+        limit: z.number().int().min(1).optional(),
+        // A forms.source that names the subject's records.
+        source: z.string().optional(),
+      }),
+    }),
+    // Something a module does once a response has taken a move, such as issuing the award.
+    'forms.outcome-action': point({ kind: 'code', contract: 'outcome-action' }),
+  },
+
+  jobs: {
+    'forms.run-action': job({ payload: z.object({ runId: z.string() }) }),
   },
 
   events: {
     announces: {
       // Ids only: what was answered stays inside, and a listener reads it through forms.
       'forms.response.submitted': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string() }), internal: true }),
+      // A response reached an approved or declined stage.
+      'forms.response.decided': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), outcome: z.enum(['approved', 'declined']) }), internal: true }),
       'forms.response.moved': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), kind: z.enum(STAGE_KINDS), revision: z.number() }), internal: true }),
     },
   },

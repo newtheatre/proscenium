@@ -1,10 +1,13 @@
 <!-- Sharing a form (FB-301): its address, who may answer, when it opens and closes, how many
      responses it takes and whether each person may answer once. A form is offered nowhere until
-     this is saved for the first time. -->
+     this is saved for the first time. The same terms apply where a form is attached to another
+     module's record (`place`): there it is offered at an address of its own, and saving attaches it. -->
 <script setup lang="ts">
 interface Link { audience: 'anyone' | 'signed_in', opensAt: number | null, closesAt: number | null, responseCap: number | null, responseCount: number, onePerPerson: boolean, status: 'active' | 'paused' | 'ended' }
 
-const props = defineProps<{ formId: string, anonymous: boolean }>()
+const props = defineProps<{ formId: string, anonymous: boolean, place?: { slot: string, subject: string } }>()
+const emit = defineEmits<{ saved: [] }>()
+const at = computed(() => props.place ? `/api/forms/slots/${encodeURIComponent(props.place.slot)}/${encodeURIComponent(props.place.subject)}` : '')
 const open = defineModel<boolean>('open', { default: false })
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -32,27 +35,35 @@ watch(open, async (now) => {
   refusal.value = null
   loading.value = true
   try {
-    const got = await $api<{ link: Link | null, address: string, published: boolean }>(`/api/forms/forms/${props.formId}/link` as string)
+    const got = props.place
+      ? await $api<{ attached: (Link & { formId: string, address: string })[] }>(at.value).then((there) => {
+          const link = there.attached.find(a => a.formId === props.formId) ?? null
+          return { link, address: link?.address ?? '', published: true }
+        })
+      : await $api<{ link: Link | null, address: string, published: boolean }>(`/api/forms/forms/${props.formId}/link` as string)
     address.value = got.address
     published.value = got.published
     shared.value = got.link !== null
     count.value = got.link?.responseCount ?? 0
     Object.assign(state, got.link
       ? { audience: got.link.audience, opensAt: got.link.opensAt, closesAt: got.link.closesAt, responseCap: got.link.responseCap, onePerPerson: got.link.onePerPerson, taking: got.link.status === 'active' }
-      : { audience: 'anyone', opensAt: null, closesAt: null, responseCap: null, onePerPerson: false, taking: true })
+      : { audience: props.place ? 'signed_in' : 'anyone', opensAt: null, closesAt: null, responseCap: null, onePerPerson: false, taking: true })
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
   loading.value = false
-})
+// Immediately too: where a form is attached, the dialog is made already open.
+}, { immediate: true })
 
 async function save() {
   refusal.value = null
   try {
-    await $api(`/api/forms/forms/${props.formId}/link` as string, { method: 'PUT', body: { audience: state.audience, opensAt: state.opensAt, closesAt: state.closesAt, responseCap: state.responseCap, onePerPerson: state.onePerPerson, status: state.taking ? 'active' : 'paused' } })
-    toast.add({ title: t(shared.value ? 'forms.screens.link.saved' : 'forms.screens.link.shared'), color: 'success' })
+    await $api((props.place ? `${at.value}/${props.formId}` : `/api/forms/forms/${props.formId}/link`) as string, { method: 'PUT', body: { audience: state.audience, opensAt: state.opensAt, closesAt: state.closesAt, responseCap: state.responseCap, onePerPerson: state.onePerPerson, status: state.taking ? 'active' : 'paused' } })
+    toast.add({ title: t(shared.value ? 'forms.screens.link.saved' : props.place ? 'forms.screens.slot.attached' : 'forms.screens.link.shared'), color: 'success' })
     shared.value = true
+    emit('saved')
+    if (props.place) open.value = false
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -64,8 +75,8 @@ async function save() {
 <template>
   <UModal
     v-model:open="open"
-    :title="t('forms.screens.link.title')"
-    :description="t('forms.screens.link.help')"
+    :title="t(place ? 'forms.screens.slot.terms' : 'forms.screens.link.title')"
+    :description="t(place ? 'forms.screens.slot.terms-help' : 'forms.screens.link.help')"
   >
     <template #body>
       <UAlert
@@ -86,6 +97,7 @@ async function save() {
       >
         <RefusalNotice :refusal="refusal" />
         <UFormField
+          v-if="!place || shared"
           :label="t('forms.screens.link.address')"
           :help="shared ? t('forms.screens.link.responses', { count }) : t('forms.screens.link.not-shared')"
         >
@@ -172,7 +184,7 @@ async function save() {
         form="forms-link"
         loading-auto
         :disabled="loading"
-        :label="shared ? t('forms.screens.settings.save') : t('forms.screens.link.share')"
+        :label="shared ? t('forms.screens.settings.save') : t(place ? 'forms.screens.slot.attach' : 'forms.screens.link.share')"
       />
     </template>
   </UModal>

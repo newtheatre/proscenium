@@ -23,6 +23,7 @@ interface Open {
   today: string | null
   asksEmail: boolean
   draft: { responseId: string, answers: Answers, pageId: string | null } | null
+  about: { slot: string, label: string, name: string | null } | null
 }
 interface Kept { responseId: string, answers: Answers, pageId: string | null, email: string, at: number }
 
@@ -34,7 +35,11 @@ const { dateTime } = useDates()
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 
-const { data, error, refresh } = await useAPI<Open>(() => `/api/forms/open/${encodeURIComponent(slug.value)}`, { key: `forms:open:${slug.value}` })
+// A form attached to another module's record is answered at the same address, with the place named.
+const place = computed(() => typeof route.query.place === 'string' ? route.query.place : '')
+const at = computed(() => place.value ? `?place=${encodeURIComponent(place.value)}` : '')
+
+const { data, error, refresh } = await useAPI<Open>(() => `/api/forms/open/${encodeURIComponent(slug.value)}${at.value}`, { key: `forms:open:${slug.value}:${place.value}` })
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
 const form = computed(() => data.value!)
 
@@ -50,7 +55,7 @@ const reference = ref('')
 
 // ---- keeping answers ----
 const KEEP_FOR = 7 * 86_400_000 // not-policy: the interface specification's limit for a draft kept on a device
-const storageKey = computed(() => `forms:answers:${slug.value}`)
+const storageKey = computed(() => `forms:answers:${slug.value}${place.value ? `:${place.value}` : ''}`)
 const hasSpecial = computed(() => form.value.definition ? questionsOf(form.value.definition).some(({ question }) => question.dataClass === 'special') : false)
 /** Where answers so far are kept: with the account, on this device, or nowhere. */
 const keeping = computed(() => form.value.state !== 'open' ? 'none' : form.value.signedIn && !form.value.anonymous ? 'account' : hasSpecial.value ? 'none' : 'device')
@@ -86,7 +91,7 @@ async function keep() {
   if (keeping.value !== 'account') return
   saved.value = 'saving'
   try {
-    const kept = await $api<{ responseId: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/draft` as string, { method: 'PUT', body: { responseId: responseId.value, answers: answers.value, pageId: pageId.value } })
+    const kept = await $api<{ responseId: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/draft${at.value}` as string, { method: 'PUT', body: { responseId: responseId.value, answers: answers.value, pageId: pageId.value } })
     responseId.value = kept.responseId
     saved.value = 'saved'
   }
@@ -112,7 +117,7 @@ async function send(kept: Answers): Promise<boolean> {
   }
   clearTimeout(timer)
   try {
-    const sent = await $api<{ reference: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/responses` as string, {
+    const sent = await $api<{ reference: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/responses${at.value}` as string, {
       method: 'POST',
       body: { responseId: responseId.value, answers: kept, ...(form.value.asksEmail ? { email: email.value.trim() } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
@@ -140,6 +145,7 @@ async function send(kept: Answers): Promise<boolean> {
 <template>
   <PageFrame
     :title="form.title"
+    :description="form.about?.name ? `${t(form.about.label)} ${form.about.name}` : undefined"
     width="reading"
   >
     <EmptyState

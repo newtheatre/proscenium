@@ -58,6 +58,7 @@ const setMove = (key: string, change: Partial<Transition>, merge?: string) => wr
   Object.assign(move, change)
   const to = f.stages.find(s => s.key === move.to)?.kind
   if (!move.needsReason || move.who !== 'staff' || (to !== 'approved' && to !== 'declined')) delete move.needsReason
+  if (!move.actions?.length) delete move.actions
 }, merge)
 /** A move staff make to an approved or declined stage is a decision, and may ask for a reason. */
 const decides = (move: Transition) => move.who === 'staff' && ['approved', 'declined'].includes(flow.value?.stages.find(s => s.key === move.to)?.kind ?? '')
@@ -245,13 +246,18 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
                 :label="t('forms.screens.stages.needs-reason')"
                 @update:model-value="setMove(move.key, { needsReason: $event === true })"
               />
+              <FormsMoveActions
+                :move="move"
+                :n="i + 1"
+                @change="setMove(move.key, { actions: $event })"
+              />
               <p
                 v-for="p in problemsAt(`move:${move.key}`)"
                 :key="p.code"
                 class="text-sm"
                 :class="p.level === 'error' ? 'text-error' : 'text-warning'"
               >
-                {{ t(`forms.problems.${p.code}`) }}
+                {{ t(`forms.problems.${p.code}`, p.params ?? {}) }}
               </p>
             </li>
           </ol>

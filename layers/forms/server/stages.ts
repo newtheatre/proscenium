@@ -8,6 +8,7 @@ import type { Answers, Definition, Stage, Transition } from '../shared/engine'
 import { evaluate, hasStages, isDecision, resubmitMove, staffMoves, stageOf, statusOf, workflowOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
+import { queueActions } from './actions'
 import { closeRounds, conflicted, openRound } from './review'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
@@ -44,6 +45,9 @@ async function apply(unit: UnitView, input: { form: FormRow, response: ResponseR
   await openRound(unit, { def: input.def, stage: to, formId: input.form.id, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at, answers: input.answers })
   unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key, ...(decision ? { decision: to.kind } : {}) } })
   unit.announce('forms.response.moved', { responseId: input.response.id, formId: input.form.id, kind: to.kind, revision: input.revision }, { record: ['forms.response', input.response.id] })
+  if (to.kind === 'approved' || to.kind === 'declined') unit.announce('forms.response.decided', { responseId: input.response.id, formId: input.form.id, outcome: to.kind }, { record: ['forms.response', input.response.id] })
+  // What other modules do about this move is asked for with it, and runs once it has committed.
+  queueActions(unit, { response: input.response, move: input.move, revision: input.revision, actorId: input.actorId, at: input.at })
   return to
 }
 
