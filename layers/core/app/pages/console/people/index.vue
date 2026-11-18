@@ -45,6 +45,14 @@ const { data: grantOptions, refresh: refreshOptions } = await useAPI<GrantOption
 watch(readsGrants, (may) => { if (may) void refreshOptions() }, { immediate: true })
 const mayInvite = computed(() => readsGrants.value && !!grantOptions.value?.invite)
 const inviting = ref(false)
+// ?invite=1 (the command palette's Invite someone) opens the dialogue once the page knows the viewer
+// may invite; the flag is then dropped, so going back or reloading does not open it again.
+onMounted(async () => {
+  if (route.query.invite === undefined) return
+  if (readsGrants.value && !grantOptions.value) await refreshOptions()
+  if (mayInvite.value) inviting.value = true
+  void navigateTo({ query: { ...route.query, invite: undefined } }, { replace: true })
+})
 
 const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased') : (row.name ?? t('core.people.unnamed'))
 </script>

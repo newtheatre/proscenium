@@ -105,6 +105,12 @@ test.describe('someone who gives roles', () => {
     await expect(dialog.getByText('This is needed.').first()).toBeVisible()
     await noViolations(page)
   })
+
+  test('?invite=1 opens Invite someone, and the flag leaves the address', async ({ page }) => {
+    await visit(page, '/console/people?invite=1')
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'Invite someone' })).toBeVisible()
+    await expect(page).not.toHaveURL(/invite=1/)
+  })
 })
 
 test.describe('someone who handles data requests', () => {
