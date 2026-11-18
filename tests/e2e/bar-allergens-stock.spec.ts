@@ -60,10 +60,10 @@ test('a stock item\'s label is checked, and the product made from it answers wit
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Record the check' }).click()
   await expect(page.getByText('Allergens recorded.').first()).toBeVisible()
-  await expect(page.getByText('May contain: Sulphites').first()).toBeVisible()
+  await expect(page.getByText('May contain: Sulphur dioxide and sulphites').first()).toBeVisible()
 
   await visit(page, `/admin/modules/bar/products/${s.product}`)
   await expect(page.getByText(`From Fruit cup ${stamp}`, { exact: true })).toBeVisible()
-  await expect(page.getByText('May contain: Sulphites')).toBeVisible()
+  await expect(page.getByText('May contain: Sulphur dioxide and sulphites')).toBeVisible()
   await noViolations(page)
 })
