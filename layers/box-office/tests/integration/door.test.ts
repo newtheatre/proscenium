@@ -74,7 +74,7 @@ describe('scanning at the door', () => {
     const h = await freeHouse(4)
     const other = await freeHouse(4)
     const [code, second] = await tickets(h, 2)
-    expect((await scan(other, code!)).body).toMatchObject({ result: 'wrong_performance', ticketPerformanceId: h.performanceId })
+    expect((await scan(other, code!)).body).toMatchObject({ result: 'wrong_performance', ticketPerformanceId: h.performanceId, ticketPerformance: { id: h.performanceId, startsAt: expect.any(Number), title: expect.any(String) } })
 
     const [kind, keyId, random, signature] = second!.split('.') as [string, string, string, string]
     const forged = `${kind}.${keyId}.${random.slice(0, -1)}${random.endsWith('A') ? 'B' : 'A'}.${signature}`
@@ -105,6 +105,20 @@ describe('scanning at the door', () => {
     // At another performance's door it is not for tonight, paid or not.
     const other = await house(4)
     expect((await scan(other, reserved.body.deskCode)).body).toMatchObject({ result: 'wrong_performance', ticketPerformanceId: h.performanceId })
+  })
+
+  it('names the performance for a paid booking\'s reference at another door, and finds it at its own', async () => {
+    const h = await freeHouse(4)
+    const other = await freeHouse(4)
+    const made = await buy(h, 2)
+    if (!made.ok) throw new Error(made.code)
+    const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/checkout`, { expectedTotalMinor: 0, email: `door${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
+    expect(done.body.state, JSON.stringify(done.body)).toBe('confirmed')
+    const reference = done.body.reference as string
+    expect((await scan(other, reference)).body).toMatchObject({ result: 'wrong_performance', scanId: null, ticketPerformance: { id: h.performanceId } })
+    expect((await scan(h, reference.toLowerCase())).body).toEqual({ result: 'reference', scanId: null, reference })
+    // Neither is a scan of a ticket, so neither writes a row.
+    expect(await count('SELECT count(*) AS n FROM box_office_scans WHERE performance_id IN (?, ?)', h.performanceId, other.performanceId)).toBe(0)
   })
 
   it('counts who is in for the live door, and lists tonight\'s doors for whoever may admit', async () => {
