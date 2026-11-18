@@ -43,7 +43,10 @@ function fieldsGiven(): boolean {
   return !errors.length
 }
 
-async function join(given?: Answers): Promise<boolean> {
+/** The answers last sent, so asking staff to check an ID sends them again. */
+let lastAnswers: Answers | undefined
+async function join(given?: Answers, askStaff = false): Promise<boolean> {
+  lastAnswers = given
   refusal.value = null
   try {
     const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string, opensMembersArea?: boolean }>(`/api/membership/schemes/${props.scheme.id}/join` as string, {
@@ -53,6 +56,7 @@ async function join(given?: Answers): Promise<boolean> {
         lengthOptionId: state.lengthOptionId ?? (props.scheme.options.length === 1 ? props.scheme.options[0]!.id : null),
         reference: props.scheme.asksFor ? state.reference.trim() : undefined,
         ...(given && form.value ? { form: { formId: form.value.formId, answers: given } } : {}),
+        ...(askStaff ? { askStaff: true } : {}),
       },
     })
     if (joined.waiting === 'payment') {
@@ -60,7 +64,7 @@ async function join(given?: Answers): Promise<boolean> {
       return true
     }
     if (joined.pending) {
-      toast.add({ title: t('membership.screens.mine.applied', { scheme: props.scheme.name }), description: t(joined.waiting === 'approval' ? 'membership.screens.mine.waiting-approval' : 'membership.screens.mine.waiting-staff'), color: 'success' })
+      toast.add({ title: t('membership.screens.mine.applied', { scheme: props.scheme.name }), description: t(joined.waiting === 'approval' ? 'membership.screens.mine.waiting-approval' : joined.waiting === 'not-on-list' ? 'membership.screens.mine.waiting-not-on-list' : 'membership.screens.mine.waiting-staff'), color: 'success' })
       emit('applied')
       return true
     }
@@ -110,6 +114,15 @@ async function join(given?: Answers): Promise<boolean> {
         maxlength="254"
       />
     </UFormField>
+    <UButton
+      v-if="refusal?.code === 'membership.join.not-on-list' && scheme.asksFor"
+      color="neutral"
+      variant="outline"
+      size="sm"
+      loading-auto
+      :label="t('membership.join.ask-staff')"
+      @click="join(lastAnswers, true)"
+    />
     <UButton
       v-if="!scheme.applicationForm"
       type="submit"

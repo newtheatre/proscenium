@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
 interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null, referenceLabel: string | null, referenceNoun: string | null, referenceShape: Shape | null, uploadedAt: number, loaded: boolean }
-interface Detail { list: List, schemes: { id: string, name: string }[], keySet: boolean }
+interface Detail { list: List, schemes: { id: string, name: string }[], keySet: boolean, byHand: number }
 interface Loaded { loaded: number, wouldLoad?: number, refused: { line: number, reason: string }[] }
 interface Checked { found: boolean, malformed?: boolean, shape?: Shape | null, current?: boolean, endsOn?: string | null, name?: string | null, claimed?: boolean }
 
@@ -160,6 +160,8 @@ const facts = computed(() => {
   return [
     { label: t('membership.screens.list.fact-holds'), value: t(`membership.screens.lists.kinds.${l.keyKind}`) },
     { label: t('membership.screens.list.fact-entries'), value: String(l.entryCount) },
+    // Added by staff and kept through file loads until a file holds them too.
+    ...(data.value?.byHand ? [{ label: t('membership.screens.list.fact-by-hand'), value: String(data.value.byHand) }] : []),
     ...(l.validUntil ? [{ label: t('membership.screens.list.valid-until'), value: day(l.validUntil) }] : []),
     { label: t('membership.screens.list.fact-loaded'), value: l.loaded ? day(new Date(l.uploadedAt)) : t('membership.screens.list.fact-never') },
     { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme') },

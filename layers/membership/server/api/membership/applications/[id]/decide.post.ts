@@ -1,11 +1,14 @@
 // Passes or declines an application waiting on a check (V2, V3). Passing activates it at once when
 // nothing else is outstanding (A1): its dates start today, or end on the list entry's date (D9).
 // Declining is final; the person may apply again. Every decision is a verification row.
+// Passing an ID the list did not hold can add it to the list (addToList), as an entry staff added:
+// claimed by this membership, ending when it ends, and kept through file loads until a file holds it.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { defineRoute, first, nowMs, refuse, today, useSetting } from '#kit'
+import { defineRoute, first, newId, nowMs, refuse, today, useSetting, type UnitView } from '#kit'
 import { activatePending } from '../../../../memberships'
-import { requireScheme } from '../../../../schemes'
+import { hashValue, schemeList } from '../../../../lists'
+import { requireScheme, type Scheme } from '../../../../schemes'
 import { recordOutcome } from '../../../../verify'
 
 export default defineRoute({
@@ -15,12 +18,17 @@ export default defineRoute({
   input: z.object({
     outcome: z.enum(['pass', 'decline']),
     note: z.string().trim().max(500).nullish(), // not-policy: the bound of a staff note
+    // For an ID the list did not hold: add it to the list as well.
+    addToList: z.boolean().optional(),
   }),
 }, async (_event, { input, actor, record, unit }) => {
-  const row = await first<{ account_id: string, scheme_id: string, state: string, needs_approval: number, approved_at: number | null, needs_payment: number, paid_at: number | null, count: number | null, entry_ends: string | null, verifier: string | null }>(
+  const row = await first<{ account_id: string, scheme_id: string, state: string, needs_approval: number, approved_at: number | null, needs_payment: number, paid_at: number | null, count: number | null, entry_ends: string | null, verifier: string | null, reason: string | null, reference: string | null, account_name: string | null }>(
     `SELECT m.account_id, m.scheme_id, m.state, m.needs_approval, m.approved_at, m.needs_payment, m.paid_at, o.count,
             (SELECT e.ends_on FROM membership_verifications v JOIN membership_verification_entries e ON e.id = v.entry_id WHERE v.membership_id = m.id ORDER BY v.created_at DESC LIMIT 1) AS entry_ends,
-            (SELECT v.verifier FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC LIMIT 1) AS verifier
+            (SELECT v.verifier FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC LIMIT 1) AS verifier,
+            (SELECT v.reason FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC, v.id DESC LIMIT 1) AS reason,
+            (SELECT v.reference FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC, v.id DESC LIMIT 1) AS reference,
+            (SELECT a.name FROM core_accounts a WHERE a.id = m.account_id) AS account_name
        FROM membership_memberships m LEFT JOIN membership_length_options o ON o.id = m.length_option_id WHERE m.id = ?`,
     record!.id,
   )
@@ -35,7 +43,10 @@ export default defineRoute({
     unit.audit({ action: 'state', record: ['membership.membership', record!.id], detail: { to: 'declined' } })
     return { state: 'declined' }
   }
-  recordOutcome(unit, record!.id, { outcome: 'passed', verifier }, actor.accountId, note)
+  const scheme = await requireScheme(row!.scheme_id)
+  // The ID the list did not hold, added for this membership; its check then names the new entry.
+  const added = input.addToList && row!.reason === 'not-on-list' && row!.reference ? await addEntry(unit, scheme, record!.id, row!.reference, row!.account_name) : null
+  recordOutcome(unit, record!.id, { outcome: 'passed', verifier, entryId: added?.entryId, reference: row!.reference ?? undefined }, actor.accountId, note)
   // An entry nobody has claimed (its name differed from the applicant's) is claimed on passing.
   unit.add({
     sql: 'UPDATE membership_verification_entries SET used_by = ?1 WHERE used_by IS NULL AND id = (SELECT entry_id FROM membership_verifications WHERE membership_id = ?1 AND entry_id IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 1)',
@@ -51,11 +62,37 @@ export default defineRoute({
     unit.add({ sql: 'UPDATE membership_memberships SET verified_at = ?, expires_at = ?, updated_at = ? WHERE id = ? AND state = \'pending\'', params: [at, expiresAt, at, record!.id] }).expect(1)
     return { state: 'pending', waiting: unapproved ? 'approval' : 'payment' }
   }
-  const scheme = await requireScheme(row!.scheme_id)
   const dates = await activatePending(unit, {
     id: record!.id, scheme, accountId: row!.account_id, count: row!.count ?? 1, startsOn: await today(),
     ...(row!.entry_ends ? { endsOn: row!.entry_ends } : {}),
   })
+  // The entry added for it ends when the membership does.
+  if (added?.fresh) unit.add({ sql: 'UPDATE membership_verification_entries SET ends_on = ? WHERE id = ?', params: [dates.endsOn, added.entryId] })
   unit.audit({ action: 'state', record: ['membership.membership', record!.id], detail: { to: 'active' } })
   return { state: 'active', ...dates }
 })
+
+/**
+ * Adds the reference to the scheme's list as an entry staff added, claimed by the membership. The
+ * entry, and whether it is new; null when the scheme no longer checks a list of references.
+ */
+async function addEntry(unit: UnitView, scheme: Scheme, membershipId: string, reference: string, name: string | null): Promise<{ entryId: string, fresh: boolean } | null> {
+  const list = await schemeList(scheme)
+  if (!list || list.keyKind !== 'reference') return null
+  const id = newId('mve')
+  // A file loaded since may hold it now: then that entry is claimed instead of a second one added.
+  const hash = await hashValue(list.keyKind, reference)
+  const there = await first<{ id: string, usedBy: string | null }>('SELECT id, used_by AS usedBy FROM membership_verification_entries WHERE list_id = ? AND key_hash = ?', list.id, hash)
+  if (there) {
+    if (there.usedBy) return null
+    unit.add({ sql: 'UPDATE membership_verification_entries SET used_by = ? WHERE id = ? AND used_by IS NULL', params: [membershipId, there.id] })
+    return { entryId: there.id, fresh: false }
+  }
+  unit.add({
+    sql: 'INSERT INTO membership_verification_entries (id, list_id, key_hash, ends_on, holder_name, used_by, by_hand, created_at) VALUES (?, ?, ?, NULL, ?, ?, 1, ?)',
+    params: [id, list.id, hash, name, membershipId, nowMs()],
+  })
+  unit.add({ sql: 'UPDATE membership_verification_lists SET entry_count = entry_count + 1 WHERE id = ?', params: [list.id] })
+  unit.audit({ action: 'update', record: ['membership.verification-list', list.id], detail: { entry: 'added', from: 'application' } })
+  return { entryId: id, fresh: true }
+}
