@@ -77,7 +77,8 @@ test.describe('someone who gives roles', () => {
 
   test('gives a role from Who holds what and from a person\'s page', async ({ page }) => {
     await visit(page, '/console/people/grants')
-    await page.getByRole('button', { name: 'Give a role' }).click()
+    // With nobody holding anything yet the empty list offers the button too.
+    await page.getByRole('button', { name: 'Give a role' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: 'Give a role' })).toBeVisible()
     await expect(dialog.getByText('Person')).toBeVisible()
@@ -97,7 +98,7 @@ test.describe('someone who gives roles', () => {
 
   test('invites someone from Accounts by name, address and role', async ({ page }) => {
     await visit(page, '/console/people')
-    await page.getByRole('button', { name: 'Invite someone' }).click()
+    await page.getByRole('button', { name: 'Invite someone' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: 'Invite someone' })).toBeVisible()
     for (const label of ['Name', 'Email address', 'Role']) await expect(dialog.getByText(label, { exact: true })).toBeVisible()

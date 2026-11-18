@@ -41,8 +41,10 @@ const hiddenOf = (result: Record<string, unknown>) => {
 // Inviting needs Who holds what's options, which only someone who reads grants may ask for.
 const { entries } = useViewer()
 const readsGrants = computed(() => entries('console').some(e => e.id === 'core.grants'))
-const { data: grantOptions, refresh: refreshOptions } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:grants:options', immediate: false })
-watch(readsGrants, (may) => { if (may) void refreshOptions() }, { immediate: true })
+// Its own key: Who holds what asks the same address with a default, and the two must not share an answer.
+const { data: grantOptions, refresh: refreshOptions } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:people:grant-options', immediate: false })
+if (readsGrants.value) await refreshOptions()
+watch(readsGrants, (may) => { if (may && !grantOptions.value) void refreshOptions() })
 const mayInvite = computed(() => readsGrants.value && !!grantOptions.value?.invite)
 const inviting = ref(false)
 // ?invite=1 (the command palette's Invite someone) opens the dialogue once the page knows the viewer
