@@ -1,11 +1,13 @@
 // Give somebody a role (ID-23, ID-29), or invite somebody to one by name and address (ID-06). An
 // address nobody holds makes an unclaimed account, which needs the ability to add people too. The
-// grant waits for the person's first sign-in, and the invitation's link is that sign-in.
+// grant waits for the person's first sign-in, and the invitation's link is that sign-in. While the
+// theatre cannot send email yet, the link is given back once, for the inviter to pass on.
 import { z } from 'zod'
 import { defineRoute, first, refuse, requireAbility } from '#kit'
 import { normaliseAddress } from '../../identity/accounts'
 import { findOrCreateAccount } from '../../identity/guests'
 import { createInvitation } from '../../identity/invitations'
+import { canSendEmail } from '../../notifications/send'
 import { giveRole } from '../../identity/roles'
 import { roleNotice } from '../../identity/notices'
 import { scopeInput } from '../../identity/inputs'
@@ -41,6 +43,7 @@ export default defineRoute({
     return { id, accountId: found.accountId, invited: false }
   }
   const role = await first<{ name: string }>('SELECT name FROM core_roles WHERE id = ?', grant.roleId)
-  await createInvitation(unit, event, actor, { accountId: found.accountId, address: normaliseAddress(person.address), role: role!.name })
-  return { id, accountId: found.accountId, invited: true }
+  const invitation = await createInvitation(unit, event, actor, { accountId: found.accountId, address: normaliseAddress(person.address), role: role!.name })
+  if (await canSendEmail()) return { id, accountId: found.accountId, invited: true, emailed: true }
+  return { id, accountId: found.accountId, invited: true, emailed: false, link: invitation.link, expiresAt: invitation.expiresAt }
 })

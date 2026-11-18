@@ -70,12 +70,13 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await visit(page, `/book/an-old-name/${performanceId}`)
   await expect(page).not.toHaveURL(/an-old-name/)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Circle' })).toBeVisible()
+  // One part of the house and one type: neither is named.
+  await expect(page.getByRole('heading', { name: 'Circle' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Choose your tickets' })).toBeDisabled()
   await noViolations(page)
 
-  await page.getByRole('button', { name: 'Increment' }).click()
-  await page.getByRole('button', { name: 'Increment' }).click()
+  await page.getByRole('button', { name: 'Add a ticket' }).click()
+  await page.getByRole('button', { name: 'Add a ticket' }).click()
   await page.getByRole('button', { name: 'Hold 2 tickets, £20.00' }).click()
 
   await expect(page).toHaveURL(/\/book\/basket$/)
@@ -168,8 +169,8 @@ test('a buyer types a promo code, sees the saving on one ticket, and holds at th
   await expect(page.getByText(`${promoCode} applied. The prices above include it.`)).toBeVisible()
   await noViolations(page)
   // The code is for one ticket an order: the second is at the full price.
-  await page.getByRole('button', { name: 'Increment' }).click()
-  await page.getByRole('button', { name: 'Increment' }).click()
+  await page.getByRole('button', { name: 'Add a ticket' }).click()
+  await page.getByRole('button', { name: 'Add a ticket' }).click()
   await page.getByRole('button', { name: 'Hold 2 tickets, £18.00' }).click()
   await expect(page).toHaveURL(/\/book\/basket$/)
   await expect(page.getByRole('button', { name: 'Reserve and pay £18.00 at the box office' })).toBeVisible()

@@ -5,6 +5,7 @@ import { Browser, address, deliver, env, goStale, grantDirectly, leaveIdentity, 
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { createUnit } from '#kit'
+import { setClock } from '#kit/clock'
 import sweep from '../../../server/tasks/sweep-identity'
 
 /** Every email sent, with its subject and text, alongside the sign-in mailbox the helpers keep. */
@@ -149,6 +150,28 @@ describe('managing my email addresses (ID-12)', () => {
     listed = (await browser.get('/api/core/me/addresses')).body.addresses
     expect(listed.find((a: any) => a.address === extra).verified).toBe(true)
     expect((await new Browser().post('/api/core/me/addresses/verify', { token: fragment(linkIn(verify)) })).body.code).toBe('core.address.link-unknown')
+  })
+
+  it('the link for an unconfirmed address can be sent again after a pause (AC-6)', async () => {
+    const { browser } = await staff()
+    const extra = address()
+    const start = Date.now()
+    setClock(start)
+    try {
+      expect((await browser.post('/api/core/me/addresses', { address: extra })).status).toBe(200)
+      const listed = (await browser.get('/api/core/me/addresses')).body.addresses
+      expect(listed.find((a: any) => a.address === extra).resendAt).toBe(start + 60_000) // not-policy: the default pause
+      const soon = await browser.post('/api/core/me/addresses', { address: extra })
+      expect(soon.status).toBe(429)
+      expect(soon.body.code).toBe('core.address.resend-wait')
+      setClock(start + 61_000) // not-policy: past the pause
+      expect((await browser.post('/api/core/me/addresses', { address: extra })).status).toBe(200)
+      await deliver()
+      expect(to(extra)).toHaveLength(2)
+    }
+    finally {
+      setClock(undefined)
+    }
   })
 
   it('adding an address needs a recent re-assertion', async () => {

@@ -232,8 +232,9 @@ export async function activatePending(unit: UnitView, input: { id: string, schem
 /** The person's member number, shown with the theatre's prefix. Null before their first membership. */
 export async function memberNumber(accountId: string): Promise<{ number: number, label: string, since: string } | null> {
   // After a merge both accounts' rows may be in scope (rule X2): the lower number and the earlier date count.
+  // Member since follows the earliest start date, so a corrected or back-dated membership is reflected (first_joined_on is the fallback).
   const row = await first<{ number: number | null, first_joined_on: string }>(
-    `SELECT min(number) AS number, min(first_joined_on) AS first_joined_on FROM membership_members WHERE account_id IN (${accountScopeSql('?1')})`,
+    `SELECT min(number) AS number, coalesce((SELECT min(starts_on) FROM membership_memberships WHERE state IN ('active', 'ended') AND account_id IN (${accountScopeSql('?1')})), min(first_joined_on)) AS first_joined_on FROM membership_members WHERE account_id IN (${accountScopeSql('?1')})`,
     accountId,
   )
   if (!row?.number) return null

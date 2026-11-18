@@ -3,7 +3,7 @@
 // period read from core.rate-limits.<class>.
 import { afterEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
-import { memoryRateStore, resetRateLimits, sharedRateStore, countAgainstRate } from '#kit/ratelimit'
+import { memoryRateStore, resetRateLimits, sharedRateStore, countAgainstRate, waitRemedy } from '#kit/ratelimit'
 import { setClock, advanceClock } from '#kit/clock'
 import { env, inContext } from './helpers'
 
@@ -81,5 +81,24 @@ describe('shared rate limits (F-36)', () => {
   it('refuses a rate setting outside 1 to 10,000 in 1 minute to 1 day', async () => {
     await expect(setRate('core.rate-limits.sign-in', { count: 0, per: '10m' })).rejects.toThrow(/between 1 and 10,000/)
     await expect(setRate('core.rate-limits.sign-in', { count: 10, per: '2d' })).rejects.toThrow(/between 1 minute and 1 day/)
+  })
+
+  it('says how long to wait in seconds, minutes or hours', () => {
+    expect(waitRemedy(1)).toBe('Try again in 1 second.')
+    expect(waitRemedy(45)).toBe('Try again in 45 seconds.')
+    expect(waitRemedy(60)).toBe('Try again in 1 minute.')
+    expect(waitRemedy(61)).toBe('Try again in 2 minutes.')
+    expect(waitRemedy(600)).toBe('Try again in 10 minutes.')
+    expect(waitRemedy(5400)).toBe('Try again in 2 hours.')
+  })
+
+  it('counts the sign-in-link and sign-in-code classes apart, in the shared store', async () => {
+    setClock(Date.UTC(2026, 10, 16, 20))
+    await setRate('core.rate-limits.sign-in-link', { count: 1, per: '10m' })
+    const who = `address:${crypto.randomUUID()}@example.org`
+    expect((await take('sign-in-link', who)).allowed).toBe(true)
+    expect((await take('sign-in-link', who)).allowed).toBe(false)
+    // Asking for links has not spent any code tries.
+    expect((await take('sign-in-code', who)).allowed).toBe(true)
   })
 })

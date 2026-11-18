@@ -323,7 +323,7 @@ export const contributes = {
     },
   }],
   // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
-  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }, { id: 'core.inbox-unread-members', file: 'inbox-unread-members' }],
+  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }],
   'core.account-section': [
     { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
   ],
@@ -332,7 +332,7 @@ export const contributes = {
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
   // The production page's "Ready to publish?" checklist (R-35).
-  'core.record-check': ['summary', 'category', 'effects', 'advisories', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),
+  'core.record-check': ['summary', 'category', 'effects', 'advisories', 'booking', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),
   'core.operating-day': [{ id: 'core.performances', table: 'core_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [

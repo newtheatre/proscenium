@@ -1,6 +1,6 @@
 // What the order services share: the order and its live ticket lines as they are read, and the
 // words a message uses for them.
-import { all, theatreTimeZone, useSetting } from '#kit'
+import { all, refuse, theatreTimeZone, useSetting } from '#kit'
 import { getPerformance, getProduction, getVenue } from '#modules/core'
 
 export interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, intent_id: string | null, confirm_email: string | null, confirm_name: string | null, admit_on_payment: number, sold_by: string | null }
@@ -9,6 +9,19 @@ export interface LineRow { id: string, performance_id: string, band_id: string, 
 
 export const ORDER = 'SELECT id, reference, state, account_id, currency, total_minor, expires_at, release_at, intent_id, confirm_email, confirm_name, admit_on_payment, sold_by FROM box_office_orders'
 export const RAN_OUT = { code: 'box-office.basket.expired', reason: 'Your basket has run out, and the seats are back on sale.', remedy: 'Choose your tickets again.' }
+
+/**
+ * A production only for people over an age is booked online only once the buyer has said everyone
+ * using the tickets is that age: the box office's own check stays at the door, where ID may be asked for.
+ */
+export async function assertAgeConfirmed(lines: { performance_id: string }[], confirmed: boolean | undefined): Promise<void> {
+  if (confirmed) return
+  for (const performanceId of new Set(lines.map(l => l.performance_id))) {
+    const production = await getProduction((await getPerformance(performanceId)).productionId)
+    if (production.ageRestricted && production.ageMin !== null)
+      refuse('box-office.order.age-not-confirmed', `Everyone using these tickets must be ${production.ageMin} or over.`, { status: 422, remedy: 'Tick the box to say they are.', fields: { ageConfirmed: 'box-office.order.age-not-confirmed' } })
+  }
+}
 
 export function liveLines(orderId: string): Promise<LineRow[]> {
   return all<LineRow>(
@@ -33,6 +46,9 @@ export async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow
     show: production.title,
     when: new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone }).format(performance.startsAt),
     tickets: [...counts].map(([name, count]) => `${count} × ${name}`).join(', '),
+    /** The tickets, with the age every holder must be where the production is age-restricted, for the messages that carry the tickets. */
+    ticketsWithAge: [...counts].map(([name, count]) => `${count} × ${name}`).join(', ')
+      + (production.ageRestricted && production.ageMin !== null ? `. Everyone using these tickets must be ${production.ageMin} or over; ID may be checked.` : ''),
     amount: new Intl.NumberFormat(locale, { style: 'currency', currency: order.currency }).format(amountMinor / 100), // not-policy: minor units to units; every currency sold here has two decimals
     timeOf: (at: number) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(at),
     startsAt: performance.startsAt,

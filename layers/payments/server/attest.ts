@@ -14,6 +14,8 @@ export interface AttestInput {
   amountMinor?: number
   /** Cash only: what was handed over, for the change. */
   tenderedMinor?: number
+  /** Other only: what it was, such as a voucher number or an invoice. */
+  note?: string
   /** False records that the machine declined. */
   succeeded?: boolean
 }
@@ -41,7 +43,7 @@ export async function attest(input: AttestInput): Promise<{ attemptId: string, s
   if (tendered !== null && tendered < amount) throw new Refusal('payments.attempt.short', 'Less cash was handed over than the amount.', { status: 422, fields: { tenderedMinor: 'payments.attempt.short' } })
 
   const unit = createUnit()
-  const attempt = addAttempt(unit.view(), { intentId: intent.id, providerAccountId: account.id, method: input.method, amountMinor: amount, tenderedMinor: tendered })
+  const attempt = addAttempt(unit.view(), { intentId: intent.id, providerAccountId: account.id, method: input.method, amountMinor: amount, tenderedMinor: tendered, note: input.method === 'other_attested' ? input.note?.trim() || null : null })
   await unit.commit()
   const result = await recordAnswer(attempt.id, input.succeeded === false ? { state: 'failed', failureCode: 'declined' } : { state: 'succeeded' }, { kind: 'person' })
   return { attemptId: attempt.id, settled: result.settled, unfulfilled: result.unfulfilled, changeMinor: tendered === null ? 0 : tendered - amount }
