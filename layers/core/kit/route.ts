@@ -117,6 +117,17 @@ function moduleOfPath(path: string): string | undefined {
  * Declares an API route. A route with neither `ability` nor `public: true` fails the build (F-04);
  * a refused request gets the standard body `{ code, reason, remedy?, fields? }`.
  */
+/**
+ * The body as text. On Cloudflare, Nitro hands h3 a body only for POST, PUT and PATCH, so for a
+ * DELETE h3 would wait for one that never arrives and the Worker is cancelled as hung. The body of
+ * a DELETE is read from the request the Worker was given instead.
+ */
+async function bodyText(event: H3Event, method: string): Promise<string> {
+  const given = (event.context as { _platform?: { cloudflare?: { request?: Request } } })._platform?.cloudflare?.request
+  if (method === 'DELETE' && given) return given.bodyUsed ? '' : await given.text()
+  return (await readRawBody(event, 'utf8')) ?? ''
+}
+
 export function defineRoute<I extends z.ZodType | undefined = undefined, R = unknown>(
   decl: RouteDeclaration<I>,
   handler: (event: H3Event, context: RouteContext<I extends z.ZodType ? z.output<I> : undefined>) => Promise<R> | R,
@@ -171,7 +182,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const method = event.method.toUpperCase()
     const reads = method === 'GET' || method === 'HEAD'
     const binary = decl.body === 'binary'
-    const rawBody = reads || binary ? '' : (await readRawBody(event, 'utf8')) ?? ''
+    const rawBody = reads || binary ? '' : await bodyText(event, method)
 
     if (decl.protect === 'turnstile') {
       const token = getHeader(event, 'cf-turnstile-response')
