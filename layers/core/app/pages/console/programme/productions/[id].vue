@@ -94,15 +94,17 @@ const detailsForm = useTemplateRef('detailsForm')
 const detailsSchema = computed(() => elsewhere.value
   ? blankAsNull(productionPatch.extend({ externalBookingUrl: productionPatch.shape.externalBookingUrl.unwrap().unwrap() }))
   : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
-watch(production, (p) => {
-  if (!p) return
-  Object.assign(details, {
-    title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
-    seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
-    intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
-    bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
-  })
-}, { immediate: true })
+const detailsFrom = (p: Production) => ({
+  title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
+  seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
+  intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
+  bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
+})
+const resetDetails = () => production.value && Object.assign(details, detailsFrom(production.value))
+watch(production, resetDetails, { immediate: true })
+// Leaving the Details tab, or the page, with changes asks first; leaving drops them.
+const detailsDirty = computed(() => !!production.value && JSON.stringify({ ...details }) !== JSON.stringify(detailsFrom(production.value)))
+useLeaveGuard(detailsDirty, { query: ['tab'], thing: 'this tab', discard: resetDetails })
 const saveDetails = () => run(() => api('', 'PATCH', {
   ...(({ bookedElsewhere: _, ...rest }) => rest)(details),
   categoryTermId: details.categoryTermId || null,
@@ -153,10 +155,11 @@ const actions = computed<DropdownMenuItem[][]>(() => {
 // The facts strip and the overview read the dates the Dates tab shows, by the same key.
 interface Dated { id: string, venueId: string, startsAt: number, endsAt: number, state: 'draft' | 'scheduled' | 'cancelled' | 'completed', label: string | null }
 const { data: dated } = await useAPI<{ performances: Dated[], options: { venues: { id: string, name: string }[] } }>(() => `${base.value}/performances`, { key: `core:production:${String(route.params.id)}:performances` })
-const { day, dateTime } = useDates()
+const { span, dateTime } = useDates()
 const venueName = (id: string) => dated.value?.options.venues.find(v => v.id === id)?.name ?? ''
 const performances = computed(() => dated.value?.performances ?? [])
 const running = computed(() => performances.value.filter(p => p.state === 'scheduled' || p.state === 'completed'))
+const oneVenue = computed(() => new Set(performances.value.map(p => p.venueId)).size <= 1)
 const comingUp = computed(() => performances.value.filter(p => p.state === 'scheduled' && p.endsAt > Date.now()).slice(0, 3))
 const summary = computed(() => {
   const p = production.value
@@ -166,8 +169,9 @@ const summary = computed(() => {
   const next = comingUp.value[0]
   const cancelled = performances.value.filter(x => x.state === 'cancelled').length
   return [
-    { label: 'Run', value: first && last ? `${day(first.startsAt)} to ${day(last.startsAt)}` : 'No dates yet' },
-    { label: 'Next performance', value: next ? `${dateTime(next.startsAt)}, ${venueName(next.venueId)}` : 'None to come' },
+    { label: 'Run', value: first && last ? span(first.startsAt, last.startsAt) : 'No dates yet' },
+    // The venue only when the run plays in more than one.
+    { label: 'Next performance', value: next ? (oneVenue.value ? dateTime(next.startsAt) : `${dateTime(next.startsAt)}, ${venueName(next.venueId)}`) : 'None to come' },
     { label: 'Season', value: data.value?.options.seasons.find(s => s.id === p.seasonId)?.name ?? 'None' },
     { label: 'Performances', value: cancelled ? `${running.value.length}, and ${cancelled} cancelled` : String(running.value.length) },
   ]
