@@ -50,6 +50,7 @@
   "membership.abilities.scheme.view.label": "See membership schemes, including drafts and closed ones",
   "membership.abilities.scheme.manage.label": "Create, change, open, close and archive membership schemes",
   "membership.abilities.membership.view.label": "See who holds which membership, with dates and status",
+  "membership.abilities.membership.fields.label": "Fill in the details kept about a member",
   "membership.abilities.membership.verify.label": "Pass or decline an application waiting to be checked",
   "membership.abilities.membership.end.label": "End a membership",
   "membership.abilities.membership.add.label": "Add a member directly",

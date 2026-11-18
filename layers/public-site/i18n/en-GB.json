@@ -156,5 +156,11 @@
   "public-site.readiness.productions.effects-unanswered": "Published with no answer on staging effects. List them or confirm there are none.",
   "public-site.readiness.card.line.one": "1 thing on the public site is unfinished",
   "public-site.readiness.card.line.other": "{count} things on the public site are unfinished",
-  "public-site.readiness.card.action": "See site readiness"
+  "public-site.readiness.card.action": "See site readiness",
+  "public-site.readiness.policies.title": "Policies",
+  "public-site.readiness.policies.none": "Every policy is written, reviewed and has the facts it states.",
+  "public-site.readiness.policies.unwritten": "Only you can write this section, so it is left off the page. Write it at {file}.",
+  "public-site.readiness.policies.stale": "The default wording has changed since yours was written. Compare {file} with it, then update its based-on line.",
+  "public-site.readiness.policies.setting": "Not set, so the policies say less than they should.",
+  "public-site.readiness.policies.unreviewed": "This is default text. Have a competent person read it for your theatre, then add it to the reviewed policies."
 }

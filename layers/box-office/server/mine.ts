@@ -4,7 +4,7 @@
 // first. A basket, an expired order and a cancelled one are left out.
 import { sql } from 'drizzle-orm'
 import { inAccountScope, nowMs, useDb } from '#kit'
-import { getPerformance, getProduction, placeOf } from '#modules/core'
+import { getPerformance, getProduction, placeName } from '#modules/core'
 import { liveLines } from './orders'
 import { lineKey, unnamedLines } from './line-names'
 import { doorCodesForOrders } from './tickets'
@@ -43,7 +43,7 @@ export async function myBookings(accountId: string): Promise<{ upcoming: MyVisit
         state: order.state,
         currency: order.currency,
         amountDueMinor: order.state === 'confirmed' ? 0 : order.total_minor,
-        performance: { id: performance.id, startsAt: performance.startsAt, endsAt: performance.endsAt, venue: placeOf(performance.spaceName, performance.venueName), state: performance.state },
+        performance: { id: performance.id, startsAt: performance.startsAt, endsAt: performance.endsAt, venue: await placeName(performance.spaceId) ?? performance.venueName, state: performance.state },
         production: { title: production.title, slug: production.slug },
         tickets: lines.filter(l => l.performance_id === performanceId).map(l => ({
           lineId: l.id,

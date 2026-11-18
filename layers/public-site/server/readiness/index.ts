@@ -58,7 +58,7 @@ export async function siteReadiness(event: H3Event): Promise<SiteReadiness> {
     if (value === null || value === undefined || value === '') settings.push({ ...q, to })
   }
   const core = await coreReadiness()
-  const lists = [found.placeholders, found.images, components, settings, core.brand, core.images, core.venues, core.levelsAssumed, core.effectsUnanswered]
+  const lists = [found.placeholders, found.images, components, settings, core.brand, core.images, core.venues, core.levelsAssumed, core.effectsUnanswered, core.policies]
   return {
     hidden: await useSetting('public-site.search.hidden') as boolean,
     outstanding: lists.reduce((n, l) => n + l.length, 0),

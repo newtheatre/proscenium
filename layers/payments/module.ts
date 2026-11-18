@@ -28,7 +28,7 @@ export default defineModule({
     // Where the till opens a session when the device has not used one before: a core space's id.
     'sessions.default-space': setting.custom({ schema: z.string().min(1).max(40), unset: true, change, audience: 'staff' }), // not-policy: an id's length
     'sessions.close-when-quiet': setting.duration({ default: '2h', min: '15m', max: '12h', change, audience: 'staff' }),
-    'cash.enabled': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
+    'cash.enabled': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     // For a test instance only: a provider account in test mode takes payment for real sales, which
@@ -144,6 +144,16 @@ export default defineModule({
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
+    // What the policies say about paying (/policies): which card companies are really connected,
+    // worked out from the provider accounts, so the privacy notice names them and no others.
+    'core.policy-fact': [{ id: 'payments.card-providers', file: 'card-providers' }, { id: 'payments.stripe', file: 'stripe' }, { id: 'payments.sumup', file: 'sumup' }],
+    'core.supplier': [
+      { id: 'payments.stripe', name: 'Stripe', purpose: 'Takes card payments', when: 'fact="payments.stripe" is="true"', cookies: { when: 'Only on the payment page', purpose: 'To take your payment securely and prevent fraud' }, order: 20 },
+      { id: 'payments.sumup', name: 'SumUp', purpose: 'Takes card payments', when: 'fact="payments.sumup" is="true"', cookies: { when: 'Only on the payment page', purpose: 'To take your payment securely and prevent fraud' }, order: 21 },
+    ],
+    'core.privacy-record': [
+      { id: 'payments.payments', holds: 'Payments and refunds: the amount, the type of card and its last four digits', why: 'To match payments to orders and make refunds', basis: 'To carry out our contract with you, and a legal duty (tax and accounting law)', keptFor: 'For as long as tax and accounting law requires', order: 120 },
+    ],
     // The tills on a performance's operating day, for Front of house's board and night report.
     'front-of-house.tonight-figure': [{ id: 'payments.tills', file: 'tills' }],
     'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],

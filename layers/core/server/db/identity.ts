@@ -30,6 +30,8 @@ export const accounts = defineTable('core_accounts', {
   origin: col.internal(text('origin', { enum: ACCOUNT_ORIGINS }).notNull()),
   createdAt: col.createdAt(),
   firstSignedInAt: col.timestamp('first_signed_in_at'),
+  // The terms of use as they read when the person first made the account theirs (/policies/terms).
+  termsVersionId: col.ref('core_policy_versions', { nullable: true }),
   lastSignedInAt: col.personal(integer('last_signed_in_at'), { erase: 'clear' }),
   disabledAt: col.timestamp('disabled_at'),
   disabledReason: col.internal(text('disabled_reason', { enum: DISABLED_REASONS })),

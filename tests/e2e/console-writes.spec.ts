@@ -93,8 +93,9 @@ test('Add a ticket type, then a band and its prices on a performance, all from t
   expect((await page.request.post(`/api/box-office/productions/${setup.performance.productionId}/prices`, { data: { prices: [{ bandId: band.id, ticketTypeId: type.ticketTypeId, amountMinor: 1500 }], from }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
   await visit(page, `/console/box-office/performances/${performanceId}`)
   await expect(page.getByRole('heading', { name: 'Price changes to come' })).toBeVisible()
-  await expect(page.getByText(new RegExp(`Circle, ${typeName}: £15\\.00 from`))).toBeVisible()
-  await page.getByRole('button', { name: new RegExp(`^Cancel the change to ${typeName}, Circle`) }).click()
+  // Circle is named only when the show has other sections too (from the theatre's usual preset, if one is set).
+  await expect(page.getByText(new RegExp(`^(Circle, )?${typeName}: £15\\.00 from`))).toBeVisible()
+  await page.getByRole('button', { name: new RegExp(`^Cancel the change to ${typeName}(, Circle)? on`) }).click()
   await expect(page.getByText('Price change cancelled').first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Price changes to come' })).toHaveCount(0)
 })

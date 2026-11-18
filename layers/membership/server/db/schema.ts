@@ -166,6 +166,9 @@ export const verifications = defineTable('membership_verifications', {
   outcome: col.internal(text('outcome', { enum: ['passed', 'failed', 'needs-staff'] }).notNull()),
   reason: col.internal(text('reason')),
   entryId: col.ref('membership_verification_entries', { nullable: true }),
+  // The reference the person typed for a reference list, such as a student ID, as checked, so staff
+  // can compare it with a physical card (Matt, 2026-11-18). The list itself keeps only hashes.
+  reference: col.personal(text('reference'), { erase: 'clear' }),
   decidedBy: col.account('decided_by', { role: 'actor', nullable: true }),
   note: col.freeText(text('note')),
   createdAt: col.createdAt(),
@@ -218,6 +221,9 @@ export const verificationEntries = defineTable('membership_verification_entries'
   // The name on the issuer's file, for staff only, one entry at a time (rule V18).
   holderName: col.personal(text('holder_name')),
   usedBy: col.ref('membership_memberships', { nullable: true }),
+  // Added by staff, from an application they passed or by hand, rather than from the issuer's file.
+  // Loading a file leaves it in place until the file holds it too (Matt, 2026-11-17).
+  byHand: col.internal(integer('by_hand', { mode: 'boolean' }).notNull().default(false)),
   createdAt: col.createdAt(),
 }, {
   id: 'mve',

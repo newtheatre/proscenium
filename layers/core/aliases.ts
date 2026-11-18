@@ -1,5 +1,5 @@
 // The import aliases every part of the build shares: Nuxt (app and server), Vitest and the scripts.
-// `#kit` is the kit, `#registry` the generated registry, and `#modules/<id>` a module's public
+// `#kit` is the kit, `#registry` the generated registry, `#policies` the generated policy sections, and `#modules/<id>` a module's public
 // services (`server/services.ts`), which another module may import only if it lists that module in
 // `requires` (the imports check enforces it).
 import { existsSync, readdirSync } from 'node:fs'
@@ -22,6 +22,8 @@ export function kitAliases(root: string, extraRoots: string[] = []): Record<stri
   const aliases: Record<string, string> = {
     '#kit': resolve(root, 'layers/core/kit'),
     '#registry': resolve(root, '.generated/registry.ts'),
+    // Every policy section, collected by the build (scripts/lib/policies.ts).
+    '#policies': resolve(root, '.generated/policies.ts'),
   }
   for (const dir of [...moduleRoots(root), ...extraRoots]) {
     const services = join(dir, 'server/services.ts')

@@ -1,7 +1,8 @@
 // Loads a file into a list (MEM-20, MEM-57): up to three columns, the address or reference, the end
 // date and the name. Each value is hashed as it arrives and the file itself is never stored (V10).
 // Importing again keeps the id of every entry whose value is unchanged, so evidence a host kept
-// still points at it (V11); an entry missing from the new file stops matching and loses its name.
+// still points at it (V11); an entry missing from the new file stops matching and loses its name,
+// unless staff added it by hand: that one stays until a file holds it too, which makes it the file's.
 // With dryRun nothing is written: the answer says how many rows would load and which would not.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
@@ -35,7 +36,7 @@ export default defineRoute({
   const hashed = await Promise.all(rows.map(async r => ({ id: newId('mve'), h: await hashValue(list.keyKind, r.value), e: r.endsOn, n: r.name })))
   for (let i = 0; i < hashed.length; i += CHUNK) {
     unit.add({
-      sql: 'INSERT INTO membership_verification_entries (id, list_id, key_hash, ends_on, holder_name, created_at) SELECT json_extract(j.value, \'$.id\'), ?1, json_extract(j.value, \'$.h\'), json_extract(j.value, \'$.e\'), json_extract(j.value, \'$.n\'), ?2 FROM json_each(?3) j WHERE true ON CONFLICT (list_id, key_hash) DO UPDATE SET ends_on = excluded.ends_on, holder_name = excluded.holder_name',
+      sql: 'INSERT INTO membership_verification_entries (id, list_id, key_hash, ends_on, holder_name, created_at) SELECT json_extract(j.value, \'$.id\'), ?1, json_extract(j.value, \'$.h\'), json_extract(j.value, \'$.e\'), json_extract(j.value, \'$.n\'), ?2 FROM json_each(?3) j WHERE true ON CONFLICT (list_id, key_hash) DO UPDATE SET ends_on = excluded.ends_on, holder_name = excluded.holder_name, by_hand = 0',
       params: [list.id, at, JSON.stringify(hashed.slice(i, i + CHUNK))],
     })
   }
@@ -43,9 +44,9 @@ export default defineRoute({
   // record but ended yesterday and without its name.
   const kept = JSON.stringify(hashed.map(r => r.h))
   const unused = 'id NOT IN (SELECT entry_id FROM membership_verifications WHERE entry_id IS NOT NULL)'
-  unit.add({ sql: `DELETE FROM membership_verification_entries WHERE list_id = ?1 AND key_hash NOT IN (SELECT value FROM json_each(?2)) AND ${unused}`, params: [list.id, kept] })
-  unit.add({ sql: 'UPDATE membership_verification_entries SET ends_on = ?3, holder_name = NULL WHERE list_id = ?1 AND key_hash NOT IN (SELECT value FROM json_each(?2))', params: [list.id, kept, addDays(day, -1)] })
-  unit.add({ sql: 'UPDATE membership_verification_lists SET entry_count = (SELECT count(*) FROM membership_verification_entries WHERE list_id = ?1 AND key_hash IN (SELECT value FROM json_each(?2))), uploaded_at = ?3 WHERE id = ?1', params: [list.id, kept, at] }).expect(1)
+  unit.add({ sql: `DELETE FROM membership_verification_entries WHERE list_id = ?1 AND key_hash NOT IN (SELECT value FROM json_each(?2)) AND by_hand = 0 AND ${unused}`, params: [list.id, kept] })
+  unit.add({ sql: 'UPDATE membership_verification_entries SET ends_on = ?3, holder_name = NULL WHERE list_id = ?1 AND by_hand = 0 AND key_hash NOT IN (SELECT value FROM json_each(?2))', params: [list.id, kept, addDays(day, -1)] })
+  unit.add({ sql: 'UPDATE membership_verification_lists SET entry_count = (SELECT count(*) FROM membership_verification_entries WHERE list_id = ?1 AND (by_hand = 1 OR key_hash IN (SELECT value FROM json_each(?2)))), uploaded_at = ?3 WHERE id = ?1', params: [list.id, kept, at] }).expect(1)
   unit.add({ sql: 'UPDATE membership_verification_lists SET uploaded_by = ? WHERE id = ?', params: [actor.accountId, list.id] }) // exact-account: records who uploaded, reads nothing
   unit.audit({ action: 'update', record: ['membership.verification-list', list.id], detail: { loaded: rows.length, refused: refused.length } })
   return { loaded: rows.length, refused }

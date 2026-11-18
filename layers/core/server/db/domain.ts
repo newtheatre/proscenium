@@ -783,4 +783,29 @@ export const webhookDeliveries = defineTable('core_webhook_deliveries', {
   ],
 })
 
-export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+/**
+ * A policy as it read at one time (/policies/<id>): the whole text as plain Markdown, with every
+ * setting's value filled in. A row is written the first time a policy is found to read differently,
+ * whether its wording, a setting it quotes or a module changed. What a person agreed to (an order's
+ * terms) points at a row here, so the words they saw can always be shown again. Never changed.
+ */
+export const policyVersions = defineTable('core_policy_versions', {
+  id: col.id(),
+  policy: col.internal(text('policy').notNull()),
+  // Counts from 1 within a policy, in the order the versions were first seen.
+  number: col.internal(integer('number').notNull()),
+  hash: col.internal(text('hash').notNull()),
+  title: col.internal(text('title').notNull()),
+  body: col.internal(text('body').notNull()),
+  createdAt: col.timestamp('created_at').notNull(),
+}, {
+  id: 'pvn',
+  realm: 'system',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_policy_versions_number').on(t.policy, t.number),
+    uniqueIndex('core_policy_versions_hash').on(t.policy, t.hash),
+  ],
+})
+
+export const tables = { policyVersions, webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

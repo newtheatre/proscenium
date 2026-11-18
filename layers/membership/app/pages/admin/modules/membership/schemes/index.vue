@@ -85,6 +85,16 @@ async function create() {
         </RecordListItem>
       </RecordList>
     </DataBoundary>
+    <PageSection
+      class="mt-6"
+      :title="t('membership.screens.schemes.member-fields')"
+      :description="t('membership.screens.schemes.member-fields-help')"
+    >
+      <FormsSlotForms
+        slot-id="membership.member-fields"
+        subject="*"
+      />
+    </PageSection>
 
     <UModal
       v-model:open="open"

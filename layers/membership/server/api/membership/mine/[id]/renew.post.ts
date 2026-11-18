@@ -56,7 +56,7 @@ export default defineRoute({
     unit.audit({ action: 'create', record: ['membership.membership', membershipId], detail: { origin: 'renewed', waiting: checked.reason } })
     return { membershipId, pending: true, renewed: true }
   }
-  const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null } : null
+  const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null, reference: checked.reference } : null
   const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId, false, endsByList)
   if (scheme.requiresPayment) {
     const { membershipId, quote } = await writePaying(unit, { scheme, accountId, lengthOptionId: option?.id ?? null, renewsId: id, verified: true, day })

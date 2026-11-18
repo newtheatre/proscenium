@@ -3,8 +3,8 @@
 // money: fees are the separate membership-fees module. This file grows with the build; it declares
 // only what the code so far uses.
 //
-// The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
-// needs no form (tab 7), so forms is only used until the application form is wired in.
+// Forms is required, as the specification says: a scheme's application form and members' own
+// fields are form slots. Forms is always on, so requiring it ties nothing to a switch.
 import { z } from 'zod'
 import { ability, credentialDecl, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
@@ -18,7 +18,8 @@ export default defineModule({
   manifest: 1,
   since: '0.1.0',
   stability: 'experimental',
-  uses: ['forms', 'communications', 'box-office', 'front-of-house'],
+  requires: ['forms'],
+  uses: ['communications', 'box-office', 'front-of-house'],
 
   settings: defineSettings('membership', {
     'applications.expire-after': setting.duration({ default: '14d', min: '1d', max: '90d', change, whenModule: 'membership-fees', audience: 'public', quotable: true }),
@@ -63,6 +64,8 @@ export default defineModule({
     'membership.add': ability({ on: 'membership.scheme', implies: ['membership.view'] }),
     // Correcting a membership's dates (D7, MEM-28). Nobody corrects their own.
     'membership.update': ability({ on: 'membership.membership', owner: 'refuses', implies: ['membership.view'] }),
+    // Filling in a membership's custom fields (MEM-34): the holder fills in their own, and staff who hold it fill in anybody's.
+    'membership.fields': ability({ on: 'membership.membership', owner: 'grants', implies: ['membership.view'] }),
     // Exporting the members list (MEM-27): a file of people, so privileged.
     // Importing members from a file (MEM-49): a dry run, then bulk jobs. Privileged: it makes accounts.
     'membership.import': ability({ on: 'membership.scheme', risk: 'privileged', implies: ['membership.add'] }),
@@ -128,6 +131,22 @@ export default defineModule({
   },
 
   contributes: {
+    // The application form a scheme asks applicants to answer (MEM-03, MEM-12); a decision stage on it is approval (AP1).
+    'forms.slot': [
+      { id: 'membership.application', subject: 'membership.scheme', attach: 'membership.scheme.manage', label: 'membership.forms.application.label', limit: 1 },
+      // MEM-34: what a theatre keeps about its members, such as course and year, for every membership.
+      { id: 'membership.member-fields', subject: 'membership.membership', attach: 'membership.scheme.manage', edit: 'membership.membership.fields', mode: 'record' as const, label: 'membership.forms.member-fields.label', limit: 1 },
+    ],
+    // Membership's lines of the privacy notice's "what we hold" table (/policies/privacy).
+    // The terms a person agrees to by joining. Their text is content/policies/membership/*.md.
+    'core.policy': [
+      { id: 'membership', title: 'Membership terms', summary: 'Joining, how long membership lasts, leaving, and how members are asked to behave.', order: 18, kind: 'terms', accepted: 'joining' },
+    ],
+    'core.privacy-record': [
+      { id: 'membership.memberships', holds: 'Your membership: its kind, its dates and your membership number', why: 'To run your membership', basis: 'To carry out our contract with you', keptFor: 'While you are a member', order: 150 },
+      { id: 'membership.ended', holds: 'Memberships that have ended', why: 'To answer questions about past membership', basis: 'Our legitimate interests in keeping an accurate record of who our members were', keptFor: 'membership.retention.ended-after', order: 160 },
+      { id: 'membership.verification-names', holds: 'Names on a membership list another organisation sent us', why: 'So that staff can resolve a mismatch', basis: 'Our legitimate interests in checking membership fairly', keptFor: 'membership.verification.names-keep-for', order: 170 },
+    ],
     'core.navigation': [
       { id: 'membership.schemes', menu: 'admin', group: 'modules', to: '/admin/modules/membership/schemes', match: '/admin/modules/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
@@ -252,6 +271,10 @@ export default defineModule({
       'membership.scheme.closed': event({ version: 1, payload: scheme, internal: false }),
       // Anything about a person's standing stays inside.
       'membership.membership.started': event({ version: 1, payload: membership, internal: true }),
+    },
+    listens: {
+      // AP2: approved or declined at the application form's decision stage.
+      'forms.response.decided': 'application-decided',
     },
   },
 })
