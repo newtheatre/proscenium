@@ -320,7 +320,6 @@
   "forms.screens.fill.add-entry": "Add another",
   "forms.screens.fill.remove-entry": "Remove entry {n}",
   "forms.screens.fill.file-later": "Files can be added once the form is live.",
-  "forms.screens.fill.record-later": "The person answering searches and picks from the source here.",
   "forms.screens.fill.address.line1": "Address line 1",
   "forms.screens.fill.address.line2": "Address line 2",
   "forms.screens.fill.address.town": "Town or city",
@@ -656,5 +655,16 @@
   "forms.screens.responses.reason": "Reason for the decision",
   "forms.screens.responses.reason-help": "Kept for the record. It is never sent to the person who sent the response.",
   "forms.screens.responses.reason-needed": "Give a reason for the record.",
-  "forms.screens.responses.reason-kept": "Reason for the decision:"
+  "forms.screens.responses.reason-kept": "Reason for the decision:",
+  "forms.screens.fill.record-no-source": "This question has nothing to choose from yet.",
+  "forms.screens.fill.record-shut": "You cannot search here, so this question is left for the theatre to fill in.",
+  "forms.screens.fill.record-choose": "Search and choose",
+  "forms.screens.fill.record-search": "Type a name",
+  "forms.screens.fill.record-type-more": "Type two letters or more.",
+  "forms.screens.fill.record-none": "Nothing matches.",
+  "forms.screens.fill.record-failed": "The search did not work. Try again.",
+  "forms.screens.fill.record-chosen": "Chosen",
+  "forms.screens.details.people-involved": "These people are involved",
+  "forms.screens.details.people-involved-help": "A reviewer named in the answer cannot review or see that response.",
+  "forms.issues.record": "Choose from the list."
 }

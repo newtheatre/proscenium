@@ -21,7 +21,7 @@ const MOST_SHOWN = 4 // not-policy: options listed on a card before "and n more"
   </p>
   <p
     class="mt-1 font-medium"
-    :class="question.label.trim() ? '' : 'text-dimmed'"
+    :class="question.label.trim() ? '' : 'text-muted'"
   >
     {{ formsQuestionName(question) }}
   </p>

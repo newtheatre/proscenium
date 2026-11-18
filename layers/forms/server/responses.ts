@@ -10,6 +10,7 @@ import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questi
 import { answers as answersTable } from './db/schema'
 import type { FormRow, VersionRow } from './forms'
 import { openRound } from './review'
+import { recordLabels } from './sources'
 
 // ---- the link ----
 
@@ -161,39 +162,43 @@ interface AnswerRow {
 const optionWords = (q: Question, id: string, other: unknown): string => id === OTHER ? (typeof other === 'string' && other.trim() ? other.trim() : 'Other') : q.options?.find(o => o.id === id)?.label ?? id
 
 /** The words of what was chosen, so a renamed or removed option still reads as it did. */
-function snapshot(q: Question, value: Value, other: unknown): string | null {
+function snapshot(q: Question, value: Value, other: unknown, labels?: Record<string, string>): string | null {
+  // A chosen record reads as it was named when the response was sent.
+  if (q.type === 'record') return (typeof value === 'string' ? [value] : Array.isArray(value) ? value as string[] : []).map(id => labels?.[id] ?? id).join('; ') || null
   if (!q.type.startsWith('choice.')) return null
   if (typeof value === 'string') return optionWords(q, value, other)
   if (Array.isArray(value)) return (value as string[]).map(v => optionWords(q, v, other)).join('; ')
   return null
 }
 
-async function rowOf(base: Pick<AnswerRow, 'responseId' | 'revision'>, q: Question, repeatIndex: number, value: Value, other: unknown): Promise<AnswerRow | null> {
+async function rowOf(base: Pick<AnswerRow, 'responseId' | 'revision'>, q: Question, repeatIndex: number, value: Value, other: unknown, labels?: Record<string, string>): Promise<AnswerRow | null> {
   if (isEmpty(value)) return null
   const row: AnswerRow = { ...base, questionId: q.id, repeatIndex, dataClass: q.dataClass, valueText: null, valueNumber: null, valueJson: null, otherText: null, valueCipher: null, labelSnapshot: null }
   const otherText = typeof other === 'string' && other.trim() ? other.trim() : null
   // A special-category answer is held only sealed (FB-601): nothing of it sits in a readable column.
-  if (q.dataClass === 'special') return { ...row, valueCipher: await sealSpecial(JSON.stringify({ value, other: otherText, label: snapshot(q, value, other) })) }
+  if (q.dataClass === 'special') return { ...row, valueCipher: await sealSpecial(JSON.stringify({ value, other: otherText, label: snapshot(q, value, other, labels) })) }
   if (typeof value === 'string') row.valueText = value
   else if (typeof value === 'number') row.valueNumber = value
   else if (typeof value === 'boolean') row.valueNumber = value ? 1 : 0
   else row.valueJson = JSON.stringify(value)
-  return { ...row, otherText, labelSnapshot: snapshot(q, value, other) }
+  return { ...row, otherText, labelSnapshot: snapshot(q, value, other, labels) }
 }
 
 /** One row per answered question, and per entry of a repeating group. Hidden answers are already gone. */
 export async function answerRows(def: Definition, kept: Answers, responseId: string, revision: number): Promise<AnswerRow[]> {
   const out: AnswerRow[] = []
   const base = { responseId, revision }
+  // Every record chosen is checked against its source, and refused if the source does not know it.
+  const labels = await recordLabels(def, kept)
   for (const { question: q, group } of questionsOf(def)) {
     if (!group) {
-      const row = await rowOf(base, q, 0, kept[q.id] as Value, kept[otherKey(q.id)])
+      const row = await rowOf(base, q, 0, kept[q.id] as Value, kept[otherKey(q.id)], labels.get(q.id))
       if (row) out.push(row)
       continue
     }
     const entries = Array.isArray(kept[group.id]) ? kept[group.id] as Entry[] : []
     for (const [i, entry] of entries.entries()) {
-      const row = await rowOf(base, q, i, entry[q.id], entry[otherKey(q.id)])
+      const row = await rowOf(base, q, i, entry[q.id], entry[otherKey(q.id)], labels.get(q.id))
       if (row) out.push(row)
     }
   }
@@ -277,7 +282,7 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const rows = await answerRows(def, evaluation.answers, s.responseId, 1)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   recordMove(unit, { responseId: s.responseId, from: null, to: stage, transitionKey: SUBMIT, revision: 1, actorId: s.actor.accountId ?? null, at: s.at })
-  await openRound(unit, { stage, formId: s.form.id, responseId: s.responseId, personId, revision: 1, at: s.at })
+  await openRound(unit, { def, stage, formId: s.form.id, responseId: s.responseId, personId, revision: 1, at: s.at, answers: evaluation.answers })
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
   unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
   return { reference }

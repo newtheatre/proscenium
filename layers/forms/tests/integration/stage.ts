@@ -28,6 +28,7 @@ import reviewsGet from '../../server/api/forms/reviews/index.get'
 import reviewGet from '../../server/api/forms/reviews/[id].get'
 import reviewPut from '../../server/api/forms/reviews/[id].put'
 import conflictPost from '../../server/api/forms/reviews/[id]/conflict.post'
+import sourceGet from '../../server/api/forms/sources/[source].get'
 import type { Definition, Question } from '../../shared/engine'
 
 export const handle = server({
@@ -52,6 +53,7 @@ export const handle = server({
   'PUT /api/forms/mine/:id': mineOnePut,
   'POST /api/forms/forms/:id/responses/:response/move': movePost,
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,
+  'GET /api/forms/sources/:source': sourceGet,
   'GET /api/forms/reviews': reviewsGet,
   'GET /api/forms/reviews/:id': reviewGet,
   'PUT /api/forms/reviews/:id': reviewPut,

@@ -140,7 +140,7 @@ const logic = (q: { visibleWhen?: Question['visibleWhen'] }) => q.visibleWhen ? 
         </p>
         <p
           class="mt-1 line-clamp-3 whitespace-pre-line text-sm"
-          :class="item.text.trim() ? '' : 'text-dimmed'"
+          :class="item.text.trim() ? '' : 'text-muted'"
         >
           {{ item.text.trim() || t('forms.screens.builder.empty-content') }}
         </p>
@@ -169,7 +169,7 @@ const logic = (q: { visibleWhen?: Question['visibleWhen'] }) => q.visibleWhen ? 
           </p>
           <p
             class="mt-1 font-medium"
-            :class="item.label.trim() ? '' : 'text-dimmed'"
+            :class="item.label.trim() ? '' : 'text-muted'"
           >
             {{ name }}
           </p>

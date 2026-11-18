@@ -2,7 +2,7 @@
 // with logic, versions and, where a form wants one, a workflow. Always on, as the specification
 // decides. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, point, setting } from '#kit'
 import { STAGE_KINDS } from './shared/engine/types'
 import { tables } from './server/db/schema'
 
@@ -59,6 +59,11 @@ export default defineModule({
 
   tables,
 
+  points: {
+    // Somewhere a "record from a source" question chooses from: search, labels, and who may look.
+    'forms.source': point({ kind: 'code', contract: 'source' }),
+  },
+
   events: {
     announces: {
       // Ids only: what was answered stays inside, and a listener reads it through forms.
@@ -70,6 +75,11 @@ export default defineModule({
   contributes: {
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
+    // Core contributes to no module's point, so the sources for core's records are forms' own.
+    'forms.source': [
+      { id: 'forms.person', file: 'person' }, { id: 'forms.production', file: 'production' }, { id: 'forms.performance', file: 'performance' },
+      { id: 'forms.venue', file: 'venue' }, { id: 'forms.space', file: 'space' },
+    ],
     'core.account-section': [
       { id: 'forms.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'FormsMine', order: 45, to: '/account/forms', icon: 'i-lucide-file-text', count: 'forms.mine', hideEmpty: true },
     ],

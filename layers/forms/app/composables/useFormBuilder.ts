@@ -14,6 +14,8 @@ export interface BuilderData {
   fields: PublishedField[]
   /** For the stages editor: roles whose holders can review, and the names of people a stage names. */
   reviewers?: { roles: { id: string, name: string }[], people: Record<string, string> }
+  /** Where a "record from a source" question may choose from now. */
+  sources?: { key: string, label: string, people: boolean }[]
   versions: { id: string, number: number, publishedAt: number }[]
 }
 export type SaveState = 'saved' | 'waiting' | 'saving' | 'stale' | 'failed'
@@ -32,6 +34,7 @@ export interface FormBuilder {
   problems: ComputedRef<Problem[]>
   problemsAt: ComputedRef<Map<string, Problem[]>>
   published: ComputedRef<Map<string, PublishedField>>
+  sources: ComputedRef<{ key: string, label: string, people: boolean }[]>
   canUndo: ComputedRef<boolean>
   canRedo: ComputedRef<boolean>
   /** Replaces the definition. Edits with the same `merge` name close together are one undo step. */
@@ -127,7 +130,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
     if (found) pageId.value = found.page.id
   }
 
-  const problems = computed(() => checkDefinition(definition.value))
+  const problems = computed(() => checkDefinition(definition.value, data.sources ? { sources: data.sources.map(s => s.key) } : {}))
   const problemsAt = computed(() => {
     const map = new Map<string, Problem[]>()
     for (const p of problems.value) map.set(p.at, [...(map.get(p.at) ?? []), p])
@@ -136,6 +139,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
   return {
     definition, revision, state, failure, selected, pageId, problems, problemsAt,
     published: computed(() => new Map(fields().map(f => [f.questionId, f]))),
+    sources: computed(() => data.sources ?? []),
     canUndo: computed(() => past.value.length > 0),
     canRedo: computed(() => future.value.length > 0),
     apply,

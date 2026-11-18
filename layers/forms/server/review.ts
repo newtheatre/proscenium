@@ -6,8 +6,8 @@
 import { all, first, newId, refuse, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { canonicalAccount, holdersOfRole } from '#modules/core'
-import type { Definition, Review, ScoreSummary, Stage, Tally, Vote } from '../shared/engine'
-import { stageOf, summarise, tally, validScores } from '../shared/engine'
+import type { Answers, Definition, Entry, Review, ScoreSummary, Stage, Tally, Vote } from '../shared/engine'
+import { questionsOf, stageOf, summarise, tally, validScores } from '../shared/engine'
 import { reviewAssignments } from './db/schema'
 
 const CONFLICT = 409 // not-policy: HTTP status
@@ -25,10 +25,14 @@ export async function reviewersFor(review: Review): Promise<string[]> {
  * Opens a round for a response arriving in a stage that asks for review: one assignment per
  * reviewer. The person who sent the response is assigned as conflicted, without declaring it.
  */
-export async function openRound(unit: UnitView, input: { stage: Stage, formId: string, responseId: string, personId: string | null, revision: number, at: number }): Promise<void> {
+export async function openRound(unit: UnitView, input: { def: Definition, stage: Stage, formId: string, responseId: string, personId: string | null, revision: number, at: number, answers?: Answers }): Promise<void> {
   if (!input.stage.review) return
   const reviewers = await reviewersFor(input.stage.review)
-  const own = input.personId ? await canonicalAccount(input.personId) : null
+  // Whoever sent it, and anybody named in a question of people marked as involved (FB-406).
+  const barred = new Set<string>()
+  if (input.personId) barred.add(await canonicalAccount(input.personId))
+  const named = input.answers ? involvedIn(input.def, input.answers) : await involvedStored(input.def, input.responseId, input.revision)
+  for (const id of named) barred.add(await canonicalAccount(id))
   const roundId = newId('frnd')
   unit.add({
     sql: 'INSERT INTO forms_review_rounds (id, response_id, form_id, stage_key, revision, opened_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -37,8 +41,27 @@ export async function openRound(unit: UnitView, input: { stage: Stage, formId: s
   if (!reviewers.length) return
   unit.insertSet(reviewAssignments, reviewers.map(reviewerId => ({
     roundId, responseId: input.responseId, formId: input.formId, reviewerId,
-    status: reviewerId === own ? 'conflicted' : 'assigned', conflict: reviewerId === own ? 'automatic' : null, createdAt: input.at,
+    status: barred.has(reviewerId) ? 'conflicted' : 'assigned', conflict: barred.has(reviewerId) ? 'automatic' : null, createdAt: input.at,
   })))
+}
+
+const ids = (value: unknown): string[] => typeof value === 'string' && value ? [value] : Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+const involvedQuestions = (def: Definition) => questionsOf(def).filter(({ question: q }) => q.type === 'record' && q.peopleInvolved)
+
+/** The accounts named in "people involved" questions, from answers in hand. */
+export function involvedIn(def: Definition, answers: Answers): string[] {
+  return involvedQuestions(def).flatMap(({ question: q, group }) => group
+    ? (Array.isArray(answers[group.id]) ? answers[group.id] as Entry[] : []).flatMap(entry => ids(entry[q.id]))
+    : ids(answers[q.id]))
+}
+
+/** The same, from a stored revision. A sealed answer names nobody here: it is not opened for this. */
+async function involvedStored(def: Definition, responseId: string, revision: number): Promise<string[]> {
+  const questions = involvedQuestions(def).map(({ question }) => question.id)
+  if (!questions.length) return []
+  const rows = await all<{ valueText: string | null, valueJson: string | null }>(
+    'SELECT value_text AS valueText, value_json AS valueJson FROM forms_answers WHERE response_id = ? AND revision = ? AND question_id IN (SELECT value FROM json_each(?))', responseId, revision, JSON.stringify(questions))
+  return rows.flatMap(r => r.valueText ? [r.valueText] : ids(r.valueJson ? JSON.parse(r.valueJson) : null))
 }
 
 /** Ends any round a response has open, as it leaves the stage. What was written stays for the record. */
