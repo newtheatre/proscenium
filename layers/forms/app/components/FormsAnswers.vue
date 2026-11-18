@@ -6,7 +6,7 @@ import type { DataClass, Definition, Question, Value } from '../../shared/engine
 
 export interface ShownAnswer { questionId: string, repeatIndex: number, dataClass: DataClass, restricted: boolean, value: Value, other: string | null, label: string | null }
 
-const props = defineProps<{ definition: Definition, answers: ShownAnswer[] }>()
+const props = defineProps<{ definition: Definition, answers: ShownAnswer[], /** Questions whose answers differ from the revision before: each is marked. */ changed?: string[] }>()
 const { t } = useT()
 const { day, dateTime } = useDates()
 
@@ -30,6 +30,7 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
       key: `${q.id}.${a.repeatIndex}`,
       label: item.kind === 'group' ? `${item.label} ${a.repeatIndex + 1}: ${formsQuestionName(q)}` : formsQuestionName(q),
       restricted: a.restricted,
+      changed: !!props.changed?.includes(q.id),
       text: a.restricted ? '' : words(q, a),
     })))
   }),
@@ -63,6 +64,11 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
         >
           <dt class="text-sm text-muted">
             {{ row.label }}
+            <StatusBadge
+              v-if="row.changed"
+              tone="info"
+              :label="t('forms.screens.answers.changed')"
+            />
           </dt>
           <dd class="whitespace-pre-wrap break-words">
             <StatusBadge

@@ -3,10 +3,10 @@
 // keeps an unsent working copy, and sending stores the response and one row per answer in one unit
 // of work. The server never trusts what the browser worked out: it runs the engine again on the
 // answers, drops what logic hides, and refuses what is not valid.
-import { all, first, linkTokens, openSpecial, refuse, sealSpecial, today, useSetting, type Actor, type UnitView } from '#kit'
+import { all, first, linkTokens, newId, openSpecial, refuse, sealSpecial, today, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import type { Answers, DataClass, Definition, Entry, Evaluation, Question, Value } from '../shared/engine'
-import { OTHER, evaluate, isEmpty, otherKey, questionsOf } from '../shared/engine'
+import type { Answers, DataClass, Definition, Entry, Evaluation, Question, Stage, Value } from '../shared/engine'
+import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questionsOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow, VersionRow } from './forms'
 
@@ -75,12 +75,14 @@ export interface ResponseRow {
   personId: string | null
   respondentEmail: string | null
   state: 'draft' | 'awaiting_payment' | 'submitted' | 'withdrawn'
+  stageKey: string | null
   stageKind: string | null
+  stageNote: string | null
   currentRevision: number
   submittedAt: number | null
   createdAt: number
 }
-const RESPONSE = 'id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_kind AS stageKind, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
+const RESPONSE = 'id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
 export const getResponse = (id: string) => first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE id = ?`, id)
 
 /** Whether a response is this person's: by account, across any merged into it. A signed-out response is nobody's to come back to. */
@@ -204,6 +206,18 @@ export function refuseInvalid(evaluation: Evaluation): void {
   refuse('forms.response.invalid', 'Some answers need attention.', { status: 422, fields }) // not-policy: HTTP status
 }
 
+/** When a response's retention period ends: counted from the moment it reaches a final stage, and not before. */
+export const retentionFrom = (form: FormRow, kind: string, at: number): number | null =>
+  form.retentionDays === null || !isFinal(kind) ? null : at + form.retentionDays * 86_400_000 // not-policy: milliseconds in a day
+
+/** Writes the history row of a move, in the unit that makes it (FB-403). */
+export function recordMove(unit: UnitView, move: { responseId: string, from: string | null, to: Stage, transitionKey: string, revision: number, actorId: string | null, at: number }): void {
+  unit.add({
+    sql: 'INSERT INTO forms_stage_history (id, response_id, from_stage, to_stage, to_kind, transition_key, revision, actor_id, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [newId('fstg'), move.responseId, move.from, move.to.key, move.to.kind, move.transitionKey, move.revision, move.actorId, move.at],
+  })
+}
+
 export interface Sending {
   responseId: string
   form: FormRow
@@ -231,7 +245,9 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const email = s.form.anonymous || personId ? null : s.email
   const uniqueKey = await uniqueKeyOf(s.link, personId ?? undefined, email)
   const reference = s.draft?.reference ?? newReference()
-  const retentionDue = s.form.retentionDays === null ? null : s.at + s.form.retentionDays * 86_400_000 // not-policy: milliseconds in a day
+  // A response starts in the form's first stage; its retention period runs once it reaches a final one.
+  const stage = firstStage(def)
+  const retentionDue = retentionFrom(s.form, stage.kind, s.at)
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
 
   unit.add({
@@ -243,20 +259,21 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const taken = 'EXISTS (SELECT 1 FROM forms_responses WHERE placement_id = ?2 AND unique_key = ?3 AND id <> ?1)'
   if (s.draft) {
     unit.add({
-      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = 'received', stage_kind = 'closed', current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7 WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`, // not-policy: numbered parameters
-      params: [s.responseId, s.link.id, uniqueKey, s.version.id, calculated, s.at, retentionDue],
+      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = ?8, stage_kind = ?9, current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7 WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, s.version.id, calculated, s.at, retentionDue, stage.key, stage.kind],
     }).expect(1, once)
     unit.add({ sql: 'DELETE FROM forms_response_drafts WHERE response_id = ?', params: [s.responseId] })
   }
   else {
     unit.add({
-      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', 'received', 'closed', 1, ?9, 0, ?10, ?10, ?10, ?11 WHERE NOT ${taken}`, // not-policy: numbered parameters
-      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue],
+      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', ?12, ?13, 1, ?9, 0, ?10, ?10, ?10, ?11 WHERE NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue, stage.key, stage.kind],
     }).expect(1, once)
   }
 
   const rows = await answerRows(def, evaluation.answers, s.responseId, 1)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
+  recordMove(unit, { responseId: s.responseId, from: null, to: stage, transitionKey: SUBMIT, revision: 1, actorId: s.actor.accountId ?? null, at: s.at })
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
   unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
   return { reference }
@@ -292,17 +309,37 @@ async function unpack(row: AnswerRecord, type: string | undefined, open: boolean
 
 /**
  * The current answers of some responses, by response. `open` says whether special-category answers
- * are opened; when it is false they come back marked restricted and nothing is decrypted.
+ * are opened; when it is false they come back marked restricted and nothing is decrypted. An
+ * earlier revision is read by its number.
  */
-export async function readAnswers(responseIds: string[], types: Map<string, string>, open: boolean): Promise<Map<string, StoredAnswer[]>> {
+export async function readAnswers(responseIds: string[], types: Map<string, string>, open: boolean, revision?: number): Promise<Map<string, StoredAnswer[]>> {
   const out = new Map<string, StoredAnswer[]>(responseIds.map(id => [id, []]))
   if (!responseIds.length) return out
   // One parameter however many responses: D1 allows a hundred bound values and no more.
   const rows = await all<AnswerRecord>(
     `SELECT a.response_id AS responseId, a.question_id AS questionId, a.repeat_index AS repeatIndex, a.data_class AS dataClass, a.value_text AS valueText, a.value_number AS valueNumber, a.value_json AS valueJson, a.other_text AS otherText, a.value_cipher AS valueCipher, a.label_snapshot AS labelSnapshot
-     FROM forms_answers a JOIN forms_responses r ON r.id = a.response_id AND r.current_revision = a.revision
-     WHERE a.response_id IN (SELECT value FROM json_each(?)) ORDER BY a.response_id, a.question_id, a.repeat_index`, JSON.stringify(responseIds))
+     FROM forms_answers a JOIN forms_responses r ON r.id = a.response_id AND a.revision = COALESCE(?2, r.current_revision)
+     WHERE a.response_id IN (SELECT value FROM json_each(?1)) ORDER BY a.response_id, a.question_id, a.repeat_index`, JSON.stringify(responseIds), revision ?? null)
   for (const row of rows) out.get(row.responseId)!.push(await unpack(row, types.get(row.questionId), open))
+  return out
+}
+
+/** Stored answers as the form takes them: by question id, a repeating group's as its entries. For a person changing their own response. */
+export function toAnswers(def: Definition, stored: StoredAnswer[]): Answers {
+  const out: Answers = {}
+  for (const { question: q, group } of questionsOf(def)) {
+    for (const a of stored.filter(s => s.questionId === q.id && !s.restricted)) {
+      if (!group) {
+        out[q.id] = a.value
+        if (a.other !== null) out[otherKey(q.id)] = a.other
+        continue
+      }
+      const entries = (out[group.id] ??= []) as Entry[]
+      while (entries.length <= a.repeatIndex) entries.push({})
+      entries[a.repeatIndex]![q.id] = a.value
+      if (a.other !== null) entries[a.repeatIndex]![otherKey(q.id)] = a.other
+    }
+  }
   return out
 }
 
@@ -321,8 +358,8 @@ export function words(answer: StoredAnswer, type: string | undefined): string {
 
 // ---- the responses of a form ----
 
-export interface ResponseFilter { from?: number, to?: number, questionId?: string, value?: string }
-export interface ListedResponse { id: string, reference: string, versionNumber: number, personId: string | null, personName: string | null, respondentEmail: string | null, submittedAt: number }
+export interface ResponseFilter { from?: number, to?: number, questionId?: string, value?: string, stage?: string }
+export interface ListedResponse { id: string, reference: string, versionId: string, stageKey: string | null, stageKind: string | null, versionNumber: number, personId: string | null, personName: string | null, respondentEmail: string | null, submittedAt: number }
 
 function where(formId: string, filter: ResponseFilter): { sql: string, params: unknown[] } {
   const parts = ['r.form_id = ?', 'r.state = \'submitted\'']
@@ -334,6 +371,10 @@ function where(formId: string, filter: ResponseFilter): { sql: string, params: u
   if (filter.to !== undefined) {
     parts.push('r.submitted_at < ?')
     params.push(filter.to)
+  }
+  if (filter.stage !== undefined) {
+    parts.push('r.stage_key = ?')
+    params.push(filter.stage)
   }
   if (filter.questionId !== undefined && filter.value !== undefined) {
     // A plain answer by its value; one of several choices by its place in the list. Sealed answers are never matched.
@@ -348,7 +389,7 @@ export async function listResponses(formId: string, filter: ResponseFilter, limi
   const w = where(formId, filter)
   const total = (await first<{ n: number }>(`SELECT COUNT(*) AS n FROM forms_responses r WHERE ${w.sql}`, ...w.params))!.n
   const rows = await all<ListedResponse>(
-    `SELECT r.id, r.reference, v.number AS versionNumber, r.person_id AS personId, a.name AS personName, r.respondent_email AS respondentEmail, r.submitted_at AS submittedAt
+    `SELECT r.id, r.reference, r.version_id AS versionId, r.stage_key AS stageKey, r.stage_kind AS stageKind, v.number AS versionNumber, r.person_id AS personId, a.name AS personName, r.respondent_email AS respondentEmail, r.submitted_at AS submittedAt
      FROM forms_responses r JOIN forms_versions v ON v.id = r.version_id LEFT JOIN core_accounts a ON a.id = r.person_id
      WHERE ${w.sql} ORDER BY r.submitted_at DESC, r.id DESC LIMIT ? OFFSET ?`, ...w.params, limit, offset)
   return { rows, total }

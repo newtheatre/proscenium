@@ -50,3 +50,8 @@ export function formsConditionSentence(condition: Condition, def: Definition): s
   }
   return say(condition, true)
 }
+
+/** The colour a stage of each kind is shown in, wherever a stage is named. */
+export function formsStageTone(kind: string | null | undefined): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
+  return kind === 'approved' ? 'success' : kind === 'declined' ? 'danger' : kind === 'returned' ? 'warning' : kind === 'in_review' || kind === 'pending' ? 'info' : 'neutral'
+}
