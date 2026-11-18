@@ -23,9 +23,9 @@ export default defineRoute({
   )
   if (!m) refuse('core.not-found', 'There is no such membership.', { status: 404 })
   const day = await todayOrNull()
-  // The list a check used and the name it gives for the entry, for staff comparing it with the person (V18). The ID itself is only ever kept as a hash.
-  const checks = await all<{ verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null }>(
-    `SELECT v.verifier, v.outcome, v.reason, v.note, v.decided_by AS decidedBy, v.created_at AS createdAt, l.name AS listName, e.holder_name AS listedAs
+  // The list a check used, the name it gives for the entry and the ID as typed, for staff comparing them with the person and their card (V18).
+  const checks = await all<{ verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null, reference: string | null, noun: string | null }>(
+    `SELECT v.verifier, v.outcome, v.reason, v.note, v.decided_by AS decidedBy, v.created_at AS createdAt, l.name AS listName, e.holder_name AS listedAs, v.reference, l.reference_noun AS noun
        FROM membership_verifications v
        LEFT JOIN membership_verification_entries e ON e.id = v.entry_id
        LEFT JOIN membership_verification_lists l ON l.id = e.list_id

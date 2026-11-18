@@ -56,7 +56,7 @@ export default defineRoute({
     unit.audit({ action: 'create', record: ['membership.membership', membershipId], detail: { origin: 'applied', waiting: checked.reason } })
     return { membershipId, pending: true, waiting: checked.reason }
   }
-  const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null } : null
+  const pass = checked?.outcome === 'passed' && checked.entryId ? { entryId: checked.entryId, endsOn: checked.endsOn ?? null, reference: checked.reference } : null
   // D9: an entry's own end date wins, and the membership then has no length option.
   const option = pass?.endsOn ? null : await chooseLength(scheme, input.lengthOptionId, false, endsByList)
   if (scheme.requiresPayment) {
