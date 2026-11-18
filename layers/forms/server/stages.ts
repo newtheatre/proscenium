@@ -3,14 +3,14 @@
 // on the server: it must be open from where the response is now, to this kind of mover, and nobody
 // moves their own response. The move, its history row, the audit entry and the event commit
 // together, and a second person making a move at the same moment is refused.
-import { all, can, refuse, today, type Actor, type UnitView } from '#kit'
+import { all, can, newId, refuse, today, type Actor, type UnitView } from '#kit'
 import type { Answers, Definition, Stage, Transition } from '../shared/engine'
 import { evaluate, hasStages, isDecision, resubmitMove, staffMoves, stageOf, statusOf, workflowOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
 import { queueActions } from './actions'
 import { tellMoved } from './notices'
-import { closeRounds, conflicted, openRound } from './review'
+import { closeRounds, conflicted, namedIn, openRound } from './review'
 import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
@@ -44,6 +44,8 @@ async function apply(unit: UnitView, input: { form: FormRow, response: ResponseR
     params: [input.response.id, to.key, to.kind, input.note, input.revision, input.at, retentionFrom(input.form, to.kind, input.at), input.response.stageKey, input.response.currentRevision, decision ? input.at : null, decision ? input.reason ?? null : null, ...(resend ? [input.calculated ?? null] : [])],
   }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
   recordMove(unit, { responseId: input.response.id, from: input.response.stageKey, to, transitionKey: input.move.key, revision: input.revision, actorId: input.actorId, at: input.at })
+  // What staff wrote with the move is kept beside the history, for staff: the person stops seeing it once the response moves on.
+  if (input.note && input.move.who === 'staff') unit.add({ sql: 'INSERT INTO forms_stage_notes (id, response_id, at, note) VALUES (?, ?, ?, ?)', params: [newId('fsn'), input.response.id, input.at, input.note] })
   if (stageOf(input.def, input.response.stageKey)?.review) closeRounds(unit, input.response.id, input.at)
   await openRound(unit, { def: input.def, stage: to, formId: input.form.id, title: input.form.title, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at, answers: input.answers })
   unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key, ...(decision ? { decision: to.kind } : {}) } })
@@ -65,6 +67,7 @@ export async function moveResponse(unit: UnitView, input: { form: FormRow, respo
   if (input.response.state !== 'submitted') return refuse('forms.stage.not-open', 'This response cannot be moved.', { status: CONFLICT })
   if (await owns(input.response, input.actor)) return refuse('forms.stage.own-response', 'You cannot move your own response.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
   if (await conflicted(input.actor, input.response.id)) return refuse('forms.review.conflicted', 'You have a conflict of interest on this response, so you cannot move it.', { status: 403 }) // not-policy: HTTP status
+  if (await namedIn(input.actor, input.def, input.response)) return refuse('forms.review.conflicted', 'You are named in this response, so you cannot move it.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
   const move = staffMoves(input.def, input.response.stageKey, true).find(t => t.key === input.transitionKey)
   if (!move) return refuse('forms.stage.not-open', 'This move is not open from where the response is now.', { status: CONFLICT, remedy: 'Open the response again to see where it is now.' })
   if (isDecision(input.def, move)) {
@@ -94,16 +97,17 @@ export async function resubmit(unit: UnitView, input: { form: FormRow, response:
   return to
 }
 
-export interface HistoryEntry { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null }
+export interface HistoryEntry { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null, note: string | null }
 
 /** A response's moves, oldest first, with the stage names of its own version. */
 export async function historyOf(def: Definition, responseId: string): Promise<HistoryEntry[]> {
-  const rows = await all<{ at: number, fromStage: string | null, toStage: string, toKind: string, transitionKey: string, revision: number, name: string | null }>(
-    `SELECT h.at, h.from_stage AS fromStage, h.to_stage AS toStage, h.to_kind AS toKind, h.transition_key AS transitionKey, h.revision, a.name
+  const rows = await all<{ at: number, fromStage: string | null, toStage: string, toKind: string, transitionKey: string, revision: number, name: string | null, note: string | null }>(
+    `SELECT h.at, h.from_stage AS fromStage, h.to_stage AS toStage, h.to_kind AS toKind, h.transition_key AS transitionKey, h.revision, a.name,
+       (SELECT n.note FROM forms_stage_notes n WHERE n.response_id = h.response_id AND n.at = h.at LIMIT 1) AS note
      FROM forms_stage_history h LEFT JOIN core_accounts a ON a.id = h.actor_id WHERE h.response_id = ? ORDER BY h.at, h.id`, responseId)
   const name = (key: string | null) => key === null ? null : stageOf(def, key)?.name || key
   const label = (key: string) => workflowOf(def).transitions.find(t => t.key === key)?.label ?? key
-  return rows.map(r => ({ at: r.at, from: name(r.fromStage), to: name(r.toStage)!, toKind: r.toKind, move: label(r.transitionKey), revision: r.revision, by: r.name }))
+  return rows.map(r => ({ at: r.at, from: name(r.fromStage), to: name(r.toStage)!, toKind: r.toKind, move: label(r.transitionKey), revision: r.revision, by: r.name, note: r.note }))
 }
 
 /** Which questions' answers differ between a revision and the one before it. A sealed answer counts only when it appears or goes. */
@@ -117,9 +121,75 @@ export async function changedIn(responseId: string, revision: number): Promise<s
   return [...new Set([...now.keys(), ...before.keys()])].filter(id => now.get(id) !== before.get(id)).sort()
 }
 
+/**
+ * What has happened to a person's own response, oldest first, in the words the form chose for them:
+ * each change of status and when. Who moved it, and stages that read the same to them, are left out.
+ */
+export async function ownHistory(def: Definition, response: ResponseRow): Promise<{ at: number, status: string, kind: string }[]> {
+  if (!hasStages(def)) return []
+  const rows = await all<{ at: number, toStage: string, toKind: string }>('SELECT at, to_stage AS toStage, to_kind AS toKind FROM forms_stage_history WHERE response_id = ? ORDER BY at, id', response.id)
+  const out: { at: number, status: string, kind: string }[] = []
+  for (const r of rows) {
+    const status = statusOf(stageOf(def, r.toStage)) || r.toStage
+    if (out.at(-1)?.status !== status) out.push({ at: r.at, status, kind: r.toKind })
+  }
+  return out
+}
+
 /** What a person is shown about where their own response is. */
 export function ownStatus(def: Definition, response: ResponseRow): { status: string, kind: string, note: string | null, canChange: boolean } | null {
   if (!hasStages(def) || response.state !== 'submitted') return null
   const stage = stageIn(def, response)
   return { status: statusOf(stage), kind: stage.kind, note: response.stageNote, canChange: !!resubmitMove(def, response.stageKey) }
+}
+
+/**
+ * What a person may still do with their own response where the form allows edits: change the
+ * answers, or withdraw it. Both stop once staff have started on it: with stages, once it leaves a
+ * stage that is still waiting (it may always be withdrawn while it is back with them); without,
+ * once the form has closed. Changing is not offered in a stage under review, where reviewers may
+ * already have read the answers.
+ */
+export function ownRights(form: FormRow, def: Definition, response: ResponseRow): { canEdit: boolean, canWithdraw: boolean } {
+  if (!form.allowEdits || form.anonymous || response.state !== 'submitted') return { canEdit: false, canWithdraw: false }
+  if (!hasStages(def)) {
+    const open = form.status === 'live' || form.status === 'paused'
+    return { canEdit: open, canWithdraw: open }
+  }
+  const stage = stageIn(def, response)
+  return { canEdit: stage.kind === 'pending' && !stage.review, canWithdraw: stage.kind === 'pending' || stage.kind === 'returned' }
+}
+
+/** The person changes their answers where the form allows it: a new revision beside the earlier ones, in the same stage. */
+export async function amend(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, actor: Actor, answers: Answers, at: number }): Promise<void> {
+  if (!ownRights(input.form, input.def, input.response).canEdit) return refuse('forms.response.not-editable', 'This response can no longer be changed.', { status: CONFLICT })
+  const evaluation = evaluate(input.def, input.answers, { today: await today() })
+  refuseInvalid(evaluation)
+  const revision = input.response.currentRevision + 1
+  const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
+  unit.add({
+    sql: 'UPDATE forms_responses SET current_revision = ?2, calculated = ?3, updated_at = ?4 WHERE id = ?1 AND state = \'submitted\' AND current_revision = ?5 AND stage_key IS ?6',
+    params: [input.response.id, revision, calculated, input.at, input.response.currentRevision, input.response.stageKey],
+  }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
+  const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
+  if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
+  unit.audit({ action: 'update', record: ['forms.response', input.response.id], detail: { formId: input.form.id, revision } })
+  unit.announce('forms.response.changed', { responseId: input.response.id, formId: input.form.id, revision }, { record: ['forms.response', input.response.id] })
+}
+
+/**
+ * The person takes their response back where the form allows it. It leaves the responses staff
+ * read, gives up its place (so they may answer again, and the form's limit counts one fewer), and
+ * its answers go at the next retention run.
+ */
+export function withdraw(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, at: number }): void {
+  if (!ownRights(input.form, input.def, input.response).canWithdraw) return refuse('forms.response.not-withdrawable', 'This response can no longer be withdrawn.', { status: CONFLICT, remedy: 'Get in touch with the theatre.' })
+  unit.add({
+    sql: 'UPDATE forms_responses SET state = \'withdrawn\', unique_key = NULL, stage_note = NULL, updated_at = ?2, retention_due_at = ?2 WHERE id = ?1 AND state = \'submitted\' AND stage_key IS ?3',
+    params: [input.response.id, input.at, input.response.stageKey],
+  }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
+  unit.add({ sql: 'UPDATE forms_placements SET response_count = MAX(0, response_count - 1) WHERE id = ?', params: [input.response.placementId] })
+  closeRounds(unit, input.response.id, input.at)
+  unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, withdrawn: true } })
+  unit.announce('forms.response.withdrawn', { responseId: input.response.id, formId: input.form.id }, { record: ['forms.response', input.response.id] })
 }

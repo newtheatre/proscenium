@@ -7,7 +7,7 @@
 <script setup lang="ts">
 import type { ButtonProps } from '@nuxt/ui'
 
-interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, reference?: { label: string, field?: string, shape: string } }
+interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string }
   production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
@@ -35,6 +35,13 @@ useSeoMeta({ title: () => t('box-office.book.title', { title: data.value?.produc
 
 const counts = ref<Record<string, number>>({})
 const keyOf = (bandId: string, typeId: string) => `${bandId} ${typeId}`
+const { viewer } = useViewer()
+// Each reference box has an id of its own, so its label never points at the stepper (UFormField's id).
+const referenceId = useId()
+// What to do about a price that cannot be chosen: the source's way to put it right, or signing in.
+const remedyOf = (type: TicketType) => type.remedy ?? (type.unmet && !type.unmetHelp && !viewer.value.signedIn ? { label: t('box-office.book.sign-in'), to: `/sign-in?next=${encodeURIComponent(route.fullPath)}` } : undefined)
+// A price limited per person says so once the limit is reached.
+const atMost = (bandId: string, type: TicketType) => type.most !== undefined && type.most < (data.value?.maxPerOrder ?? Infinity) && (counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0) >= type.most
 const chosen = computed(() => (data.value?.bands ?? []).flatMap(b => b.types.map(type => ({ band: b, type, quantity: counts.value[keyOf(b.bandId, type.ticketTypeId)] ?? 0 }))).filter(c => c.quantity > 0))
 const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0))
 // A promo code (BO-17), tried before holding so the saving shows; sent with the hold, which applies it again.
@@ -270,6 +277,14 @@ async function hold() {
                     <template v-else>
                       <span class="font-medium">{{ type.name }}</span>: <span class="text-muted">{{ type.unmet }}</span>
                     </template>
+                    <template v-if="remedyOf(type)">
+                      {{ ' ' }}<ULink
+                        :to="remedyOf(type)!.to"
+                        class="text-primary underline"
+                      >
+                        {{ remedyOf(type)!.label }}
+                      </ULink>
+                    </template>
                   </p>
                   <UFormField
                     v-else
@@ -277,6 +292,13 @@ async function hold() {
                     :help="typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
                     :error="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)] ? referenceRefusal?.reason : undefined"
                   >
+                    <template
+                      v-if="atMost(band.bandId, type)"
+                      #help
+                    >
+                      {{ typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined)) }}
+                      {{ t('box-office.book.most', { count: type.most! }) }}
+                    </template>
                     <div class="space-y-2">
                       <UInputNumber
                         v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
@@ -290,6 +312,7 @@ async function hold() {
                       <template v-if="typing(type)">
                         <UInput
                           v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
+                          :id="`${referenceId}-${band.bandId}-${type.ticketTypeId}-${n}`"
                           :key="n"
                           :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
                           :aria-label="t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"

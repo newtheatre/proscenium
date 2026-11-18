@@ -68,5 +68,8 @@
   "membership.facts.holder.label": "Holds a current membership",
   "membership.facts.supporter.label": "Is a supporter",
   "membership.facts.voter.label": "May vote: a member of a voting scheme past the qualifying period",
-  "membership.facts.scheme-holder.label": "Holds a membership of this scheme"
+  "membership.facts.scheme-holder.label": "Holds a membership of this scheme",
+  "membership.welcome.gives": "Your account shows what your membership includes.",
+  "membership.welcome.until": "It runs until {date}.",
+  "membership.welcome.no-end": "It has no end date."
 }

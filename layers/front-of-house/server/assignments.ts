@@ -6,8 +6,8 @@ import { newId, nowMs, refuse, requirements, useSetting, type UnitView } from '#
 import { accountScopeSql } from '#kit/accounts'
 import { LIVE_STATES } from './db/schema'
 import { getDuty, getShift, type Shift } from './shifts'
-import { shiftWords } from './words'
-import { notify } from '#modules/core'
+import { calendarLink, shiftDetails, shiftWords } from './words'
+import { accountLabel, notify } from '#modules/core'
 
 const live = LIVE_STATES.map(s => `'${s}'`).join(', ')
 
@@ -73,8 +73,14 @@ export async function signUp(unit: UnitView, input: { shiftId: string, accountId
   return { assignmentId: id, state }
 }
 
-/** What follows a confirmation, however it came: the event and the person told (FH-10). */
-export async function confirmed(unit: UnitView, input: { assignmentId: string, shift: Shift, accountId: string }): Promise<void> {
+/**
+ * What follows a confirmation, however it came: the event and the person told (FH-10). A person a
+ * manager put on the shift (`by`) is told so, rather than thanked for signing up (EM-5).
+ */
+export async function confirmed(unit: UnitView, input: { assignmentId: string, shift: Shift, accountId: string, by?: string }): Promise<void> {
   unit.announce('front-of-house.assignment.confirmed', { assignmentId: input.assignmentId, shiftId: input.shift.id, accountId: input.accountId }, { record: ['front-of-house.assignment', input.assignmentId] })
-  await notify(unit, 'front-of-house.shift-confirmed', { to: input.accountId, variables: await shiftWords(input.shift), dedupeKey: `confirmed:${input.assignmentId}`, subject: ['front-of-house.assignment', input.assignmentId] })
+  const variables = { ...await shiftWords(input.shift), details: await shiftDetails(input.shift), calendar: await calendarLink(input.assignmentId) }
+  const subject = ['front-of-house.assignment', input.assignmentId] as const
+  if (input.by) await notify(unit, 'front-of-house.shift-assigned', { to: input.accountId, variables: { ...variables, by: await accountLabel(input.by) }, dedupeKey: `confirmed:${input.assignmentId}`, subject })
+  else await notify(unit, 'front-of-house.shift-confirmed', { to: input.accountId, variables, dedupeKey: `confirmed:${input.assignmentId}`, subject })
 }

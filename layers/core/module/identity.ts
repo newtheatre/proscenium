@@ -178,6 +178,9 @@ export const identityTasks = {
   // Runs confirmed erasures whose cooling-off is over, and re-checks held ones (ID-16, ID-35).
   // Hourly rather than the specification's daily, so an erasure runs within the hour it falls due.
   'core.review-data-requests': task({ every: '1h' }),
+  // Offers modules already on the default roles and fact mappings they have not offered yet (FH-4),
+  // so a site that switched a module on before its defaults shipped gets them within the hour.
+  'core.module-defaults': task({ every: '1h' }),
 }
 
 // CORE_SESSION_KEY protects every session, and CORE_OWNER_RECOVERY is for when no Owner can sign
@@ -302,11 +305,11 @@ export const identityContributions = {
     channels: ['email' as const],
     lane: 'prompt' as const,
     // Both sign the person in, so both are sealed.
-    variables: { link: 'sealed' as const, code: 'sealed' as const },
+    variables: { link: 'sealed' as const, code: 'sealed' as const, lasts: 'text' as const },
     wording: {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
-        body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+        body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nThe link and the code work for {{ lasts }}.\n\nIf you did not ask to sign in, you can ignore this email.',
       },
     },
   }, {
@@ -339,6 +342,22 @@ export const identityContributions = {
       },
     },
   }, {
+    // Sent instead of the one above when the person answers a reviewer's question.
+    id: 'core.access-answer-received',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { scheme: 'text' as const },
+    link: '/account',
+    wording: {
+      'en-GB': {
+        subject: 'Thanks, we\'ve got your answer',
+        body: 'Thank you for answering. {{ theatre }} has your answer about your application to the {{ scheme }}, and the people who run it will read it and let you know.\n\nYou can see where it is in your account.',
+        action: 'See my application',
+      },
+    },
+  }, {
     // To the reviewers, once, when an application has waited longer than reply-within (ID-40).
     id: 'core.access-application-waiting',
     category: 'transactional' as const,
@@ -349,8 +368,8 @@ export const identityContributions = {
     link: '/console/people/access-scheme',
     wording: {
       'en-GB': {
-        subject: 'Applications to the {{ scheme }} are waiting',
-        body: 'Applications waiting longer than {{ theatre }} aims to answer: {{ count }}. The queue shows which.',
+        subject: 'Access scheme applications are waiting for review',
+        body: 'Applications to the {{ scheme }} waiting for review for longer than {{ theatre }} aims to take to answer: {{ count }}. The queue shows which.',
         action: 'Open the queue',
       },
     },
@@ -432,11 +451,13 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { what: 'text' as const },
+    variables: { what: 'text' as const, when: 'text' as const, device: 'text' as const },
+    link: '/account/sign-in',
     wording: {
       'en-GB': {
         subject: 'Your sign-in at {{ theatre }} has changed',
-        body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+        body: 'This was added to your account: **{{ what }}**.\n\nWhen: {{ when }}\n\nFrom: {{ device }}\n\nIf this was you, there is nothing to do. If it was not, someone else may be able to sign in as you: sign in, remove anything you do not recognise under Signing in, and contact the theatre straight away.',
+        action: 'Check how I sign in',
       },
     },
   }, {
@@ -514,6 +535,36 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Roles at {{ theatre }} are about to lapse',
         body: 'Roles you can renew are about to lapse: {{ count }}, the first on {{ date }}. Renew those that should carry on; the rest end by themselves.',
+      },
+    },
+  }, {
+    // A role given to a person who already has an account (an invitation says so itself) (EM-13).
+    id: 'core.role-given',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { role: 'text' as const, until: 'text' as const },
+    link: '/account',
+    wording: {
+      'en-GB': {
+        subject: 'You have a new role at {{ theatre }}: {{ role }}',
+        body: '{{ theatre }} has given you the role **{{ role }}**. {{ until }}\n\nWhat it lets you do is there the next time you sign in. If you were not expecting this, ask whoever looks after roles at {{ theatre }}.',
+        action: 'Sign in',
+      },
+    },
+  }, {
+    // A role ended by someone, not one that lapsed or was replaced by a change (EM-13).
+    id: 'core.role-ended',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { role: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your role at {{ theatre }} has ended: {{ role }}',
+        body: '{{ theatre }} has ended your role **{{ role }}**, so what it let you do has stopped.\n\nIf you were not expecting this, ask whoever looks after roles at {{ theatre }}.',
       },
     },
   }, {

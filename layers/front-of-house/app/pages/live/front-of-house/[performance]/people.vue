@@ -1,10 +1,10 @@
 <!-- Who is on tonight (Front of house specification, part 5, "Live mode"; FH-21): each duty with its
      people, whether they have arrived, and a flag for anyone past their call. Someone leading marks
-     people arrived; anyone marks themselves. -->
+     people arrived or not coming, and can ring anyone missing; anyone marks themselves. -->
 <script setup lang="ts">
 import { useIntervalFn } from '@vueuse/core'
 
-interface Person { assignmentId: string, name: string, state: string, checkedInAt: number | null, notArrived: boolean }
+interface Person { assignmentId: string, name: string, state: string, checkedInAt: number | null, notArrived: boolean, phone: string | null }
 interface Board {
   performance: { id: string, title: string, startsAt: number, venueName: string }
   shifts: { id: string, dutyName: string, isLead: boolean, callAt: number, places: number, people: Person[] }[]
@@ -17,6 +17,7 @@ const { t } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
+const { confirm } = useConfirm()
 const { time } = useDates()
 const route = useRoute()
 const id = computed(() => String(route.params.performance))
@@ -40,6 +41,23 @@ async function arrived(p: Person) {
     busy.value = null
   }
 }
+async function notComing(p: Person) {
+  if (!(await confirm({ verb: t('front-of-house.live.not-coming-verb'), thing: t('front-of-house.live.not-coming-thing', { name: p.name }), consequence: t('front-of-house.live.not-coming-consequence'), button: t('front-of-house.live.not-coming') }))) return
+  refusal.value = null
+  busy.value = `${p.assignmentId}:not`
+  try {
+    await write(`/api/front-of-house/assignments/${encodeURIComponent(p.assignmentId)}/not-coming`, { method: 'POST', body: {} })
+    toast.add({ title: t('front-of-house.live.marked-not-coming', { name: p.name }), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = null
+  }
+}
+const waiting = (p: Person) => p.state === 'confirmed' || p.state === 'release_requested'
 const context = computed(() => data.value ? [data.value.performance.title, time(data.value.performance.startsAt)].join(' · ') : undefined)
 </script>
 
@@ -101,15 +119,54 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
                   tone="success"
                   :label="t('front-of-house.assignment-states.checked_in')"
                 />
+                <StatusBadge
+                  v-else-if="p.state === 'no_show'"
+                  tone="neutral"
+                  :label="t('front-of-house.live.not-coming-state')"
+                />
                 <UButton
-                  v-else-if="d.can.lead || p.assignmentId === d.mine"
+                  v-else-if="p.assignmentId === d.mine"
                   size="xl"
                   icon="i-lucide-check"
                   :loading="busy === p.assignmentId"
-                  :label="p.assignmentId === d.mine ? t('front-of-house.live.im-here') : t('front-of-house.live.arrived')"
-                  :aria-label="p.assignmentId === d.mine ? undefined : t('front-of-house.live.mark-arrived', { name: p.name })"
+                  :label="t('front-of-house.live.im-here')"
                   @click="arrived(p)"
                 />
+                <template
+                  v-if="d.can.lead && waiting(p) && p.assignmentId !== d.mine"
+                  #below
+                >
+                  <div class="flex flex-wrap gap-2">
+                    <UButton
+                      size="xl"
+                      icon="i-lucide-check"
+                      :loading="busy === p.assignmentId"
+                      :label="t('front-of-house.live.mark-arrived-button')"
+                      :aria-label="t('front-of-house.live.mark-arrived', { name: p.name })"
+                      @click="arrived(p)"
+                    />
+                    <UButton
+                      size="xl"
+                      color="neutral"
+                      variant="outline"
+                      icon="i-lucide-user-x"
+                      :loading="busy === `${p.assignmentId}:not`"
+                      :label="t('front-of-house.live.not-coming')"
+                      :aria-label="t('front-of-house.live.not-coming-for', { name: p.name })"
+                      @click="notComing(p)"
+                    />
+                    <UButton
+                      v-if="p.phone"
+                      size="xl"
+                      color="neutral"
+                      variant="outline"
+                      icon="i-lucide-phone"
+                      :href="`tel:${p.phone.replace(/[^\d+]/g, '')}`"
+                      :label="t('front-of-house.live.call')"
+                      :aria-label="t('front-of-house.live.call-person', { name: p.name, phone: p.phone })"
+                    />
+                  </div>
+                </template>
               </RecordListItem>
             </RecordList>
           </section>

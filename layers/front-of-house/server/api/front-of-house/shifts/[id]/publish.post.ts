@@ -14,6 +14,6 @@ export default defineRoute({
 }, async (_event, { record, unit }) => {
   const shift = await getShift(record!.id!)
   if (!shift) refuse('core.not-found', 'There is no such shift.', { status: 404 })
-  publishShifts(unit.view(), [shift])
+  await publishShifts(unit.view(), [shift])
   return { shiftId: shift.id }
 })

@@ -47,6 +47,12 @@ export interface NavigationEntry {
   match?: string
   /** A tab of a module's page in Admin: the console entries or groups whose settings window shows it. */
   settingsIn?: string[]
+  /**
+   * An account entry where someone who is not a member finds out how to become one (Membership's
+   * My membership). The members' area sends a signed-in non-member there, with ?from=members,
+   * instead of answering "not found".
+   */
+  forNonMembers?: boolean
 }
 
 export interface NavigationGroupDecl {

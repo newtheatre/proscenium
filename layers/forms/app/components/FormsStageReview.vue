@@ -36,7 +36,8 @@ function picked(person: { id: string, label: string } | undefined) {
   if (!person) return
   emit('named', person.id, person.label)
   set((r) => { r.reviewers.people = [...new Set([...(r.reviewers.people ?? []), person.id])] })
-  adding.value = undefined
+  // The picker writes its own value after it says who was picked: clear the box once it has.
+  nextTick(() => { adding.value = undefined })
 }
 const passes = computed(() => PASS_MARKS.map(value => ({ value, label: t(`forms.screens.review.pass.${value}`) })))
 

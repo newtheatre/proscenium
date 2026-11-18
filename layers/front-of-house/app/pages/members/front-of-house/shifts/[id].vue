@@ -21,8 +21,10 @@ interface ShiftView {
   briefing: string | null
   state: 'draft' | 'published' | 'completed' | 'cancelled'
   releaseNotice: number
+  curtainAt: number | null
   people: { name: string, state: string }[]
-  mine: { assignmentId: string, state: string } | null
+  mine: { assignmentId: string, state: string, calendar: string, freeRelease: boolean } | null
+  clash: { shiftId: string, dutyName: string, productionTitle: string | null, title: string | null, callAt: number, endsAt: number } | null
   coverFor: string | null
 }
 
@@ -31,7 +33,7 @@ const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
-const { dateTime, time } = useDates()
+const { dateTime, time, dayNamed } = useDates()
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = await useAPI<ShiftView>(() => `/api/front-of-house/shifts/${encodeURIComponent(id.value)}`, { key: `front-of-house:shift:${id.value}` })
@@ -58,44 +60,64 @@ async function act(path: string, body: Record<string, unknown>, done: string) {
   }
 }
 
-const name = computed(() => {
-  const s = data.value
-  if (!s) return ''
-  return s.productionTitle ? t('front-of-house.shift.of-show', { duty: s.dutyName, show: s.productionTitle }) : s.title ? t('front-of-house.shift.of-occasion', { duty: s.dutyName, title: s.title }) : s.dutyName
+const nameOf = (s: { dutyName: string, productionTitle: string | null, title: string | null }) =>
+  s.productionTitle ? t('front-of-house.shift.of-show', { duty: s.dutyName, show: s.productionTitle }) : s.title ? t('front-of-house.shift.of-occasion', { duty: s.dutyName, title: s.title }) : s.dutyName
+const name = computed(() => (data.value ? nameOf(data.value) : ''))
+// The notice rule in the words a person thinks in: days from two days up, else hours.
+const noticeLabel = computed(() => {
+  const hours = Math.round((data.value?.releaseNotice ?? 0) / 3600) // not-policy: seconds in an hour
+  return hours >= 48 ? t('front-of-house.shift.notice.days', { count: Math.round(hours / 24) }) : t('front-of-house.shift.notice.hours', { count: hours }) // not-policy: hours in a day, and when days read better
 })
-// Within the release notice a place is not simply given up: cover is asked for and the person stays on.
-const noticeHours = computed(() => Math.round((data.value?.releaseNotice ?? 0) / 3600)) // not-policy: seconds in an hour
+// Inside the window the shift is about to start or has: someone who can't come says so, and managers are told.
+const inWindow = computed(() => !!data.value && now.value >= data.value.windowOpensAt && now.value <= data.value.windowClosesAt)
+const clashName = computed(() => (data.value?.clash ? t('front-of-house.shift.clash', { shift: nameOf(data.value.clash), when: dateTime(data.value.clash.callAt) }) : null))
 async function giveUp() {
   const s = data.value!
-  const early = s.callAt - now.value > s.releaseNotice * 1000 // not-policy: seconds to milliseconds
+  const free = s.mine!.freeRelease || s.callAt - now.value > s.releaseNotice * 1000 // not-policy: seconds to milliseconds
+  const date = dayNamed(s.callAt)
+  const consequence = s.mine!.freeRelease
+    ? t('front-of-house.shift.give-up.changed', { date })
+    : free
+      ? t('front-of-house.shift.give-up.early', { date, notice: noticeLabel.value })
+      : inWindow.value
+        ? t('front-of-house.shift.give-up.now')
+        : t('front-of-house.shift.give-up.late', { date, notice: noticeLabel.value })
   if (!await confirm({
     verb: t('front-of-house.shift.give-up.verb'),
     thing: t('front-of-house.shift.give-up.thing', { shift: name.value }),
-    consequence: early ? t('front-of-house.shift.give-up.early', { count: noticeHours.value }) : t('front-of-house.shift.give-up.late', { count: noticeHours.value }),
+    consequence,
     button: t('front-of-house.shift.give-up.button'),
   })) return
-  await act(`/api/front-of-house/assignments/${encodeURIComponent(s.mine!.assignmentId)}/release`, {}, t(early ? 'front-of-house.shift.give-up.done' : 'front-of-house.shift.give-up.asked'))
+  await act(`/api/front-of-house/assignments/${encodeURIComponent(s.mine!.assignmentId)}/release`, {}, t(free ? 'front-of-house.shift.give-up.done' : 'front-of-house.shift.give-up.asked'))
 }
 
-type Action = { label: string, icon: string, run: () => Promise<void> }
+type Action = { label: string, icon: string, run?: () => Promise<void>, href?: string, disabled?: boolean }
+const LIVE = ['confirmed', 'release_requested', 'checked_in']
+// The one main action. Giving up is never it: that is the quieter button beside the details.
 const primary = computed<Action | null>(() => {
   const s = data.value
   if (!s || s.state !== 'published') return null
   const mine = s.mine
   const assignment = (action: string) => `/api/front-of-house/assignments/${encodeURIComponent(mine!.assignmentId)}/${action}`
-  const inWindow = now.value >= s.windowOpensAt && now.value <= s.windowClosesAt
-  if (mine && inWindow && (mine.state === 'confirmed' || mine.state === 'release_requested'))
+  if (mine && inWindow.value && (mine.state === 'confirmed' || mine.state === 'release_requested'))
     return { label: t('front-of-house.shift.check-in'), icon: 'i-lucide-map-pin-check', run: () => act(assignment('check-in'), {}, t('front-of-house.shift.checked-in')) }
-  if (mine?.state === 'requested')
-    return { label: t('front-of-house.shift.withdraw'), icon: 'i-lucide-undo-2', run: () => act(assignment('release'), {}, t('front-of-house.shift.withdrawn')) }
-  if (mine?.state === 'confirmed')
-    return { label: t('front-of-house.shift.give-up.button'), icon: 'i-lucide-calendar-x', run: giveUp }
   if (mine?.state === 'release_requested')
     return { label: t('front-of-house.shift.keep'), icon: 'i-lucide-calendar-check', run: () => act(assignment('keep'), {}, t('front-of-house.shift.kept')) }
+  if (mine && LIVE.includes(mine.state))
+    return { label: t('front-of-house.shift.add-to-calendar'), icon: 'i-lucide-calendar-plus', href: mine.calendar }
   if (!mine && s.coverFor)
-    return { label: t('front-of-house.shift.take-cover'), icon: 'i-lucide-hand-helping', run: () => act(`/api/front-of-house/assignments/${encodeURIComponent(s.coverFor!)}/cover`, {}, t('front-of-house.shift.taken')) }
+    return { label: t('front-of-house.shift.take-cover'), icon: 'i-lucide-hand-helping', disabled: !!s.clash, run: () => act(`/api/front-of-house/assignments/${encodeURIComponent(s.coverFor!)}/cover`, {}, t('front-of-house.shift.taken')) }
   if (!mine && s.placesTaken < s.places && s.signUpClosesAt !== null && s.signUpClosesAt > now.value)
-    return { label: t('front-of-house.shift.sign-up'), icon: 'i-lucide-calendar-plus', run: () => act(`/api/front-of-house/shifts/${encodeURIComponent(s.id)}/sign-up`, {}, t('front-of-house.shift.signed-up')) }
+    return { label: t('front-of-house.shift.sign-up'), icon: 'i-lucide-calendar-plus', disabled: !!s.clash, run: () => act(`/api/front-of-house/shifts/${encodeURIComponent(s.id)}/sign-up`, {}, t('front-of-house.shift.signed-up')) }
+  return null
+})
+const secondary = computed<Action | null>(() => {
+  const s = data.value
+  if (!s || s.state !== 'published' || !s.mine) return null
+  if (s.mine.state === 'requested')
+    return { label: t('front-of-house.shift.withdraw'), icon: 'i-lucide-undo-2', run: () => act(`/api/front-of-house/assignments/${encodeURIComponent(s.mine!.assignmentId)}/release`, {}, t('front-of-house.shift.withdrawn')) }
+  if (s.mine.state === 'confirmed')
+    return { label: t(inWindow.value ? 'front-of-house.shift.cant-come' : 'front-of-house.shift.give-up.button'), icon: 'i-lucide-calendar-x', run: giveUp }
   return null
 })
 
@@ -106,6 +128,7 @@ const summary = computed(() => {
     { label: t('front-of-house.shift.duty'), value: s.dutyName },
     ...(s.venueName ? [{ label: t('front-of-house.shift.venue'), value: s.venueName }] : []),
     { label: t('front-of-house.shift.call-at'), value: dateTime(s.callAt) },
+    ...(s.curtainAt !== null ? [{ label: t('front-of-house.shift.curtain'), value: time(s.curtainAt) }] : []),
     { label: t('front-of-house.shift.ends-at'), value: time(s.endsAt) },
     { label: t('front-of-house.shift.places'), value: t('front-of-house.shift.places-value', { taken: s.placesTaken, places: s.places }) },
   ]
@@ -142,16 +165,41 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
         </template>
         <template #primary>
           <UButton
-            v-if="primary"
+            v-if="primary?.href"
             :icon="primary.icon"
             :label="primary.label"
+            :href="primary.href"
+            external
+            download
+          />
+          <UButton
+            v-else-if="primary"
+            :icon="primary.icon"
+            :label="primary.label"
+            :disabled="primary.disabled"
             loading-auto
             @click="primary.run"
           />
         </template>
         <div class="space-y-6">
           <RefusalNotice :refusal="refusal" />
+          <p
+            v-if="clashName && !s.mine"
+            class="text-sm text-muted"
+          >
+            {{ clashName }}
+          </p>
           <FactStrip :facts="summary" />
+          <div v-if="secondary">
+            <UButton
+              color="neutral"
+              variant="outline"
+              :icon="secondary.icon"
+              :label="secondary.label"
+              loading-auto
+              @click="secondary.run"
+            />
+          </div>
           <PageSection
             v-if="s.dutyDescription || s.briefing"
             :title="t('front-of-house.shift.about')"

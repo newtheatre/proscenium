@@ -26,7 +26,7 @@ const toast = useToast()
 
 const UNAVAILABLE = {
   'workers-dev': 'This site is on workers.dev, which cannot send email from its own address. Add a custom domain to the Worker and open the site there to set email up automatically.',
-  'local': 'This site has no public domain yet, so email cannot be set up automatically here.',
+  'local': 'This site has no public domain yet, so email cannot be set up automatically here. Give the Worker a custom domain in Cloudflare, then record it as the site\'s address.',
   'no-token': 'To set this up automatically, save a Cloudflare API token with Email Sending edit and Zone read under Keys, below. You can also onboard a domain in the Cloudflare dashboard and enter it in the email settings.',
 } as const
 
@@ -133,6 +133,9 @@ async function setUp() {
             color="info"
             icon="i-lucide-info"
             :description="UNAVAILABLE[data.automatic.unavailable]"
+            :actions="data.automatic.unavailable === 'local' || data.automatic.unavailable === 'workers-dev'
+              ? [{ label: 'The site\'s address', to: '/admin/theatre?setting=core.site.origin', color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }]
+              : undefined"
           />
           <template
             v-if="data.automatic.unavailable === null"
@@ -185,7 +188,7 @@ async function setUp() {
               {{ theatreName }}
             </p>
             <p class="mb-3">
-              Thank you for booking with us. Your tickets are attached.
+              Thank you for booking with us. We look forward to seeing you.
             </p>
             <p
               v-if="typeof value === 'string' && value.trim()"

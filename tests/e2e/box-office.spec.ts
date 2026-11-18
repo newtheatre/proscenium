@@ -1,7 +1,7 @@
 // The desk in a real browser: Sell is the till with Box office's panel first. A seller sells
 // tickets to somebody at the desk for cash, then finds a reservation by its reference and takes
 // payment for it, and the screen has no accessibility violations on the way.
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { test, expect, type APIRequestContext, type ConsoleMessage, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -11,6 +11,7 @@ const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.crea
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
 const office = person('acc_officeboss', 'Office Boss', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange', 'box-office.report.export', 'box-office.promo.manage'])
 const producer = person('acc_compproducer', 'Pat Producer', ['box-office.comp.request'])
+const canceller = person('acc_deskcanceller', 'Cass Canceller', ['box-office.order.view', 'box-office.order.cancel', 'box-office.order.refund'])
 const approver = person('acc_compapprover', 'Alex Approver', ['box-office.comp.request', 'box-office.comp.approve'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const key = () => ({ 'idempotency-key': crypto.randomUUID() })
@@ -22,6 +23,7 @@ let swapping = ''
 let group = ''
 let amending = ''
 let unfinished = ''
+let cancelling = ''
 const premiumName = `Premium ${stamp}`
 let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
@@ -63,11 +65,11 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await api.dispose()
 
-  // Each reservation is made by its own buyer, in a browser of their own: one person may only
-  // reserve so many tickets for a performance, and a guest stays signed in to the account their
-  // first booking made, so a shared buyer would soon reach that limit.
+  // Each reservation is made by its own guest buyer, in a browser of their own. One person may only
+  // reserve so many tickets for a performance. A context made here takes the file's `use` options,
+  // so without clearing the headers every buyer would be the seller signed in, one person.
   const basketFor = async (quantity: number) => {
-    const buyer = await playwright.request.newContext(base)
+    const buyer = await playwright.request.newContext({ ...base, extraHTTPHeaders: {} })
     const basket = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity }] })
     return { buyer, basket }
   }
@@ -88,6 +90,8 @@ test.beforeAll(async ({ playwright }) => {
   const couple = await basketFor(2)
   unfinished = await reserve(await basketFor(1), 'Unfinished')
   amending = await reserve(couple, 'Couple')
+  // And two that are cancelled from the order page.
+  cancelling = await reserve(await basketFor(2), 'Cancelling')
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
   expect([200, 409]).toContain((await till.post('/api/payments/sessions', { data: { pointLabel: 'Box office desk' }, headers: key() })).status())
@@ -111,12 +115,16 @@ async function noViolations(page: Page) {
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
 
-async function payCash(page: Page, amount: string) {
+async function payCash(page: Page, amount: string, afterSale?: () => Promise<void>) {
   await cash(page).click()
   await expect(page.getByText(`Still to pay: ${amount}`)).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
   // The till says so once.
   await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
+  // The sale stays on screen, with its booking, until the next customer.
+  await expect(page.getByRole('heading', { name: /^Booking / })).toBeVisible()
+  await afterSale?.()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 }
 
@@ -126,23 +134,42 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Sell' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sell' }).first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
-  const quantity = page.getByLabel(`Stalls, ${typeName}, £12.00`)
-  // How many are left is the field's help, which it names as its description.
-  const help = page.locator(`[id="${(await quantity.getAttribute('aria-describedby'))!.split(' ').at(-1)}"]`)
-  const before = Number((await help.textContent())!.match(/(\d+) left/)![1])
-  await quantity.fill('2')
-  await quantity.blur()
+  // A tile for each kind of ticket; each tap adds one, and the receipt holds how many.
+  const tile = page.getByRole('button', { name: new RegExp(`^${typeName}\\s*in Stalls\\s*£12\\.00\\s*add one$`) })
+  // How many are left shows beside the performance, and counts what the sale holds only once sold.
+  const left = page.getByText(/^\d+ left$/)
+  const before = Number((await left.textContent())!.match(/(\d+) left/)![1])
+  await tile.click()
+  await tile.click()
   await page.getByRole('checkbox', { name: 'Admit now' }).check()
   await expect(payButton(page, '£24.00')).toBeEnabled()
   await noViolations(page)
-  await payCash(page, '£24.00')
-  // The panel shows what is left after the sale without a reload.
-  await expect(help).toHaveText(`${before - 2} left`)
+  await payCash(page, '£24.00', async () => {
+    // The tickets print from the sale: a page of their own, one ticket to a block, each with its code.
+    const reference = (await page.getByRole('heading', { name: /^Booking / }).textContent())!.replace(/^Booking /, '').trim()
+    const [printout] = await Promise.all([page.waitForEvent('popup'), page.getByRole('link', { name: 'Print tickets' }).click()])
+    await expect(printout.getByRole('heading', { level: 1, name: `Tickets for ${reference}` })).toBeVisible()
+    const tickets = printout.getByRole('list', { name: 'Tickets' }).getByRole('listitem')
+    await expect(tickets).toHaveCount(2)
+    await expect(tickets.first()).toContainText('The Desk Show')
+    await expect(tickets.first()).toContainText(typeName)
+    await expect(tickets.first()).toContainText(`Booking ${reference}`)
+    await expect(printout.getByRole('img', { name: `Ticket code ${reference}-1` })).toBeVisible()
+    await expect(printout.getByRole('img', { name: `Ticket code ${reference}-2` })).toBeVisible()
+    await noViolations(printout)
+    // On paper only the tickets show: the buttons stay on screen.
+    await printout.emulateMedia({ media: 'print' })
+    await expect(printout.getByRole('button', { name: 'Print' })).toBeHidden()
+    await expect(tickets).toHaveCount(2)
+    await printout.close()
+  })
+  // Back for the next customer, the panel shows what is left after the sale without a reload.
+  await expect(tile).toBeVisible()
+  await expect(left).toHaveText(`${before - 2} left`)
 })
 
 test('Sell finds a reservation by its reference and takes payment for it', async ({ page }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(reference.toLowerCase())
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByRole('heading', { name: `Booking ${reference}` })).toBeVisible()
@@ -158,7 +185,6 @@ test('Sell finds a reservation by its reference and takes payment for it', async
 
 test('a payment left by a reload is picked up again, and another till can cancel it to take the booking', async ({ page, browser }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(unfinished)
   await page.getByRole('button', { name: 'Find' }).click()
   await cash(page).click()
@@ -173,7 +199,6 @@ test('a payment left by a reload is picked up again, and another till can cancel
   const officeContext = await browser.newContext(as(office))
   const other = await officeContext.newPage()
   await visit(other, '/console/box-office/sell')
-  await other.getByRole('tab', { name: 'Collect a reservation' }).click()
   await other.getByLabel(/^Booking reference, desk code or name/).fill(unfinished)
   await other.getByRole('button', { name: 'Find' }).click()
   await expect(other.getByText('A payment was started and not finished')).toBeVisible()
@@ -186,7 +211,6 @@ test('a payment left by a reload is picked up again, and another till can cancel
 
 test('Sell splits a reservation so one of a group pays for their own tickets', async ({ page }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(group)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('To pay: £36.00')).toBeVisible()
@@ -209,7 +233,6 @@ test('Sell splits a reservation so one of a group pays for their own tickets', a
 
 test('Sell takes the difference on an exchange for a dearer ticket', async ({ page, browser, playwright }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(swapping)
   await page.getByRole('button', { name: 'Find' }).click()
   await payCash(page, '£12.00')
@@ -229,7 +252,6 @@ test('Sell takes the difference on an exchange for a dearer ticket', async ({ pa
   await noViolations(page)
   await payCash(page, '£3.00')
 
-  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(swapping)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText(premiumName)).toBeVisible()
@@ -259,7 +281,6 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
 test('the till in live mode collects a reservation, changed to who came, and takes payment', async ({ page }) => {
   await page.setViewportSize({ width: 820, height: 1180 }) // a tablet held upright, as at a desk
   await visit(page, '/live/till')
-  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
   await page.getByLabel(/^Booking reference, desk code or name/).fill(amending)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('To pay: £24.00')).toBeVisible()
@@ -273,6 +294,7 @@ test('the till in live mode collects a reservation, changed to who came, and tak
   await noViolations(page)
   await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken' }).click()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
@@ -302,7 +324,7 @@ test.describe('the box office console', () => {
     await page.keyboard.press('Escape')
 
     await visit(page, '/console/box-office/performances')
-    await expect(page.getByRole('heading', { level: 1, name: 'Performances' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Ticket set-up' })).toBeVisible()
     await noViolations(page)
 
     await visit(page, `/console/box-office/performances/${performanceId}`)
@@ -325,9 +347,17 @@ test.describe('the box office console', () => {
     await expect(page.getByText('1 admitted').first()).toBeVisible()
     await expect(page.getByRole('button', { name: `Admit one ticket for ${reference}` })).toHaveCount(0)
 
+    // The report is drawn the same on the server and in the browser: no hydration mismatch.
+    const mismatches: string[] = []
+    const listen = (message: ConsoleMessage) => {
+      if (/hydrat/i.test(message.text())) mismatches.push(message.text())
+    }
+    page.on('console', listen)
     await visit(page, '/console/box-office/reports/sales')
     await expect(page.getByRole('heading', { level: 1, name: 'Sales report' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Download as CSV' })).toBeVisible()
+    page.off('console', listen)
+    expect(mismatches).toEqual([])
     await noViolations(page)
 
     await visit(page, '/admin/modules/box-office/ticket-types')
@@ -381,12 +411,18 @@ test.describe('the box office console', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Promo codes' })).toBeVisible()
     await page.getByRole('button', { name: 'New code' }).first().click()
     const dialog = page.getByRole('dialog', { name: 'New code' })
-    await dialog.getByLabel('Code').fill(code.toLowerCase())
+    // A character a code cannot hold is named beside the field; a space is left out, and the form says so.
+    await dialog.getByLabel('Code').fill('half price!')
+    await dialog.getByRole('button', { name: 'Save code' }).click()
+    await expect(dialog.getByText('Use only letters, numbers, hyphens and underscores.')).toBeVisible()
+    await dialog.getByLabel('Code').fill(`${code.slice(0, 4).toLowerCase()} ${code.slice(4)}`)
+    await expect(dialog.getByText(`Saved as ${code}`, { exact: false })).toBeVisible()
     await dialog.getByRole('spinbutton', { name: 'Percentage off' }).fill('15')
     await dialog.getByRole('spinbutton', { name: 'Uses in all' }).fill('40')
     await noViolations(page)
     await dialog.getByRole('button', { name: 'Save code' }).click()
     await expect(dialog).toBeHidden()
+    await expect(page.getByText(`${code} added.`).first()).toBeVisible()
     await expect(page.getByText('15% off · 0 of 40 used')).toBeVisible()
     await page.getByRole('button', { name: `Actions for ${code}` }).click()
     await page.getByRole('menuitem', { name: 'Retire' }).click()
@@ -396,6 +432,35 @@ test.describe('the box office console', () => {
     await page.locator('button', { hasText: 'Undo' }).last().click()
     await expect(page.getByText(code, { exact: true })).toBeVisible()
     await expect(page.getByText('15% off · 0 of 40 used')).toBeVisible()
+    await noViolations(page)
+  })
+})
+
+test.describe('cancelling from the order page', () => {
+  test.use(as(canceller))
+
+  test('a reservation offers one Cancel reservation, whose dialogue lists each ticket with no accessibility violations', async ({ page }) => {
+    await visit(page, '/console/box-office/orders')
+    await page.getByRole('searchbox').first().fill(cancelling)
+    await page.getByRole('link', { name: cancelling, exact: true }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: `Order ${cancelling}` })).toBeVisible()
+    // Alike tickets are one row, and the payments say nothing has been paid yet.
+    await expect(page.getByText(`2 × Stalls, ${typeName}`)).toBeVisible()
+    await expect(page.getByText('Nothing paid yet. £24.00 to pay when it is collected.')).toBeVisible()
+    await page.getByRole('button', { name: /More actions/ }).click()
+    await expect(page.getByRole('menuitem', { name: 'Release reservation' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Cancel reservation' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Cancel reservation' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('checkbox', { name: /^Ticket 1, Stalls/ })).toBeChecked()
+    await expect(dialog.getByRole('checkbox', { name: /^Ticket 2, Stalls/ })).toBeChecked()
+    await noViolations(page)
+    // Leaving one out cancels the other alone.
+    await dialog.getByRole('checkbox', { name: /^Ticket 2, Stalls/ }).click()
+    await dialog.getByRole('button', { name: 'Cancel reservation' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByText('Reservation cancelled').first()).toBeVisible()
+    await expect(page.getByText('1 ticket cancelled', { exact: false })).toBeVisible()
     await noViolations(page)
   })
 })

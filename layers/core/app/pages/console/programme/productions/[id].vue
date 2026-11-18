@@ -20,6 +20,7 @@ interface Production {
   kind: 'own' | 'visiting' | 'hire' | 'event'
   categoryTermId: string | null
   seasonId: string | null
+  usualSpaceId: string | null
   companyName: string | null
   ageMin: number | null
   ageRestricted: boolean
@@ -40,7 +41,7 @@ interface Production {
   effects: { termId: string, detail: string | null }[]
 }
 interface Need { key: string, sentence: string, link: string }
-interface Answer { production: Production, needs: Need[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[] } }
+interface Answer { production: Production, needs: Need[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[], spaces: { id: string, label: string }[] } }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -81,10 +82,11 @@ const TONES = { draft: 'neutral', published: 'success', withdrawn: 'warning', ca
 const STATE_TONES = { scheduled: 'success', draft: 'neutral', cancelled: 'danger', completed: 'neutral' } as const
 const categories = computed(() => (data.value?.options.categories ?? []).filter(c => !c.retired || c.id === production.value?.categoryTermId).map(c => ({ value: c.id, label: c.label })))
 const seasons = computed(() => [{ value: NONE, label: 'No season' }, ...(data.value?.options.seasons ?? []).map(s => ({ value: s.id, label: s.name }))])
+const spaces = computed(() => [{ value: NONE, label: 'Not set' }, ...(data.value?.options.spaces ?? []).map(s => ({ value: s.id, label: s.label }))])
 
 // Details
 const details = reactive({
-  title: '', slug: '', subtitle: '', summary: '', description: '', kind: 'own' as Production['kind'], categoryTermId: '', seasonId: NONE, companyName: '',
+  title: '', slug: '', subtitle: '', summary: '', description: '', kind: 'own' as Production['kind'], categoryTermId: '', seasonId: NONE, usualSpaceId: NONE, companyName: '',
   contentNote: '', runningMinutes: null as number | null, intervalCount: 0, intervalMinutes: null as number | null, doorsBeforeMinutes: null as number | null,
   capacity: null as number | null, bookedElsewhere: false, externalBookingUrl: '', creditsPublic: true, listed: true,
 })
@@ -101,11 +103,9 @@ const detailsSchema = computed(() => linkNeeded.value
   : elsewhere.value
     ? blankAsNull(productionPatch)
     : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
-// What an empty length stands for, said beside the field rather than only greyed inside it.
-const inherited = (own: number | null, theatre: number | undefined) => own === null && theatre !== undefined ? `${minutesInWords(theatre)} (theatre default)` : undefined
 const detailsFrom = (p: Production) => ({
   title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
-  seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
+  seasonId: p.seasonId ?? NONE, usualSpaceId: p.usualSpaceId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
   intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
   bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
 })
@@ -118,6 +118,7 @@ const saveDetails = () => run(() => api('', 'PATCH', {
   ...(({ bookedElsewhere: _, ...rest }) => rest)(details),
   categoryTermId: details.categoryTermId || null,
   seasonId: details.seasonId === NONE ? null : details.seasonId,
+  usualSpaceId: details.usualSpaceId === NONE ? null : details.usualSpaceId,
   externalBookingUrl: elsewhere.value ? details.externalBookingUrl.trim() || null : null,
   runningMinutes: details.runningMinutes || null,
 }), 'Production saved', detailsForm.value)
@@ -192,13 +193,20 @@ function onPrimary() {
 const actions = computed<DropdownMenuItem[][]>(() => {
   const p = production.value
   if (!p) return []
-  const groups: DropdownMenuItem[][] = [[{ label: 'Duplicate', icon: 'i-lucide-copy', onSelect: () => { void duplicate() } }]]
-  if (p.state === 'published') groups[0]!.push({ label: 'Withdraw', icon: 'i-lucide-eye-off', onSelect: () => { void withdraw() } })
-  const destructive: DropdownMenuItem[] = []
-  if (p.state === 'published' || p.state === 'withdrawn') destructive.push({ label: 'Cancel production', icon: 'i-lucide-calendar-x', color: 'error', onSelect: () => { cancelling.value = true } })
-  if (p.state === 'draft' && !p.publishedAt) destructive.push({ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { void remove() } })
-  if (destructive.length) groups.push(destructive)
-  return groups
+  // Every move is listed in every state; one that does not apply now is greyed with the reason.
+  const published = p.state === 'published'
+  const cancellable = published || p.state === 'withdrawn'
+  const deletable = p.state === 'draft' && !p.publishedAt
+  return [
+    [
+      { label: 'Duplicate', icon: 'i-lucide-copy', onSelect: () => { void duplicate() } },
+      { label: 'Withdraw', icon: 'i-lucide-eye-off', disabled: !published, description: published ? undefined : 'Only a published production can be withdrawn.', onSelect: () => { void withdraw() } },
+    ],
+    [
+      { label: 'Cancel production', icon: 'i-lucide-calendar-x', color: 'error', disabled: !cancellable, description: cancellable ? undefined : p.state === 'cancelled' ? 'It is already cancelled.' : 'A draft is not public, so there is nothing to cancel. Delete it instead.', onSelect: () => { cancelling.value = true } },
+      { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', disabled: !deletable, description: deletable ? undefined : 'Once it has been public it is kept: withdraw or cancel it instead.', onSelect: () => { void remove() } },
+    ],
+  ]
 })
 
 // The facts strip and the overview read the dates the Dates tab shows, by the same key.
@@ -440,6 +448,17 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   />
                 </UFormField>
                 <UFormField
+                  name="usualSpaceId"
+                  label="Usual space"
+                  help="Where it usually plays: adding dates starts there."
+                >
+                  <USelectMenu
+                    v-model="details.usualSpaceId"
+                    value-key="value"
+                    :items="spaces"
+                  />
+                </UFormField>
+                <UFormField
                   v-if="details.kind !== 'own'"
                   name="companyName"
                   label="Company"
@@ -453,11 +472,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   label="Running time"
                   help="Including the intervals."
                   name="runningMinutes"
-                  :hint="inherited(details.runningMinutes, data?.theatre.runningMinutes)"
                 >
-                  <MinutesInput
+                  <DefaultedMinutes
                     v-model="details.runningMinutes"
-                    :placeholder="data?.theatre.runningMinutes"
+                    :fallback="data?.theatre.runningMinutes"
                     :min="1"
                     label="Running time"
                   />
@@ -465,11 +483,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 <UFormField
                   label="Doors open before"
                   name="doorsBeforeMinutes"
-                  :hint="inherited(details.doorsBeforeMinutes, data?.theatre.doorsBeforeMinutes)"
                 >
-                  <MinutesInput
+                  <DefaultedMinutes
                     v-model="details.doorsBeforeMinutes"
-                    :placeholder="data?.theatre.doorsBeforeMinutes"
+                    :fallback="data?.theatre.doorsBeforeMinutes"
                     :max="180"
                     label="Doors open before"
                   />
@@ -487,11 +504,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 <UFormField
                   label="Each interval"
                   name="intervalMinutes"
-                  :hint="inherited(details.intervalMinutes, data?.theatre.intervalMinutes)"
                 >
-                  <MinutesInput
+                  <DefaultedMinutes
                     v-model="details.intervalMinutes"
-                    :placeholder="data?.theatre.intervalMinutes"
+                    :fallback="data?.theatre.intervalMinutes"
                     :max="120"
                     label="Each interval"
                   />

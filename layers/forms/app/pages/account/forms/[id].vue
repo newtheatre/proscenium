@@ -13,6 +13,8 @@ interface Own {
   answers: ShownAnswer[]
   values: Answers | null
   progress: { status: string, kind: string, note: string | null, canChange: boolean } | null
+  history: { at: number, status: string, kind: string }[]
+  rights: { canEdit: boolean, canWithdraw: boolean }
   today: string
 }
 const { t } = useT()
@@ -24,6 +26,7 @@ const route = useRoute()
 const { data, error, refresh } = await useAPI<Own>(() => `/api/forms/mine/${encodeURIComponent(String(route.params.id))}`, { key: `forms:mine:${route.params.id}` })
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
 const own = computed(() => data.value!)
+provide('forms:answering', computed(() => own.value.form.slug))
 // Files added while making changes go into the same response.
 provideFormsUploads(computed(() => own.value.form.slug), computed(() => own.value.response.id))
 
@@ -49,6 +52,25 @@ async function send(kept: Answers): Promise<boolean> {
   changing.value = false
   await refresh()
   return false
+}
+// Taking it back, where the form allows it: asked twice, because it cannot be undone.
+const withdrawing = ref(false)
+const taking = ref(false)
+const withdrawFailure = ref<{ reason: string, remedy?: string } | null>(null)
+async function withdraw() {
+  withdrawFailure.value = null
+  taking.value = true
+  try {
+    await $api(`/api/forms/mine/${encodeURIComponent(own.value.response.id)}/withdraw` as string, { method: 'POST', body: {} })
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    withdrawFailure.value = { reason: refusal.reason, remedy: refusal.remedy }
+    taking.value = false
+    return
+  }
+  toast.add({ title: t('forms.screens.mine.withdrawn', { reference: own.value.response.reference }), color: 'success' })
+  await navigateTo('/account/forms')
 }
 </script>
 
@@ -117,11 +139,90 @@ async function send(kept: Answers): Promise<boolean> {
           @click="changing = false"
         />
       </template>
-      <FormsAnswers
-        v-else
-        :definition="own.definition"
-        :answers="own.answers"
-      />
+      <template v-else>
+        <section
+          v-if="own.history.length > 1"
+          class="space-y-2"
+        >
+          <h2 class="text-sm font-medium text-muted">
+            {{ t('forms.screens.mine.history') }}
+          </h2>
+          <ol class="space-y-1.5">
+            <li
+              v-for="(h, i) in own.history"
+              :key="i"
+              class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+            >
+              <StatusBadge
+                :tone="formsStageTone(h.kind)"
+                :label="h.status"
+              />
+              <span class="text-muted">{{ dateTime(h.at) }}</span>
+            </li>
+          </ol>
+        </section>
+        <FormsAnswers
+          :definition="own.definition"
+          :answers="own.answers"
+        />
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            :label="t('forms.screens.mine.back')"
+            icon="i-lucide-arrow-left"
+            to="/account/forms"
+            color="neutral"
+            variant="subtle"
+          />
+          <UButton
+            v-if="own.rights.canEdit"
+            :label="t('forms.screens.mine.edit')"
+            icon="i-lucide-pencil"
+            color="neutral"
+            variant="outline"
+            @click="start"
+          />
+          <UButton
+            v-if="own.rights.canWithdraw"
+            :label="t('forms.screens.mine.withdraw')"
+            icon="i-lucide-undo-2"
+            color="error"
+            variant="outline"
+            @click="withdrawing = true"
+          />
+        </div>
+      </template>
     </div>
+    <UModal
+      v-model:open="withdrawing"
+      :title="t('forms.screens.mine.withdraw-title')"
+      :description="t('forms.screens.mine.withdraw-help')"
+    >
+      <template
+        v-if="withdrawFailure"
+        #body
+      >
+        <UAlert
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="withdrawFailure.reason"
+          :description="withdrawFailure.remedy"
+        />
+      </template>
+      <template #footer>
+        <UButton
+          :label="t('forms.screens.mine.withdraw-confirm')"
+          color="error"
+          :loading="taking"
+          @click="withdraw"
+        />
+        <UButton
+          :label="t('forms.screens.mine.withdraw-keep')"
+          color="neutral"
+          variant="ghost"
+          @click="withdrawing = false"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

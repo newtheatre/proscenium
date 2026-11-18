@@ -3,7 +3,7 @@
 // closure are predicates on the update, so two people scheduling into the same space at once cannot
 // both succeed. A read beforehand only chooses the words of the refusal.
 import { sql, type SQL } from 'drizzle-orm'
-import { all, first, newId, nowMs, refuse, useDb, usePoint, useSetting } from '#kit'
+import { all, first, newId, nowMs, refuse, TIME_ZONE_REMEDY, useDb, usePoint, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
 import type { SettingKey } from '#kit/registry-types'
 import { assertTerm } from '../vocabularies/service'
@@ -308,7 +308,7 @@ type Times<T> = Omit<T, 'startsAt' | 'endsAt' | 'doorsAt'> & { startsAt?: number
 export async function inInstants<T extends PerformancePatch>(input: Times<T>): Promise<T> {
   const local = (['startsAt', 'endsAt', 'doorsAt'] as const).filter(k => typeof input[k] === 'string')
   if (!local.length) return input as T
-  const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
+  const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
   const out: Record<string, unknown> = { ...input }
   for (const k of local) {
     const v = input[k] as string

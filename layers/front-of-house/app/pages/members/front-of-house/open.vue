@@ -13,16 +13,18 @@ interface OpenShift {
   dutyDescription: string | null
   callAt: number
   endsAt: number
+  curtainAt: number | null
   placesFree: number
   coverFor: string | null
   eligible: boolean
   reasons: string[]
   unmet: Unmet[]
   overlaps: boolean
+  clash: { shiftId: string, dutyName: string, productionTitle: string | null, title: string | null, callAt: number, endsAt: number } | null
 }
 
 const { t, te } = useT()
-const { dayNamed, time } = useDates()
+const { dayNamed, time, dateTime } = useDates()
 const route = useRoute()
 const router = useRouter()
 const { data, status, error, refresh } = await useAPI<{ shifts: OpenShift[] }>('/api/front-of-house/open-shifts', { key: 'front-of-house:open-shifts' })
@@ -40,18 +42,25 @@ const productions = computed(() => options((data.value?.shifts ?? []).filter(s =
 const duties = computed(() => options((data.value?.shifts ?? []).map(s => [s.dutyId, s.dutyName])))
 
 const shown = computed(() => (data.value?.shifts ?? []).filter(s => (production.value === 'all' || s.productionTitle === production.value) && (duty.value === 'all' || s.dutyId === duty.value)))
-// Cover first, then by date; the server sends them in that order.
+// By date, one entry for each shift: a place needing cover is a badge on it, not a second listing.
 const groups = computed(() => {
   const out: { key: string, label: string, shifts: OpenShift[] }[] = []
   for (const s of shown.value) {
-    const key = s.coverFor ? 'cover' : dayNamed(s.callAt)
+    const key = dayNamed(s.callAt)
     let group = out.find(g => g.key === key)
-    if (!group) out.push(group = { key, label: s.coverFor ? t('front-of-house.open-shifts.cover-needed') : key, shifts: [] })
+    if (!group) out.push(group = { key, label: key, shifts: [] })
     group.shifts.push(s)
   }
   return out
 })
-const name = (s: OpenShift) => s.productionTitle ? t('front-of-house.shift.of-show', { duty: s.dutyName, show: s.productionTitle }) : s.title ? t('front-of-house.shift.of-occasion', { duty: s.dutyName, title: s.title }) : s.dutyName
+// Call and finish, the curtain where there is one (a matinee and an evening look alike otherwise), then places.
+const row = (s: OpenShift) => [
+  t('front-of-house.open-shifts.range', { from: time(s.callAt), to: time(s.endsAt) }),
+  ...(s.curtainAt !== null ? [t('front-of-house.open-shifts.curtain', { time: time(s.curtainAt) })] : []),
+  ...(s.placesFree > 0 ? [t('front-of-house.open-shifts.places', { count: s.placesFree })] : []),
+  ...(s.coverFor ? [t('front-of-house.open-shifts.cover-place')] : []),
+].join(' · ')
+const name = (s: { dutyName: string, productionTitle: string | null, title: string | null }) => s.productionTitle ? t('front-of-house.shift.of-show', { duty: s.dutyName, show: s.productionTitle }) : s.title ? t('front-of-house.shift.of-occasion', { duty: s.dutyName, title: s.title }) : s.dutyName
 // The requirement sources' own sentences where they gave them, else what is needed; then the way forward.
 const why = (s: OpenShift) => [
   ...(s.eligible
@@ -60,7 +69,7 @@ const why = (s: OpenShift) => [
       ? s.reasons
       : [t('front-of-house.open-shifts.needs', { what: s.unmet.map(u => te(u.label) ? t(u.label) : u.label).join(', ') })]),
   ...(s.eligible ? [] : [t('front-of-house.open-shifts.needs-remedy')]),
-  ...(s.overlaps ? [t('front-of-house.open-shifts.overlaps')] : []),
+  ...(s.clash ? [t('front-of-house.open-shifts.overlaps', { shift: name(s.clash), when: dateTime(s.clash.callAt) })] : []),
 ].join(' ')
 const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label'), to: '/members/front-of-house' }])
 </script>
@@ -115,7 +124,7 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
               :to="`/members/front-of-house/shifts/${encodeURIComponent(s.id)}`"
               icon="i-lucide-calendar-clock"
               :name="name(s)"
-              :description="t('front-of-house.open-shifts.row', { from: time(s.callAt), to: time(s.endsAt), count: s.placesFree })"
+              :description="row(s)"
               :muted="!s.eligible || s.overlaps"
             >
               <StatusBadge

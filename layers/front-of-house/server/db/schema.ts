@@ -132,6 +132,9 @@ export const assignments = defineTable('front_of_house_assignments', {
   releaseReason: col.freeText(text('release_reason')),
   minutesWorked: col.internal(integer('minutes_worked')),
   reminded: col.internal(integer('reminded').notNull().default(0)),
+  // When the shift's time or place changed under this person after they took it: they may give it up
+  // at any time, without the release notice.
+  movedAt: col.timestamp('moved_at'),
   // The merge that released this assignment because both accounts were on the shift (part 3).
   freedByMerge: col.internal(text('freed_by_merge')),
   createdAt: col.createdAt(),
@@ -486,4 +489,24 @@ export const nightReportNotes = defineTable('front_of_house_night_report_notes',
   ],
 })
 
-export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates }
+/**
+ * A person's private calendar feed: the address of a subscribable iCal file of their shifts. The
+ * token is a keyed hash of the account and the generation, so the screen can work it out again
+ * without it being kept; only the hash of the token is stored, to find the person. Making a new
+ * address raises the generation.
+ */
+export const calendarFeeds = defineTable('front_of_house_calendar_feeds', {
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'One feed each is the primary key, which must name the surviving account.' }),
+  tokenHash: col.internal(text('token_hash').notNull()),
+  generation: col.internal(integer('generation').notNull().default(1)),
+  createdAt: col.createdAt(),
+}, {
+  realm: 'members',
+  subject: 'account_id',
+  extra: t => [
+    primaryKey({ columns: [t.accountId] }),
+    uniqueIndex('front_of_house_calendar_feeds_token').on(t.tokenHash),
+  ],
+})
+
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }

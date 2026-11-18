@@ -15,6 +15,8 @@ export interface FormRow {
   status: 'draft' | 'live' | 'paused' | 'closed' | 'archived'
   liveVersionId: string | null
   anonymous: boolean
+  /** Whether a person may change or withdraw their own response before it is considered. */
+  allowEdits: boolean
   retentionDays: number | null
   retentionDeclinedDays: number | null
   createdBy: string
@@ -25,20 +27,31 @@ export interface DraftRow { definition: string, editRevision: number, editedBy: 
 export interface FieldRow { questionId: string, key: string, type: string, dataClass: DataClass, label: string, firstVersion: number, retiredInVersion: number | null }
 export interface VersionRow { id: string, number: number, definition: string, definitionHash: string, changeSummary: string, publishedBy: string, publishedAt: number }
 
-const FORM = `id, slug, title, mode, status, live_version_id AS liveVersionId, anonymous, retention_days AS retentionDays,
+const FORM = `id, slug, title, mode, status, live_version_id AS liveVersionId, anonymous, allow_edits AS allowEdits, retention_days AS retentionDays,
   retention_declined_days AS retentionDeclinedDays, created_by AS createdBy, created_at AS createdAt, archived_at AS archivedAt`
 
 export async function getForm(id: string | undefined): Promise<FormRow | null> {
   if (!id) return null
   const row = await first<FormRow>(`SELECT ${FORM} FROM forms_forms WHERE id = ?`, id)
-  return row ? { ...row, anonymous: !!row.anonymous } : null
+  return row ? { ...row, anonymous: !!row.anonymous, allowEdits: !!row.allowEdits } : null
 }
 
 /** The form at a public address, such as the `spring-auditions` of /forms/spring-auditions. */
 export async function getFormBySlug(slug: string | undefined): Promise<FormRow | null> {
   if (!slug) return null
   const row = await first<FormRow>(`SELECT ${FORM} FROM forms_forms WHERE slug = ?`, slug)
-  return row ? { ...row, anonymous: !!row.anonymous } : null
+  return row ? { ...row, anonymous: !!row.anonymous, allowEdits: !!row.allowEdits } : null
+}
+
+/** The address now of the form that used to be at this one, for sending an old link on. */
+export async function movedFrom(slug: string | undefined): Promise<string | null> {
+  if (!slug) return null
+  return (await first<{ slug: string }>('SELECT f.slug FROM forms_old_addresses o JOIN forms_forms f ON f.id = o.form_id WHERE o.slug = ?', slug))?.slug ?? null
+}
+
+/** Whether another form is at this address, or was: an old address stays its form's, so old links never lead to a stranger's form. */
+export async function addressTaken(slug: string, formId: string): Promise<boolean> {
+  return !!(await first<{ n: number }>('SELECT 1 AS n FROM forms_forms WHERE slug = ?1 AND id <> ?2 UNION ALL SELECT 1 FROM forms_old_addresses WHERE slug = ?1 AND form_id <> ?2', slug, formId))
 }
 
 export async function requireForm(id: string | undefined): Promise<FormRow> {
@@ -46,7 +59,7 @@ export async function requireForm(id: string | undefined): Promise<FormRow> {
 }
 
 export async function listForms(): Promise<FormRow[]> {
-  return (await all<FormRow>(`SELECT ${FORM} FROM forms_forms ORDER BY archived_at IS NOT NULL, title COLLATE NOCASE, id`)).map(r => ({ ...r, anonymous: !!r.anonymous }))
+  return (await all<FormRow>(`SELECT ${FORM} FROM forms_forms ORDER BY archived_at IS NOT NULL, title COLLATE NOCASE, id`)).map(r => ({ ...r, anonymous: !!r.anonymous, allowEdits: !!r.allowEdits }))
 }
 
 export async function getDraft(formId: string): Promise<DraftRow> {
@@ -95,14 +108,14 @@ export function slugOf(title: string): string {
   const slug = title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z\d]+/g, '-').replace(/^-+|-+$/g, '').slice(0, SLUG_LENGTH).replace(/-+$/, '')
   return slug || 'form'
 }
-const SLUG_LENGTH = 60 // not-policy: a readable address
+export const SLUG_LENGTH = 60 // not-policy: a readable address
 /** The longest title a form may have. */
 export const TITLE_LENGTH = 120 // not-policy: fits a list row and a page heading
 
 /** The first free address from the title: `auditions`, then `auditions-2`, and so on. */
 export async function freeSlug(title: string): Promise<string> {
   const base = slugOf(title)
-  const taken = new Set((await all<{ slug: string }>('SELECT slug FROM forms_forms WHERE slug = ? OR slug LIKE ?', base, `${base}-%`)).map(r => r.slug))
+  const taken = new Set((await all<{ slug: string }>('SELECT slug FROM forms_forms WHERE slug = ?1 OR slug LIKE ?2 UNION SELECT slug FROM forms_old_addresses WHERE slug = ?1 OR slug LIKE ?2', base, `${base}-%`)).map(r => r.slug))
   if (!taken.has(base)) return base
   let n = 2
   while (taken.has(`${base}-${n}`)) n++

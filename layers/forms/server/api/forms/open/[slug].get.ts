@@ -4,13 +4,16 @@
 import { getRouterParam } from 'h3'
 import { aboutOf, placeIn, placeOf } from '../../../slots'
 import { defineRoute, nowMs, refuse, today } from '#kit'
-import { getFormBySlug, getVersion } from '../../../forms'
+import { getFormBySlug, getVersion, movedFrom } from '../../../forms'
 import { REASONS, draftOf, shut } from '../../../responses'
 import type { Definition } from '../../../../shared/engine'
 import { withoutWorkflow } from '../../../../shared/engine'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (event, { actor }) => {
   const form = await getFormBySlug(getRouterParam(event, 'slug'))
+  // An address the form used to have: the page sends the person on to where it is now.
+  const moved = form ? null : await movedFrom(getRouterParam(event, 'slug'))
+  if (moved) return { movedTo: moved }
   const link = form ? await placeOf(form, placeIn(event)) : null
   const version = form ? await getVersion(form.liveVersionId) : null
   // A form with no link, or never published, is not there at all as far as the public is concerned.

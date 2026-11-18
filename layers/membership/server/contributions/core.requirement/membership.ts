@@ -7,7 +7,7 @@
 // Evidence is the list entry's id where one exists, otherwise the membership's id (V11).
 import { all, defineRequirementSource, first, localDate, useSetting, type SourceAnswer } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { findEntry, getList, normalise, schemeList, wellFormed, type ListRow } from '../../lists'
+import { findEntry, getList, normalise, nounOf, schemeList, wellFormed, type ListRow } from '../../lists'
 import { getScheme, listSchemes, type Scheme } from '../../schemes'
 import { shapeText } from '../../verify'
 
@@ -33,6 +33,31 @@ async function survivor(accountId: string): Promise<string> {
 }
 
 const matches = (ref: string, m: Held) => ref === ANY || m.schemeId === ref
+const MINE = '/account/membership'
+
+/** The last day of the latest membership of this account that has lapsed (past its end and grace), for a reference. */
+async function lastLapsed(accountId: string, ref: string, day: string): Promise<string | null> {
+  const row = await first<{ endsOn: string }>(
+    `SELECT m.ends_on AS endsOn FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id
+      WHERE m.account_id IN (${accountScopeSql('?1')}) AND m.state = 'active' AND m.ends_on IS NOT NULL
+        AND date(m.ends_on, '+' || s.grace_days || ' days') < ?2 ${ref === ANY ? '' : 'AND m.scheme_id = ?'}
+      ORDER BY m.ends_on DESC LIMIT 1`,
+    accountId, day, ...(ref === ANY ? [] : [ref]),
+  )
+  return row?.endsOn ?? null
+}
+
+/** Whether somebody could join a scheme this reference counts, themselves, now. */
+async function mayJoin(ref: string, scheme: Scheme | null): Promise<boolean> {
+  const schemes = ref === ANY ? await listSchemes(['open']) : scheme?.state === 'open' ? [scheme] : []
+  return schemes.some(s => s.joinMode === 'apply')
+}
+
+/** A day written out for a sentence, in the theatre's language: "1 October 2026". */
+async function longDate(day: string): Promise<string> {
+  const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.parse(`${day}T00:00:00Z`))
+}
 
 interface Entry { id: string, endsOn: string | null, usedBy: string | null }
 
@@ -105,9 +130,11 @@ export default defineRequirementSource({
     const out: Record<string, { label: string, presentable?: { label: string, field?: string, shape: string } }> = {}
     const presentableOf = async (scheme: Scheme) => {
       const list = await schemeList(scheme)
-      // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a sentence.
+      // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a
+      // sentence; the hint uses the list's short noun, and says a member number works too, since a
+      // member added by staff may have no reference on the list.
       return list?.keyKind === 'reference'
-        ? { label: `${scheme.name}: type your reference to get this price`, field: list.referenceLabel ?? 'Membership reference', shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
+        ? { label: `${scheme.name}: type your ${nounOf(list)} or member number to get this price`, field: list.referenceLabel ?? 'Membership reference', shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
         : { label: `${scheme.name}: type your member number to get this price`, field: 'Member number', shape: 'member-number' }
     }
     for (const ref of refs) {
@@ -118,7 +145,7 @@ export default defineRequirementSource({
         const taking = (await listSchemes(['open', 'closed'])).filter(s => s.acceptsReference)
         out[ref] = taking.length === 1
           ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
-          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference to get this price', field: 'Membership reference', shape: 'reference' } } : { label: 'Members' }
+          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', shape: 'reference' } } : { label: 'Members' }
         continue
       }
       const scheme = await getScheme(id)
@@ -126,7 +153,7 @@ export default defineRequirementSource({
         out[ref] = { label: NO_LONGER }
         continue
       }
-      // V13: the label names the scheme, never a bare noun. A list's own label where it has one.
+      // V13: the list's own question, never a bare noun; for member numbers, built from the scheme's name.
       out[ref] = scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }
     }
     return out
@@ -186,7 +213,7 @@ export default defineRequirementSource({
             if (number === null && !shaped) {
               // V15: not well formed, so say what one looks like.
               const sample = lists[0]?.list
-              const reason = sample ? shapeText(sample.referenceShape) : 'That is not a member number. It is the number on your membership card, such as M-412.'
+              const reason = sample ? shapeText(nounOf(sample), sample.referenceShape) : 'That is not a member number. It is the number on your membership card, such as M-412.'
               out.push({ account, ref: fullRef, verdict: 'not-met', reason, summary: 'Not a well-formed reference.' })
               continue
             }
@@ -204,16 +231,24 @@ export default defineRequirementSource({
           const reason = !list || typedValue === null
             ? 'We could not find a current membership for that number. Have a membership? Contact us.'
             : lists.some(l => wellFormed(l.list.referenceShape, typedValue))
-              ? 'We could not find a current membership with that reference. Have a membership? Contact us.'
-              : shapeText(list.referenceShape)
+              ? `We could not find a current membership with that ${nounOf(list)}. Have a membership? Contact us.`
+              : shapeText(nounOf(list), list.referenceShape)
           out.push({ account, ref: fullRef, verdict: 'not-met', reason, help, summary: 'No current membership found for the reference given.' })
           continue
         }
+        if (ref !== ANY && (!scheme || scheme.state === 'archived')) {
+          out.push({ account, ref: fullRef, verdict: 'not-met', reason: 'This price is for a membership that is no longer offered.', summary: 'Not a member.' })
+          continue
+        }
+        // A signed-in person is told why and where to put it right: renew what lapsed, or join.
+        const ended = account ? await lastLapsed(account, ref, day) : null
+        const joinable = account && !ended ? await mayJoin(ref, scheme) : false
         out.push({
           account,
           ref: fullRef,
           verdict: 'not-met',
-          reason: ref !== ANY && (!scheme || scheme.state === 'archived') ? 'This price is for a membership that is no longer offered.' : 'This price is for members.',
+          reason: ended ? `Your membership ended on ${await longDate(ended)}.` : 'This price is for members.',
+          ...(ended ? { remedy: { label: 'Renew', to: MINE } } : joinable ? { remedy: { label: 'Join', to: MINE } } : {}),
           summary: 'Not a member.',
         })
       }
