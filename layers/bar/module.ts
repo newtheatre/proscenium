@@ -31,6 +31,10 @@ export default defineModule({
     'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', change, audience: 'staff' }),
     'allergens.statement': setting.text({ default: '', maxLength: 400, multiline: true, change, audience: 'public' }),
     'allergens.publish': setting.boolean({ default: true, change, audience: 'staff' }),
+    // Stocktakes (tab 3, "A stocktake"): whether counters see the expected level, and how small a
+    // difference the person who counted may approve themselves.
+    'stocktake.blind': setting.boolean({ default: false, change, audience: 'staff' }),
+    'stocktake.self-approve-under': setting.money({ default: 2000, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('bar', {
@@ -41,6 +45,7 @@ export default defineModule({
     'stock-item': { table: 'bar_stock_items' },
     'stock-location': { table: 'bar_stock_locations' },
     'delivery': { table: 'bar_deliveries', owner: 'created_by' },
+    'stocktake': { table: 'bar_stocktakes', owner: 'started_by' },
     'product-preset': { table: 'bar_product_presets' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
@@ -62,6 +67,10 @@ export default defineModule({
     'stock.receive': ability({ implies: ['stock.view'] }),
     // Write stock off as wasted, with a reason.
     'stock.waste': ability({ implies: ['stock.view'] }),
+    // Count a location's stock and submit the count.
+    'stock.count': ability({ implies: ['stock.view'] }),
+    // Approve a count, which changes the levels, or send it back.
+    'stocktake.approve': ability({ implies: ['stock.count'] }),
     // Use the bar's panel in the till, at an outlet.
     'sale.sell': ability({ on: 'bar.outlet' }),
     // Close an outlet's opening; the person who opened it may close it.
@@ -88,6 +97,8 @@ export default defineModule({
       'bar.sale.refunded': event({ version: 1, payload: z.object({ saleId: z.string(), refundId: z.string() }), internal: false }),
       // For a stock report or an outside purchasing system: what arrived where, no person.
       'bar.delivery.received': event({ version: 1, payload: z.object({ deliveryId: z.string(), locationId: z.string() }), internal: false }),
+      // A count was approved and the levels changed.
+      'bar.stocktake.approved': event({ version: 1, payload: z.object({ stocktakeId: z.string(), locationId: z.string() }), internal: false }),
       'bar.age-check.refused': event({ version: 1, payload: z.object({ ageCheckId: z.string(), openingId: z.string() }), internal: true }),
     },
     // Standard is made when the bar is switched on.
@@ -137,6 +148,17 @@ export default defineModule({
         { slug: 'line-cleaning', label: 'Line cleaning' },
         { slug: 'staff', label: 'Staff drink' },
         { slug: 'other', label: 'Other' },
+      ],
+    }, {
+      id: 'bar.variance-reason',
+      label: 'Reasons a count differs',
+      termClass: 'internal',
+      terms: [
+        { slug: 'miscounted', label: 'Counted wrongly before' },
+        { slug: 'unrecorded-waste', label: 'Waste not recorded' },
+        { slug: 'delivery-short', label: 'Delivery short or over' },
+        { slug: 'free-drinks', label: 'Drinks given away' },
+        { slug: 'unknown', label: 'Not known' },
       ],
     }, {
       id: 'bar.supplier',
