@@ -97,7 +97,7 @@ describe('scanning at the door', () => {
     const reserved = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `door${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
     expect(reserved.body.state, JSON.stringify(reserved.body)).toBe('reserved')
     // What the door shows, so it can send them to the box office or the bar to pay.
-    const unpaid = { result: 'not_paid', scanId: null, reservation: { reference: reserved.body.reference, tickets: 1, amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
+    const unpaid = { result: 'not_paid', scanId: null, reservation: { reference: reserved.body.reference, buyer: expect.any(String), tickets: 1, amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
     expect((await scan(h, reserved.body.deskCode)).body).toEqual(unpaid)
     // The live door counts them as still to come.
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, steward)).body).toMatchObject({ tickets: 0, admitted: 0, unpaid: 1 })
@@ -161,6 +161,18 @@ describe('the door list', () => {
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)).body.rows).toHaveLength(0)
     const everyone = await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all`, undefined, steward)
     expect(everyone.body.rows[0]).toMatchObject({ tickets: 2, admitted: 2 })
+  })
+
+  it('lists a reservation not yet paid for as Not paid, found by its reference, and never as arrived', async () => {
+    const h = await house(4)
+    const made = await buy(h, 2)
+    if (!made.ok) throw new Error(made.code)
+    const reserved = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `door${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
+    expect(reserved.body.state, JSON.stringify(reserved.body)).toBe('reserved')
+    const row = { reference: reserved.body.reference, tickets: 2, admitted: 0, unpaid: { amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)).body.rows).toEqual([expect.objectContaining(row)])
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door?q=${reserved.body.reference}`, undefined, steward)).body.rows).toEqual([expect.objectContaining(row)])
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door?arrived=yes`, undefined, steward)).body.rows).toHaveLength(0)
   })
 
   it('admits by name from the list, as many as asked, and never the same ticket twice', async () => {
