@@ -278,3 +278,70 @@ describe('cashing up (PAY-03)', () => {
     expect(all.body.total).toBeGreaterThanOrEqual(opened.length)
   })
 })
+
+describe('splitting a sale by item', () => {
+  const panels = [{ basket: 'tickets', input: { amountMinor: 1000, quantity: 3 } }, { basket: 'snacks', input: { amountMinor: 350 } }]
+  const plan = [
+    { items: [{ basket: 'tickets', line: 0, quantity: 1 }, { basket: 'snacks', line: 0, quantity: 1 }] },
+    { items: [{ basket: 'tickets', line: 0, quantity: 2 }] },
+  ]
+  const attest = (intentId: string, me: ReturnType<typeof person>, body: Record<string, unknown>) => post(`/api/payments/intents/${intentId}/attest`, me, { providerAccountId: cash, method: 'cash', ...body }, true)
+
+  it('gives each person their items, takes exactly their share, and emails each their own receipt', async () => {
+    const me = seller()
+    await post('/api/payments/sessions', me, { pointLabel: 'Foyer' }, true)
+    const sale = await post('/api/payments/till/sale', me, { panels, splits: plan }, true)
+    expect(sale.body.amountMinor).toBe(1350)
+    const id = sale.body.intentId as string
+    // The odd penny of three tickets at £10 goes to the first person.
+    expect((await get(`/api/payments/intents/${id}`, me)).body.splits).toEqual([
+      { position: 1, amountMinor: 684, paid: false, items: [{ label: 'Ticket', quantity: 1, amountMinor: 334 }, { label: 'Snacks', quantity: 1, amountMinor: 350 }] },
+      { position: 2, amountMinor: 666, paid: false, items: [{ label: 'Ticket', quantity: 2, amountMinor: 666 }] },
+    ])
+    // Nobody types an amount, and a split sale needs to know who is paying.
+    expect((await attest(id, me, { amountMinor: 500 })).status).toBe(422)
+    expect((await attest(id, me, {})).body).toMatchObject({ code: 'payments.till.which-person' })
+
+    expect((await attest(id, me, { split: 2, receiptTo: 'second@example.com' })).body).toMatchObject({ settled: false })
+    expect((await attest(id, me, { split: 2 })).body).toMatchObject({ code: 'payments.till.person-paid' })
+    const sent = await rows<{ address: string, payload: string }>("SELECT address, payload FROM core_notifications WHERE type_key = 'payments.till-receipt'")
+    expect(sent).toHaveLength(1)
+    expect(sent[0]!.address).toBe('second@example.com')
+    expect(JSON.parse(sent[0]!.payload)).toMatchObject({ items: '2 × Ticket', amount: '£6.66', method: 'Cash' })
+
+    const last = await attest(id, me, { split: 1, receiptTo: 'first@example.com', tenderedMinor: 1000 })
+    expect(last.body).toMatchObject({ settled: true, changeMinor: 316 })
+    expect(await rows("SELECT address FROM core_notifications WHERE type_key = 'payments.till-receipt' ORDER BY address")).toEqual([{ address: 'first@example.com' }, { address: 'second@example.com' }])
+    // The owner is told who paid for which of its lines, with their address, at settle.
+    expect((globalThis as { ticketsSplits?: unknown }).ticketsSplits).toEqual([
+      { position: 1, receiptTo: 'first@example.com', items: [{ line: 0, key: 'all', quantity: 1 }] },
+      { position: 2, receiptTo: 'second@example.com', items: [{ line: 0, key: 'all', quantity: 2 }] },
+    ])
+    // Once the sale is over, the addresses are gone.
+    expect(await rows('SELECT receipt_to FROM payments_till_splits WHERE intent_id = ? AND receipt_to IS NOT NULL', id)).toEqual([])
+    expect((await get(`/api/payments/intents/${id}`, me)).body).toMatchObject({ state: 'succeeded', splits: [{ paid: true }, { paid: true }] })
+  })
+
+  it('refuses a plan that leaves an item out, gives one twice, or splits a single item', async () => {
+    const me = seller()
+    await post('/api/payments/sessions', me, { pointLabel: 'Foyer' }, true)
+    const short = await post('/api/payments/till/sale', me, { panels, splits: [plan[0], { items: [{ basket: 'tickets', line: 0, quantity: 1 }] }] }, true)
+    expect(short).toMatchObject({ status: 422, body: { code: 'payments.till.bad-split' } })
+    const twice = await post('/api/payments/till/sale', me, { panels, splits: [plan[0], { items: [{ basket: 'tickets', line: 0, quantity: 3 }] }] }, true)
+    expect(twice).toMatchObject({ status: 422, body: { code: 'payments.till.bad-split' } })
+    const one = [{ basket: 'tickets', input: { amountMinor: 1000 } }]
+    const single = await post('/api/payments/till/sale', me, { panels: one, splits: [{ items: [{ basket: 'tickets', line: 0, quantity: 1 }] }, { items: [{ basket: 'tickets', line: 0, quantity: 1 }] }] }, true)
+    expect(single).toMatchObject({ status: 422, body: { code: 'payments.till.split-one-item' } })
+    // Nothing was made by the refused plans.
+    expect((await get('/api/payments/session', me)).body.unfinished).toBeNull()
+  })
+
+  it('takes a sale that is not split whole, with no person or receipt address', async () => {
+    const me = seller()
+    await post('/api/payments/sessions', me, { pointLabel: 'Foyer' }, true)
+    const sale = await post('/api/payments/till/sale', me, { panels }, true)
+    expect((await attest(sale.body.intentId, me, { split: 1 })).body).toMatchObject({ code: 'payments.till.not-split' })
+    expect((await attest(sale.body.intentId, me, { receiptTo: 'someone@example.com' })).body).toMatchObject({ code: 'payments.till.not-split' })
+    expect((await attest(sale.body.intentId, me, {})).body).toMatchObject({ settled: true })
+  })
+})

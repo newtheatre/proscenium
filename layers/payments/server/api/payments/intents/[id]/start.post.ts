@@ -12,7 +12,9 @@ export default defineRoute({
     providerAccountId: idSchema('ppa'),
     method: z.enum(['card_online', 'card_reader']),
     readerId: idSchema('rdr').optional(),
-    amountMinor: z.number().int().positive().optional(),
+    // A split sale is paid one person at a time, each for their own items; no amount is typed.
+    split: z.number().int().positive().max(100).optional(), // not-policy: a person's number on the receipt
+    receiptTo: z.email().max(254).optional(), // not-policy: an address's longest
     // The screen to come back to after a hand-off to another app, such as the till.
     returnTo: z.string().max(200).regex(RETURN_PATH).optional(), // not-policy: a path's bound
   }).strict(),

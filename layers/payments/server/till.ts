@@ -5,6 +5,7 @@
 import { can, nowMs, Refusal, runInContext, useContext, usePoint, type Actor, type UnitView } from '#kit'
 import { createIntent } from './intents'
 import type { DeskBasket } from './points/desk-basket'
+import { addSplits, planSplits, type SplitInput, type SplitPanel } from './splits'
 
 /** How long a desk sale may wait unpaid before the expiry task releases it. */
 const DESK_INTENT_LIFETIME = 30 * 60_000 // not-policy: a backstop for a till left mid-sale; the seller cancels or takes payment long before
@@ -61,18 +62,31 @@ export async function tillSummary(actor: Actor, panels: PanelInput[]) {
   return { panels: out, amountMinor: out.reduce((s, p) => s + p.amountMinor, 0) }
 }
 
-/** Prepares every filled panel and opens one intent for them in the session, in the caller's unit. */
-export async function prepareSale(unit: UnitView, actor: Actor, sessionId: string, panels: PanelInput[]): Promise<{ intentId: string, amountMinor: number }> {
+/**
+ * Prepares every filled panel and opens one intent for them in the session, in the caller's unit.
+ * With `splits`, the sale is split between people by item: each panel's summary lines are given out
+ * as the till says, and must add up to what the panel prepared.
+ */
+export async function prepareSale(unit: UnitView, actor: Actor, sessionId: string, panels: PanelInput[], splits?: SplitInput[]): Promise<{ intentId: string, amountMinor: number }> {
   if (!panels.length) throw new Refusal('payments.till.empty', 'There is nothing to take payment for.', { status: 422 })
   const parts = []
   const prepared = []
+  const lined: SplitPanel[] = []
   for (const { panel, input } of await chosen(actor, panels)) {
     const part = await panel.value.prepare(unit, { sessionId, input })
     if (part.owner.module !== panel.module) throw new Error(`${panel.module}'s panel prepared a part for ${part.owner.module}`)
     parts.push(part)
     prepared.push({ panel, part })
+    if (splits) {
+      const { lines } = await panel.value.summary({ input })
+      if (lines.reduce((sum, l) => sum + l.amountMinor, 0) !== part.amountMinor)
+        throw new Refusal('payments.till.total-changed', 'The items on the receipt no longer add up to the total.', { status: 409, remedy: 'Check the receipt, then split it again.' })
+      lined.push({ basket: panel.id, owner: part.owner, lines })
+    }
   }
+  const planned = splits ? planSplits(lined, splits) : null
   const { intentId } = await createIntent(unit, { parts, channel: 'desk', sessionId, expiresAt: nowMs() + DESK_INTENT_LIFETIME })
   for (const { panel, part } of prepared) await panel.value.attach?.(unit, part.owner.record, intentId)
+  if (planned) addSplits(unit, intentId, planned)
   return { intentId, amountMinor: parts.reduce((s, p) => s + p.amountMinor, 0) }
 }

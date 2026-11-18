@@ -1,6 +1,6 @@
 // The money screens in a real browser: Payments' and Finance's console pages load for someone who
 // holds their abilities, have no accessibility violations, and the till opens a till session by itself.
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -149,61 +149,61 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await noViolations(page)
 })
 
-/** Types an amount into a currency number field, leaves it, and waits for it to show the amount. */
-async function amount(field: Locator, typed: string) {
-  await field.click()
-  await field.press('ControlOrMeta+a')
-  await field.pressSequentially(typed)
-  await field.press('Tab')
-  await expect(field).toHaveValue(`£${Number(typed).toFixed(2)}`)
-}
+/** A person's way to pay in a split sale. */
+const personCash = (page: Page, n: number) => page.getByRole('group', { name: `How person ${n} is paying` }).getByRole('button', { name: /^Cash/ }).first()
 
-test('the Till takes part of the total one way and the rest another', async ({ page }) => {
+test('the Till splits a sale by item, and each person pays for their own with their own receipt', async ({ page }) => {
   await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Split' }).click()
-  // Typed as a seller types it, over the whole of what is there. Playwright's fill() sets the text in
-  // one go, which the number field's own input checks sometimes refuse once it holds a formatted
-  // amount, leaving the old one in place.
-  const part = page.getByLabel(/^Amount to take this way/)
-  await amount(part, '7')
-  await expect(page.getByText('Enter an amount above nothing and no more than £6.00.')).toBeVisible()
-  await amount(part, '2.50')
-  await cash(page).click()
-  await page.getByRole('button', { name: 'Cash taken: £2.50' }).click()
-  await expect(page.getByText('£2.50 taken. Still to pay: £3.50', { exact: true })).toBeVisible()
-  await expect(page.getByText('Paid so far: £2.50')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Give back what was taken' })).toBeVisible()
+  // Each item is given to a person; nobody types an amount.
+  await expect(page.getByText('Split by item')).toBeVisible()
+  await expect(page.getByLabel('Amount to take this way')).toHaveCount(0)
+  await expect(page.getByRole('radiogroup', { name: 'Who pays for Programme' })).toHaveCount(2)
   await noViolations(page)
-  await cash(page).click()
-  await page.getByRole('button', { name: 'Cash taken: £3.50' }).click()
+  await page.getByLabel('Email a receipt to').nth(1).fill('pat@example.com')
+  await personCash(page, 2).click()
+  await expect(page.getByText('Person 2 pays £3.00')).toBeVisible()
+  await page.getByRole('button', { name: 'Cash taken: £3.00' }).click()
+  await expect(page.getByText('£3.00 taken. Still to pay: £3.00', { exact: true })).toBeVisible()
+  await expect(page.getByText('Paid so far: £3.00')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
+  await expect(page.getByRole('group', { name: 'How person 2 is paying' })).toHaveCount(0)
+  await noViolations(page)
+  await personCash(page, 1).click()
+  await page.getByRole('button', { name: 'Cash taken: £3.00' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
 })
 
-test('Split asks for the first amount before starting the sale, and a reload keeps the split and its lines', async ({ page }) => {
+test('Split is off for a single item, gives every item to someone, and a reload keeps who pays for what', async ({ page }) => {
   await visit(page, '/live/till')
+  await page.getByLabel('Programmes sold').fill('1')
+  await page.getByLabel('Programmes sold').blur()
+  await expect(payButton(page, '£3.00')).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Split' })).toBeDisabled()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Split' }).click()
-  // Nothing is started yet: the way back leaves the sale as it was.
+  // Both programmes to person 1 leaves person 2 nothing to pay for.
+  await page.getByRole('radiogroup', { name: 'Who pays for Programme' }).nth(1).getByRole('radio', { name: 'Person 1' }).click()
+  await expect(page.getByText('Nothing given to this person yet.')).toBeVisible()
+  await expect(personCash(page, 1)).toBeDisabled()
+  await page.getByRole('radiogroup', { name: 'Who pays for Programme' }).nth(1).getByRole('radio', { name: 'Person 2' }).click()
+  // Nothing is started until someone pays.
   await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
-  await expect(cash(page)).toBeDisabled() // a split needs its first amount
-  await amount(page.getByLabel(/^Amount to take this way/), '2')
-  await cash(page).click()
+  await personCash(page, 1).click()
   await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
-  // Reloaded before the first part is taken: the split and what the sale is for are still there.
+  // Reloaded before anyone has paid: the people and what each pays for come back from the sale.
   await page.reload()
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
   await expect(page.getByText('A payment of £6.00 was not finished').first()).toBeVisible()
   await expect(page.getByText('Programmes × 2')).toBeVisible()
-  await expect(page.getByLabel(/^Amount to take this way/)).toHaveValue('£2.00')
-  await cash(page).click()
-  await page.getByRole('button', { name: 'Cash taken: £2.00' }).click()
-  await expect(page.getByText('Paid so far: £2.00')).toBeVisible()
-  await cash(page).click()
-  await page.getByRole('button', { name: 'Cash taken: £4.00' }).click()
+  await personCash(page, 1).click()
+  await page.getByRole('button', { name: 'Cash taken: £3.00' }).click()
+  await expect(page.getByText('Paid so far: £3.00')).toBeVisible()
+  await personCash(page, 2).click()
+  await page.getByRole('button', { name: 'Cash taken: £3.00' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   // The note about the unfinished payment goes once it is paid.
   await expect(page.getByText('A payment of £6.00 was not finished')).toHaveCount(0)
@@ -211,17 +211,16 @@ test('Split asks for the first amount before starting the sale, and a reload kee
 
 test('the Till gives back what was taken when the customer leaves a sale paid in part', async ({ page }) => {
   await visit(page, '/live/till')
-  await page.getByLabel('Programmes sold').fill('1')
+  await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Split' }).click()
-  await amount(page.getByLabel(/^Amount to take this way/), '2')
-  await cash(page).click()
-  await page.getByRole('button', { name: 'Cash taken: £2.00' }).click()
-  await expect(page.getByText('Paid so far: £2.00')).toBeVisible()
+  await personCash(page, 1).click()
+  await page.getByRole('button', { name: 'Cash taken: £3.00' }).click()
+  await expect(page.getByText('Paid so far: £3.00')).toBeVisible()
   await page.getByRole('button', { name: 'Give back what was taken' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Give back what was taken' }).click()
   await expect(page.getByText('Sale ended and payment given back', { exact: true })).toBeVisible()
-  await expect(page.getByText('£2.00 handed back.', { exact: true })).toBeVisible()
+  await expect(page.getByText('£3.00 handed back.', { exact: true })).toBeVisible()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
 

@@ -4,6 +4,16 @@
 // payments.settlement release.
 import type { UnitView } from '#kit'
 
+/** One line of a panel's summary. */
+export interface SummaryLine {
+  label: string
+  amountMinor: number
+  quantity?: number
+  item?: string
+  /** The owner's own name for the line, such as an order line's id, handed back at settle with who paid for it. */
+  key?: string
+}
+
 export interface DeskContext {
   sessionId: string
   /** What the seller has put in this module's panel, as the panel sent it. */
@@ -50,6 +60,12 @@ export interface DeskBasket {
    * place of its own. Reads only.
    */
   space?: (context: Pick<DeskContext, 'input'>) => Promise<string | null>
-  /** Lines and an amount for display. Reads only, and comes before any session is open. */
-  summary: (context: Pick<DeskContext, 'input'>) => Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }>
+  /**
+   * Lines and an amount for display. Reads only, and comes before any session is open. A line of
+   * several of the same thing says how many (`quantity`, 1 when absent) and what one of them is
+   * called (`item`, the label when absent): a split sale gives each one to a person, and the line's
+   * amount is shared between them a penny at a time from the first. A sale is split only by these
+   * lines, so they must add up to the amount `prepare` gives.
+   */
+  summary: (context: Pick<DeskContext, 'input'>) => Promise<{ lines: SummaryLine[], amountMinor: number }>
 }

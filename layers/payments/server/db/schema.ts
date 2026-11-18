@@ -166,6 +166,38 @@ export const attempts = defineTable('payments_attempts', {
   ],
 })
 
+/**
+ * A till sale split between people by item (Matt, 18 November 2026): each person pays for the items
+ * given to them, never a typed amount. The plan is fixed when the sale is made; each person's
+ * payment is an attempt for exactly their amount, and their receipt goes to the address they gave
+ * once it succeeds. The address is kept only until then: it is cleared when the receipt is sent,
+ * and by a trigger when the sale ends without one.
+ */
+export const tillSplits = defineTable('payments_till_splits', {
+  id: col.id(),
+  intentId: col.ref('payments_intents'),
+  // 1, 2, 3: "Person 1" on the till.
+  position: col.internal(integer('position').notNull()),
+  amountMinor: col.minor('amount_minor').notNull(),
+  // JSON list of { basket, line, quantity, label, amountMinor }: what this person pays for.
+  items: col.internal(text('items').notNull()),
+  // The latest payment taken for this person; theirs is paid once it has succeeded.
+  attemptId: col.ref('payments_attempts', { nullable: true }),
+  receiptTo: col.email('receipt_to', { erase: 'clear' }),
+  receiptSentAt: col.timestamp('receipt_sent_at'),
+  createdAt: col.createdAt(),
+}, {
+  id: 'tsp',
+  realm: 'audience',
+  subject: { email: 'receipt_to' },
+  extra: t => [
+    uniqueIndex('payments_till_splits_position').on(t.intentId, t.position),
+    index('payments_till_splits_attempt').on(t.attemptId).where(sql`attempt_id IS NOT NULL`),
+    check('payments_till_splits_amount', sql`${t.amountMinor} > 0`),
+    check('payments_till_splits_position', sql`${t.position} > 0`),
+  ],
+})
+
 /** Everything that was heard about an attempt, in the order it was heard. */
 export const attemptEvents = defineTable('payments_attempt_events', {
   id: col.id(),
@@ -246,4 +278,4 @@ export const webhookEvents = defineTable('payments_webhook_events', {
   ],
 })
 
-export const tables = { providerAccounts, readers, sessions, intents, intentParts, attempts, attemptEvents, refunds, webhookEvents }
+export const tables = { providerAccounts, readers, sessions, intents, intentParts, attempts, attemptEvents, refunds, webhookEvents, tillSplits }

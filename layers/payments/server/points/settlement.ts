@@ -13,6 +13,12 @@ export interface Part {
   record: string
   amountMinor: number
   currency: string
+  /**
+   * For a till sale split between people by item: who paid for which of this part's summary lines
+   * (by index, and by the line's `key` where the panel gave one), with the address each person gave
+   * for their receipt. Absent when the sale was not split.
+   */
+  splits?: { position: number, receiptTo: string | null, items: { line: number, key: string | null, quantity: number }[] }[]
 }
 
 /**

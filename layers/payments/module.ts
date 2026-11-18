@@ -153,7 +153,22 @@ export default defineModule({
     ],
     'core.privacy-record': [
       { id: 'payments.payments', holds: 'Payments and refunds: the amount, the type of card and its last four digits', why: 'To match payments to orders and make refunds', basis: 'To carry out our contract with you, and a legal duty (tax and accounting law)', keptFor: 'For as long as tax and accounting law requires', order: 120 },
+      { id: 'payments.till-receipts', holds: 'An email address you give at the till for your receipt, when a bill is split', why: 'To send you a receipt for what you paid', basis: 'To carry out our contract with you', keptFor: 'Until the sale is finished', order: 121 },
     ],
+    // A receipt for one person's share of a sale split at the till, to the address they gave there.
+    'core.notification-type': [{
+      id: 'payments.till-receipt',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      variables: { items: 'text' as const, amount: 'text' as const, method: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your receipt from {{ theatre }}',
+          body: 'Thank you for your payment of **{{ amount }}** to {{ theatre }} ({{ method }}).\n\nYou paid for: {{ items }}.',
+        },
+      },
+    }],
     // The tills on a performance's operating day, for Front of house's board and night report.
     'front-of-house.tonight-figure': [{ id: 'payments.tills', file: 'tills' }],
     'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],
