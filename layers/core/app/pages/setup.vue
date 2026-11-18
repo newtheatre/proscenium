@@ -211,7 +211,7 @@ const description = computed(() => {
       </div>
     </UForm>
     <RecoveryCodes
-      v-else
+      v-else-if="codes"
       :codes="codes"
       @kept="finish"
     />
