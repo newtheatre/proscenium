@@ -1,16 +1,21 @@
 // The theatre's mapping of facts to abilities (ID-22, part 3 "Facts"): a fact a module declares,
 // such as "is the stage manager of this production", brings the abilities the theatre maps to it,
 // edited the same way as a role. A privileged ability counts only once the theatre has confirmed it.
-import { all, nowMs, refuse, type Actor, type UnitView } from '#kit'
+import { all, isEnabled, nowMs, refuse, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { impliedAbility } from '#kit/abilities'
 import { abilityError, checkAbilities, notHeld } from './roles'
 
-/** Every ability, with whether the actor holds it at site scope, for the role and fact editors. */
+/**
+ * Every ability, with whether the actor holds it at site scope and whether its module is on, for
+ * the role and fact editors.
+ */
 export async function abilityCatalogue(actor: Actor) {
   const registry = useRegistry()
   const names = [...registry.abilities.keys()]
   const missing = new Set(await notHeld(actor, names))
+  const on = new Map<string, boolean>()
+  for (const module of registry.modules.keys()) on.set(module, await isEnabled(module))
   return [...registry.abilities].map(([name, { module, decl }]) => ({
     name,
     module,
@@ -18,6 +23,7 @@ export async function abilityCatalogue(actor: Actor) {
     implies: (decl.implies ?? []).map(entry => impliedAbility(module, entry)),
     label: `${module}.abilities.${name.slice(module.length + 1)}.label`,
     held: !missing.has(name),
+    moduleOn: on.get(module) ?? false,
   }))
 }
 
