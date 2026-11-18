@@ -124,6 +124,20 @@ describe('an option with a stock item', () => {
   })
 })
 
+describe('a size made only from choices', () => {
+  it('has no label of its own: it is checked, and depends on what is picked', async () => {
+    const spirit = await commit(async (unit) => {
+      const v = unit.view()
+      const category = (await rows<{ category_id: string }>('SELECT category_id FROM bar_products WHERE id = ?', s.crispsProduct))[0]!.category_id
+      const made = await addProduct(v, { categoryId: category, name: 'Stock allergen spirit and mixer' }, { amountMinor: 500 }, manager.accountId!)
+      setProductGroups(v, made.productId, [s.milkGroup])
+      return made.variantId
+    })
+    await commit(unit => setRecipe(unit.view(), spirit, { lines: [{ choiceGroupId: s.milkGroup, quantity: 1 }] }))
+    expect(item(await menu(), spirit).allergens).toEqual({ contains: [], mayContain: [], checked: true, dependsOnChoice: true })
+  })
+})
+
 describe('step 3: the public chart, the home card and the re-check prompt', () => {
   const chart = async () => {
     const response = await call(handle, 'GET', '/api/bar/allergens/chart')

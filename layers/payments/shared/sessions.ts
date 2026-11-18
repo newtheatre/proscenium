@@ -26,4 +26,12 @@ export interface YourSession {
   awaiting: YourSessionSummary[]
   /** A sale in the open session that was started and neither paid nor cancelled, such as one left by a reload. */
   unfinished?: { intentId: string, amountMinor: number } | null
+  /** Where the next session opens when the device has no place of its own. */
+  defaultSpaceId?: string | null
+  /** What the open session has taken, by way of paying. */
+  takings?: { method: string, amountMinor: number }[]
+  /** The open session's latest sales, newest first. */
+  sales?: YourSale[]
 }
+
+export interface YourSale { intentId: string, at: number, amountMinor: number, currency: string, state: string, methods: string[], notes: string[] }

@@ -2,12 +2,11 @@
 // person writes and staff read them only while the person holds a standing. A staff read is one
 // person at a time, with a reason from a fixed list, audited, and shown to the person.
 import { all, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
+import { MAX_EMERGENCY_CONTACTS as MAX_CONTACTS } from '../../shared/emergency-contacts'
 import { hasStanding } from './standings'
 
 export const READ_REASONS = ['emergency', 'incident', 'welfare-follow-up', 'activity-check'] as const
 export type ReadReason = typeof READ_REASONS[number]
-
-export const MAX_CONTACTS = 3 // not-policy: the spec fixes up to three (ID-17)
 
 export interface EmergencyContact { name: string, relationship: string | null, phone: string }
 

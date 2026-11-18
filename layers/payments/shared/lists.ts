@@ -25,7 +25,7 @@ export const refundsList = defineList('payments.refunds', {
   columns: {
     amount: { label: 'Amount', always: true, card: true },
     method: { label: 'Paid by', card: true },
-    owner: { label: 'For' },
+    owner: { label: 'Order' },
     requested: { label: 'Asked', sort: 'requested', card: true },
     state: { label: 'State', card: true },
   },

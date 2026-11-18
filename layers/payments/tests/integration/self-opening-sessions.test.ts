@@ -93,6 +93,42 @@ describe('opening from the till', () => {
   })
 })
 
+describe('what Your session shows', () => {
+  it('says what the session has taken by each way of paying, and lists its sales, newest first', async () => {
+    await setting('payments.cash.enabled', true)
+    try {
+      const me = seller()
+      await send('POST', '/api/payments/till/session', me, {})
+      const first = await send('POST', '/api/payments/till/sale', me, { panels: [{ basket: 'tickets', input: { amountMinor: 500 } }] })
+      await send('POST', `/api/payments/intents/${first.body.intentId}/attest`, me, { providerAccountId: cash, method: 'cash', tenderedMinor: 1000 })
+      advanceClock(60_000)
+      const second = await send('POST', '/api/payments/till/sale', me, { panels: [{ basket: 'tickets', input: { amountMinor: 300 } }] })
+      await send('POST', `/api/payments/intents/${second.body.intentId}/attest`, me, { providerAccountId: cash, method: 'cash' })
+      const { body } = await send('GET', '/api/payments/session', me)
+      expect(body.takings).toEqual([{ method: 'cash', amountMinor: 800 }])
+      expect(body.sales).toMatchObject([
+        { intentId: second.body.intentId, amountMinor: 300, state: 'succeeded', methods: ['cash'] },
+        { intentId: first.body.intentId, amountMinor: 500, state: 'succeeded', methods: ['cash'] },
+      ])
+    }
+    finally {
+      await setting('payments.cash.enabled', false)
+    }
+  })
+
+  it('says where the next session opens when the device has no place', async () => {
+    await setting('payments.sessions.default-space', studio)
+    try {
+      expect((await send('GET', '/api/payments/session', seller())).body.defaultSpaceId).toBe(studio)
+    }
+    finally {
+      await setting('payments.sessions.default-space', null)
+    }
+    // Two spaces and no default: nowhere.
+    expect((await send('GET', '/api/payments/session', seller())).body.defaultSpaceId).toBeNull()
+  })
+})
+
 describe('moving a session', () => {
   it('moves your own open session and changes its note; someone else may not', async () => {
     const me = seller()

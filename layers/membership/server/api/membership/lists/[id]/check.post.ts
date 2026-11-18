@@ -3,7 +3,7 @@
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, first, today } from '#kit'
-import { hashValue, requireList } from '../../../../lists'
+import { hashValue, normalise, requireList, wellFormed } from '../../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.check',
@@ -12,6 +12,8 @@ export default defineRoute({
   input: z.object({ value: z.string().trim().min(1).max(254) }), // not-policy: an address's bound
 }, async (_event, { input, record }) => {
   const list = await requireList(record!.id)
+  // A mistyped reference is told so, rather than that it is not on the list (V15).
+  if (list.keyKind === 'reference' && !wellFormed(list.referenceShape, normalise('reference', input.value))) return { found: false, malformed: true, shape: list.referenceShape }
   const entry = await first<{ ends_on: string | null, holder_name: string | null, used_by: string | null }>(
     'SELECT ends_on, holder_name, used_by FROM membership_verification_entries WHERE list_id = ? AND key_hash = ?',
     list.id, await hashValue(list.keyKind, input.value),

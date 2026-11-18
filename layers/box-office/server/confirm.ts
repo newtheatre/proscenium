@@ -10,7 +10,7 @@ import { claimLink, notify } from '#modules/core'
 import { hashOf, randomToken } from './codes'
 import { siteUrl } from './links'
 import { RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
-import { issueTickets } from './tickets'
+import { issueTickets, ticketNumbers } from './tickets'
 
 export interface Confirmed {
   state: 'confirmed'
@@ -18,8 +18,12 @@ export interface Confirmed {
   reference: string
   currency: string
   totalMinor: number
-  /** The door codes, one for each ticket line in order. Handed out here and in the message, and kept nowhere. */
+  /** The door codes, one for each ticket line in order. Handed out here; the message links to the page that shows them. */
   doorCodes: string[]
+  /** The message carries the link that opens the buyer's account, so the page may say so. */
+  accountLinkSent: boolean
+  /** Opens the booking's page (the link in the message), so the screen can show the tickets at once. Never stored. */
+  token: string
 }
 
 export interface ConfirmOptions {
@@ -28,7 +32,7 @@ export interface ConfirmOptions {
   /** The payment that settled, which must be the one the order is waiting for. */
   intentId?: string
   /** Who the order is for, when confirming is also when that is first known (a free order). */
-  account?: { id: string, signedIn: boolean }
+  account?: { id: string, signedIn: boolean, madeWith?: { address: string } | null }
   /** Whether a message can link to the site: false where no request is at hand to take the address from. */
   link?: boolean
 }
@@ -58,11 +62,13 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
   const performanceIds = [...new Set(lines.map(l => l.performance_id))]
   unit.announce('box-office.order.confirmed', { orderId: order.id, performanceIds }, { record: ['box-office.order', order.id] })
   // An anonymous desk sale has nobody to write to: the seller hands over the tickets.
+  let accountLinkSent = false
   if (accountId) {
     const words = await wordsFor(order, lines, order.total_minor)
-    const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, paid: words.amount, codes: doorCodes.join('\n\n'), link: await siteUrl(`/book/order/${token}`) }
+    const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.ticketsWithAge, paid: order.total_minor === 0 ? 'Free' : words.amount, numbers: (await ticketNumbers(order, lines.map(l => l.id))).join(', '), link: await siteUrl(`/book/order/${token}`) }
     // A buyer who has never signed in also gets the link that opens their account (core's claim link).
-    const account = await claimLink(unit, accountId)
+    const account = await claimLink(unit, accountId, options.account?.madeWith)
+    accountLinkSent = !!account
     await notify(unit, account ? 'box-office.order-confirmed-guest' : 'box-office.order-confirmed', {
       to: accountId,
       variables: account ? { ...variables, account } : variables,
@@ -70,5 +76,5 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
       dedupeKey: `confirmed:${order.id}`,
     })
   }
-  return { state: 'confirmed', orderId: order.id, reference: order.reference, currency: order.currency, totalMinor: order.total_minor, doorCodes }
+  return { state: 'confirmed', orderId: order.id, reference: order.reference, currency: order.currency, totalMinor: order.total_minor, doorCodes, accountLinkSent, token }
 }

@@ -21,7 +21,7 @@ describe('the Performances list', () => {
     const seen = await req('GET', '/api/box-office/performances')
     expect(seen.status).toBe(200)
     const row = (id: string) => seen.body.performances.find((p: { id: string }) => p.id === id)
-    expect(row(onSale.performanceId)).toMatchObject({ sales: 'on_sale', capacity: 30, taken: 0, scheduled: true })
+    expect(row(onSale.performanceId)).toMatchObject({ productionId: onSale.productionId, sales: 'on_sale', capacity: 30, taken: 0, scheduled: true })
     expect(row(notYet.performanceId).sales).not.toBe('on_sale')
     expect(row(onSale.performanceId).title).toBeTruthy()
   })
