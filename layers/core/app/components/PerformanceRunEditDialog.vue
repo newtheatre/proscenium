@@ -52,7 +52,11 @@ function body() {
 }
 const adds = computed(() => (change.value?.add ?? []).filter(p => !p.problem))
 const moves = computed(() => (change.value?.move ?? []).filter(m => !m.problem))
-const blocked = computed(() => [...(change.value?.add ?? []).filter(p => p.problem), ...(change.value?.move ?? []).filter(m => m.problem)])
+// What cannot be done, as one list: a new date that clashes, or a move that would.
+const blocked = computed(() => [
+  ...(change.value?.add ?? []).filter(p => p.problem).map(p => ({ key: `add-${p.startsAt}`, at: p.startsAt, description: p.reason ?? undefined })),
+  ...(change.value?.move ?? []).filter(m => m.problem).map(m => ({ key: m.performanceId, at: m.toStartsAt, description: `Stays at ${dates.dateTime(m.startsAt)}: ${m.reason}` })),
+])
 const nothing = computed(() => !!change.value && !adds.value.length && !moves.value.length && !change.value.remove.length)
 const counted = (n: number) => n === 1 ? '1 performance' : `${n} performances`
 
@@ -224,10 +228,10 @@ async function apply() {
             >
               <RecordListItem
                 v-for="b in blocked"
-                :key="'toStartsAt' in b ? b.performanceId : b.startsAt"
+                :key="b.key"
                 icon="i-lucide-ban"
-                :name="dates.dateTime('toStartsAt' in b ? b.toStartsAt : b.startsAt)"
-                :description="'toStartsAt' in b ? `Stays at ${dates.dateTime(b.startsAt)}: ${b.reason}` : b.reason ?? undefined"
+                :name="dates.dateTime(b.at)"
+                :description="b.description"
                 muted
               />
             </RecordList>
