@@ -33,6 +33,7 @@ onMounted(() => { mounted.value = true })
 const panel = computed({ get: () => !wide.value && builder.selected.value !== null, set: (open: boolean) => { if (!open) builder.selected.value = null } })
 const selectedName = computed(() => {
   const found = builder.selected.value ? find(builder.definition.value, builder.selected.value) : null
+  if (!found && builder.definition.value.calculations?.some(c => c.id === builder.selected.value)) return t('forms.screens.calculations.one')
   if (!found) return t(builder.selected.value ? 'forms.screens.endings.one' : 'forms.screens.details.title')
   if (found.kind === 'page') return t('forms.screens.details.kind-page')
   return t(`forms.screens.details.kind-${found.item.kind}`)

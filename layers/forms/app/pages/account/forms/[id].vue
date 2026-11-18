@@ -11,6 +11,7 @@ interface Own {
   form: { title: string, slug: string }
   definition: Definition
   answers: ShownAnswer[]
+  calculated?: Record<string, string | number | null> | null
   values: Answers | null
   progress: { status: string, kind: string, note: string | null, canChange: boolean } | null
   history: { at: number, status: string, kind: string }[]
@@ -164,6 +165,8 @@ async function withdraw() {
         <FormsAnswers
           :definition="own.definition"
           :answers="own.answers"
+          :calculated="own.calculated"
+          placed-only
         />
         <div class="flex flex-wrap gap-2">
           <UButton

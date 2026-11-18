@@ -133,7 +133,23 @@ export type Expression
     | { fn: 'sum', group: string, of: string }
     | { fn: 'count', group: string }
     | { fn: 'choose', when: Condition, then: Expression, else: Expression }
-export interface Calculation { id: string, key: string, type: 'number' | 'money' | 'date' | 'text', expression: Expression }
+/**
+ * What a calculation's value is, and so how it reads: a number, money in whole minor units of the
+ * theatre's currency, a share shown as a percentage (0.25 reads as 25%), a date, or text.
+ */
+export const CALCULATION_TYPES = ['number', 'money', 'percent', 'date', 'text'] as const
+export type CalculationType = (typeof CALCULATION_TYPES)[number]
+export interface Calculation {
+  id: string
+  /** The readable name used in exports. Unique within a form, with the questions' keys. */
+  key: string
+  type: CalculationType
+  expression: Expression
+  /** What it is called where people read it: on its page, beside the answers, in the table. The key stands in without one. */
+  label?: string
+  /** The page it is shown on, as a read-only line after that page's questions. Without one, nobody answering sees it. */
+  page?: string
+}
 
 /** A closing screen. One that does not submit stores nothing and shows its message. */
 export interface Ending { id: string, title: string, message?: string, submits: boolean }

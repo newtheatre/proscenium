@@ -73,7 +73,7 @@ export function calculate(calculation: Calculation, scope: Scope): string | numb
     const whole = fRound(worked)
     return whole ? whole.n : null
   }
-  if (calculation.type === 'number') return isFraction(worked) ? fNumber(worked) : null
+  if (calculation.type === 'number' || calculation.type === 'percent') return isFraction(worked) ? fNumber(worked) : null
   if (calculation.type === 'date') return typeof worked === 'string' && (isDate(worked) || isDateTime(worked)) ? worked : null
   return isFraction(worked) ? String(fNumber(worked)) : worked
 }

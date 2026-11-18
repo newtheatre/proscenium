@@ -64,12 +64,25 @@ const proposal: Definition = {
   ],
   calculations: [
     { id: 'fees', key: 'fees', type: 'money', expression: { fn: 'sum', group: 'team', of: 'fee' } },
-    { id: 'total', key: 'total', type: 'money', expression: { fn: 'add', args: [{ calculation: 'fees' }, { fn: 'choose', when: { left: { answer: 'set' }, op: 'answered' }, then: { answer: 'set' }, else: { value: 0 } }] } },
+    { id: 'total', key: 'total', type: 'money', label: 'Total budget', page: 'money', expression: { fn: 'add', args: [{ calculation: 'fees' }, { fn: 'choose', when: { left: { answer: 'set' }, op: 'answered' }, then: { answer: 'set' }, else: { value: 0 } }] } },
     { id: 'each', key: 'per_night', type: 'money', expression: { fn: 'divide', args: [{ calculation: 'total' }, { answer: 'nights' }] } },
     { id: 'closes', key: 'closes', type: 'date', expression: { fn: 'add-days', args: [{ answer: 'opens' }, { fn: 'subtract', args: [{ answer: 'nights' }, { value: 1 }] }] } },
     { id: 'head', key: 'headcount', type: 'number', expression: { fn: 'count', group: 'team' } },
   ],
   endings: [{ id: 'members-only', title: 'Members only', message: 'Proposals are open to current members.', submits: false }],
+}
+
+/** A share: a percentage is worked out as a fraction of one and only reads as a percentage. */
+const shares: Definition = {
+  format: 1,
+  pages: [{ id: 'p1', title: 'Seats', items: [
+    { kind: 'question', id: 'sold', key: 'sold', type: 'number', label: 'Seats sold', dataClass: 'internal' },
+    { kind: 'question', id: 'seats', key: 'seats', type: 'number', label: 'Seats in the house', dataClass: 'internal' },
+  ] }],
+  calculations: [
+    { id: 'full', key: 'full', type: 'percent', label: 'How full', page: 'p1', expression: { fn: 'divide', args: [{ answer: 'sold' }, { answer: 'seats' }] } },
+    { id: 'left', key: 'left', type: 'number', expression: { fn: 'subtract', args: [{ answer: 'seats' }, { fn: 'choose', when: { left: { answer: 'sold' }, op: 'answered' }, then: { answer: 'sold' }, else: { value: 0 } }] } },
+  ],
 }
 
 const fullProposal: Answers = {
@@ -187,6 +200,18 @@ export const CASES: Case[] = [
     context: { facts: { 'core.member': true } },
     answers: { title: 'x'.repeat(60), opens: '2026-12-15', nights: 10, rig: false, genres: ['com', 'tra'], team: [{ role: 'pro' }] },
     expect: { issues: {}, valid: true },
+  },
+  {
+    name: 'a percentage is a share of one, and a blank counted as nothing still adds up',
+    definition: shares,
+    answers: { sold: 90, seats: 120 },
+    expect: { calculated: { full: 0.75, left: 30 } },
+  },
+  {
+    name: 'a percentage of an unanswered question is empty',
+    definition: shares,
+    answers: { seats: 120 },
+    expect: { calculated: { full: null, left: 120 } },
   },
   {
     name: 'answers of the wrong type are refused, never coerced',

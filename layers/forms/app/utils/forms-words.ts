@@ -1,6 +1,8 @@
 // Words for the builder: a question type's icon, and a condition read back as a sentence (FB-204).
 import type { Condition, Definition, Operand, Question, QuestionType } from '../../shared/engine'
 import { questionsOf } from '../../shared/engine'
+import type { Formula, Operation, Term } from '../../shared/builder/formula'
+import { figureName } from '../../shared/figures'
 import { find } from '../../shared/builder/edit'
 import { FORMS_QUESTION_ICONS } from '../components/FormsQuestionIcon.vue'
 
@@ -22,7 +24,7 @@ export function formsQuestionName(q: Pick<Question, 'label'> | undefined): strin
 /** A condition as a sentence: "Role is Cast and Age is at least 18". Matches the stored condition exactly. */
 export function formsConditionSentence(condition: Condition, def: Definition): string {
   const questions = new Map(questionsOf(def).map(q => [q.question.id, q.question]))
-  const calculations = new Map((def.calculations ?? []).map(c => [c.id, c.key]))
+  const calculations = new Map((def.calculations ?? []).map(c => [c.id, figureName(c)]))
   // An option with no wording yet is named by its place, never by its id.
   const optionName = (about: Question | undefined, id: string): string => {
     const at = about?.options?.findIndex(x => x.id === id) ?? -1
@@ -67,7 +69,10 @@ export function formsProblemName(def: Definition, at: string, t: (key: string, p
   if (at.startsWith('stage:')) return def.workflow?.stages.find(s => s.key === at.slice(6))?.name.trim() || t('forms.screens.stages.a-stage') // not-policy: the length of "stage:"
   if (at.startsWith('move:')) return def.workflow?.transitions.find(m => m.key === at.slice(5))?.label.trim() || t('forms.screens.stages.a-move') // not-policy: the length of "move:"
   const found = find(def, at)
-  if (!found) return def.calculations?.find(c => c.id === at)?.key ?? at
+  if (!found) {
+    const calculation = def.calculations?.find(c => c.id === at)
+    return calculation ? figureName(calculation) : at
+  }
   if (found.kind === 'page') return found.page.title.trim() || t('forms.screens.builder.page-n', { n: found.pageIndex + 1 })
   const item = found.item
   return item.kind === 'question' ? formsQuestionName(item) : item.kind === 'group' ? item.label.trim() || t('forms.screens.builder.untitled-group') : t(`forms.screens.details.kind-${item.kind}`)
@@ -81,6 +86,26 @@ export function formsProblemWords(def: Definition, p: { code: string, at: string
     return t('forms.problems.option-no-label', { n: options.findIndex(o => o.id === p.params!.option) + 1 })
   }
   return t(`forms.problems.${p.code}`, p.params ?? {})
+}
+
+export const FORMS_OPERATION_SIGNS: Record<Operation, string> = { add: '+', subtract: '−', multiply: '×', divide: '÷' }
+
+/** A formula as a line: "Performing rights + Set and props × 2". `number` words a number written into it. */
+export function formsFormulaSentence(formula: Formula, def: Definition, number: (value: number, index: number) => string = v => String(v)): string {
+  const questions = new Map(questionsOf(def).map(q => [q.question.id, q.question]))
+  const groups = new Map(def.pages.flatMap(p => p.items).flatMap(i => i.kind === 'group' ? [[i.id, i] as const] : []))
+  const groupName = (id: string) => groups.get(id)?.label.trim() || translate('forms.screens.builder.untitled-group')
+  const term = (t: Term, i: number): string => {
+    if ('answer' in t) return formsQuestionName(questions.get(t.answer))
+    if ('calculation' in t) {
+      const c = def.calculations?.find(x => x.id === t.calculation)
+      return c ? figureName(c) : t.calculation
+    }
+    if ('value' in t) return number(t.value, i)
+    if (t.fn === 'sum') return translate('forms.screens.calculations.sentence-sum', { question: formsQuestionName(questions.get(t.of)), group: groupName(t.group) })
+    return translate('forms.screens.calculations.sentence-count', { group: groupName(t.group) })
+  }
+  return formula.rows.map((row, i) => (i ? `${FORMS_OPERATION_SIGNS[row.op ?? 'add']} ${term(row.term, i)}` : term(row.term, i))).join(' ')
 }
 
 /** A file's size as people read it: "820 KB", "2.4 MB". */
