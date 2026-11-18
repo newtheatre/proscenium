@@ -8,7 +8,7 @@ import { membersList } from '../../../../shared/lists'
 definePageMeta({ layout: 'console' })
 
 type Status = 'current' | 'in-grace' | 'upcoming' | 'lapsed' | 'ended'
-interface Row { id: string, accountId: string, name: string, number: string | null, scheme: string, status: Status, until: string | null, joined: number }
+interface Row { id: string, accountId: string, name: string, number: string | null, scheme: string, status: Status, until: string | null, joined: string }
 
 const { t } = useT()
 const { day } = useDates()
@@ -38,6 +38,15 @@ const list = computed(() => ({
     :can-export="access.data.value?.canExport ?? false"
     :empty="{ title: t('membership.members.empty.title'), description: t('membership.members.empty.description'), icon: 'i-lucide-users' }"
   >
+    <template #card-description="{ row }">
+      <span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <StatusBadge
+          :tone="TONES[row.status as Status]"
+          :label="t(`membership.members.status.${row.status}`)"
+        />
+        <span>{{ row.until ? t('membership.members.until', { date: day(row.until) }) : t('membership.members.no-end') }}</span>
+      </span>
+    </template>
     <template #cell-number="{ row }">
       <span class="font-mono">{{ row.number ?? '' }}</span>
     </template>
