@@ -38,5 +38,5 @@ export default defineRoute({
   unit.afterCommit(async () => {
     await ensureModuleDefaults('core', accountId)
   })
-  return { next: '/' }
+  return { next: '/admin' }
 })

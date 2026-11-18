@@ -25,7 +25,9 @@ test.describe('a site owner with no console', () => {
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
-    await expect(page.getByText('Nothing needs attention')).toBeVisible()
+    // A new site's first steps, each a link to where it is done until it is.
+    await expect(page.getByText('Get your theatre ready')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Add a logo and colours' })).toHaveAttribute('href', '/admin/branding')
     await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('button', { name: 'Upkeep' }).click()
     await expect(page.getByRole('navigation', { name: 'Admin', exact: true })).toContainText('Advanced')
     await noViolations(page)
