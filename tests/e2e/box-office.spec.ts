@@ -11,6 +11,7 @@ const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.crea
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
 const office = person('acc_officeboss', 'Office Boss', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange', 'box-office.report.export', 'box-office.promo.manage'])
 const producer = person('acc_compproducer', 'Pat Producer', ['box-office.comp.request'])
+const canceller = person('acc_deskcanceller', 'Cass Canceller', ['box-office.order.view', 'box-office.order.cancel', 'box-office.order.refund'])
 const approver = person('acc_compapprover', 'Alex Approver', ['box-office.comp.request', 'box-office.comp.approve'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const key = () => ({ 'idempotency-key': crypto.randomUUID() })
@@ -22,6 +23,7 @@ let swapping = ''
 let group = ''
 let amending = ''
 let unfinished = ''
+let cancelling = ''
 const premiumName = `Premium ${stamp}`
 let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
@@ -63,11 +65,11 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await api.dispose()
 
-  // Each reservation is made by its own buyer, in a browser of their own: one person may only
-  // reserve so many tickets for a performance, and a guest stays signed in to the account their
-  // first booking made, so a shared buyer would soon reach that limit.
+  // Each reservation is made by its own guest buyer, in a browser of their own. One person may only
+  // reserve so many tickets for a performance. A context made here takes the file's `use` options,
+  // so without clearing the headers every buyer would be the seller signed in, one person.
   const basketFor = async (quantity: number) => {
-    const buyer = await playwright.request.newContext(base)
+    const buyer = await playwright.request.newContext({ ...base, extraHTTPHeaders: {} })
     const basket = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity }] })
     return { buyer, basket }
   }
@@ -88,6 +90,8 @@ test.beforeAll(async ({ playwright }) => {
   const couple = await basketFor(2)
   unfinished = await reserve(await basketFor(1), 'Unfinished')
   amending = await reserve(couple, 'Couple')
+  // And two that are cancelled from the order page.
+  cancelling = await reserve(await basketFor(2), 'Cancelling')
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
   expect([200, 409]).toContain((await till.post('/api/payments/sessions', { data: { pointLabel: 'Box office desk' }, headers: key() })).status())
@@ -407,6 +411,35 @@ test.describe('the box office console', () => {
     await page.locator('button', { hasText: 'Undo' }).last().click()
     await expect(page.getByText(code, { exact: true })).toBeVisible()
     await expect(page.getByText('15% off · 0 of 40 used')).toBeVisible()
+    await noViolations(page)
+  })
+})
+
+test.describe('cancelling from the order page', () => {
+  test.use(as(canceller))
+
+  test('a reservation offers one Cancel reservation, whose dialogue lists each ticket with no accessibility violations', async ({ page }) => {
+    await visit(page, '/console/box-office/orders')
+    await page.getByRole('searchbox').first().fill(cancelling)
+    await page.getByRole('link', { name: cancelling, exact: true }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: `Order ${cancelling}` })).toBeVisible()
+    // Alike tickets are one row, and the payments say nothing has been paid yet.
+    await expect(page.getByText(`2 × Stalls, ${typeName}`)).toBeVisible()
+    await expect(page.getByText('Nothing paid yet. £24.00 to pay when it is collected.')).toBeVisible()
+    await page.getByRole('button', { name: /More actions/ }).click()
+    await expect(page.getByRole('menuitem', { name: 'Release reservation' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Cancel reservation' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Cancel reservation' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('checkbox', { name: /^Ticket 1, Stalls/ })).toBeChecked()
+    await expect(dialog.getByRole('checkbox', { name: /^Ticket 2, Stalls/ })).toBeChecked()
+    await noViolations(page)
+    // Leaving one out cancels the other alone.
+    await dialog.getByRole('checkbox', { name: /^Ticket 2, Stalls/ }).click()
+    await dialog.getByRole('button', { name: 'Cancel reservation' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByText('Reservation cancelled').first()).toBeVisible()
+    await expect(page.getByText('1 ticket cancelled', { exact: false })).toBeVisible()
     await noViolations(page)
   })
 })
