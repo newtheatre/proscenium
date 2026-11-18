@@ -45,7 +45,8 @@ function setAddress(key: keyof Address, value: string) {
   model.value = Object.values(next).some(Boolean) ? next as Address : undefined
 }
 const ADDRESS: (keyof Address)[] = ['line1', 'line2', 'town', 'county', 'postcode']
-const AUTOCOMPLETE: Partial<Record<keyof Address, string>> = { line1: 'address-line1', line2: 'address-line2', town: 'address-level2', county: 'address-level1', postcode: 'postal-code' }
+const AUTOCOMPLETE: Record<string, string> = { line1: 'address-line1', line2: 'address-line2', town: 'address-level2', county: 'address-level1', postcode: 'postal-code' }
+const autocompleteOf = (part: string): string | undefined => AUTOCOMPLETE[part]
 
 const DATE_LENGTH = 10 // not-policy: the length of a date
 const timeOf = (value: string) => {
@@ -239,7 +240,7 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
         <UInput
           :class="part === 'postcode' ? 'w-40' : 'w-full'"
           :model-value="address[part] ?? ''"
-          :autocomplete="AUTOCOMPLETE[part]"
+          :autocomplete="autocompleteOf(part)"
           @update:model-value="setAddress(part, String($event))"
         />
       </label>
