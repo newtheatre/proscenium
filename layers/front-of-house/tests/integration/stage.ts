@@ -46,6 +46,8 @@ import feedPost from '../../server/api/front-of-house/me/calendar/index.post'
 import feedReset from '../../server/api/front-of-house/me/calendar/reset.post'
 import checkInPost from '../../server/api/front-of-house/assignments/[id]/check-in.post'
 import timingsPost from '../../server/api/front-of-house/performances/[id]/timings.post'
+import timingDelete from '../../server/api/front-of-house/performances/[id]/timings/[kind].delete'
+import notComingPost from '../../server/api/front-of-house/assignments/[id]/not-coming.post'
 import extendPost from '../../server/api/front-of-house/performances/[id]/extend.post'
 import tonightGet from '../../server/api/front-of-house/performances/[id]/tonight.get'
 import tonightListGet from '../../server/api/front-of-house/tonight.get'
@@ -130,6 +132,8 @@ export const handle = server({
   'GET /api/front-of-house/me/shifts': myShiftsGet,
   'POST /api/front-of-house/assignments/:id/check-in': checkInPost,
   'POST /api/front-of-house/performances/:id/timings': timingsPost,
+  'DELETE /api/front-of-house/performances/:id/timings/:kind': timingDelete,
+  'POST /api/front-of-house/assignments/:id/not-coming': notComingPost,
   'POST /api/front-of-house/performances/:id/extend': extendPost,
   'GET /api/front-of-house/performances/:id/tonight': tonightGet,
   'GET /api/front-of-house/tonight': tonightListGet,
