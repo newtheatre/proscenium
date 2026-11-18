@@ -666,4 +666,54 @@ export const stockLevels = defineTable('bar_stock_levels', {
   extra: t => [primaryKey({ columns: [t.stockItemId, t.locationId] })],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels }
+export const DELIVERY_STATES = ['draft', 'received'] as const
+
+/**
+ * Stock arriving at a location (tab 2, "bar_deliveries"). Built up as a draft, then received in one
+ * batch that writes a delivery movement per line; received is final, and a mistake is put right by
+ * another delivery, by wastage or at the next count.
+ */
+export const deliveries = defineTable('bar_deliveries', {
+  id: col.id(),
+  locationId: col.ref('bar_stock_locations'),
+  supplierTerm: col.ref('core_terms', { nullable: true }),
+  supplierRef: col.internal(text('supplier_ref')),
+  state: col.internal(text('state', { enum: DELIVERY_STATES }).notNull()),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias' }),
+  receivedBy: col.account('received_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  receivedAt: col.timestamp('received_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bdlv',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('bar_deliveries_state').on(t.state, t.receivedAt),
+    check('bar_deliveries_state', sql`${t.state} IN (${inList(DELIVERY_STATES)})`),
+    check('bar_deliveries_ref', sql`${t.supplierRef} IS NULL OR length(${t.supplierRef}) <= 40`),
+    check('bar_deliveries_received', sql`(${t.state} = 'received') = (${t.receivedAt} IS NOT NULL)`),
+  ],
+})
+
+/** What a delivery brought: whole packs and loose base units. Changed only while the delivery is a draft. */
+export const deliveryLines = defineTable('bar_delivery_lines', {
+  id: col.id(),
+  deliveryId: col.ref('bar_deliveries'),
+  stockItemId: col.ref('bar_stock_items'),
+  packs: col.internal(integer('packs').notNull().default(0)),
+  looseUnits: col.internal(integer('loose_units').notNull().default(0)),
+  packCostMinor: col.minor('pack_cost_minor'),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bdll',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_delivery_lines_item').on(t.deliveryId, t.stockItemId),
+    check('bar_delivery_lines_quantity', sql`${t.packs} >= 0 AND ${t.looseUnits} >= 0 AND ${t.packs} + ${t.looseUnits} > 0`),
+    check('bar_delivery_lines_cost', sql`${t.packCostMinor} IS NULL OR ${t.packCostMinor} >= 0`),
+  ],
+})
+
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels, deliveries, deliveryLines }
