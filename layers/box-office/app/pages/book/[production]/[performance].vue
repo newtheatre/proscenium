@@ -7,6 +7,7 @@
 <script setup lang="ts">
 import type { ButtonProps } from '@nuxt/ui'
 import type { ChosenPass } from '~~/layers/box-office/app/components/BoxOfficePassBox.vue'
+import type { BoughtPass, PassOnSale } from '~~/layers/box-office/app/components/BoxOfficePassOffer.vue'
 
 interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
 interface Page {
@@ -17,7 +18,7 @@ interface Page {
   currency: string | null
   maxPerOrder: number
   bands: { bandId: string, name: string, soldOut: boolean, types: TicketType[] }[]
-  passes: { accepted: boolean, wheelchair: boolean, mine: { code: string, name: string, priceName: string, owedMinor: number, left: number | null, unusable: string | null }[] }
+  passes: { accepted: boolean, wheelchair: boolean, onSale: PassOnSale[], mine: { code: string, name: string, priceName: string, owedMinor: number, left: number | null, unusable: string | null }[] }
 }
 
 const { t } = useT()
@@ -47,7 +48,10 @@ const atMost = (bandId: string, type: TicketType) => type.most !== undefined && 
 const chosen = computed(() => (data.value?.bands ?? []).flatMap(b => b.types.map(type => ({ band: b, type, quantity: counts.value[keyOf(b.bandId, type.ticketTypeId)] ?? 0 }))).filter(c => c.quantity > 0))
 // Passes added by their codes (BO-64): one entry each, at no charge. A signed-in holder's own pass is there already.
 const passes = ref<ChosenPass[]>((data.value?.passes.mine ?? []).filter(m => !m.unusable).slice(0, 1).map(m => ({ code: m.code, name: m.name, priceName: m.priceName, owedMinor: m.owedMinor, wheelchair: false, own: true })))
-const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length)
+// Passes bought with this booking: each gives its first entry here.
+const buying = ref<BoughtPass[]>([])
+const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length + buying.value.length)
+const passMinor = computed(() => buying.value.reduce((sum, b) => sum + b.amountMinor, 0))
 // A promo code (BO-17), tried before holding so the saving shows; sent with the hold, which applies it again.
 const promoInput = ref('')
 const promo = ref<{ code: string, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] } | null>(null)
@@ -82,7 +86,7 @@ const totalMinor = computed(() => {
 })
 const currency = computed(() => data.value?.currency ?? undefined)
 // A pass entry is a ticket a companion may come with, as a paid one is.
-const companionAlone = computed(() => chosen.value.length > 0 && !passes.value.length && chosen.value.every(c => c.type.needsPaidTicket))
+const companionAlone = computed(() => chosen.value.length > 0 && !passes.value.length && !buying.value.length && chosen.value.every(c => c.type.needsPaidTicket))
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
 const atLimit = computed(() => !!data.value && quantity.value >= data.value.maxPerOrder)
 // The most of one type the steppers allow: what the visitor may have, and what is left of the order's limit.
@@ -153,6 +157,7 @@ onMounted(async () => {
   if (route.query.change && remembered.choices) {
     counts.value = Object.fromEntries(remembered.choices.map(c => [keyOf(c.bandId, c.ticketTypeId), c.quantity]))
     if (remembered.passes) passes.value = remembered.passes
+    if (remembered.buying) buying.value = remembered.buying
     if (remembered.promoCode) {
       promoInput.value = remembered.promoCode
       await tryCode()
@@ -169,14 +174,14 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}) },
+      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length ? { buy: buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })) } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     // Changing tickets: the new ones are held, so the old basket is let go.
     const before = recallBasket()
     if (before && before.orderId !== basket.orderId)
       void $api(`/api/box-office/baskets/${encodeURIComponent(before.orderId)}/release`, { method: 'POST', body: {}, headers: { 'x-basket-token': before.token } }).catch(() => undefined)
-    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code, passes: passes.value })
+    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code, passes: passes.value, buying: buying.value })
     await navigateTo('/book/basket')
   }
   catch (e) {
@@ -250,8 +255,16 @@ async function hold() {
               :wheelchair="data.passes.wheelchair"
               :refusal="passRefusal"
             />
+            <BoxOfficePassOffer
+              v-for="pass in data.passes.onSale"
+              :key="pass.id"
+              v-model="buying"
+              :pass="pass"
+              :currency="currency"
+              :wheelchair="data.passes.wheelchair"
+            />
             <p
-              v-if="passes.length"
+              v-if="passes.length || buying.length"
               class="text-sm font-medium text-muted"
             >
               {{ t('box-office.book.pass.more-tickets') }}
@@ -412,7 +425,7 @@ async function hold() {
               size="lg"
               :loading="busy"
               :disabled="!ready"
-              :label="quantity ? (totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
+              :label="quantity ? (buying.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
               @click="hold"
             />
           </template>

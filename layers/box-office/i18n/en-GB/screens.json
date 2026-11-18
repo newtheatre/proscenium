@@ -1111,5 +1111,21 @@
   "box-office.book.pass.help": "Each pass covers one entry. The code is on the pass and in its email.",
   "box-office.book.pass.apply": "Add",
   "box-office.book.pass.repeated": "That pass is already added. Each pass gives one entry.",
-  "box-office.book.pass.more-tickets": "More tickets"
+  "box-office.book.pass.more-tickets": "More tickets",
+  "box-office.book.pass-offer.title": "{name} · from {from}",
+  "box-office.book.pass-offer.shows.one": "This show and 1 more for one price.",
+  "box-office.book.pass-offer.shows.other": "This show and {count} more for one price.",
+  "box-office.book.pass-offer.covers": "One price for every show it covers.",
+  "box-office.book.pass-offer.first": "Buy it here and today's ticket is your first.",
+  "box-office.book.pass-offer.price": "Price",
+  "box-office.book.pass-offer.sign-in": "Sign in to buy at this price.",
+  "box-office.book.pass-offer.not-yours": "Not available to you.",
+  "box-office.book.pass-offer.in-basket": "In your basket",
+  "box-office.book.pass-offer.add": "Add the pass",
+  "box-office.book.pass-offer.remove": "Remove the pass",
+  "box-office.book.pass-offer.entry": "Your ticket for this performance comes with it.",
+  "box-office.book.hold-with-pass.one": "Hold 1 ticket and the pass, {total}",
+  "box-office.book.hold-with-pass.other": "Hold {count} tickets and the pass, {total}",
+  "box-office.basket.pass-sale": "{name}, {price}",
+  "box-office.basket.pass-owed": "{name}, still to pay"
 }

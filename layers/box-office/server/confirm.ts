@@ -10,6 +10,7 @@ import { claimLink, notify } from '#modules/core'
 import { hashOf, randomToken } from './codes'
 import { siteUrl } from './links'
 import { RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
+import { sendNewPasses, settlePassSales } from './pass-sales'
 import { issueTickets, ticketNumbers } from './tickets'
 
 export interface Confirmed {
@@ -56,6 +57,10 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
   unit.add(sql`UPDATE box_office_claims SET state = 'confirmed', expires_at = NULL
     WHERE state IN ('held', 'confirmed') AND displaced_for_id IS NULL AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
     .expect(lines.length, options.from === 'basket' ? RAN_OUT : GONE)
+
+  // Its passes are the buyer's and paid for: those bought with it, and any earlier one collected here.
+  await sendNewPasses(unit, order, accountId, true)
+  settlePassSales(unit, order.id, accountId, true, at)
 
   // Paid at the desk with the buyer standing there: admitted in the same batch, by whoever sold it.
   const doorCodes = await issueTickets(unit, lines, options.from === 'awaiting_payment' && order.admit_on_payment && order.sold_by ? { by: order.sold_by, at } : undefined)

@@ -9,6 +9,7 @@ import { timingFor, type PaymentTiming } from './reservations'
 import { salesOf } from './setup'
 import { sellableTypes } from './ticket-types'
 import { passesFor, type OfferedPass } from './pass-entries'
+import { passesOnSale, type PassOnSale } from './pass-sales'
 import { WHEELCHAIR_TYPE } from './prices'
 
 export interface BookingPage {
@@ -22,7 +23,7 @@ export interface BookingPage {
   maxPerOrder: number
   timing: PaymentTiming
   /** Whether a pass covers this performance, and the signed-in visitor's own passes that do (BO-64). */
-  passes: { accepted: boolean, /** Whether the visitor may put a pass's entry in a wheelchair space here. */ wheelchair: boolean, mine: OfferedPass[] }
+  passes: { accepted: boolean, /** Whether the visitor may put a pass's entry in a wheelchair space here. */ wheelchair: boolean, /** Passes on sale that cover this performance, to buy with the booking. */ onSale: PassOnSale[], mine: OfferedPass[] }
   bands: {
     bandId: string
     name: string
@@ -68,6 +69,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
       judged.set(type.id, { unmet: said?.reason ?? 'Only for people who qualify.', ...(help ? { unmetHelp: help } : {}), ...(remedy ? { remedy } : {}), ...(reference ? { reference } : {}) })
     }
   }
+  const timing = await timingFor(performanceId)
   return {
     performance: { id: performance.id, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? `${performance.spaceName}, ${performance.venueName}`, state: performance.state },
     production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle, ageMin: production.ageMin, ageRestricted: production.ageRestricted && production.ageMin !== null },
@@ -75,8 +77,9 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     onSaleAt: found.onSaleAt,
     currency: found.currency,
     maxPerOrder: sales?.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number,
-    timing: await timingFor(performanceId),
-    passes: { ...await passesFor(performanceId, account), wheelchair: [...types.values()].some(type => type.managedBy === WHEELCHAIR_TYPE && judged.get(type.id)?.most !== undefined && found.bands.some(b => b.free > 0 && b.prices.some(p => p.ticketTypeId === type.id))) },
+    timing,
+    // A pass that must be paid for when it is bought is not offered where online orders can only be reserved.
+    passes: { ...await passesFor(performanceId, account), onSale: (await passesOnSale(performanceId, { channel: 'online', account })).filter(p => p.reserveUnpaid || timing !== 'reserve'), wheelchair: [...types.values()].some(type => type.managedBy === WHEELCHAIR_TYPE && judged.get(type.id)?.most !== undefined && found.bands.some(b => b.free > 0 && b.prices.some(p => p.ticketTypeId === type.id))) },
     bands: found.bands.map(b => ({
       bandId: b.bandId,
       name: b.name,
