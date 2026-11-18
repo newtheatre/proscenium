@@ -430,6 +430,10 @@ export const tickets = defineTable('box_office_tickets', {
   // Copied, so the door reads one table.
   performanceId: col.internal(text('performance_id').notNull()),
   codeHash: col.internal(text('code_hash').notNull()),
+  // The code part itself, sealed with the core key, so the buyer's booking page and My account can
+  // show the ticket again: it is signed afresh each time it is shown. Null for a ticket issued before
+  // this was kept; cleared with the person.
+  doorCode: col.internal(text('door_code'), { encrypted: true, erase: 'clear' }),
   // The kit signing key that signed the door code, under the purpose box-office.door-code.
   keyId: col.internal(text('key_id').notNull()),
   state: col.internal(text('state', { enum: ['valid', 'void'] }).notNull().default('valid')),

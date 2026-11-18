@@ -33,5 +33,14 @@
   "forms.abilities.response.export.label": "Export a form's responses",
   "forms.abilities.response.read-special.label": "Open restricted answers",
   "forms.abilities.response.move.label": "Move responses between stages",
-  "forms.abilities.response.decide.label": "Approve or decline responses, and release reviews"
+  "forms.abilities.response.decide.label": "Approve or decline responses, and release reviews",
+  "forms.settings-sections.reminders": "Reminders",
+  "forms.settings.reminders.unfinished.label": "Remind about unfinished answers after",
+  "forms.settings.reminders.unfinished.help": "How long a signed-in person's unsent answers sit untouched before they are reminded, once. Nought sends no reminder.",
+  "forms.settings.reminders.closing.label": "Remind before a form closes",
+  "forms.settings.reminders.closing.help": "How long before a form closes somebody with unsent answers to it is reminded, once. Nought sends no reminder.",
+  "forms.settings.reminders.returned.label": "Remind about changes asked for after",
+  "forms.settings.reminders.returned.help": "How long a response sent back for changes waits before its person is reminded, once each time it is sent back. Nought sends no reminder.",
+  "forms.settings.reminders.review.label": "Remind reviewers after",
+  "forms.settings.reminders.review.help": "How long a review may be outstanding before the reviewer is reminded, once each round. Nought sends no reminder."
 }

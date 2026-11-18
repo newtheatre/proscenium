@@ -58,7 +58,7 @@ describe('the booking button from Box office', () => {
     expect((await answers(h))[h.performanceId]).toEqual({ state: 'not-yet', opensAt })
   })
 
-  it('prices a production from the lowest open price online, with lower prices for those who qualify by name', async () => {
+  it('prices a production from the lowest price needing no proof or membership online, with lower prices for those who qualify by name', async () => {
     const h = await house(10)
     const member = await req('POST', '/api/box-office/ticket-types', { name: `Member rate ${h.productionId}`, requirementRefs: ['seats:member'] })
     expect(member.status, JSON.stringify(member.body)).toBe(200)
@@ -74,7 +74,8 @@ describe('the booking button from Box office', () => {
     ] })
     expect(set.status, JSON.stringify(set.body)).toBe(200)
     const found = await inContext(() => priceSummaries([h.productionId]))
-    expect(found[h.productionId]).toEqual({ currency: 'GBP', fromMinor: 900, others: [{ label: `Member rate ${h.productionId}`, amountMinor: 400 }] })
+    // The concession asks for proof, so it is named rather than read as "From".
+    expect(found[h.productionId]).toEqual({ currency: 'GBP', fromMinor: 1200, toMinor: 1200, others: [{ label: `Member rate ${h.productionId}`, amountMinor: 400 }, { label: 'Concession', amountMinor: 900 }] })
   })
 
   it('gives no price for a production whose dates are past or not priced', async () => {

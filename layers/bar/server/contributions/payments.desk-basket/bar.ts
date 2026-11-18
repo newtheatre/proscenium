@@ -9,7 +9,7 @@ export default {
   tab: 'bar.desk.tab',
   ability: 'bar.sale.sell',
   order: 10, // not-policy: after Box office's panel, before membership fees
-  icon: 'i-lucide-beer',
+  icon: 'i-lucide-wine',
   panel: 'BarTillPanel',
   livePanel: 'BarTillLivePanel',
   prepare: deskPrepare,

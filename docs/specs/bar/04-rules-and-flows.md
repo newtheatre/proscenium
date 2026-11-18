@@ -300,7 +300,7 @@ Received is final. A mistake is corrected by a second delivery, by wastage, or a
 
 ## What is posted to the ledger, and when
 
-Positive is a debit, negative a credit. `clearing` is cash for cash and the provider's card clearing account otherwise, and is Payments' line, not the bar's. The bar never calls `postEntries` for a sale: its handlers return entries and Payments writes one sealed posting per intent, setting `for_module` on each stored entry from the part's owner. The bar does not set it. A part's entries total exactly the part and name only the bar's accounts; entries that do not are treated as the bar refusing to settle (see "When a part cannot settle").
+Positive is a debit, negative a credit. `clearing` is cash for cash, `payments.other` for money taken some other way, and the provider's card clearing account for cards, and is Payments' line, not the bar's. The bar never calls `postEntries` for a sale: its handlers return entries and Payments writes one sealed posting per intent, setting `for_module` on each stored entry from the part's owner. The bar does not set it. A part's entries total exactly the part and name only the bar's accounts; entries that do not are treated as the bar refusing to settle (see "When a part cannot settle").
 
 | Fact | Posted when | The bar's entries |
 | --- | --- | --- |
