@@ -1,5 +1,5 @@
 // Open schemes that could not be opened today (tab 4, core.health-check): a list or its key gone, a
-// domain check with no domain, the members' area switched off, or a fee with no price or no fees
+// domain check with no domain, an application form gone, the members' area switched off, or a fee with no price or no fees
 // module. People may be unable to join them.
 import { listSchemes, openChecklist } from '../../schemes'
 import { schemeList } from '../../lists'
@@ -11,7 +11,7 @@ export default {
     const outdated: string[] = []
     const day = await todayOrNull()
     for (const scheme of await listSchemes(['open'])) {
-      if ((await openChecklist(scheme)).some(item => !item.done && item.code !== 'application-form')) broken.push(scheme.name)
+      if ((await openChecklist(scheme)).some(item => !item.done)) broken.push(scheme.name)
       const list = await schemeList(scheme)
       if (day && list?.validUntil && list.validUntil < day) outdated.push(scheme.name)
     }

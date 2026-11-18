@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import type { OfferedScheme } from '../../utils/membership-join'
 
-interface Mine { memberships: { schemeId: string, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[], applications: { id: string, schemeId: string, waiting: 'staff' | 'payment' }[] }
+interface Mine { memberships: { schemeId: string, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[], applications: { id: string, schemeId: string, waiting: 'staff' | 'approval' | 'payment' }[] }
 
 const { t } = useT()
 const route = useRoute()
@@ -82,7 +82,7 @@ useSeoMeta({ title, description: () => scheme.value?.summary ?? undefined })
             variant="subtle"
             icon="i-lucide-hourglass"
             :title="t('membership.join.waiting', { scheme: scheme.name })"
-            :description="application.waiting === 'payment' ? t('membership.join.waiting-payment') : t('membership.screens.mine.waiting-staff')"
+            :description="application.waiting === 'payment' ? t('membership.join.waiting-payment') : t(application.waiting === 'approval' ? 'membership.screens.mine.waiting-approval' : 'membership.screens.mine.waiting-staff')"
             :actions="[application.waiting === 'payment'
               ? { label: t('membership.join.pay'), to: `/account/membership/${application.id}/pay` }
               : { label: t('membership.join.to-mine'), to: '/account/membership', color: 'neutral', variant: 'outline' }]"

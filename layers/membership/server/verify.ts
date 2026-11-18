@@ -16,7 +16,12 @@ export type Outcome
     | { outcome: 'needs-staff' | 'failed', verifier: string, reason: string, entryId?: string, reference?: string }
 
 /** Runs the scheme's verifier for somebody joining. Refuses on a failure; null when nothing is checked. */
-export async function runVerifier(scheme: Scheme, accountId: string, reference: string | null | undefined, day: string): Promise<Outcome | null> {
+/**
+ * Runs the scheme's check. With `askStaff`, a well-formed reference the list does not hold waits for
+ * staff (reason `not-on-list`) instead of being refused: for somebody whose ID the issuer's file has
+ * not caught up with. Passing it can add the ID to the list (Matt, 2026-11-17).
+ */
+export async function runVerifier(scheme: Scheme, accountId: string, reference: string | null | undefined, day: string, askStaff = false): Promise<Outcome | null> {
   if (!scheme.verifier) return null
   if (scheme.verifier === 'membership.staff') return { outcome: 'needs-staff', verifier: scheme.verifier, reason: 'staff-check' }
   if (scheme.verifier === 'membership.email-domain') {
@@ -39,7 +44,10 @@ export async function runVerifier(scheme: Scheme, accountId: string, reference: 
   }
   catch (error) {
     // V4: an entry somebody else claimed waits for staff rather than refusing.
-    if ((error as { code?: string }).code !== 'membership.join.entry-already-used') throw error
+    const code = (error as { code?: string }).code
+    if (code === 'membership.join.not-on-list' && askStaff && list!.keyKind === 'reference')
+      return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'not-on-list', reference: normalise('reference', reference!) }
+    if (code !== 'membership.join.entry-already-used') throw error
     const entry = await findEntry(list!, reference!, day)
     return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'entry-already-used', entryId: entry?.id, reference: list!.keyKind === 'reference' ? normalise('reference', reference!) : undefined }
   }

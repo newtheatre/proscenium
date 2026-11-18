@@ -1,11 +1,13 @@
 // The open schemes, for My account and the public component MembershipSchemes (MEM-10). Signed-out
 // visitors see them only while membership.join.public-listing is on. A scheme that requires payment
-// shows the fee for joining at each length, and says when it cannot be joined online (S5).
+// shows the fee for joining at each length, and says when it cannot be joined online (S5), and
+// whether joining asks an application form.
 import { defineRoute, useSetting } from '#kit'
+import { slotForms } from '#modules/forms'
 import { charger } from '../../../charge'
 import { listSetsEnd, schemeList } from '../../../lists'
 import { todayOrNull } from '../../../memberships'
-import { lengthOptions, listSchemes } from '../../../schemes'
+import { APPLICATION_SLOT, lengthOptions, listSchemes } from '../../../schemes'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (_event, { actor }) => {
   if (actor.kind !== 'person' && !(await useSetting('membership.join.public-listing'))) return { schemes: [] }
@@ -32,6 +34,8 @@ export default defineRoute({ public: true, rateLimit: 'default' }, async (_event
       online: !s.requiresPayment || !!fees,
       asksFor: asks.get(s.id) ?? null,
       endsByList: endsByList.has(s.id),
+      // MEM-12: joining asks the scheme's application form too, on the scheme's join page.
+      applicationForm: (await slotForms(APPLICATION_SLOT, s.id, actor)).forms.length > 0,
     }))),
   }
 })
