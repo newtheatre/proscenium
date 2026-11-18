@@ -24,6 +24,15 @@ export interface Part {
 /** Where a till receipt goes: a person the seller found, or an address they typed. */
 export type Destination = { accountId: string, email?: undefined } | { email: string, accountId?: undefined }
 
+/** A link an owner puts on a till receipt, such as to the buyer's tickets. */
+export interface ReceiptLink { label: string, url: string }
+
+/**
+ * One receipt of a till sale: where it goes, and which of the part's summary lines it covers (all of
+ * them, for a sale that was not split, at position 0).
+ */
+export interface ReceiptPerson { position: number, to: Destination, items: { line: number, key: string | null, quantity: number }[] }
+
 /**
  * An owner's ledger entry for its part. The owner's entries total exactly the part's amount as
  * credits (their amounts sum to minus the part's amount) on a settle, and as debits on a refund, and
@@ -43,14 +52,14 @@ export interface Settlement {
    */
   settle: (unit: UnitView, part: Part) => Promise<OwnerEntry[]> | OwnerEntry[]
   /**
-   * The till is sending receipts for a sale that includes this part, to these people (one for the
-   * whole sale, or each person of a split sale whose items include it). An owner with something to
-   * show them, such as their tickets, joins its record to them in the unit and gives one link to put
-   * on each receipt, so a till sale sends one email, never a receipt and a separate message. Null
-   * when it has nothing to add. Called in the unit that settles the sale, after `settle`, or later
-   * when the seller sends a receipt someone asked for after paying.
+   * The till is sending a receipt for a sale that includes this part, settled already: to the whole
+   * sale's buyer, or to one person of a split sale whose items include some of it. An owner with
+   * something to show them, such as their tickets, gives it to them in the unit (Box office moves a
+   * person's tickets to a booking of their own) and returns the link to put on the receipt, so a
+   * till sale sends one email, never a receipt and a separate message. Null when it has nothing to
+   * add. Each receipt has a unit of its own, so this may write as much as one person needs.
    */
-  receiptLink?: (unit: UnitView, part: Part, to: Destination[]) => Promise<{ label: string, url: string } | null>
+  receiptLink?: (unit: UnitView, part: Part, person: ReceiptPerson) => Promise<ReceiptLink | null>
   /** A refund of this part succeeded: return the entries that undo the income it refunds. */
   refunded: (unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) => Promise<OwnerEntry[]> | OwnerEntry[]
   /**

@@ -51,7 +51,7 @@ export async function settlements(): Promise<Map<string, Settlement>> {
       refunded: (unit, part, refund) => as(() => refunded(unit, part, refund)),
       release: release && ((unit, part) => as(() => release(unit, part))),
       describe: describe && (record => as(() => describe(record))),
-      receiptLink: receiptLink && ((unit, part, to) => as(() => receiptLink(unit, part, to))),
+      receiptLink: receiptLink && ((unit, part, person) => as(() => receiptLink(unit, part, person))),
     })
   }
   return out
