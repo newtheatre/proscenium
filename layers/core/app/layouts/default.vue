@@ -119,7 +119,8 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
       <slot />
     </UMain>
 
-    <!-- One shape for everybody: the same footer signed in or out. -->
+    <!-- One shape for everybody: the same footer signed in or out. The links wrap, since every policy
+         adds one and a phone is narrow. -->
     <UFooter>
       <template
         v-if="brand?.creditLine"
@@ -133,6 +134,7 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
         :items="footer"
         variant="link"
         :aria-label="t('core.public.footer-navigation')"
+        :ui="{ root: 'max-w-full', list: 'flex-wrap justify-center' }"
       />
     </UFooter>
   </div>
