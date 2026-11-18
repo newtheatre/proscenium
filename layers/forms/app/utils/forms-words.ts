@@ -59,7 +59,7 @@ export function formsConditionSentence(condition: Condition, def: Definition): s
 
 /** The colour a stage of each kind is shown in, wherever a stage is named. */
 export function formsStageTone(kind: string | null | undefined): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
-  return kind === 'approved' ? 'success' : kind === 'declined' ? 'danger' : kind === 'returned' ? 'warning' : kind === 'in_review' || kind === 'pending' ? 'info' : 'neutral'
+  return kind === 'approved' ? 'success' : kind === 'declined' ? 'danger' : kind === 'returned' ? 'warning' : kind === 'in_review' ? 'info' : 'neutral'
 }
 
 /** What a problem is about, in the author's words: the question, page, stage or move it points at. */

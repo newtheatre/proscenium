@@ -10,7 +10,7 @@ import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
 import { queueActions } from './actions'
 import { tellMoved } from './notices'
-import { closeRounds, conflicted, openRound } from './review'
+import { closeRounds, conflicted, namedIn, openRound } from './review'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
 const CONFLICT = 409 // not-policy: HTTP status
@@ -63,6 +63,7 @@ export async function moveResponse(unit: UnitView, input: { form: FormRow, respo
   if (input.response.state !== 'submitted') return refuse('forms.stage.not-open', 'This response cannot be moved.', { status: CONFLICT })
   if (await owns(input.response, input.actor)) return refuse('forms.stage.own-response', 'You cannot move your own response.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
   if (await conflicted(input.actor, input.response.id)) return refuse('forms.review.conflicted', 'You have a conflict of interest on this response, so you cannot move it.', { status: 403 }) // not-policy: HTTP status
+  if (await namedIn(input.actor, input.def, input.response)) return refuse('forms.review.conflicted', 'You are named in this response, so you cannot move it.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
   const move = staffMoves(input.def, input.response.stageKey, true).find(t => t.key === input.transitionKey)
   if (!move) return refuse('forms.stage.not-open', 'This move is not open from where the response is now.', { status: CONFLICT, remedy: 'Open the response again to see where it is now.' })
   if (isDecision(input.def, move)) {

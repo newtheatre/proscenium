@@ -46,11 +46,18 @@ async function attachFields(formId: string) {
 }
 // A new set of fields starts as an empty form in record mode, named after the slot, and opens in the builder.
 const making = ref(false)
+const naming = ref(false)
+const name = reactive({ title: '' })
+function startFields() {
+  name.title = ''
+  refusal.value = null
+  naming.value = true
+}
 async function newFields() {
   refusal.value = null
   making.value = true
   try {
-    const made = await $api<{ formId: string }>('/api/forms/forms', { method: 'POST', body: { title: t(data.value!.slot.label), mode: 'record' } })
+    const made = await $api<{ formId: string }>('/api/forms/forms', { method: 'POST', body: { title: name.title.trim(), mode: 'record' } })
     await navigateTo(`/console/forms/${made.formId}`)
   }
   catch (e) {
@@ -70,13 +77,23 @@ watch(open, (now) => {
 async function saved() {
   adding.value = undefined
   await refresh()
+  await refreshFields()
 }
+/** Custom fields drawn on this page come from the same slot: what is attached has changed, so they are read again. */
+async function refreshFields() {
+  if (!fields.value) return
+  const keys = Object.keys(useNuxtApp().payload.data).filter(k => k.startsWith(`forms:record:${props.slotId}:`))
+  if (keys.length) await refreshNuxtData(keys)
+}
+// Somebody who may fill in fields but not attach them is shown nothing here, rather than a refusal.
+const shut = computed(() => !!error.value && toRefusal(error.value).status === 403) // not-policy: HTTP status
 async function detach(form: Attached) {
   refusal.value = null
   try {
     await $api(`${at.value}/${form.formId}` as string, { method: 'DELETE', body: {} })
     toast.add({ title: t(fields.value ? 'forms.screens.fields.detached' : 'forms.screens.slot.detached'), color: 'success' })
     await refresh()
+    await refreshFields()
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -86,7 +103,10 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div
+    v-if="!shut"
+    class="space-y-3"
+  >
     <RefusalNotice :refusal="refusal ?? (error ? toRefusal(error) : null)" />
     <template v-if="data">
       <p
@@ -153,6 +173,18 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
         :label="t(fields ? 'forms.screens.fields.add' : 'forms.screens.slot.add')"
         :help="choices.length ? undefined : t('forms.screens.slot.nothing-published')"
       >
+        <template
+          v-if="!choices.length"
+          #help
+        >
+          {{ t('forms.screens.slot.nothing-published') }}
+          <ULink
+            to="/console/forms"
+            class="underline"
+          >
+            {{ t('forms.screens.slot.go-to-forms') }}
+          </ULink>
+        </template>
         <USelectMenu
           v-model="adding"
           value-key="value"
@@ -171,14 +203,49 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
           icon="i-lucide-plus"
           color="neutral"
           variant="subtle"
-          :loading="making"
-          @click="newFields"
+          @click="startFields"
         />
         <p class="text-sm text-muted">
           {{ t('forms.screens.fields.new-help') }}
         </p>
       </div>
     </template>
+    <UModal
+      v-model:open="naming"
+      :title="t('forms.screens.fields.new')"
+      :description="t('forms.screens.fields.new-help')"
+    >
+      <template #body>
+        <UForm
+          id="forms-new-fields"
+          :state="name"
+          :validate="() => needs({ title: name.title })"
+          novalidate
+          @submit="newFields"
+        >
+          <UFormField
+            name="title"
+            :label="t('forms.screens.fields.name')"
+            :help="t('forms.screens.fields.name-help')"
+            required
+          >
+            <UInput
+              v-model="name.title"
+              maxlength="120"
+              autofocus
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="forms-new-fields"
+          :loading="making"
+          :label="t('forms.screens.fields.create')"
+        />
+      </template>
+    </UModal>
     <FormsLinkDialog
       v-if="editing"
       v-model:open="open"

@@ -35,6 +35,9 @@ test('custom fields are built, attached for every record and filled in on one', 
 
   // ---- a new set of fields opens in the builder, with no link and no stages ----
   await page.getByRole('button', { name: 'New set of fields' }).click()
+  // The set is given its own name, so two sets can be told apart.
+  await page.getByLabel('Name of the set').fill('Details of a show')
+  await page.getByRole('button', { name: 'Create and open the builder' }).click()
   await page.waitForURL(/\/console\/forms\/frm_/)
   const builder = new URL(page.url()).pathname
   await expect(page.getByText('Custom fields', { exact: true }).first()).toBeVisible()

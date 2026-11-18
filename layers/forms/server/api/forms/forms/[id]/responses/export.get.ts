@@ -3,7 +3,7 @@
 // may read them and asks for them.
 import { getRouterParam, setResponseHeader } from 'h3'
 import { z } from 'zod'
-import { defineRoute, refuse, requireAbility, useSetting } from '#kit'
+import { defineRoute, refuse, requireAbility, theatreTimeZone, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
 import { cells, columnsOf, listResponses, readAnswers, toCsv } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
@@ -32,6 +32,10 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   const filter = { from: input.from, to: input.to, questionId: input.question, value: input.value, stage: input.stage, reader: actor.accountId ?? undefined }
   const most = await useSetting('forms.limits.export-rows') as number
 
+  // Times read as the theatre's clock does, in a shape a spreadsheet takes as a date and time.
+  const zone = await theatreTimeZone().catch(() => null)
+  const clock = zone ? new Intl.DateTimeFormat('sv-SE', { timeZone: zone, dateStyle: 'short', timeStyle: 'medium' }) : null
+  const sentAt = (at: number) => clock ? clock.format(at) : new Date(at).toISOString()
   const lines: string[][] = []
   const types = new Map(columns.map(c => [c.questionId, c.type]))
   for (let offset = 0; ; offset += CHUNK) {
@@ -40,7 +44,7 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
     const answers = await readAnswers(rows.map(r => r.id), types, special)
     for (const r of rows) {
       const row = cells(answers.get(r.id)!, columns)
-      lines.push([r.reference, new Date(r.submittedAt).toISOString(), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? '')])
+      lines.push([r.reference, sentAt(r.submittedAt), String(r.versionNumber), r.personName ?? r.respondentEmail ?? '', ...(staged ? [stageOf(liveDef!, r.stageKey)?.name ?? r.stageKey ?? ''] : []), ...columns.map(c => row[c.questionId]?.text ?? '')])
     }
     if (rows.length < CHUNK) break
   }
