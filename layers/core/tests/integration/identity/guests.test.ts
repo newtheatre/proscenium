@@ -49,7 +49,7 @@ describe('buying without signing in (ID-05)', () => {
   it('makes one unclaimed account for an address, with no session, and a second order finds it', async () => {
     const to = address()
     const first = await checkout({ address: to, name: 'Gail Guest' })
-    expect(first).toEqual({ accountId: expect.any(String), created: true, claimed: false })
+    expect(first).toEqual({ accountId: expect.any(String), created: true, claimed: false, madeWith: { address: to } })
     expect(await account(first.accountId)).toMatchObject({ origin: 'guest', name: 'Gail Guest', first_signed_in_at: null })
     expect(await rows('SELECT count(*) AS n FROM core_sessions WHERE account_id = ?', first.accountId)).toEqual([{ n: 0 }])
     const second = await checkout({ address: ` ${to.toUpperCase()} ` })
@@ -175,6 +175,22 @@ describe('adding and inviting people (ID-06)', () => {
     await deliver()
     const message = mailbox.find(m => m.address === to)!
     expect(await rows('SELECT count(*) AS n FROM core_notifications WHERE payload LIKE ?', `%${tokenOf(message)}%`)).toEqual([{ n: 0 }])
+  })
+
+  it('an invitation is emailed, and while email cannot be sent its link is given back once to pass on', async () => {
+    const roleId = await makeRole(['core.role.read'])
+    const emailed = await owner.browser.post('/api/core/grants', { person: { address: address(), name: 'Ivy Invited' }, roleId })
+    expect(emailed.body).toMatchObject({ invited: true, emailed: true })
+    expect(emailed.body.link).toBeUndefined()
+
+    await clearSetting('core.notifications.verified-domain')
+    try {
+      const shown = await owner.browser.post('/api/core/grants', { person: { address: address(), name: 'Ivy Invited' }, roleId })
+      expect(shown.body).toMatchObject({ invited: true, emailed: false, link: expect.stringMatching(/\/sign-in\/link#.+/), expiresAt: expect.any(Number) })
+    }
+    finally {
+      await setSetting('core.notifications.verified-domain', 'mail.example.org')
+    }
   })
 
   it('the invitation lasts for the invite-lifetime setting', async () => {

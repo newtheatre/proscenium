@@ -104,6 +104,26 @@ describe('notify', () => {
     expect((await rows<{ payload: string | null }>('SELECT payload FROM core_notifications WHERE id = ?', ids[0]))[0]!.payload).toBeNull()
   })
 
+  it('puts a button to the type\'s link in the email, made absolute on the site\'s address (EM-1)', async () => {
+    await setSetting('core.site.origin', 'https://theatre.example.org')
+    sent.length = 0
+    try {
+      const to = await account('button@example.org')
+      await send('notify.receipt', { to, variables: { order: 'B7' } })
+      await deliver()
+      const mail = mails.find(m => m.to === 'button@example.org')!
+      expect(mail.html).toContain('href="https://theatre.example.org/account/orders/B7"')
+      expect(mail.html).toContain('>Open it</a>')
+      expect(mail.text).toContain('Open it: https://theatre.example.org/account/orders/B7')
+      // The inbox keeps its own link, and its text gets no button.
+      const [inbox] = await rows<{ body: string }>('SELECT body FROM core_inbox_items WHERE account_id = ?', to)
+      expect(inbox!.body).not.toContain('https://')
+    }
+    finally {
+      await setSetting('core.site.origin', null)
+    }
+  })
+
   it('keeps a sealed variable encrypted in its own column, sends it by email only and clears it once sent', async () => {
     const to = await account('invitee@example.org')
     const link = 'https://theatre.example.org/invite#k3y-that-signs-in'

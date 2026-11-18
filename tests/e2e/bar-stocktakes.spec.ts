@@ -67,7 +67,7 @@ test('a count is started, counted, submitted and approved, and the level is put 
 
   // The level is shown, since counts are not blind; four and a half bottles are counted.
   const row = page.getByRole('row', { name: new RegExp(`Gin ${stamp}`) })
-  await expect(row.getByRole('cell', { name: '6 (4,200 ml)' })).toBeVisible()
+  await expect(row.getByRole('cell', { name: '6 bottles (4,200 ml)' })).toBeVisible()
   await page.getByLabel(`Count of Gin ${stamp}`).fill('4.5')
   // A number field takes what was typed when it loses focus.
   await page.getByLabel(`Count of Gin ${stamp}`).press('Tab')
@@ -77,14 +77,17 @@ test('a count is started, counted, submitted and approved, and the level is put 
 
   // The review: 1.5 bottles short.
   const review = page.getByRole('row', { name: new RegExp(`Gin ${stamp}`) })
-  await expect(review.getByRole('cell', { name: '−1.5 (1,050 ml)' })).toBeVisible()
+  await expect(review.getByRole('cell', { name: '−1.5 bottles (1,050 ml)' })).toBeVisible()
   await review.getByLabel(`Why Gin ${stamp} differs`).click()
   await page.getByRole('option', { name: 'Waste not recorded' }).click()
   await noViolations(page)
-  await page.getByRole('button', { name: /^Approve and change \d+ levels$/ }).click()
-  await expect(page.getByText(/Count approved\. \d+ levels changed\./).first()).toBeVisible()
+  await page.getByRole('button', { name: /^Approve and change \d+ levels?$/ }).click()
+  // Approving asks first, with what was found and what is missing.
+  await expect(page.getByRole('dialog').getByText(/stock missing worth/)).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: /^Approve and change \d+ levels?$/ }).click()
+  await expect(page.getByText(/Count approved\. \d+ levels? changed\./).first()).toBeVisible()
   await expect(page.getByText('Approved', { exact: true }).first()).toBeVisible()
 
   await visit(page, `/console/bar/stock?location=${s.store}`)
-  await expect(page.getByRole('row', { name: new RegExp(`Gin ${stamp}`) }).getByRole('cell', { name: '4.5 (3,150 ml)' })).toBeVisible()
+  await expect(page.getByRole('row', { name: new RegExp(`Gin ${stamp}`) }).getByRole('cell', { name: '4.5 bottles (3,150 ml)' })).toBeVisible()
 })

@@ -195,7 +195,7 @@ async function archive() {
             color="neutral"
             trailing-icon="i-lucide-arrow-right"
             :label="t('core.roles.who-link')"
-            :to="`/console/people/grants?roleId=${role.id}`"
+            :to="`/console/people/grants?role=${role.id}`"
           />
         </PageSection>
 
