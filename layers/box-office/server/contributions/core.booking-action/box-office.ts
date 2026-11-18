@@ -58,7 +58,7 @@ const DATES_PER_PRODUCTION = 10 // not-policy: a bound on one read, not a rule o
 
 /**
  * What each production is sold at, from its dates to come that are or will be on sale. "From" is
- * the lowest price open to anyone; each type that needs something (a membership, a concession)
+ * the lowest price open to anyone, with no proof or membership asked; each type that needs something (a membership, a concession)
  * and comes in lower is given by its own name. Free tickets and tickets that ride on a paid one are
  * not prices anyone books at, and a type sold only at the desk is not on offer to a reader of the
  * listing, so they are left out.
@@ -90,15 +90,22 @@ async function prices(productionIds: string[]): Promise<Record<string, PriceSumm
     }
   }
 
+  // A concession, or any type that asks for proof or a membership, is not a price a passer-by can
+  // book at: it is named on its own rather than read as "From" (a student's price is not everyone's).
+  const qualifies = (id: string) => {
+    const type = types.get(id)!
+    return type.requirementRefs.length > 0 || type.kind === 'concession' || !!type.proofNote
+  }
   const out: Record<string, PriceSummary> = {}
   for (const [productionId, { currency, byType }] of lowest) {
-    const open = [...byType].filter(([id]) => !types.get(id)!.requirementRefs.length).map(([, amount]) => amount)
+    const open = [...byType].filter(([id]) => !qualifies(id)).map(([, amount]) => amount)
     const fromMinor = open.length ? Math.min(...open) : null
+    const toMinor = open.length ? Math.max(...open) : null
     const others = [...byType]
-      .filter(([id, amount]) => types.get(id)!.requirementRefs.length && (fromMinor === null || amount < fromMinor))
+      .filter(([id, amount]) => qualifies(id) && (fromMinor === null || amount < fromMinor))
       .map(([id, amountMinor]) => ({ label: types.get(id)!.name, amountMinor }))
       .sort((a, b) => a.amountMinor - b.amountMinor || a.label.localeCompare(b.label))
-    out[productionId] = { currency, fromMinor, others }
+    out[productionId] = { currency, fromMinor, toMinor, others }
   }
   return out
 }

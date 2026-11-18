@@ -2,7 +2,6 @@
      phone. Each filter is a labelled field of its own kind; the list updates as each field changes
      and the panel ends with "Clear all" and "Done". The panel is controlled so a chip can open it. -->
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import { UDrawer, UPopover } from '#components'
 import type { FilterDef, ListOption } from '../../shared/list'
 
@@ -18,7 +17,8 @@ const emit = defineEmits<{ change: [name: string, value: string], clear: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 
 const { t } = useT()
-const phone = useMediaQuery('(max-width: 639px)')
+// The drawer only once hydrated: the server draws the popover, and the first render must match it.
+const phone = useScreenQuery('(max-width: 639px)')
 const container = computed(() => (phone.value ? UDrawer : UPopover))
 const ANY = '__any' // a select item cannot have an empty value, so "Any" has its own
 
