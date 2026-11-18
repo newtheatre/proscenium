@@ -148,6 +148,7 @@ export default defineModule({
       { id: 'bar.price-lists', menu: 'admin', group: 'modules', to: '/admin/modules/bar/price-lists', match: '/admin/modules/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
       { id: 'bar.age-checks', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/age-checks', icon: 'i-lucide-id-card', ability: 'bar.age-check.view', order: 40 },
       { id: 'bar.outlets', menu: 'admin', group: 'modules', to: '/admin/modules/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },
+      { id: 'bar.stock', menu: 'admin', group: 'modules', to: '/admin/modules/bar/stock', icon: 'i-lucide-package', ability: 'bar.stock.manage', order: 35 },
     ],
   },
 })

@@ -4,7 +4,7 @@
 <script setup lang="ts">
 type Kind = 'bar' | 'kiosk' | 'desk'
 type Layout = 'chips' | 'folders' | 'rail'
-interface Outlet { id: string, name: string, kind: Kind, priceListId: string, priceList: string, spaceId: string | null, tillLayout: Layout, favourites: string[], active: boolean }
+interface Outlet { id: string, name: string, kind: Kind, priceListId: string, priceList: string, spaceId: string | null, stockLocationId: string | null, tillLayout: Layout, favourites: string[], active: boolean }
 interface Option { id: string, name: string }
 interface Size { id: string, product: string, size: string, category: string }
 
@@ -12,11 +12,12 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ outlets: Outlet[], lists: Option[], spaces: Option[], sizes: Size[] }>('/api/bar/outlets', { key: 'bar:outlets' })
+const { data, status, error, refresh } = await useAPI<{ outlets: Outlet[], lists: Option[], spaces: Option[], locations: Option[], sizes: Size[] }>('/api/bar/outlets', { key: 'bar:outlets' })
 
 const kindItems = computed(() => (['bar', 'kiosk', 'desk'] as const).map(k => ({ value: k, label: t(`bar.screens.outlets.kinds.${k}`) })))
 const listItems = computed(() => (data.value?.lists ?? []).map(l => ({ value: l.id, label: l.name })))
 const spaceItems = computed(() => [{ value: 'none', label: t('bar.screens.outlets.no-space') }, ...(data.value?.spaces ?? []).map(s => ({ value: s.id, label: s.name }))])
+const locationItems = computed(() => [{ value: 'none', label: t('bar.screens.outlets.no-stock') }, ...(data.value?.locations ?? []).map(l => ({ value: l.id, label: l.name }))])
 const layoutItems = computed(() => (['chips', 'folders', 'rail'] as const).map(l => ({ value: l, label: t(`bar.screens.outlets.layouts.${l}`) })))
 // "Each" is never shown: a one-size product is just its name.
 const sizeLabel = (s: Size) => s.size === 'Each' ? s.product : `${s.product} · ${s.size}`
@@ -24,18 +25,18 @@ const sizeItems = computed(() => (data.value?.sizes ?? []).map(s => ({ value: s.
 const spaceName = (id: string | null) => id ? data.value?.spaces.find(s => s.id === id)?.name ?? null : null
 const describe = (o: Outlet) => [t(`bar.screens.outlets.kinds.${o.kind}`), t('bar.screens.outlets.sells-from', { list: o.priceList }), spaceName(o.spaceId)].filter(Boolean).join(' · ')
 
-const form = ref<{ id: string | null, name: string, kind: Kind, priceListId: string, spaceId: string, tillLayout: Layout, favourites: string[] } | null>(null)
+const form = ref<{ id: string | null, name: string, kind: Kind, priceListId: string, spaceId: string, stockLocationId: string, tillLayout: Layout, favourites: string[] } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function edit(o?: Outlet) {
   refusal.value = null
   form.value = o
-    ? { id: o.id, name: o.name, kind: o.kind, priceListId: o.priceListId, spaceId: o.spaceId ?? 'none', tillLayout: o.tillLayout, favourites: [...o.favourites] }
-    : { id: null, name: '', kind: 'bar', priceListId: listItems.value[0]?.value ?? '', spaceId: 'none', tillLayout: 'chips', favourites: [] }
+    ? { id: o.id, name: o.name, kind: o.kind, priceListId: o.priceListId, spaceId: o.spaceId ?? 'none', stockLocationId: o.stockLocationId ?? 'none', tillLayout: o.tillLayout, favourites: [...o.favourites] }
+    : { id: null, name: '', kind: 'bar', priceListId: listItems.value[0]?.value ?? '', spaceId: 'none', stockLocationId: data.value?.locations.length === 1 ? data.value.locations[0]!.id : 'none', tillLayout: 'chips', favourites: [] }
 }
 async function save() {
   const f = form.value!
   refusal.value = null
-  const body = { name: f.name, kind: f.kind, priceListId: f.priceListId || null, spaceId: f.spaceId === 'none' ? null : f.spaceId, tillLayout: f.tillLayout }
+  const body = { name: f.name, kind: f.kind, priceListId: f.priceListId || null, spaceId: f.spaceId === 'none' ? null : f.spaceId, stockLocationId: f.stockLocationId === 'none' ? null : f.stockLocationId, tillLayout: f.tillLayout }
   try {
     let id = f.id
     if (id) await $api(`/api/bar/outlets/${id}` as string, { method: 'PATCH', body })
@@ -159,6 +160,17 @@ async function setActive(o: Outlet, active: boolean) {
               v-model="form.spaceId"
               :items="spaceItems"
               value-key="value"
+            />
+          </UFormField>
+          <UFormField
+            v-if="data?.locations.length"
+            :label="t('bar.screens.outlets.stock')"
+            :help="t('bar.screens.outlets.stock-help')"
+            name="stockLocationId"
+          >
+            <USelect
+              v-model="form.stockLocationId"
+              :items="locationItems"
             />
           </UFormField>
           <UFormField

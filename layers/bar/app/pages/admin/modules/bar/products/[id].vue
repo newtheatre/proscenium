@@ -15,7 +15,9 @@ const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], groups: { id: string, name: string }[], lists: List[], canPrice: boolean, canAllergens: boolean }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
+interface RecipeLine { id: string, stockItemId: string | null, choiceGroupId: string | null, quantity: number }
+interface StockItem { id: string, name: string, baseUnit: 'each' | 'ml' | 'g' }
+const { data, status, error, refresh } = await useAPI<{ product: Product, categories: { id: string, name: string }[], groups: { id: string, name: string, source: 'options' | 'mixers' }[], lists: List[], canPrice: boolean, canAllergens: boolean, canStock: boolean, recipes: Record<string, RecipeLine[]>, stockItems: StockItem[] }>(() => `/api/bar/products/${id.value}`, { key: `bar:product:${id.value}` })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/admin/modules/bar/products' }])
@@ -155,6 +157,48 @@ async function saveAllergens() {
   }
 }
 
+// A size's recipe: what selling one uses up. A line is a stock item, or one of the product's choices,
+// where the option picked supplies the item (a mixer choice counts servings of the mixer's own recipe).
+type Draft = { what: string, quantity: number | null }
+const recipeOf = ref<{ variant: Variant, lines: Draft[] } | null>(null)
+const whatItems = computed(() => [
+  ...(data.value?.stockItems ?? []).map(i => ({ value: `i:${i.id}`, label: i.name })),
+  ...(data.value?.groups ?? []).filter(g => data.value!.product.groupIds.includes(g.id)).map(g => ({ value: `g:${g.id}`, label: t('bar.screens.product.recipe-choice', { name: g.name }) })),
+])
+function unitOf(what: string): string {
+  const [kind, ref] = [what.slice(0, 1), what.slice(2)]
+  if (kind === 'i') return t(`bar.screens.stock.units.${data.value?.stockItems.find(i => i.id === ref)?.baseUnit ?? 'each'}`)
+  return data.value?.groups.find(g => g.id === ref)?.source === 'mixers' ? t('bar.screens.product.recipe-servings') : t('bar.screens.product.recipe-measure')
+}
+function recipeText(v: Variant): string {
+  const lines = data.value?.recipes[v.id] ?? []
+  if (!lines.length) return t('bar.screens.product.recipe-none')
+  return lines.map((l) => {
+    const what = l.stockItemId ? `i:${l.stockItemId}` : `g:${l.choiceGroupId}`
+    const name = l.stockItemId ? data.value!.stockItems.find(i => i.id === l.stockItemId)?.name : t('bar.screens.product.recipe-choice', { name: data.value!.groups.find(g => g.id === l.choiceGroupId)?.name ?? '' })
+    return `${l.quantity} ${unitOf(what)} · ${name}`
+  }).join(', ')
+}
+function editRecipe(v: Variant) {
+  refusal.value = null
+  const lines = (data.value?.recipes[v.id] ?? []).map(l => ({ what: l.stockItemId ? `i:${l.stockItemId}` : `g:${l.choiceGroupId}`, quantity: l.quantity as number | null }))
+  recipeOf.value = { variant: v, lines: lines.length ? lines : [{ what: '', quantity: null }] }
+}
+async function saveRecipe() {
+  const r = recipeOf.value!
+  refusal.value = null
+  const lines = r.lines.filter(l => l.what && l.quantity).map(l => l.what.startsWith('i:') ? { stockItemId: l.what.slice(2), quantity: l.quantity! } : { choiceGroupId: l.what.slice(2), quantity: l.quantity! })
+  try {
+    await $api(`/api/bar/variants/${r.variant.id}/recipe` as string, { method: 'POST', body: { lines } })
+    recipeOf.value = null
+    toast.add({ title: t('bar.screens.product.recipe-saved'), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
 const priceOf = (v: Variant, l: List) => v.prices.find(p => p.listId === l.id)
 function shown(v: Variant, l: List): string {
   const p = priceOf(v, l)
@@ -258,6 +302,20 @@ function planned(v: Variant, l: List): string | null {
             />
           </template>
           <RecordList :label="t('bar.screens.product.prices-of', { name: v.name })">
+            <RecordListItem
+              v-if="data.canStock"
+              :name="t('bar.screens.product.recipe')"
+              :description="recipeText(v)"
+            >
+              <UButton
+                color="neutral"
+                variant="outline"
+                size="sm"
+                :label="t('bar.screens.product.edit-recipe')"
+                :aria-label="t('bar.screens.product.edit-recipe-of', { size: v.name })"
+                @click="editRecipe(v)"
+              />
+            </RecordListItem>
             <RecordListItem
               v-for="l in data.lists"
               :key="l.id"
@@ -450,6 +508,86 @@ function planned(v: Variant, l: List): string | null {
           type="submit"
           form="bar-allergens"
           :label="t('bar.screens.product.allergens-record')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      :open="!!recipeOf"
+      :title="recipeOf ? t('bar.screens.product.recipe-title', { size: recipeOf.variant.name }) : ''"
+      :description="t('bar.screens.product.recipe-help')"
+      @update:open="v => { if (!v) recipeOf = null }"
+    >
+      <template #body>
+        <UForm
+          v-if="recipeOf"
+          id="bar-recipe"
+          :state="recipeOf"
+          class="space-y-4"
+          novalidate
+          @submit="saveRecipe"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <p
+            v-if="!whatItems.length"
+            class="text-sm text-muted"
+          >
+            {{ t('bar.screens.product.recipe-no-items') }}
+          </p>
+          <div
+            v-for="(line, i) in recipeOf.lines"
+            :key="i"
+            class="flex items-end gap-2"
+          >
+            <UFormField
+              :label="t('bar.screens.product.recipe-what')"
+              :name="`lines.${i}.what`"
+              class="flex-1"
+            >
+              <USelectMenu
+                v-model="line.what"
+                :items="whatItems"
+                value-key="value"
+                :placeholder="t('bar.screens.product.recipe-pick')"
+              />
+            </UFormField>
+            <UFormField
+              :label="t('bar.screens.product.recipe-quantity')"
+              :name="`lines.${i}.quantity`"
+            >
+              <UFieldGroup>
+                <UInputNumber
+                  v-model="line.quantity"
+                  :min="1"
+                />
+                <UBadge
+                  color="neutral"
+                  variant="outline"
+                  size="lg"
+                  :label="line.what ? unitOf(line.what) : ''"
+                />
+              </UFieldGroup>
+            </UFormField>
+            <IconButton
+              icon="i-lucide-x"
+              :label="t('bar.screens.product.recipe-remove')"
+              @click="recipeOf.lines.splice(i, 1)"
+            />
+          </div>
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-plus"
+            :label="t('bar.screens.product.recipe-add')"
+            @click="recipeOf.lines.push({ what: '', quantity: null })"
+          />
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="bar-recipe"
+          :label="t('bar.screens.save')"
         />
       </template>
     </UModal>
