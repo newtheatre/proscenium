@@ -1,6 +1,6 @@
 <!-- Stocktakes (S10): counts going on and waiting for approval first, then the latest finished. A
-     count is started at a location, of everything or of one category; a row opens it to count, to
-     review or as its record. -->
+     count is started at a location, of everything or of one category, and of every item in use or
+     only those the location has held; a row opens it to count, to review or as its record. -->
 <script setup lang="ts">
 type State = 'counting' | 'submitted' | 'approved' | 'abandoned'
 interface Stocktake { id: string, location: string, state: State, category: string | null, startedBy: string, startedAt: number, submittedAt: number | null, approvedAt: number | null, varianceValueMinor: number | null }
@@ -11,7 +11,7 @@ const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
-const { data, status, error, refresh } = await useAPI<{ stocktakes: Stocktake[], locations: { id: string, name: string }[], categories: { id: string, name: string }[], can: { approve: boolean } }>('/api/bar/stocktakes', { key: 'bar:stocktakes' })
+const { data, status, error, refresh } = await useAPI<{ stocktakes: Stocktake[], locations: { id: string, name: string }[], categories: { id: string, name: string }[], uncategorised: number, can: { approve: boolean } }>('/api/bar/stocktakes', { key: 'bar:stocktakes' })
 
 const tone = (s: State) => ({ counting: 'info', submitted: 'warning', approved: 'success', abandoned: 'neutral' } as const)[s]
 const columns = computed(() => [
@@ -24,13 +24,13 @@ const columns = computed(() => [
 
 // Starting a count: where, and of what.
 const EVERYTHING = 'everything'
-const starting = ref<{ locationId: string, categoryId: string } | null>(null)
+const starting = ref<{ locationId: string, categoryId: string, heldOnly: boolean } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
 function openStart() {
   refusal.value = null
   const locations = data.value?.locations ?? []
-  starting.value = { locationId: locations.length === 1 ? locations[0]!.id : '', categoryId: EVERYTHING }
+  starting.value = { locationId: locations.length === 1 ? locations[0]!.id : '', categoryId: EVERYTHING, heldOnly: true }
 }
 const locationItems = computed(() => (data.value?.locations ?? []).map(l => ({ value: l.id, label: l.name })))
 const scopeItems = computed(() => [{ value: EVERYTHING, label: t('bar.screens.stocktakes.everything') }, ...(data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name }))])
@@ -39,7 +39,7 @@ async function start() {
   refusal.value = null
   busy.value = true
   try {
-    const made = await $api<{ stocktakeId: string }>('/api/bar/stocktakes', { method: 'POST', body: { locationId: s.locationId, categoryId: s.categoryId === EVERYTHING ? null : s.categoryId } })
+    const made = await $api<{ stocktakeId: string }>('/api/bar/stocktakes', { method: 'POST', body: { locationId: s.locationId, categoryId: s.categoryId === EVERYTHING ? null : s.categoryId, heldOnly: s.heldOnly } })
     starting.value = null
     await router.push(`/console/bar/stocktakes/${made.stocktakeId}`)
   }
@@ -132,7 +132,7 @@ async function start() {
           </UFormField>
           <UFormField
             :label="t('bar.screens.stocktakes.what')"
-            :help="t('bar.screens.stocktakes.what-help')"
+            :help="[t('bar.screens.stocktakes.what-help'), data?.uncategorised && starting.categoryId !== EVERYTHING ? t('bar.screens.stocktakes.uncategorised', { count: data.uncategorised }) : ''].filter(Boolean).join(' ')"
             name="categoryId"
           >
             <USelect
@@ -140,6 +140,12 @@ async function start() {
               :items="scopeItems"
             />
           </UFormField>
+          <UCheckbox
+            v-model="starting.heldOnly"
+            name="heldOnly"
+            :label="t('bar.screens.stocktakes.held-only')"
+            :description="t('bar.screens.stocktakes.held-only-help')"
+          />
         </UForm>
       </template>
       <template #footer>

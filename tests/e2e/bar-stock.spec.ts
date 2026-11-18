@@ -57,8 +57,11 @@ test('a delivery is drafted, then received into its location', async ({ page }) 
   await page.getByLabel('Into').click()
   await page.getByRole('option', { name: `Cellar ${stamp}` }).click()
   await page.getByLabel('Delivery note number').fill(`DN-${stamp}`)
-  await page.getByRole('button', { name: 'Add an item' }).click()
+  // The picker searches, takes several and stays a picker, never showing an id.
+  await page.getByRole('button', { name: 'Add items' }).click()
+  await page.getByPlaceholder('Find an item').fill(`Cola can ${stamp}`)
   await page.getByRole('option', { name: `Cola can ${stamp}` }).click()
+  await page.keyboard.press('Escape')
   await page.getByLabel(`Packs of Cola can ${stamp}`).fill('2')
   await page.getByLabel(`Loose units of Cola can ${stamp}`).fill('6')
   // A number field takes what was typed when it loses focus.

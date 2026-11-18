@@ -16,12 +16,17 @@ export default defineRoute({
   const product = categories.flatMap(c => c.products).find(p => p.id === record!.id)
   if (!product) refuse('core.not-found', 'There is no such product.', { status: 404 })
   const canStock = (await can(actor, 'bar.stock.manage')).allowed
+  // The unit a choice's options are measured in, when they agree, so a recipe reads "25 ml of the chosen spirit".
+  const units = new Map((await all<{ group_id: string, unit: string }>(
+    `SELECT o.group_id, min(i.base_unit) AS unit FROM bar_choice_options o JOIN bar_stock_items i ON i.id = o.stock_item_id
+      WHERE o.active = 1 GROUP BY o.group_id HAVING count(DISTINCT i.base_unit) = 1`,
+  )).map(r => [r.group_id, r.unit] as const))
   return {
     product,
     categories: categories.filter(c => c.active || c.id === product!.categoryId).map(c => ({ id: c.id, name: c.name })),
     lists: lists.filter(l => l.active),
     currency,
-    groups: (await choiceGroups()).filter(g => g.active || product!.groupIds.includes(g.id)).map(g => ({ id: g.id, name: g.name, source: g.source })),
+    groups: (await choiceGroups()).filter(g => g.active || product!.groupIds.includes(g.id)).map(g => ({ id: g.id, name: g.name, source: g.source, unit: units.get(g.id) ?? null })),
     canPrice: (await can(actor, 'bar.price.manage')).allowed,
     canAllergens: (await can(actor, 'bar.allergens.manage')).allowed,
     canStock,

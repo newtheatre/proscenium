@@ -97,6 +97,9 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
 
   await page.getByRole('button', { name: 'New location' }).click()
   let dialog = page.getByRole('dialog')
+  // Saved empty, the form says what is missing beside the field.
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog.getByText('This is needed.').first()).toBeVisible()
   await dialog.getByLabel('Name', { exact: true }).fill(`Cellar ${stamp}`)
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Location saved.').first()).toBeVisible()
@@ -106,6 +109,9 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   await dialog.getByLabel('Name', { exact: true }).fill(`Cocoa ${stamp}`)
   await dialog.getByLabel('Delivered as').fill('tub')
   await dialog.getByLabel('Amount in one').fill('500')
+  // Once there are categories, an item needs one, so it is on some count by category.
+  await dialog.getByRole('button', { name: /^Category\*?$/ }).click()
+  await page.getByRole('option', { name: `Snacks ${stamp}` }).click()
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Stock item saved.').first()).toBeVisible()
@@ -113,7 +119,7 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
 
   await visit(page, `/admin/modules/bar/products/${s.product}`)
   await expect(page.getByText('No recipe: moves no stock')).toBeVisible()
-  await page.getByRole('button', { name: 'Edit the recipe of Each' }).click()
+  await page.getByRole('button', { name: 'Edit recipe of Each' }).click()
   dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: 'Ingredient', exact: true }).click()
   await page.getByRole('option', { name: `Cocoa ${stamp}` }).click()
@@ -121,7 +127,7 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Recipe saved.').first()).toBeVisible()
-  await expect(page.getByText(`20 ml · Cocoa ${stamp}`)).toBeVisible()
+  await expect(page.getByText(`20 ml of Cocoa ${stamp}`)).toBeVisible()
 })
 
 test('Add a product starts from a preset, fills a row per size, and stays on the list', async ({ page }) => {
