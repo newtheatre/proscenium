@@ -193,7 +193,13 @@ export default defineModule({
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
       { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40, settingsIn: ['box-office.performances'] },
+      // The person's own bookings, in My account (C3).
+      { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
+    ],
+    // Your next visit, first among the cards on My account's overview.
+    'core.account-section': [
+      { id: 'box-office.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'BoxOfficeNextVisit', order: 30, to: '/account/tickets', icon: 'i-lucide-ticket' },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
