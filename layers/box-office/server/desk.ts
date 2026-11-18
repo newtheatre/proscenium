@@ -461,7 +461,10 @@ export interface DeskSold {
  * "after the sale"): each booking it paid for, with its reference, tickets and whether each is in.
  */
 export async function deskSold(intentId: string): Promise<DeskSold[]> {
-  const paid = await all<{ id: string, reference: string, account_id: string | null }>("SELECT id, reference, account_id FROM box_office_orders WHERE intent_id = ? AND state = 'confirmed' ORDER BY created_at", intentId)
+  // An order this payment bought, or one whose exchange to dearer tickets it paid the difference on.
+  const paid = await all<{ id: string, reference: string, account_id: string | null }>(
+    `SELECT id, reference, account_id FROM box_office_orders
+      WHERE (intent_id = ?1 OR id IN (SELECT order_id FROM box_office_exchanges WHERE intent_id = ?1)) AND state = 'confirmed' ORDER BY created_at`, intentId)
   return Promise.all(paid.map(async (order) => {
     const lines = await all<{ id: string, performance_id: string, band_name: string | null, type_name: string, amount_minor: number, admitted_at: number | null }>(
       `SELECT l.id, l.performance_id, CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name,

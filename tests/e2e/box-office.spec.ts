@@ -133,7 +133,8 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(payButton(page, '£24.00')).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£24.00')
-  // The panel shows what is left after the sale without a reload.
+  // Back for the next customer, the panel shows what is left after the sale without a reload.
+  await expect(tile).toBeVisible()
   await expect(left).toHaveText(`${before - 2} left`)
 })
 
