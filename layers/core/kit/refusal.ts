@@ -7,6 +7,8 @@ export interface RefusalBody {
   reason: string
   remedy?: string
   fields?: Record<string, string>
+  /** Facts a screen may link to or act on, such as the id of the record in the way. Never prose. */
+  detail?: Record<string, string>
 }
 
 export class Refusal extends Error {
@@ -14,15 +16,17 @@ export class Refusal extends Error {
   readonly reason: string
   readonly remedy?: string
   readonly fields?: Record<string, string>
+  readonly detail?: Record<string, string>
   readonly status: number
 
-  constructor(code: string, reason: string, options: { remedy?: string, fields?: Record<string, string>, status?: number } = {}) {
+  constructor(code: string, reason: string, options: { remedy?: string, fields?: Record<string, string>, detail?: Record<string, string>, status?: number } = {}) {
     super(`${code}: ${reason}`)
     this.name = 'Refusal'
     this.code = code
     this.reason = reason
     this.remedy = options.remedy
     this.fields = options.fields
+    this.detail = options.detail
     this.status = options.status ?? 409
   }
 
@@ -30,12 +34,13 @@ export class Refusal extends Error {
     const body: RefusalBody = { code: this.code, reason: this.reason }
     if (this.remedy) body.remedy = this.remedy
     if (this.fields) body.fields = this.fields
+    if (this.detail) body.detail = this.detail
     return body
   }
 }
 
 /** The one way to say no. Throws, so a handler stops where it refuses. */
-export function refuse(code: string, reason: string, options: { remedy?: string, fields?: Record<string, string>, status?: number } = {}): never {
+export function refuse(code: string, reason: string, options: { remedy?: string, fields?: Record<string, string>, detail?: Record<string, string>, status?: number } = {}): never {
   throw new Refusal(code, reason, options)
 }
 

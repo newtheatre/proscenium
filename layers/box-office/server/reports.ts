@@ -80,10 +80,12 @@ export async function salesSummary(productionId: string): Promise<SalesSummary> 
     type.tickets += l.tickets
     type.valueMinor += l.valueMinor
     byType.set(l.ticketTypeId, type)
-    const channel = byChannel.get(l.channel) ?? { channel: l.channel, tickets: 0, valueMinor: 0 }
+    // Complimentary tickets are their own way of being given out, whoever issued them.
+    const how = isComp(l) ? 'complimentary' : l.channel
+    const channel = byChannel.get(how) ?? { channel: how, tickets: 0, valueMinor: 0 }
     channel.tickets += l.tickets
     channel.valueMinor += l.valueMinor
-    byChannel.set(l.channel, channel)
+    byChannel.set(how, channel)
   }
   const add = (key: 'sold' | 'reserved' | 'complimentary' | 'admitted' | 'valueMinor') => rows.reduce((total, r) => total + r[key], 0)
   return {
@@ -112,17 +114,17 @@ export async function salesRows(productionId: string): Promise<Record<string, un
   const summary = await salesSummary(productionId)
   const ids = summary.performances.map(p => p.id)
   const marks = ids.map(() => '?').join(', ') || 'NULL'
-  const lines = await all<{ performance_id: string, name: string, channel: string, state: string, tickets: number, value: number, currency: string }>(
-    `SELECT l.performance_id, t.name, o.channel, o.state, count(*) AS tickets, sum(l.amount_minor) AS value, o.currency
+  const lines = await all<{ performance_id: string, name: string, how: string, state: string, tickets: number, value: number, currency: string }>(
+    `SELECT l.performance_id, t.name, CASE WHEN t.kind = 'complimentary' THEN 'complimentary' ELSE o.channel END AS how, o.state, count(*) AS tickets, sum(l.amount_minor) AS value, o.currency
       FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types t ON t.id = l.ticket_type_id
       WHERE l.kind = 'ticket' AND l.state = 'live' AND o.state IN ('confirmed', 'reserved') AND l.performance_id IN (${marks})
-      GROUP BY l.performance_id, t.name, o.channel, o.state, o.currency ORDER BY l.performance_id, t.name`, ...ids)
+      GROUP BY l.performance_id, t.name, CASE WHEN t.kind = 'complimentary' THEN 'complimentary' ELSE o.channel END, o.state, o.currency ORDER BY l.performance_id, t.name`, ...ids)
   const performance = new Map(summary.performances.map(p => [p.id, p]))
   return lines.map(l => ({
     performance: [summary.production.title, performance.get(l.performance_id)?.label].filter(Boolean).join(', '),
     startsAt: new Date(performance.get(l.performance_id)?.startsAt ?? nowMs()).toISOString(),
     ticketType: l.name,
-    channel: l.channel,
+    channel: l.how,
     state: l.state === 'confirmed' ? 'sold' : 'reserved',
     tickets: l.tickets,
     value: (l.value / 100).toFixed(2), // not-policy: minor units to units; every currency sold here has two decimals

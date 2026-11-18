@@ -473,7 +473,7 @@ test.describe('the access scheme screens', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'More about your visit' })).toBeVisible()
     // A companion is a tick box that asks how many only once ticked.
     await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toHaveCount(0)
-    await page.getByRole('checkbox', { name: 'I require a companion/carer' }).click()
+    await page.getByRole('checkbox', { name: 'I come with a companion or carer' }).click()
     await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toBeVisible()
     await noViolations(page)
     if (process.env.PROSCENIUM_SHOTS) await page.screenshot({ path: `${process.env.PROSCENIUM_SHOTS}/form.png`, fullPage: true })

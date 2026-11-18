@@ -201,6 +201,16 @@ describe('selling moves stock', () => {
     expect(await levels()).toEqual(before)
     await commit(unit => updateOutlet(unit.view(), s.outlet, { stockLocationId: s.bar }))
   })
+
+  it('says which lines are packaged, so only those are offered back to stock on a refund', async () => {
+    const packaged = async () => Object.fromEntries(((await send('GET', `/api/bar/sales/${reference}`)).body.sale.lines as { label: string, packaged: boolean }[]).map(l => [l.label.split(' · ')[0], l.packaged]))
+    // Poured, made with a choice, or with no recipe at all: not packaged.
+    expect(await packaged()).toEqual({ 'Stock cider, Pint': false, 'Stock cider, Half': false, 'Stock G and T, Double': false, 'Stock G and T, Single': false, 'Stock tap water': false })
+    // A can sold as itself is.
+    expect((await recipe(s.water, [{ stockItemId: s.tonicCan, quantity: 1 }])).status).toBe(200)
+    expect((await packaged())['Stock tap water']).toBe(true)
+    expect((await recipe(s.water, [])).status).toBe(200)
+  })
 })
 
 describe('what guards stock', () => {
