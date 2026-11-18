@@ -5,7 +5,7 @@
 import { all, first, refuse, useSetting, type UnitView } from '#kit'
 import { actionList } from './actions'
 import { sources } from './sources'
-import { DATA_CLASSES, FORMAT, checkDefinition, parseDefinition, publishable, questionsOf, type DataClass, type Definition, type Fault, type Limits, type Problem, type Question } from '../shared/engine'
+import { DATA_CLASSES, FORMAT, checkDefinition, hasStages, parseDefinition, publishable, questionsOf, type DataClass, type Definition, type Fault, type Limits, type Problem, type Question } from '../shared/engine'
 
 export interface FormRow {
   id: string
@@ -193,7 +193,12 @@ export async function planPublish(form: FormRow, draft: DraftRow): Promise<Publi
   const present = new Set(now.map(q => q.id))
   for (const [id, q] of before) if (!present.has(id)) changes.push({ kind: 'retired', impact: 'breaking', questionId: id, label: q.label, what: [] })
 
-  if (form.retentionDays === null && now.some(q => PERSONAL.includes(q.dataClass)) && await useSetting('forms.retention.require-choice'))
+  // Custom fields live and go with their record: no stages, nothing a reader could not then be shown, and no retention period of their own.
+  if (form.mode === 'record') {
+    if (hasStages(definition)) refusals.push({ code: 'forms.publish.record-stages', reason: 'Custom fields cannot have stages. Remove the stages before publishing.' })
+    for (const q of now.filter(q => q.dataClass === 'special')) refusals.push({ code: 'forms.publish.record-special', questionId: q.id, reason: `"${q.label}" asks for special-category information, which custom fields cannot hold yet.` })
+  }
+  else if (form.retentionDays === null && now.some(q => PERSONAL.includes(q.dataClass)) && await useSetting('forms.retention.require-choice'))
     refusals.push({ code: 'forms.publish.retention-needed', reason: 'This form asks for personal answers, so say how long they are kept before publishing it.' })
 
   const text = JSON.stringify(definition)

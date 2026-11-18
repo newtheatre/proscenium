@@ -65,12 +65,15 @@ function leaving(event: BeforeUnloadEvent) {
 onMounted(() => window.addEventListener('beforeunload', leaving))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', leaving))
 
+// Custom fields are filled in on their record: nobody is sent them, and they have no stages.
+const fields = computed(() => form.value.mode === 'record')
 const more = computed(() => [[
-  { label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } },
+  ...(fields.value ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
   { label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` },
+  ...(form.value.liveVersion === null ? [] : [{ label: t('forms.screens.versions.title'), icon: 'i-lucide-history', to: `/console/forms/${form.value.id}/versions` }]),
 ], [
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
-  { label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } },
+  ...(fields.value ? [] : [{ label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } }]),
   { label: t('forms.screens.json.title'), icon: 'i-lucide-braces', onSelect: () => { json.value = true } },
   ...(props.data.canSaveTemplate ? [{ label: t('forms.screens.templates.save'), icon: 'i-lucide-copy-plus', onSelect: () => { templating.value = true } }] : []),
 ], life.value])
@@ -103,7 +106,8 @@ function published(number: number) {
   toast.add({ title: t('forms.screens.publish.done', { n: number }), color: 'success' })
   emit('changed')
   // A form published for the first time is in front of nobody yet: offer to share it.
-  if (form.value.liveVersion === null) sharing.value = true
+  if (form.value.liveVersion === null && !fields.value) sharing.value = true
+  if (fields.value) toast.add({ title: t('forms.screens.fields.published'), color: 'info' })
 }
 const saveWords = computed(() => t(`forms.screens.save.${builder.state.value}`))
 const reload = () => window.location.reload()
@@ -119,6 +123,11 @@ const reload = () => window.location.reload()
       <StatusBadge
         :tone="form.liveVersion === null ? 'neutral' : 'success'"
         :label="form.liveVersion === null ? t('forms.screens.status.draft') : t('forms.screens.builder.version', { n: form.liveVersion })"
+      />
+      <StatusBadge
+        v-if="fields"
+        tone="info"
+        :label="t('forms.screens.fields.badge')"
       />
       <StatusBadge
         v-if="form.status === 'paused' || form.status === 'closed' || form.status === 'archived'"

@@ -22,7 +22,18 @@ export interface FormsSlot {
   limit?: number
   /** A forms.source that names the subject's records, so a response can say what it is about. */
   source?: string
+  /**
+   * `submission` (when left out): a form answered once, attached to one record. `record`: custom
+   * fields, a form attached once for every record of the type and filled in on each record's page.
+   */
+  mode?: 'submission' | 'record'
+  /** Record mode: the ability needed, on the record, to fill in or change its fields. */
+  edit?: string
 }
+
+/** Where a record-mode form is attached: to every record of the slot's type, not to one of them. */
+export const EVERY = '*'
+export const modeOf = (slot: FormsSlot): 'submission' | 'record' => slot.mode ?? 'submission'
 
 export async function slots(): Promise<FormsSlot[]> {
   return (await usePoint<FormsSlot>('forms.slot')).map(c => c.value)
@@ -62,7 +73,18 @@ export async function attachedTo(slot: string, subjectId: string): Promise<Attac
   return Promise.all(rows.map(async r => ({ ...r, onePerPerson: !!r.onePerPerson, anonymous: !!r.anonymous, address: await siteUrl(`/forms/${r.slug}?place=${r.id}`) })))
 }
 
-export const mayAttach = (actor: Actor, slot: FormsSlot, subjectId: string) => requireAbility(actor, slot.attach as never, [slot.subject, subjectId])
+/**
+ * Whether this person may attach a form here or take one away. Custom fields are attached for
+ * every record of the type at once, so the ability is asked for outright, not on one record.
+ */
+export async function mayAttach(actor: Actor, slot: FormsSlot, subjectId: string): Promise<void> {
+  if ((modeOf(slot) === 'record') !== (subjectId === EVERY)) refuse('forms.slot.not-found', 'A form cannot be attached here.', { status: 404 }) // not-policy: HTTP status
+  if (subjectId === EVERY) await requireAbility(actor, slot.attach as never)
+  else await requireAbility(actor, slot.attach as never, [slot.subject, subjectId])
+}
+
+/** For the audit entry: the record a form is attached to, or that it is attached for every record. */
+const about = (subjectId: string) => subjectId === EVERY ? { every: true } : { subject: subjectId }
 
 export interface Terms { audience: 'anyone' | 'signed_in', opensAt: number | null, closesAt: number | null, responseCap: number | null, onePerPerson: boolean, status: 'active' | 'paused' }
 
@@ -73,7 +95,7 @@ export interface Terms { audience: 'anyone' | 'signed_in', opensAt: number | nul
 export async function attach(unit: UnitView, input: { slot: FormsSlot, subjectId: string, form: FormRow, terms: Terms, actor: Actor, at: number }): Promise<string> {
   const { slot, form, terms } = input
   if (!form.liveVersionId || form.status === 'archived') return refuse('forms.slot.unpublished', 'Publish this form before attaching it.', { status: 409 }) // not-policy: HTTP status
-  if (form.mode !== 'submission') return refuse('forms.slot.wrong-mode', 'This form cannot be attached here.', { status: 409 }) // not-policy: HTTP status
+  if (form.mode !== modeOf(slot)) return refuse('forms.slot.wrong-mode', 'This form cannot be attached here.', { status: 409, remedy: modeOf(slot) === 'record' ? 'Attach a set of custom fields, not a form people send.' : undefined }) // not-policy: HTTP status
   if (terms.opensAt !== null && terms.closesAt !== null && terms.closesAt <= terms.opensAt)
     return refuse('forms.link.dates', 'The form must close after it opens.', { status: 422, fields: { closesAt: 'forms.link.dates' } }) // not-policy: HTTP status
   if (form.anonymous && terms.onePerPerson)
@@ -99,7 +121,7 @@ export async function attach(unit: UnitView, input: { slot: FormsSlot, subjectId
       params: [id, slot.id, slot.subject, input.subjectId, slot.limit ?? 1],
     }).expect(1, { code: 'forms.slot.full', reason: 'No more forms can be attached here.', remedy: 'Take one away first.' })
   }
-  unit.audit({ action: 'update', record: ['forms.form', form.id], detail: { slot: slot.id, subject: input.subjectId, attached: existing && existing.status !== 'ended' ? 'changed' : 'made', status: terms.status } })
+  unit.audit({ action: 'update', record: ['forms.form', form.id], detail: { slot: slot.id, ...about(input.subjectId), attached: existing && existing.status !== 'ended' ? 'changed' : 'made', status: terms.status } })
   return id
 }
 
@@ -107,7 +129,7 @@ export async function attach(unit: UnitView, input: { slot: FormsSlot, subjectId
 export function detach(unit: UnitView, input: { slot: FormsSlot, subjectId: string, formId: string }): void {
   unit.add({ sql: 'UPDATE forms_placements SET status = \'ended\' WHERE slot_key = ? AND subject_type = ? AND subject_id = ? AND form_id = ? AND status <> \'ended\'', params: [input.slot.id, input.slot.subject, input.subjectId, input.formId] })
     .expect(1, { code: 'forms.slot.not-attached', reason: 'This form is not attached here.' })
-  unit.audit({ action: 'update', record: ['forms.form', input.formId], detail: { slot: input.slot.id, subject: input.subjectId, attached: 'ended' } })
+  unit.audit({ action: 'update', record: ['forms.form', input.formId], detail: { slot: input.slot.id, ...about(input.subjectId), attached: 'ended' } })
 }
 
 /** What a response is about, in words: the slot's name and, where its source can say, the record's. */

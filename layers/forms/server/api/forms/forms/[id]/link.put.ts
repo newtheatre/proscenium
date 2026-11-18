@@ -19,6 +19,7 @@ const input = z.object({
 
 export default defineRoute({ ability: 'forms.form.publish', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, actor, unit }) => {
   const form = await requireForm(record!.id)
+  if (form.mode === 'record') refuse('forms.link.record', 'Custom fields are filled in on their record, so they have no link.', { status: 409 }) // not-policy: HTTP status
   if (input.opensAt !== null && input.closesAt !== null && input.closesAt <= input.opensAt)
     refuse('forms.link.dates', 'The form must close after it opens.', { status: 422, fields: { closesAt: 'forms.link.dates' } })
   // An anonymous form keeps nothing to tell one person from another, so it cannot hold them to one answer.

@@ -3,7 +3,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { listForms } from '../../../../../forms'
-import { attachedTo, mayAttach, requireSlot } from '../../../../../slots'
+import { attachedTo, mayAttach, modeOf, requireSlot } from '../../../../../slots'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
   const slot = await requireSlot(getRouterParam(event, 'slot'))
@@ -11,6 +11,6 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
   await mayAttach(actor, slot, subjectId)
   const attached = await attachedTo(slot.id, subjectId)
   const taken = new Set(attached.map(a => a.formId))
-  const forms = (await listForms()).filter(f => f.liveVersionId && f.status !== 'archived' && f.mode === 'submission' && !taken.has(f.id))
-  return { slot: { id: slot.id, label: slot.label, limit: slot.limit ?? 1 }, attached, forms: forms.map(f => ({ id: f.id, title: f.title, anonymous: f.anonymous })) }
+  const forms = (await listForms()).filter(f => f.liveVersionId && f.status !== 'archived' && f.mode === modeOf(slot) && !taken.has(f.id))
+  return { slot: { id: slot.id, label: slot.label, limit: slot.limit ?? 1, mode: modeOf(slot) }, attached, forms: forms.map(f => ({ id: f.id, title: f.title, anonymous: f.anonymous })) }
 })
