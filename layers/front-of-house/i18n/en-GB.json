@@ -669,5 +669,12 @@
   "front-of-house.notification-topics.cover-needed.label": "Cover requests",
   "front-of-house.notification-topics.cover-needed.description": "When someone asks for cover on a shift you could take.",
   "front-of-house.notification-topics.night-reports.label": "Night reports",
-  "front-of-house.notification-topics.night-reports.description": "When a night report is signed off."
+  "front-of-house.notification-topics.night-reports.description": "When a night report is signed off.",
+  "front-of-house.shift-details.where": "Where: {place}",
+  "front-of-house.shift-details.curtain": "Curtain up: {time}",
+  "front-of-house.shift-details.ends": "Shift ends: about {time}",
+  "front-of-house.shift-details.briefing": "Briefing: {briefing}",
+  "front-of-house.calendar-file.curtain": "Curtain up: {time}",
+  "front-of-house.calendar-file.one": "Shift",
+  "front-of-house.calendar-file.mine": "My shifts"
 }

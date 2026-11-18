@@ -137,8 +137,9 @@ Any module may import core's services without listing core: `import { notifyAddr
 - `notifyAddress(unit, typeKey, { address, variables, locale?, dedupeKey? })` sends one
   transactional email from inside your job. Declare the type as a contribution to
   `core.notification-type` (wording inline, variables `url` or `text`, `{{ theatre }}` filled by
-  core). It throws on failure, so your job retries; nothing is sent until the sending domain is set
-  and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
+  core; a phrase your server code builds into a variable comes from your catalogue through
+  `wordsFrom(catalogue)` from `#kit`, never an English literal). It throws on failure, so your job
+  retries; nothing is sent until the sending domain is set and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
   records messages instead of sending them.
 - `notify(unit, typeKey, { to, variables?, dedupeKey?, senderKey?, subject? })` tells accounts
   something (C-29). `to` is an account id or a set of them, each optionally

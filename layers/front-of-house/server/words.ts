@@ -1,8 +1,12 @@
 // What a message says about a shift: the duty, the show or occasion, when to arrive, and the
 // details a person needs on the night (where, curtain up, the briefing).
-import { first, linkTokens, siteUrl, theatreTimeZone, useSetting } from '#kit'
+import { first, linkTokens, siteUrl, theatreTimeZone, useSetting, wordsFrom } from '#kit'
 import { getPerformance } from '#modules/core'
+import catalogue from '../i18n/en-GB.json'
 import type { Shift } from './shifts'
+
+/** The module's own strings, for the words the server builds into a message or a calendar file. */
+export const say = wordsFrom(catalogue)
 
 export async function formatter() {
   const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
@@ -38,14 +42,14 @@ export async function shiftDetails(shift: Pick<Shift, 'performanceId' | 'venueId
   const lines: string[] = []
   if (shift.performanceId) {
     const performance = await getPerformance(shift.performanceId)
-    lines.push(`Where: ${performance.venueName}, ${performance.spaceName}`, `Curtain up: ${time(performance.startsAt)}`)
+    lines.push(say('front-of-house.shift-details.where', { place: `${performance.venueName}, ${performance.spaceName}` }), say('front-of-house.shift-details.curtain', { time: time(performance.startsAt) }))
   }
   else if (shift.venueId) {
     const venue = await first<{ name: string }>('SELECT name FROM core_venues WHERE id = ?', shift.venueId)
-    if (venue) lines.push(`Where: ${venue.name}`)
+    if (venue) lines.push(say('front-of-house.shift-details.where', { place: venue.name }))
   }
-  lines.push(`Shift ends: about ${time(shift.endsAt)}`)
-  if (shift.briefing) lines.push(`Briefing: ${shift.briefing}`)
+  lines.push(say('front-of-house.shift-details.ends', { time: time(shift.endsAt) }))
+  if (shift.briefing) lines.push(say('front-of-house.shift-details.briefing', { briefing: shift.briefing }))
   return lines.join('\n')
 }
 

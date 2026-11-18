@@ -33,11 +33,11 @@ interface One {
   changed: string[]
   stage: (Stage & { note: string | null }) | null
   moves: Move[]
-  history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null }[]
+  history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null, note: string | null }[]
   review: (ReviewResult & { stage: string, mode: 'scores' | 'vote', open: boolean, released: boolean, conflicted: number, quorum: number | null, quorate: boolean, canRelease: boolean }) | null
   decision: { at: number, reason: string | null } | null
   about: { slot: string, label: string, name: string | null } | null
-  actions: { id: string, action: string, label: string | null, state: 'waiting' | 'done' | 'skipped' | 'failed', detail: string | null, at: number, canRunAgain: boolean }[]
+  actions: { id: string, action: string, label: string | null, state: 'waiting' | 'done' | 'skipped' | 'failed', detail: string | null, at: number, canRunAgain: boolean, record: { type: string, id: string, title: string, to?: string } | null }[]
 }
 
 definePageMeta({ layout: 'console' })
@@ -219,6 +219,17 @@ const sharedMoves = computed(() => {
   return keys.size === 1 ? data.value?.stages.find(s => s.key === [...keys][0])?.moves ?? [] : null
 })
 const many = ref(false)
+// What the move's actions would do with this response, asked for as the dialog opens: the award an
+// approval would issue, and anything in its way. Several at once are not previewed.
+interface Preview { action: string, label: string, lines?: { label: string, value: string }[], warnings?: string[], blocked?: string, skipped?: 'slot' }
+const previews = ref<Preview[]>([])
+watch([moving, many], async ([move, several]) => {
+  previews.value = []
+  if (!move || several || !one.value) return
+  const key = move.key
+  const got = await $api<{ previews: Preview[] }>(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/preview` as string, { query: { move: key } }).catch(() => null)
+  if (moving.value?.key === key && !many.value) previews.value = got?.previews ?? []
+})
 function chooseMany(move: Move) {
   choose(move)
   many.value = true
@@ -584,6 +595,11 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
                   v-else-if="run.state === 'skipped'"
                   class="block text-muted"
                 >{{ run.detail && run.detail !== 'slot' ? run.detail : t('forms.screens.actions.skipped-slot') }}</span>
+                <ULink
+                  v-if="run.record"
+                  :to="run.record.to"
+                  class="block text-primary"
+                >{{ run.record.title }}</ULink>
               </li>
             </ul>
           </section>
@@ -617,6 +633,10 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               >
                 <span class="block font-medium">{{ h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }) }}</span>
                 <span class="block text-muted">{{ h.by ? t('forms.screens.responses.by-at', { who: h.by, when: dateTime(h.at) }) : dateTime(h.at) }}</span>
+                <span
+                  v-if="h.note"
+                  class="mt-1 block border-l-2 border-default pl-2 whitespace-pre-line"
+                >{{ t('forms.screens.responses.history-note', { note: h.note }) }}</span>
               </li>
             </ol>
           </section>
@@ -643,6 +663,47 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
           :title="decisionWarning"
           :description="t('forms.screens.review.warn-help')"
         />
+        <section
+          v-for="preview in previews"
+          :key="preview.action"
+          class="mb-4 space-y-2 rounded-md border border-default p-3 text-sm"
+        >
+          <h3 class="font-medium">
+            {{ t('forms.screens.actions.preview', { action: t(preview.label) }) }}
+          </h3>
+          <UAlert
+            v-if="preview.skipped || preview.blocked"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('forms.screens.actions.preview-blocked')"
+            :description="preview.blocked ? phrase(preview.blocked) : t('forms.screens.actions.skipped-slot')"
+          />
+          <template v-else>
+            <dl
+              v-if="preview.lines?.length"
+              class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1"
+            >
+              <template
+                v-for="line in preview.lines"
+                :key="line.label"
+              >
+                <dt class="text-muted">
+                  {{ phrase(line.label) }}
+                </dt>
+                <dd>{{ line.value }}</dd>
+              </template>
+            </dl>
+            <UAlert
+              v-for="warning in preview.warnings ?? []"
+              :key="warning"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              :title="phrase(warning)"
+            />
+          </template>
+        </section>
         <UFormField
           v-if="moving?.decision"
           class="mb-4"

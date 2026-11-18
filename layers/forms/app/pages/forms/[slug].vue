@@ -41,6 +41,9 @@ const at = computed(() => place.value ? `?place=${encodeURIComponent(place.value
 
 const { data, error, refresh } = await useAPI<Open>(() => `/api/forms/open/${encodeURIComponent(slug.value)}${at.value}`, { key: `forms:open:${slug.value}:${place.value}` })
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
+// An address the form used to have: on to where it is now, with whatever else the link carried.
+const movedTo = (data.value as { movedTo?: string }).movedTo
+if (movedTo) await navigateTo(`/forms/${encodeURIComponent(movedTo)}${at.value}`, { redirectCode: 301, external: true }) // not-policy: HTTP status
 const form = computed(() => data.value!)
 provide('forms:answering', slug)
 
