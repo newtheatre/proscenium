@@ -2,7 +2,7 @@
      for a screen's totals, so they look the same everywhere. A chart never replaces one of these: the
      figure stays in text. Extra facts (a module's own, a small chart) go in the default slot. -->
 <script setup lang="ts">
-export interface Fact { label: string, value: string | number, /** The figure the others lead to. */ strong?: boolean }
+export interface Fact { label: string, value: string | number, /** The figure the others lead to. */ strong?: boolean, /** Where the value leads, such as the record it names or a mailto: address. */ to?: string }
 defineProps<{ facts: Fact[], /** A border round the strip, when it stands alone on the page. */ framed?: boolean, /** Centred in a row, for a card. */ centred?: boolean }>()
 </script>
 
@@ -24,7 +24,17 @@ defineProps<{ facts: Fact[], /** A border round the strip, when it stands alone 
         class="tabular-nums text-highlighted"
         :class="fact.strong !== false && 'font-medium'"
       >
-        {{ fact.value }}
+        <ULink
+          v-if="fact.to"
+          :to="fact.to"
+          raw
+          class="text-highlighted underline underline-offset-2"
+        >
+          {{ fact.value }}
+        </ULink>
+        <template v-else>
+          {{ fact.value }}
+        </template>
       </dd>
     </div>
     <slot />

@@ -1,20 +1,23 @@
 <script setup lang="ts">
-// The poster in the production page's side panel (C-23): seen beside every tab, and added, replaced,
-// described and put to use from there without opening the Media tab. Photos and anything removed
-// are on the Media tab.
-import { IMAGE_TYPES, POSTER, REFUSED_IMAGE } from '../composables/useProductionMedia'
+// The poster in the production page's side panel (C-23): seen beside every tab, with where it stands.
+// It is added, described, replaced and put to use in one place, the Media tab, so a new poster is
+// never described in two boxes at once; this card says what is waiting and links there.
+import { POSTER } from '../composables/useProductionMedia'
 
 const props = defineProps<{ productionId: string }>()
 
-const { data, refusal, busy, descriptions, upload: send, use, remove } = await useProductionMedia(props.productionId)
-
-// Emptied after each choice, so choosing again never sends the earlier file twice.
-const picked = ref<File | null>(null)
-function upload(chosen: File | File[] | null | undefined) {
-  picked.value = null
-  return send(POSTER, chosen)
-}
+const { data } = await useProductionMedia(props.productionId)
+const route = useRoute()
 const waiting = computed(() => (data.value?.waiting ?? []).filter(f => f.slot === POSTER))
+// What the card says about a poster not yet in use: being checked, refused, or waiting for its description.
+const status = computed(() => {
+  if (waiting.value.some(f => f.state === 'pending')) return { icon: 'i-lucide-loader-circle', spin: true, text: 'Checking the new poster…' }
+  if (waiting.value.some(f => f.state === 'ready')) return { icon: 'i-lucide-pencil', spin: false, text: 'A new poster is waiting for its description.' }
+  if (waiting.value.some(f => f.state === 'rejected')) return { icon: 'i-lucide-circle-x', spin: false, text: 'The new poster was refused.' }
+  return null
+})
+const media = computed(() => ({ query: { ...route.query, tab: 'media' } }))
+const onMedia = computed(() => route.query.tab === 'media')
 </script>
 
 <template>
@@ -29,128 +32,39 @@ const waiting = computed(() => (data.value?.waiting ?? []).filter(f => f.slot ==
     >
       Poster
     </h2>
-    <RefusalNotice :refusal="refusal" />
-    <figure
+    <img
       v-if="data.poster"
-      class="space-y-2"
+      :src="data.poster.url!"
+      :alt="data.poster.altText ?? ''"
+      class="aspect-[2/3] w-full rounded-md border border-default object-cover"
     >
-      <img
-        :src="data.poster.url!"
-        :alt="data.poster.altText ?? ''"
-        class="aspect-[2/3] w-full rounded-md border border-default object-cover"
-      >
-      <figcaption class="text-xs text-muted">
-        {{ data.poster.altText }}
-      </figcaption>
-    </figure>
-    <div
-      v-if="data.poster"
-      class="flex flex-wrap gap-2"
+    <p
+      v-else-if="!status"
+      class="text-sm text-muted"
     >
-      <UFileUpload
-        v-slot="{ open }"
-        :accept="IMAGE_TYPES"
-        :model-value="picked"
-        :dropzone="false"
-        :interactive="false"
-        :preview="false"
-        @update:model-value="upload"
-      >
-        <UButton
-          label="Replace"
-          icon="i-lucide-upload"
-          color="neutral"
-          variant="outline"
-          size="sm"
-          :disabled="busy !== null"
-          @click="open()"
-        />
-      </UFileUpload>
-      <UButton
-        label="Remove"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        :disabled="busy !== null"
-        @click="remove(data.poster)"
+      No poster yet.
+    </p>
+    <p
+      v-if="status"
+      class="flex items-start gap-2 text-sm"
+      role="status"
+    >
+      <UIcon
+        :name="status.icon"
+        class="mt-0.5 size-4 shrink-0 text-muted"
+        :class="status.spin ? 'animate-spin' : ''"
       />
-    </div>
-    <UFileUpload
-      v-else-if="!waiting.length"
-      :accept="IMAGE_TYPES"
-      label="Add a poster"
-      description="PNG, JPEG or WebP"
-      :model-value="picked"
-      :preview="false"
-      :disabled="busy !== null"
-      class="aspect-[2/3] w-full"
-      @update:model-value="upload"
+      {{ status.text }}
+    </p>
+    <UButton
+      v-if="!onMedia"
+      :label="status ? 'Open the Media tab' : data.poster ? 'Change on the Media tab' : 'Add on the Media tab'"
+      :to="media"
+      replace
+      color="neutral"
+      variant="outline"
+      size="sm"
+      trailing-icon="i-lucide-arrow-right"
     />
-
-    <div
-      v-for="file in waiting"
-      :key="file.id"
-      class="space-y-2 border-t border-default pt-3"
-    >
-      <p
-        v-if="file.state === 'pending'"
-        class="flex items-center gap-2 text-sm text-muted"
-        role="status"
-      >
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="size-4 animate-spin"
-        />
-        Checking the new poster…
-      </p>
-      <template v-else-if="file.state === 'rejected'">
-        <p class="text-sm">
-          {{ REFUSED_IMAGE[file.rejectedReason ?? ''] ?? 'This file was refused.' }}
-        </p>
-        <UButton
-          label="Dismiss"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :disabled="busy !== null"
-          @click="remove(file)"
-        />
-      </template>
-      <template v-else>
-        <img
-          :src="file.url!"
-          alt=""
-          class="aspect-[2/3] w-24 rounded border border-default object-cover"
-        >
-        <UFormField
-          label="Describe the new poster"
-          help="What someone who cannot see it needs to know."
-          required
-        >
-          <UTextarea
-            v-model="descriptions[file.id]"
-            :rows="2"
-            :maxlength="300"
-          />
-        </UFormField>
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            label="Use as the poster"
-            size="sm"
-            :loading="busy === `use:${file.id}`"
-            :disabled="!descriptions[file.id]?.trim() || busy !== null"
-            @click="use(file)"
-          />
-          <UButton
-            label="Discard"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            :disabled="busy !== null"
-            @click="remove(file)"
-          />
-        </div>
-      </template>
-    </div>
   </section>
 </template>

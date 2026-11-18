@@ -1,5 +1,6 @@
 <!-- The editor for core.programme.run-preset: the run preset Add a run starts from in a space with no
-     usual preset of its own. None leaves the setting unset. -->
+     usual preset of its own. None leaves the setting unset. An unset setting arrives as an empty
+     string, which is None too, so the control never shows a blank choice. -->
 <script setup lang="ts">
 defineProps<{ disabled?: boolean }>()
 const model = defineModel<string | null>({ default: null })
@@ -11,7 +12,7 @@ const items = computed(() => [{ value: NONE, label: 'None' }, ...(data.value?.ro
 <template>
   <div class="flex flex-wrap items-center gap-2">
     <USelect
-      :model-value="model ?? NONE"
+      :model-value="model || NONE"
       :items="items"
       :disabled="disabled"
       class="w-72"
