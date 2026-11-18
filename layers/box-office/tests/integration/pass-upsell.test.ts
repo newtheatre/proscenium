@@ -11,6 +11,7 @@ import { scheme as memberScheme, req as membershipReq } from '../../../membershi
 import typesGet from '../../server/api/box-office/pass-types/index.get'
 import typesPost from '../../server/api/box-office/pass-types/index.post'
 import { createBasket, type Basket, type BasketInput } from '../../server/baskets'
+import { exchangeLines } from '../../server/exchange'
 import { passesOnSale } from '../../server/pass-sales'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
 import { listPassTypes } from '../../server/passes'
@@ -164,5 +165,42 @@ describe('passes sent on after checkout', () => {
     const [friend] = await rows<{ id: string }>("SELECT account_id AS id FROM core_account_emails WHERE address = 'friend@example.org'")
     expect(moved!.account_id).toBe(friend!.id)
     expect(second!.buyers).toBe(true)
+  })
+})
+
+describe('a pass entry exchanged', () => {
+  async function exchange(orderId: string, performanceId: string, lineId: string, bandId: string, ticketTypeId: string) {
+    try {
+      return await inContext(async () => {
+        const unit = createUnit()
+        const done = await exchangeLines(unit.view(), orderId, { performanceId, lines: [{ lineId, bandId, ticketTypeId }], by: 'acc_test' })
+        await unit.commit()
+        return { ok: true as const, ...done }
+      })
+    }
+    catch (error: any) {
+      if (error?.name !== 'Refusal') throw error
+      return { ok: false as const, code: error.code as string }
+    }
+  }
+
+  it('moves to another performance of the same show, still the pass\'s entry, and never to another show', async () => {
+    const later = await house(5, { of: a })
+    const type = await passType({ prices: [{ name: 'Adult', amountMinor: 3000 }] })
+    const made = await hold({ performanceId: a.performanceId, lines: [], buy: [{ passTypeId: type.id, passPriceId: type.prices[0]!.id }] })
+    if (!made.ok) throw new Error(made.code)
+    expect(await pay(made)).toMatchObject({ settled: true })
+    const [line] = await rows<{ id: string, band_id: string, ticket_type_id: string }>("SELECT id, band_id, ticket_type_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live'", made.orderId)
+    // Another show is never an exchange, for a pass's entry or a ticket.
+    expect(await exchange(made.orderId, b.performanceId, line!.id, b.bandId, line!.ticket_type_id)).toMatchObject({ ok: false, code: 'box-office.exchange.other-show' })
+    const moved = await exchange(made.orderId, later.performanceId, line!.id, later.bandId, line!.ticket_type_id)
+    expect(moved, JSON.stringify(moved)).toMatchObject({ ok: true, refund: null })
+    const [now] = await rows<{ performance_id: string, amount_minor: number, ticket_type_id: string, pass_redemption_id: string }>("SELECT performance_id, amount_minor, ticket_type_id, pass_redemption_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live'", made.orderId)
+    expect(now).toMatchObject({ performance_id: later.performanceId, amount_minor: 0, ticket_type_id: line!.ticket_type_id })
+    const entries = await rows<{ id: string, performance_id: string, state: string }>('SELECT d.id, d.performance_id, d.state FROM box_office_pass_redemptions d JOIN box_office_passes p ON p.id = d.pass_id JOIN box_office_order_lines l ON l.id = p.order_line_id WHERE l.order_id = ? ORDER BY d.created_at, d.state', made.orderId)
+    expect(entries.map(e => [e.performance_id, e.state]).sort()).toEqual([[a.performanceId, 'released'], [later.performanceId, 'live']].sort())
+    expect(entries.find(e => e.state === 'live')!.id).toBe(now!.pass_redemption_id)
+    const [held] = await rows<{ uses_taken: number }>('SELECT p.uses_taken FROM box_office_passes p JOIN box_office_order_lines l ON l.id = p.order_line_id WHERE l.order_id = ?', made.orderId)
+    expect(held!.uses_taken).toBe(1)
   })
 })

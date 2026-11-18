@@ -83,7 +83,7 @@ const payCash = (intentId: string) => inContext(() => attest({ intentId, provide
 describe('exchanging tickets', () => {
   it('moves tickets to another performance at the same price: seats, codes and deferred money all move', async () => {
     const from = await house(5)
-    const to = await house(5)
+    const to = await house(5, { of: from })
     const o = await paid(from, 2)
     const target = each(o.lines, to.performanceId, to.bandId, to.fullId)
     expect((await exchange(o.orderId, { ...target, preview: true }, exchanger)).body).toMatchObject({ oldMinor: 2400, newMinor: 2400, differenceMinor: 0 })
@@ -173,7 +173,7 @@ describe('exchanging tickets', () => {
 
   it('keeps each ticket\'s own type, so a mixed booking moves as it is and only the changed line costs more', async () => {
     const from = await house(5)
-    const to = await house(5)
+    const to = await house(5, { of: from })
     const o = await paid(from, 2)
     // One full price and one concession, moved together to another performance.
     const mixed = { performanceId: to.performanceId, lines: [{ lineId: o.lines[0]!, bandId: to.bandId, ticketTypeId: to.fullId }, { lineId: o.lines[1]!, bandId: to.bandId, ticketTypeId: to.concessionId }] }
@@ -223,7 +223,7 @@ describe('exchanging tickets', () => {
 
   it('leaves the buyer with what they had when the new performance has just filled', async () => {
     const from = await house(5)
-    const full = await house(1)
+    const full = await house(1, { of: from })
     const o = await paid(from, 1)
     await paid(full, 1)
     const refused = await exchange(o.orderId, each(o.lines, full.performanceId, full.bandId, full.fullId))

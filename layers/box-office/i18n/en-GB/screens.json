@@ -373,6 +373,7 @@
   "box-office.order.exchange.seats": "New seats and ticket type for each ticket",
   "box-office.order.exchange.choose": "Choose seats and ticket type",
   "box-office.order.exchange.option": "{band}, {type}, {price}, {free} left",
+  "box-office.order.exchange.pass-option": "{band}, with the pass, {free} left",
   "box-office.order.exchange.line": "Ticket {number}, {band}, {type}, {price}",
   "box-office.order.exchange.this-performance": "This performance, {when}",
   "box-office.order.exchange.performance-option": "{title}, {when}",

@@ -15,6 +15,7 @@ import { claimSeats, releaseHold } from './capacity'
 import { hashOf, randomToken } from './codes'
 import { cancellations, orderLines } from './db/schema'
 import { siteUrl } from './links'
+import { movePassEntries } from './pass-entries'
 import { liveLines, ORDER, wordsFor, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
 import { refundOrder, type OrderRefund } from './refunds'
@@ -66,9 +67,7 @@ async function check(orderId: string, input: ExchangeTarget, options: { heldPric
   const wanted = new Map(input.lines.map(l => [l.lineId, l]))
   const chosen = lines.filter(l => wanted.has(l.id))
   if (!chosen.length || chosen.length !== wanted.size || wanted.size !== input.lines.length) refuse(CHANGED.code, 'Those tickets are not on this booking any more.', { status: 409, remedy: CHANGED.remedy })
-  if (chosen.some(l => l.pass_entry))
-    refuse('box-office.exchange.pass-entry', 'A ticket booked with a pass is not exchanged.', { status: 422, remedy: 'Cancel it, then book the other date with the pass.' })
-  if (chosen.some(l => l.type_kind === 'companion' || l.type_kind === 'complimentary'))
+  if (chosen.some(l => !l.pass_entry && (l.type_kind === 'companion' || l.type_kind === 'complimentary')))
     refuse('box-office.exchange.not-this-kind', 'Companion and complimentary tickets are not exchanged.', { status: 422, remedy: 'Cancel them and issue new ones.' })
   const at = nowMs()
   for (const performanceId of new Set(chosen.map(l => l.performance_id))) {
@@ -82,6 +81,11 @@ async function check(orderId: string, input: ExchangeTarget, options: { heldPric
 
   const target = await getPerformance(input.performanceId)
   if (target.state !== 'scheduled' || target.startsAt <= at) refuse('box-office.exchange.target-closed', 'That performance cannot take bookings.', { status: 409 })
+  // Only between performances of the same show, for tickets and pass entries alike (Matt, 18 November).
+  for (const performanceId of new Set(chosen.map(l => l.performance_id))) {
+    if ((await getPerformance(performanceId)).productionId !== target.productionId)
+      refuse('box-office.exchange.other-show', 'Tickets are exchanged only for another performance of the same show.', { status: 422, remedy: 'Cancel them and book the other show.' })
+  }
   const pools = await poolsOf(input.performanceId)
   // Seats held for a payment were priced when they were held; the prices are the exchange's own then.
   const prices = options.heldPrices ? null : await pricesFor(input.performanceId, at)
@@ -89,6 +93,8 @@ async function check(orderId: string, input: ExchangeTarget, options: { heldPric
     const { bandId, ticketTypeId } = wanted.get(line.id)!
     const pool = pools.find(p => p.bandId === bandId)
     if (!pool) refuse('box-office.exchange.bad-band', 'Those seats are not sold for that performance.', { status: 422, fields: { bandId: 'invalid' } })
+    // A pass's entry stays one: it moves to its new seat at no charge, and its ticket type is kept.
+    if (line.pass_entry) return { line, bandId, ticketTypeId: line.ticket_type_id, poolId: pool.id, priceId: null, priceMinor: 0 }
     if (!prices) return { line, bandId, ticketTypeId, poolId: pool.id, priceId: options.heldPrices!.get(line.id)?.priceId ?? null, priceMinor: options.heldPrices!.get(line.id)?.priceMinor ?? 0 }
     const price = prices.find(p => p.bandId === bandId && p.ticketTypeId === ticketTypeId)
     if (!price) refuse('box-office.exchange.no-price', 'That ticket type has no price for those seats.', { status: 422, fields: { ticketTypeId: 'invalid' } })
@@ -155,13 +161,15 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
     WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(chosen.length, CHANGED)
   unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = 'exchanged'
     WHERE state = 'confirmed' AND id IN (SELECT claim_id FROM box_office_order_lines WHERE order_id = ${order.id} AND id IN (SELECT value FROM json_each(${ids})))`).expect(chosen.length, CHANGED)
+  // The old seats' release has given their pass entries back; each takes its entry again for its new seat.
+  const passEntries = await movePassEntries(unit, order.id, chosen.filter(l => l.pass_entry).map(l => ({ lineId: l.id, claimId: claimed[chosen.indexOf(l)]! })), input.performanceId, (await getPerformance(input.performanceId)).productionId)
   if (paid) {
     unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = 'exchanged', updated_at = ${at}
       WHERE state = 'valid' AND admitted_at IS NULL AND order_line_id IN (SELECT value FROM json_each(${ids}))`).expect(chosen.length, CHANGED)
   }
   const newIds = unit.insertSet(orderLines, moves.map((m, i) => ({
     orderId: order.id, kind: 'ticket', performanceId: input.performanceId, bandId: m.bandId, ticketTypeId: m.ticketTypeId, claimId: claimed[i],
-    priceId: m.priceId, listMinor: m.priceMinor, discountMinor: 0, amountMinor: m.priceMinor, replacesLineId: m.line.id, state: 'live',
+    priceId: m.priceId, listMinor: m.priceMinor, discountMinor: 0, amountMinor: m.priceMinor, passRedemptionId: passEntries.get(m.line.id) ?? null, replacesLineId: m.line.id, state: 'live',
   })))
   unit.expect(chosen.length)
   // The message carries a new link to the booking, where the new tickets are; it replaces the old one.
