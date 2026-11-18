@@ -2,11 +2,13 @@
 // with logic, versions and, where a form wants one, a workflow. Always on, as the specification
 // decides. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { STAGE_KINDS } from './shared/engine/types'
 import { tables } from './server/db/schema'
 
 const change = 'forms.settings.manage'
+const text = 'text' as const
+const notice = { category: 'transactional' as const, side: 'audience' as const, channels: ['email' as const, 'inbox' as const] }
 
 export default defineModule({
   id: 'forms',
@@ -84,6 +86,11 @@ export default defineModule({
     'forms.run-action': job({ payload: z.object({ runId: z.string() }) }),
   },
 
+  tasks: {
+    // Anonymises responses once the period their form keeps them for is up.
+    'forms.sweep-retention': task({ dailyAt: '04:50' }),
+  },
+
   events: {
     announces: {
       // Ids only: what was answered stays inside, and a listener reads it through forms.
@@ -106,6 +113,33 @@ export default defineModule({
       { id: 'forms.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'FormsMine', order: 45, to: '/account/forms', icon: 'i-lucide-file-text', count: 'forms.mine', hideEmpty: true },
     ],
     'core.count': [{ id: 'forms.mine', file: 'mine' }],
+    // What forms tells people. Nothing anybody wrote is in a message: it says what happened and where to read the rest.
+    'core.notification-type': [
+      {
+        id: 'forms.received', ...notice, variables: { form: text, reference: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'We have your response: {{ form }}', body: '{{ theatre }} has received your response to **{{ form }}**. Your reference is {{ reference }}.\n\n[See what you sent]({{ link }})' } },
+      },
+      {
+        id: 'forms.received-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text },
+        wording: { 'en-GB': { subject: 'We have your response: {{ form }}', body: '{{ theatre }} has received your response to **{{ form }}**. Your reference is {{ reference }}. Quote it if you get in touch about your response.' } },
+      },
+      {
+        id: 'forms.returned', ...notice, variables: { form: text, reference: text, status: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'Changes needed: {{ form }}', body: '{{ theatre }} has sent your response to **{{ form }}** ({{ reference }}) back to you for changes.\n\n[See what is asked and make your changes]({{ link }})' } },
+      },
+      {
+        id: 'forms.status', ...notice, variables: { form: text, reference: text, status: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: '{{ status }}: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is now: **{{ status }}**.\n\n[See your response]({{ link }})' } },
+      },
+      {
+        id: 'forms.status-guest', ...notice, channels: ['email' as const], variables: { form: text, reference: text, status: text },
+        wording: { 'en-GB': { subject: '{{ status }}: {{ form }}', body: 'Your response to **{{ form }}** ({{ reference }}) is now: **{{ status }}**.\n\nIf you have a question about it, reply to {{ theatre }} and quote your reference.' } },
+      },
+      {
+        id: 'forms.review-requested', ...notice, variables: { form: text, link: text }, link: '/account/forms',
+        wording: { 'en-GB': { subject: 'A response to review: {{ form }}', body: 'You have been asked to review a response to **{{ form }}**.\n\n[Open it and give your review]({{ link }})' } },
+      },
+    ],
     'core.navigation': [
       { id: 'forms.forms', menu: 'console', group: 'forms', section: 'everyday', to: '/console/forms', match: '/console/forms', icon: 'i-lucide-file-text', ability: ['forms.form.create', 'forms.form.edit', 'forms.response.read'], order: 1 },
       // What a person has started or sent, in their account; shown once they have one.

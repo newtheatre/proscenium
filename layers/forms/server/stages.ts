@@ -9,6 +9,7 @@ import { evaluate, hasStages, isDecision, resubmitMove, staffMoves, stageOf, sta
 import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
 import { queueActions } from './actions'
+import { tellMoved } from './notices'
 import { closeRounds, conflicted, openRound } from './review'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
@@ -42,10 +43,12 @@ async function apply(unit: UnitView, input: { form: FormRow, response: ResponseR
   }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
   recordMove(unit, { responseId: input.response.id, from: input.response.stageKey, to, transitionKey: input.move.key, revision: input.revision, actorId: input.actorId, at: input.at })
   if (stageOf(input.def, input.response.stageKey)?.review) closeRounds(unit, input.response.id, input.at)
-  await openRound(unit, { def: input.def, stage: to, formId: input.form.id, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at, answers: input.answers })
+  await openRound(unit, { def: input.def, stage: to, formId: input.form.id, title: input.form.title, responseId: input.response.id, personId: input.response.personId, revision: input.revision, at: input.at, answers: input.answers })
   unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key, ...(decision ? { decision: to.kind } : {}) } })
   unit.announce('forms.response.moved', { responseId: input.response.id, formId: input.form.id, kind: to.kind, revision: input.revision }, { record: ['forms.response', input.response.id] })
   if (to.kind === 'approved' || to.kind === 'declined') unit.announce('forms.response.decided', { responseId: input.response.id, formId: input.form.id, outcome: to.kind }, { record: ['forms.response', input.response.id] })
+  // The person is told of a move staff made; their own they already know of.
+  if (input.move.who === 'staff') await tellMoved(unit, input.form, input.response, { from: stageOf(input.def, input.response.stageKey), to, key: input.move.key, at: input.at })
   // What other modules do about this move is asked for with it, and runs once it has committed.
   queueActions(unit, { response: input.response, move: input.move, revision: input.revision, actorId: input.actorId, at: input.at })
   return to
