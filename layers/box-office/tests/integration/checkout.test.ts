@@ -150,6 +150,10 @@ describe('paying online', () => {
     const told = await mail('box-office.order-confirmed', b.orderId)
     expect(told).toMatchObject({ reference: b.reference, tickets: '3 × Full price' })
     expect(told.paid).toContain('36.00')
+    // Where to go, when the doors open and what to ask about access (EM-7).
+    expect(told.where).toBeTruthy()
+    expect(told.doors).toMatch(/\d/)
+    expect(told.access).toBeTruthy()
     const codes = told.codes!.split('\n\n')
     expect(codes).toHaveLength(3)
     const everything = JSON.stringify(await rows('SELECT * FROM box_office_tickets')) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))

@@ -18,7 +18,7 @@ import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
-import { liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
+import { liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
@@ -160,7 +160,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
   await notify(unit, 'box-office.order-reserved', {
     to: accountId,
-    variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) },
+    variables: { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.tickets, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) },
     subject: ['box-office.order', order.id],
     dedupeKey: order.id,
   })

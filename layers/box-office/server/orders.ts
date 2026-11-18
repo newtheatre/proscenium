@@ -1,7 +1,7 @@
 // What the order services share: the order and its live ticket lines as they are read, and the
 // words a message uses for them.
 import { all, theatreTimeZone, useSetting } from '#kit'
-import { getPerformance, getProduction } from '#modules/core'
+import { getPerformance, getProduction, getVenue } from '#modules/core'
 
 export interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, intent_id: string | null, confirm_email: string | null, confirm_name: string | null, admit_on_payment: number, sold_by: string | null }
 /** band_name is null when the production has one band, so there is no part of the house to name. */
@@ -36,5 +36,26 @@ export async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow
     amount: new Intl.NumberFormat(locale, { style: 'currency', currency: order.currency }).format(amountMinor / 100), // not-policy: minor units to units; every currency sold here has two decimals
     timeOf: (at: number) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(at),
     startsAt: performance.startsAt,
+  }
+}
+
+/**
+ * What a booking confirmation says about coming to the performance: where it is, with the address,
+ * when the doors open, and the venue's and space's access information (or where to ask about it).
+ */
+export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors: string, access: string }> {
+  const performance = await getPerformance(lines[0]!.performance_id)
+  const venue = await getVenue(performance.venueId)
+  const space = venue.spaces.find(s => s.id === performance.spaceId)
+  const locale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
+  const timeZone = await theatreTimeZone()
+  const same = performance.spaceName.trim().localeCompare(venue.name.trim(), undefined, { sensitivity: 'accent' }) === 0
+  const address = [venue.addressLines?.replace(/\s*\n\s*/g, ', '), venue.locality, venue.postcode].filter(Boolean).join(', ')
+  const place = same ? venue.name : `${performance.spaceName}, ${venue.name}`
+  const notes = [venue.accessInfo, space?.accessInfo].map(n => n?.trim()).filter(Boolean)
+  return {
+    where: address ? `${place}, ${address}` : place,
+    doors: new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(performance.doorsAt ?? performance.startsAt),
+    access: notes.length ? `Access: ${notes.join(' ')}` : 'If anything would make your visit easier, tell the box office before you come.',
   }
 }
