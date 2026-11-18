@@ -51,18 +51,20 @@ const props = withDefaults(defineProps<{
 }>(), { trail: undefined, subRows: undefined, subRowsNoun: undefined, subRowsTotal: undefined, subRowsAllTo: undefined, subRowLabel: undefined, subRowTo: undefined, list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
 
 defineSlots<{
-  primary?: () => unknown
+  'primary'?: () => unknown
   /** Above the rows: something the page shows first, such as Sessions' "Your session" card. */
-  before?: () => unknown
+  'before'?: () => unknown
   /** After the list: a panel or dialog the page opens from it. */
-  default?: () => unknown
+  'default'?: () => unknown
   [cell: `cell-${string}`]: (props: { row: Row }) => unknown
   /** A column's cell on a child row. A column the child has nothing for stays empty. */
   [subcell: `subcell-${string}`]: (props: { row: Row, parent: Row }) => unknown
+  /** A line under the title of a row's card on a phone, for what the desk needs at a glance (a status and a date). */
+  'card-description'?: (props: { row: Row }) => unknown
   /** A free panel under a row, for a few facts that do not merit a page. */
-  expanded?: (props: { row: Row }) => unknown
+  'expanded'?: (props: { row: Row }) => unknown
   /** A line about the answer, such as "4 not yet signed in are not shown", from any extra field the route sends beside the rows. */
-  note?: (props: { result: ListResult<Row> & Record<string, unknown> }) => unknown
+  'note'?: (props: { result: ListResult<Row> & Record<string, unknown> }) => unknown
 }>()
 const slots = useSlots()
 
@@ -301,16 +303,22 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
     </template>
 
     <!-- Built-in views, when the list declares any: tabs kept in the address as view=. -->
-    <UTabs
+    <!-- Scrolls sideways on a phone rather than cutting each tab's name short. -->
+    <div
       v-if="viewItems.length"
-      :model-value="state.view"
-      :items="viewItems"
-      :content="false"
-      color="neutral"
-      variant="link"
-      :aria-label="t('core.list.views', { title })"
-      @update:model-value="pickView(String($event))"
-    />
+      class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+    >
+      <UTabs
+        :model-value="state.view"
+        :items="viewItems"
+        :content="false"
+        color="neutral"
+        variant="link"
+        :ui="{ list: 'w-max min-w-full', trigger: 'shrink-0 grow-0 whitespace-nowrap' }"
+        :aria-label="t('core.list.views', { title })"
+        @update:model-value="pickView(String($event))"
+      />
+    </div>
 
     <div
       v-if="chips.length"
@@ -618,13 +626,25 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                     size="md"
                   />
                 </div>
+                <div
+                  v-if="slots['card-description']"
+                  class="mt-1 text-sm text-muted"
+                >
+                  <slot
+                    name="card-description"
+                    :row="row"
+                  />
+                </div>
                 <p
                   v-if="matchLine(row)"
                   class="mt-1 text-xs text-muted"
                 >
                   {{ matchLine(row) }}
                 </p>
-                <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                <dl
+                  v-if="cardColumns.length"
+                  class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                >
                   <template
                     v-for="c in cardColumns"
                     :key="c.key"

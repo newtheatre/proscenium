@@ -26,6 +26,7 @@ export async function allergenChart(): Promise<Chart | null> {
   if (!settings.enabled || !settings.publish) return null
   const out: Chart['outlets'] = []
   let complete = true
+  const links = await stockLinks()
   const lists = new Set((await priceLists()).filter(l => l.active).map(l => l.id))
   // An outlet whose price list has been retired sells nothing, so it has no chart.
   for (const outlet of (await outlets()).filter(o => o.active && lists.has(o.priceListId))) {
@@ -36,15 +37,18 @@ export async function allergenChart(): Promise<Chart | null> {
       rows: c.items.map((i): ChartRow => {
         const allergens = i.allergens ?? { contains: [], mayContain: [], checked: false, dependsOnChoice: false }
         if (!allergens.checked) complete = false
+        const choices = i.groupIds.flatMap((id) => {
+          const g = groups.get(id)
+          return g ? [{ group: g.name, options: g.options.map(o => ({ label: o.label, allergens: (o as { allergens?: ChartAnswer }).allergens ?? { contains: [], mayContain: [], checked: false } })) }] : []
+        })
+        // A size made from nothing but choices is only as checked as the options it offers.
+        if (links.choiceOnly.has(i.variantId) && choices.some(c => c.options.some(o => !o.allergens.checked))) complete = false
         return {
           variantId: i.variantId,
           product: i.product,
           size: i.variant,
           allergens,
-          choices: i.groupIds.flatMap((id) => {
-            const g = groups.get(id)
-            return g ? [{ group: g.name, options: g.options.map(o => ({ label: o.label, allergens: (o as { allergens?: ChartAnswer }).allergens ?? { contains: [], mayContain: [], checked: false } })) }] : []
-          }),
+          choices,
         }
       }),
     })).filter(c => c.rows.length)
