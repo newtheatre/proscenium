@@ -64,10 +64,13 @@ function setRequired(mode: string) {
 }
 
 // ---- checks on the answer ----
-const RULES_OFFERED: RuleName[] = ['minLength', 'maxLength', 'min', 'max', 'whole', 'minDate', 'maxDate', 'minChosen', 'maxChosen', 'pattern', 'maxFiles']
+const RULES_OFFERED: RuleName[] = ['minLength', 'maxLength', 'min', 'max', 'whole', 'minDate', 'maxDate', 'minChosen', 'maxChosen', 'pattern', 'fileTypes', 'maxFileSize', 'maxFiles']
 const rules = computed(() => question.value?.validation ?? [])
 const rulesLeft = computed(() => RULES_OFFERED.filter(r => question.value && RULES_FOR[r].includes(question.value.type) && !rules.value.some(x => x.rule === r)).map(r => ({ label: t(`forms.rules.${r}`), onSelect: () => addRule(r) })))
-const starting = (rule: RuleName): Rule['value'] => rule === 'whole' ? undefined : rule === 'pattern' ? 'letters' : rule === 'minDate' || rule === 'maxDate' ? { today: 0 } : 1
+const MEGABYTE = 1024 * 1024 // not-policy: unit of size; a file's largest size is kept in bytes and set in megabytes
+// The kinds of file the platform can check: documents and images, each a rule value the engine reads.
+const FILE_KINDS = computed(() => [{ value: '.pdf', label: t('forms.screens.details.file-pdf') }, { value: 'image/*', label: t('forms.screens.details.file-images') }])
+const starting = (rule: RuleName): Rule['value'] => rule === 'whole' ? undefined : rule === 'pattern' ? 'letters' : rule === 'minDate' || rule === 'maxDate' ? { today: 0 } : rule === 'fileTypes' ? ['.pdf', 'image/*'] : rule === 'maxFileSize' ? 5 * MEGABYTE : 1 // not-policy: a starting size an author changes
 function addRule(rule: RuleName) {
   const value = starting(rule)
   setQ('validation', [...rules.value, value === undefined ? { rule } : { rule, value }])
@@ -271,8 +274,34 @@ const text = (v: unknown) => String(v ?? '')
       >
         <div class="flex items-center gap-2">
           <span class="min-w-0 flex-1 text-sm font-medium">{{ t(`forms.rules.${rule.rule}`) }}</span>
+          <UCheckboxGroup
+            v-if="rule.rule === 'fileTypes'"
+            orientation="horizontal"
+            size="sm"
+            :model-value="Array.isArray(rule.value) ? rule.value as string[] : []"
+            :items="FILE_KINDS"
+            :aria-label="t('forms.rules.fileTypes')"
+            @update:model-value="setRule(i, { value: $event as string[] })"
+          />
+          <UFieldGroup
+            v-else-if="rule.rule === 'maxFileSize'"
+            size="sm"
+          >
+            <UInputNumber
+              class="w-24"
+              :min="1"
+              :model-value="Math.max(1, Math.round((rule.value as number) / MEGABYTE))"
+              :aria-label="t('forms.rules.maxFileSize')"
+              @update:model-value="setRule(i, { value: ($event ?? 1) * MEGABYTE }, `rule:${rule.rule}`)"
+            />
+            <UBadge
+              color="neutral"
+              variant="outline"
+              :label="t('forms.screens.details.megabytes')"
+            />
+          </UFieldGroup>
           <UInputNumber
-            v-if="typeof rule.value === 'number'"
+            v-else-if="typeof rule.value === 'number'"
             class="w-28"
             size="sm"
             :model-value="rule.value"

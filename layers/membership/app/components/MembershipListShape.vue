@@ -16,6 +16,7 @@ const { t } = useT()
     <UFormField
       :label="t('membership.screens.list.label')"
       :help="t('membership.screens.list.label-help')"
+      name="referenceLabel"
       :error="labelError"
       required
     >

@@ -1,4 +1,4 @@
-// Creates an empty list. A reference list needs the whole phrase its checkout field shows (V13).
+// Creates an empty list (its upload time is 0 until a file is loaded). A reference list needs the whole phrase its checkout field shows (V13).
 import { defineRoute, newId, nowMs, refuse } from '#kit'
 import { listInput } from '../../../list-input'
 
@@ -12,7 +12,7 @@ export default defineRoute({ ability: 'membership.verification-list.manage', rat
   unit.add({
     sql: `INSERT INTO membership_verification_lists (id, name, key_kind, entry_count, valid_until, uploaded_by, uploaded_at, reference_label, reference_noun, reference_shape, created_at)
           VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [id, input.name, input.keyKind, input.validUntil ?? null, actor.accountId, at, input.keyKind === 'reference' ? input.referenceLabel : null, input.keyKind === 'reference' ? input.referenceNoun : null, input.referenceShape ? JSON.stringify(input.referenceShape) : null, at],
+    params: [id, input.name, input.keyKind, input.validUntil ?? null, actor.accountId, 0, input.keyKind === 'reference' ? input.referenceLabel : null, input.keyKind === 'reference' ? input.referenceNoun : null, input.referenceShape ? JSON.stringify(input.referenceShape) : null, at],
   }).expect(1)
   unit.audit({ action: 'create', record: ['membership.verification-list', id] })
   return { listId: id }

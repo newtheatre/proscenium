@@ -10,7 +10,7 @@ import { collect, methodsFor, refreshIntent, startAttempt, type StartResult } fr
 import { basketByToken, type BasketView } from './baskets'
 import { hashOf } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
-import { liveLines, ORDER, RAN_OUT, type OrderRow } from './orders'
+import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, type OrderRow } from './orders'
 import { timingFor } from './reservations'
 
 export interface CheckoutInput {
@@ -22,6 +22,8 @@ export interface CheckoutInput {
   /** Needed when nobody is signed in. */
   email?: string | null
   name?: string | null
+  /** That everyone using the tickets is old enough, for a production only for people over an age. */
+  ageConfirmed?: boolean
 }
 
 export interface AwaitingPayment {
@@ -46,6 +48,7 @@ export async function startCheckout(unit: UnitView, input: CheckoutInput): Promi
   if (order.state !== 'basket' || order.expires_at === null || order.expires_at <= at) refuse(RAN_OUT.code, RAN_OUT.reason, { status: 409, remedy: RAN_OUT.remedy })
   const lines = await liveLines(order.id)
   if (!lines.length) refuse(RAN_OUT.code, RAN_OUT.reason, { status: 409, remedy: RAN_OUT.remedy })
+  await assertAgeConfirmed(lines, input.ageConfirmed)
   if (order.total_minor !== input.expectedTotalMinor) {
     const money = (minor: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: order.currency }).format(minor / 100) // not-policy: minor units to units
     refuse('box-office.order.total-changed', `The total is now ${money(order.total_minor)}, not ${money(input.expectedTotalMinor)}.`, { status: 409, remedy: 'Check the basket and try again.' })
