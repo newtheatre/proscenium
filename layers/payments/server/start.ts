@@ -10,7 +10,8 @@ import { getIntent, intentStatus, type IntentStatus } from './intents'
 import { reconcileAttempt } from './tasks/reconcile-attempts'
 import { forProvider, providerAccount, providers } from './providers'
 import type { Method, NextStep, ProviderAnswer } from './points/provider'
-import { amountFor, claimSplit } from './splits'
+import { amountFor, claimSplit, setReceipt } from './splits'
+import type { Destination } from './points/settlement'
 
 export interface StartInput {
   method: Method
@@ -20,8 +21,8 @@ export interface StartInput {
   amountMinor?: number
   /** For a till sale split between people: which person is paying (1, 2, …). */
   split?: number
-  /** Where that person's receipt goes once their payment succeeds. */
-  receiptTo?: string
+  /** Where that person's receipt goes once the sale is paid. */
+  receipt?: Destination
   /** The site's address, from the request, so a provider can be told where to send its webhook. */
   origin?: string
   /** The screen that started the payment, for a provider that sends the person back (RETURN_PATH). */
@@ -114,7 +115,7 @@ export async function startAttempt(intentId: string, input: StartInput): Promise
     throw new Refusal('payments.attempt.in-flight', 'Another payment for this is still waiting for its answer.', { status: 409 })
   }
   const remaining = intent.amount_minor - attempts.filter(a => a.state === 'succeeded').reduce((s, a) => s + a.amount_minor, 0)
-  const { amountMinor: amount, split } = await amountFor(intent, remaining, input)
+  const { amountMinor: amount, split, whole } = await amountFor(intent, remaining, input)
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remaining) throw new Refusal('payments.attempt.bad-amount', `The amount must be above nothing and no more than the ${remaining} still to pay.`, { status: 422 })
   if (amount < remaining && intent.channel !== 'desk') throw new Refusal('payments.attempt.split-desk-only', 'Only the desk takes a payment in parts.', { status: 422 })
 
@@ -122,7 +123,8 @@ export async function startAttempt(intentId: string, input: StartInput): Promise
   // payment on a reader still waiting for one.
   const unit = createUnit()
   const added = addAttempt(unit.view(), { intentId: intent.id, providerAccountId: account.id, method: input.method, amountMinor: amount, readerId: input.readerId ?? null })
-  if (split) claimSplit(unit.view(), split, added.id, input.receiptTo)
+  if (split) claimSplit(unit.view(), split, added.id, input.receipt)
+  if (whole && input.receipt) setReceipt(unit.view(), whole, input.receipt)
   await unit.commit()
   return call(added, input.origin, false, input.returnTo && RETURN_PATH.test(input.returnTo) ? input.returnTo : undefined)
 }

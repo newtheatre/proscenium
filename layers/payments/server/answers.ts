@@ -10,7 +10,7 @@ import { clearingFor } from './providers'
 import { refundInFull } from './refunds'
 import { isTestMoney } from './test-money'
 import type { Method, ProviderAnswer } from './points/provider'
-import { sendSplitReceipt, splitsForPart, splitsOf } from './splits'
+import { paidByOf, rowsOf, sendReceipts, splitsForPart } from './splits'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
 export interface AttemptRow { id: string, intent_id: string, provider_account_id: string, method: Method, amount_minor: number, state: AttemptState, idempotency_key: string, provider_ref: string | null, reader_id: string | null, started_at: number, refunded_minor: number }
@@ -97,7 +97,8 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
   if (test && parts.some(p => p.owner_module !== 'payments')) throw new SettlementRefused('payments', new Refusal('payments.attempt.test-mode', 'A test payment cannot pay for a real sale.', { status: 409 }))
   const handlers = await settlements()
   const owned: EntryInput[] = []
-  const split = intent.channel === 'desk' ? await splitsOf(intent.id) : []
+  const rows = intent.channel === 'desk' ? await rowsOf(intent.id) : []
+  const split = rows.filter(r => r.position > 0)
   for (const part of parts) {
     const handler = handlers.get(part.owner_module)
     if (!handler) throw new SettlementRefused(part.owner_module, new Error('the module that owns this part is not switched on'))
@@ -114,6 +115,8 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
     if (total !== -part.amount_minor) throw new SettlementRefused(part.owner_module, new Refusal('payments.settlement.part-mismatch', `${part.owner_module}'s ledger entries for its part total ${-total}, not the part's ${part.amount_minor}.`, { status: 500 }))
     for (const e of entries) owned.push({ account: e.account, amountMinor: e.amountMinor, forModule: part.owner_module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null })
   }
+  // Each receipt asked for at the till goes now the sale is whole, with any owner's link on it.
+  if (rows.length && !test) await sendReceipts(unit, intent, parts, rows, handlers, await paidByOf(intent.id, rows, attempt))
   if (!test) {
     try {
       await postEntries(unit, {
@@ -151,8 +154,6 @@ export async function applyAnswer(unit: UnitView, attempt: AttemptRow, answer: A
     await holdAndRefund(unit, intent, await partsOf(intent.id), [{ ...attempt, state: 'succeeded' }])
     return { changed: true, settled: false }
   }
-  // One person's share of a split sale is paid: their receipt goes now, whether or not the sale is whole.
-  if (intent.channel === 'desk' && intent.state === 'open') await sendSplitReceipt(unit, attempt, intent.currency)
   const paid = (await moneyLines(intent.id)).reduce((sum, l) => sum + l.amountMinor, 0) + attempt.amount_minor
   if (intent.state !== 'open' || paid !== intent.amount_minor) return { changed: true, settled: false }
   await settle(unit, intent, await partsOf(intent.id), attempt)

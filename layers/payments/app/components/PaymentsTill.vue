@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import type { YourSession } from '../../shared/sessions'
+import type { ReceiptTo } from './PaymentsReceiptTo.vue'
 
 /** One line a panel hands the receipt; `more` and `fewer` draw a stepper on it. */
 interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more?: () => void, fewer?: () => void }
@@ -285,7 +286,7 @@ async function takePayment() {
     if (!open.value && !await ensureSession()) return
     // A split sale says who pays for which items; the server works out each person's amount.
     const splits = splitting.value ? plan.value.map(p => ({ items: p.items.map(i => ({ basket: i.basket, line: i.line, quantity: i.quantity })) })) : undefined
-    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value, splits }, headers: { 'idempotency-key': saleKey.value } })
+    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value, splits, receipt: splits ? undefined : destination(receiptTo.value[0]) }, headers: { 'idempotency-key': saleKey.value } })
     let made: Awaited<ReturnType<typeof sell>>
     try {
       made = await sell()
@@ -344,7 +345,7 @@ function startSplit(on: boolean) {
   splitting.value = on
   people.value = 2
   owners.value = units.value.map((_, i) => (i % 2) + 1)
-  receiptTo.value = {}
+  receiptTo.value = on ? { 1: receiptTo.value[0] } : { 0: receiptTo.value[1] }
 }
 // When the receipt changes while splitting, a new item goes to the first person.
 watch(() => units.value.map(u => `${u.basket} ${u.line}`).join('|'), (now, before) => {
@@ -386,12 +387,10 @@ const persons = computed<Share[]>(() => payment.value?.splits?.length
   ? payment.value.splits
   : splitting.value ? plan.value.map(p => ({ position: p.position, amountMinor: p.amountMinor, items: p.items.map(i => ({ label: i.label, quantity: i.quantity, amountMinor: i.amountMinor })), paid: false })) : [])
 const isSplit = computed(() => persons.value.length > 0)
-// Where each person's receipt goes; kept on the screen only, never on the device.
-const receiptTo = ref<Record<number, string>>({})
-const receiptBad = (position: number) => {
-  const value = receiptTo.value[position]?.trim()
-  return !!value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-}
+// Who each receipt goes to: 0 for a whole sale, or each person of a split one. Kept on the screen
+// only, never on the device. The receipt carries any tickets too, so there is no other email box.
+const receiptTo = ref<Record<number, ReceiptTo | undefined>>({})
+const destination = (to: ReceiptTo | undefined) => (!to ? undefined : 'accountId' in to ? { accountId: to.accountId } : { email: to.email })
 // The person whose payment is being taken now.
 const paying = ref<number | null>(null)
 const payingFor = computed(() => persons.value.find(p => p.position === paying.value) ?? null)
@@ -410,7 +409,6 @@ async function payWith(m: Offer) {
 }
 /** One person pays their share this way; the first press makes the sale with the plan. */
 async function payPerson(position: number, m: Offer) {
-  if (receiptBad(position)) return
   paying.value = position
   if (!sale.value) await takePayment()
   if (!sale.value) {
@@ -437,7 +435,9 @@ const otherNote = ref('')
 const readerId = ref<string | undefined>(undefined)
 // What this payment takes: the paying person's share in a split sale, otherwise all that is due.
 const taken = computed(() => payingFor.value?.amountMinor ?? due.value)
-const splitOf = () => (isSplit.value && paying.value !== null ? { split: paying.value, receiptTo: receiptTo.value[paying.value]?.trim() || undefined } : {})
+const splitOf = () => (isSplit.value && paying.value !== null
+  ? { split: paying.value, receipt: destination(receiptTo.value[paying.value]) }
+  : { receipt: destination(receiptTo.value[0]) })
 watch(splitting, () => keep())
 watch(chosen, (m) => {
   tendered.value = undefined
@@ -669,18 +669,39 @@ function done() {
   const paid = sale.value!
   const change = changeMinor.value
   const sold = filled.value.map(f => f.basket)
+  const split = isSplit.value
+  const receiptSent = !split && !!receiptTo.value[0]
   reset()
   afterSale()
   for (const p of panels.value) inputs[p.id] = null
   // The sale stays on the receipt, and each panel that sold something shows what it made, until the
   // seller moves on to the next customer (till proposal, "after the sale").
-  finished.value = { intentId: paid.intentId, amountMinor: paid.amountMinor, changeMinor: change, panels: sold }
+  finished.value = { intentId: paid.intentId, amountMinor: paid.amountMinor, changeMinor: change, panels: sold, split, receiptSent }
+  afterTo.value = undefined
   // Where the receipt is a sheet, what was paid and any change are said at once as well.
   if (!beside.value) toast.add({ title: t('payments.screens.till.paid', { amount: money(paid.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
   emit('settled', { intentId: paid.intentId, amountMinor: paid.amountMinor })
 }
 /** The sale just paid for, shown until the next customer. */
-const finished = ref<{ intentId: string, amountMinor: number, changeMinor: number, panels: string[] } | null>(null)
+const finished = ref<{ intentId: string, amountMinor: number, changeMinor: number, panels: string[], split: boolean, receiptSent: boolean } | null>(null)
+// A receipt asked for after paying.
+const afterTo = ref<ReceiptTo | undefined>()
+const sending = ref(false)
+async function sendAfter() {
+  if (!finished.value || !afterTo.value) return
+  sending.value = true
+  refusal.value = null
+  try {
+    await $api(`/api/payments/intents/${finished.value.intentId}/receipt` as string, { method: 'POST', body: { receipt: destination(afterTo.value) } })
+    finished.value = { ...finished.value, receiptSent: true }
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    sending.value = false
+  }
+}
 const settledFor = (id: string) => (finished.value?.panels.includes(id) ? finished.value.intentId : null)
 function nextCustomer() {
   finished.value = null
@@ -885,6 +906,39 @@ function ended() {
                   >
                     {{ t('payments.screens.till.change', { amount: money(finished.changeMinor) }) }}
                   </p>
+                  <!-- Someone who asks for a receipt after paying: one for the whole sale, or for one
+                       person of a split one, sent once. -->
+                  <p
+                    v-if="finished.receiptSent"
+                    class="flex items-center gap-2 text-sm text-muted"
+                  >
+                    <UIcon
+                      name="i-lucide-mail-check"
+                      class="size-4"
+                    />{{ t('payments.screens.till.receipt-sent') }}
+                  </p>
+                  <UFormField
+                    v-else-if="!finished.split"
+                    :label="t('payments.screens.till.receipt-after')"
+                    :hint="t('payments.screens.optional')"
+                  >
+                    <div class="flex gap-2">
+                      <PaymentsReceiptTo
+                        v-model="afterTo"
+                        class="flex-1"
+                        :disabled="sending"
+                      />
+                      <UButton
+                        color="neutral"
+                        variant="outline"
+                        icon="i-lucide-send"
+                        :loading="sending"
+                        :disabled="!afterTo"
+                        :label="t('payments.screens.till.receipt-send')"
+                        @click="sendAfter"
+                      />
+                    </div>
+                  </UFormField>
                   <UButton
                     block
                     size="xl"
@@ -913,6 +967,19 @@ function ended() {
               </p>
 
               <RefusalNotice :refusal="refusal" />
+
+              <!-- The receipt for a sale that is not split, with any tickets on it: before paying, or
+                   while it is being paid. A split sale has one for each person instead. -->
+              <UFormField
+                v-if="!isSplit && !splitting && (sale || groups.length) && methods.length && !waiting"
+                :label="t('payments.screens.till.receipt-to')"
+                :hint="t('payments.screens.optional')"
+              >
+                <PaymentsReceiptTo
+                  v-model="receiptTo[0]"
+                  :disabled="taking"
+                />
+              </UFormField>
 
               <!-- Splitting, before anything is taken: each item is given to a person, and each person
                    pays for their own. The basket stays as it is until someone pays. -->

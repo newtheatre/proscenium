@@ -138,6 +138,12 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
+  // A receipt asked for after paying.
+  await page.getByLabel('Email a receipt').click()
+  await page.getByPlaceholder('Name or email address').fill('after@example.com')
+  await page.getByRole('option', { name: 'Use after@example.com' }).click()
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(page.getByText('Receipt sent, with any tickets.')).toBeVisible()
   await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
   // The sale opened the session, shown as Your session above Till sessions with the cash expected.
@@ -162,7 +168,10 @@ test('the Till splits a sale by item, and each person pays for their own with th
   await expect(page.getByLabel('Amount to take this way')).toHaveCount(0)
   await expect(page.getByRole('radiogroup', { name: 'Who pays for Programme' })).toHaveCount(2)
   await noViolations(page)
-  await page.getByLabel('Email a receipt to').nth(1).fill('pat@example.com')
+  // Person 2's receipt, to an address typed into their receipt box.
+  await page.getByLabel('Email a receipt to').nth(1).click()
+  await page.getByPlaceholder('Name or email address').fill('pat@example.com')
+  await page.getByRole('option', { name: 'Use pat@example.com' }).click()
   await personCash(page, 2).click()
   await expect(page.getByText('Person 2 pays £3.00')).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken: £3.00' }).click()

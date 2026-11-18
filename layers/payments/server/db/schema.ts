@@ -167,34 +167,39 @@ export const attempts = defineTable('payments_attempts', {
 })
 
 /**
- * A till sale split between people by item (Matt, 18 November 2026): each person pays for the items
- * given to them, never a typed amount. The plan is fixed when the sale is made; each person's
- * payment is an attempt for exactly their amount, and their receipt goes to the address they gave
- * once it succeeds. The address is kept only until then: it is cleared when the receipt is sent,
- * and by a trigger when the sale ends without one.
+ * Who pays for what in a till sale, and where their receipt goes (Matt, 18 November 2026). A sale
+ * that is not split has one row, position 0, for everything. A sale split between people by item has
+ * a row for each person (1, 2, …): each pays for exactly the items given to them, never a typed
+ * amount. The items are fixed when the sale is made. Receipts go once the sale is paid, one for each
+ * row with somewhere to send it, by account or by a typed address. The address is kept only until the
+ * sale ends: a trigger clears it then.
  */
 export const tillSplits = defineTable('payments_till_splits', {
   id: col.id(),
   intentId: col.ref('payments_intents'),
-  // 1, 2, 3: "Person 1" on the till.
+  // 0 for a whole sale; 1, 2, 3 for "Person 1" on the till.
   position: col.internal(integer('position').notNull()),
   amountMinor: col.minor('amount_minor').notNull(),
-  // JSON list of { basket, line, quantity, label, amountMinor }: what this person pays for.
+  // JSON list of { basket, module, record, line, key, quantity, label, amountMinor }: what this row pays for.
   items: col.internal(text('items').notNull()),
   // The latest payment taken for this person; theirs is paid once it has succeeded.
   attemptId: col.ref('payments_attempts', { nullable: true }),
+  // Where the receipt goes: a person found by the seller, or an address typed.
+  receiptAccountId: col.account('receipt_account_id', { role: 'subject', nullable: true }),
   receiptTo: col.email('receipt_to', { erase: 'clear' }),
   receiptSentAt: col.timestamp('receipt_sent_at'),
   createdAt: col.createdAt(),
 }, {
   id: 'tsp',
   realm: 'audience',
-  subject: { email: 'receipt_to' },
+  subject: { account: 'receipt_account_id', unlinked: 'staff' },
   extra: t => [
     uniqueIndex('payments_till_splits_position').on(t.intentId, t.position),
     index('payments_till_splits_attempt').on(t.attemptId).where(sql`attempt_id IS NOT NULL`),
+    index('payments_till_splits_account').on(t.receiptAccountId).where(sql`receipt_account_id IS NOT NULL`),
     check('payments_till_splits_amount', sql`${t.amountMinor} > 0`),
-    check('payments_till_splits_position', sql`${t.position} > 0`),
+    check('payments_till_splits_position', sql`${t.position} >= 0`),
+    check('payments_till_splits_one_receipt', sql`${t.receiptAccountId} IS NULL OR ${t.receiptTo} IS NULL`),
   ],
 })
 

@@ -1,7 +1,9 @@
 <!-- The people sharing a split till sale (Matt, 18 November 2026): each with the items given to them,
-     their amount, a box for where their own receipt goes, and the ways to pay their share. Someone who
+     their amount, a box for who their own receipt (and any tickets) goes to, and the ways to pay their share. Someone who
      has paid shows a tick instead. The till does the paying; this only draws the people. -->
 <script setup lang="ts" generic="Method extends { providerAccountId: string, method: string }">
+import type { ReceiptTo } from './PaymentsReceiptTo.vue'
+
 interface Person { position: number, amountMinor: number, items: { label: string, quantity: number, amountMinor: number }[], paid: boolean }
 
 const props = defineProps<{
@@ -16,23 +18,13 @@ const props = defineProps<{
   paying: number | null
 }>()
 const emit = defineEmits<{ pay: [position: number, method: Method] }>()
-const receiptTo = defineModel<Record<number, string>>('receiptTo', { required: true })
+const receiptTo = defineModel<Record<number, ReceiptTo | undefined>>('receiptTo', { required: true })
 const { t } = useT()
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const bad = (position: number) => {
-  const value = receiptTo.value[position]?.trim()
-  return !!value && !EMAIL.test(value)
-}
-// An address is checked when the seller leaves the box or tries to pay, not while it is being typed.
-const touched = ref<Record<number, boolean>>({})
-function set(position: number, value: string) {
+function set(position: number, value: ReceiptTo | undefined) {
   receiptTo.value = { ...receiptTo.value, [position]: value }
 }
-function pay(position: number, m: Method) {
-  touched.value = { ...touched.value, [position]: true }
-  if (!bad(position)) emit('pay', position, m)
-}
+const pay = (position: number, m: Method) => emit('pay', position, m)
 const keyOf = (m: Method) => `${m.providerAccountId}:${m.method}`
 const items = (p: Person) => p.items.map(i => (i.quantity > 1 ? t('payments.screens.till.person-item', { n: i.quantity, item: i.label }) : i.label)).join(', ')
 </script>
@@ -65,16 +57,11 @@ const items = (p: Person) => p.items.map(i => (i.quantity > 1 ? t('payments.scre
         <UFormField
           :label="t('payments.screens.till.receipt-to')"
           :hint="t('payments.screens.optional')"
-          :error="touched[p.position] && bad(p.position) ? t('payments.screens.till.receipt-to-bad') : undefined"
         >
-          <UInput
-            :model-value="receiptTo[p.position] ?? ''"
-            type="email"
-            autocomplete="off"
-            inputmode="email"
+          <PaymentsReceiptTo
+            :model-value="receiptTo[p.position]"
             :disabled="props.busy && props.paying === p.position"
-            @update:model-value="set(p.position, String($event ?? ''))"
-            @blur="touched = { ...touched, [p.position]: true }"
+            @update:model-value="set(p.position, $event)"
           />
         </UFormField>
         <div

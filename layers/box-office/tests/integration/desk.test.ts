@@ -252,6 +252,22 @@ describe('selling at the desk', () => {
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', made!.id)).toBe(0)
   })
 
+  it('puts the tickets on the till\'s receipt: one email, and the order joins the buyer', async () => {
+    const h = await house(3)
+    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input: { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] } }], receipt: { email: 'receipt.buyer@example.org' } }, seller)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(made!.account_id).toBeNull()
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const after = await order(made!.id)
+    expect(after).toMatchObject({ state: 'confirmed' })
+    expect(after!.account_id).toBeTruthy()
+    // One email: the receipt, with the tickets' link on it, and no separate tickets message.
+    const sent = await rows<{ type_key: string, address: string }>('SELECT type_key, address FROM core_notifications WHERE subject_id = ? OR address = ?', sale.body.intentId, 'receipt.buyer@example.org')
+    expect(sent).toEqual([{ type_key: 'payments.till-receipt-link', address: 'receipt.buyer@example.org' }])
+    expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', made!.id)).toBe(0)
+  })
+
   it('emails the tickets to an address the buyer gives, and the order joins that account', async () => {
     const h = await house(3)
     const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], email: 'Desk.Buyer@Example.org' })
@@ -272,8 +288,6 @@ describe('selling at the desk', () => {
     expect(found.body.people).toEqual([expect.objectContaining({ id: accountId, label: 'Pickering Buyer', claimed: false })])
     expect(JSON.stringify(found.body)).not.toContain('picked.buyer@example.org')
     expect((await req('GET', '/api/box-office/desk/buyers?q=Pickering', undefined, onlooker)).status).toBe(403)
-    const desk = await req('GET', '/api/box-office/desk/performances', undefined, seller)
-    expect(desk.body.emailDomains).toContain('gmail.com')
     const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], accountId }
     const sale = await till(input)
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)

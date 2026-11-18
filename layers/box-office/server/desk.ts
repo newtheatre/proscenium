@@ -17,6 +17,7 @@ import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
+import { siteUrl } from './links'
 import { DOOR_CODE_PURPOSE, doorCodesForOrder, signedPart, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
@@ -528,6 +529,25 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
   await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}` })
   unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
   return { buyer: await accountLabel(accountId) }
+}
+
+/**
+ * The till's receipt is going to these people, for a sale with this order in it (Matt, 18 November:
+ * one receipt, which carries the tickets). A desk sale made with nobody's details joins the first
+ * person's account, as if given at the sale, and the receipt links to the booking, which shows the
+ * tickets' codes, so no separate tickets email is sent. An order that already has a buyer was sent
+ * its tickets when it was confirmed, so it adds nothing.
+ */
+export async function deskReceiptLink(unit: UnitView, orderId: string, to: { accountId?: string, email?: string }[]): Promise<{ label: string, url: string } | null> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order || order.account_id || !to.length) return null
+  const buyer = to[0]!
+  const accountId = buyer.accountId ?? (await findOrCreateAccount(unit, { address: buyer.email!, origin: 'guest' })).accountId
+  const token = randomToken()
+  unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${nowMs()}
+    WHERE id = ${order.id} AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentWithReceipt: true } })
+  return { label: 'Show my tickets', url: await siteUrl(`/book/order/${token}`) }
 }
 
 export interface PrintedTicket {

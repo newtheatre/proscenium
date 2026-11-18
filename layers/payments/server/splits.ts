@@ -2,19 +2,22 @@
 // receipt to a person; nobody types an amount. The plan is fixed in the batch that makes the sale:
 // each person's amount is the sum of their items, a line of several sharing its amount a penny at a
 // time from the first person. Each person then pays exactly their amount, in any order, and may have
-// their receipt emailed to an address of their own once their payment succeeds.
+// their receipt emailed to an address of their own. A sale that is not split has one row for
+// everything, so every till sale can have a receipt. Receipts go once the whole sale is paid, in the
+// unit that settles it, one for each row with somewhere to send it; an owner with something to show
+// the buyer (Box office's tickets) adds its link to that receipt, so nobody gets two emails.
 import { all, first, log, newId, nowMs, refuse, type UnitView } from '#kit'
-import { notifyAddress } from '#modules/core'
-import type { AttemptRow } from './answers'
-import type { IntentRow } from './intents'
+import { notify, notifyAddress } from '#modules/core'
+import type { IntentRow, PartRow } from './intents'
 import type { SummaryLine } from './points/desk-basket'
+import type { Destination, Settlement } from './points/settlement'
 
 /** One person's share of the sale, as the till sends it: how many of each summary line are theirs. */
 export interface SplitInput { items: { basket: string, line: number, quantity: number }[] }
 
 /** What one person pays for, as stored. */
 export interface SplitItem { basket: string, module: string, record: string, line: number, key: string | null, quantity: number, label: string, amountMinor: number }
-export interface SplitRow { id: string, intent_id: string, position: number, amount_minor: number, items: string, attempt_id: string | null, receipt_to: string | null, receipt_sent_at: number | null }
+export interface SplitRow { id: string, intent_id: string, position: number, amount_minor: number, items: string, attempt_id: string | null, receipt_account_id: string | null, receipt_to: string | null, receipt_sent_at: number | null }
 
 /** One panel of the sale, as the split works it out: its summary lines and whose part it made. */
 export interface SplitPanel { basket: string, owner: { module: string, record: string }, lines: SummaryLine[] }
@@ -68,19 +71,28 @@ export function planSplits(panels: SplitPanel[], splits: SplitInput[]): { positi
   return planned
 }
 
-/** Writes the plan in the batch that makes the sale. */
-export function addSplits(unit: UnitView, intentId: string, planned: ReturnType<typeof planSplits>): void {
+/** The whole sale as one row, for a sale that is not split: every line, at its own amount. */
+export function wholeSale(panels: SplitPanel[]): { position: number, amountMinor: number, items: SplitItem[] } {
+  const items = panels.flatMap(p => p.lines.map((l, line) => ({ basket: p.basket, module: p.owner.module, record: p.owner.record, line, key: l.key ?? null, quantity: l.quantity ?? 1, label: l.item ?? l.label, amountMinor: l.amountMinor })))
+  return { position: 0, amountMinor: items.reduce((sum, i) => sum + i.amountMinor, 0), items }
+}
+
+/** Writes the rows in the batch that makes the sale, with where the whole sale's receipt goes. */
+export function addSplits(unit: UnitView, intentId: string, planned: { position: number, amountMinor: number, items: SplitItem[] }[], receipt?: Destination): void {
   const at = nowMs()
   for (const s of planned) {
+    // A sale of nothing but credits, such as an exchange that gives money back, has no receipt here.
+    if (s.amountMinor <= 0) continue
+    const to = s.position === 0 ? receipt : undefined
     unit.add({
-      sql: 'INSERT INTO payments_till_splits (id, intent_id, position, amount_minor, items, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      params: [newId('tsp'), intentId, s.position, s.amountMinor, JSON.stringify(s.items), at],
+      sql: 'INSERT INTO payments_till_splits (id, intent_id, position, amount_minor, items, receipt_account_id, receipt_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      params: [newId('tsp'), intentId, s.position, s.amountMinor, JSON.stringify(s.items), to?.accountId ?? null, to?.email?.trim() ?? null, at],
     })
   }
 }
 
 export async function splitsOf(intentId: string): Promise<SplitRow[]> {
-  return all<SplitRow>('SELECT * FROM payments_till_splits WHERE intent_id = ? ORDER BY position', intentId)
+  return all<SplitRow>('SELECT * FROM payments_till_splits WHERE intent_id = ? AND position > 0 ORDER BY position', intentId)
 }
 
 /** Each person's share, with whether it is paid, for the till. Empty for a sale that is not split. */
@@ -101,55 +113,100 @@ export async function splitStatus(intentId: string): Promise<{ position: number,
  * for exactly their share; a sale that is not split is paid whole, unless the caller is Payments' own
  * code asking for less (a typed amount is never taken from the till).
  */
-export async function amountFor(intent: IntentRow, remaining: number, asked: { split?: number, amountMinor?: number, receiptTo?: string }): Promise<{ amountMinor: number, split: SplitRow | null }> {
-  const rows = intent.channel === 'desk' ? await splitsOf(intent.id) : []
+export async function amountFor(intent: IntentRow, remaining: number, asked: { split?: number, amountMinor?: number, receipt?: Destination }): Promise<{ amountMinor: number, split: SplitRow | null, whole: SplitRow | null }> {
+  const all = intent.channel === 'desk' ? await rowsOf(intent.id) : []
+  const rows = all.filter(r => r.position > 0)
   if (!rows.length) {
-    if (asked.split !== undefined || asked.receiptTo !== undefined) refuse('payments.till.not-split', 'This sale is not split between people.', { status: 422 })
-    return { amountMinor: asked.amountMinor ?? remaining, split: null }
+    const whole = all.find(r => r.position === 0) ?? null
+    if (asked.split !== undefined || (asked.receipt && !whole)) refuse('payments.till.not-split', 'This sale is not split between people.', { status: 422 })
+    return { amountMinor: asked.amountMinor ?? remaining, split: null, whole: asked.receipt ? whole : null }
   }
   const split = rows.find(r => r.position === asked.split)
   if (!split) refuse('payments.till.which-person', 'Say which person is paying.', { status: 422, fields: { split: 'payments.till.which-person' } })
   if (split!.attempt_id && await first("SELECT 1 FROM payments_attempts WHERE id = ? AND state = 'succeeded'", split!.attempt_id))
     refuse('payments.till.person-paid', `Person ${split!.position} has already paid.`, { status: 409 })
-  return { amountMinor: split!.amount_minor, split: split! }
+  return { amountMinor: split!.amount_minor, split: split!, whole: null }
+}
+
+/** Where the whole sale's receipt goes, given or changed as it is paid. */
+export function setReceipt(unit: UnitView, row: SplitRow, receipt: Destination): void {
+  unit.add({ sql: 'UPDATE payments_till_splits SET receipt_account_id = ?, receipt_to = ? WHERE id = ? AND receipt_sent_at IS NULL', params: [receipt.accountId ?? null, receipt.email?.trim() ?? null, row.id] })
 }
 
 /** Ties the payment just added to the person it is for, with where their receipt goes. */
-export function claimSplit(unit: UnitView, split: SplitRow, attemptId: string, receiptTo: string | undefined): void {
-  unit.add({ sql: 'UPDATE payments_till_splits SET attempt_id = ?, receipt_to = ? WHERE id = ? AND receipt_sent_at IS NULL', params: [attemptId, receiptTo?.trim() || null, split.id] })
+export function claimSplit(unit: UnitView, split: SplitRow, attemptId: string, receipt: Destination | undefined): void {
+  unit.add({ sql: 'UPDATE payments_till_splits SET attempt_id = ?, receipt_account_id = ?, receipt_to = ? WHERE id = ? AND receipt_sent_at IS NULL', params: [attemptId, receipt?.accountId ?? null, receipt?.email?.trim() || null, split.id] })
     .expect(1, { code: 'payments.till.person-paid', reason: `Person ${split.position} has already paid.` })
 }
 
 const METHOD: Record<string, string> = { cash: 'Cash', card_attested: 'Card', card_reader: 'Card', card_online: 'Card', other_attested: 'Other' }
 const money = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(minor / 100) // not-policy: minor units to units; every currency sold here has two decimals
+const destinationOf = (row: SplitRow): Destination | null => (row.receipt_account_id ? { accountId: row.receipt_account_id } : row.receipt_to ? { email: row.receipt_to } : null)
 
 /**
- * A person's payment has succeeded: their receipt goes to the address they gave, in the same unit as
- * the answer, so it goes exactly when the payment holds. A receipt that cannot be prepared is logged
- * and left out: the payment still stands.
+ * Sends the receipt for each row with somewhere to send it, in the unit that settles the sale (or,
+ * asked for afterwards, a unit of its own). Each owner whose part a receipt covers may add a link to
+ * it, such as the tickets; an owner is asked once for all its receipts, so one link serves them all.
+ * A receipt that cannot be prepared is logged and left out: the payment still stands.
  */
-export async function sendSplitReceipt(unit: UnitView, attempt: AttemptRow, currency: string): Promise<void> {
-  const split = await first<SplitRow>('SELECT * FROM payments_till_splits WHERE attempt_id = ?', attempt.id)
-  if (!split || !split.receipt_to || split.receipt_sent_at !== null) return
-  const items = (JSON.parse(split.items) as SplitItem[]).map(i => `${i.quantity} × ${i.label}`).join(', ')
-  try {
-    await notifyAddress(unit, 'payments.till-receipt', {
-      address: split.receipt_to,
-      variables: { items, amount: money(split.amount_minor, currency), method: METHOD[attempt.method] ?? 'Other' },
-      record: ['payments.intent', split.intent_id],
-      dedupeKey: `till-receipt:${split.id}`,
-    })
-    unit.add({ sql: 'UPDATE payments_till_splits SET receipt_sent_at = ? WHERE id = ?', params: [nowMs(), split.id] })
+export async function sendReceipts(unit: UnitView, intent: IntentRow, parts: PartRow[], rows: SplitRow[], handlers: Map<string, Settlement>, paidBy: Map<string, string[]>): Promise<number> {
+  const due = rows.filter(r => r.receipt_sent_at === null && destinationOf(r))
+  if (!due.length) return 0
+  // Each owner's link, asked once with everyone whose receipt covers its part.
+  const links = new Map<string, { label: string, url: string } | null>()
+  for (const part of parts) {
+    const handler = handlers.get(part.owner_module)
+    const covering = due.filter(r => (JSON.parse(r.items) as SplitItem[]).some(i => i.module === part.owner_module && i.record === part.owner_record))
+    if (!handler?.receiptLink || !covering.length) continue
+    try {
+      links.set(part.id, await handler.receiptLink(unit, { id: part.id, intentId: intent.id, record: part.owner_record, amountMinor: part.amount_minor, currency: intent.currency }, covering.map(r => destinationOf(r)!)))
+    }
+    catch (error) {
+      log.warn('payments.receipt-link-failed', { intentId: intent.id, module: part.owner_module, error: String((error as Error)?.message ?? error) })
+    }
   }
-  catch (error) {
-    log.warn('payments.till-receipt-failed', { splitId: split.id, error: String((error as Error)?.message ?? error) })
+  let sent = 0
+  for (const row of due) {
+    const items = JSON.parse(row.items) as SplitItem[]
+    const link = parts.map(p => (items.some(i => i.module === p.owner_module && i.record === p.owner_record) ? links.get(p.id) : null)).find(Boolean) ?? null
+    const methods = [...new Set((paidBy.get(row.id) ?? []).map(m => METHOD[m] ?? 'Other'))]
+    const variables = {
+      items: items.map(i => `${i.quantity} × ${i.label}`).join(', '),
+      amount: money(row.amount_minor, intent.currency),
+      method: methods.join(' and ') || 'Other',
+      ...(link ? { linkText: link.label, link: link.url } : {}),
+    }
+    const type = link ? 'payments.till-receipt-link' : 'payments.till-receipt'
+    const to = destinationOf(row)!
+    try {
+      if (to.accountId) await notify(unit, type, { to: to.accountId, variables, subject: ['payments.intent', intent.id], dedupeKey: `till-receipt:${row.id}` })
+      else await notifyAddress(unit, type, { address: to.email!, variables, record: ['payments.intent', intent.id], dedupeKey: `till-receipt:${row.id}` })
+      unit.add({ sql: 'UPDATE payments_till_splits SET receipt_sent_at = ?, receipt_to = NULL WHERE id = ?', params: [nowMs(), row.id] })
+      sent++
+    }
+    catch (error) {
+      log.warn('payments.till-receipt-failed', { rowId: row.id, error: String((error as Error)?.message ?? error) })
+    }
   }
+  return sent
+}
+
+/** Every row of a sale, the whole-sale row included. */
+export async function rowsOf(intentId: string): Promise<SplitRow[]> {
+  return all<SplitRow>('SELECT * FROM payments_till_splits WHERE intent_id = ? ORDER BY position', intentId)
+}
+
+/** How each row was paid: a person's own attempt, or every succeeded attempt for the whole sale. */
+export async function paidByOf(intentId: string, rows: SplitRow[], including?: { id: string, method: string }): Promise<Map<string, string[]>> {
+  const attempts = await all<{ id: string, method: string }>("SELECT id, method FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded'", intentId)
+  if (including && !attempts.some(a => a.id === including.id)) attempts.push(including)
+  return new Map(rows.map(r => [r.id, r.position === 0 ? attempts.map(a => a.method) : attempts.filter(a => a.id === r.attempt_id).map(a => a.method)]))
 }
 
 /** What each person paid for in one owner's part, for its settle handler. Empty when not split. */
-export function splitsForPart(rows: SplitRow[], owner: { module: string, record: string }): { position: number, receiptTo: string | null, items: { line: number, key: string | null, quantity: number }[] }[] {
-  return rows.flatMap((r) => {
+export function splitsForPart(rows: SplitRow[], owner: { module: string, record: string }): { position: number, receiptTo: string | null, receiptAccountId: string | null, items: { line: number, key: string | null, quantity: number }[] }[] {
+  return rows.filter(r => r.position > 0).flatMap((r) => {
     const items = (JSON.parse(r.items) as SplitItem[]).filter(i => i.module === owner.module && i.record === owner.record)
-    return items.length ? [{ position: r.position, receiptTo: r.receipt_to, items: items.map(i => ({ line: i.line, key: i.key, quantity: i.quantity })) }] : []
+    return items.length ? [{ position: r.position, receiptTo: r.receipt_to, receiptAccountId: r.receipt_account_id, items: items.map(i => ({ line: i.line, key: i.key, quantity: i.quantity })) }] : []
   })
 }

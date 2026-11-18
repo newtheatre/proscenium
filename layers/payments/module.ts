@@ -28,6 +28,8 @@ export default defineModule({
     // Where the till opens a session when the device has not used one before: a core space's id.
     'sessions.default-space': setting.custom({ schema: z.string().min(1).max(40), unset: true, change, audience: 'staff' }), // not-policy: an id's length
     'sessions.close-when-quiet': setting.duration({ default: '2h', min: '15m', max: '12h', change, audience: 'staff' }),
+    // The common providers the receipt box offers a typed name at (Matt, 17 November, first for tickets).
+    'desk.email-domains': setting.list({ default: ['gmail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'icloud.com', 'yahoo.com', 'yahoo.co.uk', 'live.co.uk', 'btinternet.com'], of: 'text', maxLength: 253, change, audience: 'staff' }),
     'cash.enabled': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
@@ -153,19 +155,34 @@ export default defineModule({
     ],
     'core.privacy-record': [
       { id: 'payments.payments', holds: 'Payments and refunds: the amount, the type of card and its last four digits', why: 'To match payments to orders and make refunds', basis: 'To carry out our contract with you, and a legal duty (tax and accounting law)', keptFor: 'For as long as tax and accounting law requires', order: 120 },
-      { id: 'payments.till-receipts', holds: 'An email address you give at the till for your receipt, when a bill is split', why: 'To send you a receipt for what you paid', basis: 'To carry out our contract with you', keptFor: 'Until the sale is finished', order: 121 },
+      { id: 'payments.till-receipts', holds: 'An email address you give at the till for your receipt, or your account if you are found there', why: 'To send you a receipt for what you paid', basis: 'To carry out our contract with you', keptFor: 'A typed address until the receipt is sent; the account with the payment', order: 121 },
     ],
-    // A receipt for one person's share of a sale split at the till, to the address they gave there.
+    // The till's receipts: one for a whole sale, or one for each person of a sale split by item, to a
+    // person found or an address typed. An owner may add one link, such as "Show my tickets", so a
+    // till sale sends one email.
     'core.notification-type': [{
       id: 'payments.till-receipt',
       category: 'transactional' as const,
       side: 'audience' as const,
-      channels: ['email' as const],
+      channels: ['email' as const, 'inbox' as const],
       variables: { items: 'text' as const, amount: 'text' as const, method: 'text' as const },
       wording: {
         'en-GB': {
           subject: 'Your receipt from {{ theatre }}',
           body: 'Thank you for your payment of **{{ amount }}** to {{ theatre }} ({{ method }}).\n\nYou paid for: {{ items }}.',
+        },
+      },
+    }, {
+      id: 'payments.till-receipt-link',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      // The link is the owner's, such as a booking's tickets, which let their holder in, so it is sealed.
+      variables: { items: 'text' as const, amount: 'text' as const, method: 'text' as const, linkText: 'text' as const, link: 'sealed' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your receipt from {{ theatre }}',
+          body: 'Thank you for your payment of **{{ amount }}** to {{ theatre }} ({{ method }}).\n\nYou paid for: {{ items }}.\n\n[{{ linkText }}]({{ link }})\n\nAnyone with the link can use what it shows, so only pass this email on to the people you are with.',
         },
       },
     }],

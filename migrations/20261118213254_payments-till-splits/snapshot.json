@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "4a1299f9-fd08-474e-9a27-be7541504d5e",
+  "id": "f21852f4-04fa-457b-8dcf-667c94cd8f49",
   "prevIds": [
     "5023dabb-0cd6-4f04-8ffa-24722f0fc76f"
   ],
@@ -18536,6 +18536,16 @@
     },
     {
       "table": "payments_till_splits",
+      "name": "receipt_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_till_splits",
       "name": "receipt_to",
       "type": "text",
       "notNull": false,
@@ -23089,6 +23099,20 @@
       ],
       "isUnique": false,
       "where": "attempt_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_till_splits",
+      "name": "payments_till_splits_account",
+      "columns": [
+        {
+          "value": "receipt_account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "receipt_account_id IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -29780,7 +29804,13 @@
     {
       "table": "payments_till_splits",
       "name": "payments_till_splits_position",
-      "value": "\"position\" > 0",
+      "value": "\"position\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_till_splits",
+      "name": "payments_till_splits_one_receipt",
+      "value": "\"receipt_account_id\" IS NULL OR \"receipt_to\" IS NULL",
       "entityType": "checks"
     }
   ],
