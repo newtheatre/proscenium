@@ -61,13 +61,6 @@ export interface DeskBasket {
    */
   space?: (context: Pick<DeskContext, 'input'>) => Promise<string | null>
   /**
-   * The panel's input for just these lines of its summary, for a sale split between people: each
-   * person with some of its lines then gets a record of their own, prepared from their narrowed
-   * input, such as a booking for their own tickets. Null when the sale in the panel cannot be
-   * divided; its one record is then shared. Reads only.
-   */
-  narrow?: (input: unknown, lines: { line: number, quantity: number }[]) => unknown | null | Promise<unknown | null>
-  /**
    * Lines and an amount for display. Reads only, and comes before any session is open. A line of
    * several of the same thing says how many (`quantity`, 1 when absent) and what one of them is
    * called (`item`, the label when absent): a split sale gives each one to a person, and the line's
