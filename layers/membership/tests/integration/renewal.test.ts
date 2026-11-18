@@ -23,7 +23,8 @@ const runReminders = () => inContext(async () => {
   await sendReminders(unit.view(), { dueAt: Date.now() })
   await unit.commit()
 }, { kind: 'job' } as never)
-const sent = async (membershipId: string) => (await rows<{ type_key: string }>('SELECT type_key FROM core_notifications WHERE subject_id = ? ORDER BY created_at, id', membershipId)).map(r => r.type_key)
+// Reminders only: a new membership's welcome is tested with joining.
+const sent = async (membershipId: string) => (await rows<{ type_key: string }>('SELECT type_key FROM core_notifications WHERE subject_id = ? AND type_key <> \'membership.welcome\' ORDER BY created_at, id', membershipId)).map(r => r.type_key)
 
 async function member(name: string, fields: Record<string, unknown> = {}) {
   setClock(NOV_17)
