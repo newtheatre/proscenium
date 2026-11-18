@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute, requireAbility } from '#kit'
 import { exchangeLines, exchangeQuote } from '../../../../exchange'
+import { fromRequest } from '../../../../links'
 
 export default defineRoute({
   ability: 'box-office.order.exchange',
@@ -20,10 +21,12 @@ export default defineRoute({
     }).strict()).min(1).max(50), // not-policy: more lines than any order holds
     preview: z.boolean().optional(),
   }).strict(),
-}, async (_event, { input, record, actor, unit }) => {
+}, async (event, { input, record, actor, unit }) => {
   const { preview, ...change } = input
   const quote = await exchangeQuote(record!.id!, change)
   if (preview) return quote
   if (quote.paid && quote.differenceMinor < 0) await requireAbility(actor, 'box-office.order.refund', ['box-office.order', record!.id!])
+  // The message links to the booking, where the new tickets are.
+  await fromRequest(event)
   return exchangeLines(unit.view(), record!.id!, { ...change, by: actor.accountId! })
 })

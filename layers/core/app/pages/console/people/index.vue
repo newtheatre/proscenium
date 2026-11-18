@@ -1,8 +1,9 @@
 <!-- Accounts (Identity Doc part 5, console People): everyone, searched by name or verified address
      and filtered by state. Unclaimed and erased accounts are hidden unless looked for, through the
-     state filter or the views. -->
+     state filter or the views. Someone who gives roles and adds people can invite someone from here. -->
 <script setup lang="ts">
 import { accountsList } from '../../../../shared/identity-lists'
+import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
 
 definePageMeta({ layout: 'console' })
 
@@ -37,6 +38,20 @@ const hiddenOf = (result: Record<string, unknown>) => {
   return (['unclaimed', 'anonymised'] as const).flatMap(view => hidden[view] ? [{ view, count: hidden[view]! }] : [])
 }
 
+// Inviting needs Who holds what's options, which only someone who reads grants may ask for: for
+// anyone else the answer is a refusal, and there is nothing to offer.
+const { $api } = useNuxtApp()
+const { data: grantOptions } = await useAsyncData('core:people:grant-options', () => $api<GrantOptions>('/api/core/grants/options').catch(() => null))
+const mayInvite = computed(() => !!grantOptions.value?.invite)
+const inviting = ref(false)
+// ?invite=1 (the command palette's Invite someone) opens the dialogue once the page knows the viewer
+// may invite; the flag is then dropped, so going back or reloading does not open it again.
+onMounted(() => {
+  if (route.query.invite === undefined) return
+  if (mayInvite.value) inviting.value = true
+  void navigateTo({ query: { ...route.query, invite: undefined } }, { replace: true })
+})
+
 const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased') : (row.name ?? t('core.people.unnamed'))
 </script>
 
@@ -49,6 +64,16 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     :row-to="(row: Row) => `/console/people/${encodeURIComponent(row.id)}`"
     :empty="{ title: t('core.people.empty.title'), description: t('core.people.empty.description'), icon: 'i-lucide-users' }"
   >
+    <template
+      v-if="mayInvite"
+      #primary
+    >
+      <UButton
+        icon="i-lucide-mail-plus"
+        :label="t('core.grants.invite.open')"
+        @click="inviting = true"
+      />
+    </template>
     <template #note="{ result }">
       <p
         v-if="hiddenOf(result).length"
@@ -86,5 +111,12 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     <template #cell-since="{ row }">
       {{ day(row.since) }}
     </template>
+    <GiveRoleDialog
+      v-if="mayInvite && grantOptions"
+      v-model:open="inviting"
+      :options="grantOptions"
+      invite
+      @changed="refreshNuxtData('core:list:/api/core/people')"
+    />
   </PageList>
 </template>
