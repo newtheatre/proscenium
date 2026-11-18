@@ -37,10 +37,6 @@ const needs = (m: ModuleView) => {
   return ids.length ? t('core.modules.needs', { modules: listOf(ids.map(nameOf)) }) : ''
 }
 const lockedBy = (m: ModuleView) => keptOnBy(m, modules.value)
-const lockedWhy = (m: ModuleView) => {
-  const ids = lockedBy(m)
-  return t('core.modules.locked', { modules: listOf(ids.map(nameOf)), those: t('core.modules.locked-those', { count: ids.length }) })
-}
 const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count', { count: m.settings }) : ''
 </script>
 
@@ -141,21 +137,14 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
                   />
                 </div>
               </div>
-              <UTooltip
+              <USwitch
                 v-if="data?.manage && !m.alwaysOn"
-                :text="lockedBy(m).length ? lockedWhy(m) : undefined"
-                :disabled="!lockedBy(m).length"
-              >
-                <span class="inline-flex">
-                  <USwitch
-                    :model-value="m.on"
-                    :loading="busy === m.id"
-                    :disabled="(busy !== null && busy !== m.id) || lockedBy(m).length > 0"
-                    :aria-label="t('core.modules.toggle', { module: nameOf(m.id) })"
-                    @update:model-value="toggle(m)"
-                  />
-                </span>
-              </UTooltip>
+                :model-value="m.on"
+                :loading="busy === m.id"
+                :disabled="busy !== null && busy !== m.id"
+                :aria-label="t('core.modules.toggle', { module: nameOf(m.id) })"
+                @update:model-value="toggle(m)"
+              />
             </div>
             <div class="flex-1">
               <p

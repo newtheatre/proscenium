@@ -20,7 +20,6 @@ const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [
 
 const view = computed(() => data.value?.modules.find(m => m.id === props.module))
 const lockedBy = computed(() => view.value ? keptOnBy(view.value, data.value?.modules ?? []) : [])
-const lockedWhy = computed(() => t('core.modules.locked', { modules: listOf(lockedBy.value.map(nameOf)), those: t('core.modules.locked-those', { count: lockedBy.value.length }) }))
 const tabs = computed(() => tabData.value?.tabs ?? [])
 const items = computed(() => tabs.value.map(tab => ({ label: te(tab.label) ? t(tab.label) : tab.label, value: tab.to, icon: tab.icon })))
 // A record page below a tab's screen keeps that tab open.
@@ -114,22 +113,14 @@ const side = computed<NavigationMenuItem[][]>(() => {
         </span>
       </template>
       <template #primary>
-        <UTooltip
+        <USwitch
           v-if="view && data?.manage && !view.alwaysOn"
-          :text="lockedBy.length ? lockedWhy : undefined"
-          :disabled="!lockedBy.length"
-        >
-          <span class="inline-flex">
-            <USwitch
-              :model-value="view.on"
-              :label="t(view.on ? 'core.modules.state.on' : 'core.modules.state.off')"
-              :loading="busy === view.id"
-              :disabled="lockedBy.length > 0"
-              :aria-label="t('core.modules.toggle', { module: nameOf(module) })"
-              @update:model-value="toggle(view)"
-            />
-          </span>
-        </UTooltip>
+          :model-value="view.on"
+          :label="t(view.on ? 'core.modules.state.on' : 'core.modules.state.off')"
+          :loading="busy === view.id"
+          :aria-label="t('core.modules.toggle', { module: nameOf(module) })"
+          @update:model-value="toggle(view)"
+        />
       </template>
       <p
         v-if="descriptionOf(module)"
@@ -141,9 +132,14 @@ const side = computed<NavigationMenuItem[][]>(() => {
         v-if="lockedBy.length"
         class="text-sm text-muted"
       >
-        {{ lockedWhy }}
+        {{ t('core.modules.needed-by', { modules: listOf(lockedBy.map(nameOf)) }) }}
       </p>
       <RefusalNotice :refusal="refusal" />
+      <ModuleSetupCard
+        v-if="view"
+        :view="view"
+        :tabs="tabs"
+      />
       <template v-if="view?.on">
         <UAlert
           v-for="name in view.missingSecrets"

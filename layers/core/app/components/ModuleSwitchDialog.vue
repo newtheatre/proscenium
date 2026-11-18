@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ close: [confirmed: boolean] }>()
 const { t } = useT()
-const { nameOf, listOf, screensOf } = useModuleWords()
+const { nameOf, listOf, screensOf, dependantsOf } = useModuleWords()
 
 const byId = computed(() => new Map(props.modules.map(m => [m.id, m])))
 const also = computed(() => props.module.alsoOn.map(id => byId.value.get(id) ?? { id } as ModuleView))
@@ -31,8 +31,9 @@ const screenGroups = computed(() => {
   const rank = (menu: string) => shellOrder.includes(menu) ? shellOrder.indexOf(menu) : shellOrder.length
   return [...groups.values()].sort((a, b) => rank(a.menu) - rank(b.menu))
 })
-const preventers = computed(() => props.module.requiredBy.filter(id => byId.value.get(id)?.on))
-const blocked = computed(() => props.on ? blocking.value.length > 0 : preventers.value.length > 0)
+// Switching off a module others need switches those off first, listed so nothing goes quietly.
+const dependants = computed(() => props.on ? [] : dependantsOf(props.module, props.modules))
+const blocked = computed(() => props.on && blocking.value.length > 0)
 </script>
 
 <template>
@@ -106,13 +107,17 @@ const blocked = computed(() => props.on ? blocking.value.length > 0 : preventers
           icon="i-lucide-key-round"
           :description="t('core.modules.dialog.secret-blocks', { names: listOf(blocking) })"
         />
-        <UAlert
-          v-if="!on && preventers.length"
-          color="error"
-          variant="subtle"
-          icon="i-lucide-link"
-          :description="t('core.modules.dialog.prevented', { modules: listOf(preventers.map(nameOf)), count: preventers.length })"
-        />
+        <div v-if="!on && dependants.length">
+          <p>{{ t('core.modules.dialog.also-off', { count: dependants.length }) }}</p>
+          <ul class="mt-1 list-disc ps-5">
+            <li
+              v-for="id in dependants"
+              :key="id"
+            >
+              {{ nameOf(id) }}
+            </li>
+          </ul>
+        </div>
       </div>
     </template>
     <template #footer>
@@ -124,7 +129,7 @@ const blocked = computed(() => props.on ? blocking.value.length > 0 : preventers
       />
       <UButton
         :color="on ? undefined : 'error'"
-        :label="t(on ? 'core.modules.switch-on' : 'core.modules.switch-off')"
+        :label="on || !dependants.length ? t(on ? 'core.modules.switch-on' : 'core.modules.switch-off') : t('core.modules.switch-off-with', { module: nameOf(module.id), count: dependants.length })"
         :disabled="blocked"
         @click="emit('close', true)"
       />

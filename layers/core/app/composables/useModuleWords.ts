@@ -15,6 +15,21 @@ export function useModuleWords() {
   const keptOnBy = (m: Pick<ModuleView, 'on' | 'requiredBy'>, all: ModuleView[]) => m.on
     ? m.requiredBy.filter(id => all.find(o => o.id === id)?.on)
     : []
+  /** Every module still on that needs this one, directly or not, in the order to switch them off: those nothing needs first. */
+  const dependantsOf = (m: Pick<ModuleView, 'id' | 'requiredBy'>, all: ModuleView[]) => {
+    const order: string[] = []
+    const visit = (view: Pick<ModuleView, 'id' | 'requiredBy'>) => {
+      for (const id of view.requiredBy) {
+        const other = all.find(o => o.id === id)
+        if (other?.on && !order.includes(id)) {
+          visit(other)
+          order.push(id)
+        }
+      }
+    }
+    visit(m)
+    return order
+  }
   /** Everything a module needs, those it needs in turn included. */
   const needsOf = (m: Pick<ModuleView, 'requires'>, all: ModuleView[]) => {
     const seen = new Set<string>()
@@ -26,5 +41,5 @@ export function useModuleWords() {
     walk(m.requires)
     return [...seen]
   }
-  return { nameOf, descriptionOf, listOf, screensOf, keptOnBy, needsOf }
+  return { nameOf, descriptionOf, listOf, screensOf, keptOnBy, needsOf, dependantsOf }
 }
