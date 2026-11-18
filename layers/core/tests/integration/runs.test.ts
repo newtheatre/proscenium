@@ -11,6 +11,9 @@ import getRun from '../../server/api/core/productions/[id]/runs/[run]/index.get'
 import finishRun from '../../server/api/core/productions/[id]/runs/[run]/finish.post'
 import removeRun from '../../server/api/core/productions/[id]/runs/[run]/remove.post'
 import undoRun from '../../server/api/core/productions/[id]/performances/undo.post'
+import planEdit from '../../server/api/core/productions/[id]/runs/[run]/plan.post'
+import editRun from '../../server/api/core/productions/[id]/runs/[run]/edit.post'
+import undoEdit from '../../server/api/core/productions/[id]/runs/[run]/undo-edit.post'
 import schedule from '../../server/api/core/performances/[id]/schedule.post'
 import createVenue from '../../server/api/core/venues/index.post'
 import createClosure from '../../server/api/core/closures/index.post'
@@ -30,6 +33,9 @@ const handle = server({
   'GET /api/core/productions/:id/runs/:run': getRun,
   'POST /api/core/productions/:id/runs/:run/finish': finishRun,
   'POST /api/core/productions/:id/runs/:run/remove': removeRun,
+  'POST /api/core/productions/:id/runs/:run/plan': planEdit,
+  'POST /api/core/productions/:id/runs/:run/edit': editRun,
+  'POST /api/core/productions/:id/runs/:run/undo-edit': undoEdit,
   'POST /api/core/performances/:id/schedule': schedule,
   'POST /api/core/venues': createVenue,
   'POST /api/core/closures': createClosure,
@@ -112,7 +118,7 @@ describe('a run of performances', () => {
     expect(list).toHaveLength(200)
     const { status, body } = await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, performances: list })
     expect(status, JSON.stringify(body)).toBe(200)
-    expect(body).toEqual({ created: 200, ids: expect.any(Array) })
+    expect(body).toEqual({ created: 200, ids: expect.any(Array), runId: null })
     expect(await count(s.productionId, 'scheduled')).toBe(200)
     expect(await rows("SELECT id FROM core_events WHERE name = 'core.performance.scheduled' AND payload LIKE ?", `%${s.productionId}%`)).toHaveLength(200)
 
@@ -220,5 +226,72 @@ describe('a run of performances', () => {
     expect(await count(s.productionId, 'cancelled')).toBe(10)
     expect(await count(s.productionId, 'scheduled')).toBe(0)
     expect((await rows<{ last_ends_at: number | null }>('SELECT last_ends_at FROM core_productions WHERE id = ?', s.productionId))[0]!.last_ends_at).toBeNull()
+  })
+})
+
+describe('editing a run', () => {
+  const WEEKDAYS = { from: '2029-03-05', to: '2029-03-09', slots: [{ days: [1, 2, 3, 4, 5], times: ['19:30'] }] }
+  const LATER = { from: '2029-03-06', to: '2029-03-10', slots: [{ days: [2, 3, 4, 5, 6], times: ['19:45'] }] }
+  async function made(s: { productionId: string, venueId: string, spaceId: string }) {
+    const list = keep(await planned(s, { from: WEEKDAYS.from, to: WEEKDAYS.to, slots: WEEKDAYS.slots }))
+    const { body } = await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, pattern: WEEKDAYS, performances: list })
+    expect(body.runId).toEqual(expect.any(String))
+    return body as { runId: string, ids: string[] }
+  }
+  const starts = async (productionId: string, state: string) =>
+    (await rows<{ starts_at: number }>('SELECT starts_at FROM core_performances WHERE production_id = ? AND state = ? ORDER BY starts_at', productionId, state)).map(r => new Date(r.starts_at).toISOString().slice(0, 16))
+
+  it('is kept with its pattern, and listed for editing', async () => {
+    const s = await stage()
+    const { runId, ids } = await made(s)
+    const { body } = await req('GET', `/api/core/productions/${s.productionId}/performances`)
+    expect(body.editableRuns).toEqual([{ id: runId, venueId: s.venueId, spaceId: s.spaceId, scheduled: true, pattern: WEEKDAYS, count: 5, performanceIds: expect.arrayContaining(ids) }])
+    // Undoing the whole run removes it from the list.
+    await req('POST', `/api/core/productions/${s.productionId}/performances/undo`, { ids })
+    expect((await req('GET', `/api/core/productions/${s.productionId}/performances`)).body.editableRuns).toEqual([])
+  })
+
+  it('shows what a new pattern adds, moves and removes, applies it, and can be undone', async () => {
+    const s = await stage()
+    const { runId } = await made(s)
+    const edit = { venueId: s.venueId, spaceId: s.spaceId, pattern: LATER }
+    const plan = await req('POST', `/api/core/productions/${s.productionId}/runs/${runId}/plan`, edit)
+    expect(plan.status, JSON.stringify(plan.body)).toBe(200)
+    expect(plan.body.add.map((p: { startsAt: number }) => new Date(p.startsAt).toISOString().slice(0, 16))).toEqual(['2029-03-10T19:45'])
+    expect(plan.body.move).toHaveLength(4)
+    expect(plan.body.move.every((m: { problem: string | null }) => m.problem === null)).toBe(true)
+    expect(plan.body.remove).toEqual([expect.objectContaining({ state: 'scheduled', startsAt: Date.parse('2029-03-05T19:30:00Z') })])
+    expect(plan.body).toMatchObject({ keep: 0, refusal: null })
+
+    // A preview that no longer matches is refused.
+    expect((await req('POST', `/api/core/productions/${s.productionId}/runs/${runId}/edit`, { ...edit, seen: { add: 2, move: 4, remove: 1 } })).body.code).toBe('core.run.changed')
+    // Removing a scheduled performance cancels it, which needs the ability to cancel.
+    expect((await req('POST', `/api/core/productions/${s.productionId}/runs/${runId}/edit`, { ...edit, seen: { add: 1, move: 4, remove: 1 } }, scheduler)).status).toBe(403)
+
+    const applied = await req('POST', `/api/core/productions/${s.productionId}/runs/${runId}/edit`, { ...edit, seen: { add: 1, move: 4, remove: 1 } })
+    expect(applied.status, JSON.stringify(applied.body)).toBe(200)
+    expect(await starts(s.productionId, 'scheduled')).toEqual(['2029-03-06T19:45', '2029-03-07T19:45', '2029-03-08T19:45', '2029-03-09T19:45', '2029-03-10T19:45'])
+    expect(await starts(s.productionId, 'cancelled')).toEqual(['2029-03-05T19:30'])
+    expect((await req('GET', `/api/core/productions/${s.productionId}/performances`)).body.editableRuns[0].pattern).toEqual(LATER)
+    // Planning the same pattern again changes nothing.
+    expect((await req('POST', `/api/core/productions/${s.productionId}/runs/${runId}/plan`, edit)).body).toMatchObject({ add: [], move: [], remove: [], keep: 5 })
+
+    const undone = await req('POST', `/api/core/productions/${s.productionId}/runs/${runId}/undo-edit`, applied.body)
+    expect(undone.status, JSON.stringify(undone.body)).toBe(200)
+    expect(await starts(s.productionId, 'scheduled')).toEqual(['2029-03-05T19:30', '2029-03-06T19:30', '2029-03-07T19:30', '2029-03-08T19:30', '2029-03-09T19:30'])
+    expect(await starts(s.productionId, 'cancelled')).toEqual([])
+    expect((await req('GET', `/api/core/productions/${s.productionId}/performances`)).body.editableRuns[0].pattern).toEqual(WEEKDAYS)
+  })
+
+  it('deletes drafts it no longer has, and adds them back on Undo', async () => {
+    const s = await stage()
+    const list = keep(await planned(s, { from: WEEKDAYS.from, to: WEEKDAYS.to, slots: WEEKDAYS.slots }))
+    const { body } = await req('POST', `/api/core/productions/${s.productionId}/performances/run`, { venueId: s.venueId, spaceId: s.spaceId, scheduled: false, pattern: WEEKDAYS, performances: list })
+    const shorter = { venueId: s.venueId, spaceId: s.spaceId, pattern: { ...WEEKDAYS, to: '2029-03-07' } }
+    const applied = await req('POST', `/api/core/productions/${s.productionId}/runs/${body.runId}/edit`, { ...shorter, seen: { add: 0, move: 0, remove: 2 } }, scheduler)
+    expect(applied.status, JSON.stringify(applied.body)).toBe(200)
+    expect(await count(s.productionId, 'draft')).toBe(3)
+    expect((await req('POST', `/api/core/productions/${s.productionId}/runs/${body.runId}/undo-edit`, applied.body, scheduler)).status).toBe(200)
+    expect(await count(s.productionId, 'draft')).toBe(5)
   })
 })

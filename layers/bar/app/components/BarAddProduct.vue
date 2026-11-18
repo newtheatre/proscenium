@@ -2,8 +2,8 @@
      run. First the kind of product, as large tiles of presets; opened from a category with a usual
      preset (its own or its parent's), it starts straight on the second step. Then one form: name,
      category, a row per size with its Standard price and what percentage lists will charge, the
-     choices it asks, and its age check. The footer saves the product, or the rows and choices as a
-     preset for next time. The theatre's own presets can be renamed or deleted from their tiles. -->
+     choices it asks, and its age check. The footer saves the product (and starts another, or closes,
+     leaving the list in view), or the rows and choices as a preset for next time. The theatre's own presets can be renamed or deleted from their tiles. -->
 <script setup lang="ts">
 import { presetInput, presetPatch, setupInput } from '../../server/input'
 
@@ -68,7 +68,8 @@ function ageFor(p: Preset | null): Age {
   return p.ageRestricted ? 'yes' : 'no'
 }
 
-async function start(categoryId?: string) {
+// usual: whether a category's usual preset opens straight on the form (not when adding another).
+async function start(categoryId?: string, usual = true) {
   refusal.value = null
   confirmUnpriced.value = false
   ageTouched.value = false
@@ -81,8 +82,8 @@ async function start(categoryId?: string) {
   // From the page's own button: no category yet, and always the kinds of product first.
   form.value = { name: '', categoryId: categoryId ?? '', age: 'category', sizes: [], groupIds: [], mixer: false }
   preset.value = null
-  const usual = categoryId ? presets.value.find(x => x.id === usualOf(category.value)) : undefined
-  if (usual) choose(usual)
+  const opening = usual && categoryId ? presets.value.find(x => x.id === usualOf(category.value)) : undefined
+  if (opening) choose(opening)
   else step.value = 1
 }
 function choose(p: Preset) {
@@ -123,6 +124,8 @@ const body = () => {
 }
 const validate = () => bodyErrors(setupInput, body())
 
+// Which footer button sent the form: Add another starts again on the kinds of product, in the same category.
+const another = ref(false)
 async function add() {
   refusal.value = null
   if (unpriced.value.length && !confirmUnpriced.value) {
@@ -132,9 +135,14 @@ async function add() {
   try {
     const name = form.value.name
     const made = await $api<{ productId: string }>('/api/bar/products/setup', { method: 'POST', body: body() })
-    open.value = false
-    toast.add({ title: t('bar.screens.add-product.added', { name }), color: 'success' })
+    toast.add({
+      title: t('bar.screens.add-product.added', { name }),
+      color: 'success',
+      actions: [{ label: t('bar.screens.add-product.open'), color: 'neutral', variant: 'outline', to: `/admin/modules/bar/products/${made.productId}` }],
+    })
     emit('added', made.productId)
+    if (another.value) await start(form.value.categoryId || undefined, false)
+    else open.value = false
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -422,12 +430,23 @@ async function deletePreset(p: Preset) {
           :label="t('bar.screens.add-product.save-preset')"
           @click="newPreset"
         />
-        <UButton
-          type="submit"
-          form="bar-add-product"
-          loading-auto
-          :label="confirmUnpriced && unpriced.length ? t('bar.screens.add-product.add-unpriced') : t('bar.screens.add-product.add')"
-        />
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            type="submit"
+            form="bar-add-product"
+            color="neutral"
+            variant="outline"
+            :label="t('bar.screens.add-product.add-another')"
+            @click="another = true"
+          />
+          <UButton
+            type="submit"
+            form="bar-add-product"
+            loading-auto
+            :label="confirmUnpriced && unpriced.length ? t('bar.screens.add-product.add-unpriced') : t('bar.screens.add-product.add')"
+            @click="another = false"
+          />
+        </div>
       </div>
     </template>
   </UModal>

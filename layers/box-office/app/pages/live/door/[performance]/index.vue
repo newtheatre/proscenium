@@ -5,7 +5,11 @@
      till), red anything that does not get in, including a ticket whose holder no longer qualifies for
      its type (such as a lapsed member), who goes to the box office to change it, unless a holder of the
      override admits them anyway with a reason (R-30). How many are in stays in view. Typing a code, finding
-     someone by name and pausing the camera are the large buttons at the foot. -->
+     someone by name and pausing the camera are the large buttons at the foot.
+     Offline (D2), the door keeps working from its copy of the door list on the device
+     (useOfflineDoor): a ticket's signed code is checked here, admitted here and sent when the
+     connection returns; the strip says how many admissions are waiting. The door list can be
+     printed as the paper fallback. -->
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
 
@@ -30,7 +34,7 @@ interface Shown { tone: Tone, icon: string, headline: string, line: string, at: 
 interface Term { id: string, label: string }
 
 // Another performance's ticket is ours, so it is amber, with the show and time to tell them (D1).
-const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info' }
+const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info', not_on_list: 'warning', card_offline: 'warning' }
 const ICONS: Record<Tone, string> = { success: 'i-lucide-circle-check', warning: 'i-lucide-circle-alert', info: 'i-lucide-hand-coins', error: 'i-lucide-circle-x' }
 // The banner's colours: strong enough to read across a foyer, with text that passes contrast on each.
 const BANNER: Record<Tone, string> = { success: 'bg-success text-inverted', warning: 'bg-warning text-inverted', info: 'bg-info text-inverted', error: 'bg-error text-inverted' }
@@ -56,6 +60,22 @@ const { data: live } = await useNavigation('live')
 const tillTo = (reference: string) => live.value?.items.some(i => i.to === '/live/till') ? `/live/till?panel=box-office&collect=${encodeURIComponent(reference)}` : undefined
 
 const { data, status, error, refresh } = await useAPI<Summary>(() => `${base.value}/door/summary`, { key: `box-office:door:summary:${id.value}` })
+
+// The door's copy on the device, and the admissions made offline waiting to be sent.
+const toast = useToast()
+const door = useOfflineDoor(id, {
+  onSent: (results) => {
+    const admitted = results.filter(r => r.result === 'admitted').reduce((n, r) => n + (r.admitted ?? 1), 0)
+    const turned = results.filter(r => r.result !== 'admitted' && r.result !== 'sent').length
+    toast.add({
+      title: t('box-office.live-door.offline-sent', { count: admitted }),
+      ...turned ? { description: t('box-office.live-door.offline-sent-problems', { count: turned }), color: 'warning' as const } : { color: 'success' as const },
+    })
+    void refresh()
+  },
+})
+// Offline, the counts are the device's: the server's last word with what was admitted here since.
+const counts = computed(() => (!online.value && door.summary.value) ? door.summary.value : data.value)
 const context = computed(() => data.value ? [data.value.performance.title, time(data.value.performance.startsAt), data.value.performance.label].filter(Boolean).join(' · ') : undefined)
 
 // The camera runs from the moment the screen opens, until paused.
@@ -90,6 +110,10 @@ function describe(out: Scan): Shown {
   else if (out.result === 'already_admitted' && out.booking && out.admittedAt) {
     line = t('box-office.live-door.line.already_admitted', { when: time(out.admittedAt), reference: out.booking.reference })
   }
+  else if (out.result === 'already_admitted' && out.booking) {
+    // Checked on the device, which knows the ticket is in but not when.
+    line = t('box-office.live-door.line.already_admitted-here', { reference: out.booking.reference })
+  }
   else if (out.result === 'not_paid' && out.reservation) {
     const owed = { count: out.reservation.tickets, amount: money(out.reservation.amountDueMinor, out.reservation.currency), reference: out.reservation.reference }
     line = out.reservation.buyer
@@ -111,12 +135,25 @@ function show(result: Shown) {
   recent.value = [result, ...recent.value].slice(0, RECENT)
 }
 
-async function scan(code: string) {
-  if (!code.trim()) return
-  if (!online.value) {
+/** Offline: checked against the device's copy of the door list, and admitted here. */
+async function scanOffline(code: string) {
+  if (!door.ready.value) {
     show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: t('box-office.live-door.offline'), at: Date.now() })
     return
   }
+  const out = await door.check(code)
+  if (out.result === 'reference' && out.reference) {
+    query.value = out.reference
+    finding.value = true
+    return
+  }
+  const said = describe(out)
+  show({ ...said, line: `${said.line} ${t('box-office.live-door.checked-here')}` })
+}
+
+async function scan(code: string) {
+  if (!code.trim()) return
+  if (!online.value) return scanOffline(code)
   try {
     const out = await $api<Scan>(`${base.value}/scan`, { method: 'POST', body: { code: code.trim() } })
     // A paid booking's reference for tonight: the list finds it, and its tickets are admitted there.
@@ -126,9 +163,12 @@ async function scan(code: string) {
       return
     }
     show(describe(out))
+    if (out.result === 'admitted' || out.result === 'already_admitted') await door.noteIn(code)
     if (out.result === 'admitted') await refresh()
   }
   catch (e) {
+    // The connection dropped between the check and the answer: the device checks it instead.
+    if (!online.value || (e as { statusCode?: number }).statusCode === undefined) return scanOffline(code)
     const refusal = toRefusal(e)
     show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: refusal.reason, at: Date.now() })
   }
@@ -179,6 +219,10 @@ const search = useDebounceFn(async () => {
     found.value = null
     return
   }
+  if (!online.value) {
+    found.value = door.find(q)
+    return
+  }
   try {
     found.value = (await $api<{ rows: Row[] }>(`${base.value}/door`, { query: { q } })).rows
   }
@@ -200,9 +244,16 @@ async function submitQuery() {
 }
 
 async function admit(row: Row, count: number) {
+  if (!online.value) {
+    const admitted = door.admit(row.id, count)
+    show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: `${t('box-office.door.admitted-now', { count: admitted })} ${t('box-office.live-door.checked-here')}`, at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
+    await search()
+    return
+  }
   admitting.value = row.id
   try {
     const { admitted } = await $api<{ admitted: number }>(`${base.value}/door/admit`, { method: 'POST', body: { orderId: row.id, count } })
+    door.noteAdmitted(row.id, admitted)
     show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: t('box-office.door.admitted-now', { count: admitted }), at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     await refresh()
     await search()
@@ -234,8 +285,8 @@ async function admit(row: Row, count: number) {
           <div class="flex flex-1 flex-col gap-3 lg:flex-row">
             <div class="flex flex-1 flex-col gap-3">
               <p class="flex flex-wrap items-baseline gap-x-2">
-                <span class="whitespace-nowrap text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: d.admitted, tickets: d.tickets + d.unpaid }) }}</span>
-                <span class="text-muted">{{ t('box-office.live-door.to-come', { count: d.tickets + d.unpaid - d.admitted }) }}<template v-if="d.unpaid"> · {{ t('box-office.live-door.unpaid', { count: d.unpaid }) }}</template></span>
+                <span class="whitespace-nowrap text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: (counts ?? d).admitted, tickets: (counts ?? d).tickets + (counts ?? d).unpaid }) }}</span>
+                <span class="text-muted">{{ t('box-office.live-door.to-come', { count: (counts ?? d).tickets + (counts ?? d).unpaid - (counts ?? d).admitted }) }}<template v-if="(counts ?? d).unpaid"> · {{ t('box-office.live-door.unpaid', { count: (counts ?? d).unpaid }) }}</template></span>
               </p>
               <!-- With no camera there is nothing to frame: the area collapses to the result and the warning. -->
               <section
@@ -467,6 +518,12 @@ async function admit(row: Row, count: number) {
             </UFormField>
           </UForm>
           <p
+            v-if="!online"
+            class="text-sm text-muted"
+          >
+            {{ door.madeAt.value ? t('box-office.live-door.copy-from', { time: time(door.madeAt.value) }) : t('box-office.live-door.no-copy') }}
+          </p>
+          <p
             v-if="found && !found.length"
             class="text-muted"
           >
@@ -537,6 +594,17 @@ async function admit(row: Row, count: number) {
             </li>
           </ul>
         </div>
+      </template>
+      <template #footer>
+        <!-- The paper fallback, printed before the doors open. -->
+        <UButton
+          :to="`/live/door/${encodeURIComponent(id)}/print`"
+          icon="i-lucide-printer"
+          color="neutral"
+          variant="ghost"
+          size="lg"
+          :label="t('box-office.live-door.print')"
+        />
       </template>
     </USlideover>
   </div>
