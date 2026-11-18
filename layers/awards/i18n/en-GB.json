@@ -1,6 +1,5 @@
 {
   "awards.module.name": "Awards",
-  "awards.facts.type-holder.label": "Holds a current award of the type",
   "awards.module.description": "The honours the theatre gives, such as fellowships and commendations, who holds them, and the ticket price an award may carry.",
 
   "awards.settings-sections.issuing": "Issuing an award",

@@ -1,9 +1,5 @@
 {
   "membership.module.name": "Membership",
-  "membership.facts.holder.label": "Holds a current members' membership",
-  "membership.facts.supporter.label": "Holds a current supporters' membership",
-  "membership.facts.voter.label": "May vote as a member",
-  "membership.facts.scheme-holder.label": "Holds a current membership of the scheme",
   "membership.module.description": "Membership schemes, who holds them and until when, the members' area a members' scheme opens, and the lists a scheme checks against.",
 
   "membership.settings-sections.applications": "Applications",
