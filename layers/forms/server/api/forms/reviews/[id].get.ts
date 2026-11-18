@@ -3,9 +3,10 @@
 // released, or from the start where the stage reviews in the open.
 import { getRouterParam } from 'h3'
 import { defineRoute, refuse } from '#kit'
-import { getForm, getVersion } from '../../../forms'
+import { getForm, getVersion, accountName } from '../../../forms'
 import { getResponse, readAnswers } from '../../../responses'
-import { ownAssignment, ownReview, roundView } from '../../../review'
+import { ownAssignment, ownReview, roundView, waitingFor } from '../../../review'
+import { aboutOf } from '../../../slots'
 import type { Definition } from '../../../../shared/engine'
 import { questionsOf, stageOf, withoutWorkflow } from '../../../../shared/engine'
 
@@ -19,10 +20,17 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
   // The round keeps the revision it opened on, so a reviewer marks what was sent to them.
   const answers = (await readAnswers([response.id], types, false, round.revision)).get(response.id)!
   const view = await roundView(definition, response.id, 'panel')
+  const form = (await getForm(response.formId))!
+  // The next response still waiting on this reviewer, so one review leads to the next.
+  const next = (await waitingFor(actor.accountId!)).find(w => w.status === 'assigned' && w.assignmentId !== assignment.id)
   return {
     id: assignment.id,
-    form: { title: (await getForm(response.formId))!.title },
+    form: { title: form.title },
     response: { reference: response.reference, submittedAt: response.submittedAt },
+    // What it is about, where the form is attached to a record, and who sent it unless the form is anonymous.
+    about: await aboutOf(response),
+    from: form.anonymous ? null : response.personId ? await accountName(response.personId) : response.respondentEmail,
+    next: next?.assignmentId ?? null,
     stage: stage.name,
     mode: stage.review.mode,
     criteria: stage.review.criteria ?? [],

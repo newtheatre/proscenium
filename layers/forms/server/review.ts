@@ -10,6 +10,7 @@ import { canonicalAccount, holdersOfRole } from '#modules/core'
 import type { Answers, Definition, Entry, Review, ScoreSummary, Stage, Tally, Vote } from '../shared/engine'
 import { questionsOf, stageOf, summarise, tally, validScores } from '../shared/engine'
 import { reviewAssignments } from './db/schema'
+import { aboutOf } from './slots'
 
 const CONFLICT = 409 // not-policy: HTTP status
 const FORBIDDEN = 403 // not-policy: HTTP status
@@ -76,6 +77,19 @@ export function closeRounds(unit: UnitView, responseId: string, at: number): voi
 export async function conflicted(actor: Actor, responseId: string): Promise<boolean> {
   if (!actor.accountId) return false
   return !!await first(`SELECT 1 AS yes FROM forms_review_assignments WHERE response_id = ?2 AND status = 'conflicted' AND reviewer_id IN (${accountScopeSql('?1')}) LIMIT 1`, actor.accountId, responseId)
+}
+
+/**
+ * Whether this person is named in the response itself, in a question of people marked as involved.
+ * Such a person may not move or decide it, reviewer or not (FB-406).
+ */
+export async function namedIn(actor: Actor, def: Definition, response: { id: string, currentRevision: number }): Promise<boolean> {
+  if (!actor.accountId) return false
+  const named = await involvedStored(def, response.id, response.currentRevision)
+  if (!named.length) return false
+  const me = await canonicalAccount(actor.accountId)
+  for (const id of named) if (await canonicalAccount(id) === me) return true
+  return false
 }
 
 /** Refuses somebody with a conflict (FB-406): on every route that returns anything about the response. */
@@ -150,6 +164,9 @@ export interface RoundView {
   assigned: number
   submitted: number
   conflicted: number
+  /** The least number who must vote, and whether that many reviews are in. Counts only, so anybody may be told. */
+  quorum: number | null
+  quorate: boolean
   /** A vote's count, once it may be seen. */
   tally: Tally | null
   /** A scored round's summary, once it may be seen. */
@@ -184,23 +201,33 @@ export async function roundView(def: Definition, responseId: string, reader: 'ch
     assigned: rows.filter(r => r.status !== 'conflicted').length,
     submitted: done.length,
     conflicted: rows.filter(r => r.status === 'conflicted').length,
+    quorum: review.mode === 'vote' ? review.quorum ?? 1 : null,
+    quorate: review.mode === 'vote' ? done.length >= (review.quorum ?? 1) : done.length > 0,
     tally: shown && review.mode === 'vote' ? tally(review, done.map(r => r.vote!)) : null,
     summary: shown && review.mode === 'scores' ? summarise(review.criteria ?? [], marks) : null,
     reviews: named ? done.map((r, i) => ({ reviewer: r.name ?? '', vote: r.vote, scores: marks[i]!, comment: r.comment ?? '' })) : null,
   }
 }
 
-export interface Waiting { assignmentId: string, title: string, reference: string, stage: string, mode: Review['mode'], status: 'assigned' | 'submitted', released: boolean, openedAt: number }
+export interface Waiting { assignmentId: string, title: string, reference: string, /** What tells this response from the next: what it is about, and its first short answer. */ about: string | null, first: string | null, stage: string, mode: Review['mode'], status: 'assigned' | 'submitted', released: boolean, openedAt: number }
 /** The reviews a person is asked for now: their assignments in rounds still open, oldest first. */
 export async function waitingFor(accountId: string): Promise<Waiting[]> {
-  const rows = await all<{ assignmentId: string, title: string, reference: string, stageKey: string, status: 'assigned' | 'submitted', releasedAt: number | null, openedAt: number, workflow: string | null }>(
-    `SELECT a.id AS assignmentId, f.title, r.reference, n.stage_key AS stageKey, a.status, n.released_at AS releasedAt, n.opened_at AS openedAt, json_extract(v.definition, '$.workflow') AS workflow
+  const rows = await all<{ assignmentId: string, responseId: string, revision: number, title: string, reference: string, stageKey: string, status: 'assigned' | 'submitted', releasedAt: number | null, openedAt: number, definition: string, placementId: string, subjectType: string | null, subjectId: string | null }>(
+    `SELECT a.id AS assignmentId, r.id AS responseId, n.revision, f.title, r.reference, n.stage_key AS stageKey, a.status, n.released_at AS releasedAt, n.opened_at AS openedAt, v.definition,
+       r.placement_id AS placementId, r.subject_type AS subjectType, r.subject_id AS subjectId
      FROM forms_review_assignments a JOIN forms_review_rounds n ON n.id = a.round_id JOIN forms_responses r ON r.id = a.response_id JOIN forms_forms f ON f.id = a.form_id JOIN forms_versions v ON v.id = r.version_id
      WHERE a.reviewer_id IN (${accountScopeSql('?1')}) AND a.status <> 'conflicted' AND n.closed_at IS NULL AND r.state = 'submitted'
      ORDER BY n.opened_at, a.id LIMIT 200`, accountId) // not-policy: more than anyone is asked for at once
-  return rows.flatMap((r) => {
-    const stage = r.workflow ? stageOf({ format: 1, pages: [], workflow: JSON.parse(r.workflow) } as Definition, r.stageKey) : undefined
-    if (!stage?.review) return []
-    return [{ assignmentId: r.assignmentId, title: r.title, reference: r.reference, stage: stage.name, mode: stage.review.mode, status: r.status, released: r.releasedAt !== null, openedAt: r.openedAt }]
-  })
+  const out: Waiting[] = []
+  for (const r of rows) {
+    const def = JSON.parse(r.definition) as Definition
+    const stage = stageOf(def, r.stageKey)
+    if (!stage?.review) continue
+    // The first short answer that is not about a person: a show's name, a title, a subject.
+    const lead = questionsOf(def).find(({ question: q, group }) => !group && q.type === 'text.short' && (q.dataClass === 'public' || q.dataClass === 'internal'))?.question.id
+    const answer = lead ? await first<{ text: string | null }>('SELECT value_text AS text FROM forms_answers WHERE response_id = ? AND revision = ? AND question_id = ? AND repeat_index = 0', r.responseId, r.revision, lead) : null
+    const about = await aboutOf(r)
+    out.push({ assignmentId: r.assignmentId, title: r.title, reference: r.reference, about: about?.name ?? null, first: answer?.text?.trim() || null, stage: stage.name, mode: stage.review.mode, status: r.status, released: r.releasedAt !== null, openedAt: r.openedAt })
+  }
+  return out
 }

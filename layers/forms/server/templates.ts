@@ -58,14 +58,14 @@ export async function listTemplates(): Promise<TemplateInfo[]> {
  * What a form started from this template begins with. A copy: changing it changes nothing else.
  * `mode` is the template's, or null for the theatre's own, which take the mode asked for.
  */
-export async function startFrom(key: string): Promise<{ definition: Definition, anonymous: boolean, mode: 'submission' | 'record' | null }> {
+export async function startFrom(key: string): Promise<{ definition: Definition, anonymous: boolean, mode: 'submission' | 'record' | null, retentionDays: number | null }> {
   const shipped = SHIPPED_TEMPLATES.find(t => t.key === key)
-  if (shipped) return { definition: structuredClone(shipped.definition), anonymous: !!shipped.anonymous, mode: 'submission' }
+  if (shipped) return { definition: structuredClone(shipped.definition), anonymous: !!shipped.anonymous, mode: 'submission', retentionDays: shipped.retentionDays }
   const contributed = (await contributedTemplates()).find(t => t.key === key)
-  if (contributed) return { definition: structuredClone(contributed.definition), anonymous: !!contributed.anonymous, mode: contributed.mode ?? 'submission' }
+  if (contributed) return { definition: structuredClone(contributed.definition), anonymous: !!contributed.anonymous, mode: contributed.mode ?? 'submission', retentionDays: contributed.retentionDays ?? null }
   const row = await first<Row>('SELECT id, name, description, definition FROM forms_templates WHERE id = ?', key)
   if (!row) return refuse('forms.template.not-found', 'This template is no longer there.', { status: 404, remedy: 'Choose another, or start with a blank form.' }) // not-policy: HTTP status
-  return { definition: await parseOrRefuse(JSON.parse(row.definition)), anonymous: false, mode: null }
+  return { definition: await parseOrRefuse(JSON.parse(row.definition)), anonymous: false, mode: null, retentionDays: null }
 }
 
 /**

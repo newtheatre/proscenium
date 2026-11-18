@@ -3,6 +3,7 @@
      and that is the end of it, so most forms never open this. Every change is an edit to the draft
      like any other: it saves itself, can be undone, and is checked with the rest of the form. -->
 <script setup lang="ts">
+import { DragDropProvider } from '@dnd-kit/vue'
 import { MOVERS, STAGE_KINDS, reviewWorkflow } from '../../shared/engine'
 import type { Definition, Mover, Stage, StageKind, Transition, Workflow } from '../../shared/engine'
 
@@ -50,6 +51,13 @@ const removeStage = (key: string) => write((f) => {
   f.stages = f.stages.filter(s => s.key !== key)
   f.transitions = f.transitions.filter(m => m.from !== key && m.to !== key)
 })
+
+function dropStage(event: { canceled: boolean, operation: { source: unknown } }) {
+  if (event.canceled) return
+  const { initialIndex, index } = event.operation.source as { initialIndex?: number, index?: number }
+  if (initialIndex === undefined || index === undefined || initialIndex === index) return
+  shiftStage(initialIndex, index - initialIndex)
+}
 const shiftStage = (index: number, by: number) => write((f) => { f.stages.splice(index + by, 0, ...f.stages.splice(index, 1)) })
 
 const addMove = () => write((f) => { f.transitions.push({ key: fresh(f.transitions.map(m => m.key), 'move'), from: f.stages[0]!.key, to: (f.stages[1] ?? f.stages[0]!).key, label: '', who: 'staff' }) })
@@ -75,7 +83,7 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
     v-model:open="open"
     :title="t('forms.screens.stages.title')"
     :description="t('forms.screens.stages.help')"
-    :ui="{ content: 'sm:max-w-3xl' }"
+    :ui="{ content: 'sm:max-w-5xl' }"
   >
     <template #body>
       <div
@@ -110,79 +118,93 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
               {{ t('forms.screens.stages.stages-help') }}
             </p>
           </div>
-          <ol class="space-y-3">
-            <li
-              v-for="(stage, i) in flow.stages"
-              :key="stage.key"
-              class="space-y-1 rounded-md border border-default p-3"
-            >
-              <div class="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,2fr)_auto]">
-                <UInput
-                  :model-value="stage.name"
-                  :placeholder="t('forms.screens.stages.name')"
-                  :aria-label="t('forms.screens.stages.name-n', { n: i + 1 })"
-                  @update:model-value="setStage(stage.key, { name: String($event) }, `stage-name:${stage.key}`)"
-                />
-                <USelect
-                  :model-value="stage.kind"
-                  :items="kinds"
-                  :aria-label="t('forms.screens.stages.kind-n', { n: i + 1 })"
-                  @update:model-value="setStage(stage.key, { kind: $event as StageKind })"
-                />
-                <UInput
-                  :model-value="stage.status ?? ''"
-                  :placeholder="t('forms.screens.stages.status', { name: stage.name.trim() || t('forms.screens.stages.stage-n', { n: i + 1 }) })"
-                  :aria-label="t('forms.screens.stages.status-n', { n: i + 1 })"
-                  @update:model-value="setStage(stage.key, { status: String($event) }, `stage-status:${stage.key}`)"
-                />
-                <div class="flex items-center">
-                  <IconButton
-                    icon="i-lucide-arrow-up"
-                    size="sm"
-                    :label="t('forms.screens.builder.move-up')"
-                    :disabled="i === 0"
-                    @click="shiftStage(i, -1)"
+          <DragDropProvider @drag-end="dropStage">
+            <ol class="space-y-3">
+              <FormsSortableItem
+                v-for="(stage, i) in flow.stages"
+                :id="stage.key"
+                :key="stage.key"
+                :index="i"
+                class="space-y-1 rounded-md border border-default bg-default p-3"
+              >
+                <div class="grid gap-2 sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,2fr)_auto]">
+                  <span
+                    data-drag-handle
+                    class="hidden cursor-grab touch-none items-center text-dimmed hover:text-default sm:flex"
+                    :title="t('forms.screens.builder.drag')"
+                  >
+                    <UIcon
+                      name="i-lucide-grip-vertical"
+                      class="block"
+                    />
+                  </span>
+                  <UInput
+                    :model-value="stage.name"
+                    :placeholder="t('forms.screens.stages.name')"
+                    :aria-label="t('forms.screens.stages.name-n', { n: i + 1 })"
+                    @update:model-value="setStage(stage.key, { name: String($event) }, `stage-name:${stage.key}`)"
                   />
-                  <IconButton
-                    icon="i-lucide-arrow-down"
-                    size="sm"
-                    :label="t('forms.screens.builder.move-down')"
-                    :disabled="i === flow.stages.length - 1"
-                    @click="shiftStage(i, 1)"
+                  <USelect
+                    :model-value="stage.kind"
+                    :items="kinds"
+                    :aria-label="t('forms.screens.stages.kind-n', { n: i + 1 })"
+                    @update:model-value="setStage(stage.key, { kind: $event as StageKind })"
                   />
-                  <IconButton
-                    icon="i-lucide-x"
-                    size="sm"
-                    :label="t('forms.screens.stages.remove-stage', { n: i + 1 })"
-                    @click="removeStage(stage.key)"
+                  <UInput
+                    :model-value="stage.status ?? ''"
+                    :placeholder="t('forms.screens.stages.status', { name: stage.name.trim() || t('forms.screens.stages.stage-n', { n: i + 1 }) })"
+                    :aria-label="t('forms.screens.stages.status-n', { n: i + 1 })"
+                    @update:model-value="setStage(stage.key, { status: String($event) }, `stage-status:${stage.key}`)"
                   />
+                  <div class="flex items-center">
+                    <IconButton
+                      icon="i-lucide-arrow-up"
+                      size="sm"
+                      :label="t('forms.screens.builder.move-up')"
+                      :disabled="i === 0"
+                      @click="shiftStage(i, -1)"
+                    />
+                    <IconButton
+                      icon="i-lucide-arrow-down"
+                      size="sm"
+                      :label="t('forms.screens.builder.move-down')"
+                      :disabled="i === flow.stages.length - 1"
+                      @click="shiftStage(i, 1)"
+                    />
+                    <IconButton
+                      icon="i-lucide-x"
+                      size="sm"
+                      :label="t('forms.screens.stages.remove-stage', { n: i + 1 })"
+                      @click="removeStage(stage.key)"
+                    />
+                  </div>
                 </div>
-              </div>
-              <p
-                v-if="i === 0"
-                class="text-sm text-muted"
-              >
-                {{ t('forms.screens.stages.first') }}
-              </p>
-              <FormsStageReview
-                v-if="stage.kind === 'in_review'"
-                :stage="stage"
-                :n="i + 1"
-                :roles="reviewers?.roles ?? []"
-                :people="people"
-                @change="(review, merge) => setStage(stage.key, { review }, merge)"
-                @named="(id, name) => { named[id] = name }"
-              />
-              <p
-                v-for="p in problemsAt(`stage:${stage.key}`)"
-                :key="p.code"
-                class="text-sm"
-                :class="p.level === 'error' ? 'text-error' : 'text-warning'"
-              >
-                {{ t(`forms.problems.${p.code}`) }}
-              </p>
-            </li>
-          </ol>
+                <p
+                  v-if="i === 0"
+                  class="text-sm text-muted"
+                >
+                  {{ t('forms.screens.stages.first') }}
+                </p>
+                <FormsStageReview
+                  v-if="stage.kind === 'in_review'"
+                  :stage="stage"
+                  :n="i + 1"
+                  :roles="reviewers?.roles ?? []"
+                  :people="people"
+                  @change="(review, merge) => setStage(stage.key, { review }, merge)"
+                  @named="(id, name) => { named[id] = name }"
+                />
+                <p
+                  v-for="p in problemsAt(`stage:${stage.key}`)"
+                  :key="p.code"
+                  class="text-sm"
+                  :class="p.level === 'error' ? 'text-error' : 'text-warning'"
+                >
+                  {{ t(`forms.problems.${p.code}`) }}
+                </p>
+              </FormsSortableItem>
+            </ol>
+          </DragDropProvider>
           <UButton
             :label="t('forms.screens.stages.add-stage')"
             icon="i-lucide-plus"
@@ -208,7 +230,7 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
               :key="move.key"
               class="space-y-1 rounded-md border border-default p-3"
             >
-              <div class="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_auto]">
+              <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,1.2fr)_auto]">
                 <UInput
                   :model-value="move.label"
                   :placeholder="t('forms.screens.stages.move-label')"
