@@ -152,7 +152,8 @@ test('Add a product starts from a preset, fills a row per size, and stays on the
   await expect(page).toHaveURL(/\/admin\/modules\/bar\/products$/)
   const row = page.getByRole('listitem').filter({ hasText: `House red ${stamp}` })
   await expect(row.getByText('Needs a price')).toBeVisible()
-  await page.getByRole('link', { name: 'Open' }).first().click()
+  // The toast's own Open, matched exactly: an earlier link on the page whose name merely contains "Open" was taken first.
+  await page.getByRole('link', { name: 'Open', exact: true }).click()
   await expect(page.getByRole('heading', { name: '250ml' })).toBeVisible()
 })
 
