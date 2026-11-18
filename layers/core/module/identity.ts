@@ -255,7 +255,8 @@ export const identityContributions = {
     ],
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
-  'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // Holding a role, as core.role:<role id>, such as a duty kept for people with the Duty manager role (FH-5).
+  'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }, { id: 'core.role', file: 'roles' }],
   // The people who decide access scheme applications, made with the site (FH-4). Not an Owner's or
   // Administrator's by default, so the theatre gives it to whoever runs the scheme.
   'core.role-preset': [{ id: 'core.access-coordinator', key: 'access-coordinator', name: 'Access coordinator', description: 'Reads and decides access scheme applications.', abilities: ['core.access-scheme.review'] }],
