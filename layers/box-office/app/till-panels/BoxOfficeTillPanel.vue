@@ -6,7 +6,7 @@
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string }, holder?: true }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -60,6 +60,11 @@ const performance = computed(() => performances.value.find(p => p.performanceId 
 const choices = computed(() => performances.value.map(p => ({ value: p.performanceId, label: `${p.title}, ${dateTime(p.startsAt)}` })))
 const quantities = ref<Record<string, number>>({})
 const keyOf = (row: { bandId: string, ticketTypeId: string }) => `${row.bandId} ${row.ticketTypeId}`
+function setQuantity(row: PerformanceRow, value: number | null | undefined) {
+  const n = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
+  const { [keyOf(row)]: _, ...others } = quantities.value
+  quantities.value = n > 0 ? { ...others, [keyOf(row)]: n } : others
+}
 // A member's references, typed for each ticket of a member price.
 const references = ref<Record<string, string[]>>({})
 function setReference(row: PerformanceRow, n: number, value: string) {
@@ -475,11 +480,13 @@ function clear() {
             :help="t('box-office.screens.panel.left', { count: row.free })"
           >
             <div class="space-y-2">
+              <!-- Shown as 0 rather than empty: from an empty box, the first + would only fill in 0 (T1). -->
               <UInputNumber
-                v-model="quantities[keyOf(row)]"
+                :model-value="quantities[keyOf(row)] ?? 0"
                 :min="0"
                 :max="row.free"
                 :disabled="locked"
+                @update:model-value="setQuantity(row, $event)"
               />
               <template v-if="row.holder && (quantities[keyOf(row)] ?? 0) > 0">
                 <div
@@ -499,8 +506,8 @@ function clear() {
                   <UInput
                     v-if="row.reference && !holders[keyOf(row)]?.[n - 1]"
                     :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                    :aria-label="t('box-office.screens.panel.reference', { label: row.reference.label, n })"
-                    :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.label })"
+                    :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
+                    :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.field ?? row.reference.label })"
                     :disabled="locked"
                     autocomplete="off"
                     maxlength="64"

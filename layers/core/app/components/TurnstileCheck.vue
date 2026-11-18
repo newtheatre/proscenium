@@ -2,7 +2,8 @@
      token when it runs out, so a form never sends a stale one. Nuxt's Turnstile module loads the
      script, resets the check before it expires and removes it with the component. With no site key
      the check is quietly off, as it is on the server with no secret. The site key is the setting on
-     Admin > Sign-in, or NUXT_PUBLIC_TURNSTILE_SITE_KEY where that is unset. -->
+     Admin > Sign-in, or NUXT_PUBLIC_TURNSTILE_SITE_KEY where that is unset. A token is good for one
+     request: a page that sent one and was refused calls reset() (through a template ref) for a new one. -->
 <script setup lang="ts">
 const emit = defineEmits<{ token: [value: string] }>()
 const { t } = useT()
@@ -15,6 +16,13 @@ watch(token, (value) => {
   if (value) failed.value = false
   emit('token', value)
 })
+const widget = useTemplateRef<{ reset: () => void }>('widget')
+/** Runs the check again, for a page whose request used up the token. Emits an empty token at once. */
+function reset() {
+  token.value = ''
+  widget.value?.reset()
+}
+defineExpose({ reset })
 const options = {
   'response-field': false,
   'expired-callback': () => { token.value = '' },
@@ -28,6 +36,7 @@ const options = {
 <template>
   <div v-if="siteKey">
     <NuxtTurnstile
+      ref="widget"
       v-model="token"
       :site-key="siteKey"
       :options="options"

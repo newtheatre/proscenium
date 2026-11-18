@@ -17,7 +17,7 @@ import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
-import { DOOR_CODE_PURPOSE, reissueTickets, signedPart } from './tickets'
+import { doorCodesForOrder, DOOR_CODE_PURPOSE, reissueTickets, signedPart } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
@@ -404,7 +404,7 @@ export interface DeskPerformance {
    * `reference`, on a member price: what the buyer may give instead of the seller checking by hand,
    * worded by its source. `holder`: each ticket is for someone who qualifies, named at the till.
    */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string }, holder?: true }[]
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }[]
 }
 
 /**
@@ -482,9 +482,9 @@ export async function deskSold(intentId: string): Promise<DeskSold[]> {
 
 /**
  * Emails the tickets of a desk sale made with nobody's details, when the buyer asks after paying.
- * The order joins the account for the address, or the person picked, as if given at the sale. The
- * tickets get new door codes, since the first ones were handed out once and kept nowhere; any shown
- * at the desk stop working. Once an order has a buyer this is refused: it was sent to them already.
+ * The order joins the account for the address, or the person picked, as if given at the sale, and
+ * the message carries the tickets' own codes. Once an order has a buyer this is refused: it was sent
+ * to them already.
  */
 export async function sendDeskTickets(unit: UnitView, orderId: string, to: { email?: string, accountId?: string }): Promise<{ buyer: string }> {
   const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
@@ -495,11 +495,15 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
   if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
   await requireAbility(useContext().actor, 'box-office.order.sell', ['core.performance', lines[0]!.performance_id])
   const accountId = to.accountId ? await pickedBuyer(to.accountId) : (await findOrCreateAccount(unit, { address: to.email!, origin: 'guest' })).accountId
-  // A ticket already admitted needs no code: only those still to come in are sent.
-  const waiting = await all<{ id: string, line_id: string, performance_id: string }>(
-    `SELECT k.id, l.id AS line_id, l.performance_id FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id
-      WHERE l.order_id = ? AND l.state = 'live' AND k.state = 'valid' AND k.admitted_at IS NULL ORDER BY l.id`, order.id)
-  const doorCodes = await reissueTickets(unit, waiting.map(k => ({ ticketId: k.id, line: { id: k.line_id, performance_id: k.performance_id } })))
+  // The tickets' own codes, kept sealed since they were issued. One issued before codes were kept
+  // is issued again, unless it is in already.
+  const shown = await doorCodesForOrder(order.id)
+  const lost = shown.filter(k => !k.doorCode && !k.admitted)
+  const lineOf = new Map(lines.map(l => [l.id, l]))
+  const doorCodes = [
+    ...shown.flatMap(k => (k.doorCode ? [k.doorCode] : [])),
+    ...await reissueTickets(unit, lost.map(k => ({ ticketId: k.ticketId, line: { id: k.lineId, performance_id: lineOf.get(k.lineId)?.performance_id ?? k.performanceId } }))),
+  ]
   const token = randomToken()
   const at = nowMs()
   unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${at}
