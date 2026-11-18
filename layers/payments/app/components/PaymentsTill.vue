@@ -947,7 +947,7 @@ function ended() {
               </template>
 
               <div
-                v-else
+                v-else-if="sale"
                 class="space-y-4"
               >
                 <p class="font-medium">

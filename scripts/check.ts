@@ -5,6 +5,7 @@ import { checkPageAddresses, checkRoutes } from './checks/routes.ts'
 import { checkMigrations } from './checks/migrations.ts'
 import { checkAbilities, checkAccountComparisons, checkChangeCounts, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkSealSpecial, checkTranslations } from './checks/source.ts'
 import { checkSite } from './checks/site.ts'
+import { checkPolicies } from './checks/policies.ts'
 import { checkInterface } from './checks/interface.ts'
 
 let failed = 0
@@ -30,6 +31,7 @@ report('Routes', checkRoutes(registry, modules))
 report('Reserved addresses', checkPageAddresses())
 report('Abilities', checkAbilities(modules, registry))
 report('Settings quoted in content', checkContentTokens(registry))
+report('Policies', checkPolicies(modules, registry))
 report('The site\'s menu and page components', checkSite(registry, source => Bun.YAML.parse(source)))
 report('Events and jobs', checkEventsAndJobs(modules, registry))
 report('Imports, bindings and outside calls', checkImports(modules))

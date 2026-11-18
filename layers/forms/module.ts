@@ -135,6 +135,13 @@ export default defineModule({
   },
 
   contributes: {
+    // What forms add to the privacy notice (/policies/privacy): its table of what is held, and what a browser keeps.
+    'core.privacy-record': [
+      { id: 'forms.responses', holds: 'Answers you give on a form', why: 'For the purpose the form states', basis: 'As stated on each form', keptFor: 'As stated on each form', order: 400 },
+    ],
+    'core.browser-storage': [
+      { id: 'forms.draft', names: ['A form you have started'], kind: 'storage', purpose: 'So you do not lose your answers if you close the page. Removed when you send the form', essential: false, order: 200 },
+    ],
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }, { id: 'forms.template', file: 'template' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
     // Responses are found by reference from the palette; the route answers only those the person may read.

@@ -23,6 +23,8 @@ const advanced: SettingGroupDecl = { advanced: true }
 export const settingGroups: Record<string, SettingGroupDecl> = {
   'site': on('theatre'),
   'organisation': on('theatre'),
+  'complaints': on('theatre'),
+  'visiting': on('theatre'),
   'locale': on('theatre'),
   // Branding is to become a bespoke screen; until it is, its groups are drawn on a generated page there.
   'brand': on('branding'),
@@ -32,6 +34,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'recovery': on('sign-in'),
   'access': on('sign-in'),
   'privacy': on('privacy'),
+  'accounts': on('sign-in'),
   // The Email sending screen draws these in its own settings section (C-59), saved as a generated
   // page saves them; the verified domain is its status line.
   'notifications': { screen: '/admin/email' },

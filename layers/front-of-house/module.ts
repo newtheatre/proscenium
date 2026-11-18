@@ -41,10 +41,10 @@ export default defineModule({
     // At or above this, managers are told at once; below, in the daily digest.
     'incidents.immediate-severity': setting.choice({ default: 'serious', options: ['minor', 'moderate', 'serious'], change, audience: 'staff' }),
     // Shortening one deletes records at the next sweep, which cannot be undone: so it asks again.
-    'retention.assignments': setting.duration({ default: '2y', min: '6mo', max: '7y', change, audience: 'staff', onChange: 'confirm' }),
+    'retention.assignments': setting.duration({ default: '2y', min: '6mo', max: '7y', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'retention.checklists': setting.duration({ default: '1y', min: '3mo', max: '7y', change, audience: 'staff', onChange: 'confirm' }),
-    'retention.incidents': setting.duration({ default: '3y', min: '1y', max: '10y', change, audience: 'staff', onChange: 'confirm' }),
-    'retention.incidents-child': setting.duration({ default: '21y', min: '3y', max: '25y', change, audience: 'staff', onChange: 'confirm' }),
+    'retention.incidents': setting.duration({ default: '3y', min: '1y', max: '10y', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'retention.incidents-child': setting.duration({ default: '21y', min: '3y', max: '25y', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // When the health check warns that a venue's emergency card is stale.
     'emergency.review-every': setting.duration({ default: '1y', min: '1mo', max: '3y', change, audience: 'staff' }),
   }),
@@ -132,6 +132,12 @@ export default defineModule({
   },
 
   contributes: {
+    // Front of house's lines of the privacy notice's "what we hold" table (/policies/privacy).
+    'core.privacy-record': [
+      { id: 'front-of-house.assignments', holds: 'Shifts you signed up for, whether you came and the hours you gave', why: 'To run performances safely and recognise volunteers\' time', basis: 'Our legitimate interests in staffing performances', keptFor: 'front-of-house.retention.assignments', order: 200 },
+      { id: 'front-of-house.incidents', holds: 'Accident and incident records', why: 'Health and safety law requires them', basis: 'A legal duty, and to protect life', keptFor: 'front-of-house.retention.incidents', order: 210 },
+      { id: 'front-of-house.incidents-child', holds: 'Accident and incident records involving a child', why: 'Health and safety law requires them', basis: 'A legal duty, and to protect life', keptFor: 'front-of-house.retention.incidents-child', order: 220 },
+    ],
     'core.record-resolver': [
       { id: 'front-of-house.shift', file: 'shift' },
       { id: 'front-of-house.assignment', file: 'assignment' },

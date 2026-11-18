@@ -7,13 +7,14 @@ import { writeGenerated } from './lib/write.ts'
 import { checkRoutes } from './checks/routes.ts'
 import { publicComponentProblems, publicComponents } from './checks/site.ts'
 import { abs } from './lib/paths.ts'
+import { collectPolicies } from './lib/policies.ts'
 
 const version = JSON.parse(readFileSync(abs('package.json'), 'utf8')).version as string
 
 try {
   const { modules, registry } = await loadRegistry()
   const components = publicComponents(registry)
-  const problems = [...checkRoutes(registry, modules, { fatalOnly: true }), ...publicComponentProblems(components)]
+  const problems = [...checkRoutes(registry, modules, { fatalOnly: true }), ...publicComponentProblems(components), ...collectPolicies(modules).problems]
   if (problems.length) {
     for (const p of problems) console.error(`✗ ${p}`)
     process.exit(1)
