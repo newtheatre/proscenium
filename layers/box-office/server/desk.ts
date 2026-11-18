@@ -129,6 +129,38 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
 
+/**
+ * The panel's sale narrowed to some of its tickets, for a till sale split between people (Matt,
+ * 18 November): each person's tickets become a booking of their own, so the link on their receipt
+ * shows theirs alone. The summary has a line for each ticket, in the order the sale's lines give
+ * them, so line n is the nth ticket. A reservation or an exchange is one booking already: null.
+ */
+export function deskNarrow(input: unknown, lines: { line: number, quantity: number }[]): unknown | null {
+  const parsed = panelInput(input)
+  if (!('sale' in parsed)) return null
+  const sale = parsed.sale
+  // A promo code takes off the dearest tickets of the whole sale, so splitting it could change the price: one booking.
+  if (sale.promoCode) return null
+  const tickets = sale.lines.flatMap((l, at) => Array.from({ length: l.quantity }, (_, n) => ({ at, n })))
+  const picked = new Set<number>()
+  for (const l of lines) {
+    if (l.quantity !== 1 || !tickets[l.line] || picked.has(l.line)) return null
+    picked.add(l.line)
+  }
+  const narrowed = sale.lines.flatMap((l, at) => {
+    const ns = tickets.flatMap((t, i) => (t.at === at && picked.has(i) ? [t.n] : []))
+    if (!ns.length) return []
+    return [{
+      bandId: l.bandId,
+      ticketTypeId: l.ticketTypeId,
+      quantity: ns.length,
+      ...(l.references ? { references: ns.map(n => l.references![n] ?? '') } : {}),
+      ...(l.holders ? { holders: ns.map(n => l.holders![n] ?? '') } : {}),
+    }]
+  })
+  return { ...sale, lines: narrowed }
+}
+
 /** Makes the panel's sale real but unpaid, as an order waiting for the till's payment. */
 export async function deskPrepare(unit: UnitView, context: DeskContext): Promise<{ owner: { module: string, record: string }, amountMinor: number }> {
   const actor = useContext().actor
