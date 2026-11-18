@@ -79,6 +79,9 @@ export default defineModule({
         limit: z.number().int().min(1).optional(),
         // A forms.source that names the subject's records.
         source: z.string().optional(),
+        // Custom fields: a form attached for every record of the type, filled in on each record's page by whoever holds `edit` on it.
+        mode: z.enum(['submission', 'record']).optional(),
+        edit: z.string().optional(),
       }),
     }),
     // Something a module does once a response has taken a move, such as issuing the award.

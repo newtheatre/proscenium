@@ -38,6 +38,8 @@ import templatesPost from '../../server/api/forms/templates/index.post'
 import templateDelete from '../../server/api/forms/templates/[id].delete'
 import versionsGet from '../../server/api/forms/forms/[id]/versions/index.get'
 import versionGet from '../../server/api/forms/forms/[id]/versions/[number].get'
+import recordGet from '../../server/api/forms/records/[slot]/[record]/index.get'
+import recordPut from '../../server/api/forms/records/[slot]/[record]/[form].put'
 import statusPost from '../../server/api/forms/forms/[id]/status.post'
 import runPost from '../../server/api/forms/forms/[id]/responses/[response]/actions/[run]/run.post'
 import type { Definition, Question } from '../../shared/engine'
@@ -67,6 +69,8 @@ export const handle = server({
   'POST /api/forms/forms/:id/responses/:response/release': releasePost,
   'GET /api/forms/sources/:source': sourceGet,
   'POST /api/forms/forms/:id/status': statusPost,
+  'GET /api/forms/records/:slot/:record': recordGet,
+  'PUT /api/forms/records/:slot/:record/:form': recordPut,
   'GET /api/forms/forms/:id/versions': versionsGet,
   'GET /api/forms/forms/:id/versions/:number': versionGet,
   'GET /api/forms/templates': templatesGet,

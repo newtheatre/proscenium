@@ -4,12 +4,12 @@
      The props are part of forms' interface to other modules. -->
 <script setup lang="ts">
 interface Attached { anonymous: boolean, id: string, formId: string, title: string, address: string, responseCount: number, status: 'active' | 'paused', opensAt: number | null, closesAt: number | null, formStatus: string }
-interface There { slot: { id: string, label: string, limit: number }, attached: Attached[], forms: { id: string, title: string, anonymous: boolean }[] }
+interface There { slot: { id: string, label: string, limit: number, mode: 'submission' | 'record' }, attached: Attached[], forms: { id: string, title: string, anonymous: boolean }[] }
 
 const props = defineProps<{
   /** The slot's id, such as `awards.nomination`. */
   slotId: string
-  /** The id of the record the forms are attached to. */
+  /** The id of the record the forms are attached to. For a slot of custom fields, `*`: every record of the type. */
   subject: string
 }>()
 const { t } = useT()
@@ -30,10 +30,39 @@ function terms(formId: string, anonymous = false) {
   editing.value = { formId, anonymous }
   open.value = true
 }
+const fields = computed(() => data.value?.slot.mode === 'record')
+// Custom fields have no terms: nobody is sent them, they are filled in on each record.
+const ALWAYS = { audience: 'signed_in', opensAt: null, closesAt: null, responseCap: null, onePerPerson: false, status: 'active' }
+async function attachFields(formId: string) {
+  refusal.value = null
+  try {
+    await $api(`${at.value}/${formId}` as string, { method: 'PUT', body: ALWAYS })
+    toast.add({ title: t('forms.screens.fields.attached'), color: 'success' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  await saved()
+}
+// A new set of fields starts as an empty form in record mode, named after the slot, and opens in the builder.
+const making = ref(false)
+async function newFields() {
+  refusal.value = null
+  making.value = true
+  try {
+    const made = await $api<{ formId: string }>('/api/forms/forms', { method: 'POST', body: { title: t(data.value!.slot.label), mode: 'record' } })
+    await navigateTo(`/console/forms/${made.formId}`)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  making.value = false
+}
 // Choosing a form opens its terms; it is attached when they are saved.
 watch(adding, (id) => {
   const form = data.value?.forms.find(f => f.id === id)
-  if (form) terms(form.id, form.anonymous)
+  if (form && fields.value) attachFields(form.id)
+  else if (form) terms(form.id, form.anonymous)
 })
 watch(open, (now) => {
   if (!now) adding.value = undefined
@@ -46,7 +75,7 @@ async function detach(form: Attached) {
   refusal.value = null
   try {
     await $api(`${at.value}/${form.formId}` as string, { method: 'DELETE', body: {} })
-    toast.add({ title: t('forms.screens.slot.detached'), color: 'success' })
+    toast.add({ title: t(fields.value ? 'forms.screens.fields.detached' : 'forms.screens.slot.detached'), color: 'success' })
     await refresh()
   }
   catch (e) {
@@ -64,24 +93,26 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
         v-if="!data.attached.length"
         class="text-sm text-muted"
       >
-        {{ t('forms.screens.slot.none') }}
+        {{ t(fields ? 'forms.screens.fields.none-attached' : 'forms.screens.slot.none') }}
       </p>
       <RecordList
         v-else
-        :label="t('forms.screens.slot.attached-here')"
+        :label="t(fields ? 'forms.screens.fields.attached-here' : 'forms.screens.slot.attached-here')"
       >
         <RecordListItem
           v-for="form in data.attached"
           :key="form.id"
           icon="i-lucide-file-text"
           :name="form.title"
-          :description="form.address"
+          :description="fields ? undefined : form.address"
         >
           <StatusBadge
+            v-if="!fields"
             :tone="state(form) === 'open' ? 'success' : state(form) === 'not-yet' ? 'info' : 'neutral'"
             :label="t(`forms.screens.slot.state.${state(form)}`)"
           />
           <UButton
+            v-if="!fields"
             color="neutral"
             variant="link"
             :to="`/console/forms/${form.formId}/responses`"
@@ -89,6 +120,16 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
           />
           <div class="flex gap-2">
             <UButton
+              v-if="fields"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :label="t('forms.screens.fields.edit')"
+              :aria-label="t('forms.screens.fields.edit-n', { name: form.title })"
+              :to="`/console/forms/${form.formId}`"
+            />
+            <UButton
+              v-else
               color="neutral"
               variant="outline"
               size="sm"
@@ -108,8 +149,8 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
         </RecordListItem>
       </RecordList>
       <UFormField
-        v-if="room"
-        :label="t('forms.screens.slot.add')"
+        v-if="room && (!fields || choices.length)"
+        :label="t(fields ? 'forms.screens.fields.add' : 'forms.screens.slot.add')"
         :help="choices.length ? undefined : t('forms.screens.slot.nothing-published')"
       >
         <USelectMenu
@@ -117,10 +158,26 @@ const state = (form: Attached) => form.formStatus !== 'live' || form.status === 
           value-key="value"
           :items="choices"
           :disabled="!choices.length"
-          :placeholder="t('forms.screens.slot.choose')"
+          :placeholder="t(fields ? 'forms.screens.fields.choose' : 'forms.screens.slot.choose')"
           class="min-w-64"
         />
       </UFormField>
+      <div
+        v-if="room && fields"
+        class="space-y-1"
+      >
+        <UButton
+          :label="t('forms.screens.fields.new')"
+          icon="i-lucide-plus"
+          color="neutral"
+          variant="subtle"
+          :loading="making"
+          @click="newFields"
+        />
+        <p class="text-sm text-muted">
+          {{ t('forms.screens.fields.new-help') }}
+        </p>
+      </div>
     </template>
     <FormsLinkDialog
       v-if="editing"
