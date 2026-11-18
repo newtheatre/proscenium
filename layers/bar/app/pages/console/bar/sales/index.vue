@@ -93,6 +93,8 @@ const columns = computed(() => [
           :data="d.rows"
           :columns="columns"
           :caption="t('bar.navigation.sales.label')"
+          :meta="{ class: { tr: 'cursor-pointer' } }"
+          @select="(_event: Event, row: { original: Row }) => navigateTo(`/console/bar/sales/${row.original.reference}`)"
         >
           <template #reference-cell="{ row }">
             <ULink

@@ -633,7 +633,7 @@ Finance ships no accounts of its own. Each module declares the accounts it posts
 | Module | Accounts it declares |
 | --- | --- |
 | Box office | `box-office.ticket-income`, `box-office.deferred-ticket-income`, `box-office.booking-fee-income`, `box-office.donation-income`, `box-office.pass-liability` |
-| Payments | `payments.cash` (cash in tills), `payments.card-clearing` (one per provider account, by `scope`), `payments.bank`, `payments.provider-fees`, `payments.cash-variance`, `payments.unfulfilled` |
+| Payments | `payments.cash` (cash in tills), `payments.card-clearing` (one per provider account, by `scope`), `payments.other` (money taken some other way at the desk), `payments.bank`, `payments.provider-fees`, `payments.cash-variance`, `payments.unfulfilled` |
 
 A trigger refuses an entry whose posting's `source_module` is not the account's `module`, except that Payments may write the entries an owner returned for its own part (part 4). To let the trigger judge that, finance\_entries has one more column than the table of columns shows: for\_module (text, null, Internal, keep), which Payments sets to the part's owner. The trigger requires the account's module to equal for\_module when it is set and the posting's source\_module otherwise, and for\_module may differ from source\_module only when source\_module is payments. A declared account's code starts as its system key, such as box-office.ticket-income, until the treasurer recodes it.
 

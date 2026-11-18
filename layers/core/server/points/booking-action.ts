@@ -35,9 +35,11 @@ export interface BookingAnswer {
  */
 export interface PriceSummary {
   currency: string
-  /** The lowest price anyone may book at, or null when every price needs something (such as a membership). */
+  /** The lowest price anyone may book at, or null when every price needs something (such as a membership or proof). */
   fromMinor: number | null
-  /** Lower prices for people who qualify, each by its ticket type's own name, lowest first. */
+  /** The highest price anyone may book at, so a show whose every open price is nothing reads "Free". */
+  toMinor?: number | null
+  /** Lower prices for people who qualify (a concession, a membership), each by its ticket type's own name, lowest first. */
   others: { label: string, amountMinor: number }[]
 }
 
