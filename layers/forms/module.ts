@@ -64,8 +64,14 @@ export default defineModule({
   contributes: {
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
+    'core.account-section': [
+      { id: 'forms.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'FormsMine', order: 45, to: '/account/forms', icon: 'i-lucide-file-text', count: 'forms.mine', hideEmpty: true },
+    ],
+    'core.count': [{ id: 'forms.mine', file: 'mine' }],
     'core.navigation': [
-      { id: 'forms.forms', menu: 'console', group: 'forms', section: 'everyday', to: '/console/forms', match: '/console/forms', icon: 'i-lucide-file-text', ability: ['forms.form.create', 'forms.form.edit'], order: 1 },
+      { id: 'forms.forms', menu: 'console', group: 'forms', section: 'everyday', to: '/console/forms', match: '/console/forms', icon: 'i-lucide-file-text', ability: ['forms.form.create', 'forms.form.edit', 'forms.response.read'], order: 1 },
+      // What a person has started or sent, in their account; shown once they have one.
+      { id: 'forms.mine', menu: 'account', group: 'theatre', to: '/account/forms', match: '/account/forms', icon: 'i-lucide-file-text', ability: 'signed-in', order: 45, count: 'forms.mine', hideEmpty: true },
     ],
   },
 })
