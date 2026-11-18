@@ -188,7 +188,7 @@ export default defineModule({
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
       { id: 'box-office.reports', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/reports/sales', icon: 'i-lucide-chart-column', ability: 'box-office.report.view', order: 38 },
       { id: 'box-office.codes', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/codes', icon: 'i-lucide-percent', ability: 'box-office.promo.manage', order: 36 },
-      { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
+      { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35, count: 'box-office.comps-waiting' },
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
       { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40, settingsIn: ['box-office.performances'] },
@@ -208,6 +208,9 @@ export default defineModule({
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
     'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }],
+    // Comps requests waiting for a decision, on the console home of whoever may decide them.
+    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
+    'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
     'core.vocabulary': [{
       id: 'box-office.comp-reason',
       label: 'Reasons for complimentary tickets',

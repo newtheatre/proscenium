@@ -9,7 +9,7 @@ import { doorList } from '../../../../../../shared/lists'
 
 definePageMeta({ layout: 'console' })
 
-interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number }
+interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
 
 const { t } = useT()
 const route = useRoute()
@@ -28,10 +28,13 @@ const toast = useToast()
 const { toRefusal } = useRefusal()
 const admitting = ref<string | null>(null)
 
-interface Scan { result: string, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
+interface Scan { result: string, ticketPerformance?: DoorElsewhere, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
 const { time } = useDates()
+const { money } = await useMoney()
+const elsewhere = useDoorElsewhere()
+const { data: summary } = await useAPI<{ performance: { startsAt: number } }>(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/door/summary`, { key: `box-office:door:summary:${id.value}` })
 const lastScan = ref<{ text: string, color: 'success' | 'warning' | 'error' } | null>(null)
-const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'error', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
+const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'warning', reference: 'warning', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
 
 async function scan(code: string) {
   if (!code.trim()) return
@@ -39,7 +42,9 @@ async function scan(code: string) {
     const out = await $api<Scan>(`/api/box-office/performances/${encodeURIComponent(id.value)}/scan`, { method: 'POST', body: { code: code.trim() } })
     const said = out.result === 'card' && out.card
       ? `${out.card.headline}. ${out.card.line}`
-      : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
+      : out.result === 'wrong_performance'
+        ? elsewhere(out.ticketPerformance, summary.value?.performance.startsAt)
+        : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
     // The source's own words for why not, and a note when nobody could check.
     const text = [out.requirement?.reason, said, out.unchecked ? t('box-office.door.scan.unchecked') : null].filter(Boolean).join(' ')
     const color = out.result === 'card' && out.card?.state === 'attention' ? 'warning' : COLOUR[out.result] ?? 'error'
@@ -108,7 +113,21 @@ const trail = computed(() => [
       <span class="font-mono">{{ row.reference }}</span>
     </template>
     <template #cell-admitted="{ row }">
-      <span class="inline-flex flex-wrap items-center gap-2">
+      <!-- A reservation not yet paid for: nobody on it can be admitted until the till takes payment. -->
+      <span
+        v-if="row.unpaid"
+        class="inline-flex flex-wrap items-center gap-2"
+      >
+        <StatusBadge
+          tone="info"
+          :label="t('box-office.live-door.result.not_paid')"
+        />
+        <span class="text-muted">{{ money(row.unpaid.amountDueMinor, row.unpaid.currency) }}</span>
+      </span>
+      <span
+        v-else
+        class="inline-flex flex-wrap items-center gap-2"
+      >
         <StatusBadge
           :tone="row.admitted === row.tickets ? 'success' : row.admitted ? 'warning' : 'neutral'"
           :label="t('box-office.door.admitted', { admitted: row.admitted, tickets: row.tickets })"
