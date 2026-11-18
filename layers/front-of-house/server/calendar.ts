@@ -5,7 +5,7 @@
 import { all, first, linkTokens, nowMs, siteUrl, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { LIVE_STATES } from './db/schema'
-import { partFormatters } from './words'
+import { partFormatters, say } from './words'
 
 const live = LIVE_STATES.map(s => `'${s}'`).join(', ')
 const WEEK = 7 * 24 * 60 * 60_000 // not-policy: how far back the feed reaches
@@ -56,7 +56,7 @@ function eventOf(row: Row, host: string, clock: (at: number) => string): string[
   const what = row.production_title ? `${row.duty}, ${row.production_title}` : row.title ? `${row.duty}: ${row.title}` : row.duty
   const place = [row.venue_name, row.space_name].filter(Boolean).join(', ')
   // Curtain up is the performance's own start; the event itself runs from the call.
-  const description = [row.curtain !== null ? `Curtain up: ${clock(row.curtain)}` : null, row.briefing].filter(Boolean).join('\n')
+  const description = [row.curtain !== null ? say('front-of-house.calendar-file.curtain', { time: clock(row.curtain) }) : null, row.briefing].filter(Boolean).join('\n')
   return [
     'BEGIN:VEVENT',
     `UID:${row.id}@${host}`,
@@ -92,13 +92,13 @@ async function file(rows: Row[], name: string): Promise<string> {
 /** One place on a shift as a calendar file, or null when there is no live place by that id. */
 export async function calendarOfAssignment(assignmentId: string): Promise<string | null> {
   const row = await first<Row>(`${SELECT} WHERE a.id = ? AND a.state IN (${live})`, assignmentId)
-  return row ? file([row], 'Shift') : null
+  return row ? file([row], say('front-of-house.calendar-file.one')) : null
 }
 
 /** Every live place the person has, from a week ago on. */
 export async function calendarOfAccount(accountId: string): Promise<string> {
   const rows = await all<Row>(`${SELECT} WHERE a.account_id IN (${accountScopeSql('?1')}) AND a.state IN (${live}) AND s.state = 'published' AND s.ends_at > ?2 ORDER BY s.call_at`, accountId, nowMs() - WEEK) // not-policy: numbered parameters
-  return file(rows, 'My shifts')
+  return file(rows, say('front-of-house.calendar-file.mine'))
 }
 
 // ---------------------------------------------------------------------------------------------
