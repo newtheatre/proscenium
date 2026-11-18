@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "10bb091a-1a23-4286-8639-a751e2254cde",
+  "id": "07c0b40b-06b7-4309-b9c8-6e63eb25cbd8",
   "prevIds": [
-    "4de5caeb-cc87-46bb-9851-f9adfde926d3"
+    "39dd63c6-44e2-4faa-9345-a83154e11930"
   ],
   "ddl": [
     {
@@ -552,6 +552,10 @@
     },
     {
       "name": "front_of_house_assignments",
+      "entityType": "tables"
+    },
+    {
+      "name": "front_of_house_calendar_feeds",
       "entityType": "tables"
     },
     {
@@ -14242,6 +14246,16 @@
     },
     {
       "table": "front_of_house_assignments",
+      "name": "moved_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_assignments",
       "name": "freed_by_merge",
       "type": "text",
       "notNull": false,
@@ -14263,6 +14277,46 @@
     {
       "table": "front_of_house_assignments",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "generation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -21519,6 +21573,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "front_of_house_calendar_feeds",
+      "name": "front_of_house_calendar_feeds_token",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "front_of_house_checklist_entries",
       "name": "front_of_house_checklist_entries_item",
       "columns": [
@@ -25692,6 +25760,15 @@
       "name": "forms_response_drafts_pk",
       "columns": [
         "response_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "front_of_house_calendar_feeds",
+      "name": "front_of_house_calendar_feeds_pk",
+      "columns": [
+        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
