@@ -635,5 +635,8 @@
   "box-office.codes.field.from": "Valid from",
   "box-office.codes.field.until": "Valid until",
   "box-office.codes.field.note": "Note",
-  "box-office.codes.field.note-help": "For staff only, such as who the code was given to."
+  "box-office.codes.field.note-help": "For staff only, such as who the code was given to.",
+  "box-office.home-card.comps.one": "{count} comps request is waiting for your decision",
+  "box-office.home-card.comps.other": "{count} comps requests are waiting for your decision",
+  "box-office.home-card.comps-action": "Decide comps"
 }
