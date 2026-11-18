@@ -4,8 +4,8 @@
 // statement, so a long delivery is one batch whatever its length.
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
-import { accountLabel } from '#modules/core'
-import { writeMovements, type Movement } from './stock'
+import { accountLabel, listTerms } from '#modules/core'
+import { stock, writeMovements, type Movement } from './stock'
 
 export const WASTAGE_REASONS = 'bar.wastage-reason'
 export const SUPPLIERS = 'bar.supplier'
@@ -88,15 +88,25 @@ async function itemsInUse(ids: string[]): Promise<Map<string, { packSize: number
   return new Map(found.map(r => [r.id, { packSize: r.pack_size }]))
 }
 
+/** What the delivery form offers: the items and locations in use and the theatre's suppliers. */
+export async function deliveryForm() {
+  const { items, locations } = await stock()
+  return {
+    items: items.filter(i => i.active).map(i => ({ id: i.id, name: i.name, baseUnit: i.baseUnit, packSize: i.packSize, packName: i.packName, countUnitSize: i.countUnitSize, costMinor: i.costMinor })),
+    locations: locations.filter(l => l.active).map(l => ({ id: l.id, name: l.name })),
+    suppliers: (await listTerms(SUPPLIERS)).map(t => ({ id: t.id, label: t.label })),
+  }
+}
+
 const DELIVERY_GONE = { code: 'bar.delivery.unknown', reason: 'There is no such delivery.' }
 const NOT_DRAFT = { code: 'bar.delivery.received', reason: 'This delivery has been received, so it cannot change.', remedy: 'Record another delivery, or wastage, to put it right.' }
 
-export async function deliveries(options: { limit?: number } = {}): Promise<Delivery[]> {
+export async function deliveries(options: { id?: string, limit?: number } = {}): Promise<Delivery[]> {
   const rows = await all<{ id: string, location_id: string, supplier_term: string | null, supplier: string | null, supplier_ref: string | null, state: 'draft' | 'received', created_by: string, received_by: string | null, received_at: number | null, created_at: number }>(
     `SELECT d.id, d.location_id, d.supplier_term, t.label AS supplier, d.supplier_ref, d.state, d.created_by, d.received_by, d.received_at, d.created_at
-       FROM bar_deliveries d LEFT JOIN core_terms t ON t.id = d.supplier_term
+       FROM bar_deliveries d LEFT JOIN core_terms t ON t.id = d.supplier_term WHERE ? IS NULL OR d.id = ?
       ORDER BY d.state = 'draft' DESC, coalesce(d.received_at, d.created_at) DESC, d.id DESC LIMIT ?`,
-    options.limit ?? 50, // not-policy: a page of recent deliveries
+    options.id ?? null, options.id ?? null, options.limit ?? 50, // not-policy: a page of recent deliveries
   )
   const lineRows = await all<{ id: string, delivery_id: string, stock_item_id: string, packs: number, loose_units: number, pack_cost_minor: number | null, pack_size: number }>(
     `SELECT l.id, l.delivery_id, l.stock_item_id, l.packs, l.loose_units, l.pack_cost_minor, i.pack_size FROM bar_delivery_lines l JOIN bar_stock_items i ON i.id = l.stock_item_id

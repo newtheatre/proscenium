@@ -5,6 +5,7 @@
   "bar.abilities.price.manage.label": "Set bar prices and price lists",
   "bar.abilities.outlet.manage.label": "Set up the places that sell from the bar",
   "bar.abilities.stock.manage.label": "Set up stock items, where they are kept and what each size uses up",
+  "bar.abilities.stock.view.label": "See the bar's stock levels and movements",
   "bar.abilities.stock.receive.label": "Record deliveries and move stock between locations",
   "bar.abilities.stock.waste.label": "Write stock off as wasted",
   "bar.abilities.sale.sell.label": "Sell from the bar in the till",
