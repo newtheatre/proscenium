@@ -510,8 +510,10 @@ const folders = computed(() => {
   if (folder.value) return subsOf(folder.value).map(s => ({ id: s.id, name: s.name, colour: colourOf(s), count: tiles(s).length, open: () => { path.value = [folder.value!.id, s.id] } }))
   return tops.value.map(c => ({ id: c.id, name: c.name, colour: colourOf(c), count: productsIn(c), open: () => { path.value = [c.id] } }))
 })
-const edge = (colour: string | null) => ({ borderInlineStartColor: colour ? `var(--ui-${colour})` : undefined })
-const dot = (colour: string | null) => ({ backgroundColor: colour ? `var(--ui-${colour})` : 'var(--ui-border-accented)' })
+// Nuxt UI has no --ui-neutral, so a category coloured neutral is drawn grey.
+const shade = (colour: string) => (colour === 'neutral' ? 'var(--ui-color-neutral-400)' : `var(--ui-${colour})`)
+const edge = (colour: string | null) => ({ borderInlineStartColor: colour ? shade(colour) : undefined })
+const dot = (colour: string | null) => ({ backgroundColor: colour ? shade(colour) : 'var(--ui-border-accented)' })
 
 // Allergens: what the customer avoids is tapped once and kept for the sale. A product is never
 // called free of anything: at best nothing of what they avoid is recorded for it.

@@ -906,9 +906,13 @@ function ended() {
                         @click="tendered = toMajor(n)"
                       />
                     </div>
+                    <!-- Its room is kept while there is no change yet, so the button below does not move
+                         under the seller's finger as the amount handed over is entered. -->
                     <p
-                      v-if="chosen.method === 'cash' && changeDue > 0"
+                      v-if="chosen.method === 'cash'"
                       class="flex items-baseline justify-between"
+                      :class="changeDue > 0 ? undefined : 'invisible'"
+                      :aria-hidden="changeDue > 0 ? undefined : 'true'"
                       aria-live="polite"
                     >
                       <span class="font-semibold">{{ t('payments.screens.till.give-change') }}</span>
