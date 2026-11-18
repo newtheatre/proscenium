@@ -39,9 +39,8 @@ const card = ref<CardStep | null>(null)
 const checking = ref(false)
 const returnUrl = ref('')
 const form = ref({ name: '', email: '' })
-const siteKey = useRuntimeConfig().public.turnstile?.siteKey
-const challenge = ref('')
-const headers = computed(() => ({ 'x-basket-token': remembered.value?.token ?? '', ...(challenge.value ? { 'cf-turnstile-response': challenge.value } : {}) }))
+// The bot check was passed when the seats were held; the basket's token carries that to here.
+const headers = computed(() => ({ 'x-basket-token': remembered.value?.token ?? '' }))
 
 onMounted(async () => {
   remembered.value = recallBasket()
@@ -133,7 +132,6 @@ const detailsNeeded = computed(() => !viewer.value.signedIn)
 // The buyer's details, checked as the reserve and checkout routes check them, beside each field.
 const detailsSchema = z.object({ name: z.string().trim().max(120), email: z.string().trim().email().max(254) }) // not-policy: the routes' bounds
 const detailsForm = useTemplateRef('detailsForm')
-const ready = computed(() => !siteKey || !!challenge.value)
 /** Shows each problem beside its field; false while there is one. */
 async function detailsValid(): Promise<boolean> {
   if (!detailsNeeded.value) return true
@@ -175,7 +173,6 @@ async function pay() {
   catch (e) {
     refusal.value = toRefusal(e)
     detailsForm.value?.setErrors(fieldErrors(refusal.value))
-    challenge.value = ''
   }
   finally {
     busy.value = false
@@ -193,7 +190,6 @@ async function reserve() {
   catch (e) {
     refusal.value = toRefusal(e)
     detailsForm.value?.setErrors(fieldErrors(refusal.value))
-    challenge.value = ''
   }
   finally {
     busy.value = false
@@ -376,14 +372,12 @@ async function reserve() {
               >
                 {{ t('box-office.basket.signed-in', { name: viewer.name ?? '' }) }}
               </p>
-              <TurnstileCheck @token="challenge = $event" />
               <div class="flex flex-wrap gap-2">
                 <UButton
                   v-if="canPay"
                   type="submit"
                   size="lg"
                   :loading="busy"
-                  :disabled="!ready"
                   :label="free ? t('box-office.basket.confirm') : t('box-office.basket.pay', { amount: money(basket.totalMinor, basket.currency) })"
                 />
                 <UButton
@@ -393,7 +387,6 @@ async function reserve() {
                   :color="canPay ? 'neutral' : 'primary'"
                   :variant="canPay ? 'outline' : 'solid'"
                   :loading="busy"
-                  :disabled="!ready"
                   :label="t('box-office.basket.reserve', { amount: money(basket.totalMinor, basket.currency) })"
                   @click="canPay ? reserve() : undefined"
                 />

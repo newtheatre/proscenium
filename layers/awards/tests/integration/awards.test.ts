@@ -68,6 +68,9 @@ describe('issuing an award', () => {
     const listed = (await req('GET', `/api/awards/awards?type=${type}`)).body.awards
     expect(listed.map((a: any) => [a.recipientName, a.linked])).toEqual([['Alan Turing', true], ['Peggy Ashcroft', false]])
     expect((await req('GET', `/api/awards/awards/${past}`)).body.award.accountId).toBeNull()
+    // Somebody who has never signed in is not put on the public roll for them; a name alone (a past award) is.
+    expect((await req('GET', `/api/awards/awards/${made.body.awardId}`)).body.award.visibility).toBe('hidden')
+    expect((await req('GET', `/api/awards/awards/${past}`)).body.award.visibility).toBe('public')
   })
 
   it('refuses a person\'s own award, and needs a person or a name', async () => {

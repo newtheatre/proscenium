@@ -22,12 +22,14 @@ interface Listing {
   summary: string | null
   category: { label: string } | null
   nextStartsAt: number
+  lastStartsAt: number
   lastEndsAt: number
   venues: string[]
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
   age: string | null
   hasEffects: boolean
-  price: { currency: string, fromMinor: number | null, others: { label: string, amountMinor: number }[] } | null
+  hasWarnings: boolean
+  price: PriceSummaryView | null
 }
 
 const { t } = useT()
@@ -196,10 +198,11 @@ useHead(() => ({
               :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
               :price="p.price"
-              :when="range(p.nextStartsAt, p.lastEndsAt)"
+              :when="range(p.nextStartsAt, p.lastStartsAt)"
               :details="p.category?.label"
               :age="p.age"
               :effects="p.hasEffects"
+              :warnings="p.hasWarnings"
             />
           </li>
         </ul>
