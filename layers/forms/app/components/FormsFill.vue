@@ -1,16 +1,28 @@
 <!-- A form as a respondent fills it in, page by page, driven by the one engine: what is shown, what
      is required, what is wrong, where Continue goes and where the form ends. In the builder it is
-     the preview and keeps nothing (FB-205). -->
+     the preview and keeps nothing (FB-205); on a form's own page `send` stores the answers, and
+     the form only says it has been sent once that has worked (FB-302). -->
 <script setup lang="ts">
 import { evaluate, issuesOnPage, nextStep, otherKey, type Answers, type Context, type Definition, type Ending, type Entry, type Group, type Question, type Value } from '../../shared/engine'
 
-const props = defineProps<{ definition: Definition, context: Context, sendLabel?: string }>()
-const emit = defineEmits<{ submit: [answers: Answers] }>()
+const props = defineProps<{
+  definition: Definition
+  context: Context
+  sendLabel?: string
+  /** Stores the answers. Resolves false when it could not, and the person stays where they are. */
+  send?: (answers: Answers) => Promise<boolean>
+  /** The page to open on, for someone coming back to answers they had started. */
+  start?: string | null
+}>()
+const emit = defineEmits<{ submit: [answers: Answers], page: [id: string] }>()
 const answers = defineModel<Answers>({ default: () => ({}) })
 const { t } = useT()
 
 const evaluation = computed(() => evaluate(props.definition, answers.value, props.context))
-const pageId = ref(props.definition.pages[0]!.id)
+const pageId = ref(props.start && props.definition.pages.some(p => p.id === props.start) ? props.start : props.definition.pages[0]!.id)
+// Answers kept from an earlier visit arrive once the page is in the browser, with the page they were on.
+watch(() => props.start, (id) => { if (id && id !== pageId.value && props.definition.pages.some(p => p.id === id)) pageId.value = id })
+const sending = ref(false)
 const checked = ref(false)
 const ended = ref<Ending | 'sent' | null>(null)
 // An edit in the builder can remove the open page, or the route can stop passing through it.
@@ -29,19 +41,46 @@ async function go(to: () => void) {
   await nextTick()
   top.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 }
-function next() {
+/** Sends, where this is a real form. False means it was not stored, so nothing may say it was. */
+async function deliver(): Promise<boolean> {
+  emit('submit', evaluation.value.answers)
+  if (!props.send) return true
+  sending.value = true
+  try {
+    return await props.send(evaluation.value.answers)
+  }
+  finally {
+    sending.value = false
+  }
+}
+async function next() {
+  if (sending.value) return
   if (Object.keys(issuesOnPage(props.definition, evaluation.value, pageId.value)).length) {
     checked.value = true
+    // The first answer that needs attention takes the focus.
+    await nextTick()
+    top.value?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid] input, [data-invalid] textarea, [data-invalid] button')?.focus()
     return
   }
   const step = nextStep(evaluation.value, pageId.value)
   if ('page' in step) return go(() => { pageId.value = step.page })
   if ('ending' in step) {
-    if (step.ending.submits) emit('submit', evaluation.value.answers)
+    if (step.ending.submits && !await deliver()) return
     return go(() => { ended.value = step.ending })
   }
-  emit('submit', evaluation.value.answers)
-  go(() => { ended.value = 'sent' })
+  if (await deliver()) go(() => { ended.value = 'sent' })
+}
+watch(pageId, id => emit('page', id))
+const labelOf = (path: string): string => {
+  const id = path.split('.').pop()!
+  for (const p of props.definition.pages) {
+    for (const item of p.items) {
+      if (item.id === path && item.kind === 'group') return item.label
+      const found = (item.kind === 'question' ? [item] : item.kind === 'row' || item.kind === 'group' ? item.items : []).find(q => q.id === id)
+      if (found) return found.label
+    }
+  }
+  return path
 }
 const back = () => go(() => { pageId.value = evaluation.value.route[at.value - 1]! })
 function restart() {
@@ -69,8 +108,12 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
     ref="top"
     class="scroll-mt-4 space-y-6"
   >
-    <template v-if="ended">
-      <div class="space-y-2 text-center">
+    <div
+      v-if="ended"
+      key="ended"
+      class="space-y-2 text-center"
+    >
+      <div class="contents">
         <UIcon
           :name="ended === 'sent' || ended.submits ? 'i-lucide-circle-check' : 'i-lucide-circle-slash'"
           class="size-8 text-primary"
@@ -87,8 +130,12 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
           :ending="ended"
         />
       </div>
-    </template>
-    <template v-else>
+    </div>
+    <div
+      v-else
+      key="asking"
+      class="space-y-6"
+    >
       <div>
         <p
           v-if="evaluation.route.length > 1"
@@ -96,7 +143,10 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
         >
           {{ t('forms.screens.fill.step', { n: at + 1, count: evaluation.route.length }) }}
         </p>
-        <h2 class="text-lg font-semibold">
+        <h2
+          v-if="page.title || definition.pages.length > 1"
+          class="text-lg font-semibold"
+        >
           {{ page.title || t('forms.screens.builder.page-n', { n: definition.pages.indexOf(page) + 1 }) }}
         </h2>
         <p
@@ -112,7 +162,21 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
         variant="subtle"
         icon="i-lucide-circle-alert"
         :title="t('forms.screens.fill.fix', { count: Object.keys(issues).length })"
-      />
+      >
+        <template #description>
+          <ul class="list-disc ps-5">
+            <li
+              v-for="path in Object.keys(issues)"
+              :key="path"
+            >
+              <a
+                :href="`#answer-${path}`"
+                class="underline"
+              >{{ labelOf(path) }}</a>
+            </li>
+          </ul>
+        </template>
+      </UAlert>
       <template
         v-for="item in page.items"
         :key="item.id"
@@ -131,6 +195,8 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
           >
             <FormsFillQuestion
               v-if="visible(q.id)"
+              :id="`answer-${q.id}`"
+              class="scroll-mt-4"
               :question="q"
               :required="evaluation.required[q.id] === true"
               :issues="issues[q.id]"
@@ -143,7 +209,8 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
         </div>
         <fieldset
           v-else-if="item.kind === 'group' && visible(item.id)"
-          class="space-y-3"
+          :id="`answer-${item.id}`"
+          class="scroll-mt-4 space-y-3"
         >
           <legend class="font-medium">
             {{ item.label }}
@@ -182,6 +249,8 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
             >
               <FormsFillQuestion
                 v-if="visible(`${item.id}.${i}.${q.id}`)"
+                :id="`answer-${item.id}.${i}.${q.id}`"
+                class="scroll-mt-4"
                 :question="q"
                 :required="evaluation.required[`${item.id}.${i}.${q.id}`] === true"
                 :issues="issues[`${item.id}.${i}.${q.id}`]"
@@ -232,9 +301,10 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
         <UButton
           :label="last ? sendLabel ?? definition.presentation?.submitLabel ?? t('forms.screens.fill.send') : t('forms.screens.fill.continue')"
           :trailing-icon="last ? undefined : 'i-lucide-arrow-right'"
+          :loading="sending"
           @click="next"
         />
       </div>
-    </template>
+    </div>
   </div>
 </template>
