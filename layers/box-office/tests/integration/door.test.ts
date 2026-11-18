@@ -75,7 +75,7 @@ describe('scanning at the door', () => {
     const h = await freeHouse(4)
     const other = await freeHouse(4)
     const [code, second] = await tickets(h, 2)
-    expect((await scan(other, code!)).body).toMatchObject({ result: 'wrong_performance', ticketPerformanceId: h.performanceId })
+    expect((await scan(other, code!)).body).toMatchObject({ result: 'wrong_performance', ticketPerformanceId: h.performanceId, ticketPerformance: { id: h.performanceId, startsAt: expect.any(Number), title: expect.any(String) } })
 
     const [kind, keyId, random, signature] = second!.split('.') as [string, string, string, string]
     const forged = `${kind}.${keyId}.${random.slice(0, -1)}${random.endsWith('A') ? 'B' : 'A'}.${signature}`
@@ -97,7 +97,7 @@ describe('scanning at the door', () => {
     const reserved = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `door${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
     expect(reserved.body.state, JSON.stringify(reserved.body)).toBe('reserved')
     // What the door shows, so it can send them to the box office or the bar to pay.
-    const unpaid = { result: 'not_paid', scanId: null, reservation: { reference: reserved.body.reference, tickets: 1, amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
+    const unpaid = { result: 'not_paid', scanId: null, reservation: { reference: reserved.body.reference, buyer: expect.any(String), tickets: 1, amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
     expect((await scan(h, reserved.body.deskCode)).body).toEqual(unpaid)
     // The live door counts them as still to come.
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, steward)).body).toMatchObject({ tickets: 0, admitted: 0, unpaid: 1 })
@@ -106,6 +106,20 @@ describe('scanning at the door', () => {
     // At another performance's door it is not for tonight, paid or not.
     const other = await house(4)
     expect((await scan(other, reserved.body.deskCode)).body).toMatchObject({ result: 'wrong_performance', ticketPerformanceId: h.performanceId })
+  })
+
+  it('names the performance for a paid booking\'s reference at another door, and finds it at its own', async () => {
+    const h = await freeHouse(4)
+    const other = await freeHouse(4)
+    const made = await buy(h, 2)
+    if (!made.ok) throw new Error(made.code)
+    const done = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/checkout`, { expectedTotalMinor: 0, email: `door${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
+    expect(done.body.state, JSON.stringify(done.body)).toBe('confirmed')
+    const reference = done.body.reference as string
+    expect((await scan(other, reference)).body).toMatchObject({ result: 'wrong_performance', scanId: null, ticketPerformance: { id: h.performanceId } })
+    expect((await scan(h, reference.toLowerCase())).body).toEqual({ result: 'reference', scanId: null, reference })
+    // Neither is a scan of a ticket, so neither writes a row.
+    expect(await count('SELECT count(*) AS n FROM box_office_scans WHERE performance_id IN (?, ?)', h.performanceId, other.performanceId)).toBe(0)
   })
 
   it('counts who is in for the live door, and lists tonight\'s doors for whoever may admit', async () => {
@@ -147,6 +161,18 @@ describe('the door list', () => {
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)).body.rows).toHaveLength(0)
     const everyone = await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all`, undefined, steward)
     expect(everyone.body.rows[0]).toMatchObject({ tickets: 2, admitted: 2 })
+  })
+
+  it('lists a reservation not yet paid for as Not paid, found by its reference, and never as arrived', async () => {
+    const h = await house(4)
+    const made = await buy(h, 2)
+    if (!made.ok) throw new Error(made.code)
+    const reserved = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `door${++guests}@example.org` }, null, { 'x-basket-token': made.basket.token })
+    expect(reserved.body.state, JSON.stringify(reserved.body)).toBe('reserved')
+    const row = { reference: reserved.body.reference, tickets: 2, admitted: 0, unpaid: { amountDueMinor: made.basket.totalMinor, currency: 'GBP' } }
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)).body.rows).toEqual([expect.objectContaining(row)])
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door?q=${reserved.body.reference}`, undefined, steward)).body.rows).toEqual([expect.objectContaining(row)])
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door?arrived=yes`, undefined, steward)).body.rows).toHaveLength(0)
   })
 
   it('admits by name from the list, as many as asked, and never the same ticket twice', async () => {
