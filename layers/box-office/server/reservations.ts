@@ -18,7 +18,7 @@ import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
-import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
+import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
 import { doorCodesForOrder, ticketNumbers } from './tickets'
 
@@ -164,7 +164,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   unit.add(sql`UPDATE box_office_holds SET kind = 'reservation', updated_at = ${at} WHERE order_id = ${order.id} AND kind = 'basket'`).expect(1, RAN_OUT)
 
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
-  const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
+  const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
   // A buyer who has never signed in also gets the link that opens their account (core's claim link).
   const account = await claimLink(unit, accountId, madeWith)
   await notify(unit, account ? 'box-office.order-reserved-guest' : 'box-office.order-reserved', {

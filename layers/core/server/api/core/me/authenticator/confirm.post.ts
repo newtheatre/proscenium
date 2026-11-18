@@ -4,6 +4,7 @@ import { defineRoute } from '#kit'
 import { sessionOf } from '../../../../identity/guards'
 import { confirmAuthenticator } from '../../../../identity/authenticator'
 import { credentialNotice } from '../../../../identity/notices'
+import { deviceLabel } from '../../../../identity/web'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -13,6 +14,6 @@ export default defineRoute({
   const session = await sessionOf(event)
   await confirmAuthenticator(unit, session.accountId, input.code)
   unit.audit({ action: 'create', record: ['core.account', session.accountId], detail: { authenticator: true } })
-  await credentialNotice(unit, session.accountId, 'authenticator')
+  await credentialNotice(unit, session.accountId, 'authenticator', deviceLabel(event))
   return { added: true }
 })
