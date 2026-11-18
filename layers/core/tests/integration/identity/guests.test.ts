@@ -49,7 +49,7 @@ describe('buying without signing in (ID-05)', () => {
   it('makes one unclaimed account for an address, with no session, and a second order finds it', async () => {
     const to = address()
     const first = await checkout({ address: to, name: 'Gail Guest' })
-    expect(first).toEqual({ accountId: expect.any(String), created: true, claimed: false })
+    expect(first).toEqual({ accountId: expect.any(String), created: true, claimed: false, madeWith: { address: to } })
     expect(await account(first.accountId)).toMatchObject({ origin: 'guest', name: 'Gail Guest', first_signed_in_at: null })
     expect(await rows('SELECT count(*) AS n FROM core_sessions WHERE account_id = ?', first.accountId)).toEqual([{ n: 0 }])
     const second = await checkout({ address: ` ${to.toUpperCase()} ` })

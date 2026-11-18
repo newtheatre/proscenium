@@ -7,7 +7,7 @@ import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, newId, nowMs, refuse, today } from '#kit'
 import { addDays } from '../../../../dates'
-import { hashValue, parseFile, requireList } from '../../../../lists'
+import { hashValue, parseFile, requireList, requireListKey } from '../../../../lists'
 
 // One import is one unit: chunks of rows set-wise, within D1's limit on a statement's parameter.
 const CHUNK = 500 // not-policy: rows per statement, within the kit's set size
@@ -26,6 +26,9 @@ export default defineRoute({
   const { rows, refused } = parseFile(list.keyKind, list.referenceShape, input.file)
   if (rows.length > MOST_ROWS) refuse('membership.list.too-many', `A file may hold at most ${MOST_ROWS} rows.`, { status: 422, remedy: 'Split the file and load each part into its own list.' })
   if (!rows.length) refuse('membership.list.empty', 'No row of the file could be read.', { status: 422 })
+  // The same guards as loading, so a trial never says a file is fine that loading would refuse: the list key, and the theatre's time zone (which dates the ended entries).
+  await requireListKey()
+  const day = await today()
   if (input.dryRun) return { loaded: 0, wouldLoad: rows.length, refused }
 
   const at = nowMs()
@@ -41,7 +44,7 @@ export default defineRoute({
   const kept = JSON.stringify(hashed.map(r => r.h))
   const unused = 'id NOT IN (SELECT entry_id FROM membership_verifications WHERE entry_id IS NOT NULL)'
   unit.add({ sql: `DELETE FROM membership_verification_entries WHERE list_id = ?1 AND key_hash NOT IN (SELECT value FROM json_each(?2)) AND ${unused}`, params: [list.id, kept] })
-  unit.add({ sql: 'UPDATE membership_verification_entries SET ends_on = ?3, holder_name = NULL WHERE list_id = ?1 AND key_hash NOT IN (SELECT value FROM json_each(?2))', params: [list.id, kept, addDays(await today(), -1)] })
+  unit.add({ sql: 'UPDATE membership_verification_entries SET ends_on = ?3, holder_name = NULL WHERE list_id = ?1 AND key_hash NOT IN (SELECT value FROM json_each(?2))', params: [list.id, kept, addDays(day, -1)] })
   unit.add({ sql: 'UPDATE membership_verification_lists SET entry_count = (SELECT count(*) FROM membership_verification_entries WHERE list_id = ?1 AND key_hash IN (SELECT value FROM json_each(?2))), uploaded_at = ?3 WHERE id = ?1', params: [list.id, kept, at] }).expect(1)
   unit.add({ sql: 'UPDATE membership_verification_lists SET uploaded_by = ? WHERE id = ?', params: [actor.accountId, list.id] }) // exact-account: records who uploaded, reads nothing
   unit.audit({ action: 'update', record: ['membership.verification-list', list.id], detail: { loaded: rows.length, refused: refused.length } })

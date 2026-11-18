@@ -457,7 +457,11 @@ test.describe('complimentary tickets', () => {
     await expect(deciding.getByRole('heading', { name: 'Waiting for a decision' })).toBeVisible()
     await noViolations(deciding)
     await deciding.getByRole('button', { name: 'Approve and send' }).first().click()
-    await expect(deciding.getByText('Approved, and the tickets sent').first()).toBeVisible()
+    // The approver is told who was sent what, and finds it again under Decided by you.
+    await expect(deciding.getByText('Sent 1 complimentary ticket to Rita Reviewer').first()).toBeVisible()
+    await deciding.getByRole('button', { name: /^Decided by you \(\d+\)$/ }).click()
+    await expect(deciding.getByText(/For Rita Reviewer/).first()).toBeVisible()
+    await noViolations(deciding)
     await decidingContext.close()
   })
 })

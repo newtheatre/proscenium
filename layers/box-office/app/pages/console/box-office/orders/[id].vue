@@ -21,6 +21,7 @@ interface Order {
   channel: 'online' | 'desk' | 'phone'
   currency: string
   totalMinor: number
+  complimentary: boolean
   keep: boolean
   releaseAt: number | null
   createdAt: number
@@ -179,7 +180,7 @@ const refundDetail = (o: Order, r: Refund) => {
     <template #default="{ data: d }">
       <PageRecord
         :title="t('box-office.order.title', { reference: d.reference })"
-        :status="{ label: t(`box-office.orders.state.${d.state}`), tone: TONES[d.state as State] }"
+        :status="{ label: t(`box-office.orders.state.${d.state === 'confirmed' && d.complimentary ? 'complimentary' : d.state}`), tone: TONES[d.state as State] }"
         :primary="primary"
         :actions="actions"
         :summary="summary"
