@@ -254,7 +254,8 @@ export const identityContributions = {
     ],
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
-  'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // Holding a role, as core.role:<role id>, such as a duty kept for people with the Duty manager role (FH-5).
+  'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }, { id: 'core.role', file: 'roles' }],
   // The access scheme's screens (ID-38, ID-40). "Offered" is one while the scheme runs, so My
   // account's entry and section hide while it is off; "waiting" sits beside the console's entry.
   'core.count': [

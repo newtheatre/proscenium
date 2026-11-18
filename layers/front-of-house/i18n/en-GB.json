@@ -585,5 +585,10 @@
   "front-of-house.live.notes": "Notes",
   "front-of-house.home-card.unrostered": "{count} performances in the next fortnight have no rota",
   "front-of-house.home-card.unrostered.one": "1 performance in the next fortnight has no rota",
-  "front-of-house.home-card.unrostered-action": "Open the rota"
+  "front-of-house.home-card.unrostered-action": "Open the rota",
+  "front-of-house.duties.requirements": "Who may take it",
+  "front-of-house.duties.requirements-help": "Leave empty for anyone who can sign up. Otherwise only people who meet every one of these can take it; others see it with the reason. A manager can still add someone who does not.",
+  "front-of-house.duties.requirements-none": "Anyone who can sign up",
+  "front-of-house.duties.only-for": "Only for: {what}",
+  "front-of-house.duties.and": " and "
 }

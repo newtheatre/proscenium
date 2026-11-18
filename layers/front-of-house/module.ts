@@ -173,6 +173,8 @@ export default defineModule({
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
     'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
     'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
+    // Experience on the rota, for a duty's requirements (FH-5).
+    'core.requirement': [{ id: 'front-of-house', file: 'front-of-house' }],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
