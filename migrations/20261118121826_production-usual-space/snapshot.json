@@ -1,10 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f63e76e8-2b83-4c0e-b8dd-bd3854bdafcb",
+  "id": "735fa12d-c9fe-433e-a40e-b3dc4bc2427b",
   "prevIds": [
-    "62da3a2b-ff65-4830-b2e4-70c5b78fff29",
-    "755704ac-0132-4dfe-b40e-9002eded73b0"
+    "1e609b01-24b5-40ad-ae4c-d1ce99d9b81b",
+    "8a7d200f-533a-4758-bb61-19a80d496404"
   ],
   "ddl": [
     {
@@ -9625,6 +9625,16 @@
     },
     {
       "table": "core_performance_runs",
+      "name": "pattern",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -13504,6 +13514,26 @@
       "entityType": "columns"
     },
     {
+      "table": "forms_responses",
+      "name": "change_token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "change_token_expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "forms_review_assignments",
       "name": "id",
       "type": "text",
@@ -16805,6 +16835,16 @@
     },
     {
       "table": "membership_verification_lists",
+      "name": "reference_noun",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_verification_lists",
       "name": "reference_shape",
       "type": "text",
       "notNull": false,
@@ -17097,6 +17137,16 @@
       "table": "payments_attempts",
       "name": "tendered_minor",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "note",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -21172,6 +21222,20 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_change_token",
+      "columns": [
+        {
+          "value": "change_token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "change_token_hash IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
