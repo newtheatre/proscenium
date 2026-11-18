@@ -65,6 +65,7 @@
   "box-office.desk.label": "Tickets",
   "box-office.abilities.order.cancel.label": "Cancel tickets on an order, without refunding them",
   "box-office.abilities.order.refund.label": "Ask for a refund of an order's tickets",
+  "box-office.abilities.order.import.label": "Bring in bookings from another system",
   "box-office.abilities.order.release.label": "Release a reservation, or mark one to keep",
   "box-office.abilities.ticket.admit.label": "Scan and admit at the door",
   "box-office.abilities.settings.manage.label": "Change box office settings",
