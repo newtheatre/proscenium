@@ -94,6 +94,12 @@ test.describe('someone who gives roles', () => {
     await page.getByRole('button', { name: 'Give a role' }).click()
     await expect(page.getByRole('dialog').getByRole('heading', { name: `Give ${name} a role` })).toBeVisible()
   })
+
+  test('?give=1 opens Give a role, and the flag leaves the address', async ({ page }) => {
+    await visit(page, '/console/people/grants?give=1')
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'Give a role' })).toBeVisible()
+    await expect(page).not.toHaveURL(/give=1/)
+  })
 })
 
 test.describe('someone who handles data requests', () => {

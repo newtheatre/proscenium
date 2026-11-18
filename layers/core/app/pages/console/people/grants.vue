@@ -19,6 +19,14 @@ const toast = useToast()
 const { day } = useDates()
 const { data: options } = await useAPI<GrantOptions>('/api/core/grants/options', { key: 'core:grants:options', default: () => ({ roles: [], modules: [], manage: false, yearEnd: null, allowNoExpiry: false }) })
 const giving = ref(false)
+// ?give=1 (the command palette's Give a role) opens the dialogue for someone who may give roles; the
+// flag is then dropped, so going back or reloading does not open it again.
+const route = useRoute()
+onMounted(() => {
+  if (route.query.give === undefined) return
+  if (options.value?.manage) giving.value = true
+  void navigateTo({ query: { ...route.query, give: undefined } }, { replace: true })
+})
 
 const TONES = { live: 'success', pending: 'info', lapsing: 'warning', ended: 'neutral' } as const
 const stateLabel = (state: State) => t(`core.grants.state.${state}`)
