@@ -74,7 +74,7 @@ export function formsProblemName(def: Definition, at: string, t: (key: string, p
 }
 
 /** A problem in words. One about an option says which option. */
-export function formsProblemWords(def: Definition, p: { code: string, at: string, params?: Record<string, string> }, t: (key: string, params?: Record<string, unknown>) => string): string {
+export function formsProblemWords(def: Definition, p: { code: string, at: string, params?: Record<string, string> }, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (p.code === 'no-label' && p.params?.option) {
     const found = find(def, p.at)
     const options = found && found.kind !== 'page' && found.item.kind === 'question' ? found.item.options ?? [] : []
