@@ -174,8 +174,12 @@ export default defineModule({
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
-    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
-    'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
+    // and the members' home card: the person's next shift and the open ones (AC-7).
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.members-home', file: 'members-home' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
+    'core.home-card': [
+      { id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' },
+      { id: 'front-of-house.shifts', home: 'members', ability: 'front-of-house.shift.sign-up', component: 'FrontOfHouseShiftsCard', urgency: 'info', count: 'front-of-house.members-home' },
+    ],
     // Experience on the rota, for a duty's requirements (FH-5).
     'core.requirement': [{ id: 'front-of-house', file: 'front-of-house' }],
     // The roles part 7 suggests, made when the module is first switched on (FH-4).
@@ -184,6 +188,7 @@ export default defineModule({
       { id: 'front-of-house.manager', key: 'front-of-house-manager', name: 'Front of house manager', description: 'Runs the rota, duties and checklists, reviews incidents and reads night reports and hours.', abilities: ['front-of-house.shift.manage', 'front-of-house.checklist.manage', 'front-of-house.duty.manage', 'front-of-house.incident.manage', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view', 'front-of-house.hours.view', 'front-of-house.emergency-card.view'], opensMembersArea: true },
     ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
+    'core.upcoming': [{ id: 'front-of-house.shifts', file: 'shifts' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
     'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],
