@@ -1,5 +1,6 @@
-<!-- Sign in (ID-01, ID-02, ID-04, ID-07): a passkey first, an emailed link and code, or an outside
-     provider the theatre has switched on (Google so far), one button each (SignInForm). -->
+<!-- Sign in (ID-01, ID-02, ID-04, ID-07): an emailed link and code first, as most people use it,
+     then a passkey, or an outside provider the theatre has switched on (Google so far), one button
+     each (SignInForm). -->
 <script setup lang="ts">
 // Someone already signed in is sent on before the page is made. The page reads the same answer.
 definePageMeta({
@@ -8,7 +9,8 @@ definePageMeta({
     if (data.value?.signedIn) return navigateTo(nextPath(to.query.next) ?? '/')
   },
 })
-useSeoMeta({ title: 'Sign in' })
+const { t } = useT()
+useSeoMeta({ title: () => t('core.sign-in.page.title') })
 const route = useRoute()
 const next = nextPath(route.query.next)
 const sent = ref(false)
@@ -17,8 +19,8 @@ const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean,
 
 <template>
   <IdentityCard
-    :title="sent ? 'Check your email' : 'Sign in'"
-    :description="!sent && me?.signIn?.email && me?.signIn?.openSignUp ? 'New here? Signing in with your email creates your account.' : undefined"
+    :title="sent ? t('core.sign-in.page.sent-title') : t('core.sign-in.page.title')"
+    :description="!sent && me?.signIn?.email && me?.signIn?.openSignUp ? t('core.sign-in.page.open-sign-up') : undefined"
   >
     <SignInForm
       v-model:sent="sent"

@@ -15,6 +15,8 @@ interface Item {
   hint?: string | null
   /** A long value's provider prefix, such as sk_live_. */
   start?: string | null
+  /** Offers a button that fills the field with a random value, for a key nobody has to know. */
+  generate?: boolean
 }
 
 const props = defineProps<{ items: Item[], disabled?: boolean }>()
@@ -38,6 +40,12 @@ function cancel(name: string) {
   replacing.value = new Set([...replacing.value].filter(n => n !== name))
   const { [name]: _, ...rest } = model.value
   model.value = rest
+}
+
+/** 32 random bytes as hex, typed into the field as if pasted; the person never has to see or keep it. */
+function generate(name: string) {
+  const bytes = crypto.getRandomValues(new Uint8Array(32)) // not-policy: 256 bits
+  model.value = { ...model.value, [name]: [...bytes].map(b => b.toString(16).padStart(2, '0')).join('') } // not-policy: hex digits
 }
 
 function state(item: Item): string {
@@ -76,6 +84,15 @@ function state(item: Item): string {
           icon="i-lucide-lock-keyhole"
           class="min-w-48 flex-1"
           :ui="{ base: 'font-mono tracking-wide text-muted' }"
+        />
+        <UButton
+          v-if="item.generate && open(item)"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-wand-sparkles"
+          :disabled="disabled"
+          :label="t('core.credentials.generate')"
+          @click="generate(item.name)"
         />
         <UButton
           v-if="item.source && !open(item)"

@@ -1,7 +1,8 @@
-<!-- The ways in (ID-01, ID-02, ID-04, ID-07): a passkey first, an emailed link and code, or an outside
-     provider the theatre has switched on (Google so far), one button each. The sign-in page draws it
-     in its card; a page that asks for a sign-in in place (a scheme's join page) draws it there, with
-     `next` set to come back. `sent` is true once a link and code have been sent, for the page's title. -->
+<!-- The ways in (ID-01, ID-02, ID-04, ID-07): an emailed link and code first, as most people use it,
+     then a passkey, or an outside provider the theatre has switched on (Google so far), one button
+     each. The sign-in page draws it in its card; a page that asks for a sign-in in place (a scheme's
+     join page) draws it there, with `next` set to come back. `sent` is true once a link and code have
+     been sent, for the page's title. -->
 <script setup lang="ts">
 import { z } from 'zod'
 import type { Refusal } from '../utils/identity'
@@ -11,43 +12,43 @@ const props = defineProps<{
   next?: string
 }>()
 const sent = defineModel<boolean>('sent', { default: false })
+const { t } = useT()
 
 const route = useRoute()
 const refusal = ref<Refusal | null>(null)
-const busy = ref(false)
+// Which request is under way, so its own button shows it.
+const pending = ref<'passkey' | 'link' | 'code' | null>(null)
 const address = ref('')
 const CODE_LENGTH = 6 // not-policy: the length of the code the server sends
 // One box a digit; the request takes them as one string.
 const digits = ref<number[]>([])
 const code = computed(() => digits.value.join(''))
-const challenge = ref('')
 // What the two routes check, shown beside the field rather than in a browser bubble.
-const { t } = useT()
 const addressSchema = z.object({ address: z.email().max(254) }) // not-policy: the longest address
 const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/, t('core.form.invalid.code', { count: CODE_LENGTH })) }) // not-policy: codes are six digits
 const addressForm = useTemplateRef('addressForm')
 const codeForm = useTemplateRef('codeForm')
+const turnstile = useTemplateRef('turnstile')
 const { data: me } = await useAPI<{ signedIn: boolean, signIn?: { email: boolean, providers: { id: string, label: string }[], openSignUp?: boolean } }>('/api/core/me', { key: 'core:me' })
 const providers = computed(() => me.value?.signIn?.providers ?? [])
 // Errors come back from a provider's callback; while one provider is offered it can be named.
-const providerName = computed(() => providers.value.length === 1 ? providers.value[0]!.label : 'Your provider')
+const providerName = computed(() => providers.value.length === 1 ? providers.value[0]!.label : t('core.sign-in.page.your-provider'))
 const errorCode = typeof route.query.error === 'string' ? route.query.error : null
-const providerErrors = computed<Record<string, string>>(() => ({
-  'core.sign-in.provider-unverified': `${providerName.value} has not confirmed this account's email address. Confirm it with ${providerName.value}, or sign in another way.`,
-  'core.sign-in.provider-domain': `That ${providerName.value} account is not from an organisation that can sign in here. Choose another account.`,
-  'core.sign-in.provider-cancelled': `${providerName.value} sign-in was cancelled.`,
-  'core.sign-in.closed': 'This theatre is not taking new accounts at the moment.',
-  'core.account.disabled': 'This account is disabled. Contact the theatre to find out why.',
-}))
-const providerError = computed(() => errorCode ? (providerErrors.value[errorCode] ?? `${providerName.value} did not confirm who you are. Try again.`) : null)
+const providerErrors: Record<string, string> = {
+  'core.sign-in.provider-unverified': 'core.sign-in.page.error.provider-unverified',
+  'core.sign-in.provider-domain': 'core.sign-in.page.error.provider-domain',
+  'core.sign-in.provider-cancelled': 'core.sign-in.page.error.provider-cancelled',
+  'core.sign-in.closed': 'core.sign-in.page.error.closed',
+  'core.account.disabled': 'core.sign-in.page.error.disabled',
+}
+const providerError = computed(() => errorCode ? t(providerErrors[errorCode] ?? 'core.sign-in.page.error.provider-other', { provider: providerName.value }) : null)
 const providerHref = (id: string) => `/api/core/sign-in/${id}${props.next ? `?next=${encodeURIComponent(props.next)}` : ''}`
-const nextBody = () => props.next ? { next: props.next } : {}
 
 async function withPasskey() {
-  busy.value = true
+  pending.value = 'passkey'
   refusal.value = null
-  const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', nextBody())
-  busy.value = false
+  const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', props.next ? { next: props.next } : {})
+  pending.value = null
   if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
@@ -55,16 +56,18 @@ async function withPasskey() {
 // Offer the site's passkeys among the address box's suggestions (its autocomplete says webauthn).
 // Waits in the background; a pick signs in. Pressing the passkey button cancels it and starts afresh.
 onMounted(async () => {
-  const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', nextBody(), true)
+  const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', props.next ? { next: props.next } : {}, true)
   if (answer.ok) return arriveSignedIn(answer.data)
   if (answer.refusal.code !== 'core.passkey.cancelled') refusal.value = answer.refusal
 })
 
 async function sendLink() {
-  busy.value = true
+  pending.value = 'link'
   refusal.value = null
-  const answer = await callIdentity<{ sent?: true, provider?: string, to?: string }>('/api/core/sign-in/email', { address: address.value, ...nextBody() }, { 'cf-turnstile-response': challenge.value })
-  busy.value = false
+  // Pressed before the bot check has finished, the button waits for it rather than being refused.
+  const challenge = await turnstile.value?.waitForToken() ?? ''
+  const answer = await callIdentity<{ sent?: true, provider?: string, to?: string }>('/api/core/sign-in/email', { address: address.value, ...(props.next ? { next: props.next } : {}) }, { 'cf-turnstile-response': challenge })
+  pending.value = null
   if (!answer.ok) {
     refusal.value = answer.refusal
     addressForm.value?.setErrors(fieldErrors(answer.refusal))
@@ -75,10 +78,10 @@ async function sendLink() {
 }
 
 async function useCode() {
-  busy.value = true
+  pending.value = 'code'
   refusal.value = null
   const answer = await callIdentity<{ next: string, offerPasskey: boolean, welcome: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
-  busy.value = false
+  pending.value = null
   if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
   codeForm.value?.setErrors(fieldErrors(answer.refusal))
@@ -96,14 +99,50 @@ async function useCode() {
     <RefusalNotice :refusal="refusal" />
 
     <template v-if="!sent">
+      <template v-if="me?.signIn?.email">
+        <UForm
+          ref="addressForm"
+          :schema="addressSchema"
+          :state="{ address }"
+          class="flex flex-col gap-4"
+          novalidate
+          @submit="sendLink"
+        >
+          <UFormField
+            :label="t('core.sign-in.page.address')"
+            name="address"
+          >
+            <UInput
+              v-model="address"
+              type="email"
+              autocomplete="email webauthn"
+            />
+          </UFormField>
+          <TurnstileCheck
+            ref="turnstile"
+            quiet
+          />
+          <UButton
+            type="submit"
+            block
+            size="lg"
+            :loading="pending === 'link'"
+          >
+            {{ t('core.sign-in.page.send-link') }}
+          </UButton>
+        </UForm>
+        <USeparator :label="t('core.sign-in.page.or')" />
+      </template>
       <UButton
         block
-        size="lg"
+        :size="me?.signIn?.email ? undefined : 'lg'"
+        :color="me?.signIn?.email ? 'neutral' : undefined"
+        :variant="me?.signIn?.email ? 'outline' : undefined"
         icon="i-lucide-key-round"
-        :loading="busy"
+        :loading="pending === 'passkey'"
         @click="withPasskey"
       >
-        Sign in with a passkey
+        {{ t('core.sign-in.page.passkey') }}
       </UButton>
       <UButton
         v-for="provider in providers"
@@ -114,44 +153,13 @@ async function useCode() {
         :href="providerHref(provider.id)"
         external
       >
-        Sign in with {{ provider.label }}
+        {{ t('core.sign-in.page.provider', { provider: provider.label }) }}
       </UButton>
-      <template v-if="me?.signIn?.email">
-        <USeparator label="or" />
-        <UForm
-          ref="addressForm"
-          :schema="addressSchema"
-          :state="{ address }"
-          class="flex flex-col gap-4"
-          novalidate
-          @submit="sendLink"
-        >
-          <UFormField
-            label="Get a sign-in link by email"
-            name="address"
-          >
-            <UInput
-              v-model="address"
-              type="email"
-              autocomplete="email webauthn"
-            />
-          </UFormField>
-          <TurnstileCheck @token="challenge = $event" />
-          <UButton
-            type="submit"
-            block
-            color="neutral"
-            :loading="busy"
-          >
-            Email me a link
-          </UButton>
-        </UForm>
-      </template>
     </template>
 
     <template v-else>
       <p class="text-sm text-muted">
-        If {{ address }} can sign in here, we have sent it a link and a six-digit code. The link works in this browser; the code works anywhere.
+        {{ t('core.sign-in.page.sent', { address }) }}
       </p>
       <UForm
         ref="codeForm"
@@ -162,7 +170,7 @@ async function useCode() {
         @submit="useCode"
       >
         <UFormField
-          label="Six-digit code"
+          :label="t('core.sign-in.page.code')"
           name="code"
         >
           <UPinInput
@@ -175,9 +183,9 @@ async function useCode() {
         <UButton
           type="submit"
           block
-          :loading="busy"
+          :loading="pending === 'code'"
         >
-          Sign in
+          {{ t('core.sign-in.page.use-code') }}
         </UButton>
       </UForm>
       <UButton
@@ -185,7 +193,7 @@ async function useCode() {
         color="neutral"
         @click="sent = false"
       >
-        Use a different address
+        {{ t('core.sign-in.page.different-address') }}
       </UButton>
     </template>
   </div>
