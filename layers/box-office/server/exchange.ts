@@ -66,6 +66,8 @@ async function check(orderId: string, input: ExchangeTarget, options: { heldPric
   const wanted = new Map(input.lines.map(l => [l.lineId, l]))
   const chosen = lines.filter(l => wanted.has(l.id))
   if (!chosen.length || chosen.length !== wanted.size || wanted.size !== input.lines.length) refuse(CHANGED.code, 'Those tickets are not on this booking any more.', { status: 409, remedy: CHANGED.remedy })
+  if (chosen.some(l => l.pass_entry))
+    refuse('box-office.exchange.pass-entry', 'A ticket booked with a pass is not exchanged.', { status: 422, remedy: 'Cancel it, then book the other date with the pass.' })
   if (chosen.some(l => l.type_kind === 'companion' || l.type_kind === 'complimentary'))
     refuse('box-office.exchange.not-this-kind', 'Companion and complimentary tickets are not exchanged.', { status: 422, remedy: 'Cancel them and issue new ones.' })
   const at = nowMs()

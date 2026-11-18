@@ -43,16 +43,20 @@ export async function soldProductions(): Promise<{ id: string, title: string, st
   return out.sort((a, b) => b.startsAt - a.startsAt)
 }
 
+// The pass a ticket line is an entry of, if it is one.
+const PASS_JOIN = ' LEFT JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id LEFT JOIN box_office_passes ps ON ps.id = d.pass_id LEFT JOIN box_office_pass_types y ON y.id = ps.pass_type_id'
+
 export async function salesSummary(productionId: string): Promise<SalesSummary> {
   const production = await getProduction(productionId)
   const performances = await listPerformances({ productionId })
   const ids = performances.map(p => p.id)
   const marks = ids.map(() => '?').join(', ') || 'NULL'
   const lines = (await all<{ performance_id: string, ticket_type_id: string, name: string, kind: string, channel: string, state: 'confirmed' | 'reserved', tickets: number, value: number, currency: string }>(
-    `SELECT l.performance_id, l.ticket_type_id, t.name, t.kind, o.channel, o.state, count(*) AS tickets, sum(l.amount_minor) AS value, o.currency
-      FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types t ON t.id = l.ticket_type_id
+    // A pass's entry is counted under its pass's name, as a kind of its own: not a ticket type and not complimentary.
+    `SELECT l.performance_id, COALESCE(y.id, l.ticket_type_id) AS ticket_type_id, COALESCE(y.name, t.name) AS name, CASE WHEN y.id IS NULL THEN t.kind ELSE 'pass' END AS kind, o.channel, o.state, count(*) AS tickets, sum(l.amount_minor) AS value, o.currency
+      FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types t ON t.id = l.ticket_type_id${PASS_JOIN}
       WHERE l.kind = 'ticket' AND l.state = 'live' AND o.state IN ('confirmed', 'reserved') AND l.performance_id IN (${marks})
-      GROUP BY l.performance_id, l.ticket_type_id, o.channel, o.state, o.currency`, ...ids))
+      GROUP BY l.performance_id, COALESCE(y.id, l.ticket_type_id), o.channel, o.state, o.currency`, ...ids))
     .map((r): SalesLine => ({ performanceId: r.performance_id, ticketTypeId: r.ticket_type_id, ticketType: r.name, kind: r.kind, channel: r.channel, state: r.state, tickets: r.tickets, valueMinor: r.value, currency: r.currency }))
   const capacity = new Map((await all<{ performance_id: string, capacity: number }>(`SELECT performance_id, sum(capacity) AS capacity FROM box_office_pools WHERE performance_id IN (${marks}) GROUP BY performance_id`, ...ids)).map(r => [r.performance_id, r.capacity]))
   const admitted = new Map((await all<{ performance_id: string, n: number }>(`SELECT performance_id, count(*) AS n FROM box_office_tickets WHERE state = 'valid' AND admitted_at IS NOT NULL AND performance_id IN (${marks}) GROUP BY performance_id`, ...ids)).map(r => [r.performance_id, r.n]))
@@ -115,10 +119,10 @@ export async function salesRows(productionId: string): Promise<Record<string, un
   const ids = summary.performances.map(p => p.id)
   const marks = ids.map(() => '?').join(', ') || 'NULL'
   const lines = await all<{ performance_id: string, name: string, how: string, state: string, tickets: number, value: number, currency: string }>(
-    `SELECT l.performance_id, t.name, CASE WHEN t.kind = 'complimentary' THEN 'complimentary' ELSE o.channel END AS how, o.state, count(*) AS tickets, sum(l.amount_minor) AS value, o.currency
-      FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types t ON t.id = l.ticket_type_id
+    `SELECT l.performance_id, COALESCE(y.name, t.name) AS name, CASE WHEN y.id IS NULL AND t.kind = 'complimentary' THEN 'complimentary' ELSE o.channel END AS how, o.state, count(*) AS tickets, sum(l.amount_minor) AS value, o.currency
+      FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types t ON t.id = l.ticket_type_id${PASS_JOIN}
       WHERE l.kind = 'ticket' AND l.state = 'live' AND o.state IN ('confirmed', 'reserved') AND l.performance_id IN (${marks})
-      GROUP BY l.performance_id, t.name, CASE WHEN t.kind = 'complimentary' THEN 'complimentary' ELSE o.channel END, o.state, o.currency ORDER BY l.performance_id, t.name`, ...ids)
+      GROUP BY l.performance_id, COALESCE(y.name, t.name), CASE WHEN y.id IS NULL AND t.kind = 'complimentary' THEN 'complimentary' ELSE o.channel END, o.state, o.currency ORDER BY l.performance_id, COALESCE(y.name, t.name)`, ...ids)
   const performance = new Map(summary.performances.map(p => [p.id, p]))
   return lines.map(l => ({
     performance: [summary.production.title, performance.get(l.performance_id)?.label].filter(Boolean).join(', '),

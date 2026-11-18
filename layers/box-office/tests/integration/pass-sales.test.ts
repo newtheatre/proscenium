@@ -14,6 +14,7 @@ import { basketByToken, createBasket, type Basket, type BasketInput } from '../.
 import { getPass } from '../../server/pass-holding'
 import { passesOnSale } from '../../server/pass-sales'
 import { listPassTypes } from '../../server/passes'
+import { salesSummary } from '../../server/reports'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
 import { house, NOV_16, ready, req, type House } from './stage'
 
@@ -117,6 +118,10 @@ describe('a pass bought with a booking', () => {
     expect(await pass(made.orderId)).toMatchObject({ issued_at: NOV_16, paid_at: NOV_16, account_id: o.account_id, uses_taken: 1 })
     expect(await balance('box-office.pass-income') - income).toBe(-3500)
     expect(await balance('box-office.deferred-ticket-income') - deferred).toBe(-1200)
+    // The report counts the entry under the pass's name, not as a complimentary ticket.
+    const report = await inContext(() => salesSummary(a.productionId))
+    expect(report.byType.find(row => row.name === type.name)).toMatchObject({ kind: 'pass', tickets: 1, valueMinor: 0 })
+    expect(report.totals.complimentary).toBe(0)
   })
 
   it('reserved, is the buyer\'s at once and owed on the reservation; one that must be paid first is not reserved', async () => {
