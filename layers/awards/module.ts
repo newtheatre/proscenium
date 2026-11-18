@@ -85,6 +85,7 @@ export default defineModule({
     ],
     // My account shows Awards only to somebody who holds one.
     'core.count': [{ id: 'awards.mine', file: 'mine' }],
+    'core.account-notice': [{ id: 'awards.unlisted', file: 'unlisted' }],
     // An erased person's awards leave the roll in the erasure's own batch.
     'core.erasure-handler': [{ id: 'awards', file: 'awards' }],
     'core.requirement': [{ id: 'awards', file: 'awards' }],

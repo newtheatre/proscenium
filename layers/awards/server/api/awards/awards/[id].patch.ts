@@ -22,7 +22,8 @@ export default defineRoute({
   const changed = Object.keys(input).filter(k => (input as Record<string, unknown>)[k] !== undefined && (input as Record<string, unknown>)[k] !== (award as unknown as Record<string, unknown>)[k])
   if (!changed.length) return { awardId: award.id }
   // A date picked in full is known to the day, whatever the award was before.
-  const set = [...changed.map(k => `${COLUMN[k]} = ?`), ...(changed.includes('awardedOn') ? ['awarded_precision = \'day\''] : [])]
+  // Staff choosing where it is listed answer for the holder, who is no longer asked.
+  const set = [...changed.map(k => `${COLUMN[k]} = ?`), ...(changed.includes('awardedOn') ? ['awarded_precision = \'day\''] : []), ...(changed.includes('visibility') ? ['listing_pending = 0'] : [])]
   unit.add({
     sql: `UPDATE awards_awards SET ${set.join(', ')}, updated_at = ? WHERE id = ?`,
     params: [...changed.map(k => (input as Record<string, unknown>)[k] ?? null), nowMs(), award.id],
