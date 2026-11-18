@@ -8,7 +8,7 @@
 import { and, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, canonicalAccount, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf } from '#modules/core'
+import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, type AccessApplication, type DeskAccessForm } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -587,7 +587,16 @@ export interface DeskHolder {
   reason: string | null
   /** Whether this seller may sell it to them anyway, having checked by hand. */
   mayOverride: boolean
+  /**
+   * Whether the seller may fill in the access scheme application with them, here at the till: the
+   * ticket needs the scheme, such as a wheelchair space, and they have never applied. A submitted
+   * application is enough to book, with the booking flagged for staff (Matt, 2026-11-17).
+   */
+  mayApply: boolean
 }
+
+/** A requirement the access scheme answers, such as core.access-scheme:wheelchair. */
+const ACCESS_SCHEME = 'core.access-scheme:'
 
 /**
  * The holder named for a ticket of a type with requirements, at the till (Matt, 17 November): by a
@@ -623,5 +632,27 @@ export async function deskHolder(input: { performanceId: string, ticketTypeId: s
     met: !!verdict.met,
     reason: verdict.met ? null : verdict.reason ?? (verdict.unavailable ? `${type.name} tickets cannot be checked just now.` : `This person does not qualify for ${type.name} tickets, as far as we can tell.`),
     mayOverride: !verdict.met && (await can(actor, 'box-office.ticket-type.override-requirement', ['core.performance', input.performanceId])).allowed,
+    mayApply: !verdict.met && type.requirementRefs.some(r => r.startsWith(ACCESS_SCHEME)) && accountId !== actor.accountId && (await deskAccessForm(accountId))?.applied === false,
   }
+}
+
+/**
+ * The access scheme's application form for a seller to fill in with somebody at the till, found in
+ * the till's own box. Asks the sell ability of the performance being sold. Refused while the scheme
+ * is off; says only whether they have applied, never what they said.
+ */
+export async function deskAccessApplication(input: { performanceId: string, accountId: string }): Promise<DeskAccessForm & { accountId: string, label: string }> {
+  const actor = useContext().actor
+  await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.performanceId])
+  const accountId = await canonicalAccount(input.accountId)
+  const form = await deskAccessForm(accountId)
+  if (!form) refuse('core.not-found', 'The access scheme is not open.', { status: 404 })
+  return { accountId, label: await accountLabel(accountId), ...form }
+}
+
+/** Sends that application, as made by staff, under the seller's ability to sell the performance. */
+export async function deskApplyForAccess(unit: UnitView, input: { performanceId: string, accountId: string, application: AccessApplication }): Promise<{ status: string }> {
+  const actor = useContext().actor
+  await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.performanceId])
+  return applyAtDesk(unit, actor, await canonicalAccount(input.accountId), input.application, 'box-office.order.sell')
 }
