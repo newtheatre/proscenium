@@ -18,7 +18,10 @@ import { findOrCreateAccount } from '#modules/core'
 import { claimSeats } from './capacity'
 import { hashOf } from './codes'
 import { holds, orderLines } from './db/schema'
-import { bookingSchema, type ImportBooking } from '../shared/import-booking'
+import { bookingSchema, importPassSchema, type ImportBooking, type ImportPass } from '../shared/import-booking'
+import { judgePass, passEntryTypeId, redeemPasses, type JudgedPass } from './pass-entries'
+import { aliasHashOf, issuePass, passByCode } from './pass-holding'
+import { listPassTypes } from './passes'
 import { poolsOf, salesOf } from './setup'
 import { listTicketTypes } from './ticket-types'
 import { issueTickets } from './tickets'
@@ -27,7 +30,7 @@ export const MOST_BOOKINGS = 2000 // not-policy: a season's bookings, and a requ
 export const BOOKINGS_PER_JOB = 10 // not-policy: each booking is a handful of statements; a job stays well inside a Worker's limits
 const BASKET_FOR = 60_000 // not-policy: the order is a basket only inside its own batch
 
-export { bookingSchema, type ImportBooking }
+export { bookingSchema, importPassSchema, type ImportBooking, type ImportPass }
 
 export type ImportVerdict
   = | { reference: string, result: 'import', state: 'reserved' | 'confirmed', tickets: number, totalMinor: number }
@@ -36,8 +39,10 @@ export type ImportVerdict
 
 interface Planned {
   performanceId: string
+  productionId: string
   startsAt: number
-  lines: { poolId: string, bandId: string, ticketTypeId: string, amountMinor: number, named: boolean }[]
+  /** `pass` is the code of the pass a line is an entry of. */
+  lines: { poolId: string, bandId: string, ticketTypeId: string, amountMinor: number, named: boolean, pass?: string }[]
   totalMinor: number
 }
 
@@ -46,29 +51,43 @@ type Types = Awaited<ReturnType<typeof listTicketTypes>>
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
 /** Where a booking's tickets would go, or why it cannot be brought in. Reads only. */
-async function plan(booking: ImportBooking, types: Types): Promise<Planned | string> {
-  const performance = await first<{ id: string, starts_at: number, state: string }>(
-    `SELECT f.id, f.starts_at, f.state FROM core_performances f JOIN core_productions p ON p.id = f.production_id
+async function plan(booking: ImportBooking, types: Types, coming: ReadonlySet<string> = new Set()): Promise<Planned | string> {
+  const performance = await first<{ id: string, production_id: string, starts_at: number, state: string }>(
+    `SELECT f.id, f.production_id, f.starts_at, f.state FROM core_performances f JOIN core_productions p ON p.id = f.production_id
       WHERE p.slug = ? AND f.starts_at = ?`, booking.production, booking.startsAt)
   if (!performance) return `No performance of "${booking.production}" starts at ${new Date(booking.startsAt).toISOString()}.`
   if (performance.state !== 'scheduled') return 'The performance is not scheduled.'
   if (!await salesOf(performance.id)) return 'The performance is not set up for sale.'
   const pools = await poolsOf(performance.id)
   const lines: Planned['lines'] = []
+  const used = new Set<string>()
   for (const ticket of booking.tickets) {
-    const type = types.find(t => same(t.name, ticket.type))
-    if (!type) return `There is no ticket type named "${ticket.type}".`
     const wanted = ticket.band ? pools.filter(p => same(p.bandName, ticket.band!)) : pools.filter(p => p.bandKind === 'standard')
     if (wanted.length !== 1) return ticket.band ? `The performance has no part of the house named "${ticket.band}".` : 'The performance has more than one part of the house, so each ticket must name its own.'
+    if (ticket.pass) {
+      // A pass gives one entry, so the same pass twice on a booking is refused. One the same file
+      // brings in is judged when it is written, after the pass is here.
+      const alias = await aliasHashOf(ticket.pass)
+      if (used.has(alias)) return 'The booking uses the same pass twice.'
+      used.add(alias)
+      if (!coming.has(alias)) {
+        const refused = await judgePass(ticket.pass, performance.id, { channel: 'desk', account: null }).then(() => null, (error: any) => error?.name === 'Refusal' ? String(error.reason ?? error.code) : Promise.reject(error))
+        if (refused) return refused
+      }
+      lines.push({ poolId: wanted[0]!.id, bandId: wanted[0]!.bandId, ticketTypeId: await passEntryTypeId(), amountMinor: 0, named: false, pass: ticket.pass })
+      continue
+    }
+    const type = types.find(t => same(t.name, ticket.type!))
+    if (!type) return `There is no ticket type named "${ticket.type}".`
     lines.push({ poolId: wanted[0]!.id, bandId: wanted[0]!.bandId, ticketTypeId: type.id, amountMinor: ticket.amountMinor, named: type.requirementRefs.length > 0 })
   }
-  return { performanceId: performance.id, startsAt: performance.starts_at, lines, totalMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
+  return { performanceId: performance.id, productionId: performance.production_id, startsAt: performance.starts_at, lines, totalMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
 
 const existing = (reference: string) => first<{ id: string, state: string }>('SELECT id, state FROM box_office_orders WHERE reference = ?', reference.toUpperCase())
 
 /** What importing each booking would do, with nothing written. Room is judged only when it is taken. */
-export async function checkBookings(bookings: readonly ImportBooking[]): Promise<ImportVerdict[]> {
+export async function checkBookings(bookings: readonly ImportBooking[], coming: ReadonlySet<string> = new Set()): Promise<ImportVerdict[]> {
   const types = await listTicketTypes()
   const seen = new Set<string>()
   const out: ImportVerdict[] = []
@@ -79,17 +98,17 @@ export async function checkBookings(bookings: readonly ImportBooking[]): Promise
       continue
     }
     seen.add(reference)
-    out.push(await verdictFor(booking, types))
+    out.push(await verdictFor(booking, types, coming))
   }
   return out
 }
 
-async function verdictFor(booking: ImportBooking, types: Types): Promise<ImportVerdict> {
+async function verdictFor(booking: ImportBooking, types: Types, coming: ReadonlySet<string> = new Set()): Promise<ImportVerdict> {
   const reference = booking.reference.toUpperCase()
   const order = await existing(reference)
   if (order) return { reference, result: booking.cancelled && order.state === 'reserved' ? 'release' : 'already' }
   if (booking.cancelled) return { reference, result: 'left-out' }
-  const planned = await plan(booking, types)
+  const planned = await plan(booking, types, coming)
   if (typeof planned === 'string') return { reference, result: 'refused', reason: planned }
   return { reference, result: 'import', state: planned.totalMinor === 0 ? 'confirmed' : 'reserved', tickets: planned.lines.length, totalMinor: planned.totalMinor }
 }
@@ -130,9 +149,16 @@ async function write(unit: UnitView, booking: ImportBooking, planned: Planned, i
   const requests = [...byPool].map(([poolId, quantity]) => ({ poolId, quantity }))
   const claimed = await claimSeats(unit, { holdId: holdId!, requests, state: 'confirmed', expiresAt: null })
   const claimsOf = new Map(requests.map((r, i) => [r.poolId, [...claimed[i]!]]))
-  const lineIds = unit.insertSet(orderLines, planned.lines.map(l => ({
-    orderId, kind: 'ticket', performanceId: planned.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimsOf.get(l.poolId)!.shift()!,
+  const claimIds = planned.lines.map(l => claimsOf.get(l.poolId)!.shift()!)
+  // A pass's entry is taken as one made here is: judged, then written against its seat.
+  const entries: { pass: JudgedPass, claimId: string }[] = []
+  for (const [i, l] of planned.lines.entries())
+    if (l.pass) entries.push({ pass: await judgePass(l.pass, planned.performanceId, { channel: 'desk', account: null }, at), claimId: claimIds[i]! })
+  const redemptions = redeemPasses(unit, orderId, planned.performanceId, planned.productionId, entries)
+  const lineIds = unit.insertSet(orderLines, planned.lines.map((l, i) => ({
+    orderId, kind: 'ticket', performanceId: planned.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimIds[i]!,
     listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live', requirementAccountId: l.named ? accountId : null,
+    passRedemptionId: l.pass ? redemptions[entries.findIndex(e => e.claimId === claimIds[i])]! : null,
   })))
   unit.expect(planned.lines.length)
   if (state === 'reserved') {
@@ -148,6 +174,42 @@ async function write(unit: UnitView, booking: ImportBooking, planned: Planned, i
   }
   unit.audit({ action: 'create', record: ['box-office.order', orderId], detail: { importId, reference } })
   return state
+}
+
+export type PassVerdict = { code: string, result: 'issue' | 'already' } | { code: string, result: 'refused', reason: string }
+
+/**
+ * Passes brought in from another system, each checked and, unless `dryRun`, issued in the unit: to
+ * the account for its address, paid or still owed, found afterwards by the code its holder already
+ * has. One already here is left alone, so a file may be imported again. Nothing is sent.
+ */
+export async function importPasses(unit: UnitView, incoming: readonly ImportPass[], dryRun: boolean): Promise<PassVerdict[]> {
+  const types = incoming.length ? await listPassTypes() : []
+  const seen = new Set<string>()
+  const out: PassVerdict[] = []
+  for (const pass of incoming) {
+    const alias = await aliasHashOf(pass.code)
+    const type = types.find(t => same(t.name, pass.passType))
+    const price = type?.prices.find(p => same(p.name, pass.price))
+    if (seen.has(alias)) out.push({ code: pass.code, result: 'refused', reason: 'The file holds this pass twice.' })
+    else if (await passByCode(pass.code)) out.push({ code: pass.code, result: 'already' })
+    else if (!type) out.push({ code: pass.code, result: 'refused', reason: `There is no pass named "${pass.passType}".` })
+    else if (!price) out.push({ code: pass.code, result: 'refused', reason: `${type.name} has no price named "${pass.price}".` })
+    else {
+      if (!dryRun) {
+        const { accountId } = await findOrCreateAccount(unit, { address: pass.email, name: pass.name ?? null, origin: 'guest' })
+        await issuePass(unit, { passTypeId: type.id, passPriceId: price.id, accountId, paid: pass.paid, issuedBy: null, alias: pass.code })
+      }
+      out.push({ code: pass.code, result: 'issue' })
+    }
+    seen.add(alias)
+  }
+  return out
+}
+
+/** The passes of a file that will be here once it is imported, by the hash their codes are found by. */
+export async function comingPasses(verdicts: readonly PassVerdict[]): Promise<Set<string>> {
+  return new Set(await Promise.all(verdicts.filter(v => v.result === 'issue').map(v => aliasHashOf(v.code))))
 }
 
 export interface ImportJob { importId: string, bookings: ImportBooking[] }

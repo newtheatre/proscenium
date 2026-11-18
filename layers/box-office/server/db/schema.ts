@@ -417,6 +417,9 @@ export const passes = defineTable('box_office_passes', {
   // Whether only the holder may use it, settled when it was issued.
   named: col.internal(integer('named', { mode: 'boolean' }).notNull().default(false)),
   codeHash: col.internal(text('code_hash').notNull()),
+  // For a pass brought in from another system: the hash of the code its holder already has from there,
+  // exactly as it scans, so that code still finds the pass. Null for a pass made here.
+  aliasHash: col.internal(text('alias_hash')),
   // The code itself, sealed with the core key, so the holder's pass page and staff can show it again.
   code: col.internal(text('code'), { encrypted: true, erase: 'clear' }),
   // Copied from the pass type when issued, so a later change to the type leaves this pass as sold.
@@ -441,6 +444,7 @@ export const passes = defineTable('box_office_passes', {
   onErasure: 'keep-row',
   extra: t => [
     uniqueIndex('box_office_passes_code').on(t.codeHash),
+    uniqueIndex('box_office_passes_alias').on(t.aliasHash).where(sql`alias_hash IS NOT NULL`),
     index('box_office_passes_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
     index('box_office_passes_type').on(t.passTypeId, t.state),
     uniqueIndex('box_office_passes_line').on(t.orderLineId).where(sql`order_line_id IS NOT NULL`),

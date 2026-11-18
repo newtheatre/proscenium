@@ -19,11 +19,26 @@ export const bookingSchema = z.object({
   /** The other system no longer holds it: one imported earlier is released, and one not yet here is left out. */
   cancelled: z.boolean().default(false),
   tickets: z.array(z.object({
-    /** A ticket type's name here. */
-    type: z.string().trim().min(1).max(80),
+    /** A ticket type's name here. Left out for a pass's entry. */
+    type: z.string().trim().min(1).max(80).optional(),
+    /** For a pass's entry in place of a ticket type: the pass's code, one of ours or the other system's as it scans. */
+    pass: z.string().trim().min(4).max(512).optional(),
     amountMinor: z.number().int().min(0),
     /** A part of the house by name, where the performance has more than one. */
     band: z.string().trim().max(80).optional(),
-  })).min(1).max(MOST_TICKETS),
+  }).refine(t => !!t.type !== !!t.pass, 'A ticket has a type or a pass, not both.').refine(t => !t.pass || t.amountMinor === 0, 'A pass\'s entry costs nothing.')).min(1).max(MOST_TICKETS),
 })
 export type ImportBooking = z.infer<typeof bookingSchema>
+
+/** A pass brought in from another system, issued before the bookings that use it. */
+export const importPassSchema = z.object({
+  /** The text of the code its holder already has, as it scans. It then finds the pass here. */
+  code: z.string().trim().min(4).max(512),
+  /** The pass's name here, and the name of the price it was sold at. */
+  passType: z.string().trim().min(1).max(120),
+  price: z.string().trim().min(1).max(80),
+  email: z.string().trim().min(3).max(254),
+  name: z.string().trim().max(120).nullish(),
+  paid: z.boolean(),
+})
+export type ImportPass = z.infer<typeof importPassSchema>
