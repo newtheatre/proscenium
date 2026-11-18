@@ -9,7 +9,7 @@ import { doorList } from '../../../../../../shared/lists'
 
 definePageMeta({ layout: 'console' })
 
-interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number }
+interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
 
 const { t } = useT()
 const route = useRoute()
@@ -30,6 +30,7 @@ const admitting = ref<string | null>(null)
 
 interface Scan { result: string, ticketPerformance?: DoorElsewhere, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
 const { time } = useDates()
+const { money } = await useMoney()
 const elsewhere = useDoorElsewhere()
 const { data: summary } = await useAPI<{ performance: { startsAt: number } }>(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/door/summary`, { key: `box-office:door:summary:${id.value}` })
 const lastScan = ref<{ text: string, color: 'success' | 'warning' | 'error' } | null>(null)
@@ -112,7 +113,21 @@ const trail = computed(() => [
       <span class="font-mono">{{ row.reference }}</span>
     </template>
     <template #cell-admitted="{ row }">
-      <span class="inline-flex flex-wrap items-center gap-2">
+      <!-- A reservation not yet paid for: nobody on it can be admitted until the till takes payment. -->
+      <span
+        v-if="row.unpaid"
+        class="inline-flex flex-wrap items-center gap-2"
+      >
+        <StatusBadge
+          tone="info"
+          :label="t('box-office.live-door.result.not_paid')"
+        />
+        <span class="text-muted">{{ money(row.unpaid.amountDueMinor, row.unpaid.currency) }}</span>
+      </span>
+      <span
+        v-else
+        class="inline-flex flex-wrap items-center gap-2"
+      >
         <StatusBadge
           :tone="row.admitted === row.tickets ? 'success' : row.admitted ? 'warning' : 'neutral'"
           :label="t('box-office.door.admitted', { admitted: row.admitted, tickets: row.tickets })"
