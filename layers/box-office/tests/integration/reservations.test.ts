@@ -282,7 +282,8 @@ describe('the link that opens a guest\'s account', () => {
     // An age-restricted production says so with the tickets.
     await rows('UPDATE core_productions SET age_min = 18, age_restricted = 1 WHERE id = ?', h.productionId)
     const b = await basket(h, 1)
-    const done = await reserve(b, address())
+    // An 18+ show asks the buyer to say everyone is old enough (#361).
+    const done = await req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: b.totalMinor, email: address(), name: 'Guest Buyer', ageConfirmed: true }, null, { 'x-basket-token': b.token })
     expect(done.body).toMatchObject({ state: 'reserved', accountLinkSent: true })
     const told = await mail('box-office.order-reserved', b.orderId)
     expect(told.account).toMatch(/^https:\/\/theatre\.example\/sign-in\/link#/)
