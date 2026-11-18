@@ -28,7 +28,9 @@ interface Entry { key: string, item: Item, picks: Choice[], quantity: number, un
 interface Category { id: string, name: string, colour: string | null, parentId?: string | null, items: Item[] }
 // `idTypes` and `refusalScope` arrive with the server's support for them; without them the prompt
 // asks only whether ID was checked, and a refusal says nothing of its scope.
-interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, percentOff?: number | null, tillLayout?: 'chips' | 'folders' | 'rail', favourites?: string[], allergenStatement?: string | null, categories: Category[], groups?: Group[], ageCheck: { enabled: boolean, challengeAge: number, description: boolean, idTypes?: string[], refusalScope?: boolean } }
+// `priceListStandard`, `priceListRestricted` and `priceListAllowed` say which list the till sells from
+// and whether this seller may; `ageCheck.minimumAge` is the legal age, where the server sends it.
+interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, priceListStandard?: boolean, priceListRestricted?: boolean, priceListAllowed?: boolean, percentOff?: number | null, tillLayout?: 'chips' | 'folders' | 'rail', favourites?: string[], allergenStatement?: string | null, categories: Category[], groups?: Group[], ageCheck: { enabled: boolean, challengeAge: number, minimumAge?: number, description: boolean, idTypes?: string[], refusalScope?: boolean } }
 /** A product as one tile: its sizes, cheapest first as the server lists them. */
 interface Tile { key: string, productId: string, name: string, items: Item[], ageRestricted: boolean, fromMinor: number, choices: boolean, colour: string | null }
 interface Outlet { id: string, name: string, kind: string }
@@ -81,13 +83,13 @@ watch(outletId, async (id) => {
     menu.value = null
     refusal.value = toRefusal(e)
   }
-  clear()
+  if (!restore()) clear()
 })
 
 // The basket: a line a size and its choices, in the order they were first added. Different choices
 // on the same size are different lines.
 const basket = ref<Map<string, Entry>>(new Map())
-const clientKey = ref(crypto.randomUUID())
+const clientKey = ref<string>(crypto.randomUUID())
 const groups = computed(() => new Map((menu.value?.groups ?? []).map(g => [g.id, g])))
 const groupsOf = (i: Item) => (i.groupIds ?? []).flatMap(id => groups.value.get(id) ?? [])
 const picked = (picks: Choice[]) => picks.flatMap(p => groups.value.get(p.groupId)?.options.find(o => o.key === p.key) ?? [])
@@ -114,6 +116,53 @@ const idTypes = computed(() => menu.value?.ageCheck.idTypes ?? [])
 // What was last added, for the till's undo.
 const last = ref<string | null>(null)
 
+// The basket is kept in this tab's storage as it changes, so reloading the page (such as while a
+// payment is being taken) brings it back with its key, its age answer and any refusal: the till then
+// shows the sale's lines again, and paying carries on with the same bar sale.
+const KEPT = 'bar.till.basket'
+const KEEP_FOR = 2 * 60 * 60 * 1000 // not-policy: how long a basket left by a reload is brought back
+interface Kept { at: number, outletId: string, clientKey: string, lines: { variantId: string, picks: Choice[], quantity: number }[], answer: typeof answer.value, idType: string | null, refused: { at: number, reason: string } | null, avoid: string[] }
+let restored = false
+function keep() {
+  if (!menu.value) return
+  const kept: Kept = { at: Date.now(), outletId: menu.value.outletId, clientKey: clientKey.value, lines: lines.value.map(l => ({ variantId: l.item.variantId, picks: l.picks, quantity: l.quantity })), answer: answer.value, idType: idType.value, refused: refused.value, avoid: avoid.value }
+  try {
+    sessionStorage.setItem(KEPT, JSON.stringify(kept))
+  }
+  catch {
+    // Storage blocked: a reload starts an empty basket.
+  }
+}
+/** Brings back the basket a reload left, once, when it is for this outlet and recent. */
+function restore(): boolean {
+  if (restored || !menu.value) return false
+  restored = true
+  let kept: Kept | null = null
+  try {
+    kept = JSON.parse(sessionStorage.getItem(KEPT) ?? 'null') as Kept | null
+  }
+  catch {
+    return false
+  }
+  if (!kept || kept.outletId !== menu.value.outletId || Date.now() - kept.at > KEEP_FOR) return false
+  const items = new Map(cats.value.flatMap(c => c.items.map(i => [i.variantId, i] as const)))
+  const next = new Map<string, Entry>()
+  for (const l of kept.lines) {
+    const item = items.get(l.variantId)
+    if (!item) continue
+    const key = keyOf(item, l.picks)
+    next.set(key, { key, item, picks: l.picks, quantity: l.quantity, unitMinor: unitOf(item, l.picks), restricted: needsAge(item, l.picks) })
+  }
+  basket.value = next
+  clientKey.value = kept.clientKey
+  answer.value = kept.answer
+  idType.value = kept.idType
+  refused.value = kept.refused
+  avoid.value = kept.avoid ?? []
+  send()
+  return true
+}
+
 function undoLast() {
   const entry = last.value ? basket.value.get(last.value) : undefined
   last.value = null
@@ -122,11 +171,13 @@ function undoLast() {
 function send() {
   const said = restricted.value && answer.value
   const lastEntry = last.value ? basket.value.get(last.value) : undefined
+  keep()
   emit('receipt', {
     lines: lines.value.map(l => ({
       key: l.key,
       label: l.item.product,
-      detail: detailOf(l) || undefined,
+      // Two or more of a line say what one costs.
+      detail: [detailOf(l), l.quantity > 1 ? t('bar.desk.each', { count: l.quantity, amount: money(l.unitMinor) }) : ''].filter(Boolean).join(' · ') || undefined,
       quantity: l.quantity,
       amountMinor: l.unitMinor * l.quantity,
       more: () => set(l, l.quantity + 1),
@@ -240,7 +291,7 @@ async function refuse(reasonTermId: string) {
       clear()
       clientKey.value = crypto.randomUUID()
     }
-    toast.add({ title: t('bar.desk.refusal-recorded'), description: carriesOn ? t('bar.desk.refusal-carries-on') : undefined, color: 'success' })
+    toast.add({ id: 'bar-till', title: t('bar.desk.refusal-recorded'), description: carriesOn ? t('bar.desk.refusal-carries-on') : undefined, color: 'success' })
   }
   catch (e) {
     refusalProblem.value = toRefusal(e)
@@ -254,7 +305,7 @@ function set(entry: Entry, quantity: number) {
   if (props.locked) return
   const had = basket.value.get(entry.key)?.quantity ?? 0
   if (quantity > had && entry.restricted && refused.value) {
-    toast.add({ id: 'bar-till-refused', title: t('bar.desk.refused.blocked'), description: t('bar.desk.refused.help'), color: 'error', icon: 'i-lucide-ban' })
+    toast.add({ id: 'bar-till', title: t('bar.desk.refused.blocked'), description: t('bar.desk.refused.help'), color: 'error', icon: 'i-lucide-ban' })
     return
   }
   if (!had && needsPrompt(entry, quantity)) return
@@ -398,7 +449,8 @@ function addChosen() {
 // chips over everything, folders to open with the outlet's favourites in front, or a list of
 // categories down the side. A category may hold one level of sub-categories.
 interface Section { id: string, heading: string | null, colour: string | null, tiles: Tile[] }
-const [DefineTile, TileButton] = createReusableTemplate<{ tile: Tile }>()
+// The tile is a prop of the template, not an attribute to pass on to the button.
+const [DefineTile, TileButton] = createReusableTemplate<{ tile: Tile }>({ inheritAttrs: false })
 const layout = computed(() => menu.value?.tillLayout ?? 'chips')
 const cats = computed(() => menu.value?.categories ?? [])
 const subsOf = (c: Category) => cats.value.filter(s => s.parentId === c.id && s.items.length)
@@ -413,13 +465,14 @@ function sectionsOf(c: Category, headed: boolean): Section[] {
   ]
 }
 // Chips and the side list: which category is in view. Folders: the folder opened, and one inside it.
+// The outlet's favourites come first in every layout, and are what the till opens on.
 const category = ref<string>('all')
 const path = ref<string[]>([])
 watch(menu, () => {
-  category.value = 'all'
+  category.value = menu.value?.favourites?.length ? 'favourites' : 'all'
   path.value = []
 })
-const current = computed(() => tops.value.find(c => c.id === (layout.value === 'rail' && category.value === 'all' ? tops.value[0]?.id : category.value)) ?? null)
+const current = computed(() => (category.value === 'favourites' ? null : tops.value.find(c => c.id === (layout.value === 'rail' && category.value === 'all' ? tops.value[0]?.id : category.value)) ?? null))
 const folder = computed(() => tops.value.find(c => c.id === path.value[0]) ?? null)
 const subFolder = computed(() => (folder.value ? subsOf(folder.value).find(s => s.id === path.value[1]) ?? null : null))
 // The sizes pinned to the front of this outlet's till, each a tile of its own.
@@ -433,18 +486,27 @@ const favourites = computed<Tile[]>(() => (menu.value?.favourites ?? []).flatMap
   }
   return []
 }))
+// A search over every product, its sizes and what can be picked on it, whatever is in view.
+const query = ref('')
+const searching = ref(false)
+const q = computed(() => query.value.trim().toLowerCase())
+const matches = (tile: Tile) => [tile.name, ...tile.items.flatMap(i => [i.variant, ...groupsOf(i).flatMap(g => g.options.map(o => o.label))])].some(text => text.toLowerCase().includes(q.value))
+const found = computed(() => (q.value ? cats.value.flatMap(c => tiles(c)).filter(matches) : []))
+const favouritesSection = computed<Section[]>(() => (favourites.value.length ? [{ id: 'favourites', heading: t('bar.desk.favourites'), colour: null, tiles: favourites.value }] : []))
 const sections = computed<Section[]>(() => {
+  if (q.value) return found.value.length ? [{ id: 'search', heading: t('bar.desk.search.results', { count: found.value.length }), colour: null, tiles: found.value }] : []
+  if (layout.value !== 'folders' && category.value === 'favourites') return favouritesSection.value
   if (layout.value === 'folders') {
     if (subFolder.value) return [{ id: subFolder.value.id, heading: null, colour: colourOf(subFolder.value), tiles: tiles(subFolder.value) }]
     if (folder.value) return folder.value.items.length ? [{ id: folder.value.id, heading: null, colour: colourOf(folder.value), tiles: tiles(folder.value) }] : []
-    return favourites.value.length ? [{ id: 'favourites', heading: t('bar.desk.favourites'), colour: null, tiles: favourites.value }] : []
+    return favouritesSection.value
   }
   if (current.value) return sectionsOf(current.value, false)
   return tops.value.flatMap(c => sectionsOf(c, tops.value.length > 1))
 })
 /** The folders to open from where the seller is: categories at the front, sub-categories inside one. */
 const folders = computed(() => {
-  if (layout.value !== 'folders' || subFolder.value) return []
+  if (layout.value !== 'folders' || subFolder.value || q.value) return []
   if (folder.value) return subsOf(folder.value).map(s => ({ id: s.id, name: s.name, colour: colourOf(s), count: tiles(s).length, open: () => { path.value = [folder.value!.id, s.id] } }))
   return tops.value.map(c => ({ id: c.id, name: c.name, colour: colourOf(c), count: productsIn(c), open: () => { path.value = [c.id] } }))
 })
@@ -505,6 +567,8 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
   const may = o.allergens.mayContain.filter(avoids)
   return contains.length ? { tone: 'error', text: t('bar.desk.allergens.contains', { names: names(contains) }) } : may.length ? { tone: 'warning', text: t('bar.desk.allergens.may-contain', { names: names(may) }) } : null
 }
+// What the customer avoids and any refusal are kept with the basket, for a reload.
+watch([avoid, refused], keep, { deep: true })
 </script>
 
 <template>
@@ -516,28 +580,43 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
     >
       {{ t('bar.desk.no-outlet') }}
     </p>
+    <!-- One line, even on a phone: where the till sells and at what prices, then search and the sheets,
+         which drop to their icons where there is no room. -->
     <div
       v-else
-      class="flex flex-wrap items-end justify-between gap-3"
+      class="flex min-w-0 items-center gap-2"
     >
-      <UFormField
+      <USelect
         v-if="outletItems.length > 1"
-        :label="t('bar.desk.outlet')"
-      >
-        <USelect
-          v-model="outletId"
-          :items="outletItems"
-          :disabled="locked || lines.length > 0"
-          class="min-w-40"
+        v-model="outletId"
+        :items="outletItems"
+        :disabled="locked || lines.length > 0"
+        :aria-label="t('bar.desk.outlet')"
+        icon="i-lucide-store"
+        class="min-w-0 max-w-[45%] sm:max-w-none sm:min-w-40"
+      />
+      <UBadge
+        v-if="menu && menu.priceListStandard === false"
+        :color="menu.priceListAllowed === false ? 'error' : 'info'"
+        variant="subtle"
+        icon="i-lucide-tags"
+        class="min-w-0"
+        :ui="{ label: 'truncate' }"
+        :label="t('bar.desk.price-list', { name: menu.priceList })"
+      />
+      <div class="ms-auto flex shrink-0 items-center gap-1">
+        <SearchToggle
+          v-if="menu && tops.length"
+          v-model="query"
+          v-model:open="searching"
+          :label="t('bar.desk.search.label')"
         />
-      </UFormField>
-      <span v-else />
-      <div class="flex flex-wrap gap-1">
         <UButton
           v-if="hasAllergens"
           color="neutral"
           variant="ghost"
           icon="i-lucide-wheat"
+          :ui="{ label: 'max-sm:sr-only' }"
           :label="avoid.length ? t('bar.desk.allergens.button-avoiding', { count: avoid.length }) : t('bar.desk.allergens.button')"
           @click="allergensOpen = true"
         />
@@ -546,12 +625,21 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
           color="neutral"
           variant="ghost"
           icon="i-lucide-ban"
+          :ui="{ label: 'max-sm:sr-only' }"
           :label="lines.length ? t('bar.desk.refuse-sale') : t('bar.desk.record-refusal')"
           :disabled="locked"
           @click="refuseFromPanel()"
         />
       </div>
     </div>
+    <UAlert
+      v-if="menu?.priceListAllowed === false"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-lock"
+      :title="t('bar.desk.price-list-not-yours', { name: menu.priceList })"
+      :description="t('bar.desk.price-list-not-yours-help')"
+    />
 
     <UAlert
       v-if="refused"
@@ -566,19 +654,13 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
 
     <template v-if="menu">
       <DefineTile v-slot="{ tile }">
-        <UChip
-          :show="inSale(tile) > 0"
-          :text="inSale(tile)"
-          size="3xl"
-          inset
-          :ui="{ root: 'block' }"
-        >
+        <div class="relative">
           <UButton
             color="neutral"
             variant="outline"
             block
             class="flex-col items-stretch justify-between gap-1 border-s-4 text-start"
-            :class="[large ? 'min-h-20' : 'min-h-16', inSale(tile) ? 'bg-elevated' : '', RINGS[mark(tile)?.tone ?? 'success']]"
+            :class="[large ? 'min-h-20 xl:min-h-24 xl:text-lg' : 'min-h-16', inSale(tile) ? 'bg-elevated' : '', RINGS[mark(tile)?.tone ?? 'success']]"
             :style="edge(tile.colour)"
             :disabled="locked || barred(tile)"
             :aria-haspopup="tile.items.length > 1 || tile.choices ? 'dialog' : undefined"
@@ -620,7 +702,12 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
               <span v-else-if="tile.choices">{{ t('bar.desk.choose') }}</span>
             </span>
           </UButton>
-        </UChip>
+          <!-- How many are in the sale, large enough to read across the bar. -->
+          <span
+            v-if="inSale(tile) > 0"
+            class="pointer-events-none absolute -end-1.5 -top-1.5 flex h-7 min-w-7 items-center justify-center rounded-full bg-primary px-1.5 text-sm font-semibold text-inverted tabular-nums shadow-sm"
+          ><span aria-hidden="true">{{ inSale(tile) }}</span><span class="sr-only">{{ t('bar.desk.in-sale', { count: inSale(tile) }) }}</span></span>
+        </div>
       </DefineTile>
 
       <p
@@ -672,15 +759,27 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
         </template>
       </nav>
 
-      <div :class="layout === 'rail' && tops.length > 1 ? 'gap-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:items-start' : undefined">
+      <div :class="layout === 'rail' && (tops.length > 1 || favourites.length) && !q ? 'gap-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:items-start' : undefined">
         <!-- Chips over the tiles, or the same categories as a list down the side where there is room. -->
         <div
-          v-if="layout !== 'folders' && tops.length > 1"
+          v-if="layout !== 'folders' && (tops.length > 1 || favourites.length) && !q"
           role="group"
           :aria-label="t('bar.desk.categories')"
-          class="mb-4 flex gap-2 overflow-x-auto pb-1"
-          :class="layout === 'rail' ? 'md:sticky md:top-20 md:mb-0 md:flex-col md:overflow-visible md:pb-0' : undefined"
+          class="mb-4 flex gap-2 overflow-x-auto pe-8 pb-1"
+          :class="layout === 'rail' ? 'max-md:[mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] md:sticky md:top-20 md:mb-0 md:flex-col md:overflow-visible md:pe-0 md:pb-0' : '[mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]'"
         >
+          <UButton
+            v-if="favourites.length"
+            color="neutral"
+            :variant="category === 'favourites' ? 'solid' : 'soft'"
+            :aria-pressed="category === 'favourites'"
+            class="shrink-0"
+            :class="layout === 'rail' ? 'md:justify-start' : undefined"
+            :size="large ? 'lg' : 'md'"
+            icon="i-lucide-star"
+            :label="t('bar.desk.favourites')"
+            @click="category = 'favourites'"
+          />
           <UButton
             v-if="layout === 'chips'"
             color="neutral"
@@ -695,8 +794,8 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
             v-for="c in tops"
             :key="c.id"
             color="neutral"
-            :variant="current?.id === c.id ? 'solid' : 'soft'"
-            :aria-pressed="current?.id === c.id"
+            :variant="category !== 'favourites' && current?.id === c.id ? 'solid' : 'soft'"
+            :aria-pressed="category !== 'favourites' && current?.id === c.id"
             class="shrink-0"
             :class="layout === 'rail' ? 'md:justify-start' : undefined"
             :size="large ? 'lg' : 'md'"
@@ -733,7 +832,7 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
             </h3>
             <div
               class="grid gap-2"
-              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]'"
+              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]'"
             >
               <TileButton
                 v-for="tile in s.tiles"
@@ -742,6 +841,13 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
               />
             </div>
           </section>
+
+          <p
+            v-if="q && !found.length"
+            class="text-sm text-muted"
+          >
+            {{ t('bar.desk.search.none') }}
+          </p>
 
           <section
             v-if="folders.length"
@@ -756,7 +862,7 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
             </h3>
             <div
               class="grid gap-2"
-              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]'"
+              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]'"
             >
               <UButton
                 v-for="f in folders"
@@ -795,6 +901,7 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
       v-model:open="allergensOpen"
       :title="t('bar.desk.allergens.title')"
       :description="t('bar.desk.allergens.help')"
+      :ui="{ header: 'pe-14' }"
     >
       <template #body>
         <div class="grid gap-4">
@@ -1010,7 +1117,7 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
     <UModal
       :open="!!prompt"
       :title="t('bar.desk.prompt.title', { age: menu?.ageCheck.challengeAge ?? 25 })"
-      :description="prompt?.entry ? t('bar.desk.prompt.for', { name: label(prompt.entry.item) }) : t('bar.desk.prompt.once')"
+      :description="[prompt?.entry ? t('bar.desk.prompt.for', { name: label(prompt.entry.item) }) : t('bar.desk.prompt.once'), menu?.ageCheck.minimumAge ? t('bar.desk.prompt.minimum', { age: menu.ageCheck.minimumAge }) : ''].filter(Boolean).join(' ')"
       @update:open="v => { if (!v) prompt = null }"
     >
       <template #body>
@@ -1083,6 +1190,8 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
             v-if="scoped"
             v-model="refusing.scope"
             variant="card"
+            size="md"
+            :ui="{ base: 'size-4', indicator: 'after:size-1.5' }"
             :legend="t('bar.desk.refusal.what')"
             :items="[
               { value: 'restricted', label: t('bar.desk.refusal.restricted'), description: t('bar.desk.refusal.restricted-help', { names: restrictedNames }) },
@@ -1121,9 +1230,11 @@ function warns(o: Option): { tone: 'error' | 'warning', text: string } | null {
               color="error"
               variant="soft"
               :loading="saving"
-              :label="r.label"
+              class="h-auto min-h-12"
               @click="refuse(r.value)"
-            />
+            >
+              <span class="whitespace-normal break-words text-start">{{ r.label }}</span>
+            </UButton>
           </div>
           <UButton
             v-if="refusing.from === 'prompt'"

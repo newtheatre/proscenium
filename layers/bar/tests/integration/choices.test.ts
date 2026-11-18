@@ -14,7 +14,7 @@ import { lessPercent } from '../../server/pricing'
 
 const NOW = Date.UTC(2026, 10, 17, 22) // not-policy: a test's moment
 const handle = server({ 'POST /api/payments/till/sale': tillSalePost, 'GET /api/bar/till/menu': menuGet })
-const seller = person(['payments.session.open', 'bar.sale.sell'], { reassertedAt: NOW })
+const seller = person(['payments.session.open', 'bar.sale.sell', 'bar.sale.use-restricted-price-list'], { reassertedAt: NOW })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T> | T): Promise<T> {
   return inContext(async () => {

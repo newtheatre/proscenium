@@ -107,7 +107,7 @@ test('coming to the till opens no session: it waits for the first sale', async (
   const looker = { ...treasurer, accountId: 'acc_tilllooker', name: 'Lou Looker', grants: ['payments.session.open', 'gallery.sample.view'].map(grant) }
   await page.context().setExtraHTTPHeaders(as(looker).extraHTTPHeaders)
   await visit(page, '/live/till')
-  await expect(page.getByText('Your session opens with the first sale, at')).toBeVisible()
+  await expect(page.getByText('Your session opens with your first sale, at')).toBeVisible()
   await expect(page.getByLabel('Place: Unknown')).toBeVisible()
   await noViolations(page)
   await visit(page, '/console/payments/sessions')
@@ -135,6 +135,8 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
+  // The change stays on the receipt until the next sale starts.
+  await expect(page.getByRole('status').filter({ hasText: 'Change to give' })).toContainText('£4.00')
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
   // The sale opened the session, shown as Your session above Till sessions with the cash expected.
   await expect(page.getByText(/^Your session since/)).toBeVisible()

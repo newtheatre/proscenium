@@ -73,6 +73,8 @@ export default defineModule({
     'stocktake.approve': ability({ implies: ['stock.count'] }),
     // Use the bar's panel in the till, at an outlet.
     'sale.sell': ability({ on: 'bar.outlet' }),
+    // Sell from an outlet whose price list is restricted, such as committee prices.
+    'sale.use-restricted-price-list': ability({ on: 'bar.outlet' }),
     // Close an outlet's opening; the person who opened it may close it.
     'opening.manage': ability({ on: 'bar.outlet' }),
     'settings.manage': ability({ risk: 'privileged' }),

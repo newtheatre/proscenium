@@ -128,6 +128,9 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   const { actor } = useContext()
   await requireAbility(actor, 'bar.sale.sell', ['bar.outlet', input.outletId])
   const { outlet, priceListId, lines, totalMinor } = await priced(input)
+  // A restricted list (committee prices) is sold from only by someone allowed to.
+  const list = (await priceLists()).find(l => l.id === priceListId)
+  if (list?.restricted) await requireAbility(actor, 'bar.sale.use-restricted-price-list', ['bar.outlet', input.outletId])
   if (totalMinor !== input.expectedTotalMinor)
     refuse('bar.sale.total-changed', `The total is ${totalMinor} now, not ${input.expectedTotalMinor}.`, { status: 409, remedy: 'Check the basket and take payment again.' })
   if (totalMinor <= 0) refuse('bar.sale.zero', 'There is nothing to pay for in the bar basket.', { status: 422 })

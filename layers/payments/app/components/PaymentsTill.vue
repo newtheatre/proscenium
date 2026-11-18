@@ -47,10 +47,12 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const router = useRouter()
-const { currency, money, toMinor } = await useMoney()
+const { currency, money, toMinor, toMajor } = await useMoney()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+// The till's toasts replace one another rather than stacking up.
+const TOAST = 'payments-till'
 
 const { data: session, refresh: refreshSession } = await useAPI<YourSession>('/api/payments/session', { key: 'payments:session' })
 const open = computed(() => session.value?.session?.state === 'open')
@@ -180,13 +182,15 @@ function clearAll() {
 
 // The receipt is drawn once and shown beside the panels, or in a sheet where there is no room.
 const [DefineReceipt, Receipt] = createReusableTemplate()
-const wide = useMediaQuery(() => (props.live ? '(min-width: 768px)' : '(min-width: 1024px)'))
+// Live mode keeps the receipt beside the tiles from 900px: on a tablet held upright it would take half
+// the screen, so it is a sheet there, with the total pinned at the foot.
+const wide = useMediaQuery(() => (props.live ? '(min-width: 900px)' : '(min-width: 1024px)'))
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const beside = computed(() => !mounted.value || wide.value)
 const sheet = ref(false)
 // Payment can start once the server has agreed the total.
-const payable = computed(() => !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
+const payable = computed(() => groups.value.length > 0 && !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
 
 // In live mode each panel is a tab once there are two; its badge counts the lines it adds to the sale.
 const tabbed = computed(() => props.live && panels.value.length > 1)
@@ -289,6 +293,14 @@ watch(chosen, (m) => {
   tendered.value = undefined
   readerId.value = m?.readers?.length === 1 ? m.readers[0]!.id : undefined
 })
+// Cash: what was handed over, by a press for the usual notes, and the change to give back.
+const NOTES = [500, 1000, 2000, 5000] // not-policy: the notes a customer usually hands over, in minor units
+const quickTenders = computed(() => [taken.value, ...NOTES.filter(n => n > taken.value)].slice(0, 4))
+const tenderedMinor = computed(() => (tendered.value === undefined || tendered.value === null ? undefined : toMinor(tendered.value)))
+const changeDue = computed(() => (tenderedMinor.value !== undefined && tenderedMinor.value > taken.value ? tenderedMinor.value - taken.value : 0))
+// The change from the last sale stays on the receipt until the next one starts, not only in a toast.
+const lastChange = ref(0)
+watch(() => groups.value.length, (n) => { if (n) lastChange.value = 0 })
 const methodLabel = (m: Offer) => (m.method === 'cash' ? t('payments.screens.methods.cash') : `${t(`payments.screens.methods.${m.method}`)} · ${m.label}`)
 
 async function check() {
@@ -370,7 +382,7 @@ function partTaken(amountMinor: number) {
   const change = changeMinor.value
   stopPolling()
   result.value = null
-  toast.add({ title: t('payments.screens.till.part-paid', { amount: money(amountMinor), due: money(due.value) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
+  toast.add({ id: TOAST, title: t('payments.screens.till.part-paid', { amount: money(amountMinor), due: money(due.value) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
   changeMinor.value = 0
   choice.value = undefined
   part.value = undefined
@@ -393,10 +405,10 @@ async function resume(intentId: string, said: string) {
       result.value = { kind: 'waiting' }
       poll()
     }
-    else if (said === 'reload') toast.add({ title: t('payments.screens.till.picked-up', { amount: money(now.amountMinor - now.paidMinor) }), description: t('payments.screens.till.picked-up-help'), color: 'warning' })
-    else if (said === 'succeeded') toast.add({ title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
+    else if (said === 'reload') toast.add({ id: TOAST, title: t('payments.screens.till.picked-up', { amount: money(now.amountMinor - now.paidMinor) }), description: t('payments.screens.till.picked-up-help'), color: 'warning' })
+    else if (said === 'succeeded') toast.add({ id: TOAST, title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
     else if (said === 'failed') result.value = { kind: 'declined' }
-    else toast.add({ title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
+    else toast.add({ id: TOAST, title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -463,7 +475,7 @@ async function giveBack() {
     reset()
     afterSale()
     for (const p of panels.value) inputs[p.id] = null
-    toast.add({ title: t('payments.screens.till.given-back'), description: said || undefined, color: 'success' })
+    toast.add({ id: TOAST, title: t('payments.screens.till.given-back'), description: said || undefined, color: 'success' })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -494,22 +506,23 @@ function afterSale() {
 function done() {
   const finished = sale.value!
   const change = changeMinor.value
+  lastChange.value = change
   reset()
   afterSale()
   for (const p of panels.value) inputs[p.id] = null
-  toast.add({ title: t('payments.screens.till.paid', { amount: money(finished.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
+  toast.add({ id: TOAST, title: t('payments.screens.till.paid', { amount: money(finished.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
   emit('settled', { intentId: finished.intentId, amountMinor: finished.amountMinor })
 }
 function undone() {
   reset()
   afterSale()
   for (const p of panels.value) inputs[p.id] = null
-  toast.add({ title: t('payments.screens.till.unfulfilled'), description: t('payments.screens.till.unfulfilled-help'), color: 'error' })
+  toast.add({ id: TOAST, title: t('payments.screens.till.unfulfilled'), description: t('payments.screens.till.unfulfilled-help'), color: 'error' })
 }
 function ended() {
   reset()
   afterSale()
-  toast.add({ title: t('payments.screens.till.cancelled'), color: 'neutral' })
+  toast.add({ id: TOAST, title: t('payments.screens.till.cancelled'), color: 'neutral' })
   sum()
 }
 </script>
@@ -534,8 +547,40 @@ function ended() {
       <template #default>
         <!-- Which session sales go into, or that one opens with the first sale, and where; the place
              is remembered on this device. -->
+        <!-- On a phone the strip is one line, and the place and the session are in its menu. -->
+        <div class="mb-4 flex items-center gap-2 text-sm text-muted sm:hidden">
+          <UIcon
+            name="i-lucide-clock"
+            class="size-4 shrink-0"
+          />
+          <span class="min-w-0 flex-1 truncate">{{ open && session?.session ? t('payments.screens.till.session-since-short', { time: time(session.session.openedAt) }) : t('payments.screens.till.session-opens-short') }}</span>
+          <UPopover>
+            <IconButton
+              icon="i-lucide-map-pin"
+              :label="t('payments.screens.till.session-menu')"
+            />
+            <template #content>
+              <div class="w-72 space-y-3 p-3">
+                <PaymentsSessionPlace
+                  :model-value="open && session?.session ? session.session.spaceId : nextPlace"
+                  :disabled="!!sale"
+                  class="w-full"
+                  @update:model-value="move"
+                />
+                <UButton
+                  to="/console/payments/sessions"
+                  color="neutral"
+                  variant="ghost"
+                  block
+                  trailing-icon="i-lucide-arrow-right"
+                  :label="t('payments.screens.till.your-session')"
+                />
+              </div>
+            </template>
+          </UPopover>
+        </div>
         <div
-          class="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-muted"
+          class="mb-6 hidden flex-wrap items-center gap-x-3 gap-y-2 text-muted sm:flex"
           :class="live ? 'text-base' : 'text-sm'"
         >
           <span v-if="open && session?.session">{{ t('payments.screens.till.session-since', { time: time(session.session.openedAt) }) }}</span>
@@ -646,6 +691,14 @@ function ended() {
                   class="text-sm text-muted"
                 >
                   {{ t('payments.screens.till.nothing-yet') }}
+                </p>
+                <p
+                  v-if="lastChange > 0 && !groups.length"
+                  class="flex items-baseline justify-between rounded-lg bg-success/10 px-3 py-2 text-success"
+                  role="status"
+                >
+                  <span class="font-semibold">{{ t('payments.screens.till.give-change') }}</span>
+                  <span class="text-3xl font-semibold tabular-nums">{{ money(lastChange) }}</span>
                 </p>
               </template>
 
@@ -831,6 +884,32 @@ function ended() {
                         :format-options="{ style: 'currency', currency }"
                       />
                     </UFormField>
+                    <div
+                      v-if="chosen.method === 'cash'"
+                      role="group"
+                      :aria-label="t('payments.screens.till.quick-tender')"
+                      class="grid grid-cols-4 gap-2"
+                    >
+                      <UButton
+                        v-for="(n, i) in quickTenders"
+                        :key="n"
+                        block
+                        size="lg"
+                        color="neutral"
+                        :variant="tenderedMinor === n ? 'solid' : 'outline'"
+                        :aria-pressed="tenderedMinor === n"
+                        :label="i === 0 ? t('payments.screens.till.exact') : money(n)"
+                        @click="tendered = toMajor(n)"
+                      />
+                    </div>
+                    <p
+                      v-if="chosen.method === 'cash' && changeDue > 0"
+                      class="flex items-baseline justify-between"
+                      aria-live="polite"
+                    >
+                      <span class="font-semibold">{{ t('payments.screens.till.give-change') }}</span>
+                      <span class="text-3xl font-semibold tabular-nums text-highlighted">{{ money(changeDue) }}</span>
+                    </p>
                     <UFormField
                       v-if="chosen.method === 'card_reader' && (chosen.readers ?? []).length !== 1"
                       :label="t('payments.screens.test.reader')"
@@ -895,14 +974,27 @@ function ended() {
             </div>
           </DefineReceipt>
 
+          <!-- While a payment is being taken nothing in the sale can change: the panels say so plainly. -->
+          <UAlert
+            v-if="sale"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-lock"
+            class="mb-4"
+            :title="t('payments.screens.till.in-progress', { amount: money(due) })"
+            :description="t('payments.screens.till.in-progress-help')"
+            :actions="paidInPart ? [] : [{ label: t('payments.screens.till.in-progress-cancel'), color: 'neutral', variant: 'outline', disabled: taking, onClick: cancel }]"
+          />
           <div
             class="grid grid-cols-1 gap-6"
-            :class="live ? 'md:grid-cols-[minmax(0,1fr)_24rem]' : 'lg:grid-cols-[minmax(0,1fr)_22rem]'"
+            :class="live ? 'min-[900px]:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]' : 'lg:grid-cols-[minmax(0,1fr)_22rem]'"
           >
             <!-- Every panel stays mounted, so a tab keeps what was put in it while another is shown. -->
             <UTabs
               v-if="tabbed"
               v-model="tab"
+              :inert="!!sale"
+              :class="sale ? 'opacity-40' : undefined"
               :items="tabs"
               :unmount-on-hide="false"
               size="xl"
@@ -923,6 +1015,8 @@ function ended() {
             <div
               v-else
               class="min-w-0 space-y-6"
+              :class="sale ? 'opacity-40' : undefined"
+              :inert="!!sale"
             >
               <PageSection
                 v-for="p in panels"
@@ -941,7 +1035,7 @@ function ended() {
 
             <aside
               v-if="beside"
-              :class="live ? 'hidden md:sticky md:top-16 md:block md:self-start' : 'hidden lg:sticky lg:top-4 lg:block lg:self-start'"
+              :class="live ? 'hidden min-[900px]:sticky min-[900px]:top-16 min-[900px]:block min-[900px]:self-start' : 'hidden lg:sticky lg:top-4 lg:block lg:self-start'"
               :aria-label="t('payments.screens.till.total-label')"
             >
               <PageSection :title="t('payments.screens.till.sale', { count })">
