@@ -92,11 +92,12 @@ test.describe('someone in the console without the ability for one screen', () =>
     await noViolations(page)
   })
 
-  test('is offered no settings they cannot change: no cog, and the module page in Admin does not exist for them', async ({ page }) => {
+  test('is offered no settings they cannot change: no cog, and the module page in Admin is refused', async ({ page }) => {
     await visit(page, '/console/gallery/list')
     await expect(page.getByRole('link', { name: 'Gallery settings' })).toHaveCount(0)
+    // Console staff are told Admin is not theirs and whom to ask, rather than that it does not exist.
     const response = await visit(page, '/admin/modules/gallery')
-    expect(response?.status()).toBe(404)
+    expect(response?.status()).toBe(403)
   })
 })
 
