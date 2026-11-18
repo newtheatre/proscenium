@@ -68,7 +68,44 @@ function setReference(row: PerformanceRow, n: number, value: string) {
 watch(performanceId, () => {
   quantities.value = {}
   references.value = {}
+  dropCode()
 })
+
+// A promo code the buyer gives (BO-17): tried first, so the seller sees what it does before taking
+// payment; the sale applies it again, to the dearest tickets first, as booking online does.
+interface Promo { code: string, effect: 'percent_off' | 'amount_off' | 'set_price', value: number, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] }
+const codeOpen = ref(false)
+const codeTyped = ref('')
+const promo = ref<Promo | null>(null)
+const codeRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const codeBusy = ref(false)
+const promoPrice = (row: PerformanceRow) => promo.value?.prices.find(p => p.bandId === row.bandId && p.ticketTypeId === row.ticketTypeId)?.amountMinor
+function promoWords(p: Promo) {
+  const what = p.effect === 'percent_off' ? t('box-office.codes.words.percent_off', { percent: p.value / 100 }) : t(`box-office.codes.words.${p.effect}`, { amount: money(p.value) })
+  return p.maxPerOrder ? `${what} · ${t('box-office.codes.words.per-order', { count: p.maxPerOrder })}` : what
+}
+async function tryCode() {
+  if (!codeTyped.value.trim() || !performanceId.value) return
+  codeBusy.value = true
+  codeRefusal.value = null
+  try {
+    promo.value = await $api<Promo>(`/api/box-office/book/performances/${encodeURIComponent(performanceId.value)}/promo` as string, { query: { code: codeTyped.value.trim() } })
+    codeTyped.value = ''
+  }
+  catch (e) {
+    promo.value = null
+    codeRefusal.value = toRefusal(e)
+  }
+  finally {
+    codeBusy.value = false
+  }
+}
+function dropCode() {
+  promo.value = null
+  codeTyped.value = ''
+  codeRefusal.value = null
+  codeOpen.value = false
+}
 
 // Collecting: one order, found by what the buyer shows.
 const query = ref('')
@@ -97,13 +134,13 @@ function say() {
       const typed = (references.value[keyOf(r)] ?? []).slice(0, quantity).map(x => x.trim())
       return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(r.reference && typed.filter(Boolean).length === quantity ? { references: typed } : {}) }
     })
-    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value } : null)
+    emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
   }
   else {
     emit('update:modelValue', order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, references, order, exchange, sendTo], say, { deep: true })
+watch([mode, admit, quantities, references, order, exchange, sendTo, promo], say, { deep: true })
 onMounted(() => {
   if (exchange.value) say()
 })
@@ -114,8 +151,9 @@ watch(() => props.modelValue, (now) => {
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}
-  // The next buyer never sees who the last one was.
+  // The next buyer never sees who the last one was, nor uses their code.
   buyer.value = undefined
+  dropCode()
   if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
 })
 
@@ -272,7 +310,7 @@ function clear() {
           <UFormField
             v-for="row in performance?.rows ?? []"
             :key="keyOf(row)"
-            :label="t('box-office.screens.panel.row', { band: row.band, type: row.ticketType, price: money(row.amountMinor) })"
+            :label="promoPrice(row) !== undefined ? t('box-office.screens.panel.row-with-code', { band: row.band, type: row.ticketType, price: money(promoPrice(row)!), was: money(row.amountMinor) }) : t('box-office.screens.panel.row', { band: row.band, type: row.ticketType, price: money(row.amountMinor) })"
             :help="t('box-office.screens.panel.left', { count: row.free })"
           >
             <div class="space-y-2">
@@ -301,6 +339,70 @@ function clear() {
               </template>
             </div>
           </UFormField>
+          <div
+            v-if="promo"
+            class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated px-3 py-2 text-sm"
+          >
+            <UIcon
+              name="i-lucide-ticket-percent"
+              class="size-4 shrink-0 text-success"
+            />
+            <span class="flex-1">{{ t('box-office.screens.panel.code.applied', { code: promo.code, what: promoWords(promo) }) }}</span>
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="link"
+              :label="t('box-office.screens.panel.code.remove')"
+              :disabled="locked"
+              @click="dropCode"
+            />
+          </div>
+          <UButton
+            v-else-if="!codeOpen"
+            icon="i-lucide-ticket-percent"
+            color="neutral"
+            variant="link"
+            :label="t('box-office.screens.panel.code.add')"
+            :disabled="locked"
+            @click="codeOpen = true"
+          />
+          <UForm
+            v-else
+            :state="{ codeTyped }"
+            novalidate
+            @submit="tryCode"
+          >
+            <UFormField
+              :label="t('box-office.screens.panel.code.label')"
+              :error="codeRefusal ? codeRefusal.reason : undefined"
+              name="code"
+            >
+              <div class="flex gap-2">
+                <UInput
+                  v-model="codeTyped"
+                  class="w-48 uppercase"
+                  maxlength="40"
+                  autocomplete="off"
+                  autofocus
+                  :disabled="locked"
+                />
+                <UButton
+                  type="submit"
+                  color="neutral"
+                  variant="outline"
+                  :label="t('box-office.screens.panel.code.apply')"
+                  :loading="codeBusy"
+                  :disabled="locked || !codeTyped.trim()"
+                />
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  :label="t('core.form.cancel')"
+                  @click="dropCode"
+                />
+              </div>
+            </UFormField>
+          </UForm>
         </template>
       </template>
     </template>
