@@ -6,7 +6,7 @@
 import { z } from 'zod'
 
 interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
-interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null, referenceLabel: string | null, referenceShape: Shape | null, uploadedAt: number, loaded: boolean }
+interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null, referenceLabel: string | null, referenceNoun: string | null, referenceShape: Shape | null, uploadedAt: number, loaded: boolean }
 interface Detail { list: List, schemes: { id: string, name: string }[], keySet: boolean }
 interface Loaded { loaded: number, wouldLoad?: number, refused: { line: number, reason: string }[] }
 interface Checked { found: boolean, malformed?: boolean, shape?: Shape | null, current?: boolean, endsOn?: string | null, name?: string | null, claimed?: boolean }
@@ -119,9 +119,9 @@ watch(checking, () => {
 })
 
 // Details.
-const details = reactive({ name: '', validUntil: '', referenceLabel: '', shapeKind: 'digits' as Shape['kind'], min: 8, max: 8 })
+const details = reactive({ name: '', validUntil: '', referenceLabel: '', referenceNoun: '', shapeKind: 'digits' as Shape['kind'], min: 8, max: 8 })
 watch(list, (l) => {
-  if (l) Object.assign(details, { name: l.name, validUntil: l.validUntil ?? '', referenceLabel: l.referenceLabel ?? '', shapeKind: l.referenceShape?.kind ?? 'digits', min: l.referenceShape?.min ?? 8, max: l.referenceShape?.max ?? 8 })
+  if (l) Object.assign(details, { name: l.name, validUntil: l.validUntil ?? '', referenceLabel: l.referenceLabel ?? '', referenceNoun: l.referenceNoun ?? '', shapeKind: l.referenceShape?.kind ?? 'digits', min: l.referenceShape?.min ?? 8, max: l.referenceShape?.max ?? 8 })
 }, { immediate: true })
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function saveDetails() {
@@ -130,7 +130,7 @@ async function saveDetails() {
   try {
     await $api(base.value as string, {
       method: 'PATCH',
-      body: { name: details.name, validUntil: details.validUntil || null, ...(reference ? { referenceLabel: details.referenceLabel, referenceShape: { kind: details.shapeKind, min: details.min, max: Math.max(details.min, details.max) } } : {}) },
+      body: { name: details.name, validUntil: details.validUntil || null, ...(reference ? { referenceLabel: details.referenceLabel, referenceNoun: details.referenceNoun.trim() || null, referenceShape: { kind: details.shapeKind, min: details.min, max: Math.max(details.min, details.max) } } : {}) },
     })
     toast.add({ title: t('membership.screens.list.saved'), color: 'success' })
     await refresh()
@@ -296,10 +296,12 @@ const facts = computed(() => {
             <MembershipListShape
               v-if="list.keyKind === 'reference'"
               v-model:label="details.referenceLabel"
+              v-model:noun="details.referenceNoun"
               v-model:kind="details.shapeKind"
               v-model:min="details.min"
               v-model:max="details.max"
               :label-error="detailsRefusal?.fields?.referenceLabel ? detailsRefusal.reason : undefined"
+              :noun-error="detailsRefusal?.fields?.referenceNoun ? detailsRefusal.reason : undefined"
             />
           </UForm>
           <template #footer>
