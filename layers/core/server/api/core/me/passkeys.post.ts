@@ -28,6 +28,6 @@ export default defineRoute({
   // Proving a new passkey is a strong proof, so this session is strong from now on.
   reassert(unit, session.id, 'passkey', true)
   unit.audit({ action: 'create', record: ['core.account', session.accountId], detail: { passkeyId: id } })
-  await credentialNotice(unit, session.accountId, 'passkey')
+  await credentialNotice(unit, session.accountId, 'passkey', deviceLabel(event))
   return { passkeyId: id, recoveryCodes }
 })

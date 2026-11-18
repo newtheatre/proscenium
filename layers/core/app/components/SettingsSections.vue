@@ -7,7 +7,7 @@
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
 import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
-import { durationParts } from '../../kit/duration'
+import { durationParts, type DurationUnit } from '../../kit/duration'
 import { catalogueLabel, searchable, type CatalogueName } from '../../shared/choices'
 
 interface SettingView {
@@ -19,6 +19,7 @@ interface SettingView {
   labelKey: string
   helpKey: string
   unitKey?: string
+  units?: DurationUnit[]
   value: unknown
   default: unknown
   overridden: boolean
@@ -135,7 +136,13 @@ async function save(sectionId: string, settings: SettingView[]) {
     const confirmed = await confirm({
       verb: t('core.settings-page.confirm-verb'),
       thing: asking.map(s => t(s.labelKey)).join(', '),
-      consequence: asking.map(s => t('core.settings-page.confirm-change', { setting: t(s.labelKey), from: controlText(s.kind, toControl(s), words()), to: shown(s) })).join(' '),
+      // A setting with no value yet is set, not changed from nothing (AC-11).
+      consequence: asking.map((s) => {
+        const from = controlText(s.kind, toControl(s), words())
+        return from.trim() && from !== 'null' && from !== 'undefined'
+          ? t('core.settings-page.confirm-change', { setting: t(s.labelKey), from, to: shown(s) })
+          : t('core.settings-page.confirm-set', { setting: t(s.labelKey), to: shown(s) })
+      }).join(' '),
       button: t('core.settings-page.confirm-button'),
     })
     if (!confirmed) return
@@ -310,6 +317,7 @@ onMounted(() => {
                   :model-value="draft[s.key]"
                   :min="durationLimit(s, 'min')"
                   :max="durationLimit(s, 'max')"
+                  :units="s.units"
                   :disabled="!s.canChange"
                   :label="t(s.labelKey)"
                   @update:model-value="onEdit(s, $event ?? null)"

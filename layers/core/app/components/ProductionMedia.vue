@@ -1,6 +1,8 @@
 <script setup lang="ts">
-// A production's poster and photos (C-23, C-24): everything on the production page's Media tab. The
-// poster can also be changed from the page's side panel (ProductionPoster); both share one source.
+// A production's poster and photos (C-23, C-24): everything on the production page's Media tab, the
+// one place they are added and described. The page's side panel (ProductionPoster) shows the poster
+// and what is waiting, from the same source. Each image's description is edited once, under
+// Descriptions, rather than repeated as a caption.
 // A new poster replaces the old in one step, and anything taken off can be put back while its
 // restore period lasts.
 import { IMAGE_TYPES as ACCEPT, PHOTOS, POSTER, REFUSED_IMAGE as REFUSED, type MediaFile } from '../composables/useProductionMedia'
@@ -61,9 +63,6 @@ const waitingLabel = (f: MediaFile) => f.slot === POSTER ? 'Use as the poster' :
                 :alt="data.poster.altText ?? ''"
                 class="aspect-[2/3] w-full rounded-md border border-default object-cover"
               >
-              <figcaption class="text-xs text-muted">
-                {{ data.poster.altText }}
-              </figcaption>
               <div class="flex flex-wrap gap-2">
                 <UFileUpload
                   v-slot="{ open }"
@@ -126,9 +125,6 @@ const waitingLabel = (f: MediaFile) => f.slot === POSTER ? 'Use as the poster' :
                   :alt="photo.altText ?? ''"
                   class="aspect-[3/2] w-full rounded-md border border-default object-cover"
                 >
-                <p class="line-clamp-2 text-xs text-muted">
-                  {{ photo.altText }}
-                </p>
                 <div class="flex gap-1">
                   <IconButton
                     icon="i-lucide-arrow-left"

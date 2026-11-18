@@ -124,7 +124,13 @@ async function remove(type: TicketType) {
 // fold away under a divider below and keep their places after the others.
 const ordered = ref<TicketType[]>([])
 const retired = computed(() => (data.value?.ticketTypes ?? []).filter(x => !x.active))
-watch(() => data.value?.ticketTypes, (types) => { ordered.value = (types ?? []).filter(x => x.active) }, { immediate: true })
+// Orders being saved. While one is, the list on screen is newer than anything loaded: a load that
+// was answered before the latest save (such as the one after the save before it) would put rows
+// back where they were. The list is loaded again once the last save is done.
+let saving = 0
+watch(() => data.value?.ticketTypes, (types) => {
+  if (!saving) ordered.value = (types ?? []).filter(x => x.active)
+}, { immediate: true })
 const showRetired = ref(false)
 
 // A search that opens from its icon. Rows that do not match are hidden rather than left out, so
@@ -141,15 +147,21 @@ async function saveOrder(type: TicketType) {
   const at = ordered.value.findIndex(x => x.id === type.id)
   moved.value = t('box-office.ticket-types.order.moved', { name: type.name, position: at + 1, count: ordered.value.length })
   refusal.value = null
+  saving++
   try {
     await $api('/api/box-office/ticket-types/order', { method: 'PUT', body: { ticketTypeIds: [...ordered.value, ...retired.value].map(x => x.id) } })
-    await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
-    await refresh()
-    ordered.value = (data.value?.ticketTypes ?? []).filter(x => x.active)
   }
+  finally {
+    saving--
+  }
+  // Only the last save loads the list again, after every order sent so far is stored. A refused
+  // one draws the stored order back.
+  if (saving) return
+  await refresh()
+  if (!saving) ordered.value = (data.value?.ticketTypes ?? []).filter(x => x.active)
 }
 
 // The SortableList says what was dragged; the order is drawn from `ordered`, so it is set here.
