@@ -41,6 +41,8 @@ export default defineModule({
     'cancellations.until-before': setting.duration({ default: '24h', min: '0m', max: '30d', change, audience: 'public', quotable: true }),
     // Kept from each ticket when staff refund less the fee, and on every buyer's cancellation.
     'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    // Off, a request for complimentary tickets is issued at once, with no approver (Matt, 2026-11-17).
+    'comps.needs-approval': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'comps.per-request': setting.integer({ default: 4, min: 1, max: 50, change, audience: 'staff' }),
     // Unset means no cap on approved complimentary tickets for one performance.
     'comps.per-performance': setting.integer({ unset: true, min: 0, max: 1000, change, audience: 'staff' }),
@@ -53,6 +55,7 @@ export default defineModule({
     'order': { table: 'box_office_orders', owner: 'account_id' },
     'ticket-type': { table: 'box_office_ticket_types' },
     'ticket-preset': { table: 'box_office_ticket_presets' },
+    'promo-code': { table: 'box_office_promo_codes' },
     // The requester owns the request; a grant on a performance or its production reaches it.
     'comp-request': { table: 'box_office_comp_requests', parent: 'core.performance', owner: 'requested_by' },
   }),
@@ -82,6 +85,8 @@ export default defineModule({
     'comp.request': ability({ on: 'core.performance' }),
     // Approving issues the tickets. Never your own request.
     'comp.approve': ability({ on: 'box-office.comp-request', risk: 'privileged', owner: 'refuses' }),
+    // Making, limiting and retiring promo codes (BO-17).
+    'promo.manage': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -182,6 +187,7 @@ export default defineModule({
       { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
       { id: 'box-office.reports', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/reports/sales', icon: 'i-lucide-chart-column', ability: 'box-office.report.view', order: 38 },
+      { id: 'box-office.codes', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/codes', icon: 'i-lucide-percent', ability: 'box-office.promo.manage', order: 36 },
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },

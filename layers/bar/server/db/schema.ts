@@ -2,7 +2,7 @@
 // variants, each sold at a price from a price list; Standard always exists. A price is never edited:
 // a new row replaces it from its moment, so a bar sale keeps the price it was rung up at. An outlet is
 // a place that sells, with its default list. None of these tables names a customer.
-import { check, index, integer, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, primaryKey, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
 
@@ -149,6 +149,8 @@ export const choiceOptions = defineTable('bar_choice_options', {
   deltaMinor: col.minor('delta_minor').notNull().default(0),
   // Picking it makes the line need the age check (a whisky shot in a hot chocolate).
   ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  // What a recipe's slot for this group takes when this option is picked; none for "No mixer".
+  stockItemId: col.ref('bar_stock_items', { nullable: true }),
   position: col.internal(integer('position').notNull()),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),
@@ -232,6 +234,8 @@ export const outlets = defineTable('bar_outlets', {
   kind: col.internal(text('kind', { enum: OUTLET_KINDS }).notNull()),
   priceListId: col.ref('bar_price_lists'),
   spaceId: col.ref('core_spaces', { nullable: true }),
+  // Where its sales take stock from. Null: its sales move no stock.
+  stockLocationId: col.ref('bar_stock_locations', { nullable: true }),
   // Checked by the input, not a CHECK, so adding it does not rebuild a table sales point at.
   tillLayout: col.internal(text('till_layout', { enum: TILL_LAYOUTS }).notNull().default('chips')),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
@@ -534,4 +538,132 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks }
+export const BASE_UNITS = ['each', 'ml', 'g'] as const
+export const MOVEMENT_KINDS = ['opening', 'delivery', 'sale', 'sale_reversal', 'wastage', 'adjustment', 'transfer_out', 'transfer_in'] as const
+
+/**
+ * A thing that is counted (Bar specification, tab 2, "Stock"): a keg, a case of cans, a bottle of
+ * gin. Quantities are whole base units (each, ml or g). A pack is how it is delivered, a count unit is
+ * how people count it; weights, when set, let a stocktake weigh a keg or an open bottle.
+ */
+export const stockItems = defineTable('bar_stock_items', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  categoryId: col.ref('bar_categories', { nullable: true }),
+  baseUnit: col.internal(text('base_unit', { enum: BASE_UNITS }).notNull()),
+  packSize: col.internal(integer('pack_size').notNull()),
+  packName: col.internal(text('pack_name').notNull()),
+  countUnitSize: col.internal(integer('count_unit_size').notNull()),
+  costMinor: col.minor('cost_minor'),
+  currency: col.currency('currency').notNull(),
+  reorderLevel: col.internal(integer('reorder_level')),
+  fullWeightG: col.internal(integer('full_weight_g')),
+  emptyWeightG: col.internal(integer('empty_weight_g')),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bsti',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_stock_items_name').on(sql`lower(${t.name})`),
+    check('bar_stock_items_unit', sql`${t.baseUnit} IN (${inList(BASE_UNITS)})`),
+    check('bar_stock_items_sizes', sql`${t.packSize} >= 1 AND ${t.countUnitSize} >= 1`),
+    check('bar_stock_items_cost', sql`${t.costMinor} IS NULL OR ${t.costMinor} >= 0`),
+    check('bar_stock_items_reorder', sql`${t.reorderLevel} IS NULL OR ${t.reorderLevel} >= 0`),
+    check('bar_stock_items_weights', sql`(${t.fullWeightG} IS NULL) = (${t.emptyWeightG} IS NULL) AND (${t.fullWeightG} IS NULL OR ${t.fullWeightG} > ${t.emptyWeightG} AND ${t.emptyWeightG} >= 0)`),
+  ],
+})
+
+/**
+ * Where stock is kept: a bar, a cellar, a store cupboard. It may sit in a space or, more loosely, at a
+ * venue, so several tills in different spaces can each take from their own, and stock is seen by venue.
+ */
+export const stockLocations = defineTable('bar_stock_locations', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  spaceId: col.ref('core_spaces', { nullable: true }),
+  venueId: col.ref('core_venues', { nullable: true }),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bstl',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('bar_stock_locations_name').on(sql`lower(${t.name})`).where(sql`active = 1`)],
+})
+
+/**
+ * What selling one of a size uses up (tab 10). A line is a fixed item ("175 ml of house red") or a
+ * choice slot ("25 ml of the Spirit choice"), where the option picked supplies the item. For a mixers
+ * group the quantity is servings: the mixer's own recipe is used that many times. A size with no lines
+ * moves no stock.
+ */
+export const recipeLines = defineTable('bar_recipe_lines', {
+  id: col.id(),
+  variantId: col.ref('bar_variants'),
+  stockItemId: col.ref('bar_stock_items', { nullable: true }),
+  choiceGroupId: col.ref('bar_choice_groups', { nullable: true }),
+  quantity: col.internal(integer('quantity').notNull()),
+  position: col.internal(integer('position').notNull()),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'brcl',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_recipe_lines_item').on(t.variantId, t.stockItemId).where(sql`stock_item_id IS NOT NULL`),
+    uniqueIndex('bar_recipe_lines_group').on(t.variantId, t.choiceGroupId).where(sql`choice_group_id IS NOT NULL`),
+    check('bar_recipe_lines_one', sql`(${t.stockItemId} IS NULL) <> (${t.choiceGroupId} IS NULL)`),
+    check('bar_recipe_lines_quantity', sql`${t.quantity} >= 1`),
+  ],
+})
+
+/**
+ * Every change to a level, never edited. Its key is built from what caused it (a sale line and recipe
+ * line, a reversal and the movement it undoes), so a replayed batch moves stock once.
+ */
+export const stockMovements = defineTable('bar_stock_movements', {
+  id: col.id(),
+  stockItemId: col.ref('bar_stock_items'),
+  locationId: col.ref('bar_stock_locations'),
+  kind: col.internal(text('kind', { enum: MOVEMENT_KINDS }).notNull()),
+  quantity: col.internal(integer('quantity').notNull()),
+  reasonTerm: col.ref('core_terms', { nullable: true }),
+  sourceType: col.internal(text('source_type').notNull()),
+  sourceId: col.internal(text('source_id').notNull()),
+  idempotencyKey: col.internal(text('idempotency_key').notNull()),
+  by: col.account('by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  at: col.timestamp('at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bstm',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    uniqueIndex('bar_stock_movements_key').on(t.idempotencyKey),
+    index('bar_stock_movements_level').on(t.stockItemId, t.locationId, t.at),
+    index('bar_stock_movements_source').on(t.sourceType, t.sourceId),
+    check('bar_stock_movements_kind', sql`${t.kind} IN (${inList(MOVEMENT_KINDS)})`),
+    check('bar_stock_movements_sign', sql`${t.quantity} <> 0 AND (${t.kind} IN ('opening', 'adjustment') OR (${t.kind} IN ('delivery', 'transfer_in', 'sale_reversal')) = (${t.quantity} > 0))`),
+    check('bar_stock_movements_wastage', sql`${t.kind} <> 'wastage' OR ${t.reasonTerm} IS NOT NULL`),
+  ],
+})
+
+/** How much of an item a location holds: a cache of its movements, kept only by a trigger. May go below nought. */
+export const stockLevels = defineTable('bar_stock_levels', {
+  stockItemId: col.ref('bar_stock_items'),
+  locationId: col.ref('bar_stock_locations'),
+  quantity: col.internal(integer('quantity').notNull().default(0)),
+  lastCountedAt: col.timestamp('last_counted_at'),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [primaryKey({ columns: [t.stockItemId, t.locationId] })],
+})
+
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels }
