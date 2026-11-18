@@ -17,7 +17,7 @@ import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
-import { doorCodesForOrder, DOOR_CODE_PURPOSE, reissueTickets, signedPart } from './tickets'
+import { DOOR_CODE_PURPOSE, signedPart } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
@@ -486,8 +486,8 @@ export async function deskSold(intentId: string): Promise<DeskSold[]> {
 /**
  * Emails the tickets of a desk sale made with nobody's details, when the buyer asks after paying.
  * The order joins the account for the address, or the person picked, as if given at the sale, and
- * the message carries the tickets' own codes. Once an order has a buyer this is refused: it was sent
- * to them already.
+ * the message links to the booking, which shows the tickets' codes. Once an order has a buyer this is
+ * refused: it was sent to them already.
  */
 export async function sendDeskTickets(unit: UnitView, orderId: string, to: { email?: string, accountId?: string }): Promise<{ buyer: string }> {
   const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
@@ -498,20 +498,11 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
   if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
   await requireAbility(useContext().actor, 'box-office.order.sell', ['core.performance', lines[0]!.performance_id])
   const accountId = to.accountId ? await pickedBuyer(to.accountId) : (await findOrCreateAccount(unit, { address: to.email!, origin: 'guest' })).accountId
-  // The tickets' own codes, kept sealed since they were issued. One issued before codes were kept
-  // is issued again, unless it is in already.
-  const shown = await doorCodesForOrder(order.id)
-  const lost = shown.filter(k => !k.doorCode && !k.admitted)
-  const lineOf = new Map(lines.map(l => [l.id, l]))
-  const doorCodes = [
-    ...shown.flatMap(k => (k.doorCode ? [k.doorCode] : [])),
-    ...await reissueTickets(unit, lost.map(k => ({ ticketId: k.ticketId, line: { id: k.lineId, performance_id: lineOf.get(k.lineId)?.performance_id ?? k.performanceId } }))),
-  ]
   const token = randomToken()
   const at = nowMs()
   unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${at}
     WHERE id = ${order.id} AND state = 'confirmed' AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
-  await sendTickets(unit, order, lines, { accountId, doorCodes, token, dedupeKey: `confirmed:${order.id}` })
+  await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}` })
   unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
   return { buyer: await accountLabel(accountId) }
 }

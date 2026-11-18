@@ -11,14 +11,32 @@ import { digest, randomToken } from './crypto'
 import { mergeAccounts } from './merge'
 import { queueNotice } from './notices'
 
-export interface MyAddress { id: string, address: string, verified: boolean, audience: boolean, members: boolean }
+/** An address, and for one not yet confirmed, when its link may next be sent again (UTC milliseconds). */
+export interface MyAddress { id: string, address: string, verified: boolean, audience: boolean, members: boolean, resendAt?: number }
+
+/** When the newest waiting confirmation link for this address on this account was sent, if any. */
+async function linkSentAt(accountId: string, address: string): Promise<number | null> {
+  const row = await first<{ at: number | null }>(
+    'SELECT max(created_at) AS at FROM core_account_tokens WHERE purpose = \'verify_address\' AND account_id = ? AND address = ? AND used_at IS NULL',
+    accountId, address,
+  )
+  return row?.at ?? null
+}
 
 export async function addressesOf(account: AccountRow): Promise<MyAddress[]> {
   const rows = await all<{ id: string, address: string, verified_at: number | null }>('SELECT id, address, verified_at FROM core_account_emails WHERE account_id = ? ORDER BY created_at', account.id)
+  const wait = (await useSetting('core.sign-in.address-resend-after') as number) * 1000 // not-policy: seconds to milliseconds
+  const sent = new Map<string, number>()
+  for (const r of rows) {
+    if (r.verified_at !== null) continue
+    const at = await linkSentAt(account.id, r.address)
+    if (at !== null) sent.set(r.id, at + wait)
+  }
   return rows.map(r => ({
     id: r.id,
     address: r.address,
     verified: r.verified_at !== null,
+    ...(sent.has(r.id) ? { resendAt: sent.get(r.id)! } : {}),
     audience: account.audience_email_id === r.id,
     // No members' address of its own means the audience address serves both sides.
     members: (account.members_email_id ?? account.audience_email_id) === r.id,
@@ -51,7 +69,11 @@ export async function addAddress(unit: UnitView, event: H3Event, accountId: stri
   let id: string | null = null
   if (existing?.account_id === accountId) {
     if (existing.verified_at) refuse('core.address.already-yours', 'This address is already on your account.', { status: 409 })
-    id = existing.id // not verified yet: send its link again
+    // Not verified yet: send its link again, once the pause since the last one has passed.
+    const last = await linkSentAt(accountId, address)
+    const wait = (await useSetting('core.sign-in.address-resend-after') as number) * 1000 // not-policy: seconds to milliseconds
+    if (last !== null && last + wait > nowMs()) refuse('core.address.resend-wait', 'A link was sent to this address a moment ago.', { status: 429, remedy: 'Check your email, or wait a little and send it again.' })
+    id = existing.id
   }
   else if (existing) {
     // Held elsewhere: nothing is written to the other account until the link is used.

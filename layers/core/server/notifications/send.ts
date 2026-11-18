@@ -53,6 +53,12 @@ export async function sendingDomain(): Promise<string> {
   return domain
 }
 
+/** Whether email can be sent now: the sending domain is set and verified. */
+export async function canSendEmail(): Promise<boolean> {
+  const domain = await useSetting('core.notifications.sending-domain') as string | null
+  return !!domain && domain === await useSetting('core.notifications.verified-domain') as string | null
+}
+
 /** Who a topic's mail comes from: its routed sender, or the default built from the settings. */
 export async function senderFor(topic: string, domain: string): Promise<Sender> {
   const row = await first<{ key: string, display_name: string, local_part: string, reply_to: string | null }>(

@@ -3,7 +3,7 @@
 // code. The buyer gets the code inside a signed door code, `tkt.<key id>.<code>.<signature>`, which
 // a device can check with no connection; the database keeps only the hash of the code part.
 import { sql } from 'drizzle-orm'
-import { all, newId, nowMs, sealColumn, openColumn, type UnitView } from '#kit'
+import { all, newId, sealColumn, openColumn, type UnitView } from '#kit'
 import { signing } from '#kit/signing'
 import { scans, tickets } from './db/schema'
 import { hashOf } from './codes'
@@ -34,21 +34,6 @@ function base32(bytes: Uint8Array): string {
 
 /** What the signature of a door code covers: its first three parts. */
 export const signedPart = (kind: string, keyId: string, code: string) => `${kind}.${keyId}.${code}`
-
-/**
- * Issues tickets again with new door codes, for those issued before codes were kept, whose codes are
- * only in a message nobody received. Only tickets not yet admitted are reissued; each old one is
- * voided as reissued. Returns the new codes.
- */
-export async function reissueTickets(unit: UnitView, waiting: readonly { ticketId: string, line: { id: string, performance_id: string } }[]): Promise<string[]> {
-  if (!waiting.length) return []
-  const at = nowMs()
-  for (const w of waiting) {
-    unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = 'reissued', updated_at = ${at} WHERE id = ${w.ticketId} AND state = 'valid' AND admitted_at IS NULL`)
-      .expect(1, { code: 'box-office.ticket.changed', reason: 'One of these tickets has just been used or changed.', remedy: 'Look at the booking again.' })
-  }
-  return issueTickets(unit, waiting.map(w => w.line))
-}
 
 /**
  * Adds a valid ticket for each line to the unit and returns the door codes, in the lines' order.
@@ -110,3 +95,13 @@ export async function doorCodesForOrders(orderIds: readonly string[]): Promise<S
 
 /** One order's tickets: see `doorCodesForOrders`. */
 export const doorCodesForOrder = (orderId: string) => doorCodesForOrders([orderId])
+
+/**
+ * The short numbers a person reads off their tickets, one for each line given: the booking reference
+ * and the line's place among every ticket line the order has had, `K7MPQ2XR-1`, so a ticket keeps its
+ * number when others are cancelled. They name a ticket and open nothing; the door scans the code.
+ */
+export async function ticketNumbers(order: { id: string, reference: string }, lineIds: readonly string[]): Promise<string[]> {
+  const places = (await all<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY id", order.id)).map(r => r.id)
+  return lineIds.map(id => `${order.reference}-${places.indexOf(id) + 1}`)
+}

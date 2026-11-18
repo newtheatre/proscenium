@@ -131,19 +131,21 @@ test('the desk finds a reservation by scanning its box office code with the came
 test('the door admits a ticket scanned with the camera, and knows it when it comes round again', async ({ playwright }) => {
   const { browser, page } = await withCamera(playwright.chromium, cameraShowing(doorCode, `door-${stamp}`))
   try {
+    // The door list has one way to scan: the door itself, in live mode.
     await visit(page, `/console/box-office/performances/${performanceId}/door`)
-    await page.getByRole('button', { name: 'Scan tickets' }).first().click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog.getByRole('status').filter({ hasText: 'Admitted.' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Scan tickets' })).toHaveCount(0)
+    await page.getByRole('link', { name: 'Open the door scanner' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Admitted' })).toBeVisible({ timeout: 15_000 })
     // Held up to the camera, it is still one scan. Shown again later, it is already in.
-    await page.keyboard.press('Escape')
-    await expect(dialog).toBeHidden()
-    await page.getByRole('button', { name: 'Scan tickets' }).first().click()
-    await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: /Already in, at/ })).toBeVisible({ timeout: 15_000 })
-    // Typing is there too: a code that is not ours says so.
-    await page.getByRole('dialog').getByLabel('Or type the code').fill('NOT-A-CODE')
-    await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
-    await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'This code is not one of ours.' })).toBeVisible()
+    await page.getByRole('button', { name: 'Pause camera' }).click()
+    await page.getByRole('button', { name: 'Resume camera' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Already in' })).toBeVisible({ timeout: 15_000 })
+    // Typing is there too: a word that is not a code stays a search, and logs no failed scan.
+    await page.getByRole('button', { name: 'Pause camera' }).click()
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').fill('Nobody-here')
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').press('Enter')
+    await expect(page.getByRole('dialog').getByText('Nobody found.')).toBeVisible()
   }
   finally {
     await browser.close()

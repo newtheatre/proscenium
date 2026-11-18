@@ -298,7 +298,7 @@ describe('selling at the desk', () => {
     expect(sent.status, JSON.stringify(sent.body)).toBe(200)
     expect((await order(o.orderId)).account_id).toBeTruthy()
     expect(await count("SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE 'box-office.order-confirmed%'", o.orderId)).toBe(1)
-    // The tickets keep their codes: the message carries them.
+    // The tickets keep their codes: the message links to the booking, which shows them.
     const after = await rows<{ code_hash: string }>("SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? AND k.state = 'valid' ORDER BY k.id", o.orderId)
     expect(after).toEqual(before)
     // Sent once: a second send is refused rather than sending different codes again.

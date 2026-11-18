@@ -2,8 +2,10 @@
      prices. A product opens its own page for its sizes and prices on every list. Products move up and
      down within their category by button, so the keyboard can reorder them too. -->
 <script setup lang="ts">
+import { categoryInput } from '../../../../../../server/input'
+
 interface VariantPrice { listId: string, amountMinor: number | null }
-interface Variant { id: string, name: string, active: boolean, prices: VariantPrice[] }
+interface Variant { id: string, name: string, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, name: string, ageRestricted: boolean, active: boolean, variants: Variant[] }
 interface Category { id: string, name: string, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
 interface List { id: string, name: string, standard: boolean, percentOff: number | null, active: boolean }
@@ -11,7 +13,7 @@ interface List { id: string, name: string, standard: boolean, percentOff: number
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { money } = await useMoney()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ categories: Category[], lists: List[] }>('/api/bar/catalogue', { key: 'bar:catalogue' })
 
@@ -38,10 +40,22 @@ function line(p: Product): string {
   })
   return [sizes.join(' · '), p.ageRestricted ? t('bar.screens.products.age-restricted') : null].filter(Boolean).join(' · ')
 }
+// A size on sale with no Standard price is not on the till yet. The mixer measure is priced by its group.
+const needsPrice = (p: Product) => p.active && p.variants.some(v => v.active && !v.mixerMeasure && (v.prices.find(x => x.listId === standard.value)?.amountMinor ?? null) === null)
 
 // A category: new, or renamed, recoloured or retired.
 const category = ref<{ id: string | null, name: string, colour: string, parentId: string, ageRestricted: boolean, usualPreset: string } | null>(null)
-const presetItems = ref<{ value: string, label: string }[]>([])
+const presets = ref<{ id: string, builtIn: boolean, name: string | null }[]>([])
+const presetLabel = (id: string) => {
+  const p = presets.value.find(x => x.id === id)
+  return !p ? '' : p.builtIn ? t(`bar.presets.${p.id.slice('builtin:'.length)}.name`) : p.name!
+}
+// A sub-category with no usual preset of its own takes its parent's, which "none" then names.
+const presetItems = computed(() => {
+  const parent = data.value?.categories.find(c => c.id === category.value?.parentId)
+  const none = parent?.usualPreset ? t('bar.screens.products.preset-as-parent', { parent: parent.name, preset: presetLabel(parent.usualPreset) }) : t('bar.screens.products.preset-none')
+  return [{ value: 'none', label: none }, ...presets.value.map(p => ({ value: p.id, label: presetLabel(p.id) }))]
+})
 // A sub-category sits under a top-level category in use; one with sub-categories of its own stays top-level.
 const parentItems = computed(() => {
   const all = data.value?.categories ?? []
@@ -51,19 +65,23 @@ const parentItems = computed(() => {
   return [{ value: 'none', label: t('bar.screens.products.parent-none') }, ...tops.map(c => ({ value: c.id, label: c.name }))]
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const categoryEl = useTemplateRef<{ setErrors: (errors: FieldError[]) => void }>('categoryEl')
 async function editCategory(c?: Category) {
   refusal.value = null
-  const { presets } = await $api<{ presets: { id: string, builtIn: boolean, name: string | null }[] }>('/api/bar/presets')
-  presetItems.value = [{ value: 'none', label: t('bar.screens.products.preset-none') }, ...presets.map(p => ({ value: p.id, label: p.builtIn ? t(`bar.presets.${p.id.slice('builtin:'.length)}.name`) : p.name! }))]
+  presets.value = (await $api<{ presets: { id: string, builtIn: boolean, name: string | null }[] }>('/api/bar/presets')).presets
   category.value = c
     ? { id: c.id, name: c.name, colour: c.colour ?? 'none', parentId: c.parentId ?? 'none', ageRestricted: c.ageRestricted, usualPreset: c.usualPreset ?? 'none' }
     : { id: null, name: '', colour: 'none', parentId: 'none', ageRestricted: false, usualPreset: 'none' }
+}
+const categoryBody = () => {
+  const c = category.value!
+  return { name: c.name, colour: c.colour === 'none' ? null : c.colour, parentId: c.parentId === 'none' ? null : c.parentId, ageRestricted: c.ageRestricted, usualPreset: c.usualPreset === 'none' ? null : c.usualPreset }
 }
 async function saveCategory() {
   const c = category.value!
   refusal.value = null
   try {
-    const body = { name: c.name, colour: c.colour === 'none' ? null : c.colour, parentId: c.parentId === 'none' ? null : c.parentId, ageRestricted: c.ageRestricted, usualPreset: c.usualPreset === 'none' ? null : c.usualPreset }
+    const body = categoryBody()
     if (c.id) await $api(`/api/bar/categories/${c.id}` as string, { method: 'PATCH', body })
     else await $api('/api/bar/categories', { method: 'POST', body })
     toast.add({ title: t('bar.screens.products.category-saved'), color: 'success' })
@@ -72,6 +90,7 @@ async function saveCategory() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    categoryEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function setCategoryActive(c: Category, active: boolean) {
@@ -190,6 +209,11 @@ async function move(p: Product, direction: 'up' | 'down') {
                   {{ p.active ? p.name : t('bar.screens.products.retired-name', { name: p.name }) }}
                 </ULink>
               </template>
+              <StatusBadge
+                v-if="needsPrice(p)"
+                tone="warning"
+                :label="t('bar.screens.products.needs-price')"
+              />
               <div class="flex gap-1">
                 <IconButton
                   icon="i-lucide-arrow-up"
@@ -227,7 +251,9 @@ async function move(p: Product, direction: 'up' | 'down') {
         <UForm
           v-if="category"
           id="bar-category"
+          ref="categoryEl"
           :state="category"
+          :validate="() => bodyErrors(categoryInput, categoryBody())"
           class="space-y-4"
           novalidate
           @submit="saveCategory"
@@ -281,6 +307,7 @@ async function move(p: Product, direction: 'up' | 'down') {
         <UButton
           type="submit"
           form="bar-category"
+          loading-auto
           :label="t('bar.screens.save')"
         />
       </template>
@@ -293,6 +320,7 @@ async function move(p: Product, direction: 'up' | 'down') {
       :categories="data.categories"
       :lists="data.lists"
       @added="id => navigateTo(`/admin/modules/bar/products/${id}`)"
+      @presets="refresh()"
     />
   </PageFrame>
 </template>
