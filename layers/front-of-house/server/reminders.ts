@@ -3,7 +3,7 @@
 // who signs up late gets one reminder, not both at once.
 import { all, nowMs, useSetting, type UnitView } from '#kit'
 import { notify } from '#modules/core'
-import { formatter } from './words'
+import { formatter, partFormatters } from './words'
 
 const SECOND = 1000 // not-policy: settings are whole seconds
 const BATCH = 200 // not-policy: one unit's worth of reminders; the next run takes the rest
@@ -30,8 +30,9 @@ export async function sendReminders(unit: UnitView): Promise<number> {
   }).filter(r => r.level > r.reminded)
   if (!due.length) return 0
   const format = await formatter()
+  const { date } = await partFormatters()
   await notify(unit, 'front-of-house.shift-reminder', {
-    to: due.map(r => ({ accountId: r.account_id, variables: { duty: r.duty, show: r.show ?? r.title ?? '', when: format(r.call_at) }, dedupeKey: `reminder:${r.id}:${r.level}` })),
+    to: due.map(r => ({ accountId: r.account_id, variables: { duty: r.duty, show: r.show ?? r.title ?? '', when: format(r.call_at), date: date(r.call_at) }, dedupeKey: `reminder:${r.id}:${r.level}` })),
   })
   for (const level of [1, 2]) {
     const ids = due.filter(r => r.level === level).map(r => r.id)

@@ -33,11 +33,11 @@ interface One {
   changed: string[]
   stage: (Stage & { note: string | null }) | null
   moves: Move[]
-  history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null }[]
-  review: (ReviewResult & { stage: string, mode: 'scores' | 'vote', open: boolean, released: boolean, conflicted: number, canRelease: boolean }) | null
+  history: { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null, note: string | null }[]
+  review: (ReviewResult & { stage: string, mode: 'scores' | 'vote', open: boolean, released: boolean, conflicted: number, quorum: number | null, quorate: boolean, canRelease: boolean }) | null
   decision: { at: number, reason: string | null } | null
   about: { slot: string, label: string, name: string | null } | null
-  actions: { id: string, action: string, label: string | null, state: 'waiting' | 'done' | 'skipped' | 'failed', detail: string | null, at: number, canRunAgain: boolean }[]
+  actions: { id: string, action: string, label: string | null, state: 'waiting' | 'done' | 'skipped' | 'failed', detail: string | null, at: number, canRunAgain: boolean, record: { type: string, id: string, title: string, to?: string } | null }[]
 }
 
 definePageMeta({ layout: 'console' })
@@ -45,6 +45,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { dateTime, zone } = useDates()
+const { confirm } = useConfirm()
 const toast = useToast()
 const route = useRoute()
 const router = useRouter()
@@ -80,13 +81,32 @@ const question = computed({ get: () => view.value.question, set: (id: string | u
 const typed = ref(view.value.value ?? '')
 watch(() => view.value.value, (v) => { typed.value = v ?? '' })
 
+// ---- which question columns are shown: kept on this device for this form ----
+const hidden = ref<string[]>([])
+const hiddenKey = computed(() => `forms:columns:${formId.value}`)
+onMounted(() => {
+  try { hidden.value = JSON.parse(localStorage.getItem(hiddenKey.value) ?? '[]') as string[] }
+  catch { /* nothing kept */ }
+})
+function showColumn(id: string, on: boolean) {
+  hidden.value = on ? hidden.value.filter(h => h !== id) : [...hidden.value, id]
+  try { localStorage.setItem(hiddenKey.value, JSON.stringify(hidden.value)) }
+  catch { /* storage is off: the choice lasts for this visit */ }
+}
+const columnItems = computed(() => (data.value?.columns ?? []).map(c => ({
+  type: 'checkbox' as const,
+  label: c.label || c.key,
+  checked: !hidden.value.includes(c.questionId),
+  onUpdateChecked: (on: boolean) => showColumn(c.questionId, on),
+  onSelect: (e: Event) => e.preventDefault(),
+})))
 const columns = computed(() => [
   ...(canMoveMany.value ? [{ id: 'select', header: '' }] : []),
   { accessorKey: 'reference', header: t('forms.screens.responses.reference') },
   { accessorKey: 'sent', header: t('forms.screens.responses.sent') },
   ...(data.value?.stages.length ? [{ accessorKey: 'stage', header: t('forms.screens.responses.stage') }] : []),
   ...(data.value?.form.anonymous ? [] : [{ accessorKey: 'who', header: t('forms.screens.responses.from') }]),
-  ...(data.value?.columns ?? []).map(c => ({ accessorKey: `q:${c.questionId}`, header: c.retired ? t('forms.screens.responses.removed', { name: c.label || c.key }) : c.label || c.key })),
+  ...(data.value?.columns ?? []).filter(c => !hidden.value.includes(c.questionId)).map(c => ({ accessorKey: `q:${c.questionId}`, header: c.retired ? t('forms.screens.responses.removed', { name: c.label || c.key }) : c.label || c.key })),
 ])
 const rows = computed(() => (data.value?.rows ?? []).map(r => ({
   id: r.id,
@@ -147,7 +167,10 @@ const runTone = { waiting: 'info', done: 'success', skipped: 'neutral', failed: 
 // ---- releasing its reviews to the panel ----
 const releasing = ref(false)
 async function release() {
-  if (!one.value) return
+  if (!one.value?.review) return
+  // Releasing ends the reviewing: nobody can hand in or change a review afterwards.
+  const { submitted, assigned } = one.value.review
+  if (submitted < assigned && !(await confirm({ verb: t('forms.screens.review.release-verb'), thing: t('forms.screens.review.release-thing'), consequence: t('forms.screens.review.release-early', { done: submitted, of: assigned }) }))) return
   releasing.value = true
   try {
     await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/release` as string, { method: 'POST' })
@@ -179,7 +202,8 @@ function choose(move: Move) {
 // Rows are chosen by id and the choice is dropped when the rows change, so a move never reaches a
 // row that is no longer on screen. The moves offered are those of the stage every chosen row is in.
 const chosen = ref<Record<string, boolean>>({})
-watch(() => data.value?.rows, () => { chosen.value = {} })
+// A refresh keeps the ticks of rows still on screen, so a move that failed can be tried again.
+watch(() => data.value?.rows, (rows) => { chosen.value = Object.fromEntries((rows ?? []).filter(r => chosen.value[r.id]).map(r => [r.id, true])) })
 const canMoveMany = computed(() => (data.value?.stages ?? []).some(s => s.moves.length))
 const chosenRows = computed(() => (data.value?.rows ?? []).filter(r => chosen.value[r.id]))
 function choosing(id: string, on: boolean) {
@@ -195,6 +219,17 @@ const sharedMoves = computed(() => {
   return keys.size === 1 ? data.value?.stages.find(s => s.key === [...keys][0])?.moves ?? [] : null
 })
 const many = ref(false)
+// What the move's actions would do with this response, asked for as the dialog opens: the award an
+// approval would issue, and anything in its way. Several at once are not previewed.
+interface Preview { action: string, label: string, lines?: { label: string, value: string }[], warnings?: string[], blocked?: string, skipped?: 'slot' }
+const previews = ref<Preview[]>([])
+watch([moving, many], async ([move, several]) => {
+  previews.value = []
+  if (!move || several || !one.value) return
+  const key = move.key
+  const got = await $api<{ previews: Preview[] }>(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/preview` as string, { query: { move: key } }).catch(() => null)
+  if (moving.value?.key === key && !many.value) previews.value = got?.previews ?? []
+})
 function chooseMany(move: Move) {
   choose(move)
   many.value = true
@@ -211,6 +246,7 @@ async function moveMany() {
       description: done.skipped.length ? t('forms.screens.responses.left-many', { count: done.skipped.length, why: left }) : undefined,
       color: done.skipped.length ? 'warning' : 'success',
     })
+    if (!done.skipped.length) chosen.value = {}
   }
   catch (e) {
     const refusal = toRefusal(e)
@@ -245,6 +281,17 @@ async function move() {
   sending.value = false
   await Promise.all([load(), refresh()])
 }
+/** What the reviewing says against a decision about to be made: not enough reviews in, or a vote that went the other way. */
+const decisionWarning = computed(() => {
+  const move = moving.value
+  const review = one.value?.review
+  if (!move?.decision || many.value || !review?.open) return undefined
+  if (review.quorum !== null && !review.quorate) return t('forms.screens.review.warn-quorum', { done: review.submitted, n: review.quorum })
+  if (review.submitted < review.assigned && !review.released) return t('forms.screens.review.warn-waiting', { done: review.submitted, of: review.assigned })
+  if (review.tally && move.toKind === 'approved' && !review.tally.passed) return t('forms.screens.review.warn-not-passed')
+  if (review.tally && move.toKind === 'declined' && review.tally.passed) return t('forms.screens.review.warn-passed')
+  return undefined
+})
 const open = (id: string) => router.replace({ query: { ...route.query, open: id } })
 const close = () => router.replace({ query: { ...route.query, open: undefined } })
 const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!v) close() } })
@@ -307,6 +354,18 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             @change="show({ value: typed.trim() || undefined })"
           />
         </UFormField>
+        <UDropdownMenu
+          v-if="columnItems.length > 1"
+          :items="columnItems"
+          :ui="{ content: 'max-h-96 overflow-y-auto' }"
+        >
+          <UButton
+            :label="hidden.length ? t('forms.screens.responses.columns-n', { shown: columnItems.length - hidden.length, of: columnItems.length }) : t('forms.screens.responses.columns')"
+            icon="i-lucide-columns-3"
+            color="neutral"
+            variant="outline"
+          />
+        </UDropdownMenu>
         <UButton
           v-if="filtered"
           :label="t('forms.screens.responses.clear')"
@@ -431,7 +490,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             v-if="one.about"
             class="text-sm"
           >
-            <span class="font-medium">{{ t(one.about.label) }}</span>
+            <span class="font-medium">{{ t(one.about.label) }}{{ one.about.name ? ':' : '' }}</span>
             <template v-if="one.about.name">
               {{ ' ' }}{{ one.about.name }}
             </template>
@@ -469,7 +528,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             :aria-label="t('forms.screens.review.title')"
           >
             <h3 class="text-sm font-medium text-muted">
-              {{ t('forms.screens.review.in-stage', { stage: one.review.stage }) }}
+              {{ t(one.review.open ? 'forms.screens.review.in-stage' : 'forms.screens.review.was-in-stage', { stage: one.review.stage }) }}
             </h3>
             <FormsReviewResult
               :result="one.review"
@@ -536,6 +595,11 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
                   v-else-if="run.state === 'skipped'"
                   class="block text-muted"
                 >{{ run.detail && run.detail !== 'slot' ? run.detail : t('forms.screens.actions.skipped-slot') }}</span>
+                <ULink
+                  v-if="run.record"
+                  :to="run.record.to"
+                  class="block text-primary"
+                >{{ run.record.title }}</ULink>
               </li>
             </ul>
           </section>
@@ -569,6 +633,10 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               >
                 <span class="block font-medium">{{ h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }) }}</span>
                 <span class="block text-muted">{{ h.by ? t('forms.screens.responses.by-at', { who: h.by, when: dateTime(h.at) }) : dateTime(h.at) }}</span>
+                <span
+                  v-if="h.note"
+                  class="mt-1 block border-l-2 border-default pl-2 whitespace-pre-line"
+                >{{ t('forms.screens.responses.history-note', { note: h.note }) }}</span>
               </li>
             </ol>
           </section>
@@ -586,6 +654,56 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
       :description="moving ? many ? t('forms.screens.responses.move-help-many', { count: chosenRows.length, stage: moving.to }) : t('forms.screens.responses.move-help', { stage: moving.to }) : undefined"
     >
       <template #body>
+        <UAlert
+          v-if="decisionWarning"
+          class="mb-4"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          :title="decisionWarning"
+          :description="t('forms.screens.review.warn-help')"
+        />
+        <section
+          v-for="preview in previews"
+          :key="preview.action"
+          class="mb-4 space-y-2 rounded-md border border-default p-3 text-sm"
+        >
+          <h3 class="font-medium">
+            {{ t('forms.screens.actions.preview', { action: t(preview.label) }) }}
+          </h3>
+          <UAlert
+            v-if="preview.skipped || preview.blocked"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('forms.screens.actions.preview-blocked')"
+            :description="preview.blocked ? phrase(preview.blocked) : t('forms.screens.actions.skipped-slot')"
+          />
+          <template v-else>
+            <dl
+              v-if="preview.lines?.length"
+              class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1"
+            >
+              <template
+                v-for="line in preview.lines"
+                :key="line.label"
+              >
+                <dt class="text-muted">
+                  {{ phrase(line.label) }}
+                </dt>
+                <dd>{{ line.value }}</dd>
+              </template>
+            </dl>
+            <UAlert
+              v-for="warning in preview.warnings ?? []"
+              :key="warning"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              :title="phrase(warning)"
+            />
+          </template>
+        </section>
         <UFormField
           v-if="moving?.decision"
           class="mb-4"
@@ -602,7 +720,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         </UFormField>
         <UFormField
           :label="t('forms.screens.responses.note')"
-          :help="t('forms.screens.responses.note-help')"
+          :help="t(moving?.toKind === 'returned' ? 'forms.screens.responses.note-help' : 'forms.screens.responses.note-help-plain')"
           :hint="t('forms.screens.details.optional')"
         >
           <UTextarea

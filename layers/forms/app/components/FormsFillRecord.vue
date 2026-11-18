@@ -3,6 +3,7 @@
      to show an answer that was kept. A source this person may not search says so. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
+import type { Ref } from 'vue'
 import type { Question, Value } from '../../shared/engine'
 
 interface Found { id: string, label: string, detail?: string }
@@ -10,6 +11,8 @@ const props = defineProps<{ question: Question }>()
 const model = defineModel<Value>()
 const { t } = useT()
 const { $api } = useNuxtApp()
+// The form being answered, where there is one: a question its author opened may then be searched by anybody signed in.
+const answering = inject<Ref<string> | null>('forms:answering', null)
 
 const address = computed(() => `/api/forms/sources/${encodeURIComponent(props.question.source ?? '')}`)
 const term = ref('')
@@ -28,16 +31,19 @@ const items = computed(() => {
 const one = computed({ get: () => ids.value[0], set: (id: string | undefined) => { model.value = id || undefined } })
 const many = computed({ get: () => ids.value, set: (list: string[]) => { model.value = list.length ? list : undefined } })
 
-type Answer = { allowed: boolean, results: Found[], labels: Record<string, string> }
+type Answer = { allowed: boolean, results: Found[], labels: Record<string, string>, letters?: number }
+// The least that must be typed before a search is made: more where the question is open to everybody.
+const least = ref(2)
 let latest = 0
 async function ask(query: Record<string, string>): Promise<Answer | null> {
   const asked = ++latest
   loading.value = true
   failed.value = false
   try {
-    const answer = await $api<Answer>(address.value as string, { query })
+    const answer = await $api<Answer>(address.value as string, { query: { ...query, ...(answering?.value && props.question.openSearch ? { form: answering.value, question: props.question.id } : {}) } })
     if (asked !== latest) return null
     shut.value = !answer.allowed
+    if (answer.letters) least.value = answer.letters
     return answer
   }
   catch {
@@ -49,7 +55,7 @@ async function ask(query: Record<string, string>): Promise<Answer | null> {
   }
 }
 async function search(q: string) {
-  if (q.trim().length < 2) return void (found.value = [])
+  if (q.trim().length < least.value) return void (found.value = [])
   const answer = await ask({ q: q.trim() })
   if (!answer) return
   found.value = answer.results
@@ -88,7 +94,7 @@ onMounted(async () => {
     :ui="{ placeholder: 'text-muted' }"
   >
     <template #empty>
-      {{ failed ? t('forms.screens.fill.record-failed') : term.trim().length < 2 ? t('forms.screens.fill.record-type-more') : t('forms.screens.fill.record-none') }}
+      {{ failed ? t('forms.screens.fill.record-failed') : term.trim().length < least ? t('forms.screens.fill.record-type-more', { count: least }) : t('forms.screens.fill.record-none') }}
     </template>
   </USelectMenu>
   <USelectMenu
@@ -106,7 +112,7 @@ onMounted(async () => {
     :ui="{ placeholder: 'text-muted' }"
   >
     <template #empty>
-      {{ failed ? t('forms.screens.fill.record-failed') : term.trim().length < 2 ? t('forms.screens.fill.record-type-more') : t('forms.screens.fill.record-none') }}
+      {{ failed ? t('forms.screens.fill.record-failed') : term.trim().length < least ? t('forms.screens.fill.record-type-more', { count: least }) : t('forms.screens.fill.record-none') }}
     </template>
   </USelectMenu>
 </template>

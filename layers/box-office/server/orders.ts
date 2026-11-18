@@ -1,7 +1,10 @@
 // What the order services share: the order and its live ticket lines as they are read, and the
 // words a message uses for them.
-import { all, refuse, theatreTimeZone, useSetting } from '#kit'
+import { all, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
 import { getPerformance, getProduction, getVenue } from '#modules/core'
+import catalogue from '../i18n/en-GB.json'
+
+const say = wordsFrom(catalogue)
 
 export interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, intent_id: string | null, confirm_email: string | null, confirm_name: string | null, admit_on_payment: number, sold_by: string | null }
 /** band_name is null when the production has one band, so there is no part of the house to name. */
@@ -72,6 +75,6 @@ export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors
   return {
     where: address ? `${place}, ${address}` : place,
     doors: new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(performance.doorsAt ?? performance.startsAt),
-    access: notes.length ? `Access: ${notes.join(' ')}` : 'If anything would make your visit easier, tell the box office before you come.',
+    access: notes.length ? say('box-office.visit.access', { notes: notes.join(' ') }) : say('box-office.visit.ask'),
   }
 }

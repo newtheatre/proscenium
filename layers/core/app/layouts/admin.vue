@@ -17,9 +17,13 @@ provide(ADMIN_SHELL, true)
 const module = computed(() => /^\/admin\/modules\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(route.path)?.[1])
 watch(() => route.fullPath, () => { open.value = false })
 
-// The browser title starts with where you are, and the buttons stay neutral (see main.css).
+// The browser title is the one pattern every page follows, the page, then the area, then the theatre
+// ("Branding · Admin · Nottingham New Theatre"), and the buttons stay neutral (see main.css).
 useHead({
-  titleTemplate: title => (title ? `${t('core.admin.title')}: ${title}` : t('core.admin.title')),
+  titleTemplate: (title) => {
+    const area = t('core.admin.title')
+    return [title && title !== area ? title : null, area, brand.value.name].filter(Boolean).join(' · ')
+  },
   bodyAttrs: { class: 'admin-shell' },
 })
 

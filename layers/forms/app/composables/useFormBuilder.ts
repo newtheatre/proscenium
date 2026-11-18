@@ -5,11 +5,13 @@ import type { ComputedRef, InjectionKey, Ref, ShallowRef } from 'vue'
 import { checkDefinition, type Definition, type Problem } from '../../shared/engine'
 import { find } from '../../shared/builder/edit'
 
-export interface BuilderForm { id: string, slug: string, title: string, mode: string, status: string, anonymous: boolean, retentionDays: number | null, retentionDeclinedDays: number | null, liveVersion: number | null, archivedAt: number | null }
+export interface BuilderForm { id: string, slug: string, title: string, mode: string, status: string, anonymous: boolean, allowEdits: boolean, retentionDays: number | null, retentionDeclinedDays: number | null, liveVersion: number | null, archivedAt: number | null }
 export interface PublishedField { questionId: string, key: string, type: string, dataClass: string, retired: boolean }
 export interface BuilderAction { key: string, label: string, slot: string | null, inputs: { key: string, label: string, required: boolean, types?: string[] }[] }
 export interface BuilderData {
   today: string | null
+  requireRetention?: boolean
+  shared?: boolean
   form: BuilderForm
   draft: { definition: Definition, editRevision: number, editedBy: string | null, updatedAt: number }
   fields: PublishedField[]

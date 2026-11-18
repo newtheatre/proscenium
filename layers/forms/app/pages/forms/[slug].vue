@@ -41,7 +41,11 @@ const at = computed(() => place.value ? `?place=${encodeURIComponent(place.value
 
 const { data, error, refresh } = await useAPI<Open>(() => `/api/forms/open/${encodeURIComponent(slug.value)}${at.value}`, { key: `forms:open:${slug.value}:${place.value}` })
 if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: t('forms.screens.answer.not-found'), fatal: true })
+// An address the form used to have: on to where it is now, with whatever else the link carried.
+const movedTo = (data.value as { movedTo?: string }).movedTo
+if (movedTo) await navigateTo(`/forms/${encodeURIComponent(movedTo)}${at.value}`, { redirectCode: 301, external: true }) // not-policy: HTTP status
 const form = computed(() => data.value!)
+provide('forms:answering', slug)
 
 const responseId = ref(form.value.draft?.responseId ?? newResponseId())
 // File answers are uploaded into this response as they are chosen.
@@ -108,15 +112,17 @@ watch([answers, pageId, email], () => {
 onBeforeUnmount(() => clearTimeout(timer))
 
 // ---- sending ----
+/** The address is asked for beside the form, so it is checked with each page rather than only at the end. */
+function emailGiven(): boolean {
+  emailError.value = undefined
+  if (!form.value.asksEmail || /^\S+@\S+\.\S+$/.test(email.value.trim())) return true
+  emailError.value = t('forms.screens.answer.email-needed')
+  nextTick(() => emailBox.value?.querySelector('input')?.focus())
+  return false
+}
 async function send(kept: Answers): Promise<boolean> {
   failure.value = null
-  emailError.value = undefined
-  if (form.value.asksEmail && !/^\S+@\S+\.\S+$/.test(email.value.trim())) {
-    emailError.value = t('forms.screens.answer.email-needed')
-    await nextTick()
-    emailBox.value?.querySelector('input')?.focus()
-    return false
-  }
+  if (!emailGiven()) return false
   clearTimeout(timer)
   try {
     const sent = await $api<{ reference: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/responses${at.value}` as string, {
@@ -147,7 +153,7 @@ async function send(kept: Answers): Promise<boolean> {
 <template>
   <PageFrame
     :title="form.title"
-    :description="form.about?.name ? `${t(form.about.label)} ${form.about.name}` : undefined"
+    :description="form.about?.name ? `${t(form.about.label)}: ${form.about.name}` : undefined"
     width="reading"
   >
     <EmptyState
@@ -225,6 +231,7 @@ async function send(kept: Answers): Promise<boolean> {
         :definition="form.definition"
         :context="{ today: form.today ?? '' }"
         :send="send"
+        :check="emailGiven"
         :start="pageId"
         @page="pageId = $event"
       >

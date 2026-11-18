@@ -13,6 +13,9 @@ import ticketTypePatch from '../../server/api/box-office/ticket-types/[id].patch
 import ticketTypeDelete from '../../server/api/box-office/ticket-types/[id].delete'
 import ticketTypeOrder from '../../server/api/box-office/ticket-types/order.put'
 import bookGet from '../../server/api/box-office/book/performances/[id].get'
+import holderPost from '../../server/api/box-office/desk/holder.post'
+import { signDoorCode } from '../../server/door-codes'
+import { findOrCreateAccount } from '#modules/core'
 import { createBasket, pricedLines } from '../../server/baskets'
 import { scheme as memberScheme, req as membershipReq } from '../../../membership/tests/integration/stage'
 import { house, manager, NOV_16, ready, req, type House } from './stage'
@@ -24,6 +27,7 @@ const handle = server({
   'DELETE /api/box-office/ticket-types/:id': ticketTypeDelete,
   'PUT /api/box-office/ticket-types/order': ticketTypeOrder,
   'GET /api/box-office/book/performances/:id': bookGet,
+  'POST /api/box-office/desk/holder': holderPost,
 })
 let keys = 0
 async function api<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = manager): Promise<{ status: number, body: T }> {
@@ -182,10 +186,58 @@ describe('a member price', () => {
     const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
     expect(page.status, JSON.stringify(page.body)).toBe(200)
     expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.' })
+    // General prices come first, then those for people who qualify.
+    const restricted = page.body.bands[0].types.map((t: { unmet?: string }) => !!t.unmet) as boolean[]
+    expect(restricted).toContain(false)
+    expect(restricted).toEqual([...restricted].sort((a, b) => Number(a) - Number(b)))
     const mine = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, await member())
     expect(mine.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ most: 1 })
     // Only the Wheelchair space, which every show offers, is out of a member's reach here.
     expect(mine.body.bands[0].types.filter((t: { unmet?: string }) => t.unmet).map((t: { name: string }) => t.name)).toEqual(['Wheelchair space'])
+  })
+
+  it('is sold at the desk to the holder named, by their card or found by name, and by hand only to someone named', async () => {
+    const { h, type } = await memberHouse()
+    const holder = await member()
+    const [membership] = await rows<{ id: string }>('SELECT id FROM membership_memberships WHERE account_id = ?', holder.accountId)
+    const card = await inContext(() => signDoorCode('mem', membership!.id))
+    const { accountId: stranger } = await inContext(async () => {
+      const unit = createUnit()
+      const made = await findOrCreateAccount(unit.view(), { address: `s${Math.random().toString(36).slice(2)}@example.org`, name: 'Not A Member', origin: 'guest' })
+      await unit.commit()
+      return made
+    })
+    // Asking about somebody else's membership is Membership's card check.
+    const seller = person(['box-office.order.sell', 'membership.card.check'])
+    const supervisor = person(['box-office.order.sell', 'membership.card.check', 'box-office.ticket-type.override-requirement'])
+    const priced = (holders: string[] | undefined, actor: ReturnType<typeof person>) => inContext(async () => {
+      try {
+        return (await pricedLines(h.performanceId, [{ bandId: h.bandId, ticketTypeId: type.id, quantity: holders?.length ?? 1, ...(holders ? { holders } : {}) }], Date.now(), { channel: 'desk', account: null })).lines
+      }
+      catch (error: any) {
+        if (error?.name !== 'Refusal') throw error
+        return error.code as string
+      }
+    }, actor)
+
+    const byCard = await api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: type.id, code: card }, seller)
+    expect(byCard.status, JSON.stringify(byCard.body)).toBe(200)
+    expect(byCard.body).toMatchObject({ accountId: holder.accountId, label: 'Grace Hopper', met: true, mayOverride: false })
+    expect(await priced([holder.accountId!], seller)).toMatchObject([{ amountMinor: 500, requirement: { ref: 'membership:any', accountId: holder.accountId } }])
+    // Nobody named: refused even to someone who may check by hand.
+    expect(await priced(undefined, supervisor)).toBe('box-office.requirement.holder')
+
+    const byName = await api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: type.id, accountId: stranger }, seller)
+    expect(byName.body).toMatchObject({ accountId: stranger, met: false, mayOverride: false })
+    expect((await api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: type.id, accountId: stranger }, supervisor)).body).toMatchObject({ met: false, mayOverride: true })
+    expect(await priced([stranger], seller)).toBe('box-office.requirement.desk')
+    // Checked by hand: sold to the person named, with nothing to check again at the door.
+    expect(await priced([stranger], supervisor)).toMatchObject([{ requirement: { ref: null, accountId: stranger } }])
+
+    expect((await api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: type.id, code: 'mem.k.x.y' }, seller)).body).toMatchObject({ code: 'box-office.desk.card-unknown' })
+    expect((await api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: type.id, code: card }, person([]))).status).toBe(403)
+    // A seller who may not ask about members is told so, rather than that the member does not qualify.
+    expect((await api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: type.id, code: card }, person(['box-office.order.sell']))).body).toMatchObject({ met: false, reason: expect.any(String) })
   })
 
   it('is withheld while Membership is off', async () => {
@@ -261,7 +313,7 @@ describe('a member price by reference', () => {
         return error.code as string
       }
     }, seller)
-    expect(await priced()).toBe('box-office.requirement.desk')
+    expect(await priced()).toBe('box-office.requirement.holder')
     expect(await priced([m.number])).toMatchObject([{ amountMinor: 500, requirement: { ref: 'membership:any', evidence: m.membershipId, accountId: m.accountId } }])
   })
 

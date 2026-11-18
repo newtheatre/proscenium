@@ -67,7 +67,7 @@ test.describe('someone who looks after the public site', () => {
     await noViolations(page)
 
     await page.getByRole('switch', { name: 'Turn search engines away' }).click()
-    await page.getByRole('button', { name: 'Save Search engines settings' }).click()
+    await page.getByRole('button', { name: 'Save search engines settings' }).click()
     await page.getByRole('button', { name: 'Save the change' }).click()
     await expect(page.getByText('Search engines may list the site')).toBeVisible()
 

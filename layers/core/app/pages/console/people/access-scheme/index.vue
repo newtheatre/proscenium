@@ -105,7 +105,7 @@ const filters = [{
       </template>
       <template #cell-waitingFor="{ row }">
         <span class="inline-flex items-center gap-2">
-          {{ t('core.access.queue.days', { count: Math.floor(row.waitingFor / DAY) }) }}
+          {{ row.waitingFor < DAY ? t('core.access.queue.today') : t('core.access.queue.days', { count: Math.floor(row.waitingFor / DAY) }) }}
           <StatusBadge
             v-if="row.overdue"
             tone="warning"

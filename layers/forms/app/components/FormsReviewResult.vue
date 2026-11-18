@@ -124,7 +124,7 @@ const shown = computed(() => !!props.result.tally || !!props.result.summary)
         class="rounded-md border border-default p-2 text-sm"
       >
         <p class="font-medium">
-          {{ r.reviewer }}
+          {{ r.reviewer || t('forms.screens.review.a-reviewer') }}
           <span
             v-if="r.vote"
             class="font-normal text-muted"

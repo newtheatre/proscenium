@@ -233,6 +233,12 @@ describe('email wording (C-27)', () => {
     expect(out.text).toContain('click')
   })
 
+  it('writes a link as its words alone for the inbox, and with its address for plain email', () => {
+    const out = render({ subject: 'Hi', body: 'Thanks.\n\n[See your response]({{ link }})' }, { values: { link: 'https://example.org/account/forms/1' }, kinds: { link: 'link' }, accent: '#000000', theatre: 'T' })
+    expect(out.inbox).toBe('Thanks.\n\nSee your response')
+    expect(out.text).toContain('See your response: https://example.org/account/forms/1')
+  })
+
   it('makes a paragraph that is only a link into a button, with the address beneath', () => {
     const out = render({ subject: 'Hi', body: 'Before.\n\n[Show my tickets]({{ link }})' }, { values: { link: 'https://t.example/o/1' }, kinds: { link: 'sealed' }, accent: '#123456', theatre: 'T' })
     expect(out.html).toContain('background:#123456')

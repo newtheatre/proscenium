@@ -74,7 +74,9 @@ onMounted(() => { nextPlace.value = deviceSpace() ?? session.value?.defaultSpace
 /** Opens the seller's session if none is open, at this device's place. True once one is. */
 async function ensureSession(): Promise<boolean> {
   if (open.value) return true
-  await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace() } })
+  // The sale goes too, so a sale for tonight's performance opens the session at its space when this
+  // device has no place of its own.
+  await $api('/api/payments/till/session', { method: 'POST', body: { spaceId: deviceSpace(), panels: filled.value } })
   await refreshSession()
   return open.value
 }
@@ -587,14 +589,27 @@ function afterSale() {
   void refreshNuxtData()
 }
 function done() {
-  const finished = sale.value!
+  const paid = sale.value!
   const change = changeMinor.value
+  const sold = filled.value.map(f => f.basket)
   reset()
   afterSale()
   for (const p of panels.value) inputs[p.id] = null
-  toast.add({ title: t('payments.screens.till.paid', { amount: money(finished.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
-  emit('settled', { intentId: finished.intentId, amountMinor: finished.amountMinor })
+  // The sale stays on the receipt, and each panel that sold something shows what it made, until the
+  // seller moves on to the next customer (till proposal, "after the sale").
+  finished.value = { intentId: paid.intentId, amountMinor: paid.amountMinor, changeMinor: change, panels: sold }
+  // Where the receipt is a sheet, what was paid and any change are said at once as well.
+  if (!beside.value) toast.add({ title: t('payments.screens.till.paid', { amount: money(paid.amountMinor) }), description: change > 0 ? t('payments.screens.till.change', { amount: money(change) }) : undefined, color: 'success' })
+  emit('settled', { intentId: paid.intentId, amountMinor: paid.amountMinor })
 }
+/** The sale just paid for, shown until the next customer. */
+const finished = ref<{ intentId: string, amountMinor: number, changeMinor: number, panels: string[] } | null>(null)
+const settledFor = (id: string) => (finished.value?.panels.includes(id) ? finished.value.intentId : null)
+function nextCustomer() {
+  finished.value = null
+}
+// Starting the next sale moves on from the last.
+watch(() => filled.value.length, (now) => { if (now) finished.value = null })
 function undone() {
   reset()
   afterSale()
@@ -744,6 +759,32 @@ function ended() {
                     </div>
                   </section>
                 </div>
+                <div
+                  v-else-if="finished"
+                  class="space-y-3"
+                  role="status"
+                >
+                  <p class="flex items-center gap-2 text-lg font-semibold text-success">
+                    <UIcon
+                      name="i-lucide-circle-check"
+                      class="size-6"
+                    />{{ t('payments.screens.till.paid', { amount: money(finished.amountMinor) }) }}
+                  </p>
+                  <p
+                    v-if="finished.changeMinor > 0"
+                    class="text-base font-medium"
+                  >
+                    {{ t('payments.screens.till.change', { amount: money(finished.changeMinor) }) }}
+                  </p>
+                  <UButton
+                    block
+                    size="xl"
+                    class="justify-center"
+                    icon="i-lucide-user-round-plus"
+                    :label="t('payments.screens.till.next-customer')"
+                    @click="nextCustomer"
+                  />
+                </div>
                 <p
                   v-else
                   class="text-sm text-muted"
@@ -753,6 +794,7 @@ function ended() {
               </template>
 
               <p
+                v-if="sale || !finished || groups.length"
                 class="flex items-baseline justify-between"
                 :class="sale ? undefined : 'border-t border-default pt-3'"
                 aria-live="polite"
@@ -815,7 +857,7 @@ function ended() {
                 />
               </template>
               <!-- Nothing being paid yet: the ways to pay, one press each. -->
-              <template v-else-if="!sale">
+              <template v-else-if="!sale && !(finished && !groups.length)">
                 <template v-if="methods.length">
                   <UButton
                     block
@@ -1133,6 +1175,7 @@ function ended() {
                   class="pt-4"
                   :locked="!!sale"
                   :summary="summaryOf(item.value)"
+                  :settled="settledFor(item.value)"
                   @receipt="(r: PanelReceipt | null) => said(item.value, r)"
                 />
               </template>
@@ -1151,6 +1194,7 @@ function ended() {
                   v-model="inputs[p.id]"
                   :locked="!!sale"
                   :summary="summaryOf(p.id)"
+                  :settled="settledFor(p.id)"
                   @receipt="(r: PanelReceipt | null) => said(p.id, r)"
                 />
               </PageSection>
@@ -1217,6 +1261,15 @@ function ended() {
                   class="min-w-0 justify-center"
                   :label="t('payments.screens.till.due', { amount: money(due) })"
                   @click="sheet = true"
+                />
+                <UButton
+                  v-else-if="finished && !groups.length"
+                  block
+                  size="xl"
+                  class="min-w-0 justify-center"
+                  icon="i-lucide-user-round-plus"
+                  :label="t('payments.screens.till.next-customer')"
+                  @click="nextCustomer"
                 />
                 <UButton
                   v-else-if="methods.length"

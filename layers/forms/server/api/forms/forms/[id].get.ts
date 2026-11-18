@@ -1,10 +1,11 @@
 // A form for its builder: the form, its draft and the versions published so far.
 import { getRouterParam } from 'h3'
-import { all, can, defineRoute, isRefusal, today } from '#kit'
+import { all, can, defineRoute, isRefusal, today, useSetting } from '#kit'
 import { accountLabel } from '#modules/core'
 import type { Definition } from '../../../../shared/engine'
 import { sources } from '../../../sources'
 import { actionList } from '../../../actions'
+import { getLink } from '../../../responses'
 import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
 
 export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record, actor }) => {
@@ -24,7 +25,10 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
   const roles = await all<{ id: string, name: string }>('SELECT id, name FROM core_roles WHERE archived_at IS NULL ORDER BY fixed DESC, name')
   return {
     today: day,
-    form: { id: form.id, slug: form.slug, title: form.title, mode: form.mode, status: form.status, anonymous: form.anonymous, retentionDays: form.retentionDays, retentionDeclinedDays: form.retentionDeclinedDays, liveVersion: live?.number ?? null, createdAt: form.createdAt, archivedAt: form.archivedAt },
+    // Publishing waits on a retention period where the form asks for personal answers; nobody can answer until it is shared.
+    requireRetention: await useSetting('forms.retention.require-choice'),
+    shared: (await getLink(form.id)) !== null,
+    form: { id: form.id, slug: form.slug, title: form.title, mode: form.mode, status: form.status, anonymous: form.anonymous, allowEdits: form.allowEdits, retentionDays: form.retentionDays, retentionDeclinedDays: form.retentionDeclinedDays, liveVersion: live?.number ?? null, createdAt: form.createdAt, archivedAt: form.archivedAt },
     draft: { definition, editRevision: draft.editRevision, editedBy: await accountName(draft.editedBy), updatedAt: draft.updatedAt },
     // What has been published of each question: its type is fixed and its data class only rises.
     fields: fields.map(f => ({ questionId: f.questionId, key: f.key, type: f.type, dataClass: f.dataClass, retired: f.retiredInVersion !== null })),

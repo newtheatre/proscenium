@@ -1,16 +1,16 @@
 // The front of house section of Tonight for one performance (FH-19, FH-20), with what this viewer
 // may do on it, their own place if they have one, and the count of open incidents for those who
-// may see incidents.
+// may see incidents. Someone leading also gets who is coming needing help (AC-1).
 import { getRouterParam } from 'h3'
 import { can, defineRoute, first } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { board } from '../../../../night'
+import { board, tonightNeeds } from '../../../../night'
 
 export default defineRoute({
   ability: 'front-of-house.shift.view',
   record: event => ['core.performance', getRouterParam(event, 'id')],
   rateLimit: 'default',
-}, async (_event, { record, actor }) => {
+}, async (_event, { record, actor, unit }) => {
   const id = record!.id!
   const on = ['core.performance', id] as const
   const allowed = async (ability: string) => (await can(actor, ability as never, on)).allowed
@@ -23,12 +23,14 @@ export default defineRoute({
   const open = seesIncidents
     ? await first<{ n: number }>('SELECT count(*) AS n FROM front_of_house_incidents WHERE performance_id = ? AND state <> \'closed\'', id)
     : null
+  const lead = await allowed('front-of-house.assignment.check-in')
   return {
     ...answer,
+    needs: lead ? await tonightNeeds(unit.view(), id) : null,
     mine: mine?.id ?? null,
     openIncidents: open ? open.n : null,
     can: {
-      lead: await allowed('front-of-house.assignment.check-in'),
+      lead,
       checklists: await allowed('front-of-house.checklist.complete'),
       report: await allowed('front-of-house.night-report.write') || await allowed('front-of-house.night-report.sign-off'),
       incident: (await can(actor, 'front-of-house.incident.report')).allowed,

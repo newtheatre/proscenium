@@ -66,12 +66,37 @@ describe('a form on a link', () => {
   })
 })
 
+describe('changing a form\'s address', () => {
+  it('sends an old link on, keeps the old address for that form alone, and lets it be taken back', async () => {
+    const { formId, slug } = await offered(simple())
+    const other = await offered(simple())
+    const to = `moved-${slug}`
+    const editor = person(['forms.form.edit'])
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug: 'Not an address!' }, editor)).status).toBe(422)
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug: other.slug }, editor)).body).toMatchObject({ code: 'forms.form.address-taken', fields: { slug: 'forms.form.address-taken' } })
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug: to }, editor)).body).toMatchObject({ formId, slug: to })
+
+    expect((await req('GET', `/api/forms/open/${to}`, undefined, member)).body.state).toBe('open')
+    expect((await req('GET', `/api/forms/open/${slug}`, undefined, member)).body).toEqual({ movedTo: to })
+    // The address it left is still its own: nobody else's form may move in behind it.
+    expect((await req('PATCH', `/api/forms/forms/${other.formId}`, { slug }, editor)).body.code).toBe('forms.form.address-taken')
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug }, editor)).status).toBe(200)
+    expect((await req('GET', `/api/forms/open/${slug}`, undefined, member)).body.state).toBe('open')
+    expect((await req('GET', `/api/forms/open/${to}`, undefined, member)).body).toEqual({ movedTo: slug })
+  })
+})
+
 describe('sending', () => {
   it('stores the response and one row per answer, drops what logic hides and seals special answers', async () => {
     const { formId, slug } = await offered(simple())
     const sent = await send(slug, { name: 'Mo', role: 'crew', why: 'Hidden, because crew was chosen', needs: 'A step-free route' }, member)
     expect(sent.status, JSON.stringify(sent.body)).toBe(200)
     expect(sent.body.reference).toMatch(/^[A-Z2-9]{8}$/)
+
+    // The palette finds it by its reference, for whoever may read the form's responses and nobody else.
+    const find = (who: typeof member) => req('GET', `/api/forms/search?q=${sent.body.reference.slice(0, 5)}`, undefined, who)
+    expect((await find(reader)).body.ids).toEqual([sent.body.responseId])
+    expect((await find(other)).body.ids).toEqual([])
 
     const [response] = await rows<any>('SELECT * FROM forms_responses WHERE id = ?', sent.body.responseId)
     expect(response).toMatchObject({ form_id: formId, state: 'submitted', stage_kind: 'closed', person_id: member.accountId, respondent_email: null, current_revision: 1, submitted_at: NOV_17, retention_due_at: NOV_17 + 365 * 86_400_000 })

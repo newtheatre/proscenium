@@ -50,9 +50,13 @@ import liveTonight from '../../../core/server/api/core/live/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
+import deskSoldGet from '../../server/api/box-office/desk/sold.get'
+import deskSendPost from '../../server/api/box-office/desk/orders/[id]/send.post'
+import deskTicketsGet from '../../server/api/box-office/desk/orders/[id]/tickets.get'
 import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
 import deskBuyersGet from '../../server/api/box-office/desk/buyers.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
+import tillSessionPost from '../../../payments/server/api/payments/till/session.post'
 import sessionGet from '../../../payments/server/api/payments/session.get'
 import intentCancelPost from '../../../payments/server/api/payments/intents/[id]/cancel.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
@@ -137,6 +141,9 @@ export const handle = server({
   'POST /api/box-office/orders/:id/amend': amendPost,
   'POST /api/box-office/orders/:id/split': splitPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/desk/sold': deskSoldGet,
+  'POST /api/box-office/desk/orders/:id/send': deskSendPost,
+  'GET /api/box-office/desk/orders/:id/tickets': deskTicketsGet,
   'GET /api/box-office/desk/performances': deskPerformancesGet,
   'GET /api/box-office/desk/buyers': deskBuyersGet,
   'POST /api/box-office/orders/:id/exchange': exchangePost,
@@ -157,6 +164,7 @@ export const handle = server({
   'PUT /api/core/productions/:id/advisories': setProductionAdvisories,
   'PATCH /api/core/productions/:id': editProduction,
   'POST /api/payments/till/sale': tillSalePost,
+  'POST /api/payments/till/session': tillSessionPost,
   'GET /api/payments/session': sessionGet,
   'POST /api/payments/intents/:id/cancel': intentCancelPost,
   'POST /api/payments/till/summary': tillSummaryPost,

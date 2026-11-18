@@ -70,6 +70,22 @@ describe('the year end (ID-24)', () => {
     expect((await choose()).status).toBe(200)
     await clearSetting('core.grants.default-expiry')
   })
+
+  it('the role editor is told how a new role ends: never until a year end is set and chosen as the default', async () => {
+    const ends = async () => (await owner.browser.get('/api/core/roles')).body
+    expect(await ends()).toMatchObject({ yearEndSet: false, allowNoExpiry: true, newRoleEnds: 'none' })
+    await setSetting('core.organisation.year-end', '07-31')
+    expect(await ends()).toMatchObject({ yearEndSet: true, newRoleEnds: 'none' })
+    await setSetting('core.grants.default-expiry', 'year-end')
+    expect(await ends()).toMatchObject({ newRoleEnds: 'year_end' })
+    await clearSetting('core.grants.default-expiry')
+    await clearSetting('core.organisation.year-end')
+    await setSetting('core.grants.allow-no-expiry', false)
+    expect(await ends()).toMatchObject({ allowNoExpiry: false, newRoleEnds: 'days' })
+    await clearSetting('core.grants.allow-no-expiry')
+    // Each ability says whether its module is on, so the editor can leave out a module that is off.
+    expect((await ends()).catalogue.find((a: { name: string }) => a.name === 'core.role.read')).toMatchObject({ moduleOn: true })
+  })
 })
 
 describe('renewal (ID-24)', () => {

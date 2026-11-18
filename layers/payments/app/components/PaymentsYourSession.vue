@@ -10,7 +10,7 @@ import type { YourSale, YourSession, YourSessionSummary as Session } from '../..
 const props = defineProps<{ data: YourSession }>()
 const emit = defineEmits<{ changed: [] }>()
 
-const { t } = useT()
+const { t, te } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const { money } = await useMoney()
@@ -82,6 +82,8 @@ const takings = computed(() => props.data.takings ?? [])
 const takenInAll = computed(() => takings.value.reduce((sum, m) => sum + m.amountMinor, 0))
 const saleName = (s: YourSale) => [money(s.amountMinor, s.currency), s.methods.map(methodLabel).join(', ')].filter(Boolean).join(' · ')
 const saleAbout = (s: YourSale) => [time(s.at), s.state === 'succeeded' ? '' : t(`payments.screens.session.sale-states.${s.state}`), ...s.notes].filter(Boolean).join(' · ')
+// Each sale is named by its owners' references, linked to the record; an owner that names none is named by its module.
+const ownerName = (o: YourSale['owners'][number]) => o.reference ?? (te(`${o.module}.module.name`) ? t(`${o.module}.module.name`) : o.module)
 </script>
 
 <template>
@@ -144,9 +146,25 @@ const saleAbout = (s: YourSale) => [time(s.at), s.state === 'succeeded' ? '' : t
                 v-for="s in data.sales"
                 :key="s.intentId"
                 :name="saleName(s)"
-                :description="saleAbout(s)"
                 :muted="s.state !== 'succeeded'"
-              />
+              >
+                <template #description>
+                  <template
+                    v-for="o in s.owners"
+                    :key="`${o.module}:${o.reference}`"
+                  >
+                    <ULink
+                      v-if="o.to"
+                      :to="o.to"
+                    >
+                      {{ ownerName(o) }}
+                    </ULink>
+                    <span v-else>{{ ownerName(o) }}</span>
+                    <span> · </span>
+                  </template>
+                  <span>{{ saleAbout(s) }}</span>
+                </template>
+              </RecordListItem>
             </RecordList>
           </div>
 

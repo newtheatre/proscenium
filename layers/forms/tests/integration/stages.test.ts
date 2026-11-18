@@ -144,6 +144,9 @@ describe('returning a response for changes', () => {
 
     const mine = await req('GET', `/api/forms/mine/${responseId}`, undefined, member)
     expect(mine.body.progress).toEqual({ status: 'Back with you', kind: 'returned', note: 'Please say more about why.', canChange: true })
+    // What has happened so far, in the words the form chose for them and with nobody named.
+    expect(mine.body.history.at(-1)).toMatchObject({ status: 'Back with you', kind: 'returned' })
+    expect(mine.body.history).toHaveLength(3)
     const listed = await req('GET', '/api/forms/mine', undefined, member)
     expect(listed.body.sent.find((s: any) => s.responseId === responseId).progress).toEqual({ status: 'Back with you', kind: 'returned', canChange: true })
 
@@ -164,6 +167,10 @@ describe('returning a response for changes', () => {
     // A second send of the same changes finds nothing to do.
     expect((await put({ name: 'Mo', why: 'Again' })).body.code).toBe('forms.response.not-returned')
 
+    // Staff still see what was asked, beside the move that asked it; the person no longer does.
+    expect((await one(formId, responseId)).body.history.find((h: any) => h.toKind === 'returned').note).toBe('Please say more about why.')
+    expect((await req('GET', `/api/forms/mine/${responseId}`, undefined, member)).body.progress.note).toBeNull()
+
     // Staff see the latest, what changed, and can read the one before.
     const latest = await one(formId, responseId)
     expect(latest.body).toMatchObject({ revision: 2, revisions: 2, changed: ['why'] })
@@ -175,6 +182,47 @@ describe('returning a response for changes', () => {
     // The table shows the latest revision.
     const table = await req('GET', `/api/forms/forms/${formId}/responses`, undefined, reader)
     expect(table.body.rows[0].cells.why.text).toContain('lighting desk')
+  })
+})
+
+describe('a form that allows response edits', () => {
+  it('lets the sender change or withdraw a response until staff start on it, and not otherwise', async () => {
+    const { formId, slug } = await offered(staged())
+    const first = (await send(slug, { name: 'Mo', why: 'Because' }, member)).body.responseId
+    const mine = (id: string, who = member) => req('GET', `/api/forms/mine/${id}`, undefined, who)
+    const put = (id: string, answers: Record<string, unknown>, who = member) => req('PUT', `/api/forms/mine/${id}`, { answers }, who)
+    const withdraw = (id: string, who = member) => req('POST', `/api/forms/mine/${id}/withdraw`, {}, who)
+    // Off unless the form says so.
+    expect((await mine(first)).body.rights).toEqual({ canEdit: false, canWithdraw: false })
+    expect((await withdraw(first)).body.code).toBe('forms.response.not-withdrawable')
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { allowEdits: true })).status).toBe(200)
+    expect((await mine(first)).body.rights).toEqual({ canEdit: true, canWithdraw: true })
+    expect((await mine(first)).body.values).toMatchObject({ name: 'Mo' })
+
+    // A change is checked as a first send is, and kept as a new revision in the same stage.
+    expect((await put(first, { why: 'No name' })).status).toBe(422)
+    expect((await put(first, { name: 'Mo', why: 'A better reason' }, other)).status).toBe(404)
+    const changed = await put(first, { name: 'Mo', why: 'A better reason' })
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200)
+    expect(await row(first)).toMatchObject({ stage_key: 'received', current_revision: 2 })
+
+    // Once somebody starts on it, neither is open.
+    await move(formId, first, 'start_review')
+    expect((await mine(first)).body.rights).toEqual({ canEdit: false, canWithdraw: false })
+    expect((await put(first, { name: 'Mo', why: 'Too late' })).body.code).toBe('forms.response.not-returned')
+    expect((await withdraw(first)).body.code).toBe('forms.response.not-withdrawable')
+    // Back with them, it can be withdrawn; changes go the usual way.
+    await move(formId, first, 'return', mover, 'Say more.')
+    expect((await mine(first)).body.rights).toEqual({ canEdit: false, canWithdraw: true })
+    expect((await withdraw(first, other)).status).toBe(404)
+    const before = (await rows<any>('SELECT response_count FROM forms_placements WHERE form_id = ?', formId))[0].response_count
+    expect((await withdraw(first)).status).toBe(200)
+    expect((await rows<any>('SELECT state, unique_key, retention_due_at FROM forms_responses WHERE id = ?', first))[0]).toMatchObject({ state: 'withdrawn', unique_key: null })
+    expect((await rows<any>('SELECT response_count FROM forms_placements WHERE form_id = ?', formId))[0].response_count).toBe(before - 1)
+    // It is gone for them and for staff, and cannot be withdrawn twice.
+    expect((await mine(first)).status).toBe(404)
+    expect((await withdraw(first)).status).toBe(404)
+    expect((await req('GET', `/api/forms/forms/${formId}/responses`, undefined, reader)).body.rows.map((r: any) => r.id)).not.toContain(first)
   })
 })
 
@@ -201,6 +249,22 @@ describe('one move on several responses', () => {
     expect(await row(first)).toMatchObject({ stage_key: 'in_review', stage_note: 'We have started.' })
     expect(await row(own)).toMatchObject({ stage_key: 'received' })
     expect(await rows('SELECT transition_key FROM forms_stage_history WHERE response_id = ? ORDER BY at, id', first)).toEqual([{ transition_key: 'submit' }, { transition_key: 'start_review' }])
+  })
+
+  it('moves a long selection: each response is saved on its own, so the number chosen is not a limit', async () => {
+    const { formId, slug } = await offered(staged())
+    const ids: string[] = []
+    // More than one unit of work could hold, each from its own sender so no sender's rate limit is met.
+    for (let i = 0; i < 14; i++) { // not-policy: a test size
+      const who = person([], { name: `Sender ${i}` })
+      await account(who)
+      ids.push((await send(slug, { name: who.name }, who)).body.responseId)
+    }
+    const done = await many(formId, { responses: ids, move: 'start_review', note: 'We have started.' })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toEqual({ moved: 14, skipped: [] })
+    const table = await req('GET', `/api/forms/forms/${formId}/responses`, undefined, reader)
+    expect(table.body.rows.every((r: { stage: { name: string } }) => r.stage.name === 'In review')).toBe(true)
   })
 
   it('is refused whole when the mover may not decide, or for somebody who may not move at all', async () => {

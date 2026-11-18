@@ -24,8 +24,8 @@ export default defineRoute({ ability: 'forms.form.create', rateLimit: 'write', i
   const slug = await freeSlug(input.title)
   const at = nowMs()
   unit.add({
-    sql: 'INSERT OR IGNORE INTO forms_forms (id, slug, title, mode, status, anonymous, template_key, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    params: [id, slug, input.title, mode, 'draft', from?.anonymous ? 1 : 0, from ? input.template! : null, actor.accountId, at],
+    sql: 'INSERT OR IGNORE INTO forms_forms (id, slug, title, mode, status, anonymous, retention_days, template_key, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [id, slug, input.title, mode, 'draft', from?.anonymous ? 1 : 0, mode === 'record' ? null : from?.retentionDays ?? null, from ? input.template! : null, actor.accountId, at],
   }).expect(1, { code: 'forms.form.slug-taken', reason: 'Another form was given this address at the same moment.', remedy: 'Try again.' })
   unit.add({
     sql: 'INSERT INTO forms_drafts (form_id, definition, format, edit_revision, edited_by, updated_at) VALUES (?, ?, ?, 0, ?, ?)',

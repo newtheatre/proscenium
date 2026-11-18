@@ -4,15 +4,23 @@
      only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
+import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
 interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
 
-const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
-const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
+/** `settled`: the till payment just taken that this panel sold something in, until the next customer. */
+const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
+/** One line on the till's receipt; `more` and `fewer` draw its stepper there. */
+interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more: () => void, fewer: () => void }
+const emit = defineEmits<{
+  'update:modelValue': [unknown]
+  /** The tickets for the till's receipt, with their steppers, and what was last added (till proposal, 17 November 2026). */
+  'receipt': [{ lines: ReceiptLine[], added: { label: string, undo: () => void } | null } | null]
+}>()
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -43,8 +51,8 @@ function dropExchange() {
 const { data } = await useAPI<{ performances: Performance[], emailDomains: string[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [], emailDomains: [] }) })
 const performances = computed(() => data.value?.performances ?? [])
 
+// One search box finds a booking to collect; with none found, the panel sells walk-up tickets.
 const mode = ref<'sell' | 'collect'>('sell')
-const modes = computed(() => [{ label: t('box-office.screens.panel.sell'), value: 'sell' }, { label: t('box-office.screens.panel.collect'), value: 'collect' }])
 const admit = ref(false)
 // Who the tickets are emailed to, if the buyer wants them: a person picked by name or a typed
 // address. Optional; the till shows nothing back about them.
@@ -58,6 +66,35 @@ const performance = computed(() => performances.value.find(p => p.performanceId 
 const choices = computed(() => performances.value.map(p => ({ value: p.performanceId, label: `${p.title}, ${dateTime(p.startsAt)}` })))
 const quantities = ref<Record<string, number>>({})
 const keyOf = (row: { bandId: string, ticketTypeId: string }) => `${row.bandId} ${row.ticketTypeId}`
+// The counter (till proposal): a tile for each kind of ticket in each part of the house, adding
+// one a press; the receipt's steppers take them off again.
+const bands = computed(() => {
+  const out: { bandId: string, band: string, free: number, rows: PerformanceRow[] }[] = []
+  for (const row of performance.value?.rows ?? []) {
+    const band = out.find(b => b.bandId === row.bandId)
+    if (band) band.rows.push(row)
+    else out.push({ bandId: row.bandId, band: row.band, free: row.free, rows: [row] })
+  }
+  return out
+})
+// The seats left in a part of the house, less those already in this sale.
+const takenIn = (bandId: string) => (performance.value?.rows ?? []).filter(r => r.bandId === bandId).reduce((n, r) => n + (quantities.value[keyOf(r)] ?? 0), 0)
+const naming = computed(() => (performance.value?.rows ?? []).filter(r => r.holder && (quantities.value[keyOf(r)] ?? 0) > 0))
+const lastAdded = ref<string | null>(null)
+function addOne(row: PerformanceRow) {
+  if (takenIn(row.bandId) >= row.free) return
+  setQuantity(row, (quantities.value[keyOf(row)] ?? 0) + 1)
+  lastAdded.value = keyOf(row)
+}
+function takeOne(row: PerformanceRow) {
+  const n = (quantities.value[keyOf(row)] ?? 0) - 1
+  setQuantity(row, n)
+  // Who the last ticket was for goes with it.
+  for (const list of [holders.value[keyOf(row)], references.value[keyOf(row)]]) if (list && list.length > n) list.splice(Math.max(n, 0))
+  if (n <= 0 && lastAdded.value === keyOf(row)) lastAdded.value = null
+}
+const rowLabel = (row: PerformanceRow) => (bands.value.length > 1 ? t('box-office.screens.panel.sold.line', { band: row.band, type: row.ticketType }) : row.ticketType)
+
 function setQuantity(row: PerformanceRow, value: number | null | undefined) {
   const n = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
   const { [keyOf(row)]: _, ...others } = quantities.value
@@ -70,9 +107,23 @@ function setReference(row: PerformanceRow, n: number, value: string) {
   list[n] = value
   references.value = { ...references.value, [keyOf(row)]: list }
 }
+// Who each ticket of a member or holder price is for (Matt, 17 November): named by card or by name.
+const holders = ref<Record<string, (Holder | undefined)[]>>({})
+function setHolder(row: PerformanceRow, n: number, value: Holder | undefined) {
+  const list = [...(holders.value[keyOf(row)] ?? [])]
+  list[n] = value
+  holders.value = { ...holders.value, [keyOf(row)]: list }
+}
+/** How many of a row's tickets still need their holder named, or a reference typed. */
+function unnamed(row: PerformanceRow): number {
+  if (!row.holder) return 0
+  const quantity = quantities.value[keyOf(row)] ?? 0
+  return Array.from({ length: quantity }, (_, n) => !holders.value[keyOf(row)]?.[n] && !references.value[keyOf(row)]?.[n]?.trim()).filter(Boolean).length
+}
 watch(performanceId, () => {
   quantities.value = {}
   references.value = {}
+  holders.value = {}
   dropCode()
 })
 
@@ -130,26 +181,54 @@ function tell(value: unknown) {
   lastSaid = JSON.stringify(value)
   emit('update:modelValue', value)
 }
+// The receipt's lines for a walk-up sale: one for each kind of ticket in the sale, priced as the
+// code would price them, dearest first up to its limit, so the total shows before the server's.
+function sendReceipt(rows: PerformanceRow[]) {
+  if (exchange.value || mode.value !== 'sell' || !performance.value) return emit('receipt', null)
+  const each = rows.flatMap(r => Array.from({ length: quantities.value[keyOf(r)] ?? 0 }, () => ({ key: keyOf(r), full: r.amountMinor, with: promoPrice(r) })))
+  const discounted = new Map<string, number>()
+  each.filter(e => e.with !== undefined).sort((a, b) => b.full - a.full).slice(0, promo.value?.maxPerOrder ?? Infinity)
+    .forEach(e => discounted.set(e.key, (discounted.get(e.key) ?? 0) + (e.full - e.with!)))
+  const show = performance.value
+  const detail = t('box-office.screens.panel.receipt-detail', { title: show.title, when: dateTime(show.startsAt) })
+  const added = rows.find(r => keyOf(r) === lastAdded.value)
+  emit('receipt', {
+    lines: rows.map((r) => {
+      const quantity = quantities.value[keyOf(r)]!
+      return { key: keyOf(r), label: rowLabel(r), detail, quantity, amountMinor: r.amountMinor * quantity - (discounted.get(keyOf(r)) ?? 0), more: () => addOne(r), fewer: () => takeOne(r) }
+    }),
+    added: added ? { label: rowLabel(added), undo: () => takeOne(added) } : null,
+  })
+}
 function say() {
   if (exchange.value) {
     const { reference: _, ...body } = exchange.value
     tell({ exchange: body })
+    emit('receipt', null)
     return
   }
   if (mode.value === 'sell') {
-    const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map((r) => {
+    // A member or holder ticket joins the sale once every ticket is named, by a holder or a typed reference.
+    const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r)).map((r) => {
       const quantity = quantities.value[keyOf(r)]!
-      // The buyer's references, when the seller typed one for every ticket; otherwise the seller has checked by hand.
-      const typed = (references.value[keyOf(r)] ?? []).slice(0, quantity).map(x => x.trim())
-      return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(r.reference && typed.filter(Boolean).length === quantity ? { references: typed } : {}) }
+      if (!r.holder) return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity }
+      const typed = Array.from({ length: quantity }, (_, n) => references.value[keyOf(r)]?.[n]?.trim() ?? '')
+      const named = Array.from({ length: quantity }, (_, n) => (typed[n] ? '' : holders.value[keyOf(r)]?.[n]?.accountId ?? ''))
+      return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(typed.some(Boolean) ? { references: typed } : {}), ...(named.some(Boolean) ? { holders: named } : {}) }
     })
     tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
+    sendReceipt((performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r)))
   }
   else {
+    emit('receipt', null)
     tell(order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, references, order, exchange, sendTo, promo], say, { deep: true })
+watch([mode, admit, quantities, references, holders, order, exchange, sendTo, promo, lastAdded], say, { deep: true })
+// A booking found, or several to pick from, is what the panel shows; with none, it sells walk-up tickets.
+watch([order, matches], () => {
+  mode.value = order.value || matches.value.length ? 'collect' : 'sell'
+})
 onMounted(() => {
   if (exchange.value) say()
   // Sent from the door with a reservation to pay for (`?collect=<reference>`): it is found at once.
@@ -169,12 +248,16 @@ let lastSaid = 'null'
 // performance and how many of each ticket are shown again, as they were.
 async function restore(value: { performanceId?: unknown, lines?: unknown, admit?: unknown, email?: unknown, promoCode?: unknown }) {
   if (typeof value.performanceId !== 'string' || !Array.isArray(value.lines)) return
+  order.value = null
+  matches.value = []
   mode.value = 'sell'
   performanceId.value = value.performanceId
   await nextTick() // the performance's watcher empties the quantities first
-  const lines = value.lines as { bandId: string, ticketTypeId: string, quantity: number, references?: string[] }[]
+  const lines = value.lines as { bandId: string, ticketTypeId: string, quantity: number, references?: string[], holders?: string[] }[]
   quantities.value = Object.fromEntries(lines.map(l => [keyOf(l), l.quantity]))
   references.value = Object.fromEntries(lines.filter(l => l.references).map(l => [keyOf(l), l.references!]))
+  // Who each ticket was for is kept by account; their names were on the screen before the reload.
+  holders.value = Object.fromEntries(lines.filter(l => l.holders).map(l => [keyOf(l), l.holders!.map(id => (id ? { accountId: id, label: t('box-office.screens.panel.holder.restored'), byHand: false } : undefined))]))
   admit.value = value.admit === true
   if (typeof value.email === 'string') buyer.value = { email: value.email }
   if (typeof value.promoCode === 'string') {
@@ -195,6 +278,7 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}
+  if (Object.keys(holders.value).length) holders.value = {}
   // The next buyer never sees who the last one was, nor uses their code.
   buyer.value = undefined
   dropCode()
@@ -203,6 +287,52 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (fromTill && !wasLocked) clear()
   else if (order.value.state === 'reserved') void find(order.value.reference)
 })
+
+// After the sale (till proposal): what was made, with its reference and tickets, so the seller can
+// email them, admit the buyer, or open the booking, until the till moves on to the next customer.
+interface Sold { orderId: string, reference: string, buyer: string | null, performance: { id: string, title: string, startsAt: number } | null, lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[] }
+const sold = ref<Sold[]>([])
+const soldRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const emailTo = ref<Record<string, Buyer | undefined>>({})
+const soldBusy = ref<string | null>(null)
+async function loadSold(intent: string) {
+  try {
+    sold.value = (await $api<{ orders: Sold[] }>('/api/box-office/desk/sold', { query: { intent } })).orders
+  }
+  catch (e) {
+    soldRefusal.value = toRefusal(e)
+  }
+}
+watch(() => props.settled, (intent) => {
+  sold.value = []
+  emailTo.value = {}
+  soldRefusal.value = null
+  if (intent) void loadSold(intent)
+}, { immediate: true })
+const waitingIn = (o: Sold) => o.lines.filter(l => !l.admitted).length
+async function soldAction(o: Sold, fn: () => Promise<unknown>) {
+  soldBusy.value = o.orderId
+  soldRefusal.value = null
+  try {
+    await fn()
+    if (props.settled) await loadSold(props.settled)
+  }
+  catch (e) {
+    soldRefusal.value = toRefusal(e)
+  }
+  finally {
+    soldBusy.value = null
+  }
+}
+function emailSold(o: Sold) {
+  const to = emailTo.value[o.orderId]
+  if (!to) return
+  void soldAction(o, () => $api(`/api/box-office/desk/orders/${o.orderId}/send` as string, { method: 'POST', body: 'accountId' in to ? { accountId: to.accountId } : { email: to.email } }))
+}
+function admitSold(o: Sold) {
+  if (!o.performance) return
+  void soldAction(o, () => $api(`/api/box-office/performances/${o.performance!.id}/door/admit` as string, { method: 'POST', body: { orderId: o.orderId, count: waitingIn(o), deviceLabel: 'Desk' } }))
+}
 
 async function find(text = query.value) {
   if (!text.trim()) return
@@ -300,7 +430,111 @@ function clear() {
 
 <template>
   <div
-    v-if="exchange"
+    v-if="settled && sold.length"
+    class="space-y-4"
+  >
+    <RefusalNotice :refusal="soldRefusal" />
+    <div
+      v-for="o in sold"
+      :key="o.orderId"
+      class="space-y-3 rounded-lg border border-default p-4"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="text-lg font-semibold">
+          {{ t('box-office.screens.panel.order', { reference: o.reference }) }}
+        </h3>
+        <StatusBadge
+          tone="success"
+          :label="t('box-office.screens.panel.states.confirmed')"
+        />
+      </div>
+      <p
+        v-if="o.performance"
+        class="text-sm text-muted"
+      >
+        {{ o.performance.title }}, {{ dateTime(o.performance.startsAt) }}
+      </p>
+      <ul
+        class="divide-y divide-default"
+        :aria-label="t('box-office.screens.panel.sold.tickets')"
+      >
+        <li
+          v-for="line in o.lines"
+          :key="line.id"
+          class="flex items-center justify-between gap-2 py-1.5"
+        >
+          <span>{{ line.band ? t('box-office.screens.panel.sold.line', { band: line.band, type: line.ticketType }) : line.ticketType }}</span>
+          <span class="flex shrink-0 items-center gap-2">
+            <UBadge
+              v-if="line.admitted"
+              color="success"
+              variant="subtle"
+              :label="t('box-office.screens.panel.admitted')"
+            />
+            <span class="tabular-nums">{{ money(line.amountMinor) }}</span>
+          </span>
+        </li>
+      </ul>
+      <p
+        v-if="o.buyer"
+        class="flex items-center gap-2 text-sm"
+      >
+        <UIcon
+          name="i-lucide-mail-check"
+          class="size-4 text-success"
+        />{{ t('box-office.screens.panel.sold.emailed', { name: o.buyer }) }}
+      </p>
+      <UFormField
+        v-else
+        :label="t('box-office.screens.panel.sold.email')"
+        :help="t('box-office.screens.panel.sold.email-help')"
+      >
+        <div class="flex flex-wrap gap-2">
+          <BoxOfficeBuyerPicker
+            v-model="emailTo[o.orderId]"
+            :domains="data?.emailDomains ?? []"
+            :disabled="soldBusy === o.orderId"
+            class="min-w-64 flex-1"
+          />
+          <UButton
+            icon="i-lucide-send"
+            :label="t('box-office.screens.panel.sold.send')"
+            :loading="soldBusy === o.orderId"
+            :disabled="!emailTo[o.orderId]"
+            @click="emailSold(o)"
+          />
+        </div>
+      </UFormField>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          v-if="waitingIn(o) && o.performance"
+          icon="i-lucide-door-open"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.screens.panel.sold.admit', { count: waitingIn(o) })"
+          :loading="soldBusy === o.orderId"
+          @click="admitSold(o)"
+        />
+        <UButton
+          :to="`/console/box-office/orders/${o.orderId}/print`"
+          target="_blank"
+          icon="i-lucide-printer"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.screens.panel.sold.print')"
+        />
+        <UButton
+          :to="`/console/box-office/orders/${o.orderId}`"
+          icon="i-lucide-external-link"
+          color="neutral"
+          variant="ghost"
+          :label="t('box-office.screens.panel.sold.open')"
+        />
+      </div>
+    </div>
+  </div>
+  <div
+    v-else-if="exchange"
     class="space-y-3 rounded-lg border border-default p-4"
   >
     <h3 class="font-medium">
@@ -324,70 +558,350 @@ function clear() {
     v-else
     class="space-y-4"
   >
-    <UTabs
-      v-model="mode"
-      :items="modes"
-      :content="false"
-      :aria-label="t('box-office.screens.panel.mode')"
-    />
     <RefusalNotice :refusal="refusal" />
 
-    <template v-if="mode === 'sell'">
+    <UForm
+      :state="{ query }"
+      novalidate
+      @submit="find()"
+    >
+      <!-- The buttons sit on the box's own row, so the help line under it cannot push them out of line. -->
+      <UFormField
+        :label="t('box-office.screens.panel.find-label')"
+        :help="t('box-office.screens.panel.find-help')"
+      >
+        <div class="flex gap-2">
+          <UInput
+            v-model="query"
+            class="flex-1"
+            :disabled="locked"
+            autocomplete="off"
+          />
+          <UButton
+            type="submit"
+            :label="t('box-office.screens.panel.find')"
+            icon="i-lucide-search"
+            :loading="busy"
+            :disabled="locked || !query.trim()"
+          />
+          <CodeScanButton
+            icon-only
+            :disabled="locked"
+            @scanned="(code: string) => { query = code; find() }"
+          />
+        </div>
+      </UFormField>
+    </UForm>
+    <ul
+      v-if="!order && matches.length"
+      class="space-y-2"
+      :aria-label="t('box-office.screens.panel.matches')"
+    >
+      <li
+        v-for="m in matches"
+        :key="m.orderId"
+      >
+        <UButton
+          color="neutral"
+          variant="outline"
+          class="w-full justify-between"
+          :disabled="locked"
+          @click="order = m; matches = []"
+        >
+          <span class="flex flex-col items-start text-left">
+            <span class="font-medium">{{ t('box-office.screens.panel.order', { reference: m.reference }) }}</span>
+            <span class="text-sm text-muted">{{ about(m) }}</span>
+          </span>
+          <span class="text-sm">{{ t(`box-office.screens.panel.states.${m.state}`) }}</span>
+        </UButton>
+      </li>
+    </ul>
+    <p
+      v-if="searched && !order && !matches.length"
+      class="text-sm text-muted"
+    >
+      {{ t('box-office.screens.panel.none') }}
+    </p>
+    <div
+      v-if="order"
+      class="space-y-3 rounded-lg border border-default p-4"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="font-medium">
+          {{ t('box-office.screens.panel.order', { reference: order.reference }) }}
+        </h3>
+        <StatusBadge
+          :tone="order.state === 'confirmed' ? 'success' : order.state === 'cancelled' ? 'neutral' : 'warning'"
+          :label="t(`box-office.screens.panel.states.${order.state}`)"
+        />
+      </div>
+      <p
+        v-if="about(order)"
+        class="text-sm text-muted"
+      >
+        {{ about(order) }}
+      </p>
+      <ul class="space-y-2">
+        <li
+          v-for="(line, i) in order.lines"
+          :key="line.id"
+          class="flex items-center justify-between gap-2 text-sm"
+        >
+          <UCheckbox
+            v-if="splitting"
+            :model-value="picked.includes(line.id)"
+            :label="`${line.ticketType}, ${money(line.amountMinor, order.currency)}`"
+            :disabled="locked || busy"
+            @update:model-value="(on: boolean | 'indeterminate') => togglePicked(line.id, on)"
+          />
+          <USelect
+            v-else-if="order.state === 'reserved' && typesFor(line).length > 1"
+            :model-value="line.ticketTypeId"
+            :items="typesFor(line)"
+            class="min-w-0 flex-1"
+            :disabled="locked || busy"
+            :aria-label="t('box-office.screens.panel.type', { n: i + 1 })"
+            @update:model-value="(value: string) => amend({ retype: [{ lineId: line.id, ticketTypeId: value }] })"
+          />
+          <span v-else>{{ line.ticketType }}</span>
+          <span class="flex shrink-0 items-center gap-2">
+            <span v-if="line.admittedAt">{{ t('box-office.screens.panel.admitted') }}</span>
+            <span>{{ money(line.amountMinor, order.currency) }}</span>
+            <IconButton
+              v-if="order.state === 'reserved' && order.lines.length > 1"
+              icon="i-lucide-x"
+              size="xs"
+              :label="t('box-office.screens.panel.remove', { type: line.ticketType })"
+              :disabled="locked || busy"
+              @click="amend({ remove: [line.id] })"
+            />
+          </span>
+        </li>
+      </ul>
+      <UAlert
+        v-if="order.state === 'awaiting_payment' && order.intentId && !locked"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-hourglass"
+        :title="t('box-office.screens.panel.pending.title')"
+        :description="t('box-office.screens.panel.pending.description')"
+        :actions="[{ label: t('box-office.screens.panel.pending.cancel'), color: 'neutral', variant: 'outline', loading: busy, onClick: () => { void cancelPending() } }]"
+      />
+      <div
+        v-if="order.state === 'reserved' && addChoices.length"
+        class="flex items-end gap-2"
+      >
+        <UFormField
+          :label="t('box-office.screens.panel.add')"
+          class="grow"
+        >
+          <USelect
+            v-model="adding"
+            :items="addChoices"
+            :placeholder="t('box-office.screens.panel.add-placeholder')"
+            :disabled="locked || busy"
+          />
+        </UFormField>
+        <UButton
+          :label="t('box-office.screens.panel.add-button')"
+          color="neutral"
+          variant="outline"
+          :disabled="locked || busy || !adding"
+          @click="addTicket"
+        />
+      </div>
+      <div
+        v-if="order.state === 'reserved' && order.lines.length > 1"
+        class="flex flex-wrap gap-2"
+      >
+        <UButton
+          v-if="!splitting"
+          icon="i-lucide-split"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.screens.panel.split')"
+          :disabled="locked || busy"
+          @click="splitting = true"
+        />
+        <template v-else>
+          <UButton
+            :label="t('box-office.screens.panel.split-confirm', { count: picked.length })"
+            :disabled="locked || busy || !picked.length || picked.length === order.lines.length"
+            :loading="busy"
+            @click="split"
+          />
+          <UButton
+            color="neutral"
+            variant="ghost"
+            :label="t('core.form.cancel')"
+            @click="splitting = false; picked = []"
+          />
+        </template>
+      </div>
+      <p
+        v-if="splitting"
+        class="text-sm text-muted"
+      >
+        {{ t('box-office.screens.panel.split-help') }}
+      </p>
+      <UAlert
+        v-if="rest"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-split"
+        :description="t('box-office.screens.panel.split-rest', { reference: rest.reference, amount: money(rest.amountMinor, rest.currency) })"
+      />
+      <p class="font-medium">
+        {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
+      </p>
+      <!-- While the booking is in the sale, the receipt's Clear puts it away; one Clear at a time. -->
+      <UButton
+        v-if="modelValue === null || modelValue === undefined"
+        :label="t('box-office.screens.panel.clear')"
+        color="neutral"
+        variant="link"
+        :disabled="locked"
+        @click="clear"
+      />
+    </div>
+    <!-- Walk-up: tickets for tonight's show, one tile a kind of ticket; the receipt holds how many. -->
+    <template v-if="!order && !matches.length">
       <p
         v-if="!performances.length"
         class="text-sm text-muted"
       >
         {{ t('box-office.screens.panel.no-performances') }}
       </p>
-      <template v-else>
-        <UFormField :label="t('box-office.screens.panel.performance')">
-          <USelect
-            v-model="performanceId"
-            :items="choices"
-            :disabled="locked"
+      <section
+        v-else-if="performance"
+        class="space-y-4"
+        :aria-labelledby="`walk-up-${performance.performanceId}`"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3
+            :id="`walk-up-${performance.performanceId}`"
+            class="font-medium"
+          >
+            {{ t('box-office.screens.panel.walk-up', { title: performance.title, when: dateTime(performance.startsAt) }) }}
+          </h3>
+          <UBadge
+            v-if="bands.length === 1"
+            color="neutral"
+            variant="outline"
+            :label="t('box-office.screens.panel.left', { count: bands[0]!.free })"
           />
-        </UFormField>
+        </div>
         <p
-          v-if="performance?.state === 'paused'"
+          v-if="performance.state === 'paused'"
           class="text-sm text-muted"
         >
           {{ t('box-office.screens.panel.paused') }}
         </p>
         <template v-else>
-          <UFormField
-            v-for="row in performance?.rows ?? []"
-            :key="keyOf(row)"
-            :label="promoPrice(row) !== undefined ? t('box-office.screens.panel.row-with-code', { band: row.band, type: row.ticketType, price: money(promoPrice(row)!), was: money(row.amountMinor) }) : t('box-office.screens.panel.row', { band: row.band, type: row.ticketType, price: money(row.amountMinor) })"
-            :help="t('box-office.screens.panel.left', { count: row.free })"
+          <div
+            v-for="b in bands"
+            :key="b.bandId"
+            class="space-y-2"
           >
-            <div class="space-y-2">
-              <!-- Shown as 0 rather than empty: from an empty box, the first + would only fill in 0 (T1). -->
-              <UInputNumber
-                :model-value="quantities[keyOf(row)] ?? 0"
-                :min="0"
-                :max="row.free"
-                :disabled="locked"
-                @update:model-value="setQuantity(row, $event)"
+            <div
+              v-if="bands.length > 1"
+              class="flex items-center justify-between gap-2"
+            >
+              <h4 class="text-sm font-semibold text-muted">
+                {{ b.band }}
+              </h4>
+              <UBadge
+                color="neutral"
+                variant="outline"
+                :label="t('box-office.screens.panel.left', { count: b.free })"
               />
-              <template v-if="row.reference && (quantities[keyOf(row)] ?? 0) > 0">
-                <UInput
-                  v-for="n in quantities[keyOf(row)]"
-                  :key="n"
-                  :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                  :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
-                  :placeholder="t('box-office.screens.panel.reference-placeholder', { n })"
-                  :disabled="locked"
-                  autocomplete="off"
-                  maxlength="64"
-                  class="block w-64"
-                  @update:model-value="setReference(row, n - 1, String($event))"
-                />
-                <p class="text-xs text-muted">
-                  {{ t('box-office.screens.panel.reference-help') }}
-                </p>
-              </template>
             </div>
-          </UFormField>
+            <div
+              class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
+              role="group"
+              :aria-label="b.band"
+            >
+              <UChip
+                v-for="row in b.rows"
+                :key="keyOf(row)"
+                :show="(quantities[keyOf(row)] ?? 0) > 0"
+                :text="quantities[keyOf(row)]"
+                size="3xl"
+                inset
+                :ui="{ root: 'block' }"
+              >
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  block
+                  class="min-h-16 flex-col items-stretch justify-between gap-1 border-s-4 border-s-primary text-start"
+                  :class="(quantities[keyOf(row)] ?? 0) > 0 ? 'bg-elevated' : ''"
+                  :disabled="locked || takenIn(b.bandId) >= b.free"
+                  @click="addOne(row)"
+                >
+                  <span class="flex items-start justify-between gap-2 font-medium">
+                    <span class="min-w-0 break-words">{{ row.ticketType }}<span class="sr-only"> {{ t('box-office.screens.panel.tile-band', { band: b.band }) }}</span></span>
+                    <UIcon
+                      v-if="row.holder"
+                      name="i-lucide-id-card"
+                      class="size-4 shrink-0 text-muted"
+                    />
+                  </span>
+                  <span class="text-sm font-normal text-muted tabular-nums">
+                    <template v-if="promoPrice(row) !== undefined">
+                      {{ money(promoPrice(row)!) }} <s>{{ money(row.amountMinor) }}</s>
+                    </template>
+                    <template v-else>{{ money(row.amountMinor) }}</template>
+                  </span>
+                  <span class="sr-only">{{ t('box-office.screens.panel.tile-add') }}</span>
+                </UButton>
+              </UChip>
+            </div>
+          </div>
+
+          <!-- A member or holder ticket names who it is for before it joins the sale. -->
+          <div
+            v-for="row in naming"
+            :key="`holders-${keyOf(row)}`"
+            class="space-y-2 rounded-lg border border-default p-3"
+          >
+            <h4 class="text-sm font-medium">
+              {{ t('box-office.screens.panel.holder.heading', { type: bands.length > 1 ? `${row.band}, ${row.ticketType}` : row.ticketType }) }}
+            </h4>
+            <div
+              v-for="n in quantities[keyOf(row)]"
+              :key="n"
+              class="space-y-1"
+            >
+              <BoxOfficeHolderPicker
+                v-if="!references[keyOf(row)]?.[n - 1]?.trim()"
+                :model-value="holders[keyOf(row)]?.[n - 1]"
+                :performance-id="performance.performanceId"
+                :ticket-type-id="row.ticketTypeId"
+                :label="t('box-office.screens.panel.holder.ticket', { n })"
+                :disabled="locked"
+                @update:model-value="(h: Holder | undefined) => setHolder(row, n - 1, h)"
+              />
+              <UInput
+                v-if="row.reference && !holders[keyOf(row)]?.[n - 1]"
+                :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
+                :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
+                :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.field ?? row.reference.label })"
+                :disabled="locked"
+                autocomplete="off"
+                maxlength="64"
+                class="block w-64"
+                @update:model-value="setReference(row, n - 1, String($event))"
+              />
+            </div>
+            <p
+              v-if="unnamed(row)"
+              class="text-sm text-warning"
+              role="status"
+            >
+              {{ t('box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
+            </p>
+          </div>
           <div
             v-if="promo"
             class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated px-3 py-2 text-sm"
@@ -453,214 +967,19 @@ function clear() {
             </UFormField>
           </UForm>
         </template>
-      </template>
-    </template>
-
-    <template v-else>
-      <UForm
-        :state="{ query }"
-        novalidate
-        @submit="find()"
-      >
-        <!-- The buttons sit on the box's own row, so the help line under it cannot push them out of line. -->
-        <UFormField
-          :label="t('box-office.screens.panel.find-label')"
-          :help="t('box-office.screens.panel.find-help')"
-        >
-          <div class="flex gap-2">
-            <UInput
-              v-model="query"
-              class="flex-1"
-              :disabled="locked"
-              autocomplete="off"
-            />
-            <UButton
-              type="submit"
-              :label="t('box-office.screens.panel.find')"
-              icon="i-lucide-search"
-              :loading="busy"
-              :disabled="locked || !query.trim()"
-            />
-            <CodeScanButton
-              icon-only
-              :disabled="locked"
-              @scanned="(code: string) => { query = code; find() }"
-            />
-          </div>
-        </UFormField>
-      </UForm>
-      <ul
-        v-if="!order && matches.length"
-        class="space-y-2"
-        :aria-label="t('box-office.screens.panel.matches')"
-      >
-        <li
-          v-for="m in matches"
-          :key="m.orderId"
-        >
-          <UButton
-            color="neutral"
-            variant="outline"
-            class="w-full justify-between"
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <USelect
+            v-if="choices.length > 1"
+            v-model="performanceId"
+            :items="choices"
             :disabled="locked"
-            @click="order = m; matches = []"
-          >
-            <span class="flex flex-col items-start text-left">
-              <span class="font-medium">{{ t('box-office.screens.panel.order', { reference: m.reference }) }}</span>
-              <span class="text-sm text-muted">{{ about(m) }}</span>
-            </span>
-            <span class="text-sm">{{ t(`box-office.screens.panel.states.${m.state}`) }}</span>
-          </UButton>
-        </li>
-      </ul>
-      <p
-        v-if="searched && !order && !matches.length"
-        class="text-sm text-muted"
-      >
-        {{ t('box-office.screens.panel.none') }}
-      </p>
-      <div
-        v-if="order"
-        class="space-y-3 rounded-lg border border-default p-4"
-      >
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="font-medium">
-            {{ t('box-office.screens.panel.order', { reference: order.reference }) }}
-          </h3>
-          <StatusBadge
-            :tone="order.state === 'confirmed' ? 'success' : order.state === 'cancelled' ? 'neutral' : 'warning'"
-            :label="t(`box-office.screens.panel.states.${order.state}`)"
+            variant="ghost"
+            icon="i-lucide-calendar"
+            :aria-label="t('box-office.screens.panel.another')"
+            class="min-w-0"
           />
         </div>
-        <p
-          v-if="about(order)"
-          class="text-sm text-muted"
-        >
-          {{ about(order) }}
-        </p>
-        <ul class="space-y-2">
-          <li
-            v-for="(line, i) in order.lines"
-            :key="line.id"
-            class="flex items-center justify-between gap-2 text-sm"
-          >
-            <UCheckbox
-              v-if="splitting"
-              :model-value="picked.includes(line.id)"
-              :label="`${line.ticketType}, ${money(line.amountMinor, order.currency)}`"
-              :disabled="locked || busy"
-              @update:model-value="(on: boolean | 'indeterminate') => togglePicked(line.id, on)"
-            />
-            <USelect
-              v-else-if="order.state === 'reserved' && typesFor(line).length > 1"
-              :model-value="line.ticketTypeId"
-              :items="typesFor(line)"
-              class="min-w-0 flex-1"
-              :disabled="locked || busy"
-              :aria-label="t('box-office.screens.panel.type', { n: i + 1 })"
-              @update:model-value="(value: string) => amend({ retype: [{ lineId: line.id, ticketTypeId: value }] })"
-            />
-            <span v-else>{{ line.ticketType }}</span>
-            <span class="flex shrink-0 items-center gap-2">
-              <span v-if="line.admittedAt">{{ t('box-office.screens.panel.admitted') }}</span>
-              <span>{{ money(line.amountMinor, order.currency) }}</span>
-              <IconButton
-                v-if="order.state === 'reserved' && order.lines.length > 1"
-                icon="i-lucide-x"
-                size="xs"
-                :label="t('box-office.screens.panel.remove', { type: line.ticketType })"
-                :disabled="locked || busy"
-                @click="amend({ remove: [line.id] })"
-              />
-            </span>
-          </li>
-        </ul>
-        <UAlert
-          v-if="order.state === 'awaiting_payment' && order.intentId && !locked"
-          color="warning"
-          variant="subtle"
-          icon="i-lucide-hourglass"
-          :title="t('box-office.screens.panel.pending.title')"
-          :description="t('box-office.screens.panel.pending.description')"
-          :actions="[{ label: t('box-office.screens.panel.pending.cancel'), color: 'neutral', variant: 'outline', loading: busy, onClick: () => { void cancelPending() } }]"
-        />
-        <div
-          v-if="order.state === 'reserved' && addChoices.length"
-          class="flex items-end gap-2"
-        >
-          <UFormField
-            :label="t('box-office.screens.panel.add')"
-            class="grow"
-          >
-            <USelect
-              v-model="adding"
-              :items="addChoices"
-              :placeholder="t('box-office.screens.panel.add-placeholder')"
-              :disabled="locked || busy"
-            />
-          </UFormField>
-          <UButton
-            :label="t('box-office.screens.panel.add-button')"
-            color="neutral"
-            variant="outline"
-            :disabled="locked || busy || !adding"
-            @click="addTicket"
-          />
-        </div>
-        <div
-          v-if="order.state === 'reserved' && order.lines.length > 1"
-          class="flex flex-wrap gap-2"
-        >
-          <UButton
-            v-if="!splitting"
-            icon="i-lucide-split"
-            color="neutral"
-            variant="outline"
-            :label="t('box-office.screens.panel.split')"
-            :disabled="locked || busy"
-            @click="splitting = true"
-          />
-          <template v-else>
-            <UButton
-              :label="t('box-office.screens.panel.split-confirm', { count: picked.length })"
-              :disabled="locked || busy || !picked.length || picked.length === order.lines.length"
-              :loading="busy"
-              @click="split"
-            />
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :label="t('core.form.cancel')"
-              @click="splitting = false; picked = []"
-            />
-          </template>
-        </div>
-        <p
-          v-if="splitting"
-          class="text-sm text-muted"
-        >
-          {{ t('box-office.screens.panel.split-help') }}
-        </p>
-        <UAlert
-          v-if="rest"
-          color="info"
-          variant="subtle"
-          icon="i-lucide-split"
-          :description="t('box-office.screens.panel.split-rest', { reference: rest.reference, amount: money(rest.amountMinor, rest.currency) })"
-        />
-        <p class="font-medium">
-          {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
-        </p>
-        <!-- While the booking is in the sale, the receipt's Clear puts it away; one Clear at a time. -->
-        <UButton
-          v-if="modelValue === null || modelValue === undefined"
-          :label="t('box-office.screens.panel.clear')"
-          color="neutral"
-          variant="link"
-          :disabled="locked"
-          @click="clear"
-        />
-      </div>
+      </section>
     </template>
 
     <UFormField
