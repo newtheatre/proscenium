@@ -296,6 +296,8 @@ test('the till in live mode collects a reservation, changed to who came, and tak
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
+  // Below 900px in live mode the receipt is a sheet: open it to see it is empty.
+  await page.getByRole('button', { name: 'Sale (0)' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
 
