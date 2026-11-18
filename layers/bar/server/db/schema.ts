@@ -716,4 +716,63 @@ export const deliveryLines = defineTable('bar_delivery_lines', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels, deliveries, deliveryLines }
+export const STOCKTAKE_STATES = ['counting', 'submitted', 'approved', 'abandoned'] as const
+export const STOCKTAKE_SCOPES = ['full', 'category'] as const
+
+/**
+ * A count of what a location holds (tab 2, "bar_stocktakes"; tab 3, "A stocktake"). One live count
+ * per location. What is expected is read at submission, so sales made while counting are in it; the
+ * approval writes one adjustment per line that differs, and the approver is not the submitter unless
+ * the value of the difference is small.
+ */
+export const stocktakes = defineTable('bar_stocktakes', {
+  id: col.id(),
+  locationId: col.ref('bar_stock_locations'),
+  state: col.internal(text('state', { enum: STOCKTAKE_STATES }).notNull()),
+  scope: col.internal(text('scope', { enum: STOCKTAKE_SCOPES }).notNull()),
+  categoryId: col.ref('bar_categories', { nullable: true }),
+  startedBy: col.account('started_by', { role: 'actor', onMerge: 'alias' }),
+  submittedBy: col.account('submitted_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  approvedBy: col.account('approved_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  startedAt: col.timestamp('started_at').notNull(),
+  submittedAt: col.timestamp('submitted_at'),
+  approvedAt: col.timestamp('approved_at'),
+  // Signed, at each item's last pack cost; set at submission.
+  varianceValueMinor: col.minor('variance_value_minor'),
+  currency: col.currency('currency').notNull(),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bstk',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_stocktakes_live').on(t.locationId).where(sql`state IN ('counting', 'submitted')`),
+    index('bar_stocktakes_state').on(t.state, t.startedAt),
+    check('bar_stocktakes_state', sql`${t.state} IN (${inList(STOCKTAKE_STATES)})`),
+    check('bar_stocktakes_scope', sql`${t.scope} IN (${inList(STOCKTAKE_SCOPES)}) AND (${t.scope} = 'category') = (${t.categoryId} IS NOT NULL)`),
+  ],
+})
+
+/** One item counted: whole base units, entered as count units and a part, or by weight. Changed only while counting. */
+export const stocktakeLines = defineTable('bar_stocktake_lines', {
+  id: col.id(),
+  stocktakeId: col.ref('bar_stocktakes'),
+  stockItemId: col.ref('bar_stock_items'),
+  counted: col.internal(integer('counted')),
+  // What the level was at submission; a level may be below nought.
+  expected: col.internal(integer('expected')),
+  varianceReasonTerm: col.ref('core_terms', { nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bskl',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_stocktake_lines_item').on(t.stocktakeId, t.stockItemId),
+    check('bar_stocktake_lines_counted', sql`${t.counted} IS NULL OR ${t.counted} >= 0`),
+  ],
+})
+
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, productPresets, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks, stockItems, stockLocations, recipeLines, stockMovements, stockLevels, deliveries, deliveryLines, stocktakes, stocktakeLines }
