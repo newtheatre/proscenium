@@ -45,11 +45,11 @@ export default defineRoute({
       const at = nowMs()
       const earlier = award.awardedOn < mine.awardedOn || (award.awardedOn === mine.awardedOn && award.awardedPrecision === 'day')
       unit.add({
-        sql: `UPDATE awards_awards SET awarded_on = ?1, awarded_precision = ?2, awarded_for = coalesce(awarded_for, ?3), citation = coalesce(citation, ?4), updated_at = ?5 WHERE id = ?6 AND state = 'current'`, // not-policy: numbered parameters
+        sql: 'UPDATE awards_awards SET awarded_on = ?1, awarded_precision = ?2, awarded_for = coalesce(awarded_for, ?3), citation = coalesce(citation, ?4), updated_at = ?5 WHERE id = ?6 AND state = \'current\'', // not-policy: numbered parameters
         params: [earlier ? award.awardedOn : mine.awardedOn, earlier ? award.awardedPrecision : mine.awardedPrecision, award.awardedFor, award.citation, at, mine.id],
       }).expect(1, { code: 'awards.award.not-linkable', reason: 'Their award changed while you were merging.', remedy: 'Reload and try again.' })
       unit.add({
-        sql: `UPDATE awards_awards SET state = 'revoked', revoked_at = ?1, revoked_by = ?2, revoke_reason = ?3, updated_at = ?1 WHERE id = ?4 AND account_id IS NULL AND state = 'current'`, // not-policy: numbered parameters
+        sql: 'UPDATE awards_awards SET state = \'revoked\', revoked_at = ?1, revoked_by = ?2, revoke_reason = ?3, updated_at = ?1 WHERE id = ?4 AND account_id IS NULL AND state = \'current\'', // not-policy: numbered parameters
         params: [at, actor.accountId ?? null, `Merged into the holder's ${type.name} (${mine.id}).`, award.id],
       }).expect(1, { code: 'awards.award.not-linkable', reason: 'Only a current award with no account can be linked.' })
       unit.announce('awards.award.revoked', { awardId: award.id, typeId: award.typeId }, { record: ['awards.award', award.id] })
