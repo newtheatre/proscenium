@@ -33,15 +33,30 @@ async function add(page: Page, type: string, wording?: string) {
   await page.getByRole('menuitem', { name: type, exact: true }).click()
   if (wording !== undefined) await page.getByLabel('Question', { exact: true }).fill(wording)
 }
+/**
+ * Drags one question to the place of another above it. The list makes room while the question is
+ * still held, so this keeps the pointer moving over the place until it has, then lets go.
+ */
+async function reorder(page: Page, from: string, onto: string) {
+  const a = (await page.getByLabel(`Drag to move ${from}`).boundingBox())!
+  const b = (await page.getByLabel(`Drag to move ${onto}`).boundingBox())!
+  const x = b.x + b.width / 2
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(a.x + a.width / 2, a.y - 10, { steps: 5 })
+  await page.mouse.move(x, b.y + 4, { steps: 15 })
+  for (let i = 0; i < 20 && (await order(page))[0] !== from; i++) {
+    await page.mouse.move(x, b.y + 4 + (i % 2 ? 3 : -3), { steps: 3 })
+    await page.waitForTimeout(100)
+  }
+  await page.mouse.up()
+}
 const order = (page: Page) => page.locator('[aria-label^="Drag to move"]').evaluateAll(els => els.map(e => (e.getAttribute('aria-label') ?? '').replace('Drag to move ', '')))
 const saved = (page: Page) => expect(page.locator('[aria-live=polite]').filter({ hasText: /^\s*Saved\s*$/ })).toBeVisible()
 const card = (page: Page, name: string) => page.locator('.group\\/card', { hasText: name })
 
-/**
- * Drags as a person does: pick up by the grip, travel, and let go. Aiming at a question's edge, a
- * person looks where it now is and settles there first; reordering, the list has already moved.
- */
-async function drag(page: Page, from: string, to: ReturnType<Page['locator']>, where: (b: { x: number, y: number, width: number, height: number }) => [number, number], settle = true) {
+/** Drags onto a part of something, as a person does: pick up by the grip, travel, look where the target now is, settle, let go. */
+async function drag(page: Page, from: string, to: ReturnType<Page['locator']>, where: (b: { x: number, y: number, width: number, height: number }) => [number, number]) {
   const a = (await page.getByLabel(`Drag to move ${from}`).boundingBox())!
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
   await page.mouse.down()
@@ -50,11 +65,9 @@ async function drag(page: Page, from: string, to: ReturnType<Page['locator']>, w
   await page.mouse.move(x, a.y + a.height / 2, { steps: 10 })
   await page.mouse.move(x, y, { steps: 20 })
   await page.waitForTimeout(250)
-  if (settle) {
-    const [x2, y2] = where((await to.boundingBox())!)
-    await page.mouse.move(x2, y2, { steps: 10 })
-    await page.waitForTimeout(250)
-  }
+  const [x2, y2] = where((await to.boundingBox())!)
+  await page.mouse.move(x2, y2, { steps: 10 })
+  await page.waitForTimeout(250)
   await page.mouse.up()
 }
 
@@ -104,7 +117,7 @@ test('questions move by dragging, sit side by side when dropped on an edge, and 
   await add(page, 'Email address', 'Email')
   expect(await order(page)).toEqual(['First name', 'Last name', 'Email'])
 
-  await drag(page, 'Email', page.getByLabel('Drag to move First name'), b => [b.x + b.width / 2, b.y + 4], false)
+  await reorder(page, 'Email', 'First name')
   await expect.poll(() => order(page)).toEqual(['Email', 'First name', 'Last name'])
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect.poll(() => order(page)).toEqual(['First name', 'Last name', 'Email'])

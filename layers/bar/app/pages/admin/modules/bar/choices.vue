@@ -16,7 +16,7 @@ const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ groups: Group[], canAllergens: boolean, allergens: Record<string, Answer> }>('/api/bar/choices', { key: 'bar:choices' })
+const { data, status, error, refresh } = await useAPI<{ groups: Group[], canAllergens: boolean, allergens: Record<string, Answer>, canStock: boolean, stockItems: { id: string, name: string }[], stockOf: Record<string, string> }>('/api/bar/choices', { key: 'bar:choices' })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const sourceItems = computed(() => (['options', 'mixers'] as const).map(s => ({ value: s, label: t(`bar.screens.choices.sources.${s}`), description: t(`bar.screens.choices.sources.${s}-help`) })))
@@ -81,17 +81,18 @@ async function setGroupActive(g: Group, active: boolean) {
 }
 
 // An option of a hand-listed group.
-const option = ref<{ groupId: string, id: string | null, name: string, deltaMinor: number | null, ageRestricted: boolean } | null>(null)
+const option = ref<{ groupId: string, id: string | null, name: string, deltaMinor: number | null, ageRestricted: boolean, stockItemId: string } | null>(null)
+const stockItems = computed(() => [{ value: 'none', label: t('bar.screens.choices.no-stock') }, ...(data.value?.stockItems ?? []).map(i => ({ value: i.id, label: i.name }))])
 function editOption(g: Group, o?: Option) {
   refusal.value = null
   option.value = o
-    ? { groupId: g.id, id: o.optionId, name: o.label, deltaMinor: o.deltaMinor, ageRestricted: o.ageRestricted }
-    : { groupId: g.id, id: null, name: '', deltaMinor: null, ageRestricted: false }
+    ? { groupId: g.id, id: o.optionId, name: o.label, deltaMinor: o.deltaMinor, ageRestricted: o.ageRestricted, stockItemId: data.value?.stockOf[o.optionId!] ?? 'none' }
+    : { groupId: g.id, id: null, name: '', deltaMinor: null, ageRestricted: false, stockItemId: 'none' }
 }
 async function saveOption() {
   const o = option.value!
   refusal.value = null
-  const body = { name: o.name, deltaMinor: o.deltaMinor ?? 0, ageRestricted: o.ageRestricted }
+  const body = { name: o.name, deltaMinor: o.deltaMinor ?? 0, ageRestricted: o.ageRestricted, ...(data.value?.canStock ? { stockItemId: o.stockItemId === 'none' ? null : o.stockItemId } : {}) }
   try {
     if (o.id) await $api(`/api/bar/choice-options/${o.id}` as string, { method: 'PATCH', body })
     else await $api(`/api/bar/choices/${o.groupId}/options` as string, { method: 'POST', body })
@@ -343,6 +344,18 @@ async function saveAllergens() {
             :label="t('bar.screens.products.age-check')"
             :description="t('bar.screens.choices.option-age-help')"
           />
+          <UFormField
+            v-if="data?.canStock"
+            :label="t('bar.screens.choices.stock-item')"
+            :help="t('bar.screens.choices.stock-item-help')"
+            name="stockItemId"
+          >
+            <USelectMenu
+              v-model="option.stockItemId"
+              :items="stockItems"
+              value-key="value"
+            />
+          </UFormField>
         </UForm>
       </template>
       <template #footer>

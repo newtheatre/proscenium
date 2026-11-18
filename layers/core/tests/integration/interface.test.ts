@@ -103,7 +103,7 @@ describe('navigation and the viewer', () => {
     expect(ids).toContain('gallery')
     expect(ids).not.toContain('system') // nothing of core's is theirs to open
     const gallery = body.groups.find(g => g.id === 'gallery')!
-    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.shows', 'gallery.form', 'gallery.choices', 'gallery.record', 'gallery.feedback', 'gallery.drafts'])
+    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.shows', 'gallery.form', 'gallery.choices', 'gallery.record', 'gallery.feedback', 'gallery.drafts', 'gallery.forms-cases'])
     // Its settings are a tab of its page in Admin, opened from the console by the cog, not a console screen.
     expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps'])
     expect(gallery.setup.map(e => e.id)).not.toContain('gallery.denied')
