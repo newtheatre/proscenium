@@ -1,6 +1,7 @@
-// One award type, with how many hold it and whether it can still be deleted.
+// One award type, with how many hold it, whether it can still be deleted, and whether the form
+// builder is on, so its page can offer nominations.
 import { getRouterParam } from 'h3'
-import { can, defineRoute, first } from '#kit'
+import { can, defineRoute, first, isEnabled } from '#kit'
 import { hasAwards, requireType } from '../../../types'
 
 export default defineRoute({ ability: 'awards.type.view', record: event => ['awards.type', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { actor, record }) => {
@@ -11,6 +12,7 @@ export default defineRoute({ ability: 'awards.type.view', record: event => ['awa
     holders,
     deletable: !(await hasAwards(type.id)),
     canManage: (await can(actor, 'awards.type.manage', ['awards.type', type.id])).allowed,
+    nominations: await isEnabled('forms'),
     canIssue: (await can(actor, 'awards.award.issue', ['awards.type', type.id])).allowed,
   }
 })

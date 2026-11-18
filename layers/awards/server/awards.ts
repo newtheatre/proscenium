@@ -99,6 +99,8 @@ export interface NewAward {
   decisionNote?: string | null
   visibility?: typeof VISIBILITIES[number]
   source: typeof SOURCES[number]
+  /** The forms response a nomination's award came from. */
+  responseId?: string | null
   issuedBy: string | null
 }
 
@@ -112,11 +114,11 @@ export function writeAward(unit: UnitView, input: NewAward): string {
   const at = nowMs()
   const once = input.type.onePerPerson && input.accountId
   const held = once ? ` AND NOT EXISTS (SELECT 1 FROM awards_awards WHERE type_id = ?2 AND state = 'current' AND account_id IN (${accountScopeSql('?3')}))` : '' // not-policy: numbered parameters
-  const sql = `INSERT INTO awards_awards (id, type_id, account_id, recipient_name, awarded_on, awarded_for, citation, production_id, decided_on, decision_note, source, visibility, state, issued_by, created_at, updated_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'current', ?13, ?14, ?14 WHERE (SELECT state FROM awards_types WHERE id = ?2) = 'active'${held}` // not-policy: numbered parameters
+  const sql = `INSERT INTO awards_awards (id, type_id, account_id, recipient_name, awarded_on, awarded_for, citation, production_id, decided_on, decision_note, source, visibility, state, issued_by, created_at, updated_at, response_id) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'current', ?13, ?14, ?14, ?15 WHERE (SELECT state FROM awards_types WHERE id = ?2) = 'active'${held}` // not-policy: numbered parameters
   unit.add({
     sql,
     params: [id, input.type.id, input.accountId, input.recipientName, input.awardedOn, input.awardedFor ?? null, input.citation ?? null, input.productionId ?? null,
-      input.decidedOn ?? null, input.decisionNote ?? null, input.source, input.visibility ?? input.type.defaultVisibility, input.issuedBy, at],
+      input.decidedOn ?? null, input.decisionNote ?? null, input.source, input.visibility ?? input.type.defaultVisibility, input.issuedBy, at, input.responseId ?? null],
   }).expect(1, once
     ? { code: 'awards.award.already-held', reason: `This person already holds ${input.type.name}.`, remedy: 'Open their award to correct it instead.' }
     : { code: 'awards.type.archived', reason: `${input.type.name} is archived, so it cannot be given.`, remedy: 'Restore the award first.' })

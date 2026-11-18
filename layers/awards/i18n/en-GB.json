@@ -59,6 +59,8 @@
   "awards.screens.type.default-visibility-help": "What each award of this type starts as. Its holder can change their own.",
   "awards.screens.type.save": "Save",
   "awards.screens.type.saved": "Award type saved",
+  "awards.screens.type.nominations": "Nominations",
+  "awards.screens.type.nominations-help": "Attach a published form for people to nominate somebody for this award. Put \"Issue the award\" on the form's approving move and the award is issued when a nomination is approved.",
   "awards.screens.type.retire": "Stop giving this award",
   "awards.screens.type.retire-help": "Archiving stops it being issued. Awards already given stay as they are.",
   "awards.screens.type.restore-help": "This award type is archived. Restore it to issue it again.",
@@ -168,6 +170,13 @@
   "awards.screens.link.linked-toast": "Account linked",
 
   "awards.screens.account-tab.none": "No awards",
+
+  "awards.forms.nomination.label": "Nominations for an award",
+  "awards.forms.source.label": "Award types",
+  "awards.forms.issue-award.label": "Issue the award",
+  "awards.forms.issue-award.nominee": "The person nominated",
+  "awards.forms.issue-award.awarded-for": "What it is for",
+  "awards.forms.issue-award.citation": "Citation",
 
   "awards.roll.title": "Roll of honour",
   "awards.roll.description": "The people the theatre has honoured.",
