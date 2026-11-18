@@ -1,9 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f20971a7-4285-4f89-a7ce-badc6a09e02a",
+  "id": "bc64b66c-4739-4bdb-ac67-19014c521c58",
   "prevIds": [
-    "274c2793-7965-4b1f-90f7-c25541e7b394"
+    "1e609b01-24b5-40ad-ae4c-d1ce99d9b81b",
+    "8a7d200f-533a-4758-bb61-19a80d496404"
   ],
   "ddl": [
     {
@@ -733,6 +734,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "awards_awards",
+      "name": "awarded_precision",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'day'",
       "generated": null,
       "entityType": "columns"
     },
@@ -5468,6 +5479,16 @@
     },
     {
       "table": "box_office_promo_codes",
+      "name": "not_with_requirements",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_promo_codes",
       "name": "valid_from",
       "type": "integer",
       "notNull": false,
@@ -9608,6 +9629,16 @@
     },
     {
       "table": "core_performance_runs",
+      "name": "pattern",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_runs",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -13477,6 +13508,26 @@
       "entityType": "columns"
     },
     {
+      "table": "forms_responses",
+      "name": "change_token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "change_token_expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "forms_review_assignments",
       "name": "id",
       "type": "text",
@@ -16828,6 +16879,16 @@
     },
     {
       "table": "membership_verification_lists",
+      "name": "reference_noun",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "membership_verification_lists",
       "name": "reference_shape",
       "type": "text",
       "notNull": false,
@@ -17120,6 +17181,16 @@
       "table": "payments_attempts",
       "name": "tendered_minor",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "note",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -21195,6 +21266,20 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_change_token",
+      "columns": [
+        {
+          "value": "change_token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "change_token_hash IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
