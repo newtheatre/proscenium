@@ -25,6 +25,7 @@ interface Order {
   soldBy: string | null
   performance: { id: string, title: string, startsAt: number } | null
   lines: Line[]
+  cancellationFeeMinor: number
   cancellations: Cancellation[]
   can: { release: boolean, cancel: boolean, refund: boolean, exchange: boolean }
 }
@@ -47,6 +48,8 @@ const cancelling = ref(false)
 const exchanging = ref(false)
 // What can be exchanged: live tickets not yet used at the door.
 const exchangeable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live' && !l.admittedAt))
+// What can be cancelled: live tickets. Those used at the door are shown in the dialogue but cannot be ticked.
+const cancellable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live'))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const at = (action: string): string => `/api/box-office/orders/${encodeURIComponent(id.value)}/${action}`
 
@@ -86,7 +89,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   if (o.can.exchange && exchangeable.value.length) groups.push([{ label: t('box-office.order.exchange.title'), icon: 'i-lucide-arrow-left-right', onSelect: () => { exchanging.value = true } }])
   const destructive: DropdownMenuItem[] = []
   if (o.can.release) destructive.push({ label: t('box-office.order.release.button'), icon: 'i-lucide-undo-2', onSelect: () => { void release() } })
-  if (o.can.cancel) destructive.push({ label: t('box-office.order.cancel.title'), icon: 'i-lucide-circle-x', color: 'error', onSelect: () => { cancelling.value = true } })
+  if (o.can.cancel && cancellable.value.some(l => o.state !== 'confirmed' || !l.admittedAt)) destructive.push({ label: t('box-office.order.cancel.title'), icon: 'i-lucide-circle-x', color: 'error', onSelect: () => { cancelling.value = true } })
   if (destructive.length) groups.push(destructive)
   return groups
 })
@@ -173,6 +176,9 @@ const lineStatus = (l: Line) => l.state !== 'live'
         :reference="d.reference"
         :paid="d.state === 'confirmed'"
         :can-refund="d.can.refund"
+        :currency="d.currency"
+        :fee-minor="d.cancellationFeeMinor"
+        :lines="cancellable"
         @cancelled="refresh()"
       />
       <BoxOfficeExchangeDialog

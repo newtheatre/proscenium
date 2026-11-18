@@ -82,10 +82,10 @@ describe('joining against a list', () => {
     const { id } = await listScheme()
     const student = person([])
     expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.code).toBe('membership.join.needs-reference')
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'Your student ID is 8 digits.' })
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'Your student ID should be 8 digits.' })
     // The list's question is the field's label; sentences use its short noun (finding: never splice the question in).
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.reason).toBe('Enter your student ID.')
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20000000' }, student)).body).toMatchObject({ code: 'membership.join.not-on-list', reason: 'We could not find a membership for that student ID. Have a membership? Contact us.' })
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.reason).toBe('Type your student ID.')
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20000000' }, student)).body).toMatchObject({ code: 'membership.join.not-on-list', reason: 'We could not find a current membership with that student ID. Have a membership? Contact us.' })
     const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, student)
     expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ startsOn: '2026-11-17', endsOn: '2027-07-31', opensMembersArea: true })
     const row = await inContext(() => first<{ length_option_id: string | null, used: string | null, outcome: string }>(
@@ -115,7 +115,7 @@ describe('the member price by student ID', () => {
     const [unclaimed] = await typed('20123456')
     expect(unclaimed).toMatchObject({ verdict: 'met', evidence: entry!.id })
     expect(unclaimed).not.toHaveProperty('holderAccountId')
-    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'Your student ID is 8 digits.' })
+    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'Your student ID should be 8 digits.' })
     expect((await typed('20000000'))[0]!.verdict).toBe('not-met')
 
     const student = person([])
@@ -125,7 +125,7 @@ describe('the member price by student ID', () => {
     expect((await inContext(() => requirements.check({ accounts: [null], refs: [ref], presented: [{ ref, evidence: entry!.id }], whenUnavailable: 'not-met' }), buyer))[0]!.verdict).toBe('met')
 
     const described = await inContext(() => requirements.describe([ref]), buyer)
-    expect(described[ref]!.presentable!.label).toBe('NNT member? Enter your University of Nottingham student ID. You can use your member number instead.')
+    expect(described[ref]!.presentable).toMatchObject({ label: `${described[ref]!.label}: type your student ID or member number to get this price`, field: 'NNT member? Enter your University of Nottingham student ID' })
 
     const door = person(['membership.verification-list.check'])
     expect(await inContext(() => requirements.holder(ref, entry!.id), door)).toBe('Ada Lovelace')

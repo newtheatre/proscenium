@@ -57,9 +57,9 @@ export function recordOutcome(unit: UnitView, membershipId: string, outcome: Out
  * the list's short noun ("student ID"), never its whole question.
  */
 export function shapeText(noun: string, shape: Shape | null): string {
-  if (!shape) return `Enter your ${noun}.`
+  if (!shape) return `Type your ${noun}.`
   const length = shape.min === shape.max ? `${shape.min}` : `${shape.min} to ${shape.max}`
-  return `Your ${noun} is ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
+  return `Your ${noun} should be ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
 }
 
 /** The entry that lets this account join, or a refusal saying why not. */
@@ -75,12 +75,12 @@ export async function passList(list: ListRow, accountId: string, reference: stri
     if (!entry) refuse('membership.join.not-on-list', 'We could not find a membership for any of your verified email addresses. Have a membership? Contact us.', { status: 422, remedy: help })
   }
   else {
-    if (!reference) refuse('membership.join.needs-reference', `Enter your ${noun}.`, { status: 422, fields: { reference: 'membership.join.needs-reference' } })
+    if (!reference) refuse('membership.join.needs-reference', `Type your ${noun}.`, { status: 422, fields: { reference: 'membership.join.needs-reference' } })
     if (!wellFormed(list.referenceShape, normalise('reference', reference!)))
       refuse('membership.join.not-well-formed', shapeText(noun, list.referenceShape), { status: 422, fields: { reference: 'membership.join.not-well-formed' } })
     entry = await findEntry(list, reference!, day)
     // V15: the miss speaks of the membership, not the ID.
-    if (!entry) refuse('membership.join.not-on-list', `We could not find a membership for that ${noun}. Have a membership? Contact us.`, { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
+    if (!entry) refuse('membership.join.not-on-list', `We could not find a current membership with that ${noun}. Have a membership? Contact us.`, { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
   }
   if (entry!.usedBy) {
     const ours = await all<{ id: string }>(`SELECT id FROM membership_memberships WHERE id = ?1 AND account_id IN (${accountScopeSql('?2')})`, entry!.usedBy, accountId)
