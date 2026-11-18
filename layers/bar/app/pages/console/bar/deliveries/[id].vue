@@ -225,7 +225,6 @@ const title = computed(() => isNew.value
                 value-key="value"
                 icon="i-lucide-plus"
                 :placeholder="t('bar.screens.deliveries.add-item')"
-                :aria-label="t('bar.screens.deliveries.add-item')"
               />
             </template>
             <p
