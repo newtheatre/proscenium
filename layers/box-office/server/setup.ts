@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm'
 import { all, can, first, newId, nowMs, refuse, type Actor, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { methodsFor } from '#modules/payments'
-import { applyLayout, getLayout, houseOf, layoutOf } from './layouts'
+import { houseOf, reapply, setPerformanceChoice, type ChoiceInput } from './layouts'
 import { PRICES_IN_FORCE, pricesFor, type Price } from './prices'
 
 export type SaleState = 'draft' | 'on_sale' | 'paused' | 'closed'
@@ -22,13 +22,21 @@ export interface SalesRecord {
   paymentTiming: 'pay-now' | 'reserve' | 'buyer-chooses' | null
   /** The seating layout chosen or given (layouts.ts), or null. */
   layoutId: string | null
+  /** Wheelchair spaces typed in instead of a layout, and the seats each takes; null with a layout or none. */
+  wheelchairSpaces: number | null
+  seatsPerSpace: number | null
+  /** Whether the layout or numbers are this performance's own, not its run's or its space's usual. */
+  layoutOwn: boolean
 }
+
+/** Whether a layout or typed numbers give the performance its wheelchair spaces. */
+export const laidOut = (sales: SalesRecord | null) => !!sales && (sales.layoutId !== null || sales.wheelchairSpaces !== null)
 
 export interface Pool { id: string, bandId: string, bandName: string, bandKind: string, capacity: number, claimed: number }
 
-interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null, layout_id: string | null }
+interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null, layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null, layout_own: number }
 
-const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, paymentTiming: r.payment_timing, layoutId: r.layout_id })
+const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, paymentTiming: r.payment_timing, layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, layoutOwn: !!r.layout_own })
 
 export async function salesOf(performanceId: string): Promise<SalesRecord | null> {
   const row = await first<SalesRow>('SELECT * FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
@@ -102,8 +110,8 @@ export interface SalesInput {
   holdMinutes?: number | null
   /** Says in so many words that the pools may hold more than the space does. */
   confirmOverVenue?: boolean
-  /** The seating layout to use. Left out, a performance with none takes its space's usual one. */
-  layoutId?: string
+  /** Wheelchair spaces of its own (a copy's). Left out, a performance takes its run's or its space's usual. */
+  wheelchair?: ChoiceInput
 }
 
 /**
@@ -156,13 +164,9 @@ export async function saveSales(unit: UnitView, performanceId: string, input: Sa
     }
   }
 
-  // The seating layout: the one asked for, else the space's usual one for a performance with none.
-  const layout = input.layoutId ? await getLayout(input.layoutId) : before?.layoutId ? null : (await layoutOf(performanceId)).layout
-  if (input.layoutId && !layout) refuse('box-office.layout.not-found', 'There is no such seating layout.', { status: 422, fields: { layoutId: 'Choose a layout from the list.' } })
-  if (layout) {
-    const booked = await first<{ claimed: number }>('SELECT max(o.claimed) AS claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind = \'wheelchair\'', performanceId)
-    if (input.layoutId || (booked?.claimed ?? 0) <= layout.wheelchairSpaces) await applyLayout(unit, performanceId, layout)
-  }
+  // Wheelchair spaces: the performance's own where asked, else its run's or its space's usual (layouts.ts).
+  if (input.wheelchair) await setPerformanceChoice(unit, performanceId, input.wheelchair)
+  else if (!before || !laidOut(before)) await reapply(unit, performanceId, { create: true })
   unit.audit({ action: 'update', record: ['core.performance', performanceId], detail: { pools: wanted.length } })
 }
 

@@ -37,9 +37,9 @@ export const WHEELCHAIR_TYPE = 'box-office.wheelchair'
 export async function pricesFor(performanceId: string, at = nowMs()): Promise<Price[]> {
   const [rows, wheelchairBands] = await Promise.all([
     all<{ id: string, band_id: string, ticket_type_id: string, amount_minor: number | null, currency: string }>(PRICES_IN_FORCE, performanceId, at),
-    // With a seating layout, the production's wheelchair band holds the performance's wheelchair spaces (layouts.ts).
+    // With a seating layout or typed numbers, the production's wheelchair band holds the performance's wheelchair spaces (layouts.ts).
     all<{ band_id: string }>(`SELECT o.band_id FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id JOIN box_office_performance_sales s ON s.performance_id = o.performance_id
-      WHERE o.performance_id = ? AND b.kind = 'wheelchair' AND s.layout_id IS NOT NULL`, performanceId),
+      WHERE o.performance_id = ? AND b.kind = 'wheelchair' AND (s.layout_id IS NOT NULL OR s.wheelchair_spaces IS NOT NULL)`, performanceId),
   ])
   const set = rows.filter(r => r.amount_minor !== null).map(r => ({ id: r.id, bandId: r.band_id, ticketTypeId: r.ticket_type_id, amountMinor: r.amount_minor!, currency: r.currency }))
   return wheelchairPrices(set, new Set(wheelchairBands.map(b => b.band_id)))

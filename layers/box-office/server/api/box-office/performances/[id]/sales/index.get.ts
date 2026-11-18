@@ -5,7 +5,7 @@ import { defineRoute } from '#kit'
 import { getPerformance, getProduction } from '#modules/core'
 import { houseOf } from '../../../../../layouts'
 import { priceLayers, scheduledPrices } from '../../../../../prices'
-import { checklist, listBands, salesOf } from '../../../../../setup'
+import { checklist, laidOut, listBands, salesOf } from '../../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
@@ -15,8 +15,7 @@ export default defineRoute({
   const [sales, list, houseCapacity, performance] = await Promise.all([salesOf(record!.id), checklist(record!.id), houseOf(record!.id), getPerformance(record!.id)])
   const production = await getProduction(performance.productionId)
   // With a seating layout the wheelchair spaces are the layout's, shown and chosen on their own (layout.get.ts).
-  const laidOut = !!sales?.layoutId
-  const shown = <T extends { kind?: string, bandKind?: string }>(rows: T[]) => laidOut ? rows.filter(r => (r.kind ?? r.bandKind) !== 'wheelchair') : rows
+  const shown = <T extends { kind?: string, bandKind?: string }>(rows: T[]) => laidOut(sales) ? rows.filter(r => (r.kind ?? r.bandKind) !== 'wheelchair') : rows
   return {
     sales,
     houseCapacity,

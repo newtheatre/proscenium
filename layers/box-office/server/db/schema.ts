@@ -18,6 +18,12 @@ export const performanceSales = defineTable('box_office_performance_sales', {
   // wheelchair spaces it has and the seats each takes. Null until one is chosen or the space's usual
   // one is applied; a space with no layouts leaves it null.
   layoutId: col.internal(text('layout_id')),
+  // Numbers typed in for this performance in place of a layout: its wheelchair spaces and the seats
+  // each takes the place of. Null while a layout (or nothing) gives them.
+  wheelchairSpaces: col.internal(integer('wheelchair_spaces')),
+  seatsPerSpace: col.internal(integer('seats_per_space')),
+  // Whether the layout or numbers are this performance's own, overriding its run's choice.
+  layoutOwn: col.internal(integer('layout_own', { mode: 'boolean' }).notNull().default(false)),
   state: col.public(text('state', { enum: ['draft', 'on_sale', 'paused', 'closed'] }).notNull().default('draft')),
   onSaleAt: col.timestamp('on_sale_at'),
   // Null means the setting's default before curtain.
@@ -188,6 +194,29 @@ export const seatingLayouts = defineTable('box_office_seating_layouts', {
     uniqueIndex('box_office_seating_layouts_usual').on(t.spaceId).where(sql`usual = 1`),
     check('box_office_seating_layouts_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
     check('box_office_seating_layouts_numbers', sql`(${t.seats} IS NULL OR ${t.seats} >= 0) AND ${t.wheelchairSpaces} >= 0 AND ${t.seatsPerSpace} >= 0`),
+  ],
+})
+
+/**
+ * A production's choice for the wheelchair spaces of its run (Matt 2026-11-17, 21:58): a layout, used
+ * at its performances in that layout's space, or numbers of its own, used at every performance. With
+ * no row, each performance takes its space's usual layout. A performance may override it.
+ */
+export const runLayouts = defineTable('box_office_run_layouts', {
+  id: col.id(),
+  productionId: col.internal(text('production_id').notNull()),
+  layoutId: col.internal(text('layout_id')),
+  wheelchairSpaces: col.internal(integer('wheelchair_spaces')),
+  seatsPerSpace: col.internal(integer('seats_per_space')),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'runl',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('box_office_run_layouts_production').on(t.productionId),
+    check('box_office_run_layouts_choice', sql`(${t.layoutId} IS NOT NULL AND ${t.wheelchairSpaces} IS NULL AND ${t.seatsPerSpace} IS NULL) OR (${t.layoutId} IS NULL AND ${t.wheelchairSpaces} >= 0 AND ${t.seatsPerSpace} >= 0)`),
   ],
 })
 
@@ -633,4 +662,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, promoCodes, promoRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, promoCodes, promoRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }

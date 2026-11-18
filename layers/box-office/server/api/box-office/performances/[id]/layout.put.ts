@@ -1,18 +1,16 @@
-// Chooses the seating layout a performance uses. Its wheelchair spaces become the layout's, and a
-// performance sold as one part of the house takes the layout's seats too.
-import { z } from 'zod'
+// Chooses a performance's own wheelchair spaces, overriding its run's (Matt 2026-11-17, 21:58): a
+// layout of its space, whose seats a performance sold as one part of the house takes too, or numbers
+// typed in; or hands the performance back to its run's choice.
 import { getRouterParam } from 'h3'
-import { defineRoute, idSchema, refuse } from '#kit'
-import { applyLayout, getLayout } from '../../../../layouts'
+import { defineRoute } from '#kit'
+import { setPerformanceChoice, wheelchairChoice } from '../../../../layouts'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
   record: event => ['core.performance', getRouterParam(event, 'id')],
   rateLimit: 'write',
-  input: z.object({ layoutId: idSchema('lay') }).strict(),
+  input: wheelchairChoice,
 }, async (_event, { input, record, unit }) => {
-  const layout = await getLayout(input.layoutId)
-  if (!layout) refuse('box-office.layout.not-found', 'There is no such seating layout.', { status: 422, fields: { layoutId: 'Choose a layout from the list.' } })
-  await applyLayout(unit.view(), record!.id, layout, { seats: true })
-  return { layoutId: layout.id }
+  await setPerformanceChoice(unit.view(), record!.id, input)
+  return { ok: true }
 })

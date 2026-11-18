@@ -15,6 +15,8 @@ import layoutDelete from '../../server/api/box-office/seating-layouts/[id].delet
 import layoutUsual from '../../server/api/box-office/seating-layouts/[id]/usual.post'
 import performanceLayoutGet from '../../server/api/box-office/performances/[id]/layout.get'
 import performanceLayoutPut from '../../server/api/box-office/performances/[id]/layout.put'
+import runLayoutGet from '../../server/api/box-office/productions/[id]/layout.get'
+import runLayoutPut from '../../server/api/box-office/productions/[id]/layout.put'
 import { availability } from '../../server/availability'
 import { createBasket } from '../../server/baskets'
 import { buy, house, manager, NOV_16, ready, req, type House } from './stage'
@@ -27,6 +29,8 @@ const handle = server({
   'POST /api/box-office/seating-layouts/:id/usual': layoutUsual,
   'GET /api/box-office/performances/:id/layout': performanceLayoutGet,
   'PUT /api/box-office/performances/:id/layout': performanceLayoutPut,
+  'GET /api/box-office/productions/:id/layout': runLayoutGet,
+  'PUT /api/box-office/productions/:id/layout': runLayoutPut,
 })
 let keys = 0
 async function api<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> = manager): Promise<{ status: number, body: T }> {
@@ -131,7 +135,7 @@ describe('a seating layout', () => {
     const h = await house(10)
     await layout(h, { wheelchairSpaces: 2, seatsPerSpace: 2 })
     const round = await layout(h, { seats: 8, wheelchairSpaces: 4, seatsPerSpace: 1 }, 'In the round')
-    const chosen = await api('PUT', `/api/box-office/performances/${h.performanceId}/layout`, { layoutId: round })
+    const chosen = await api('PUT', `/api/box-office/performances/${h.performanceId}/layout`, { use: 'layout', layoutId: round })
     expect(chosen.status, JSON.stringify(chosen.body)).toBe(200)
     expect(await pools(h)).toMatchObject({ seats: { capacity: 8 }, spaces: { capacity: 4 } })
     expect((await api('GET', `/api/box-office/performances/${h.performanceId}/layout`)).body).toMatchObject({ layoutId: round, wheelchair: { spaces: 4, seatsEach: 1 } })
@@ -149,6 +153,71 @@ describe('a seating layout', () => {
     const raised = await api('PUT', `/api/box-office/seating-layouts/${id}`, { spaceId: await spaceOf(h), name: 'End-on', seats: null, wheelchairSpaces: 3, seatsPerSpace: 2 })
     expect(raised.status, JSON.stringify(raised.body)).toBe(200)
     expect((await pools(h)).spaces).toMatchObject({ capacity: 3, claimed: 2 })
+  })
+})
+
+/** A second performance of the same production in the same space, set up for sale with `capacity` seats. */
+async function another(h: House, capacity = 10): Promise<House> {
+  const [at] = await rows<{ venue_id: string, space_id: string }>('SELECT venue_id, space_id FROM core_performances WHERE id = ?', h.performanceId)
+  const made = await req('POST', `/api/core/productions/${h.productionId}/performances`, { venueId: at!.venue_id, spaceId: at!.space_id, startsAt: Date.UTC(2027, 3, 2, 19, 30), capacity: 500 })
+  expect(made.status, JSON.stringify(made.body)).toBe(200)
+  expect((await req('POST', `/api/core/performances/${made.body.id}/schedule`, {})).status).toBe(200)
+  const sales = await req('PUT', `/api/box-office/performances/${made.body.id}/sales`, { pools: [{ bandId: h.bandId, capacity }] })
+  expect(sales.status, JSON.stringify(sales.body)).toBe(200)
+  return { ...h, performanceId: made.body.id }
+}
+
+describe('a run\'s wheelchair spaces', () => {
+  it('are numbers typed in on the Tickets tab, given to every performance, which a performance can override', async () => {
+    const h = await house(10)
+    const second = await another(h)
+    const run = await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'numbers', wheelchairSpaces: 3, seatsPerSpace: 1 })
+    expect(run.status, JSON.stringify(run.body)).toBe(200)
+    expect((await pools(h)).spaces).toMatchObject({ capacity: 3 })
+    expect((await pools(second)).spaces).toMatchObject({ capacity: 3 })
+    expect((await api('GET', `/api/box-office/productions/${h.productionId}/layout`)).body).toMatchObject({ choice: { layoutId: null, wheelchairSpaces: 3, seatsPerSpace: 1 }, ownCount: 0 })
+    // Booking a space takes the one seat the run says each takes.
+    expect((await bookSpace(h)).ok).toBe(true)
+    expect(await pools(h)).toMatchObject({ seats: { claimed: 1 }, spaces: { claimed: 1 } })
+
+    // One night has its own numbers; the run changing leaves it as it is.
+    const own = await api('PUT', `/api/box-office/performances/${second.performanceId}/layout`, { use: 'numbers', wheelchairSpaces: 1, seatsPerSpace: 2 })
+    expect(own.status, JSON.stringify(own.body)).toBe(200)
+    expect((await pools(second)).spaces).toMatchObject({ capacity: 1 })
+    expect((await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'numbers', wheelchairSpaces: 4, seatsPerSpace: 1 })).status).toBe(200)
+    expect((await pools(h)).spaces).toMatchObject({ capacity: 4 })
+    expect((await pools(second)).spaces).toMatchObject({ capacity: 1 })
+    expect((await api('GET', `/api/box-office/performances/${second.performanceId}/layout`)).body).toMatchObject({
+      own: { layoutId: null, wheelchairSpaces: 1, seatsPerSpace: 2 }, inherited: { wheelchairSpaces: 4, seatsPerSpace: 1, from: 'run' }, wheelchair: { spaces: 1, seatsEach: 2 },
+    })
+    // Handed back, it takes the run's again.
+    expect((await api('PUT', `/api/box-office/performances/${second.performanceId}/layout`, { use: 'inherit' })).status).toBe(200)
+    expect((await pools(second)).spaces).toMatchObject({ capacity: 4 })
+    expect((await api('GET', `/api/box-office/performances/${second.performanceId}/layout`)).body).toMatchObject({ own: null, wheelchair: { spaces: 4, seatsEach: 1 } })
+  })
+
+  it('is a layout of the space chosen for the run, refused below the spaces booked, and goes back to the usual one', async () => {
+    const h = await house(10)
+    await layout(h, { wheelchairSpaces: 2, seatsPerSpace: 2 })
+    const round = await layout(h, { wheelchairSpaces: 4, seatsPerSpace: 1 }, 'In the round')
+    expect((await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'layout', layoutId: round })).status).toBe(200)
+    expect((await api('GET', `/api/box-office/performances/${h.performanceId}/layout`)).body).toMatchObject({ layoutId: round, own: null, inherited: { name: 'In the round', from: 'run' } })
+    expect((await pools(h)).spaces).toMatchObject({ capacity: 4 })
+    for (let i = 0; i < 3; i++) expect((await bookSpace(h)).ok).toBe(true)
+    const cut = await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'inherit' })
+    expect(cut.body.code).toBe('box-office.layout.spaces-booked')
+    expect((await pools(h)).spaces).toMatchObject({ capacity: 4, claimed: 3 })
+  })
+
+  it('leaves a run with no choice on its space\'s usual layout', async () => {
+    const h = await house(10)
+    const usual = await layout(h, { wheelchairSpaces: 2, seatsPerSpace: 2 })
+    const round = await layout(h, { wheelchairSpaces: 4, seatsPerSpace: 1 }, 'In the round')
+    expect((await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'layout', layoutId: round })).status).toBe(200)
+    expect((await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'inherit' })).status).toBe(200)
+    expect((await api('GET', `/api/box-office/performances/${h.performanceId}/layout`)).body).toMatchObject({ layoutId: usual, inherited: { from: 'usual' } })
+    expect((await pools(h)).spaces).toMatchObject({ capacity: 2 })
+    expect((await api('GET', `/api/box-office/productions/${h.productionId}/layout`)).body).toMatchObject({ choice: null })
   })
 })
 
