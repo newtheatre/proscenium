@@ -28,5 +28,6 @@
   "forms.settings.limits.export-rows.help": "The most responses one CSV export holds. A larger set is exported in parts, by date.",
   "forms.abilities.response.read.label": "Read a form's responses, except restricted answers",
   "forms.abilities.response.export.label": "Export a form's responses",
-  "forms.abilities.response.read-special.label": "Open restricted answers"
+  "forms.abilities.response.read-special.label": "Open restricted answers",
+  "forms.abilities.response.move.label": "Move responses between stages"
 }

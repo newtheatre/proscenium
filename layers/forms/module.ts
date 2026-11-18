@@ -3,6 +3,7 @@
 // decides. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
 import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting } from '#kit'
+import { STAGE_KINDS } from './shared/engine/types'
 import { tables } from './server/db/schema'
 
 const change = 'forms.settings.manage'
@@ -46,6 +47,8 @@ export default defineModule({
     'form.publish': ability({ on: 'forms.form', implies: ['form.edit'] }),
     // Responses are read form by form: these are granted on the form, never on one response.
     'response.read': ability({ on: 'forms.form', owner: 'grants', audit: false }),
+    // Moving a response between its form's stages; never one's own response (a guard in the service).
+    'response.move': ability({ on: 'forms.form', owner: 'grants', implies: ['response.read'] }),
     'response.export': ability({ on: 'forms.form', risk: 'privileged', implies: ['response.read'] }),
     // Opening special-category answers. Every reveal is recorded.
     'response.read-special': ability({ on: 'forms.form', risk: 'privileged', audit: 'read', implies: ['response.read'] }),
@@ -58,6 +61,7 @@ export default defineModule({
     announces: {
       // Ids only: what was answered stays inside, and a listener reads it through forms.
       'forms.response.submitted': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string() }), internal: true }),
+      'forms.response.moved': event({ version: 1, payload: z.object({ responseId: z.string(), formId: z.string(), kind: z.enum(STAGE_KINDS), revision: z.number() }), internal: true }),
     },
   },
 

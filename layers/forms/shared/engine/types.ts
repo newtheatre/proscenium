@@ -136,11 +136,30 @@ export interface Calculation { id: string, key: string, type: 'number' | 'money'
 /** A closing screen. One that does not submit stores nothing and shows its message. */
 export interface Ending { id: string, title: string, message?: string, submits: boolean }
 
+// ---- stages (part 3, "Workflow rules") ----
+
+export const STAGE_KINDS = ['pending', 'in_review', 'returned', 'approved', 'declined', 'closed'] as const
+export type StageKind = typeof STAGE_KINDS[number]
+/** Who may make a move: staff who may move this form's responses, or the person who sent the response. */
+export const MOVERS = ['staff', 'submitter'] as const
+export type Mover = typeof MOVERS[number]
+export interface Stage {
+  key: string
+  name: string
+  kind: StageKind
+  /** What the person who sent the response is told its status is; the stage's name when left out. */
+  status?: string
+}
+export interface Transition { key: string, from: string, to: string, label: string, who: Mover }
+/** A form's stages. A response starts in the first. A form with none has one stage, Received, which is closed. */
+export interface Workflow { stages: Stage[], transitions: Transition[] }
+
 export interface Definition {
   format: number
   pages: Page[]
   calculations?: Calculation[]
   endings?: Ending[]
+  workflow?: Workflow
   presentation?: { submitLabel?: string, confirmation?: string, progress?: boolean }
 }
 
