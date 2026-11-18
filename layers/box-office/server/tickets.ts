@@ -95,3 +95,13 @@ export async function doorCodesForOrders(orderIds: readonly string[]): Promise<S
 
 /** One order's tickets: see `doorCodesForOrders`. */
 export const doorCodesForOrder = (orderId: string) => doorCodesForOrders([orderId])
+
+/**
+ * The short numbers a person reads off their tickets, one for each line given: the booking reference
+ * and the line's place among every ticket line the order has had, `K7MPQ2XR-1`, so a ticket keeps its
+ * number when others are cancelled. They name a ticket and open nothing; the door scans the code.
+ */
+export async function ticketNumbers(order: { id: string, reference: string }, lineIds: readonly string[]): Promise<string[]> {
+  const places = (await all<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY id", order.id)).map(r => r.id)
+  return lineIds.map(id => `${order.reference}-${places.indexOf(id) + 1}`)
+}
