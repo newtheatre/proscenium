@@ -22,7 +22,7 @@ interface Setup {
   priceLayers: PriceLayer[]
   scheduledPrices: ScheduledPrice[]
   checklist: { code: string, done: boolean }[]
-  performance: { id: string, productionId: string, title: string, label: string | null, startsAt: number, state: string }
+  performance: { id: string, productionId: string, productionState: string, title: string, label: string | null, startsAt: number, state: string }
   bands: Band[]
 }
 
@@ -334,6 +334,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
         <div class="space-y-8">
           <RefusalNotice :refusal="refusal" />
+          <UAlert
+            v-if="d.performance.productionState !== 'published'"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('box-office.setup.unpublished.title')"
+            :description="t('box-office.setup.unpublished.description')"
+            :actions="[{ label: t('box-office.setup.unpublished.link'), to: `/console/programme/productions/${encodeURIComponent(d.performance.productionId)}`, color: 'neutral', variant: 'outline' }]"
+          />
           <div
             v-if="d.sales && d.sales.state !== 'draft'"
             class="flex flex-wrap gap-4"
