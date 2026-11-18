@@ -134,6 +134,9 @@ describe('a reservation at the desk', () => {
     expect(again.status, JSON.stringify(again.body)).toBe(200)
     expect(await payCash(again.body.intentId)).toMatchObject({ settled: true })
     expect(await tickets(r.orderId)).toEqual([{ state: 'valid', admitted_at: null, admitted_scan_id: null }])
+    // Your session lists the sale by the booking's reference, linked to the order.
+    const mine = await req('GET', '/api/payments/session', undefined, seller)
+    expect(mine.body.sales.find((x: { intentId: string }) => x.intentId === again.body.intentId)).toMatchObject({ state: 'succeeded', owners: [{ module: 'box-office', reference: r.reference, to: `/console/box-office/orders/${r.orderId}` }] })
   })
 
   it('is found by the buyer\'s name, with who booked and for what, soonest first', async () => {
