@@ -127,6 +127,8 @@ export default defineModule({
   points: {
     'front-of-house.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
     'front-of-house.report-section': point({ kind: 'code', contract: 'report-section' }),
+    // Who is coming tonight needing help, for the lead's Needs tonight panel (AC-1).
+    'front-of-house.tonight-needs': point({ kind: 'code', contract: 'tonight-needs' }),
   },
 
   contributes: {
