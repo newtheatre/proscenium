@@ -10,7 +10,7 @@ definePageMeta({ layout: 'console' })
 type State = 'requested' | 'approved' | 'declined' | 'issued' | 'withdrawn'
 interface Request { id: string, state: State, quantity: number, show: string, startsAt: number, band: string, forName: string | null, reason: string, requestedBy: string | null, orderId: string | null }
 interface Offer { id: string, title: string, label: string | null, startsAt: number, bands: { id: string, name: string }[] }
-interface Comps { mine: Request[], waiting: Request[], performances: Offer[], needsApproval: boolean }
+interface Comps { mine: Request[], waiting: Request[], decided: Request[], performances: Offer[], needsApproval: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -26,7 +26,9 @@ const { data: reasons } = await useAPI<{ terms: { id: string, label: string }[] 
 
 const TONES = { requested: 'info', approved: 'info', issued: 'success', declined: 'danger', withdrawn: 'neutral' } as const
 
-const blank = () => ({ performanceId: '', bandId: '', quantity: 1, name: '', email: '', reasonTermId: '' })
+// A select item cannot have an empty value, so Any seats has a word of its own.
+const ANY = 'any'
+const blank = () => ({ performanceId: '', bandId: ANY, quantity: 1, name: '', email: '', reasonTermId: '' })
 const form = ref(blank())
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const asking = ref(false)
@@ -41,24 +43,29 @@ function startAsking() {
 const busy = ref<string | null>(null)
 
 const performanceItems = computed(() => (data.value?.performances ?? []).map(p => ({ value: p.id, label: `${p.title}, ${dateTime(p.startsAt)}` })))
-const bandItems = computed(() => (data.value?.performances.find(p => p.id === form.value.performanceId)?.bands ?? []).map(b => ({ value: b.id, label: b.name })))
+// Seats are optional: left at Any, the band with most room is taken, and the approver sees which.
+const bandItems = computed(() => [
+  { value: ANY, label: t('box-office.comps.ask.any-band') },
+  ...(data.value?.performances.find(p => p.id === form.value.performanceId)?.bands ?? []).map(b => ({ value: b.id, label: b.name })),
+])
 const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ value: r.id, label: r.label })))
 watch(() => form.value.performanceId, () => {
-  form.value.bandId = bandItems.value.length === 1 ? bandItems.value[0]!.value : ''
+  form.value.bandId = ANY
 })
 
-const describe = (r: Request) => [`${r.show}, ${dateTime(r.startsAt)}`, r.band, t('box-office.comps.for', { name: r.forName ?? t('box-office.orders.no-buyer') }), r.reason].join(' · ')
+const describe = (r: Request) => [`${r.show}, ${dateTime(r.startsAt)}`, r.band, t('box-office.comps.for', { name: r.forName ?? t('box-office.orders.no-buyer') }), r.reason].join(', ')
 const nameOf = (r: Request) => t('box-office.comps.tickets', { count: r.quantity })
 // Requests withdrawn or declined fold away under a divider below the others.
 const closed = (r: Request) => r.state === 'withdrawn' || r.state === 'declined'
 const open = computed(() => (data.value?.mine ?? []).filter(r => !closed(r)))
 const finished = computed(() => (data.value?.mine ?? []).filter(closed))
 const showFinished = ref(false)
+const showDecided = ref(false)
 
 async function ask() {
   refusal.value = null
   try {
-    const { requestId, issued } = await $api<{ requestId: string, issued: boolean }>('/api/box-office/comps', { method: 'POST', body: { ...form.value, name: form.value.name.trim() || undefined, email: form.value.email.trim() } })
+    const { requestId, issued } = await $api<{ requestId: string, issued: boolean }>('/api/box-office/comps', { method: 'POST', body: { ...form.value, bandId: form.value.bandId === ANY ? undefined : form.value.bandId || undefined, name: form.value.name.trim() || undefined, email: form.value.email.trim() } })
     asking.value = false
     form.value = blank()
     await refresh()
@@ -84,7 +91,9 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
   busy.value = r.id
   try {
     await $api(`/api/box-office/comps/${encodeURIComponent(r.id)}/${verb}`, { method: 'POST', body: {} })
-    toast.add({ title: t(`box-office.comps.${verb}.done`), color: 'success' })
+    // Say who was sent what, so the approver knows exactly what they did.
+    const who = r.forName ?? t('box-office.orders.no-buyer')
+    toast.add({ title: t(`box-office.comps.${verb}.done`, { count: r.quantity, name: who }), color: 'success' })
     await refresh()
   }
   catch (e) {
@@ -121,16 +130,25 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
       <template #default="{ data: d }">
         <div class="space-y-8">
           <PageSection
-            v-if="d.waiting.length"
+            v-if="d.waiting.length || d.decided.length"
             :title="t('box-office.comps.waiting')"
           >
-            <RecordList :label="t('box-office.comps.waiting')">
+            <p
+              v-if="!d.waiting.length"
+              class="text-sm text-muted"
+            >
+              {{ t('box-office.comps.nothing-waiting') }}
+            </p>
+            <RecordList
+              v-else
+              :label="t('box-office.comps.waiting')"
+            >
               <RecordListItem
                 v-for="r in d.waiting"
                 :key="r.id"
                 icon="i-lucide-gift"
                 :name="nameOf(r)"
-                :description="`${describe(r)} · ${t('box-office.comps.asked-by', { name: r.requestedBy ?? '' })}`"
+                :description="`${describe(r)}, ${t('box-office.comps.asked-by', { name: r.requestedBy ?? '' })}`"
               >
                 <span class="inline-flex flex-wrap gap-2">
                   <UButton
@@ -150,13 +168,36 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 </span>
               </RecordListItem>
             </RecordList>
+            <CollapsibleDivider
+              v-if="d.decided.length"
+              v-model:open="showDecided"
+              :class="d.waiting.length ? 'mt-4' : undefined"
+              :label="t('box-office.comps.decided')"
+              :count="d.decided.length"
+            >
+              <RecordList :label="t('box-office.comps.decided')">
+                <RecordListItem
+                  v-for="r in d.decided"
+                  :key="r.id"
+                  icon="i-lucide-gift"
+                  :to="r.orderId ? `/console/box-office/orders/${encodeURIComponent(r.orderId)}` : undefined"
+                  :name="nameOf(r)"
+                  :description="`${describe(r)}, ${t('box-office.comps.asked-by', { name: r.requestedBy ?? '' })}`"
+                >
+                  <StatusBadge
+                    :tone="TONES[r.state]"
+                    :label="t(`box-office.comps.state.${r.state}`)"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
           </PageSection>
 
           <PageSection :title="t('box-office.comps.mine')">
             <EmptyState
               v-if="!d.mine.length"
               :title="t('box-office.comps.empty.title')"
-              :description="t('box-office.comps.empty.description')"
+              :description="askWords('empty-description')"
               icon="i-lucide-gift"
             />
             <template v-else>
@@ -244,7 +285,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
           <UFormField
             name="bandId"
             :label="t('box-office.comps.ask.band')"
-            required
+            :help="t('box-office.comps.ask.band-help')"
           >
             <USelect
               v-model="form.bandId"

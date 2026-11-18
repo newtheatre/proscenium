@@ -12,7 +12,7 @@
 // stops instead and awaits its count, which no longer stops the seller opening the next.
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { getSpace, placeName } from '#modules/core'
+import { getSpace, listSpaces, placeName } from '#modules/core'
 import { postEntries } from '#modules/finance'
 import { labelsOf } from './people'
 
@@ -44,6 +44,17 @@ async function checkSpace(spaceId: string | null | undefined): Promise<string | 
   const space = await getSpace(spaceId)
   if (!space || space.archived) throw new Refusal('payments.session.no-such-space', 'There is no such space.', { status: 422, fields: { spaceId: 'payments.session.no-such-space' } })
   return space.id
+}
+
+/**
+ * Where a session opens when the device has no place of its own: payments.sessions.default-space,
+ * else the theatre's only space when it has just one, else nowhere (unknown).
+ */
+export async function defaultSpace(): Promise<string | null> {
+  const set = await useSetting('payments.sessions.default-space') as string | null
+  if (set) return set
+  const spaces = await listSpaces()
+  return spaces.length === 1 ? spaces[0]!.id : null
 }
 
 /** Expected cash: the float, plus cash taken in the session, less cash handed back from it. */
@@ -225,6 +236,29 @@ export async function waitingIn(sessionId: string): Promise<WaitingAttempt[]> {
 export async function unfinishedIn(sessionId: string): Promise<{ intentId: string, amountMinor: number } | null> {
   const row = await first<{ id: string, amount_minor: number }>("SELECT id, amount_minor FROM payments_intents WHERE session_id = ? AND state = 'open' ORDER BY created_at DESC LIMIT 1", sessionId)
   return row ? { intentId: row.id, amountMinor: row.amount_minor } : null
+}
+
+/** What the session has taken, by way of paying: payments that succeeded, less what went back. */
+export async function takingsIn(sessionId: string): Promise<{ method: string, amountMinor: number }[]> {
+  const rows = await all<{ method: string, amount: number }>(
+    `SELECT a.method, sum(a.amount_minor - a.refunded_minor) AS amount FROM payments_attempts a JOIN payments_intents i ON i.id = a.intent_id
+      WHERE i.session_id = ? AND a.state = 'succeeded' GROUP BY a.method ORDER BY amount DESC`, sessionId)
+  return rows.map(r => ({ method: r.method, amountMinor: r.amount }))
+}
+
+const RECENT_SALES = 10 // not-policy: how many of a session's sales its card lists
+
+/** The session's latest sales, newest first: when, how much, how it was paid and how it ended. */
+export async function salesIn(sessionId: string): Promise<{ intentId: string, at: number, amountMinor: number, currency: string, state: string, methods: string[], notes: string[] }[]> {
+  const intents = await all<{ id: string, created_at: number, amount_minor: number, currency: string, state: string }>(
+    'SELECT id, created_at, amount_minor, currency, state FROM payments_intents WHERE session_id = ? ORDER BY created_at DESC LIMIT ?', sessionId, RECENT_SALES)
+  if (!intents.length) return []
+  const attempts = await all<{ intent_id: string, method: string, note: string | null }>(
+    "SELECT intent_id, method, note FROM payments_attempts WHERE state = 'succeeded' AND intent_id IN (SELECT value FROM json_each(?)) ORDER BY started_at", JSON.stringify(intents.map(i => i.id)))
+  return intents.map((i) => {
+    const mine = attempts.filter(a => a.intent_id === i.id)
+    return { intentId: i.id, at: i.created_at, amountMinor: i.amount_minor, currency: i.currency, state: i.state, methods: [...new Set(mine.map(a => a.method))], notes: mine.flatMap(a => (a.note ? [a.note] : [])) }
+  })
 }
 
 /** When a sale was last made in the session, or when it opened if none was. */

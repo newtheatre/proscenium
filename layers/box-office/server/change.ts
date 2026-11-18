@@ -18,13 +18,16 @@ export type ChangeKind = 'cancel' | 'reschedule' | 'move'
 
 /** The bookings a change to a performance would touch. */
 export interface Affected {
-  /** Paid bookings and those being paid for. */
+  /** Paid bookings and those being paid for. Complimentary tickets are counted apart. */
   bookings: number
   tickets: number
   paidMinor: number
   /** Reservations not yet paid for: cancelled with the performance whatever is decided. */
   reservations: number
   reservedTickets: number
+  /** Complimentary tickets issued, and the bookings that hold them: nothing was paid for these. */
+  complimentary: number
+  complimentaryBookings: number
   currency: string | null
   decision: Decision | null
   decidedAt: number | null
@@ -33,12 +36,13 @@ export interface Affected {
 const STATES = "('reserved', 'awaiting_payment', 'confirmed')"
 
 export async function affected(performanceId: string): Promise<Affected> {
-  const rows = await all<{ state: string, orders: number, tickets: number, money: number, currency: string }>(
-    `SELECT o.state, count(DISTINCT o.id) AS orders, count(l.id) AS tickets, coalesce(sum(l.amount_minor), 0) AS money, max(o.currency) AS currency
+  const rows = await all<{ state: string, comp: number, orders: number, tickets: number, money: number, currency: string }>(
+    `SELECT o.state, l.comp_request_id IS NOT NULL AS comp, count(DISTINCT o.id) AS orders, count(l.id) AS tickets, coalesce(sum(l.amount_minor), 0) AS money, max(o.currency) AS currency
       FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id
-      WHERE l.performance_id = ? AND l.kind = 'ticket' AND l.state = 'live' AND o.state IN ${STATES} GROUP BY o.state`, performanceId)
+      WHERE l.performance_id = ? AND l.kind = 'ticket' AND l.state = 'live' AND o.state IN ${STATES} GROUP BY o.state, comp`, performanceId)
   const sales = await first<{ change_decision: Decision | null, change_decided_at: number | null }>('SELECT change_decision, change_decided_at FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
-  const paid = rows.filter(r => r.state !== 'reserved')
+  const paid = rows.filter(r => r.state !== 'reserved' && !r.comp)
+  const comps = rows.filter(r => r.state !== 'reserved' && r.comp)
   const reserved = rows.find(r => r.state === 'reserved')
   return {
     bookings: paid.reduce((sum, r) => sum + r.orders, 0),
@@ -46,7 +50,9 @@ export async function affected(performanceId: string): Promise<Affected> {
     paidMinor: paid.reduce((sum, r) => sum + r.money, 0),
     reservations: reserved?.orders ?? 0,
     reservedTickets: reserved?.tickets ?? 0,
-    currency: rows[0]?.currency ?? null,
+    complimentary: comps.reduce((sum, r) => sum + r.tickets, 0),
+    complimentaryBookings: comps.reduce((sum, r) => sum + r.orders, 0),
+    currency: (paid[0] ?? rows[0])?.currency ?? null,
     decision: sales?.change_decision ?? null,
     decidedAt: sales?.change_decided_at ?? null,
   }
@@ -73,9 +79,9 @@ export async function guard(change: { record: { type: string, id: string }, kind
   }
   if (change.kind !== 'cancel' && change.kind !== 'reschedule' && change.kind !== 'move') return { allowed: true as const }
   const a = await affected(performanceId)
-  if (!a.bookings && !a.reservations) return { allowed: true as const }
+  if (!a.bookings && !a.reservations && !a.complimentaryBookings) return { allowed: true as const }
   if (a.decision && !(change.kind === 'cancel' && a.decision === 'keep')) return { allowed: true as const }
-  const count = a.tickets + a.reservedTickets
+  const count = a.tickets + a.reservedTickets + a.complimentary
   return {
     allowed: false as const,
     code: 'box-office.change.decision-needed',
@@ -90,6 +96,7 @@ export async function impact(change: { record: { type: string, id: string }, kin
   const a = await affected(change.record.id)
   const lines: string[] = []
   if (a.bookings) lines.push(`${a.tickets === 1 ? '1 ticket' : `${a.tickets} tickets`} on ${a.bookings === 1 ? '1 booking' : `${a.bookings} bookings`}, ${money(a.paidMinor, a.currency)} paid.`)
+  if (a.complimentary) lines.push(`${a.complimentary === 1 ? '1 complimentary ticket' : `${a.complimentary} complimentary tickets`}, nothing paid.`)
   if (a.reservations) lines.push(`${a.reservations === 1 ? '1 reservation' : `${a.reservations} reservations`} not yet paid for${change.kind === 'cancel' ? ', which will be cancelled' : ''}.`)
   if (lines.length && a.decision) lines.push(DECIDED[a.decision])
   return lines
