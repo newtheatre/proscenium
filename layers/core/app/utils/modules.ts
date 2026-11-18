@@ -8,6 +8,8 @@ export interface ModuleView {
   on: boolean
   requires: string[]
   uses: string[]
+  /** Optional partners: modules that add to this one's points. */
+  worksWith?: string[]
   /** Every module that requires this one, on or off. */
   requiredBy: string[]
   /** What switching this one on would also switch on, those required first. */
