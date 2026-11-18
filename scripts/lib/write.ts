@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, relative } from 'node:path'
 import { GENERATED, ROOT, KIT } from './paths.ts'
 import { handlerKey, type Loaded, type Owner } from './load.ts'
+import { collectPolicies, policiesSource } from './policies.ts'
 
 function write(path: string, contents: string) {
   mkdirSync(join(path, '..'), { recursive: true })
@@ -125,4 +126,6 @@ export function writeGenerated(modules: Loaded[], options: { version: string, re
   if (!registryFile.endsWith('test-registry.ts')) {
     write(join(GENERATED, 'types/registry.d.ts'), typesSource(modules))
   }
+  // Every policy section, for the server to put a policy together from (layers/core/server/policies).
+  write(join(GENERATED, 'policies.ts'), policiesSource(collectPolicies(modules)))
 }

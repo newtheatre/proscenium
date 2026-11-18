@@ -80,7 +80,7 @@ export function checkContentTokens(registry: any): string[] {
   const dirs = [join(ROOT, 'site/content'), ...readdirSync(join(ROOT, 'layers')).map(l => join(ROOT, 'layers', l, 'content'))]
   for (const file of dirs.flatMap(d => walk(d, ['.md']))) {
     lines(file).forEach((line, i) => {
-      for (const [, name] of line.matchAll(/:setting\{\s*name="([^"]+)"\s*\}/g)) {
+      for (const [, name] of line.matchAll(/:setting\{\s*name="([^"]+)"[^}]*\}/g)) {
         const found = registry.settings.get(name)
         if (!found) problems.push(`${rel(file)}:${i + 1}: quotes the setting "${name}", which does not exist`)
         else if (!found.entry.quotable) problems.push(`${rel(file)}:${i + 1}: quotes "${name}", which is not marked quotable`)

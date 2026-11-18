@@ -192,6 +192,8 @@
   "bar.desk.pick-size": "Pick a size to add it.",
   "bar.desk.choose": "choose",
   "bar.desk.choices.help": "The usual choice is already picked.",
+  "bar.desk.choices.help-avoided": "The usual choice has something the customer avoids, so it is not picked. Check what is.",
+  "bar.desk.choices.help-refused": "The usual choice cannot be sold after the refusal, so it is not picked. Check what is.",
   "bar.desk.choices.size": "Size",
   "bar.desk.choices.pick-one": "pick one",
   "bar.desk.choices.optional": "optional",
