@@ -279,6 +279,9 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
     if (typeof now === 'object' && JSON.stringify(now) !== lastSaid) void restore(now as Record<string, unknown>)
     return
   }
+  // A holder ticket still to be named, such as a wheelchair space, is not in the sale yet, so the
+  // panel says there is nothing; its own word coming back leaves the ticket waiting to be named.
+  if (lastSaid === 'null' && naming.value.some(r => unnamed(r) > 0)) return
   // Emptied by the till rather than by this panel saying there is nothing.
   const fromTill = lastSaid !== 'null'
   lastSaid = 'null'

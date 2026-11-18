@@ -143,7 +143,7 @@ const schemeName = async () => String(await useSetting('core.access-scheme.name'
  * ID-44). What was accepted stays in force until a change is decided. Staff may apply on the
  * person's behalf; the person is told and can correct it (ID-42).
  */
-export async function apply(unit: UnitView, actor: Actor, accountId: string, input: Application): Promise<{ status: ProfileRow['status'] }> {
+export async function apply(unit: UnitView, actor: Actor, accountId: string, input: Application, options: { ability?: string } = {}): Promise<{ status: ProfileRow['status'] }> {
   if (!(await schemeEnabled())) return NOT_FOUND()
   const account = await accountById(accountId)
   if (!isUsable(account)) refuse('core.not-found', 'There is no such person.', { status: 404 })
@@ -177,7 +177,7 @@ export async function apply(unit: UnitView, actor: Actor, accountId: string, inp
       params: [sealed, at, via, byStaff ? actor.accountId! : null, at, accountId],
     })
   }
-  unit.audit({ action: existing ? 'update' : 'create', ...(byStaff ? { ability: 'core.access-scheme.review' } : {}), record: ['core.account', accountId], detail: { accessApplication: via } })
+  unit.audit({ action: existing ? 'update' : 'create', ...(byStaff ? { ability: options.ability ?? 'core.access-scheme.review' } : {}), record: ['core.account', accountId], detail: { accessApplication: via } })
   await notify(unit, answering ? 'core.access-answer-received' : 'core.access-application-received', { to: accountId, variables: { scheme: await schemeName() } })
   return { status: existing?.status === 'accepted' ? 'accepted' : 'submitted' }
 }
@@ -539,4 +539,40 @@ export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor
   // Written in this unit and sent after it commits, with the pipeline's retries; the link is sealed.
   await notifyAddress(unit, 'core.access-invitation', { address, variables: { link, scheme }, dedupeKey: id })
   return { accountId: found.accountId }
+}
+
+/** What the form for applying on somebody's behalf at the box office needs, and whether it may be used. */
+export interface DeskAccessForm {
+  /** Whether they have an application already: waiting, accepted, asking for more or turned down. */
+  applied: boolean
+  needs: { id: string, key: string, label: string, description: string | null }[]
+  allowNote: boolean
+}
+
+/**
+ * The application form for a seller filling it in with somebody at the box office's till, such as
+ * for a wheelchair space (Matt, 2026-11-17: a submitted application is enough to book, flagged for
+ * staff). Null while the scheme is off. Says only whether they have applied, never what they said:
+ * an application already made is the reviewers' to read.
+ */
+export async function deskAccessForm(accountId: string): Promise<DeskAccessForm | null> {
+  if (!await schemeEnabled()) return null
+  const row = await profileOf(accountId)
+  return {
+    applied: !!row,
+    needs: (await listTerms(NEEDS_VOCABULARY)).map(t => ({ id: t.id, key: t.slug, label: t.label, description: t.description ?? null })),
+    allowNote: await useSetting('core.access-scheme.allow-note') as boolean,
+  }
+}
+
+/**
+ * Applies for somebody at the box office's till, under the seller's own ability (`ability`, asked by
+ * the caller). Only for a person with no application at all: one waiting, accepted, asking for more
+ * or turned down is the reviewers' to deal with, and the till never sees or changes what it says.
+ * Marked as made by staff, and the person is emailed, as when a reviewer applies for them.
+ */
+export async function applyAtDesk(unit: UnitView, actor: Actor, accountId: string, input: Application, ability: string): Promise<{ status: ProfileRow['status'] }> {
+  if (actor.accountId === accountId) refuse('core.access.own-record', 'You cannot apply for yourself from here.', { status: 403, remedy: 'Apply from your own account instead.' })
+  if (await profileOf(accountId)) refuse('core.access.applied', 'They have already applied to the access scheme.', { status: 409, remedy: 'The access scheme\'s reviewers can look at their application.' })
+  return apply(unit, actor, accountId, input, { ability })
 }

@@ -1,12 +1,14 @@
 <!-- Who one ticket of a member or holder price is for, at the till (Matt, 17 November): the seller
      scans the holder's card, such as a membership card, or finds them by name, and is told at once
      whether they qualify. Where they do not, a seller who may check by hand can sell it to them
-     anyway; nobody is sold one without being named. The sale checks everything again. -->
+     anyway; nobody is sold one without being named. The sale checks everything again. For a ticket
+     that needs the access scheme, such as a wheelchair space, somebody who has never applied can
+     have the application filled in with them here; once sent, it is enough to sell them one. -->
 <script setup lang="ts">
 import type { Buyer } from './BoxOfficeBuyerPicker.vue'
 
 export interface Holder { accountId: string, label: string, byHand: boolean }
-interface Answer { accountId: string, label: string, met: boolean, reason: string | null, mayOverride: boolean }
+interface Answer { accountId: string, label: string, met: boolean, reason: string | null, mayOverride: boolean, mayApply: boolean }
 
 const props = defineProps<{ performanceId: string, ticketTypeId: string, label: string, disabled?: boolean }>()
 const model = defineModel<Holder | undefined>()
@@ -49,6 +51,26 @@ function byHand() {
   model.value = { accountId: answer.value.accountId, label: answer.value.label, byHand: true }
   answer.value = null
 }
+// Applying to the access scheme with them, then asking again: a sent application is enough.
+const applying = ref(false)
+const applyFor = ref<string | null>(null)
+function startApplying() {
+  if (!answer.value) return
+  applyFor.value = answer.value.accountId
+  applying.value = true
+}
+async function applied() {
+  if (applyFor.value) await ask({ accountId: applyFor.value })
+}
+const actions = computed(() => {
+  const a = answer.value
+  if (!a) return undefined
+  const list = [
+    ...(a.mayApply ? [{ label: t('box-office.screens.panel.access.start', { name: a.label }), color: 'neutral' as const, variant: 'outline' as const, icon: 'i-lucide-accessibility', onClick: startApplying }] : []),
+    ...(a.mayOverride ? [{ label: t('box-office.screens.panel.holder.sell-anyway', { name: a.label }), color: 'neutral' as const, variant: 'outline' as const, onClick: byHand }] : []),
+  ]
+  return list.length ? list : undefined
+})
 function change() {
   model.value = undefined
   answer.value = null
@@ -106,7 +128,14 @@ function change() {
       icon="i-lucide-circle-alert"
       :title="t('box-office.screens.panel.holder.not-met', { name: answer.label })"
       :description="answer.reason ?? undefined"
-      :actions="answer.mayOverride ? [{ label: t('box-office.screens.panel.holder.sell-anyway', { name: answer.label }), color: 'neutral', variant: 'outline', onClick: byHand }] : undefined"
+      :actions="actions"
+    />
+    <BoxOfficeAccessApply
+      v-if="applyFor"
+      v-model:open="applying"
+      :performance-id="performanceId"
+      :account-id="applyFor"
+      @applied="applied"
     />
   </div>
 </template>

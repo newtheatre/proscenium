@@ -14,6 +14,8 @@ import ticketTypeDelete from '../../server/api/box-office/ticket-types/[id].dele
 import ticketTypeOrder from '../../server/api/box-office/ticket-types/order.put'
 import bookGet from '../../server/api/box-office/book/performances/[id].get'
 import holderPost from '../../server/api/box-office/desk/holder.post'
+import accessFormGet from '../../server/api/box-office/desk/access-application/index.get'
+import accessApplyPost from '../../server/api/box-office/desk/access-application/index.post'
 import { signDoorCode } from '../../server/door-codes'
 import { findOrCreateAccount } from '#modules/core'
 import { createBasket, pricedLines } from '../../server/baskets'
@@ -28,6 +30,8 @@ const handle = server({
   'PUT /api/box-office/ticket-types/order': ticketTypeOrder,
   'GET /api/box-office/book/performances/:id': bookGet,
   'POST /api/box-office/desk/holder': holderPost,
+  'GET /api/box-office/desk/access-application': accessFormGet,
+  'POST /api/box-office/desk/access-application': accessApplyPost,
 })
 let keys = 0
 async function api<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = manager): Promise<{ status: number, body: T }> {
@@ -398,6 +402,42 @@ describe('a wheelchair space', () => {
     expect(bought.ok, JSON.stringify(bought)).toBe(true)
     const [line] = await rows<{ amount_minor: number, ticket_type_id: string }>('SELECT amount_minor, ticket_type_id FROM box_office_order_lines WHERE order_id = ?', (bought as { orderId: string }).orderId)
     expect(line).toEqual({ amount_minor: 500, ticket_type_id: wheelchair.id })
+  })
+
+  it('is sold at the till to somebody who has never applied, once the seller has filled in the application with them', async () => {
+    const h = await house(20)
+    const wheelchair = await managed('box-office.wheelchair')
+    const newcomer = person([])
+    await rows('INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, \'Walk In\', \'guest\', ?)', newcomer.accountId, NOV_16)
+    // Asking whether somebody else qualifies is the access scheme's own reading ability.
+    const seller = person(['box-office.order.sell', 'core.access-profile.read'])
+    const holder = (actor = seller) => api('POST', '/api/box-office/desk/holder', { performanceId: h.performanceId, ticketTypeId: wheelchair.id, accountId: newcomer.accountId }, actor)
+    const formPath = `/api/box-office/desk/access-application?performanceId=${h.performanceId}&accountId=${newcomer.accountId}`
+
+    expect((await holder()).body).toMatchObject({ met: false, mayApply: true })
+    const form = await api('GET', formPath, undefined, seller)
+    expect(form.status, JSON.stringify(form.body)).toBe(200)
+    expect(form.body).toMatchObject({ accountId: newcomer.accountId, label: 'Walk In', applied: false })
+    const stays = form.body.needs.find((n: { key: string }) => n.key === 'wheelchair-stays')
+    // Only a seller of the performance may see the form or send it.
+    expect((await api('GET', formPath, undefined, person(['box-office.order.view']))).status).toBe(403)
+    const application = { needs: [{ term: stays.id }], companions: 0 }
+    expect((await api('POST', '/api/box-office/desk/access-application', { performanceId: h.performanceId, accountId: newcomer.accountId, application }, person(['box-office.order.view']))).status).toBe(403)
+
+    const sent = await api('POST', '/api/box-office/desk/access-application', { performanceId: h.performanceId, accountId: newcomer.accountId, application }, seller)
+    expect(sent.status, JSON.stringify(sent.body)).toBe(200)
+    expect(sent.body).toEqual({ status: 'submitted' })
+    const [profile] = await rows<{ status: string, submitted_via: string, submitted_by: string }>('SELECT status, submitted_via, submitted_by FROM core_access_profiles WHERE account_id = ?', newcomer.accountId)
+    expect(profile).toEqual({ status: 'submitted', submitted_via: 'staff', submitted_by: seller.accountId })
+
+    // Applied, not yet decided: enough to sell them one, kept on the line for staff to check.
+    expect((await holder()).body).toMatchObject({ met: true, mayApply: false })
+    const lines = await inContext(() => pricedLines(h.performanceId, [{ bandId: h.bandId, ticketTypeId: wheelchair.id, quantity: 1, holders: [newcomer.accountId!] }], Date.now(), { channel: 'desk', account: null }), seller)
+    expect(lines.lines).toMatchObject([{ requirement: { ref: 'core.access-scheme:wheelchair', accountId: newcomer.accountId, evidence: 'pending' } }])
+
+    // The till applies only once: an application made is the reviewers' to read and change.
+    expect((await api('GET', formPath, undefined, seller)).body).toMatchObject({ applied: true })
+    expect((await api('POST', '/api/box-office/desk/access-application', { performanceId: h.performanceId, accountId: newcomer.accountId, application }, seller)).body).toMatchObject({ code: 'core.access.applied' })
   })
 
   it('is refused to someone not on the access scheme, and not sold at all while the scheme is off', async () => {
