@@ -7,7 +7,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import { refundsList } from '../../../../shared/lists'
 
 type State = 'requested' | 'approved' | 'sent' | 'succeeded' | 'failed' | 'declined'
-interface Row { id: string, owner: { module: string, record: string }, amountMinor: number, currency: string, method: string, state: State, requestedByName: string | null, approvedByName: string | null, createdAt: number, handBack: boolean }
+interface Row { id: string, owner: { module: string, record: string, reference?: string, buyer?: string | null, to?: string }, amountMinor: number, currency: string, method: string, state: State, requestedByName: string | null, approvedByName: string | null, createdAt: number, handBack: boolean }
 
 const ROUTE = '/api/payments/refunds'
 const TONES = { requested: 'warning', approved: 'info', sent: 'info', succeeded: 'success', failed: 'danger', declined: 'neutral' } as const
@@ -31,7 +31,9 @@ const list = computed(() => ({
 
 const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
 const ownerLabel = (r: Row) => (te(`${r.owner.module}.module.name`) ? t(`${r.owner.module}.module.name`) : r.owner.module)
-const thing = (r: Row) => t('payments.screens.refunds.thing', { amount: money(r.amountMinor, r.currency), method: methodLabel(r.method) })
+const thing = (r: Row) => (r.owner.reference
+  ? t('payments.screens.refunds.thing-for', { amount: money(r.amountMinor, r.currency), method: methodLabel(r.method), reference: r.owner.reference })
+  : t('payments.screens.refunds.thing', { amount: money(r.amountMinor, r.currency), method: methodLabel(r.method) }))
 const fail = (e: unknown) => {
   const refusal = toRefusal(e)
   toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
@@ -105,7 +107,23 @@ const rowActions = (r: Row): DropdownMenuItem[] => {
       {{ methodLabel(row.method) }}
     </template>
     <template #cell-owner="{ row }">
-      {{ ownerLabel(row) }}
+      <template v-if="row.owner.reference">
+        <ULink
+          v-if="row.owner.to"
+          :to="row.owner.to"
+          class="font-medium"
+        >
+          {{ row.owner.reference }}
+        </ULink>
+        <span
+          v-else
+          class="font-medium"
+        >{{ row.owner.reference }}</span>
+        <span class="block text-sm text-muted">{{ row.owner.buyer ? t('payments.screens.refunds.owner-buyer', { module: ownerLabel(row), buyer: row.owner.buyer }) : ownerLabel(row) }}</span>
+      </template>
+      <template v-else>
+        {{ ownerLabel(row) }}
+      </template>
     </template>
     <template #cell-requested="{ row }">
       {{ t('payments.screens.refunds.asked', { person: row.requestedByName ?? t('payments.screens.refunds.the-system'), when: when(row.createdAt) }) }}

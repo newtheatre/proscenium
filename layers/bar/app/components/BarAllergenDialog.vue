@@ -14,7 +14,8 @@ const { toRefusal } = useRefusal()
 const toast = useToast()
 
 const allergenItems = computed(() => ALLERGENS.map(k => ({ value: k as string, label: t(`bar.allergen.${k}`) })))
-const sourceItems = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(`bar.screens.product.sources.${s}`) })))
+// The dialog checks stock items' labels; a source reads "This item's label".
+const sourceItems = computed(() => (['label', 'supplier', 'other'] as const).map(s => ({ value: s, label: t(s === 'label' ? 'bar.screens.product.sources.label-item' : `bar.screens.product.sources.${s}`) })))
 const label = ref<{ contains: string[], mayContain: string[], source: 'label' | 'supplier' | 'other' }>({ contains: [], mayContain: [], source: 'label' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(() => props.target, (target) => {
