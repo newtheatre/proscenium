@@ -10,7 +10,7 @@ import codesPost from '../../server/api/box-office/promo-codes/index.post'
 import codePut from '../../server/api/box-office/promo-codes/[id].put'
 import codeActive from '../../server/api/box-office/promo-codes/[id]/active.post'
 import promoGet from '../../server/api/box-office/book/performances/[id]/promo.get'
-import { createBasket } from '../../server/baskets'
+import { basketByToken, createBasket } from '../../server/baskets'
 import { expireBasket } from '../../server/release'
 import { house, NOV_16, ready, type House } from './stage'
 
@@ -74,6 +74,10 @@ describe('a promo code', () => {
       { list_minor: 800, discount_minor: 200, amount_minor: 600 },
     ])
     expect(await used(c.id)).toBe(3)
+    // The basket says which code it was held with and what it saved, for Check and pay.
+    const seen = await inContext(() => basketByToken((b as { orderId: string }).orderId, (b as unknown as { token: string }).token))
+    expect(seen).toMatchObject({ promo: { code: c.code.toUpperCase(), savingMinor: 800 } })
+    expect(seen!.lines.map(l => l.listMinor).sort()).toEqual([1200, 1200, 800].sort())
   })
 
   it('takes an amount off, or sets a price, only on the type it is for, and never below nothing', async () => {
@@ -135,6 +139,23 @@ describe('a promo code', () => {
     expect(await hold(h, concessionOnly.code, 1)).toMatchObject({ code: 'box-office.promo.no-tickets' })
   })
 
+  it('set "not with member or concession prices", leaves alone the types that need proof or a membership', async () => {
+    const c = await code({ effect: 'percent_off', value: 2000, notWithRequirements: true })
+    expect((await api('GET', '/api/box-office/promo-codes')).body.rows.find((r: { id: string }) => r.id === c.id)).toMatchObject({ notWithRequirements: true })
+    const b = await hold(h, c.code, 1, 1)
+    expect(b.ok && b.totalMinor).toBe(960 + 800)
+    expect(await used(c.id)).toBe(1)
+    expect(await hold(h, c.code, 0, 2)).toEqual({ ok: false, code: 'box-office.promo.no-tickets' })
+    const preview = await api('GET', `/api/box-office/book/performances/${h.performanceId}/promo?code=${c.code}`, undefined, undefined)
+    expect(preview.body.prices.some((p: { ticketTypeId: string }) => p.ticketTypeId === h.concessionId)).toBe(false)
+    expect(preview.body.prices).toEqual(expect.arrayContaining([{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 960 }]))
+    // Off by default: a code made without it still stacks, as before.
+    const plain = await code({ effect: 'percent_off', value: 2000 })
+    expect((await api('GET', '/api/box-office/promo-codes')).body.rows.find((r: { id: string }) => r.id === plain.id)).toMatchObject({ notWithRequirements: false })
+    const both = await hold(h, plain.code, 1, 1)
+    expect(both.ok && both.totalMinor).toBe(960 + 640)
+  })
+
   it('is previewed for a buyer with the prices it gives', async () => {
     const c = await code({ effect: 'amount_off', value: 300, maxPerOrder: 2 })
     const preview = await api('GET', `/api/box-office/book/performances/${h.performanceId}/promo?code=${c.code.toLowerCase()}`, undefined, undefined)
@@ -156,6 +177,23 @@ describe('managing codes', () => {
     expect(lowered.body.code).toBe('box-office.promo.below-used')
     const listed = await api('GET', '/api/box-office/promo-codes')
     expect(listed.body.rows.find((r: { id: string }) => r.id === c.id)).toMatchObject({ used: 3, active: true })
+  })
+
+  it('can be limited to one performance and one part of the house, listed with the production\'s', async () => {
+    const listed = await api('GET', '/api/box-office/promo-codes')
+    expect(listed.body.productions.find((p: { id: string }) => p.id === h.productionId)).toMatchObject({
+      performances: expect.arrayContaining([expect.objectContaining({ id: h.performanceId })]),
+      bands: expect.arrayContaining([expect.objectContaining({ id: h.bandId })]),
+    })
+    const c = await code({ effect: 'amount_off', value: 100, performanceId: h.performanceId, bandId: h.bandId })
+    const saved = (await api('GET', '/api/box-office/promo-codes')).body.rows.find((r: { id: string }) => r.id === c.id)
+    // A part of the house is its production's, so the code is for that production too.
+    expect(saved).toMatchObject({ productionId: h.productionId, performanceId: h.performanceId, bandId: h.bandId })
+    const b = await hold(h, c.code, 1)
+    expect(b.ok && b.totalMinor).toBe(1100)
+    const other = await house(5)
+    const wrong = await api('POST', '/api/box-office/promo-codes', { code: `TEST${++codes}`, effect: 'amount_off', value: 100, productionId: other.productionId, bandId: h.bandId })
+    expect(wrong.body.code).toBe('box-office.promo.scope')
   })
 
   it('is closed to someone who does not manage codes', async () => {

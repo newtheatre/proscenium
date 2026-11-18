@@ -12,7 +12,9 @@ import { postEntries } from '#modules/finance'
 import type { OwnerEntry, Part } from '#modules/payments'
 import { spread, tagged, takenBack } from './cancel'
 import { claimSeats, releaseHold } from './capacity'
+import { hashOf, randomToken } from './codes'
 import { cancellations, orderLines } from './db/schema'
+import { siteUrl } from './links'
 import { liveLines, ORDER, wordsFor, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
 import { refundOrder, type OrderRefund } from './refunds'
@@ -160,7 +162,9 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
     priceId: m.priceId, listMinor: m.priceMinor, discountMinor: 0, amountMinor: m.priceMinor, replacesLineId: m.line.id, state: 'live',
   })))
   unit.expect(chosen.length)
-  unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = ${order.state} AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
+  // The message carries a new link to the booking, where the new tickets are; it replaces the old one.
+  const token = randomToken()
+  unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, link_token_hash = ${await hashOf(token)}, updated_at = ${at} WHERE id = ${order.id} AND state = ${order.state} AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
   const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: 'exchange', lineIds: ids, refundId: refund?.id ?? null, feeMinor: 0, by: input.by }])
   const doorCodes = paid ? await issueTickets(unit, newIds.map(id => ({ id, performance_id: input.performanceId }))) : []
 
@@ -194,7 +198,10 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
         was: `${was.tickets} for ${was.show}, ${was.when}`,
         now: `${now.tickets} for ${now.show}, ${now.when}`,
         money: refund ? `A refund of ${now.amount} will go back the way you paid.` : x.extraMinor > 0 ? `You paid ${now.amount} more for these.` : 'There is nothing more to pay.',
-        codes: paid ? doorCodes.join('\n\n') : 'You pay for these at the box office when you arrive, as before.',
+        next: paid
+          ? 'The old tickets no longer work. Your new tickets, each with its own code to be scanned at the door, are on your booking\'s page. Anyone with the link can use them, so only pass this email on to the people you are bringing.'
+          : 'You pay for these at the box office when you arrive, as before.',
+        link: await siteUrl(`/book/order/${token}`),
       },
       subject: ['box-office.order', order.id],
     })

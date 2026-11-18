@@ -4,7 +4,6 @@
      the owner's own tabs first, then tabs other modules add through `core.record-tab` (absent when
      the viewer may not open them or the module is off); and a history panel from the audit trail. -->
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
 export interface RecordTab { id: string, label: string }
@@ -14,22 +13,24 @@ const props = withDefaults(defineProps<{
   title: string
   /** Always a word, never colour alone. */
   status?: { label: string, tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }
-  /** The most likely next step in this state. */
-  primary?: { label: string, to?: string, icon?: string }
+  /** The most likely next step in this state; `hint` says why it is not ready yet, and it then shows quieter. */
+  primary?: { label: string, to?: string, icon?: string, hint?: string }
   /** Everything else, destructive actions last. */
   actions?: DropdownMenuItem[][]
   /** Four to six facts. */
-  summary?: { label: string, value: string }[]
+  summary?: { label: string, value: string, to?: string }[]
   /** The record's type, such as `core.production`, and its id: what other modules' tabs and the history attach to. */
   recordType: string
   recordId: string
-  /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. */
+  /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. With only one tab in all, no tab bar is drawn. */
   tabs: RecordTab[]
   /** Where this record sits below a navigation entry, nearest parent last. */
   trail?: { label: string, to: string }[]
   /** What the readiness checklist is called, when other modules or the owner contribute checks. */
   checklistTitle?: string
-}>(), { trail: undefined, checklistTitle: undefined, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
+  /** False once the checklist has nothing left to say, such as on a published production. */
+  checklist?: boolean
+}>(), { trail: undefined, checklistTitle: undefined, checklist: true, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
 const emit = defineEmits<{ (e: 'primary'): void }>()
 defineSlots<{
   /** A side panel that stays put beside the tabs on a laptop (a poster); above them on a phone. */
@@ -65,12 +66,11 @@ const facts = computed(() => (factList.value?.facts ?? []).flatMap((f) => {
   const component = resolveComponent(f.component)
   return typeof component === 'string' ? [] : [{ ...f, component }]
 }))
-const { data: checkList } = await useAPI<{ checks: { id: string, done: boolean, sentence: string, link?: string }[] }>('/api/core/record-checks', { query: { record: props.recordType, id: props.recordId }, key: `core:record-checks:${props.recordType}:${props.recordId}`, default: () => ({ checks: [] }) })
-const checks = computed(() => checkList.value?.checks ?? [])
+const { data: checkList } = await useAPI<{ checks: { id: string, done: boolean, sentence: string, link?: string, needed?: boolean }[] }>('/api/core/record-checks', { query: { record: props.recordType, id: props.recordId }, key: `core:record-checks:${props.recordType}:${props.recordId}`, default: () => ({ checks: [] }) })
+const checks = computed(() => props.checklist ? checkList.value?.checks ?? [] : [])
 const checksDone = computed(() => checks.value.filter(c => c.done).length)
 const hasAside = computed(() => !!slots.aside || checks.value.length > 0)
 const slots = useSlots()
-const phone = import.meta.client ? useMediaQuery('(max-width: 1023px)') : ref(false)
 
 const historyOpen = ref(false)
 const history = ref<{ at: number, who: string | null, kind: string, action: string, ability: string | null, detail: Record<string, unknown> }[] | null>(null)
@@ -103,6 +103,7 @@ const { te } = useT()
   <PageFrame
     :title="title"
     :trail="trail"
+    long-title
   >
     <template #status>
       <StatusBadge
@@ -112,18 +113,26 @@ const { te } = useT()
       />
     </template>
     <template #primary>
-      <UButton
+      <UTooltip
         v-if="primary"
-        :label="primary.label"
-        :icon="primary.icon"
-        :to="primary.to"
-        @click="!primary.to && emit('primary')"
-      />
+        :text="primary.hint"
+        :disabled="!primary.hint"
+      >
+        <UButton
+          :label="primary.label"
+          :icon="primary.icon"
+          :to="primary.to"
+          :variant="primary.hint ? 'outline' : 'solid'"
+          :aria-description="primary.hint"
+          @click="!primary.to && emit('primary')"
+        />
+      </UTooltip>
       <UButton
         icon="i-lucide-history"
         color="neutral"
         variant="outline"
         :label="t('core.history.open')"
+        :ui="{ label: 'max-sm:sr-only' }"
         @click="historyOpen = true"
       />
       <RowActions
@@ -155,9 +164,10 @@ const { te } = useT()
         class="mb-4 lg:order-2"
         :aria-label="t('core.record.side-panel')"
       >
+        <!-- Both are drawn and CSS picks one, so the server and the browser draw the same markup. -->
         <UCollapsible
-          v-if="checks.length && phone"
-          class="mb-3"
+          v-if="checks.length"
+          class="mb-3 lg:hidden"
         >
           <UButton
             color="neutral"
@@ -173,25 +183,31 @@ const { te } = useT()
             />
           </template>
         </UCollapsible>
-        <template v-else>
+        <div :class="checks.length ? 'max-lg:hidden' : undefined">
           <slot name="aside" />
           <RecordChecks
             v-if="checks.length"
             :checks="checks"
             :title="checklistTitle ?? t('core.record.checklist')"
           />
-        </template>
+        </div>
       </aside>
       <div class="min-w-0 lg:order-1">
+        <!-- Page-level tabs look the same everywhere (a module's page in Admin, the settings window):
+             underlined, each label in full, scrolling sideways when they do not fit. A record with only one tab draws no bar. -->
         <UTabs
+          v-if="items.length > 1"
           v-model="current"
           :items="items"
           :content="false"
+          variant="link"
+          :aria-label="t('core.record.tabs', { name: title })"
+          :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
           class="mb-4"
         />
         <div
-          role="tabpanel"
-          :aria-label="items.find(i => i.value === current)?.label"
+          :role="items.length > 1 ? 'tabpanel' : undefined"
+          :aria-label="items.length > 1 ? items.find(i => i.value === current)?.label : undefined"
         >
           <!-- A tab of its own boundary: one whose content waits for data keeps the last tab in view
                until it is ready, and never unsettles the page around it. -->

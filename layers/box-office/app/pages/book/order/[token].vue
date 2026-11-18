@@ -1,12 +1,15 @@
 <!-- Manage booking (Box office specification, part 6; R-2): the page the link in every booking
-     message opens, with no sign-in. It shows the reference, the performance, the tickets and what is
-     still to pay. A reservation can be cancelled here, whole or some of its tickets, and the seats go
+     message opens, with no sign-in. It leads with the performance, then the tickets, each with its
+     code to be scanned at the door (a reservation shows its box office code instead), and what is
+     still to pay. Free tickets can be handed back here until the performance starts. A reservation can be cancelled here, whole or some of its tickets, and the seats go
      back on sale at once. A paid booking can be cancelled here too when the theatre allows it and the
      cut-off has not passed, and the price less the fee goes back to the card; otherwise the box
-     office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page. -->
+     office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page.
+     The signed-in owner opens the same page from My tickets, by the order's id. -->
 <script setup lang="ts">
-interface Order { accountUnclaimed?: boolean, orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, band: string | null, amountMinor: number }[], buyerCancel: { feeMinor: number, until: number } | null }
-interface Page { performance: { startsAt: number, venue: string }, production: { title: string } }
+import type { BookingView } from '../../../utils/booking'
+
+type Order = BookingView
 
 definePageMeta({ key: 'box-office-manage-booking' })
 const { t } = useT()
@@ -18,32 +21,22 @@ const { money } = await useMoney()
 const route = useRoute()
 const { viewer } = useViewer()
 const token = computed(() => String(route.params.token))
+// /book/order/mine?order=<id> is the same page for the signed-in owner, from My tickets: the booking
+// is found by its id and their account, since only the link's hash is kept. A link token is never
+// "mine", which is too short to be one.
+const ownerOrder = computed(() => token.value === 'mine' ? String(route.query.order ?? '') : null)
 useSeoMeta({ title: () => t('box-office.manage.title'), robots: 'noindex' })
 
-const headers = computed(() => ({ 'x-order-token': token.value }))
-const { data: order, error } = await useAPI<Order>('/api/box-office/orders/link', { key: `box-office:manage:${token.value}`, headers })
-const performanceId = computed(() => order.value?.lines[0]?.performanceId)
-// A performance that has passed or been cancelled is not on the public pages: the booking still shows.
-const { data: page } = await useAPI<Page>(() => `/api/box-office/book/performances/${encodeURIComponent(performanceId.value ?? '')}`, { key: `box-office:manage:page:${performanceId.value}`, immediate: !!performanceId.value })
-
-// The part of the house, such as a wheelchair space, where the production has more than one.
-const kindOf = (l: Order['lines'][number]) => (l.band ? `${l.band}, ${l.ticketType}` : l.ticketType)
-const lines = computed(() => {
-  const grouped = new Map<string, { label: string, count: number, amountMinor: number }>()
-  for (const l of order.value?.lines ?? []) {
-    const label = kindOf(l)
-    const row = grouped.get(label) ?? { label, count: 0, amountMinor: 0 }
-    row.count++
-    row.amountMinor += l.amountMinor
-    grouped.set(label, row)
-  }
-  return [...grouped.values()]
-})
+const headers = computed((): Record<string, string> => ownerOrder.value !== null ? { 'x-order-id': ownerOrder.value } : { 'x-order-token': token.value })
+const { data: order, error } = await useAPI<Order>('/api/box-office/orders/link', { key: `box-office:manage:${ownerOrder.value ?? token.value}`, headers })
+const kindOf = bookingLineName
 const reserved = computed(() => order.value?.state === 'reserved')
 // The buyer's own cancellation of what they paid for, on the theatre's terms.
 const terms = computed(() => order.value?.state === 'confirmed' ? order.value.buyerCancel : null)
 const cancellable = computed(() => !!order.value?.lines.length && (reserved.value || !!terms.value))
-const words = computed(() => terms.value ? 'refund' : 'cancel')
+// Free tickets are handed back, not refunded.
+const free = computed(() => order.value?.state === 'confirmed' && order.value.totalMinor === 0)
+const words = computed(() => terms.value ? (free.value ? 'free' : 'refund') : 'cancel')
 const refunded = ref<number | null>(null)
 
 function refundFor(ids: string[]) {
@@ -63,7 +56,7 @@ async function cancel(all: boolean) {
   if (!order.value) return
   const ids = all ? order.value.lines.map(l => l.id) : chosen.value
   const count = ids.length
-  const paid = !!terms.value
+  const paid = !!terms.value && !free.value
   const back = paid ? refundFor(ids) : 0
   const ok = await confirm({
     verb: t('box-office.manage.cancel.verb'),
@@ -113,51 +106,11 @@ async function cancel(all: boolean) {
               :title="t('box-office.manage.cancelled', { count: cancelled })"
               :description="refunded ? t('box-office.manage.refunded', { amount: money(refunded, order.currency) }) : undefined"
             />
+            <BoxOfficeBookingDetails :booking="order" />
             <BoxOfficeAccountCard
-              v-if="order.accountUnclaimed && !viewer.signedIn"
+              v-if="order.accountUnclaimed && !viewer.signedIn && ownerOrder === null"
               :order-token="token"
             />
-            <section class="space-y-2">
-              <h2
-                v-if="page"
-                class="text-lg font-semibold"
-              >
-                {{ page.production.title }}
-              </h2>
-              <p
-                v-if="page"
-                class="text-sm text-muted"
-              >
-                {{ t('box-office.book.when', { when: dateTime(page.performance.startsAt), venue: page.performance.venue }) }}
-              </p>
-              <p class="text-lg">
-                {{ t('box-office.basket.reference', { reference: order.reference }) }}
-              </p>
-              <UBadge
-                color="neutral"
-                variant="subtle"
-                :label="t(`box-office.manage.state.${order.state}`)"
-              />
-              <ul
-                v-if="lines.length"
-                class="divide-y divide-default"
-              >
-                <li
-                  v-for="line in lines"
-                  :key="line.label"
-                  class="flex justify-between py-2"
-                >
-                  <span>{{ t('box-office.basket.line', { count: line.count, label: line.label }) }}</span>
-                  <span>{{ money(line.amountMinor, order.currency) }}</span>
-                </li>
-              </ul>
-              <p
-                v-if="order.amountDueMinor > 0"
-                class="font-semibold"
-              >
-                {{ t('box-office.manage.due', { amount: money(order.amountDueMinor, order.currency) }) }}
-              </p>
-            </section>
 
             <section
               v-if="cancellable"
@@ -170,7 +123,7 @@ async function cancel(all: boolean) {
                 v-if="terms"
                 class="text-sm text-muted"
               >
-                {{ terms.feeMinor > 0
+                {{ free ? t('box-office.manage.free.terms', { until: dateTime(terms.until) }) : terms.feeMinor > 0
                   ? t('box-office.manage.refund.terms', { until: dateTime(terms.until), fee: money(terms.feeMinor, order.currency) })
                   : t('box-office.manage.refund.terms-free', { until: dateTime(terms.until) }) }}
               </p>
@@ -186,7 +139,7 @@ async function cancel(all: boolean) {
                   v-for="(line, i) in order.lines"
                   :key="line.id"
                   :model-value="chosen.includes(line.id)"
-                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: kindOf(line), price: money(line.amountMinor, order.currency) })"
+                  :label="t('box-office.manage.cancel.line', { n: i + 1, type: kindOf(line), price: line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) })"
                   @update:model-value="toggle(line.id, $event)"
                 />
               </fieldset>
@@ -197,7 +150,7 @@ async function cancel(all: boolean) {
                   variant="outline"
                   :loading="busy"
                   :disabled="!chosen.length || chosen.length === order.lines.length"
-                  :label="t('box-office.manage.cancel.button', { count: chosen.length || 0 })"
+                  :label="chosen.length ? t('box-office.manage.cancel.button', { count: chosen.length }) : t('box-office.manage.cancel.none')"
                   @click="cancel(false)"
                 />
                 <UButton

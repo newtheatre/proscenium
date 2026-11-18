@@ -8,7 +8,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
-type Sales = 'draft' | 'on_sale' | 'paused' | 'closed'
 interface Band { id: string, name: string, kind: string, sort: number }
 interface Pool { bandId: string, capacity: number, claimed: number }
 interface Price { bandId: string, ticketTypeId: string, amountMinor: number }
@@ -16,14 +15,14 @@ interface TicketType { id: string, name: string, kind: string, active: boolean, 
 interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
 interface ScheduledPrice { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }
 interface Setup {
-  sales: { state: Sales, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
+  sales: { state: SaleState, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
   houseCapacity: number | null
   pools: Pool[]
   prices: Price[]
   priceLayers: PriceLayer[]
   scheduledPrices: ScheduledPrice[]
   checklist: { code: string, done: boolean }[]
-  performance: { id: string, productionId: string, title: string, label: string | null, startsAt: number, state: string }
+  performance: { id: string, productionId: string, productionState: string, title: string, label: string | null, startsAt: number, state: string }
   bands: Band[]
 }
 
@@ -89,18 +88,18 @@ watch(data, (d) => {
 
 async function saveCapacity(confirmOverVenue = false) {
   const pools = Object.entries(capacity.value).map(([bandId, n]) => ({ bandId, capacity: n ?? 0 }))
-  const before = (data.value?.pools ?? []).map(p => ({ bandId: p.bandId, capacity: p.capacity }))
+  // A section with no seats yet goes back to none.
+  const had = data.value?.pools ?? []
+  const before = pools.map(p => ({ bandId: p.bandId, capacity: had.find(h => h.bandId === p.bandId)?.capacity ?? 0 }))
   refusal.value = null
   try {
     await $api(base.value, { method: 'PUT', body: { pools, confirmOverVenue } })
     await refresh()
     // Putting the old numbers back was allowed before, so it needs no second confirming.
-    offer(t('box-office.setup.capacity.saved'), before.length
-      ? async () => {
-        await $api(base.value, { method: 'PUT', body: { pools: before, confirmOverVenue: true } })
-        await refresh()
-      }
-      : undefined)
+    offer(t('box-office.setup.capacity.saved'), async () => {
+      await $api(base.value, { method: 'PUT', body: { pools: before, confirmOverVenue: true } })
+      await refresh()
+    })
   }
   catch (e) {
     const r = toRefusal(e)
@@ -190,14 +189,28 @@ async function inherit(bandId: string, typeId: string) {
 }
 
 // Copying another performance's set-up (BO-02).
-interface Source { id: string, title: string, label: string | null, startsAt: number }
+// The server lists this production's performances first, then the others, each production's in date
+// order; the picker groups them under the production's title.
+interface Source { id: string, productionId: string, title: string, label: string | null, startsAt: number }
 const { data: sources } = await useAPI<{ performances: Source[] }>(() => `${base.value}/sources`, { key: `box-office:setup:sources:${id.value}`, default: () => ({ performances: [] }) })
-const sourceItems = computed(() => (sources.value?.performances ?? []).map(p => ({ value: p.id, label: [p.title, dateTime(p.startsAt), p.label].filter(Boolean).join(' · ') })))
+const sourceList = computed(() => (sources.value?.performances ?? []).map(p => ({ value: p.id, productionId: p.productionId, title: p.title, label: [dateTime(p.startsAt), p.label].filter(Boolean).join(', ') })))
+const sourceItems = computed(() => {
+  const groups: { type?: 'label', value?: string, label: string }[][] = []
+  let production: string | null = null
+  for (const s of sourceList.value) {
+    if (s.productionId !== production) groups.push([{ type: 'label', label: s.title }])
+    production = s.productionId
+    groups.at(-1)!.push({ value: s.value, label: s.label })
+  }
+  return groups
+})
 const copyFrom = ref<string | undefined>(undefined)
 async function copySetup(confirmOverVenue = false) {
-  const from = sourceItems.value.find(s => s.value === copyFrom.value)
+  const from = sourceList.value.find(s => s.value === copyFrom.value)
   if (!from) return
-  if (!confirmOverVenue && !await confirm({ verb: t('box-office.setup.copy.verb'), thing: from.label, consequence: t('box-office.setup.copy.consequence'), button: t('box-office.setup.copy.button') })) return
+  // Copying onto a performance with nothing set up replaces nothing, so it needs no confirming.
+  const replaces = (data.value?.pools.length ?? 0) > 0
+  if (!confirmOverVenue && replaces && !await confirm({ verb: t('box-office.setup.copy.verb'), thing: `${from.title}, ${from.label}`, consequence: t('box-office.setup.copy.consequence'), button: t('box-office.setup.copy.button') })) return
   refusal.value = null
   try {
     const done = await $api<{ bands: number, pools: number, prices: number }>(`${base.value}/copy`, { method: 'POST', body: { fromPerformanceId: from.value, confirmOverVenue } })
@@ -212,11 +225,49 @@ async function copySetup(confirmOverVenue = false) {
   }
 }
 
-const band = ref({ name: '', kind: 'standard' as 'standard' | 'wheelchair' | 'restricted_view' })
-const bandKinds = computed(() => (['standard', 'wheelchair', 'restricted_view'] as const).map(value => ({ value, label: t(`box-office.setup.bands.kind.${value}`) })))
+// A wheelchair space is a ticket type tied to the access scheme, not a section, so a new section is
+// seats or restricted view; a production that already has a wheelchair section keeps it.
+const band = ref({ name: '', kind: 'standard' as 'standard' | 'restricted_view' })
+const bandKinds = computed(() => (['standard', 'restricted_view'] as const).map(value => ({ value, label: t(`box-office.setup.bands.kind.${value}`) })))
 async function addBand() {
   const d = data.value!
   if (await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`, { method: 'POST', body: { name: band.value.name.trim(), kind: band.value.kind, sort: d.bands.length } }), t('box-office.setup.bands.added'))) band.value = { name: '', kind: 'standard' }
+}
+
+// The whole run at once (S2): this set-up copied to every performance of the production with nothing
+// set up yet, and every performance that is ready put on sale.
+const { data: run, refresh: refreshRun } = await useProductionTickets(() => data.value?.performance.productionId ?? '')
+const others = computed(() => (run.value?.performances ?? []).filter(p => p.id !== id.value && !p.past))
+const othersBare = computed(() => others.value.filter(p => p.scheduled && !p.capacity).length)
+const runNotOnSale = computed(() => (run.value?.performances ?? []).filter(p => p.scheduled && p.sales !== 'on_sale' && p.sales !== 'closed').length)
+interface RunResult { done: number, skipped: { performanceId: string, reason: string }[] }
+function ranRun(result: RunResult, done: string, skipped: string) {
+  toast.add({ title: t(done, { count: result.done }), description: result.skipped.length ? t(skipped, { count: result.skipped.length }) : undefined, color: result.skipped.length ? 'warning' : 'success' })
+}
+async function copyToRun(confirmOverVenue = false) {
+  refusal.value = null
+  try {
+    const result = await $api<RunResult>(`${base.value}/copy-to-run`, { method: 'POST', body: { confirmOverVenue } })
+    ranRun(result, 'box-office.setup.run.copied', 'box-office.setup.run.copy-skipped')
+    await Promise.all([refresh(), refreshRun()])
+  }
+  catch (e) {
+    const r = toRefusal(e)
+    if (r?.code === 'box-office.capacity.confirm-over-venue' && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return copyToRun(true)
+    refusal.value = r
+  }
+}
+async function openRun() {
+  const d = data.value!
+  refusal.value = null
+  try {
+    const result = await $api<RunResult>(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/sales/open`, { method: 'POST', body: {} })
+    ranRun(result, 'box-office.setup.run.opened', 'box-office.setup.run.open-skipped')
+    await Promise.all([refresh(), refreshRun()])
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
 }
 
 // The production's bands: renamed in a dialogue, removed while nothing is priced or sold in them.
@@ -256,12 +307,33 @@ async function pause() {
   await act(pausing, t('box-office.setup.paused'), opening)
 }
 
-const TONES = { draft: 'neutral', on_sale: 'success', paused: 'warning', closed: 'neutral' } as const
 // A missing way to pay is fixed under Payments, so that line links there.
 const CHECK_LINKS: Record<string, string> = { payment: '/admin/modules/payments/providers' }
 const checks = computed(() => (data.value?.checklist ?? []).map(c => ({ id: c.code, done: c.done, sentence: t(`box-office.setup.check.${c.code}`), link: CHECK_LINKS[c.code] })))
 const trail = computed(() => [{ label: t('box-office.navigation.performances.label'), to: '/console/box-office/performances' }])
 const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, n) => sum + (n ?? 0), 0))
+// Once a performance has gone on sale and nothing is missing, the checklist folds to one line.
+const folded = computed(() => !!data.value?.sales && data.value.sales.state !== 'draft' && checks.value.every(c => c.done))
+
+// Leaving with seats, prices or the sale window changed but not saved asks once.
+const dirty = computed(() => {
+  const d = data.value
+  if (!d) return false
+  const seats = d.bands.some(b => (capacity.value[b.id] ?? 0) !== (d.pools.find(p => p.bandId === b.id)?.capacity ?? 0))
+  const priced = d.bands.some(b => activeTypes.value.some(type => (prices.value[cell(b.id, type.id)] ?? null) !== shown(layer(b.id, type.id))))
+  const s = d.sales
+  const windowChanged = (['onSaleAt', 'offSaleAt', 'maxPerOrder', 'holdMinutes'] as const).some(k => (windowForm.value[k] ?? null) !== (s?.[k] ?? null))
+  return seats || priced || windowChanged
+})
+onBeforeRouteLeave(async () => {
+  if (!dirty.value) return true
+  return confirm({ verb: t('core.form.leave'), thing: t('core.form.leave-thing'), consequence: t('core.form.leave-consequence') })
+})
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (dirty.value) event.preventDefault()
+}
+onMounted(() => window.addEventListener('beforeunload', beforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
 <template>
@@ -277,10 +349,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
         :trail="trail"
       >
         <template #status>
-          <StatusBadge
-            :tone="d.sales ? TONES[d.sales.state] : 'neutral'"
-            :label="d.sales ? t(`box-office.performances.sales.${d.sales.state}`) : t('box-office.performances.not-set-up')"
-          />
+          <StatusBadge v-bind="saleStateBadge(d.sales?.state ?? null, d.pools.reduce((sum, p) => sum + p.capacity, 0), t)" />
         </template>
         <template #primary>
           <UButton
@@ -301,6 +370,15 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
 
         <div class="space-y-8">
           <RefusalNotice :refusal="refusal" />
+          <UAlert
+            v-if="d.performance.productionState !== 'published'"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('box-office.setup.unpublished.title')"
+            :description="t('box-office.setup.unpublished.description')"
+            :actions="[{ label: t('box-office.setup.unpublished.link'), to: `/console/programme/productions/${encodeURIComponent(d.performance.productionId)}`, color: 'neutral', variant: 'outline' }]"
+          />
           <div
             v-if="d.sales && d.sales.state !== 'draft'"
             class="flex flex-wrap gap-4"
@@ -320,7 +398,18 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               {{ t('box-office.change.link') }}
             </ULink>
           </div>
+          <p
+            v-if="folded"
+            class="flex items-center gap-2 text-sm"
+          >
+            <UIcon
+              name="i-lucide-circle-check"
+              class="size-4 shrink-0 text-success"
+            />
+            {{ t('box-office.setup.checklist-done') }}
+          </p>
           <RecordChecks
+            v-else
             :title="t('box-office.setup.checklist')"
             :checks="checks"
           />
@@ -330,7 +419,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             :description="t('box-office.setup.copy.description')"
           >
             <p
-              v-if="!sourceItems.length"
+              v-if="!sourceList.length"
               class="text-sm text-muted"
             >
               {{ t('box-office.setup.copy.none') }}
@@ -361,6 +450,37 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                 </div>
               </UFormField>
             </UForm>
+          </PageSection>
+
+          <PageSection
+            v-if="others.length"
+            :title="t('box-office.setup.run.title')"
+            :description="t('box-office.setup.run.description')"
+          >
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-if="d.pools.length && othersBare"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-copy"
+                :label="t('box-office.setup.run.copy', { count: othersBare })"
+                @click="copyToRun()"
+              />
+              <UButton
+                v-if="runNotOnSale"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-play"
+                :label="t('box-office.setup.run.open', { count: runNotOnSale })"
+                @click="openRun"
+              />
+              <p
+                v-if="!(d.pools.length && othersBare) && !runNotOnSale"
+                class="text-sm text-muted"
+              >
+                {{ t('box-office.setup.run.all-done') }}
+              </p>
+            </div>
           </PageSection>
 
           <PageSection
@@ -517,9 +637,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                 <UFormField
                   v-for="type in activeTypes"
                   :key="type.id"
-                  :label="type.name"
                   :help="priceHelp(b.id, type.id)"
                 >
+                  <!-- Each box is named for its section too, so a screen reader does not hear "Member" twice. -->
+                  <template #label>
+                    <span class="sr-only">{{ b.name }}, </span>{{ type.name }}<span class="sr-only"> {{ t('box-office.setup.prices.price') }}</span>
+                  </template>
                   <div class="flex flex-wrap items-center gap-2">
                     <FieldMoney v-model="prices[cell(b.id, type.id)]" />
                     <UButton

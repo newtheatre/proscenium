@@ -16,21 +16,25 @@ interface Duty {
   archivedAt: number | null
 }
 
-const { t } = useT()
+const { t, te } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ duties: Duty[] }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
+const { data, status, error, refresh } = await useAPI<{ duties: Duty[], requirementOptions?: { value: string, label: string }[], requirementLabels?: Record<string, string> }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
+// A fact's label arrives as its translation key.
+const said = (label: string) => te(label) ? t(label) : label
+const requirementItems = computed(() => (data.value?.requirementOptions ?? []).map(o => ({ value: o.value, label: said(o.label) })))
+const requirementLabel = (ref: string) => said(data.value?.requirementLabels?.[ref] ?? ref)
 
-const blank = () => ({ name: '', description: '', isLead: false, callBeforeMinutes: 60, stayAfterMinutes: 30 }) // not-policy: a new duty's starting values
+const blank = () => ({ name: '', description: '', isLead: false, callBeforeMinutes: 60 as number | null, stayAfterMinutes: 30 as number | null, requirements: [] as string[] }) // not-policy: a new duty's starting values
 const form = ref(blank())
 const editing = ref<Duty | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 function edit(duty: Duty) {
   editing.value = duty
-  form.value = { name: duty.name, description: duty.description ?? '', isLead: duty.isLead, callBeforeMinutes: duty.callBeforeMinutes, stayAfterMinutes: duty.stayAfterMinutes }
+  form.value = { name: duty.name, description: duty.description ?? '', isLead: duty.isLead, callBeforeMinutes: duty.callBeforeMinutes, stayAfterMinutes: duty.stayAfterMinutes, requirements: [...duty.requirements] }
 }
 function stop() {
   editing.value = null
@@ -39,7 +43,7 @@ function stop() {
 
 async function save() {
   refusal.value = null
-  const body = { ...form.value, name: form.value.name.trim(), description: form.value.description.trim() || null, ...(editing.value ? { requirements: editing.value.requirements } : {}) }
+  const body = { ...form.value, callBeforeMinutes: form.value.callBeforeMinutes ?? 0, stayAfterMinutes: form.value.stayAfterMinutes ?? 0, name: form.value.name.trim(), description: form.value.description.trim() || null }
   try {
     if (editing.value) await write(`/api/front-of-house/duties/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/duties', { method: 'POST', body })
@@ -100,7 +104,7 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
               v-for="duty in d.duties"
               :key="duty.id"
               :name="duty.name"
-              :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.description].filter(Boolean).join(' · ')"
+              :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
             >
               <RowActions
                 :items="actions(duty)"
@@ -141,22 +145,20 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
               :label="t('front-of-house.duties.call-before')"
               :help="t('front-of-house.duties.call-before-help')"
             >
-              <UInputNumber
+              <MinutesInput
                 v-model="form.callBeforeMinutes"
                 :min="0"
                 :max="480"
-                :step="5"
               />
             </UFormField>
             <UFormField
               :label="t('front-of-house.duties.stay-after')"
               :help="t('front-of-house.duties.stay-after-help')"
             >
-              <UInputNumber
+              <MinutesInput
                 v-model="form.stayAfterMinutes"
                 :min="0"
                 :max="480"
-                :step="5"
               />
             </UFormField>
           </div>
@@ -165,6 +167,20 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
             :label="t('front-of-house.duties.is-lead')"
             :description="t('front-of-house.duties.is-lead-help')"
           />
+          <UFormField
+            v-if="requirementItems.length"
+            name="requirements"
+            :label="t('front-of-house.duties.requirements')"
+            :help="t('front-of-house.duties.requirements-help')"
+          >
+            <USelectMenu
+              v-model="form.requirements"
+              :items="requirementItems"
+              value-key="value"
+              multiple
+              :placeholder="t('front-of-house.duties.requirements-none')"
+            />
+          </UFormField>
           <div class="flex gap-2">
             <UButton
               type="submit"

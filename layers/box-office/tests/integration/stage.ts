@@ -11,6 +11,7 @@ import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post
 import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
 import bandsPost from '../../server/api/box-office/productions/[id]/bands/index.post'
 import bandsGet from '../../server/api/box-office/productions/[id]/bands/index.get'
+import productionTickets from '../../server/api/box-office/productions/[id]/tickets/index.get'
 import bandPatch from '../../server/api/box-office/productions/[id]/bands/[bandId].patch'
 import bandDelete from '../../server/api/box-office/productions/[id]/bands/[bandId].delete'
 import pricesPost from '../../server/api/box-office/productions/[id]/prices.post'
@@ -27,6 +28,7 @@ import reservePost from '../../server/api/box-office/baskets/[id]/reserve.post'
 import checkoutPost from '../../server/api/box-office/baskets/[id]/checkout.post'
 import payPost from '../../server/api/box-office/baskets/[id]/pay.post'
 import checkPost from '../../server/api/box-office/baskets/[id]/check.post'
+import basketReleasePost from '../../server/api/box-office/baskets/[id]/release.post'
 import confirmPost from '../../server/api/box-office/reservations/confirm.post'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
@@ -41,7 +43,10 @@ import doorOverride from '../../server/api/box-office/performances/[id]/door/ove
 import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.post'
 import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
+import doorOfflineGet from '../../server/api/box-office/performances/[id]/door/offline.get'
+import doorOfflinePost from '../../server/api/box-office/performances/[id]/door/offline.post'
 import doorTonight from '../../server/api/box-office/door/tonight.get'
+import liveTonight from '../../../core/server/api/core/live/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
@@ -51,7 +56,9 @@ import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import sessionGet from '../../../payments/server/api/payments/session.get'
 import intentCancelPost from '../../../payments/server/api/payments/intents/[id]/cancel.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
+import homeGet from '../../../core/server/api/core/home.get'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
+import orderAccountPost from '../../server/api/box-office/orders/link/account.post'
 import exchangePost from '../../server/api/box-office/orders/[id]/exchange.post'
 import reportsSalesGet from '../../server/api/box-office/reports/sales.get'
 import reportsSalesCsv from '../../server/api/box-office/reports/sales.csv.get'
@@ -69,6 +76,9 @@ import publishProduction from '../../../core/server/api/core/productions/[id]/pu
 import setProductionEffects from '../../../core/server/api/core/productions/[id]/effects.put'
 import setProductionAdvisories from '../../../core/server/api/core/productions/[id]/advisories.put'
 import editProduction from '../../../core/server/api/core/productions/[id]/index.patch'
+import copyToRunPost from '../../server/api/box-office/performances/[id]/sales/copy-to-run.post'
+import runSeatsPut from '../../server/api/box-office/productions/[id]/sales/seats.put'
+import openRunPost from '../../server/api/box-office/productions/[id]/sales/open.post'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -83,6 +93,7 @@ export const handle = server({
   'GET /api/box-office/ticket-types': ticketTypesGet,
   'POST /api/box-office/productions/:id/bands': bandsPost,
   'GET /api/box-office/productions/:id/bands': bandsGet,
+  'GET /api/box-office/productions/:id/tickets': productionTickets,
   'PATCH /api/box-office/productions/:id/bands/:bandId': bandPatch,
   'DELETE /api/box-office/productions/:id/bands/:bandId': bandDelete,
   'POST /api/box-office/productions/:id/prices': pricesPost,
@@ -99,21 +110,29 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/checkout': checkoutPost,
   'POST /api/box-office/baskets/:id/pay': payPost,
   'POST /api/box-office/baskets/:id/check': checkPost,
+  'POST /api/box-office/baskets/:id/release': basketReleasePost,
   'POST /api/box-office/reservations/confirm': confirmPost,
   'GET /api/box-office/orders/link': orderLinkGet,
   'GET /api/box-office/orders': ordersGet,
   'GET /api/box-office/performances': performancesGet,
   'GET /api/box-office/performances/:id/door': doorGet,
   'POST /api/box-office/performances/:id/door/admit': doorAdmit,
+  'GET /api/box-office/performances/:id/door/offline': doorOfflineGet,
+  'POST /api/box-office/performances/:id/door/offline': doorOfflinePost,
   'POST /api/box-office/performances/:id/door/override': doorOverride,
   'POST /api/box-office/performances/:id/sales/copy': copyPost,
+  'POST /api/box-office/performances/:id/sales/copy-to-run': copyToRunPost,
+  'POST /api/box-office/productions/:id/sales/open': openRunPost,
+  'PUT /api/box-office/productions/:id/sales/seats': runSeatsPut,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
   'GET /api/box-office/door/tonight': doorTonight,
+  'GET /api/core/live/tonight': liveTonight,
   'GET /api/box-office/orders/:id': orderGet,
   'POST /api/box-office/orders/:id/release': releasePost,
   'POST /api/box-office/orders/:id/keep': keepPost,
   'POST /api/box-office/orders/link/cancel': orderCancelPost,
+  'POST /api/box-office/orders/link/account': orderAccountPost,
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'POST /api/box-office/orders/:id/split': splitPost,
@@ -141,6 +160,7 @@ export const handle = server({
   'GET /api/payments/session': sessionGet,
   'POST /api/payments/intents/:id/cancel': intentCancelPost,
   'POST /api/payments/till/summary': tillSummaryPost,
+  'GET /api/core/home': homeGet,
 })
 
 export const manager = person(['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage'])

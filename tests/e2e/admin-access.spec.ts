@@ -51,10 +51,15 @@ test.describe('someone who reads roles and sets up sign-in', () => {
     await noViolations(page)
   })
 
-  test('facts and sign-in settings open', async ({ page }) => {
+  // Facts and Sign-in are separate tests: Sign-in is a long page of settings, and visiting and
+  // checking both pages with axe in one test overran the 30-second limit on a busy CI runner.
+  test('facts open', async ({ page }) => {
     await visit(page, '/admin/facts')
     await expect(page.getByRole('heading', { level: 1, name: 'Facts' })).toBeVisible()
     await noViolations(page)
+  })
+
+  test('sign-in settings open', async ({ page }) => {
     await visit(page, '/admin/sign-in')
     await expect(page.getByRole('heading', { level: 1, name: 'Sign-in' })).toBeVisible()
     await noViolations(page)

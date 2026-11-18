@@ -3,6 +3,8 @@
      member directly. -->
 <script setup lang="ts">
 import { z } from 'zod'
+import { convertCount, endsOnFor } from '../../../../../../shared/dates'
+import type { MembershipSchemeChoice } from '../../../../../../shared/scheme-choice'
 
 interface Scheme {
   id: string
@@ -26,14 +28,14 @@ interface Scheme {
   requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, endsByList: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal, fieldErrors } = useRefusal()
-const { day } = useDates()
+const { toRefusal } = useRefusal()
+const { day, toLocal } = useDates()
 const toast = useToast()
 const { confirm } = useConfirm()
 const { offer } = useUndo()
@@ -46,6 +48,15 @@ const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRu
 
 // Details: one form, saved as a whole.
 const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, requiresPayment: false, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
+// The windows are stored as days and edited as a number and a unit, like the module's settings.
+const SECONDS_IN_DAY = 86400 // not-policy: seconds in a day
+const asDuration = (field: 'rolloverDays' | 'renewalOpensDays' | 'graceDays') => computed<number | null>({
+  get: () => details[field] * SECONDS_IN_DAY,
+  set: (seconds) => { details[field] = Math.round((seconds ?? 0) / SECONDS_IN_DAY) },
+})
+const rolloverWindow = asDuration('rolloverDays')
+const renewalWindow = asDuration('renewalOpensDays')
+const graceWindow = asDuration('graceDays')
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(scheme, (s) => {
   if (!s) return
@@ -53,8 +64,29 @@ watch(scheme, (s) => {
   const { verifier: _verifier, verifierConfig: _config, ...fields } = s
   Object.assign(details, { ...fields, summary: s.summary ?? '', fixedEndMonth: s.fixedEndMonth ?? 7, fixedEndDay: s.fixedEndDay ?? 31, checks: s.verifier ?? 'none', listId: config.listId, domains: (config.domains ?? []).join(', ') })
 }, { immediate: true })
+// Lengths are a bare count in the rule's unit, so changing the rule restates them; the officer sees the new dates first.
+async function confirmLengthRule(): Promise<boolean> {
+  const s = scheme.value!
+  const options = data.value?.options ?? []
+  if (details.lengthRule === s.lengthRule || !options.length) return true
+  const rule = { lengthRule: details.lengthRule, fixedEndMonth: details.fixedEndMonth, fixedEndDay: details.fixedEndDay, rolloverDays: details.rolloverDays }
+  const unitName = t(`membership.screens.units.${details.lengthRule === 'fixed' ? 'years' : 'months'}`).toLocaleLowerCase()
+  const today = toLocal(Date.now()).slice(0, 10) // not-policy: the date part of a local date and time
+  const lines = options.filter(o => o.state === 'offered').map((o) => {
+    const count = convertCount(s.lengthRule, details.lengthRule, o.count)
+    const ends = count === null ? null : endsOnFor(rule, today, count)
+    return count === null || !ends ? o.name : t('membership.screens.scheme.confirm-length-line', { name: o.name, count, unit: unitName, ends: day(ends) })
+  })
+  return await confirm({
+    verb: t('membership.screens.scheme.verb-length-rule'),
+    thing: t('membership.screens.scheme.thing-length-rule', { scheme: s.name }),
+    consequence: t('membership.screens.scheme.confirm-length-rule', { unit: unitName, lines: lines.join('; ') }),
+    button: t('membership.screens.scheme.change-length-rule'),
+  })
+}
 async function saveDetails() {
   detailsRefusal.value = null
+  if (!(await confirmLengthRule())) return
   const fixed = details.lengthRule === 'fixed'
   const { checks, listId, domains, requiresPayment, ...rest } = details
   // While Membership fees is off the switch is locked, so the stored value is left as it is.
@@ -100,42 +132,35 @@ const actions = computed(() => {
   const out = []
   if (s.state === 'closed') out.push({ label: t('membership.screens.scheme.to-archived'), icon: 'i-lucide-archive', onSelect: () => move('archived') })
   if (s.state === 'archived') out.push({ label: t('membership.screens.scheme.to-closed'), icon: 'i-lucide-archive-restore', onSelect: () => move('closed') })
-  if (data.value?.canImport && (s.state === 'open' || s.state === 'closed')) out.push({ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', onSelect: openImport })
+  if (data.value?.canImport && (s.state === 'open' || s.state === 'closed')) out.push({ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', onSelect: () => { importing.value = true } })
   if (s.state === 'draft') out.push({ label: t('membership.screens.scheme.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove })
   return out
 })
 
-// Importing members from a file (MEM-49): tried first, then queued once the officer has seen the outcome.
-interface Imported { queued: number, wouldImport?: number, refused: { line: number, reason: string }[] }
-const importing = ref(false)
-const importFile = ref<File | null>(null)
-const importPreview = ref<Imported | null>(null)
-const importRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function openImport() {
-  importFile.value = null
-  importPreview.value = null
-  importRefusal.value = null
-  importing.value = true
+// The join page (MEM-10): its address to copy, and a poster with a QR code of it to print.
+const { data: brand } = await useBrand()
+const joinLink = computed(() => scheme.value ? `${useRequestURL().origin}/join/${scheme.value.key}` : '')
+const copiedLink = ref(false)
+async function copyJoinLink() {
+  await navigator.clipboard.writeText(joinLink.value)
+  copiedLink.value = true
+  setTimeout(() => { copiedLink.value = false }, 2000) // not-policy: how long the button says it copied
 }
-async function sendImport(dryRun: boolean): Promise<Imported | null> {
-  importRefusal.value = null
+async function downloadPoster() {
+  const s = scheme.value!
   try {
-    return await $api<Imported>(`/api/membership/schemes/${id.value}/import` as string, { method: 'POST', body: { file: await importFile.value!.text(), dryRun } })
+    await downloadMembershipPoster(membershipPosterSvg({ theatre: brand.value?.name ?? t('core.public.default-name'), title: t('membership.join.title', { scheme: s.name }), summary: s.summary, url: joinLink.value, scan: t('membership.join.poster-scan') }), `${s.key}-join-poster.png`)
   }
   catch (e) {
-    importRefusal.value = toRefusal(e)
-    return null
+    toast.add({ title: t('membership.join.poster-failed'), description: (e as Error).message, color: 'error' })
   }
 }
-watch(importFile, async (f) => {
-  importPreview.value = f ? await sendImport(true) : null
-})
-async function runImport() {
-  const done = await sendImport(false)
-  if (!done) return
-  toast.add({ title: t('membership.screens.import.queued', { count: done.queued }), description: t('membership.screens.import.queued-help'), color: 'success' })
-  importing.value = false
-}
+
+// Adding and importing members: the windows are shared with Console > Members, and offered the schemes this viewer may use.
+const { data: choices, refresh: refreshChoices } = await useAPI<{ schemes: MembershipSchemeChoice[] }>('/api/membership/members/schemes', { key: 'membership:members:schemes', default: () => ({ schemes: [] }) })
+const canAddHere = computed(() => !!choices.value?.schemes.some(s => s.id === id.value && s.canAdd))
+const importing = ref(false)
+const adding = ref(false)
 
 // Lengths: added from a window, withdrawn or offered again from the row's menu with an Undo.
 const option = reactive({ name: '', count: 12, idempotency: '' })
@@ -157,7 +182,7 @@ async function addOption() {
     await $api(`/api/membership/schemes/${id.value}/options` as string, { method: 'POST', headers: { 'idempotency-key': option.idempotency }, body: { name: option.name, count: option.count } })
     toast.add({ title: t('membership.screens.lengths.added', { name: option.name.trim() }), color: 'success' })
     addingOption.value = false
-    await refresh()
+    await Promise.all([refresh(), refreshChoices()])
   }
   catch (e) {
     optionRefusal.value = toRefusal(e)
@@ -167,10 +192,10 @@ const setOption = (o: Option, state: Option['state']) => $api(`/api/membership/s
 async function toggleOption(o: Option) {
   const to = o.state === 'offered' ? 'withdrawn' : 'offered'
   await setOption(o, to)
-  await refresh()
+  await Promise.all([refresh(), refreshChoices()])
   offer(t(`membership.screens.lengths.${to}-done`, { name: o.name }), async () => {
     await setOption(o, o.state)
-    await refresh()
+    await Promise.all([refresh(), refreshChoices()])
   })
 }
 const optionActions = (o: Option) => [[o.state === 'offered'
@@ -180,57 +205,6 @@ const offeredOptions = computed(() => (data.value?.options ?? []).filter(o => o.
 const withdrawnOptions = computed(() => (data.value?.options ?? []).filter(o => o.state === 'withdrawn'))
 const showWithdrawn = ref(false)
 const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthOptionId === optionId)?.endsOn
-
-// Adding a member directly.
-const adding = ref(false)
-const member = reactive({ name: '', address: '', lengthOptionId: undefined as string | undefined, startsOn: '', endsOn: '', note: '', fee: 'link' as 'link' | 'waive', idempotency: '' })
-// P9: for a scheme whose fee is collected through the system, a link to pay or a waiver.
-const asksFee = computed(() => !!data.value?.feesOn)
-const byLink = computed(() => asksFee.value && member.fee === 'link')
-const memberRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const memberForm = useTemplateRef('memberForm')
-// What the add route checks, beside each field; a waived fee needs its reason.
-const memberSchema = z.object({
-  address: z.string().trim().email().max(254), // not-policy: the longest address there is
-  name: z.string().trim().max(120), // not-policy: shape bound
-  note: z.string().trim().max(1000), // not-policy: shape bound
-}).passthrough().superRefine((value, ctx) => {
-  if (asksFee.value && member.fee === 'waive' && !value.note) ctx.addIssue({ code: 'custom', path: ['note'], message: t('core.form.invalid.required') })
-})
-function openAdd() {
-  Object.assign(member, { name: '', address: '', lengthOptionId: data.value?.options.find(o => o.state === 'offered')?.id, startsOn: '', endsOn: '', note: '', fee: 'link', idempotency: crypto.randomUUID() })
-  memberRefusal.value = null
-  adding.value = true
-}
-async function addMember() {
-  memberRefusal.value = null
-  try {
-    const added = await $api<{ endsOn: string | null, opensMembersArea: boolean, waiting?: string }>(`/api/membership/schemes/${id.value}/members` as string, {
-      method: 'POST',
-      headers: { 'idempotency-key': member.idempotency },
-      body: {
-        name: member.name.trim() || undefined, address: member.address.trim(), lengthOptionId: member.lengthOptionId ?? null, note: member.note.trim() || undefined,
-        ...(byLink.value ? {} : { startsOn: member.startsOn || undefined, endsOn: member.endsOn || undefined }),
-        ...(asksFee.value ? { fee: member.fee } : {}),
-      },
-    })
-    adding.value = false
-    if (added.waiting === 'payment') {
-      toast.add({ title: t('membership.screens.add-member.link-sent'), color: 'success' })
-      return
-    }
-    toast.add({
-      title: t('membership.screens.add-member.added'),
-      description: t(added.opensMembersArea ? 'membership.screens.add-member.opens-area' : 'membership.screens.add-member.no-area'),
-      color: 'success',
-    })
-    await refresh()
-  }
-  catch (e) {
-    memberRefusal.value = toRefusal(e)
-    memberForm.value?.setErrors(fieldErrors(memberRefusal.value))
-  }
-}
 </script>
 
 <template>
@@ -250,10 +224,10 @@ async function addMember() {
     >
       <div class="flex gap-2">
         <UButton
-          v-if="scheme.state === 'open'"
+          v-if="scheme.state === 'open' && canAddHere"
           :label="t('membership.screens.add-member.title')"
           icon="i-lucide-user-plus"
-          @click="openAdd"
+          @click="adding = true"
         />
         <UButton
           v-if="scheme.state === 'draft' || scheme.state === 'closed'"
@@ -301,6 +275,13 @@ async function addMember() {
                 :key="item.code"
               >
                 {{ t(`membership.screens.checklist.${item.code}`) }}
+                <ULink
+                  v-if="item.code === 'verifier'"
+                  to="/admin/modules/membership/lists"
+                  class="font-medium underline"
+                >
+                  {{ t('membership.screens.scheme.list-manage') }}
+                </ULink>
               </li>
             </ul>
           </template>
@@ -346,7 +327,7 @@ async function addMember() {
                 v-for="o in offeredOptions"
                 :key="o.id"
                 :name="o.name"
-                :description="exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
+                :description="data?.endsByList ? t('membership.screens.lengths.ends-by-list') : exampleFor(o.id) ? t('membership.screens.lengths.example', { date: day(exampleFor(o.id)!) }) : undefined"
               >
                 <RowActions
                   :items="optionActions(o)"
@@ -381,6 +362,39 @@ async function addMember() {
           :title="t('membership.screens.lengths.title')"
           :description="t('membership.screens.lengths.indefinite')"
         />
+
+        <PageSection
+          v-if="scheme.joinMode === 'apply' && scheme.state !== 'archived'"
+          :title="t('membership.join.admin-title')"
+          :description="t(scheme.state === 'open' ? 'membership.join.admin-help' : 'membership.join.admin-help-not-open')"
+        >
+          <UFormField :label="t('membership.join.admin-link')">
+            <UFieldGroup class="flex">
+              <UInput
+                :model-value="joinLink"
+                readonly
+                class="min-w-0 flex-1 font-mono"
+              />
+              <UButton
+                color="neutral"
+                variant="outline"
+                :icon="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'"
+                :label="copiedLink ? t('membership.join.copied') : t('membership.join.copy')"
+                @click="copyJoinLink"
+              />
+            </UFieldGroup>
+          </UFormField>
+          <template #actions>
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-qr-code"
+              :label="t('membership.join.poster')"
+              loading-auto
+              @click="downloadPoster"
+            />
+          </template>
+        </PageSection>
 
         <PageSection
           :title="t('membership.screens.scheme.details')"
@@ -455,10 +469,12 @@ async function addMember() {
                 :label="t('membership.screens.scheme.rollover')"
                 :help="t('membership.screens.scheme.rollover-help')"
               >
-                <UInputNumber
-                  v-model="details.rolloverDays"
-                  :min="0"
-                  :max="180"
+                <DurationInput
+                  v-model="rolloverWindow"
+                  block
+                  :label="t('membership.screens.scheme.rollover')"
+                  min="0d"
+                  max="180d"
                 />
               </UFormField>
             </div>
@@ -467,20 +483,24 @@ async function addMember() {
                 :label="t('membership.screens.scheme.renewal-opens')"
                 :help="t('membership.screens.scheme.renewal-opens-help')"
               >
-                <UInputNumber
-                  v-model="details.renewalOpensDays"
-                  :min="0"
-                  :max="180"
+                <DurationInput
+                  v-model="renewalWindow"
+                  block
+                  :label="t('membership.screens.scheme.renewal-opens')"
+                  min="0d"
+                  max="180d"
                 />
               </UFormField>
               <UFormField
                 :label="t('membership.screens.scheme.grace')"
                 :help="t('membership.screens.scheme.grace-help')"
               >
-                <UInputNumber
-                  v-model="details.graceDays"
-                  :min="0"
-                  :max="90"
+                <DurationInput
+                  v-model="graceWindow"
+                  block
+                  :label="t('membership.screens.scheme.grace')"
+                  min="0d"
+                  max="90d"
                 />
               </UFormField>
             </div>
@@ -604,157 +624,16 @@ async function addMember() {
       </template>
     </UModal>
 
-    <UModal
+    <MembershipAddMemberModal
       v-model:open="adding"
-      :title="t('membership.screens.add-member.title')"
-      :description="t('membership.screens.add-member.help')"
-    >
-      <template #body>
-        <UForm
-          id="membership-add-member"
-          ref="memberForm"
-          :schema="memberSchema"
-          :state="member"
-          class="space-y-4"
-          novalidate
-          @submit="addMember"
-        >
-          <RefusalNotice :refusal="memberRefusal" />
-          <UFormField
-            name="address"
-            :label="t('membership.screens.add-member.address')"
-            required
-          >
-            <UInput
-              v-model="member.address"
-              type="email"
-              autocomplete="off"
-            />
-          </UFormField>
-          <UFormField
-            name="name"
-            :label="t('membership.screens.add-member.name')"
-            :help="t('membership.screens.add-member.name-help')"
-          >
-            <UInput
-              v-model="member.name"
-              maxlength="120"
-              autocomplete="off"
-            />
-          </UFormField>
-          <UFormField
-            v-if="data && data.options.length > 1"
-            name="lengthOptionId"
-            :label="t('membership.screens.lengths.title')"
-          >
-            <USelect
-              v-model="member.lengthOptionId"
-              :items="data.options.map(o => ({ value: o.id, label: o.name }))"
-            />
-          </UFormField>
-          <UFormField
-            v-if="asksFee"
-            name="fee"
-            :label="t('membership.screens.add-member.fee')"
-          >
-            <URadioGroup
-              v-model="member.fee"
-              :items="(['link', 'waive'] as const).map(v => ({ value: v, label: t(`membership.screens.add-member.fee-${v}`), description: t(`membership.screens.add-member.fee-${v}-help`) }))"
-            />
-          </UFormField>
-          <div
-            v-if="!byLink"
-            class="grid gap-4 sm:grid-cols-2"
-          >
-            <UFormField
-              name="startsOn"
-              :label="t('membership.screens.add-member.starts')"
-              :help="t('membership.screens.add-member.starts-help')"
-            >
-              <FieldDate v-model="member.startsOn" />
-            </UFormField>
-            <UFormField
-              name="endsOn"
-              :label="t('membership.screens.add-member.ends')"
-              :help="t('membership.screens.add-member.ends-help')"
-            >
-              <FieldDate
-                v-model="member.endsOn"
-                :min="member.startsOn || undefined"
-              />
-            </UFormField>
-          </div>
-          <UFormField
-            name="note"
-            :label="t('membership.screens.add-member.note')"
-            :help="asksFee && member.fee === 'waive' ? t('membership.screens.add-member.waive-note-help') : t('membership.screens.add-member.note-help')"
-            :required="asksFee && member.fee === 'waive'"
-          >
-            <UTextarea
-              v-model="member.note"
-              maxlength="1000"
-              :rows="2"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="membership-add-member"
-          loading-auto
-          :label="t('membership.screens.add-member.submit')"
-        />
-      </template>
-    </UModal>
-
-    <UModal
+      :schemes="choices?.schemes ?? []"
+      :scheme-id="id"
+      @added="refresh()"
+    />
+    <MembershipImportModal
       v-model:open="importing"
-      :title="t('membership.screens.import.title')"
-      :description="t('membership.screens.import.help')"
-    >
-      <template #body>
-        <div class="space-y-4">
-          <RefusalNotice :refusal="importRefusal" />
-          <UFileUpload
-            v-model="importFile"
-            accept=".csv,text/csv,text/plain"
-            :label="t('membership.screens.import.file')"
-            :description="t('membership.screens.import.file-help')"
-            class="w-full"
-          />
-          <UAlert
-            v-if="importPreview"
-            :color="importPreview.refused.length ? 'warning' : 'success'"
-            variant="subtle"
-            :title="t('membership.screens.import.would-import', { count: importPreview.wouldImport ?? 0 })"
-          >
-            <template
-              v-if="importPreview.refused.length"
-              #description
-            >
-              <p>{{ t('membership.screens.import.refused', { count: importPreview.refused.length }) }}</p>
-              <ul class="list-disc ps-5">
-                <li
-                  v-for="r in importPreview.refused.slice(0, 10)"
-                  :key="r.line"
-                >
-                  {{ t('membership.screens.list.refused-line', { line: r.line, reason: t(`membership.screens.import.reasons.${r.reason}`) }) }}
-                </li>
-              </ul>
-            </template>
-          </UAlert>
-        </div>
-      </template>
-      <template #footer>
-        <UButton
-          icon="i-lucide-file-up"
-          loading-auto
-          :disabled="!importPreview?.wouldImport"
-          :label="t('membership.screens.import.submit')"
-          @click="runImport"
-        />
-      </template>
-    </UModal>
+      :schemes="choices?.schemes ?? []"
+      :scheme-id="id"
+    />
   </PageFrame>
 </template>

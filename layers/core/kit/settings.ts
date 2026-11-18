@@ -2,7 +2,7 @@
 // limits and the ability needed to change it (Settings registry tab).
 import type { z } from 'zod'
 import { DeclarationError } from './refusal'
-import { formatDuration, isDuration, parseDuration } from './duration'
+import { DURATION_UNITS, formatDuration, isDuration, parseDuration, type DurationUnit } from './duration'
 import { catalogueValues, isCatalogue, type Catalogue } from './catalogues'
 
 export type Audience = 'public' | 'signed-in' | 'staff'
@@ -18,6 +18,8 @@ interface Common {
   since?: string
   /** What the screen asks before saving: a written reason, or a second confirmation. */
   onChange?: 'reason' | 'confirm'
+  /** Another module this setting only applies while it is on, such as 'membership-fees'; the settings screens leave it out while that module is off. */
+  whenModule?: string
   /**
    * The address of a bespoke screen that manages this one setting, where only part of its group is
    * bespoke. Where it is shown is otherwise declared per group, in the manifest's settingGroups.
@@ -41,6 +43,8 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   /** A choice from one of the kit's fixed lists instead of options of its own (catalogues.ts). */
   catalogue?: Catalogue
   unit?: string
+  /** duration only: the units its control offers, such as days and weeks for a review period. */
+  units?: readonly DurationUnit[]
   record?: string
   schema?: z.ZodType
   of?: 'text' | 'choice'
@@ -79,7 +83,7 @@ export const setting = {
   /** Whole minor units in the theatre's currency. */
   money: <const O extends Common & WithDefault<number> & { min?: number, max?: number }>(o: O) => ({ kind: 'money', ...o }) as SettingEntry<Value<number, O>, 'money'> & O,
   /** Written '30m', '2h', '14d'; read as whole seconds. */
-  duration: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'duration', ...o }) as SettingEntry<Value<number, O>, 'duration'> & O,
+  duration: <const O extends Common & WithDefault<string> & { min?: string, max?: string, units?: readonly DurationUnit[] }>(o: O) => ({ kind: 'duration', ...o }) as SettingEntry<Value<number, O>, 'duration'> & O,
   /** HH:MM in the theatre's time zone; limits written the same way. */
   time: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
   text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number, multiline?: boolean }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
@@ -133,6 +137,7 @@ export function defineSettingRules(module: string, rules: SettingRule[]): { modu
 function checkEntry(key: string, entry: SettingEntry) {
   const f = (name: string) => `settings.${key}.${name}`
   if (!entry || !KINDS.includes(entry.kind as SettingKind)) throw new DeclarationError(f('kind'), 'declare a setting with setting.<kind>({...})')
+  if (entry.whenModule !== undefined && !KEBAB.test(entry.whenModule)) throw new DeclarationError(f('whenModule'), 'name the module the setting applies with as its kebab-case id')
   if (typeof entry.change !== 'string' || !entry.change) throw new DeclarationError(f('change'), 'every setting names the ability needed to change it')
   const audience = entry.audience ?? 'staff'
   if (!['public', 'signed-in', 'staff'].includes(audience)) throw new DeclarationError(f('audience'), "is 'public', 'signed-in' or 'staff'")
@@ -161,6 +166,7 @@ function checkEntry(key: string, entry: SettingEntry) {
   }
   if (entry.kind === 'duration') {
     for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !isDuration(entry[limit])) throw new DeclarationError(f(limit), 'a duration limit is written like 30m, 2h or 14d')
+    if (entry.units !== undefined && !(entry.units.length && entry.units.every(u => DURATION_UNITS.some(([unit]) => unit === u)))) throw new DeclarationError(f('units'), 'one or more units of time, such as day and week')
   }
   if (entry.default !== undefined && entry.default !== null) {
     const result = validateSettingValue(entry, entry.default)

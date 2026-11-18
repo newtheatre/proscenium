@@ -3,7 +3,7 @@
 // conditional update that stamps the ticket with the scan's id, so a ticket is admitted exactly
 // once however many devices scan it together, and the scan row written next in the same batch takes
 // its result from that stamp: admitted if the stamp is its own id, already admitted otherwise. A desk code or a
-// booking reference admits nobody and writes no scan row.
+// booking reference admits nobody and writes no scan row; one for another performance says which.
 //
 // A ticket sold on a requirement, such as a member's price, is checked again before it is admitted
 // (part 5, "Checking again at entry"): when its type rechecks, and always when it was met by a typed
@@ -12,12 +12,12 @@
 // the queue.
 import { all, can, createUnit, first, newId, nowMs, refuse, requirements, useContext } from '#kit'
 import { signing } from '#kit/signing'
-import { getTerm } from '#modules/core'
+import { accountLabel, getTerm } from '#modules/core'
 import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
 
-export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed'
+export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed' | 'reference'
 
 export interface ScanOutcome {
   result: ScanResult
@@ -31,12 +31,16 @@ export interface ScanOutcome {
   voidReason?: string
   /** Wrong performance: the one the ticket is for. */
   ticketPerformanceId?: string
+  /** Wrong performance: what the steward tells the customer, the show and when it starts. */
+  ticketPerformance?: { id: string, title: string, label: string | null, startsAt: number, venue: string }
   /** A code of another kind (box-office.door-code), such as a membership card: what it says. */
   card?: { kind: string, headline: string, line: string, state: 'ok' | 'attention' }
   /** Admitted or already in: the ticket and how much of its booking is in now. */
-  booking?: { reference: string, ticketType: string, admitted: number, tickets: number }
+  booking?: { reference: string, buyer: string | null, ticketType: string, admitted: number, tickets: number }
+  /** A paid booking's reference for this performance: the door finds it in the list, where it can admit them. */
+  reference?: string
   /** Not paid: the reservation the door sends to the box office or the bar, and what is owed. */
-  reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
+  reservation?: { reference: string, buyer: string | null, tickets: number, amountDueMinor: number, currency: string }
   /** Requirement not met: the source's words, such as "Membership not current", and the ticket's type. */
   requirement?: { reason: string | null, ticketType: string }
   /** Admitted without its requirement being checked again: the source was off, failing or not open to this steward. */
@@ -85,17 +89,43 @@ async function recheck(ticketId: string, performanceId: string): Promise<{ verdi
 
 /** The booking a ticket belongs to, at this performance: its reference, the ticket's type, and how many are in. */
 async function bookingOf(ticketId: string, performanceId: string): Promise<ScanOutcome['booking']> {
-  const row = await first<{ reference: string, type_name: string, order_id: string }>(
-    `SELECT o.reference, y.name AS type_name, o.id AS order_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id
+  const row = await first<{ reference: string, type_name: string, order_id: string, account_id: string | null }>(
+    `SELECT o.reference, y.name AS type_name, o.id AS order_id, o.account_id FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id
       JOIN box_office_orders o ON o.id = l.order_id JOIN box_office_ticket_types y ON y.id = l.ticket_type_id WHERE t.id = ?`, ticketId)
   if (!row) return undefined
   const counts = await first<{ tickets: number, admitted: number }>(
     `SELECT count(*) AS tickets, sum(CASE WHEN t.admitted_at IS NOT NULL THEN 1 ELSE 0 END) AS admitted FROM box_office_tickets t
       JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ? AND t.performance_id = ? AND t.state = 'valid'`, row.order_id, performanceId)
-  return { reference: row.reference, ticketType: row.type_name, admitted: Number(counts?.admitted ?? 0), tickets: Number(counts?.tickets ?? 0) }
+  return { reference: row.reference, buyer: row.account_id ? await accountLabel(row.account_id) : null, ticketType: row.type_name, admitted: Number(counts?.admitted ?? 0), tickets: Number(counts?.tickets ?? 0) }
 }
 
-export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null }
+/** The performance a ticket or booking is for, as the door names it to the customer. */
+async function performanceOf(performanceId: string): Promise<ScanOutcome['ticketPerformance']> {
+  const row = await first<{ id: string, title: string, label: string | null, starts_at: number, venue: string }>(
+    `SELECT f.id, p.title, f.label, f.starts_at, v.name AS venue FROM core_performances f JOIN core_productions p ON p.id = f.production_id
+      JOIN core_venues v ON v.id = f.venue_id WHERE f.id = ?`, performanceId)
+  return row ? { id: row.id, title: row.title, label: row.label, startsAt: row.starts_at, venue: row.venue } : undefined
+}
+
+/** Another performance's ticket or booking: which one it is for, so the steward can say. */
+async function elsewhere(performanceId: string): Promise<Pick<ScanOutcome, 'ticketPerformanceId' | 'ticketPerformance'>> {
+  const ticketPerformance = await performanceOf(performanceId)
+  return { ticketPerformanceId: performanceId, ...ticketPerformance ? { ticketPerformance } : {} }
+}
+
+/**
+ * A scan made on a device that was offline (D2, box office review) carries the id the device gave it
+ * and the device's time; it was admitted there already, after the device checked the code's
+ * signature against its copy of the door list. The server admits it at that time and marks it
+ * offline. A requirement it cannot confirm now is marked unchecked rather than turned away, since
+ * the person is already in.
+ */
+export interface OfflineScan { id: string, scannedAt: number }
+
+export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null, offline?: OfflineScan }
+
+/** The device's time for an offline scan, never later than the server's. */
+const deviceTime = (offline: OfflineScan | undefined, now: number) => offline ? Math.min(offline.scannedAt, now) : now
 
 interface TicketRow { id: string, performance_id: string, state: 'valid' | 'void', void_reason: string | null, admitted_at: number | null }
 
@@ -105,13 +135,15 @@ const PARTS = 4 // not-policy: kind, key id, code and signature
 export async function scan(input: ScanInput): Promise<ScanOutcome> {
   const code = input.code.trim()
   const parts = code.split('.')
-  const at = nowMs()
+  const received = nowMs()
+  const at = deviceTime(input.offline, received)
+  const offline = input.offline ? 1 : 0
   const actor = useContext().actor.accountId ?? null
   const unit = createUnit()
-  const scanId = newId('scan')
+  const scanId = input.offline?.id ?? newId('scan')
   const row = (result: string, ticketId: string | null) => unit.view().add({
-    sql: 'INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0)',
-    params: [scanId, ticketId, input.performanceId, result, actor, input.deviceLabel ?? null, at, at],
+    sql: 'INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)',
+    params: [scanId, ticketId, input.performanceId, result, actor, input.deviceLabel ?? null, at, received, offline],
   })
   const recorded = async (outcome: Omit<ScanOutcome, 'scanId'>, ticketId: string | null = null): Promise<ScanOutcome> => {
     row(outcome.result, ticketId)
@@ -130,13 +162,16 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
     return said ? { result: 'card', scanId: null, card: { kind, ...said } } : { result: 'unknown', scanId: null }
   }
   if (parts.length !== PARTS || parts[0] !== TICKET_KIND) {
-    // What a reservation's message carries is not a ticket: the desk takes the payment first.
-    const reservation = await first<{ id: string, reference: string, total_minor: number, currency: string }>("SELECT id, reference, total_minor, currency FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
-    if (reservation) {
-      const lines = await all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live'", reservation.id)
-      // A reservation for another night is that, whether paid or not.
-      if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ticketPerformanceId: lines[0]!.performance_id }
-      return { result: 'not_paid', scanId: null, reservation: { reference: reservation.reference, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: reservation.total_minor, currency: reservation.currency } }
+    // What a reservation's message carries is not a ticket: the desk takes the payment first. A paid
+    // booking's reference is ours too: for another night it says which, and for tonight the door
+    // finds the booking in its list, where its tickets can be admitted.
+    const order = await first<{ id: string, reference: string, state: string, total_minor: number, currency: string, account_id: string | null }>("SELECT id, reference, state, total_minor, currency, account_id FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment', 'confirmed') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
+    if (order) {
+      const lines = await all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live' ORDER BY performance_id", order.id)
+      // A booking for another night is that, whether paid or not.
+      if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ...await elsewhere(lines[0]!.performance_id) }
+      if (order.state === 'confirmed') return lines.length ? { result: 'reference', scanId: null, reference: order.reference } : recorded({ result: 'unknown' })
+      return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, buyer: order.account_id ? await accountLabel(order.account_id) : null, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: order.total_minor, currency: order.currency } }
     }
     return recorded({ result: 'unknown' })
   }
@@ -146,21 +181,21 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   const ticket = await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE code_hash = ?', await hashOf(random))
   if (!ticket) return recorded({ result: 'unknown' })
   if (ticket.state === 'void') return recorded({ result: 'void', ticketId: ticket.id, voidReason: ticket.void_reason ?? undefined }, ticket.id)
-  if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ticketPerformanceId: ticket.performance_id }, ticket.id)
+  if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ...await elsewhere(ticket.performance_id) }, ticket.id)
   // A ticket already in is said so without asking again; one not yet in is checked before it is admitted.
   const checked = ticket.admitted_at === null ? await recheck(ticket.id, input.performanceId) : { verdict: 'met' as const }
-  if (checked.verdict === 'not-met') {
+  if (checked.verdict === 'not-met' && !input.offline) {
     const overridable = await mayOverride(ticket.id, input.performanceId)
     return recorded({ result: 'requirement_not_met', ticketId: ticket.id, requirement: { reason: checked.reason, ticketType: checked.ticketType }, ...overridable ? { overridable } : {} }, ticket.id)
   }
-  const unchecked = checked.verdict === 'unchecked' ? 1 : 0
+  const unchecked = checked.verdict === 'met' ? 0 : 1
 
   // One conditional update admits and stamps; the scan row reads the stamp to say whether it was the one.
-  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
+  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, received, ticket.id, input.performanceId] })
   unit.view().add({
     sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
-      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, CASE WHEN t.admitted_scan_id = ?1 THEN ?7 ELSE 0 END, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
-    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, unchecked],
+      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, CASE WHEN t.admitted_scan_id = ?1 THEN ?7 ELSE 0 END, ?3, ?4, ?5, ?8, ?9 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, unchecked, received, offline],
   })
   await unit.commit()
   const written = await first<{ result: 'admitted' | 'already_admitted' }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
@@ -209,7 +244,8 @@ export async function admitAnyway(input: AdmitAnywayInput): Promise<ScanOutcome>
   return { result: 'admitted', scanId, ticketId: ticket.id, booking }
 }
 
-export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null }
+/** `offline`: admitted on a device that was offline, with an id for each ticket it let in and the device's time. */
+export interface AdmitByNameInput { performanceId: string, orderId: string, count: number, deviceLabel?: string | null, offline?: { ids: string[], scannedAt: number } }
 
 /**
  * Admits tickets of one order from the door list, for a buyer with no phone and no printout (part 6,
@@ -224,18 +260,20 @@ export async function admitByName(input: AdmitByNameInput): Promise<{ admitted: 
     input.orderId, input.performanceId, input.count,
   )
   if (!waiting.length) return { admitted: 0, scanIds: [] }
-  const at = nowMs()
+  const received = nowMs()
+  const at = input.offline ? Math.min(input.offline.scannedAt, received) : received
+  const offline = input.offline ? 1 : 0
   const actor = useContext().actor.accountId ?? null
   const unit = createUnit()
   const scanIds: string[] = []
-  for (const ticket of waiting) {
-    const scanId = newId('scan')
+  for (const [n, ticket] of waiting.entries()) {
+    const scanId = input.offline?.ids[n] ?? newId('scan')
     scanIds.push(scanId)
-    unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
+    unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, received, ticket.id, input.performanceId] })
     unit.view().add({
       sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
-        SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
-      params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id],
+        SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?7, ?8 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+      params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, received, offline],
     })
   }
   await unit.commit()

@@ -59,7 +59,9 @@ const props = withDefaults(defineProps<{
   draftKey?: string
   /** Panel mode: whether the panel is open. */
   open?: boolean
-}>(), { description: undefined, open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
+  /** What the toast says once saved, such as "Production created". Default: "Saved". */
+  savedTitle?: string
+}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -136,6 +138,9 @@ function focusField(item: { id?: string, name: string }) {
 
 const dirty = computed(() => JSON.stringify(state) !== JSON.stringify(base.value))
 const labelOf = (name: string) => props.fields.find(f => f.name === name)?.label ?? name
+// In the summary a label is followed by ": message", so a label that ends in its own colon (a
+// question such as "would you rather:") loses it rather than reading "rather:: Choose…".
+const summaryLabelOf = (name: string) => labelOf(name).replace(/\s*:\s*$/, '')
 const show = (value: unknown) => value === undefined || value === null || value === '' ? t('core.form.empty-value') : String(value)
 
 // A long form keeps a draft on the device and offers to restore it.
@@ -179,7 +184,7 @@ async function onSubmit() {
     const result = await props.submit({ ...state }, version.value)
     saved.value = true
     discardDraft()
-    toast.add({ title: t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
+    toast.add({ title: props.savedTitle ?? t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
     emit('saved', result)
     if (panel.value) emit('update:open', false)
     else await (props.returnTo ? navigateTo(props.returnTo) : router.back())
@@ -228,15 +233,7 @@ async function cancel() {
 }
 
 // Leaving with unsaved changes asks once.
-onBeforeRouteLeave(async () => {
-  if (saved.value || !dirty.value) return true
-  return confirm({ verb: t('core.form.leave'), thing: t('core.form.leave-thing'), consequence: t('core.form.leave-consequence') })
-})
-function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value && !saved.value) event.preventDefault()
-}
-onMounted(() => window.addEventListener('beforeunload', beforeUnload))
-onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
+useLeaveGuard(() => dirty.value && !saved.value)
 </script>
 
 <template>
@@ -272,7 +269,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   class="underline"
                   @click.prevent="focusField(item)"
                 >
-                  {{ labelOf(item.name) }}
+                  {{ summaryLabelOf(item.name) }}
                 </ULink>: {{ item.message }}
               </li>
             </ul>

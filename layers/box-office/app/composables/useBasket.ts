@@ -1,7 +1,14 @@
 // The buyer's basket between pages (Box office specification, part 6): its id and the token that
 // opens it, kept in this tab only. The token is shown once by the server and never stored there, so
 // a closed tab or blocked storage means choosing again, which is safe: the hold simply lapses.
-export interface RememberedBasket { orderId: string, token: string, back: string }
+export interface RememberedBasket {
+  orderId: string
+  token: string
+  back: string
+  /** What was chosen, so Change tickets can fill Choose tickets in again. */
+  choices?: { bandId: string, ticketTypeId: string, quantity: number }[]
+  promoCode?: string
+}
 
 const KEY = 'box-office:basket'
 

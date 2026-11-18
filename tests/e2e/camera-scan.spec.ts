@@ -1,7 +1,7 @@
 // Scanning with the camera, in a real browser with a pretend camera that shows a QR code: at the desk
 // a reservation's box office code is scanned and the booking opens; at the door a ticket is scanned
 // and admitted, then scanned again and found already in. The door in live mode opens with the camera
-// running, admits a ticket at once, and sends an unpaid reservation to the box office or the bar. Chromium's fake camera plays a Y4M file,
+// running, admits a ticket at once, and sends an unpaid reservation to the till. Chromium's fake camera plays a Y4M file,
 // which is made here from the code, so what the camera "sees" is a real QR code read by the page.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -132,19 +132,21 @@ test('the desk finds a reservation by scanning its box office code with the came
 test('the door admits a ticket scanned with the camera, and knows it when it comes round again', async ({ playwright }) => {
   const { browser, page } = await withCamera(playwright.chromium, cameraShowing(doorCode, `door-${stamp}`))
   try {
+    // The door list has one way to scan: the door itself, in live mode.
     await visit(page, `/console/box-office/performances/${performanceId}/door`)
-    await page.getByRole('button', { name: 'Scan tickets' }).first().click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog.getByRole('status').filter({ hasText: 'Admitted.' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Scan tickets' })).toHaveCount(0)
+    await page.getByRole('link', { name: 'Open the door scanner' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Admitted' })).toBeVisible({ timeout: 15_000 })
     // Held up to the camera, it is still one scan. Shown again later, it is already in.
-    await page.keyboard.press('Escape')
-    await expect(dialog).toBeHidden()
-    await page.getByRole('button', { name: 'Scan tickets' }).first().click()
-    await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: /Already in, at/ })).toBeVisible({ timeout: 15_000 })
-    // Typing is there too: a code that is not ours says so.
-    await page.getByRole('dialog').getByLabel('Or type the code').fill('NOT-A-CODE')
-    await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
-    await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'This code is not one of ours.' })).toBeVisible()
+    await page.getByRole('button', { name: 'Pause camera' }).click()
+    await page.getByRole('button', { name: 'Resume camera' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Already in' })).toBeVisible({ timeout: 15_000 })
+    // Typing is there too: a word that is not a code stays a search, and logs no failed scan.
+    await page.getByRole('button', { name: 'Pause camera' }).click()
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').fill('Nobody-here')
+    await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').press('Enter')
+    await expect(page.getByRole('dialog').getByText('Nobody found.')).toBeVisible()
   }
   finally {
     await browser.close()
@@ -170,7 +172,7 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').press('Enter')
     const unpaid = page.getByRole('status').filter({ hasText: 'Not paid' })
     await expect(unpaid).toBeVisible()
-    await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the box office or the bar to pay.`)
+    await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the till to pay.`)
     await expect(page.getByRole('dialog')).toBeHidden()
 
     // A member whose membership has lapsed is sent to the box office with the members list's own words.
@@ -210,6 +212,36 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.getByRole('button', { name: 'Resume camera' }).click()
     await page.waitForTimeout(500)
     await page.screenshot({ path: 'test-results/live-door-phone.png' })
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+test('the door keeps checking tickets offline from its copy, and sends what it admitted on reconnecting', async ({ playwright }) => {
+  const browser = await playwright.chromium.launch()
+  const context = await browser.newContext({ ...base, ...as(seller) })
+  const page = await context.newPage()
+  try {
+    const copied = page.waitForResponse(r => r.url().includes(`/performances/${performanceId}/door/offline`) && r.request().method() === 'GET')
+    await visit(page, `/live/door/${performanceId}`)
+    await copied
+    await context.setOffline(true)
+    await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeVisible()
+    const box = () => page.getByRole('dialog').getByLabel('Ticket code, booking reference or name')
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await box().fill(doorCode)
+    await box().press('Enter')
+    // Its signature is checked on the device and its ticket found in the copy: in, or in already.
+    const checked = page.getByRole('status').filter({ hasText: /Admitted|Already in/ })
+    await expect(checked).toContainText('Checked on this device')
+    // A code the theatre did not sign is caught without the server.
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await box().fill('tkt.nokey.NOTACODE.c2lnbmF0dXJl')
+    await box().press('Enter')
+    await expect(page.getByRole('status').filter({ hasText: 'Altered code' })).toBeVisible()
+    await context.setOffline(false)
+    await expect(page.getByText(/waiting to send/)).toHaveCount(0, { timeout: 15_000 })
   }
   finally {
     await browser.close()

@@ -2,7 +2,7 @@
   "core.navigation.roles.label": "Roles",
   "core.navigation.facts.label": "Facts",
   "core.roles.title": "Roles",
-  "core.roles.description": "What each role lets its holders do. Give a role to a person from Who holds what, in the console.",
+  "core.roles.description": "What each role lets its holders do. To give someone a role, use Give a role on Who holds what or on their page in People, in the console.",
   "core.roles.new": "New role",
   "core.roles.role": "Role",
   "core.roles.holders.one": "1 holding it now",
@@ -88,5 +88,9 @@
   "core.facts.saved": "{fact} saved",
   "core.sign-in-settings.title": "Sign-in",
   "core.roles.empty": "No roles yet",
-  "core.roles.empty-help": "A role is a set of abilities, such as running the box office, that you give to people for a time."
+  "core.roles.empty-help": "A role is a set of abilities, such as running the box office, that you give to people for a time.",
+  "core.facts.show-all": "Show every ability ({count} more)",
+  "core.facts.member.label": "Is a member: holds a standing now",
+  "core.facts.access-scheme.label": "Is on the access scheme",
+  "core.facts.production-team.label": "Is on the production's team"
 }

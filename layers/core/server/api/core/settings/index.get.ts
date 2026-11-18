@@ -33,7 +33,7 @@ export default defineRoute({
   const on = await enabledModules()
   const placeOf = (pageId?: string) => pageId ? registry.settingPages.get(pageId)!.place : undefined
   const mine = [...registry.settings].filter(([key, s]) => {
-    if (!on.has(s.module)) return false
+    if (!on.has(s.module) || (s.entry.whenModule && !on.has(s.entry.whenModule))) return false
     const home = registry.settingHomes.get(key)!
     if (input.page !== undefined) return home.page === input.page
     if (input.screen !== undefined) return home.screen === input.screen
@@ -83,6 +83,8 @@ export default defineRoute({
       min: entry.kind === 'rate' ? RATE_COUNT.min : entry.min,
       max: entry.kind === 'rate' ? RATE_COUNT.max : entry.max,
       maxLength: entry.maxLength,
+      /** A duration's units, when it offers only some. */
+      units: entry.kind === 'duration' ? entry.units : undefined,
       multiline: entry.multiline === true,
       /** A rate's period limits, written like 1m and 1d, for the period control. */
       periodMin: entry.kind === 'rate' ? RATE_PERIOD.min : undefined,

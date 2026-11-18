@@ -5,7 +5,7 @@
      gives what they do not have. Each group can be ticked whole. A module that is switched off is
      left out unless something of it is ticked, and can be shown on request. -->
 <script setup lang="ts">
-export interface CatalogueAbility { name: string, module: string, risk: 'normal' | 'privileged', implies: string[], label: string, held: boolean, moduleOn?: boolean }
+export interface CatalogueAbility { name: string, module: string, risk: 'normal' | 'privileged', implies: string[], label: string, held: boolean, moduleOn?: boolean, on?: string | null, within?: string[] }
 
 const props = defineProps<{
   catalogue: CatalogueAbility[]
@@ -13,6 +13,8 @@ const props = defineProps<{
   disabled?: boolean
   /** The abilities confirmed already, for a fact: a privileged one not in it is marked unconfirmed. */
   confirmed?: string[]
+  /** Only these are listed (a ticked one always is); what they imply is still worked out from the whole catalogue. */
+  shown?: (ability: CatalogueAbility) => boolean
 }>()
 const chosen = defineModel<string[]>({ required: true })
 const { t, te } = useT()
@@ -50,7 +52,7 @@ const isTicked = (name: string) => chosen.value.includes(name) || implied.value.
 
 const allGroups = computed<Group[]>(() => {
   const out = new Map<string, CatalogueAbility[]>()
-  for (const ability of props.catalogue) (out.get(ability.module) ?? out.set(ability.module, []).get(ability.module)!).push(ability)
+  for (const ability of props.catalogue) if (!props.shown || props.shown(ability) || isTicked(ability.name)) (out.get(ability.module) ?? out.set(ability.module, []).get(ability.module)!).push(ability)
   return [...out].map(([module, abilities]) => {
     const on = abilities[0]?.moduleOn !== false
     if (module !== 'core') return { module, on, sections: [{ id: module, abilities }] }
