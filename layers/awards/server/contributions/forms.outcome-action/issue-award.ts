@@ -26,6 +26,29 @@ interface Call {
   at: number
 }
 
+type Reading = Omit<Call, 'runId'>
+const LISTED = { public: 'On the public roll', members: 'Members only', hidden: 'Not listed' } as const
+
+/**
+ * Who a nomination would give which award to, or why it never could. An archived award is not a
+ * reason here: restoring it puts that right, so the run waits and the preview warns.
+ */
+async function reading(call: Reading): Promise<{ skipped: string } | { type: NonNullable<Awaited<ReturnType<typeof getType>>>, account: { id: string, name: string | null }, name: string }> {
+  const type = call.response.subjectType === 'awards.type' ? await getType(call.response.subjectId ?? undefined) : null
+  if (!type) return { skipped: 'No award was issued: the award this nomination was for no longer exists.' }
+  const picked = call.input.nominee?.value
+  const accountId = Array.isArray(picked) ? picked[0] : picked
+  const account = typeof accountId === 'string' ? await first<{ id: string, name: string | null }>('SELECT id, name FROM core_accounts WHERE id = ? AND anonymised_at IS NULL', accountId) : null
+  if (!account) return { skipped: 'No award was issued: the nomination does not name a person with an account. Issue it by hand from Awards instead.' }
+  if (call.actorId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, account.id, call.actorId))
+    return { skipped: 'No award was issued: nobody can approve an award for their own account. Somebody else can issue it from Awards.' }
+  const name = account.name ?? call.input.nominee?.text.trim()
+  if (!name) return { skipped: 'No award was issued: this person has no name on their account. Issue it by hand from Awards instead.' }
+  if (type.onePerPerson && await first(`SELECT 1 FROM awards_awards WHERE type_id = ?1 AND state = 'current' AND account_id IN (${accountScopeSql('?2')})`, type.id, account.id))
+    return { skipped: `No award was issued: ${name} already holds ${type.name}.` }
+  return { type, account, name }
+}
+
 const words = (answer: Answer | undefined, most: number) => answer?.text.trim().slice(0, most) || null
 
 export default {
@@ -38,22 +61,33 @@ export default {
     { key: 'citation', label: 'awards.forms.issue-award.citation', types: ['text.short', 'text.long'] },
   ],
 
-  async run(unit: UnitView, call: Call): Promise<{ skipped: string } | undefined> {
-    const type = call.response.subjectType === 'awards.type' ? await getType(call.response.subjectId ?? undefined) : null
-    if (!type) return { skipped: 'No award was issued: the award this nomination was for no longer exists.' }
-    if (type!.state !== 'active') refuse('awards.type.archived', `${type!.name} is archived, so it cannot be given.`, { status: 409, remedy: 'Restore the award, then run this again.' })
-    const picked = call.input.nominee?.value
-    const accountId = Array.isArray(picked) ? picked[0] : picked
-    const account = typeof accountId === 'string' ? await first<{ id: string, name: string | null }>('SELECT id, name FROM core_accounts WHERE id = ? AND anonymised_at IS NULL', accountId) : null
-    if (!account) return { skipped: 'No award was issued: the nomination does not name a person with an account. Issue it by hand from Awards instead.' }
-    if (call.actorId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, account.id, call.actorId))
-      return { skipped: 'No award was issued: nobody can approve an award for their own account. Somebody else can issue it from Awards.' }
-    const name = account.name ?? call.input.nominee?.text.trim()
-    if (!name) return { skipped: 'No award was issued: this person has no name on their account. Issue it by hand from Awards instead.' }
-    if (type!.onePerPerson && await first(`SELECT 1 FROM awards_awards WHERE type_id = ?1 AND state = 'current' AND account_id IN (${accountScopeSql('?2')})`, type!.id, account.id))
-      return { skipped: `No award was issued: ${name} already holds ${type!.name}.` }
+  /** What approving would issue, for whoever is about to approve: the wording goes on the award as it is written. */
+  async preview(call: Reading) {
+    const found = await reading(call)
+    if ('skipped' in found) return { lines: [], blocked: found.skipped.replace(/^No award was issued: /, 'No award will be issued: ') }
+    const { type, name } = found
+    const lines = [
+      { label: 'awards.forms.issue-award.preview.award', value: type.name },
+      { label: 'awards.forms.issue-award.preview.to', value: name },
+    ]
+    const awardedFor = words(call.input.awardedFor, 200) // not-policy: the bound on the line
+    const citation = words(call.input.citation, 2000) // not-policy: the bound on a citation
+    if (awardedFor) lines.push({ label: 'awards.forms.issue-award.awarded-for', value: awardedFor })
+    if (citation) lines.push({ label: 'awards.forms.issue-award.citation', value: citation })
+    lines.push({ label: 'awards.forms.issue-award.preview.listed', value: LISTED[type.defaultVisibility] })
+    const warnings: string[] = []
+    if (type.state !== 'active') warnings.push('awards.forms.issue-award.preview.archived')
+    if (type.defaultVisibility !== 'hidden' && (awardedFor || citation)) warnings.push('awards.forms.issue-award.preview.wording')
+    return { lines, warnings }
+  },
+
+  async run(unit: UnitView, call: Call): Promise<{ skipped: string } | { record: [string, string] }> {
+    const found = await reading(call)
+    if ('skipped' in found) return found
+    const { type, account, name } = found
+    if (type.state !== 'active') refuse('awards.type.archived', `${type.name} is archived, so it cannot be given.`, { status: 409, remedy: 'Restore the award, then run this again.' })
     const awardId = writeAward(unit, {
-      type: type!,
+      type,
       accountId: account.id,
       recipientName: name.slice(0, 120), // not-policy: the bound on a name
       awardedOn: await localDate(call.at),
@@ -66,8 +100,8 @@ export default {
       issuedBy: call.actorId,
     })
     if (await useSetting('awards.issuing.tell-recipient'))
-      await notify(unit, 'awards.awarded', { to: account.id, variables: { award: type!.name, link: await siteUrl('/account/awards') }, subject: ['awards.award', awardId], dedupeKey: `awarded:${awardId}` })
+      await notify(unit, 'awards.awarded', { to: account.id, variables: { award: type.name, link: await siteUrl('/account/awards') }, subject: ['awards.award', awardId], dedupeKey: `awarded:${awardId}` })
     unit.audit({ action: 'create', record: ['awards.award', awardId], detail: { source: 'nomination', responseId: call.response.id, runId: call.runId } })
-    return undefined
+    return { record: ['awards.award', awardId] }
   },
 }
