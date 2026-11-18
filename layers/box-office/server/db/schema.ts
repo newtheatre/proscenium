@@ -36,6 +36,8 @@ export const performanceSales = defineTable('box_office_performance_sales', {
   offSaleAt: col.timestamp('off_sale_at'),
   maxPerOrder: col.public(integer('max_per_order')),
   holdMinutes: col.internal(integer('hold_minutes')),
+  // Minutes before the start that unpaid reservations are released; null means the setting's.
+  releaseMinutes: col.internal(integer('release_minutes')),
   paymentTiming: col.public(text('payment_timing', { enum: ['pay-now', 'reserve', 'buyer-chooses'] })),
   // What happens to tickets when the core cancels, reschedules or moves this performance (R-11).
   changeDecision: col.internal(text('change_decision', { enum: ['refund_all', 'offer_exchange', 'keep'] })),

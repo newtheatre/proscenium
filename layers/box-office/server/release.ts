@@ -4,8 +4,9 @@
 // time the theatre set before the start, or by hand, unless staff marked it to keep; one being paid
 // at that moment is not reserved, so it is never touched. Each order is its own batch.
 import { sql } from 'drizzle-orm'
-import { all, first, nowMs, refuse, type UnitView } from '#kit'
-import { notify } from '#modules/core'
+import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+import { getPerformance, notify } from '#modules/core'
+import { claimSeats } from './capacity'
 import { hashOf } from './codes'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
 
@@ -83,4 +84,53 @@ export function keepReservation(unit: UnitView, orderId: string, keep: boolean):
   unit.add(sql`UPDATE box_office_orders SET keep = ${keep}, updated_at = ${nowMs()} WHERE id = ${orderId} AND state = 'reserved'`)
     .expect(1, { code: 'box-office.order.not-reserved', reason: 'This order is not a reservation waiting to be paid for.' })
   unit.audit({ action: keep ? 'keep' : 'unkeep', record: ['box-office.order', orderId] })
+}
+
+/**
+ * The unpaid reservations for a performance that the door can let go now: reserved, not marked to
+ * keep, and not being paid for at this moment.
+ */
+export async function unpaidFor(performanceId: string): Promise<string[]> {
+  return (await all<{ id: string }>(`SELECT DISTINCT o.id FROM box_office_orders o JOIN box_office_order_lines l ON l.order_id = o.id
+    WHERE o.state = 'reserved' AND o.keep = 0 AND l.performance_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY o.id`, performanceId)).map(r => r.id)
+}
+
+const NOT_RELEASED = { code: 'box-office.order.not-released', reason: 'This booking was not a reservation released unpaid.', remedy: 'Reload to see what became of it.' }
+
+/**
+ * Seats someone whose unpaid reservation was released, when they turn up after all (Matt,
+ * 2026-11-18): the same booking, reference and prices, reserved again on seats taken through the
+ * ordinary claim, so it is refused when the house has filled. It is then kept, so the release does
+ * not take it again before they pay. A line keeps its claim, so the tickets are new lines and the old
+ * ones are marked moved on, as an exchange's are.
+ */
+export async function reinstateReservation(unit: UnitView, orderId: string, by: string | null): Promise<{ orderId: string, reference: string }> {
+  const order = await first<{ id: string, reference: string, state: string, reserved_at: number | null }>('SELECT id, reference, state, reserved_at FROM box_office_orders WHERE id = ?', orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  const lines = await all<{ id: string, pool_id: string, performance_id: string, release_reason: string | null }>(
+    `SELECT l.id, c.pool_id, l.performance_id, c.release_reason FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
+      WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
+  if (order.state !== 'expired' || order.reserved_at === null || !lines.length || lines.some(l => l.release_reason !== 'expired' && l.release_reason !== 'staff'))
+    refuse(NOT_RELEASED.code, NOT_RELEASED.reason, { status: 409, remedy: NOT_RELEASED.remedy })
+  const performance = await getPerformance(lines[0]!.performance_id)
+  const until = performance.startsAt + (await useSetting('box-office.sales.desk-until-after') as number) * 1000 // not-policy: seconds to milliseconds
+  const at = nowMs()
+  if (performance.state !== 'scheduled' || at >= until) refuse('box-office.sales.closed', 'Sales have closed for this performance.', { status: 409 })
+  const hold = await first<{ id: string }>("SELECT id FROM box_office_holds WHERE order_id = ? AND kind = 'reservation'", orderId)
+  if (!hold) refuse(NOT_RELEASED.code, NOT_RELEASED.reason, { status: 409, remedy: NOT_RELEASED.remedy })
+
+  unit.add(sql`UPDATE box_office_orders SET state = 'reserved', release_at = NULL, keep = 1, updated_at = ${at}
+    WHERE id = ${orderId} AND state = 'expired' AND reserved_at IS NOT NULL`).expect(1, NOT_RELEASED)
+  const claimed = (await claimSeats(unit, { holdId: hold.id, requests: lines.map(l => ({ poolId: l.pool_id, quantity: 1 })), state: 'confirmed', expiresAt: null })).flat()
+  const ids = JSON.stringify(lines.map(l => l.id))
+  unit.add(sql`UPDATE box_office_order_lines SET state = 'exchanged', updated_at = ${at}
+    WHERE order_id = ${orderId} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(lines.length, NOT_RELEASED)
+  lines.forEach((line, i) => {
+    // A promo code's use went back with the seat, so the discount stays and the use is not taken again.
+    unit.add(sql`INSERT INTO box_office_order_lines (id, order_id, kind, performance_id, band_id, ticket_type_id, claim_id, price_id, list_minor, discount_minor, amount_minor, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, state, created_at, updated_at)
+      SELECT ${newId('orl')}, order_id, kind, performance_id, band_id, ticket_type_id, ${claimed[i]}, price_id, list_minor, discount_minor, amount_minor, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, 'live', ${at}, ${at}
+        FROM box_office_order_lines WHERE id = ${line.id}`).expect(1, NOT_RELEASED)
+  })
+  unit.audit({ action: 'update', record: ['box-office.order', orderId], detail: { reinstated: lines.length, by } })
+  return { orderId, reference: order.reference }
 }

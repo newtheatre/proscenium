@@ -19,7 +19,7 @@ import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
 import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
-import { salesOf } from './setup'
+import { releaseTime, salesOf } from './setup'
 import { doorCodesForOrder, ticketNumbers } from './tickets'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
@@ -134,9 +134,8 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith } })
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
-  const releaseBefore = await useSetting('box-office.reservations.release-before') as number | null
   const words = await wordsFor(order, lines, order.total_minor)
-  const releaseAt = releaseBefore === null ? null : words.startsAt - releaseBefore * 1000 // not-policy: seconds to milliseconds
+  const releaseAt = await releaseTime(words.startsAt, (await salesOf(lines[0]!.performance_id))?.releaseMinutes ?? null)
 
   const byPerformance = new Map<string, number>()
   for (const line of lines) byPerformance.set(line.performance_id, (byPerformance.get(line.performance_id) ?? 0) + 1)
