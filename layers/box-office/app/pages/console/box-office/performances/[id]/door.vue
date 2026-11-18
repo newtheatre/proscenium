@@ -28,10 +28,12 @@ const toast = useToast()
 const { toRefusal } = useRefusal()
 const admitting = ref<string | null>(null)
 
-interface Scan { result: string, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
+interface Scan { result: string, ticketPerformance?: DoorElsewhere, admittedAt?: number, voidReason?: string, card?: { headline: string, line: string, state: 'ok' | 'attention' }, requirement?: { reason: string | null, ticketType: string }, unchecked?: boolean }
 const { time } = useDates()
+const elsewhere = useDoorElsewhere()
+const { data: summary } = await useAPI<{ performance: { startsAt: number } }>(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/door/summary`, { key: `box-office:door:summary:${id.value}` })
 const lastScan = ref<{ text: string, color: 'success' | 'warning' | 'error' } | null>(null)
-const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'error', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
+const COLOUR: Record<string, 'success' | 'warning' | 'error'> = { admitted: 'success', card: 'success', already_admitted: 'warning', not_paid: 'warning', wrong_performance: 'warning', reference: 'warning', void: 'error', unknown: 'error', bad_signature: 'error', card_not_allowed: 'error' }
 
 async function scan(code: string) {
   if (!code.trim()) return
@@ -39,7 +41,9 @@ async function scan(code: string) {
     const out = await $api<Scan>(`/api/box-office/performances/${encodeURIComponent(id.value)}/scan`, { method: 'POST', body: { code: code.trim() } })
     const said = out.result === 'card' && out.card
       ? `${out.card.headline}. ${out.card.line}`
-      : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
+      : out.result === 'wrong_performance'
+        ? elsewhere(out.ticketPerformance, summary.value?.performance.startsAt)
+        : t(`box-office.door.scan.result.${out.result}`, { when: out.admittedAt ? time(out.admittedAt) : '' })
     // The source's own words for why not, and a note when nobody could check.
     const text = [out.requirement?.reason, said, out.unchecked ? t('box-office.door.scan.unchecked') : null].filter(Boolean).join(' ')
     const color = out.result === 'card' && out.card?.state === 'attention' ? 'warning' : COLOUR[out.result] ?? 'error'
