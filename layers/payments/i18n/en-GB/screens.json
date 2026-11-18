@@ -209,6 +209,7 @@
   "payments.screens.till.cancel-waiting": "The reader is asked to stop. If it takes the money after all, it is refunded in full.",
   "payments.screens.till.cancel-button": "Cancel sale",
   "payments.screens.till.paid": "Paid {amount}",
+  "payments.screens.till.next-customer": "Next customer",
   "payments.screens.till.change": "Give {amount} change.",
   "payments.screens.till.unfulfilled": "The money was taken but the sale could not be completed",
   "payments.screens.till.unfulfilled-help": "It is refunded in full automatically. Needs attention shows it until the refund goes through.",

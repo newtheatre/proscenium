@@ -3,7 +3,7 @@
 // code. The buyer gets the code inside a signed door code, `tkt.<key id>.<code>.<signature>`, which
 // a device can check with no connection; the database keeps only the hash of the code part.
 import { sql } from 'drizzle-orm'
-import { newId, type UnitView } from '#kit'
+import { newId, nowMs, type UnitView } from '#kit'
 import { signing } from '#kit/signing'
 import { scans, tickets } from './db/schema'
 import { hashOf } from './codes'
@@ -41,12 +41,29 @@ export const signedPart = (kind: string, keyId: string, code: string) => `${kind
  * `admit`, the buyer is at the desk: each ticket is admitted as it is issued, with its scan row,
  * exactly as the door would have written it.
  */
+/** A fresh door code: what the buyer is given, and what the ticket keeps of it. */
+async function freshCode(): Promise<{ keyId: string, codeHash: string, doorCode: string }> {
+  const code = base32(crypto.getRandomValues(new Uint8Array(CODE_BYTES)))
+  const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
+  return { keyId, codeHash: await hashOf(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}` }
+}
+
+/**
+ * Issues tickets again with new door codes, so they can be sent to a buyer after the sale: the codes
+ * they had were handed out once and kept nowhere. Only tickets not yet admitted are reissued; each
+ * old one is voided as reissued, so a code shown before stops working. Returns the new codes.
+ */
+export async function reissueTickets(unit: UnitView, waiting: readonly { ticketId: string, line: { id: string, performance_id: string } }[]): Promise<string[]> {
+  const at = nowMs()
+  for (const w of waiting) {
+    unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = 'reissued', updated_at = ${at} WHERE id = ${w.ticketId} AND state = 'valid' AND admitted_at IS NULL`)
+      .expect(1, { code: 'box-office.ticket.changed', reason: 'One of these tickets has just been used or changed.', remedy: 'Look at the booking again.' })
+  }
+  return issueTickets(unit, waiting.map(w => w.line))
+}
+
 export async function issueTickets(unit: UnitView, lines: readonly { id: string, performance_id: string }[], admit?: { by: string, at: number }): Promise<string[]> {
-  const made = await Promise.all(lines.map(async (line) => {
-    const code = base32(crypto.getRandomValues(new Uint8Array(CODE_BYTES)))
-    const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
-    return { line, keyId, codeHash: await hashOf(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}`, scanId: admit ? newId('scan') : null }
-  }))
+  const made = await Promise.all(lines.map(async line => ({ line, ...await freshCode(), scanId: admit ? newId('scan') : null })))
   const ids = unit.insertSet(tickets, made.map(m => ({
     orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, keyId: m.keyId, state: 'valid', admittedAt: admit ? admit.at : null, admittedScanId: m.scanId,
   })))

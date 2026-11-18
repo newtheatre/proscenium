@@ -110,6 +110,9 @@ async function payCash(page: Page, amount: string) {
   await page.getByRole('button', { name: 'Cash taken' }).click()
   // The till says so once.
   await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
+  // The sale stays on screen, with its booking, until the next customer.
+  await expect(page.getByRole('heading', { name: /^Booking / })).toBeVisible()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 }
 
@@ -266,6 +269,7 @@ test('the till in live mode collects a reservation, changed to who came, and tak
   await noViolations(page)
   await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken' }).click()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })

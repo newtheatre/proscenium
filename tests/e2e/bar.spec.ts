@@ -121,6 +121,7 @@ test('one press adds a product sold one way; one with sizes asks which, and the 
   await expect(page.getByText('Still to pay: £10.40')).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £10.40', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
 

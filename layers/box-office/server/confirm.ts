@@ -57,18 +57,21 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
   const doorCodes = await issueTickets(unit, lines, options.from === 'awaiting_payment' && order.admit_on_payment && order.sold_by ? { by: order.sold_by, at } : undefined)
   const performanceIds = [...new Set(lines.map(l => l.performance_id))]
   unit.announce('box-office.order.confirmed', { orderId: order.id, performanceIds }, { record: ['box-office.order', order.id] })
-  // An anonymous desk sale has nobody to write to: the seller hands over the tickets.
-  if (accountId) {
-    const words = await wordsFor(order, lines, order.total_minor)
-    const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, paid: words.amount, codes: doorCodes.join('\n\n'), link: await siteUrl(`/book/order/${token}`) }
-    // A buyer who has never signed in also gets the link that opens their account (core's claim link).
-    const account = await claimLink(unit, accountId)
-    await notify(unit, account ? 'box-office.order-confirmed-guest' : 'box-office.order-confirmed', {
-      to: accountId,
-      variables: account ? { ...variables, account } : variables,
-      subject: ['box-office.order', order.id],
-      dedupeKey: `confirmed:${order.id}`,
-    })
-  }
+  // An anonymous desk sale has nobody to write to: the seller hands over the tickets, or sends them afterwards.
+  if (accountId) await sendTickets(unit, order, lines, { accountId, doorCodes, token, dedupeKey: `confirmed:${order.id}` })
   return { state: 'confirmed', orderId: order.id, reference: order.reference, currency: order.currency, totalMinor: order.total_minor, doorCodes }
+}
+
+/** Sends the buyer their tickets: the door codes and the link to the booking, whose token is `token`. */
+export async function sendTickets(unit: UnitView, order: Pick<OrderRow, 'id' | 'reference' | 'currency' | 'total_minor'>, lines: LineRow[], send: { accountId: string, doorCodes: string[], token: string, dedupeKey: string }): Promise<void> {
+  const words = await wordsFor(order, lines, order.total_minor)
+  const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, paid: words.amount, codes: send.doorCodes.join('\n\n'), link: await siteUrl(`/book/order/${send.token}`) }
+  // A buyer who has never signed in also gets the link that opens their account (core's claim link).
+  const account = await claimLink(unit, send.accountId)
+  await notify(unit, account ? 'box-office.order-confirmed-guest' : 'box-office.order-confirmed', {
+    to: send.accountId,
+    variables: account ? { ...variables, account } : variables,
+    subject: ['box-office.order', order.id],
+    dedupeKey: send.dedupeKey,
+  })
 }

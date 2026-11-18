@@ -14,7 +14,9 @@ import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle } from './entitlement'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
-import { hashOf, newReference } from './codes'
+import { hashOf, newReference, randomToken } from './codes'
+import { sendTickets } from './confirm'
+import { reissueTickets } from './tickets'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
@@ -435,4 +437,66 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       })),
     }
   }))
+}
+
+export interface DeskSold {
+  orderId: string
+  reference: string
+  /** Who the tickets were sent to, as Identity names them; null for a sale with nobody's details. */
+  buyer: string | null
+  performance: { id: string, title: string, startsAt: number } | null
+  lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[]
+}
+
+/**
+ * What a till payment bought from Box office, for the panel shown after the sale (till proposal,
+ * "after the sale"): each booking it paid for, with its reference, tickets and whether each is in.
+ */
+export async function deskSold(intentId: string): Promise<DeskSold[]> {
+  const paid = await all<{ id: string, reference: string, account_id: string | null }>("SELECT id, reference, account_id FROM box_office_orders WHERE intent_id = ? AND state = 'confirmed' ORDER BY created_at", intentId)
+  return Promise.all(paid.map(async (order) => {
+    const lines = await all<{ id: string, performance_id: string, band_name: string | null, type_name: string, amount_minor: number, admitted_at: number | null }>(
+      `SELECT l.id, l.performance_id, CASE WHEN (SELECT count(*) FROM box_office_bands o WHERE o.production_id = b.production_id) > 1 THEN b.name END AS band_name,
+          t.name AS type_name, l.amount_minor, k.admitted_at
+        FROM box_office_order_lines l JOIN box_office_ticket_types t ON t.id = l.ticket_type_id JOIN box_office_bands b ON b.id = l.band_id
+        LEFT JOIN box_office_tickets k ON k.order_line_id = l.id AND k.state = 'valid'
+        WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, order.id)
+    const performance = lines[0] ? { id: lines[0].performance_id, ...await showOf(lines[0].performance_id) } : null
+    return {
+      orderId: order.id,
+      reference: order.reference,
+      buyer: order.account_id ? await accountLabel(order.account_id) : null,
+      performance,
+      lines: lines.map(l => ({ id: l.id, band: l.band_name, ticketType: l.type_name, amountMinor: l.amount_minor, admitted: l.admitted_at !== null })),
+    }
+  }))
+}
+
+/**
+ * Emails the tickets of a desk sale made with nobody's details, when the buyer asks after paying.
+ * The order joins the account for the address, or the person picked, as if given at the sale. The
+ * tickets get new door codes, since the first ones were handed out once and kept nowhere; any shown
+ * at the desk stop working. Once an order has a buyer this is refused: it was sent to them already.
+ */
+export async function sendDeskTickets(unit: UnitView, orderId: string, to: { email?: string, accountId?: string }): Promise<{ buyer: string }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (order.state !== 'confirmed') refuse('box-office.desk.not-sold', 'These tickets are not paid for yet.', { status: 409 })
+  if (order.account_id) refuse('box-office.desk.already-sent', 'These tickets were sent to the buyer already.', { status: 409, remedy: 'Send them again from the booking\'s page.' })
+  const lines = await liveLines(order.id)
+  if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  await requireAbility(useContext().actor, 'box-office.order.sell', ['core.performance', lines[0]!.performance_id])
+  const accountId = to.accountId ? await pickedBuyer(to.accountId) : (await findOrCreateAccount(unit, { address: to.email!, origin: 'guest' })).accountId
+  // A ticket already admitted needs no code: only those still to come in are sent.
+  const waiting = await all<{ id: string, line_id: string, performance_id: string }>(
+    `SELECT k.id, l.id AS line_id, l.performance_id FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id
+      WHERE l.order_id = ? AND l.state = 'live' AND k.state = 'valid' AND k.admitted_at IS NULL ORDER BY l.id`, order.id)
+  const doorCodes = await reissueTickets(unit, waiting.map(k => ({ ticketId: k.id, line: { id: k.line_id, performance_id: k.performance_id } })))
+  const token = randomToken()
+  const at = nowMs()
+  unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${at}
+    WHERE id = ${order.id} AND state = 'confirmed' AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
+  await sendTickets(unit, order, lines, { accountId, doorCodes, token, dedupeKey: `confirmed:${order.id}` })
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
+  return { buyer: await accountLabel(accountId) }
 }

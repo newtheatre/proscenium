@@ -45,6 +45,8 @@ import doorTonight from '../../server/api/box-office/door/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
 import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
+import deskSoldGet from '../../server/api/box-office/desk/sold.get'
+import deskSendPost from '../../server/api/box-office/desk/orders/[id]/send.post'
 import deskPerformancesGet from '../../server/api/box-office/desk/performances.get'
 import deskBuyersGet from '../../server/api/box-office/desk/buyers.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
@@ -118,6 +120,8 @@ export const handle = server({
   'POST /api/box-office/orders/:id/amend': amendPost,
   'POST /api/box-office/orders/:id/split': splitPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/desk/sold': deskSoldGet,
+  'POST /api/box-office/desk/orders/:id/send': deskSendPost,
   'GET /api/box-office/desk/performances': deskPerformancesGet,
   'GET /api/box-office/desk/buyers': deskBuyersGet,
   'POST /api/box-office/orders/:id/exchange': exchangePost,
