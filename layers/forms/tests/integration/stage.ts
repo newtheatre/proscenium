@@ -16,6 +16,8 @@ import linkPut from '../../server/api/forms/forms/[id]/link.put'
 import openGet from '../../server/api/forms/open/[slug].get'
 import openDraftPut from '../../server/api/forms/open/[slug]/draft.put'
 import openSendPost from '../../server/api/forms/open/[slug]/responses.post'
+import openFilePost from '../../server/api/forms/open/[slug]/files/index.post'
+import openFileGet from '../../server/api/forms/open/[slug]/files/[file].get'
 import responsesGet from '../../server/api/forms/forms/[id]/responses/index.get'
 import responseGet from '../../server/api/forms/forms/[id]/responses/[response].get'
 import responsesExport from '../../server/api/forms/forms/[id]/responses/export.get'
@@ -58,6 +60,8 @@ export const handle = server({
   'GET /api/forms/open/:slug': openGet,
   'PUT /api/forms/open/:slug/draft': openDraftPut,
   'POST /api/forms/open/:slug/responses': openSendPost,
+  'POST /api/forms/open/:slug/files': openFilePost,
+  'GET /api/forms/open/:slug/files/:file': openFileGet,
   'GET /api/forms/forms/:id/responses': responsesGet,
   'GET /api/forms/forms/:id/responses/export': responsesExport,
   'GET /api/forms/forms/:id/responses/:response': responseGet,
