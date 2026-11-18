@@ -12,7 +12,7 @@ const items = computed(() => [{ value: NONE, label: t('box-office.presets.none')
 <template>
   <div class="flex flex-wrap items-center gap-2">
     <USelect
-      :model-value="model ?? NONE"
+      :model-value="model || NONE"
       :items="items"
       :disabled="disabled"
       class="w-72"

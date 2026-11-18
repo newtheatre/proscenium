@@ -180,6 +180,8 @@ export default defineModule({
       { id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' },
       { id: 'front-of-house.shifts', home: 'members', ability: 'front-of-house.shift.sign-up', component: 'FrontOfHouseShiftsCard', urgency: 'info', count: 'front-of-house.members-home' },
     ],
+    // Experience on the rota, for a duty's requirements (FH-5).
+    'core.requirement': [{ id: 'front-of-house', file: 'front-of-house' }],
     // The roles part 7 suggests, made when the module is first switched on (FH-4).
     'core.role-preset': [
       { id: 'front-of-house.volunteer', key: 'volunteer', name: 'Volunteer', description: 'Signs up for shifts, reports incidents and opens the emergency card.', abilities: ['front-of-house.shift.sign-up', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], opensMembersArea: true },

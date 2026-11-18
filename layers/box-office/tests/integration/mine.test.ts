@@ -7,6 +7,8 @@ import { call, inContext, person, rows, server } from '../../../../tests/integra
 import mineGet from '../../server/api/box-office/orders/mine.get'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
+const LINK = '/api/box-office/orders/link'
+
 const own = server({ 'GET /api/box-office/orders/mine': mineGet })
 const mine = async (actor: ReturnType<typeof person>) => {
   const response = await call(own, 'GET', '/api/box-office/orders/mine', { actor })
@@ -76,5 +78,36 @@ describe('My tickets', () => {
     expect((await mine(person([]))).body).toEqual({ upcoming: [], past: [] })
     const signedOut = await call(own, 'GET', '/api/box-office/orders/mine')
     expect(signedOut.status).toBe(401)
+  })
+
+  it('opens a booking for its signed-in owner by its id, as its link does, and lets them cancel it', async () => {
+    const visit = await booked(Date.UTC(2027, 6, 2, 19, 30), 2)
+    const fan = person([])
+    // The booking is on an account merged into the fan's, so it is theirs through the account scope.
+    await rows('UPDATE core_accounts SET merged_into_id = ? WHERE id = ?', fan.accountId!, visit.accountId)
+    const byId = { 'x-order-id': visit.orderId }
+
+    const seen = await req('GET', LINK, undefined, fan, byId)
+    expect(seen.status, JSON.stringify(seen.body)).toBe(200)
+    expect(seen.body).toMatchObject({ orderId: visit.orderId, state: 'confirmed', show: { title: expect.any(String) } })
+    expect(seen.body.tickets).toHaveLength(2)
+    expect(seen.body.buyerCancel).not.toBeNull()
+
+    // Anyone else, signed in or not, is told no such booking: not that it is someone else's.
+    const stranger = person([])
+    for (const actor of [stranger, null]) {
+      const looked = await req('GET', LINK, undefined, actor, byId)
+      expect(looked.status).toBe(404)
+      expect(looked.body).toMatchObject({ code: 'box-office.order.not-found' })
+      expect((await req('POST', `${LINK}/cancel`, {}, actor, byId)).status).toBe(404)
+    }
+    // A made-up id is refused the same way.
+    expect((await req('GET', LINK, undefined, fan, { 'x-order-id': 'ord_nothing' })).status).toBe(404)
+    expect((await rows<{ state: string }>('SELECT state FROM box_office_orders WHERE id = ?', visit.orderId))[0]!.state).toBe('confirmed')
+
+    const cancelled = await req('POST', `${LINK}/cancel`, {}, fan, byId)
+    expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200)
+    expect(cancelled.body).toMatchObject({ orderId: visit.orderId, state: 'cancelled', lines: [] })
+    expect((await rows<{ state: string }>('SELECT state FROM box_office_orders WHERE id = ?', visit.orderId))[0]!.state).toBe('cancelled')
   })
 })

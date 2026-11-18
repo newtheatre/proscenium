@@ -24,7 +24,7 @@ export default defineRoute({
     scheduledPrices: await scheduledPrices(production.id, performance.id),
     checklist: list.items,
     // For the set-up screen: what the performance is, and every band its production has.
-    performance: { id: performance.id, productionId: production.id, title: production.title, label: performance.label, startsAt: performance.startsAt, state: performance.state },
+    performance: { id: performance.id, productionId: production.id, productionState: production.state, title: production.title, label: performance.label, startsAt: performance.startsAt, state: performance.state },
     bands: await listBands(production.id),
   }
 })
