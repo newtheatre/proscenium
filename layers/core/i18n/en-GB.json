@@ -302,7 +302,7 @@
   "core.counts.all-exist": "All {count} already exist, so there is nothing to add.",
   "core.counts.all-exist.one": "It already exists, so there is nothing to add.",
   "core.dates.zone": "Times are in the theatre's time zone, {zone}.",
-  "core.form.optional": "(optional)",
+  "core.form.optional": "Optional",
   "core.form.cancel": "Cancel",
   "core.form.saved": "Saved",
   "core.form.problems": "Please check {count} problems",
