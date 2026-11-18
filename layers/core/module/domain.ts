@@ -147,7 +147,8 @@ export const abilities = defineAbilities('core', {
 })
 
 const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]*$/)
-const wording = z.object({ subject: z.string().min(1).max(200), body: z.string().min(1).max(5000) }).strict() // not-policy: sane bounds for shipped wording
+// action: the words on the email's button to the type's link, when the body has no link of its own.
+const wording = z.object({ subject: z.string().min(1).max(200), body: z.string().min(1).max(5000), action: z.string().min(1).max(60).optional() }).strict() // not-policy: sane bounds for shipped wording
 
 export const points = {
   /**
@@ -161,7 +162,7 @@ export const points = {
       category: z.enum(['transactional', 'optional']),
       side: z.enum(['audience', 'members']),
       channels: z.array(z.enum(['email', 'inbox'])).min(1),
-      /** The inbox item's link: a path inside the application, which may use the type's variables. */
+      /** The inbox item's link and the email's button: a path inside the application, which may use the type's variables. */
       link: z.string().startsWith('/').optional(),
       lane: z.enum(['prompt', 'bulk']).optional(),
       topic: z.string().optional(),

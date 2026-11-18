@@ -193,6 +193,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Your shift has a new time: {{ show }}',
           body: 'Your {{ duty }} shift for **{{ show }}** has moved. Please now arrive by **{{ when }}**.\n\nIf you can no longer do it, you can give it up without the usual notice.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -206,6 +207,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Your shift has moved: {{ show }}',
           body: 'The performance of **{{ show }}** you are on as {{ duty }} has moved to **{{ where }}**. Please arrive there by {{ when }}.\n\nIf you can no longer do it, you can give it up without the usual notice.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -219,6 +221,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Shift cancelled: {{ show }}',
           body: 'Your shift for **{{ show }}** on {{ when }} has been cancelled, so you are no longer needed. Thank you for signing up.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -232,6 +235,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You are on the rota: {{ show }}',
           body: 'Thank you. You are confirmed as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\nIf you find you cannot do it, give it up as early as you can from your shifts, so someone else can take it.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -245,6 +249,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Reminder: your shift for {{ show }}',
           body: 'A reminder that you are on as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -258,6 +263,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You are no longer on a shift: {{ show }}',
           body: 'You have been taken off the {{ duty }} shift for **{{ show }}** on {{ when }}, so you are not needed then. If you were not expecting this, ask the front-of-house manager.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -271,6 +277,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Your shift is covered: {{ show }}',
           body: 'Someone has taken your {{ duty }} shift for **{{ show }}** on {{ when }}, so you are no longer needed then.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -286,6 +293,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Cover needed: {{ duty }}, {{ show }}',
           body: 'Someone on the {{ duty }} shift for **{{ show }}** on {{ when }} has asked to give up their place. It stays theirs until someone takes it.',
+          action: 'See open shifts',
         },
       },
     }, {
@@ -301,6 +309,7 @@ export default defineModule({
         'en-GB': {
           subject: '{{ severity }} incident reported: {{ reference }}',
           body: '{{ kind }} {{ reference }} has been reported, marked **{{ severity }}**. Open it to review it.',
+          action: 'Open the incident',
         },
       },
     }, {
@@ -315,6 +324,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Incidents reported: {{ count }}',
           body: 'These incidents were reported since the last summary:\n\n{{ incidents }}\n\nOpen the incidents list to review them.',
+          action: 'Open the incidents',
         },
       },
     }, {
@@ -329,6 +339,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Due tomorrow: {{ what }}',
           body: 'The action "{{ what }}" from {{ incident }} is due tomorrow ({{ due }}). Mark it done when it is, or drop it with a reason.',
+          action: 'Open the incidents',
         },
       },
     }, {
@@ -373,6 +384,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Overdue: {{ what }}',
           body: 'The action "{{ what }}" from {{ incident }} was due on {{ due }} and is still open. Mark it done when it is, or drop it with a reason.',
+          action: 'Open the incidents',
         },
       },
     }],
