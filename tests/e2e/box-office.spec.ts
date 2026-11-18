@@ -117,6 +117,9 @@ async function payCash(page: Page, amount: string) {
   await page.getByRole('button', { name: 'Cash taken' }).click()
   // The till says so once.
   await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
+  // The sale stays on screen, with its booking, until the next customer.
+  await expect(page.getByRole('heading', { name: /^Booking / })).toBeVisible()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 }
 
@@ -128,16 +131,17 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
   const quantity = page.getByLabel(`Stalls, ${typeName}, £12.00`)
   // How many are left is the field's help, which it names as its description.
-  const help = page.locator(`[id="${(await quantity.getAttribute('aria-describedby'))!.split(' ').at(-1)}"]`)
-  const before = Number((await help.textContent())!.match(/(\d+) left/)![1])
+  const help = async () => page.locator(`[id="${(await quantity.getAttribute('aria-describedby'))!.split(' ').at(-1)}"]`)
+  const before = Number((await (await help()).textContent())!.match(/(\d+) left/)![1])
   await quantity.fill('2')
   await quantity.blur()
   await page.getByRole('checkbox', { name: 'Admit now' }).check()
   await expect(payButton(page, '£24.00')).toBeEnabled()
   await noViolations(page)
   await payCash(page, '£24.00')
-  // The panel shows what is left after the sale without a reload.
-  await expect(help).toHaveText(`${before - 2} left`)
+  // Back for the next customer, the panel shows what is left after the sale without a reload.
+  await expect(quantity).toBeVisible()
+  await expect(await help()).toHaveText(`${before - 2} left`)
 })
 
 test('Sell finds a reservation by its reference and takes payment for it', async ({ page }) => {
@@ -273,6 +277,7 @@ test('the till in live mode collects a reservation, changed to who came, and tak
   await noViolations(page)
   await cash(page).click()
   await page.getByRole('button', { name: 'Cash taken' }).click()
+  await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
