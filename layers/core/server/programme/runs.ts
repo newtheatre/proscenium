@@ -4,14 +4,16 @@
 // what they accept, and that list is saved. Within the kit's limit on rows in one unit it is saved
 // whole or not at all, in one statement whose guards are predicates on the insert. A longer list
 // becomes a run, which the core.create-run job saves in chunks, each its own unit and safe to
-// repeat. A run that stops part way can be finished or removed.
+// repeat. A run that stops part way can be finished or removed. Every run keeps the pattern it was
+// made from, so a whole run can be edited later: the new pattern is matched against what the run
+// made, and the difference is shown (added, moved, cancelled) before anything changes.
 import { sql, type SQL } from 'drizzle-orm'
-import { all, createUnit, first, isRefusal, newId, nowMs, refuse, useSetting } from '#kit'
+import { all, createUnit, first, isRefusal, newId, nowMs, refuse, requireAbility, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
 import { dayRule, operatingDayAt, type DayRule } from '../calendar'
-import { firstRefusal, noClash, performanceDefaults, spaceFits, syncProductionDates, turnaroundMs, whyNotFree } from './performances'
+import { cancelPerformance, changeImpact, deletePerformance, firstRefusal, noClash, performanceDefaults, reinstatePerformance, spaceFits, syncProductionDates, turnaroundMs, updatePerformance, whyNotFree } from './performances'
 
 export interface RunPattern {
   venueId: string
@@ -39,7 +41,10 @@ export type Problem = 'past' | 'exists' | 'clash' | 'closed'
 export interface PlannedPerformance { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: Problem | null, reason: string | null }
 
 export interface RunItem { startsAt: number, endsAt: number, doorsAt: number | null }
+/** What a run was made from, kept with it so it can be edited; the space is the run's own. */
+export interface StoredPattern { from: string, to: string, slots: RunSlot[], minutes?: number | null, doorsBeforeMinutes?: number | null }
 export interface RunInput {
+  pattern?: StoredPattern
   venueId: string
   spaceId: string
   scheduled: boolean
@@ -69,6 +74,7 @@ interface RunRow {
   done: number
   state: RunStatus['state']
   stop_reason: string | null
+  pattern: string | null
 }
 
 const DAY = 86_400_000 // not-policy: milliseconds in a day
@@ -95,7 +101,9 @@ function* dates(from: string, to: string): Generator<{ date: string, weekday: nu
 }
 
 /** The performances a pattern would make, each marked with what stands in its way. */
-export async function planRun(productionId: string, pattern: RunPattern): Promise<{ performances: PlannedPerformance[], limit: number }> {
+export async function planRun(productionId: string, pattern: RunPattern, options: { exceptRun?: string } = {}): Promise<{ performances: PlannedPerformance[], limit: number }> {
+  // An edited run's own performances are what it changes, so they stand in nothing's way.
+  const except = options.exceptRun ?? ''
   const production = await first<{ state: string }>('SELECT state FROM core_productions WHERE id = ?', productionId)
   if (!production) refuse('core.production.not-found', 'There is no such production.', { status: 404 })
   const space = await first<{ exclusive: number }>("SELECT exclusive FROM core_spaces WHERE id = ? AND venue_id = ? AND performable = 1 AND state = 'active'", pattern.spaceId, pattern.venueId)
@@ -124,10 +132,10 @@ export async function planRun(productionId: string, pattern: RunPattern): Promis
   const to = Math.max(...planned.map(p => p.endsAt))
   const taken = space.exclusive
     ? await all<{ production_id: string, title: string, starts_at: number, ends_at: number }>(`SELECT o.production_id, p.title, o.starts_at, o.ends_at FROM core_performances o JOIN core_productions p ON p.id = o.production_id
-        WHERE o.space_id = ? AND o.state = 'scheduled' AND o.starts_at < ? AND o.ends_at > ?`, pattern.spaceId, to + gap, from - gap)
+        WHERE o.space_id = ? AND o.state = 'scheduled' AND o.starts_at < ? AND o.ends_at > ? AND (o.run_id IS NULL OR o.run_id <> ?)`, pattern.spaceId, to + gap, from - gap, except)
     : []
   // The production's own performances at the same times, drafts included, in any space: adding the same run twice.
-  const own = new Set((await all<{ starts_at: number }>('SELECT starts_at FROM core_performances WHERE production_id = ? AND state IN (\'draft\', \'scheduled\') AND starts_at BETWEEN ? AND ?', productionId, from, to)).map(r => r.starts_at))
+  const own = new Set((await all<{ starts_at: number }>('SELECT starts_at FROM core_performances WHERE production_id = ? AND state IN (\'draft\', \'scheduled\') AND starts_at BETWEEN ? AND ? AND (run_id IS NULL OR run_id <> ?)', productionId, from, to, except)).map(r => r.starts_at))
   const closures = (await closuresBetween(from, to, { spaceId: pattern.spaceId })).filter(c => c.blocksPerformances)
   const at = nowMs()
   planned.forEach((p, i) => {
@@ -183,26 +191,35 @@ function announceScheduled(unit: UnitView, productionId: string, ids: string[]) 
  * C-04: saves the performances the person accepted. Within the limit, in the caller's unit, whole or
  * not at all. Over it, a run for the job, whose progress the console follows.
  */
-export async function createRun(unit: UnitView, productionId: string, input: RunInput): Promise<{ created: number, ids: string[] } | { run: RunStatus }> {
+export async function createRun(unit: UnitView, productionId: string, input: RunInput): Promise<{ created: number, ids: string[], runId: string | null } | { run: RunStatus }> {
   const items = [...input.performances].sort((a, b) => a.startsAt - b.startsAt)
   checkItems(items)
   const day = await rule()
   const limit = await rows()
   if (items.length <= limit) {
-    const ids = insertItems(unit, productionId, input, items, day, null, await turnaroundMs())
+    // Saved whole, the run is recorded as done, with its pattern, so it can be edited as a whole.
+    const runId = input.pattern ? newId('run') : null
+    if (runId) {
+      const at = nowMs()
+      unit.add(sql`INSERT INTO core_performance_runs (id, production_id, venue_id, space_id, scheduled, capacity, interval_count, interval_minutes, label, external_booking_url, items, total, done, state, pattern, created_at, updated_at)
+        SELECT ${runId}, ${productionId}, ${input.venueId}, ${input.spaceId}, ${input.scheduled ? 1 : 0}, ${input.capacity ?? null}, ${input.intervalCount ?? null}, ${input.intervalMinutes ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null},
+          ${JSON.stringify(items)}, ${items.length}, ${items.length}, 'done', ${JSON.stringify(input.pattern)}, ${at}, ${at}
+        WHERE ${spaceFits(input.venueId, input.spaceId)}`).expect(1, { code: 'core.performance.space-unsuitable', reason: 'Choose a space in that venue that is in use and can hold performances.' })
+    }
+    const ids = insertItems(unit, productionId, input, items, day, runId, await turnaroundMs())
     unit.expect(items.length, CHANGED)
     if (input.scheduled) {
       syncProductionDates(unit, productionId)
       announceScheduled(unit, productionId, ids)
     }
     unit.audit({ action: 'create', record: ['core.production', productionId], detail: { performances: items.length, scheduled: input.scheduled } })
-    return { created: items.length, ids }
+    return { created: items.length, ids, runId }
   }
   const id = newId('run')
   const at = nowMs()
-  unit.add(sql`INSERT INTO core_performance_runs (id, production_id, venue_id, space_id, scheduled, capacity, interval_count, interval_minutes, label, external_booking_url, items, total, done, state, created_at, updated_at)
+  unit.add(sql`INSERT INTO core_performance_runs (id, production_id, venue_id, space_id, scheduled, capacity, interval_count, interval_minutes, label, external_booking_url, items, total, done, state, pattern, created_at, updated_at)
     SELECT ${id}, ${productionId}, ${input.venueId}, ${input.spaceId}, ${input.scheduled ? 1 : 0}, ${input.capacity ?? null}, ${input.intervalCount ?? null}, ${input.intervalMinutes ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null},
-      ${JSON.stringify(items)}, ${items.length}, 0, 'running', ${at}, ${at}
+      ${JSON.stringify(items)}, ${items.length}, 0, 'running', ${input.pattern ? JSON.stringify(input.pattern) : null}, ${at}, ${at}
     WHERE ${spaceFits(input.venueId, input.spaceId)}`).expect(1, { code: 'core.performance.space-unsuitable', reason: 'Choose a space in that venue that is in use and can hold performances.' })
   unit.audit({ action: 'create', record: ['core.production', productionId], detail: { run: id, performances: items.length, scheduled: input.scheduled } })
   unit.enqueue('core.create-run', { runId: id }, { dedupeKey: `${id}:0` })
@@ -230,6 +247,10 @@ export async function undoAdded(unit: UnitView, productionId: string, ids: strin
     const refused = await firstRefusal({ record: { type: 'core.performance', id: p.id }, kind: 'cancel' }, actor)
     if (refused) refuse(refused.code, refused.reason, { status: 409, ...(refused.link ? { remedy: refused.link } : {}) })
   }
+  // A run left with nothing is removed with them, so it is no longer offered for editing.
+  unit.add(sql`UPDATE core_performance_runs SET state = 'removed', updated_at = ${nowMs()} WHERE production_id = ${productionId} AND state = 'done'
+    AND id IN (SELECT run_id FROM core_performances WHERE id IN (SELECT value FROM json_each(${list})))
+    AND NOT EXISTS (SELECT 1 FROM core_performances x WHERE x.run_id = core_performance_runs.id AND x.id NOT IN (SELECT value FROM json_each(${list})))`)
   unit.add(sql`DELETE FROM core_performances WHERE production_id = ${productionId} AND state IN ('draft', 'scheduled') AND created_at >= ${cutoff} AND id IN (SELECT value FROM json_each(${list}))`)
     .expect(unique.length, { code: 'core.run.undo-too-late', reason: 'These performances have changed since they were added, so they cannot be removed in one go.', remedy: 'Delete or cancel them one by one.' })
   if (scheduled.length) {
@@ -359,4 +380,189 @@ async function removeChunk(unit: UnitView, row: RunRow): Promise<void> {
   const more = drafts.length + scheduled.length === limit
   unit.add(sql`UPDATE core_performance_runs SET state = ${more ? 'removing' : 'removed'}, updated_at = ${nowMs()} WHERE id = ${row.id} AND state = 'removing'`).expect(1, CHANGED)
   if (more) unit.enqueue('core.create-run', { runId: row.id }, { dedupeKey: `${row.id}:remove:${nowMs()}` })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Editing a whole run ("Edit the run")
+
+/** A run that can be edited: done, with its pattern, and with performances still to come. */
+export interface EditableRun { id: string, venueId: string, spaceId: string, scheduled: boolean, pattern: StoredPattern, count: number, performanceIds: string[] }
+
+export async function editableRuns(productionId: string): Promise<EditableRun[]> {
+  const found = await all<RunRow & { count: number }>(`SELECT r.*, (SELECT count(*) FROM core_performances o WHERE o.run_id = r.id AND o.state IN ('draft', 'scheduled') AND o.starts_at > ?) AS count
+    FROM core_performance_runs r WHERE r.production_id = ? AND r.state = 'done' AND r.pattern IS NOT NULL ORDER BY r.created_at, r.id`, nowMs(), productionId)
+  const live = found.filter(r => r.count > 0)
+  const members = live.length ? await all<{ id: string, run_id: string }>('SELECT id, run_id FROM core_performances WHERE run_id IN (SELECT value FROM json_each(?))', JSON.stringify(live.map(r => r.id))) : []
+  return live.map(r => ({ id: r.id, venueId: r.venue_id, spaceId: r.space_id, scheduled: !!r.scheduled, pattern: JSON.parse(r.pattern!) as StoredPattern, count: r.count, performanceIds: members.filter(m => m.run_id === r.id).map(m => m.id) }))
+}
+
+interface Existing { id: string, state: 'draft' | 'scheduled', starts_at: number, ends_at: number, doors_at: number | null, operating_day: string, venue_id: string, space_id: string }
+export interface RunMove { performanceId: string, state: 'draft' | 'scheduled', startsAt: number, toStartsAt: number, toEndsAt: number, toDoorsAt: number | null, problem: Problem | null, reason: string | null }
+export interface RunRemoval { performanceId: string, state: 'draft' | 'scheduled', startsAt: number }
+export interface RunChange {
+  add: PlannedPerformance[]
+  move: RunMove[]
+  remove: RunRemoval[]
+  /** Performances the new pattern leaves exactly as they are. */
+  keep: number
+  /** What the changes to scheduled performances touch, from every module, once each. */
+  lines: string[]
+  refusal: { code: string, reason: string, link: string | null } | null
+  limit: number
+}
+export interface RunEditInput { venueId: string, spaceId: string, pattern: StoredPattern }
+
+async function editableRow(productionId: string, runId: string): Promise<RunRow & { pattern: string }> {
+  const row = await runRow(productionId, runId)
+  if (row.state !== 'done' || !row.pattern) refuse('core.run.not-editable', 'Only a run that was added whole can be edited as a run.', { status: 409, remedy: 'Edit its performances one by one instead.' })
+  return row as RunRow & { pattern: string }
+}
+
+/**
+ * Matches a new pattern against what the run made. A performance at a time the pattern still has is
+ * kept (or moved, when its space, end or doors change); the rest are paired in time order with the
+ * pattern's new times on the same day and moved; what is left of the pattern is added and what is
+ * left of the run is removed: a draft deleted, a scheduled performance cancelled.
+ */
+async function matchRun(productionId: string, row: RunRow, input: RunEditInput, actor: Actor): Promise<RunChange & { existing: Existing[] }> {
+  const existing = await all<Existing>(`SELECT id, state, starts_at, ends_at, doors_at, operating_day, venue_id, space_id FROM core_performances
+    WHERE run_id = ? AND production_id = ? AND state IN ('draft', 'scheduled') AND starts_at > ? ORDER BY starts_at`, row.id, productionId, nowMs())
+  const { performances: planned, limit } = await planRun(productionId, { venueId: input.venueId, spaceId: input.spaceId, ...input.pattern }, { exceptRun: row.id })
+  const unmatched = new Set(existing.map(e => e.id))
+  const free = new Set(planned.map((_, i) => i))
+  const move: RunMove[] = []
+  let keep = 0
+  const pair = (e: Existing, i: number) => {
+    const p = planned[i]!
+    unmatched.delete(e.id)
+    free.delete(i)
+    const same = p.startsAt === e.starts_at && p.endsAt === e.ends_at && p.doorsAt === e.doors_at && input.spaceId === e.space_id && input.venueId === e.venue_id
+    if (same) keep++
+    // A problem at the new time (a clash, a closure) leaves the performance where it is.
+    else move.push({ performanceId: e.id, state: e.state, startsAt: e.starts_at, toStartsAt: p.startsAt, toEndsAt: p.endsAt, toDoorsAt: p.doorsAt, problem: p.problem, reason: p.reason })
+  }
+  for (const e of existing) {
+    const i = planned.findIndex((p, n) => free.has(n) && p.startsAt === e.starts_at)
+    if (i >= 0) pair(e, i)
+  }
+  for (const e of existing.filter(x => unmatched.has(x.id))) {
+    const i = planned.findIndex((p, n) => free.has(n) && p.operatingDay === e.operating_day && p.problem !== 'past')
+    if (i >= 0) pair(e, i)
+  }
+  const add = planned.filter((_, i) => free.has(i) && planned[i]!.problem !== 'past')
+  const remove: RunRemoval[] = existing.filter(e => unmatched.has(e.id)).map(e => ({ performanceId: e.id, state: e.state, startsAt: e.starts_at }))
+
+  // Each change to a scheduled performance is put to every module, as one change at a time would be.
+  const lines = new Set<string>()
+  let refusal: RunChange['refusal'] = null
+  const ask = async (change: Parameters<typeof changeImpact>[0]) => {
+    for (const line of await changeImpact(change, actor)) lines.add(line)
+    const refused = refusal ? null : await firstRefusal(change, actor)
+    if (refused) refusal = { code: refused.code, reason: refused.reason, link: refused.link ?? null }
+  }
+  for (const m of move.filter(x => x.state === 'scheduled' && !x.problem)) {
+    const e = existing.find(x => x.id === m.performanceId)!
+    const to = { startsAt: m.toStartsAt, endsAt: m.toEndsAt, venueId: input.venueId, spaceId: input.spaceId, capacity: row.capacity }
+    if (m.toStartsAt !== e.starts_at || m.toEndsAt !== e.ends_at) await ask({ record: { type: 'core.performance', id: e.id }, kind: 'reschedule', to })
+    if (input.spaceId !== e.space_id) await ask({ record: { type: 'core.performance', id: e.id }, kind: 'move', to })
+  }
+  for (const x of remove.filter(x => x.state === 'scheduled')) await ask({ record: { type: 'core.performance', id: x.performanceId }, kind: 'cancel' })
+  return { add, move, remove, keep, lines: [...lines], refusal, limit, existing }
+}
+
+/** What editing the run to a new pattern would add, move and remove, for the person to check first. */
+export async function planRunEdit(productionId: string, runId: string, input: RunEditInput, actor: Actor): Promise<RunChange> {
+  const row = await editableRow(productionId, runId)
+  const { existing: _, ...change } = await matchRun(productionId, row, input, actor)
+  return change
+}
+
+const TOO_MANY = { code: 'core.run.edit-too-big', reason: 'That changes too many performances to do in one go.', remedy: 'Change a shorter stretch of the run at a time.' }
+const STALE = { code: 'core.run.changed', reason: 'The run has changed since you checked the changes.', remedy: 'Check the changes again, then apply them.' }
+const STEP_COST = 3 // not-policy: statements a move or cancel adds to the unit, about
+
+export interface RunEditAnswer {
+  added: string[]
+  moved: { id: string, startsAt: number, endsAt: number, doorsAt: number | null, venueId: string, spaceId: string }[]
+  cancelled: string[]
+  deleted: RunItem[]
+  venueId: string
+  spaceId: string
+  pattern: StoredPattern
+}
+
+/**
+ * Applies a run's new pattern in one unit: removals first (so their times are free), then moves,
+ * the latest first when the run moves later and the earliest first when it moves earlier, then the
+ * additions. The answer is what Undo needs to put it all back.
+ */
+export async function editRun(unit: UnitView, productionId: string, runId: string, input: RunEditInput & { seen: { add: number, move: number, remove: number } }, actor: Actor): Promise<RunEditAnswer> {
+  const row = await editableRow(productionId, runId)
+  const change = await matchRun(productionId, row, input, actor)
+  const adds = change.add.filter(p => !p.problem)
+  const moves = change.move.filter(m => !m.problem)
+  if (adds.length !== input.seen.add || moves.length !== input.seen.move || change.remove.length !== input.seen.remove) refuse(STALE.code, STALE.reason, { status: 409, remedy: STALE.remedy })
+  if (change.refusal) refuse(change.refusal.code, change.refusal.reason, { status: 409, ...(change.refusal.link ? { remedy: change.refusal.link } : {}) })
+  if (adds.length + (moves.length + change.remove.length) * STEP_COST > change.limit) refuse(TOO_MANY.code, TOO_MANY.reason, { status: 422, remedy: TOO_MANY.remedy })
+  if (change.remove.some(x => x.state === 'scheduled')) await requireAbility(actor, 'core.performance.cancel', ['core.production', productionId])
+
+  const answer: RunEditAnswer = { added: [], moved: [], cancelled: [], deleted: [], venueId: row.venue_id, spaceId: row.space_id, pattern: JSON.parse(row.pattern) as StoredPattern }
+  const removing = change.remove
+  if (removing.some(x => x.state === 'scheduled')) {
+    const reason = await first<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.cancel-reason' AND slug = 'other'")
+    if (!reason) refuse('core.run.no-reason', 'The cancel reason "other" is missing, so the run cannot be changed.', { status: 409 })
+    for (const x of removing.filter(r => r.state === 'scheduled')) {
+      await cancelPerformance(unit, x.performanceId, { reasonTermId: reason.id, note: 'Removed when the run was edited.' }, actor)
+      answer.cancelled.push(x.performanceId)
+    }
+  }
+  for (const x of removing.filter(r => r.state === 'draft')) {
+    const e = change.existing.find(p => p.id === x.performanceId)!
+    await deletePerformance(unit, x.performanceId)
+    answer.deleted.push({ startsAt: e.starts_at, endsAt: e.ends_at, doorsAt: e.doors_at })
+  }
+  const later = moves.reduce((n, m) => n + Math.sign(m.toStartsAt - m.startsAt), 0) > 0
+  for (const m of [...moves].sort((a, b) => later ? b.startsAt - a.startsAt : a.startsAt - b.startsAt)) {
+    const e = change.existing.find(p => p.id === m.performanceId)!
+    await updatePerformance(unit, m.performanceId, { venueId: input.venueId, spaceId: input.spaceId, startsAt: m.toStartsAt, endsAt: m.toEndsAt, doorsAt: m.toDoorsAt }, actor)
+    answer.moved.push({ id: e.id, startsAt: e.starts_at, endsAt: e.ends_at, doorsAt: e.doors_at, venueId: e.venue_id, spaceId: e.space_id })
+  }
+  if (adds.length) {
+    const scheduled = !!row.scheduled
+    const ids = insertItems(unit, productionId, { venueId: input.venueId, spaceId: input.spaceId, scheduled, capacity: row.capacity, intervalCount: row.interval_count, intervalMinutes: row.interval_minutes, label: row.label, externalBookingUrl: row.external_booking_url },
+      adds.map(({ startsAt, endsAt, doorsAt }) => ({ startsAt, endsAt, doorsAt })), await rule(), row.id, await turnaroundMs())
+    unit.expect(adds.length, CHANGED)
+    if (scheduled) {
+      syncProductionDates(unit, productionId)
+      announceScheduled(unit, productionId, ids)
+    }
+    answer.added = ids
+  }
+  unit.add(sql`UPDATE core_performance_runs SET pattern = ${JSON.stringify(input.pattern)}, venue_id = ${input.venueId}, space_id = ${input.spaceId}, updated_at = ${nowMs()} WHERE id = ${row.id} AND state = 'done'`).expect(1, CHANGED)
+  unit.audit({ action: 'update', record: ['core.production', productionId], detail: { run: row.id, added: answer.added.length, moved: answer.moved.length, cancelled: answer.cancelled.length, deleted: answer.deleted.length } })
+  return answer
+}
+
+/**
+ * Undo for an edit of a run: what it added is removed, what it moved goes back, what it cancelled is
+ * reinstated, the drafts it deleted are added again, and the run keeps its old pattern.
+ */
+export async function undoRunEdit(unit: UnitView, productionId: string, runId: string, input: RunEditAnswer, actor: Actor): Promise<{ undone: true }> {
+  const row = await editableRow(productionId, runId)
+  const ours = new Set((await all<{ id: string }>('SELECT id FROM core_performances WHERE run_id = ? AND production_id = ?', row.id, productionId)).map(r => r.id))
+  const touched = [...input.added, ...input.moved.map(m => m.id), ...input.cancelled]
+  if (touched.some(id => !ours.has(id))) refuse('core.run.undo-too-late', 'These performances have changed since the run was edited, so the edit cannot be undone.', { status: 409, remedy: 'Change them one by one.' })
+  if (input.added.length) await undoAdded(unit, productionId, input.added, actor)
+  // Moved back in the reverse of the order they were moved, then the cancelled ones reinstated.
+  for (const m of [...input.moved].reverse())
+    await updatePerformance(unit, m.id, { venueId: m.venueId, spaceId: m.spaceId, startsAt: m.startsAt, endsAt: m.endsAt, doorsAt: m.doorsAt }, actor)
+  for (const id of input.cancelled) await reinstatePerformance(unit, id)
+  if (input.deleted.length) {
+    insertItems(unit, productionId, { venueId: input.venueId, spaceId: input.spaceId, scheduled: false, capacity: row.capacity, intervalCount: row.interval_count, intervalMinutes: row.interval_minutes, label: row.label, externalBookingUrl: row.external_booking_url },
+      input.deleted, await rule(), row.id, await turnaroundMs())
+    unit.expect(input.deleted.length, CHANGED)
+  }
+  unit.add(sql`UPDATE core_performance_runs SET pattern = ${JSON.stringify(input.pattern)}, venue_id = ${input.venueId}, space_id = ${input.spaceId}, updated_at = ${nowMs()} WHERE id = ${row.id}`).expect(1, CHANGED)
+  unit.audit({ action: 'update', record: ['core.production', productionId], detail: { run: row.id, undone: true } })
+  return { undone: true }
 }
