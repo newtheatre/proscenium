@@ -1,7 +1,8 @@
 // Editing a definition, as pure functions: each takes a definition and returns a new one, so the
 // builder can keep every step for undo and redo, and so the same edits can be tested without a page.
 import { conditionsOf, questionsOf } from '../engine/definition'
-import type { Condition, Content, DataClass, Definition, Group, Item, Operand, Page, Question, QuestionType, Row } from '../engine/types'
+import type { Calculation, Condition, Content, DataClass, Definition, Group, Item, Operand, Page, Question, QuestionType, Row } from '../engine/types'
+import { kindOfQuestion } from '../engine/values'
 
 export const CHOICE_TYPES: readonly QuestionType[] = ['choice.single', 'choice.multiple', 'choice.dropdown', 'choice.ranking']
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -41,7 +42,7 @@ export function keyFrom(def: Definition, label: string, except?: string): string
   const taken = new Set<string>()
   for (const { question } of questionsOf(def)) if (question.id !== except) taken.add(question.key)
   for (const page of def.pages) for (const item of page.items) if (item.kind === 'group' && item.id !== except) taken.add(item.key)
-  for (const c of def.calculations ?? []) taken.add(c.key)
+  for (const c of def.calculations ?? []) if (c.id !== except) taken.add(c.key)
   if (!taken.has(base)) return base
   let n = 2
   while (taken.has(`${base}_${n}`)) n++
@@ -146,6 +147,8 @@ export function removePage(def: Definition, id: string): Definition {
   const next = copy(def)
   next.pages = next.pages.filter(p => p.id !== id)
   for (const page of next.pages) page.routes = page.routes?.filter(r => !('page' in r.to && r.to.page === id))
+  // A calculation shown on the page stays, shown nowhere, rather than pointing at nothing.
+  for (const c of next.calculations ?? []) if (c.page === id) Reflect.deleteProperty(c, 'page')
   return next
 }
 
@@ -222,7 +225,11 @@ export function dependents(def: Definition, id: string): string[] {
     if (x.answer === id || x.group === id || x.of === id) return true
     return Object.values(x).some(v => Array.isArray(v) ? v.some(reads) : reads(v))
   }
-  for (const c of def.calculations ?? []) if (reads(c.expression)) out.add(c.id)
+  for (const c of def.calculations ?? []) if (c.id !== id && reads(c.expression)) out.add(c.id)
+  for (const { condition, owner } of conditionsOf(def)) {
+    if (owner !== id && operands(condition).some(o => 'calculation' in o && o.calculation === id)) out.add(owner)
+  }
+  for (const c of def.calculations ?? []) if (c.id !== id && JSON.stringify(c.expression).includes(`"calculation":${JSON.stringify(id)}`)) out.add(c.id)
   return [...out]
 }
 
@@ -245,4 +252,71 @@ export function earlier(def: Definition, id: string): Question[] {
     }
   }
   return out
+}
+
+// ---- calculations ----
+
+/** A new calculation, shown on a page when one is given. It starts as nothing but a nought, which the author replaces. */
+export function addCalculation(def: Definition, page?: string): { def: Definition, id: string } {
+  const next = copy(def)
+  const id = freshId(next, 'calc')
+  const calculation: Calculation = { id, key: keyFrom(next, 'calculation'), type: 'number', label: '', expression: { value: 0 }, ...(page ? { page } : {}) }
+  next.calculations = [...(next.calculations ?? []), calculation]
+  return { def: next, id }
+}
+
+/** Changes one calculation in place on a copy. */
+export function changeCalculation(def: Definition, id: string, edit: (c: Calculation) => void): Definition {
+  const next = copy(def)
+  const found = next.calculations?.find(c => c.id === id)
+  if (!found) return def
+  edit(found)
+  return next
+}
+
+/** Takes a calculation out. Logic that read it then shows as a problem, as it does for a question. */
+export function removeCalculation(def: Definition, id: string): Definition {
+  if (!def.calculations?.some(c => c.id === id)) return def
+  const next = copy(def)
+  next.calculations = next.calculations!.filter(c => c.id !== id)
+  if (!next.calculations.length) Reflect.deleteProperty(next, 'calculations')
+  return next
+}
+
+/** Moves a calculation up or down the list, which is the order they are shown in on a page. */
+export function moveCalculation(def: Definition, id: string, by: number): Definition {
+  const list = def.calculations ?? []
+  const from = list.findIndex(c => c.id === id)
+  const to = from + by
+  if (from < 0 || to < 0 || to >= list.length) return def
+  const next = copy(def)
+  const [moved] = next.calculations!.splice(from, 1)
+  next.calculations!.splice(to, 0, moved!)
+  return next
+}
+
+/** The export name follows the label until the form is published or the author writes their own. */
+export function labelCalculation(def: Definition, id: string, label: string, follow: boolean): Definition {
+  return changeCalculation(def, id, (c) => {
+    const follows = follow && c.key === keyFrom(def, c.label || 'calculation', c.id)
+    c.label = label
+    if (follows) c.key = keyFrom(def, label || 'calculation', c.id)
+  })
+}
+
+/** The calculations shown on one page, in their order. */
+export const calculationsOn = (def: Definition, page: string): Calculation[] => (def.calculations ?? []).filter(c => c.page === page)
+
+/**
+ * What a calculation's formula may read: questions with a number for an answer that are not inside a
+ * repeating group, the number questions of each group (to total) and the groups (to count), and the
+ * other calculations that give a number.
+ */
+export function calculationInputs(def: Definition, self?: string): { questions: Question[], groups: { group: Group, numbers: Question[] }[], calculations: Calculation[] } {
+  const questions: Question[] = []
+  const groups: { group: Group, numbers: Question[] }[] = []
+  for (const { question, group } of questionsOf(def)) if (!group && kindOfQuestion(question) === 'number') questions.push(question)
+  for (const page of def.pages) for (const item of page.items) if (item.kind === 'group') groups.push({ group: item, numbers: item.items.filter(q => kindOfQuestion(q) === 'number') })
+  const calculations = (def.calculations ?? []).filter(c => c.id !== self && ['number', 'money', 'percent'].includes(c.type))
+  return { questions, groups, calculations }
 }

@@ -5,15 +5,35 @@
 import { accountScopeSql } from '#kit/accounts'
 import { all, first, localDate, newId, nowMs, openSpecial, refuse, sealSpecial, useSetting, type UnitView } from '#kit'
 import { sql } from 'drizzle-orm'
-import { accountLabel, assertTerm, canonicalAccount, holdersOf, notify } from '#modules/core'
+import { accountLabel, assertTerm, canonicalAccount, holdersOf, notify, type PickerPerson } from '#modules/core'
 import type { INVOLVEMENTS, INCIDENT_KINDS } from './db/schema'
-import { SEVERITIES } from './db/schema'
+import { LIVE_STATES, SEVERITIES } from './db/schema'
 
 export const CATEGORIES = 'front-of-house.incident-category'
 
 export type IncidentKind = typeof INCIDENT_KINDS[number]
 export type Severity = typeof SEVERITIES[number]
 export type Involvement = typeof INVOLVEMENTS[number]
+
+// Who counts as working a performance, for the report's Who step (IN-1): anyone holding a place on
+// one of its shifts that is not cancelled, checked in, or who has worked it.
+const WORKING = [...LIVE_STATES, 'worked'].map(s => `'${s}'`).join(', ')
+const WORKING_ON = `SELECT s.account_id FROM front_of_house_assignments s JOIN front_of_house_shifts sh ON sh.id = s.shift_id
+  WHERE sh.performance_id = ? AND sh.state <> 'cancelled' AND s.state IN (${WORKING})`
+
+/**
+ * The people working a performance whose name matches every word typed, in the core picker's shape
+ * (a name and enough to tell two apart, never contact details).
+ */
+export async function workingPeople(performanceId: string, text: string): Promise<PickerPerson[]> {
+  const rows = await all<{ id: string, name: string | null, preferred_name: string | null, created_at: number, first_signed_in_at: number | null, disabled_at: number | null }>(
+    `SELECT a.id, a.name, a.preferred_name, a.created_at, a.first_signed_in_at, a.disabled_at FROM core_accounts a
+      WHERE a.id IN (${WORKING_ON}) AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL ORDER BY coalesce(a.preferred_name, a.name)`, performanceId)
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean)
+  return rows
+    .filter(r => words.every(w => `${r.preferred_name ?? ''} ${r.name ?? ''}`.toLowerCase().includes(w)))
+    .map(r => ({ id: r.id, label: r.preferred_name || r.name || 'Unnamed person', name: r.name, since: r.created_at, claimed: !!r.first_signed_in_at, disabled: !!r.disabled_at }))
+}
 
 const rank = (s: Severity) => SEVERITIES.indexOf(s)
 export const reference = (year: number, number: number) => `INC-${year}-${String(number).padStart(4, '0')}` // not-policy: the shown format, "INC-2026-0042"
@@ -68,16 +88,16 @@ export async function reportIncident(unit: UnitView, input: ReportInput): Promis
     params: [id, number, year, input.kind, severity, input.performanceId ?? null, input.venueId ?? null, input.spaceId ?? null, input.whereNote ?? null, input.occurredAt,
       input.whatHappened, input.immediateAction ?? null, input.firstAidGiven ? 1 : 0, input.emergencyServicesCalled ? 1 : 0, input.by, at, at, at],
   })
-  // The people the reporter names (IN-1): an account chosen in the picker must still be one, and a
-  // name stands alone with its contact. Welfare details are the reviewer's to add.
+  // The people the reporter names (IN-1): an account must be someone working the performance the
+  // report is about (none without a performance), and a name stands alone with its contact. Welfare details are the reviewer's to add.
   for (const p of input.people ?? []) {
     if (!p.accountId && !p.name) refuse('front-of-house.person-unnamed', 'Choose the person\'s account, or give their name.', { status: 422, fields: { people: 'A name, or choose an account.' } })
     const accountId = p.accountId ? await canonicalAccount(p.accountId) : null
     unit.add({
       sql: `INSERT INTO front_of_house_incident_people (id, incident_id, account_id, name, contact, involvement, is_child, from_report, created_at, updated_at)
-        SELECT ?, ?, ?, ?, ?, ?, 0, 1, ?, ? WHERE ? IS NULL OR EXISTS (SELECT 1 FROM core_accounts WHERE id = ? AND anonymised_at IS NULL)`,
-      params: [newId('inp'), id, accountId, accountId ? null : p.name ?? null, accountId ? null : p.contact ?? null, p.involvement, at, at, accountId, accountId],
-    }).expect(1, { code: 'front-of-house.unknown-person', reason: 'One of the people named is not someone on the system.', remedy: 'Choose them again, or give their name instead.' })
+        SELECT ?, ?, ?, ?, ?, ?, 0, 1, ?, ? WHERE ? IS NULL OR ? IN (${WORKING_ON})`,
+      params: [newId('inp'), id, accountId, accountId ? null : p.name ?? null, accountId ? null : p.contact ?? null, p.involvement, at, at, accountId, accountId, input.performanceId ?? null],
+    }).expect(1, { code: 'front-of-house.person-not-working', reason: 'One of the people chosen is not working this performance.', remedy: 'Give their name as someone else instead.' })
   }
   unit.announce('front-of-house.incident.reported', { incidentId: id, severity }, { record: ['front-of-house.incident', id] })
   unit.audit({ action: 'create', record: ['front-of-house.incident', id], detail: { kind: input.kind, severity, people: input.people?.length ?? 0 } })

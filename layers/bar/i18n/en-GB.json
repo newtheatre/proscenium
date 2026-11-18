@@ -18,6 +18,7 @@
   "bar.settings.stocktake.reason-over.label": "A difference needs a reason when it is worth more than",
   "bar.settings.stocktake.reason-over.help": "A line of a count whose difference is worth more than this, at the item's last pack cost, cannot be approved until it has a reason.",
   "bar.abilities.sale.sell.label": "Sell from the bar in the till",
+  "bar.abilities.sale.use-restricted-price-list.label": "Sell at a restricted price list, such as committee prices",
   "bar.abilities.opening.manage.label": "Close an outlet's trading",
   "bar.abilities.settings.manage.label": "Change the bar settings",
   "bar.settings-sections.sales": "Bar sales",

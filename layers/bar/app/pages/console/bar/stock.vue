@@ -1,6 +1,7 @@
 <!-- Stock (S7): how much of each item every location holds, in the unit people count in. A level below
      nought is shown in words, as a sign that a delivery or a count is missing; stock never stops a
-     sale. From a row: write stock off, move it between locations, or read how it moved. An amount to
+     sale. A location that has never held an item shows a dash. Pressing a row reads how the item
+     moved; its menu writes stock off or moves it between locations. An amount to
      write off or move is typed in the unit people count in, in packs or in base units; taking more
      than a location holds is said plainly and asked about first. Setting up items and locations is
      in Admin. -->
@@ -51,8 +52,9 @@ const showItems = computed(() => [
   { value: 'low', label: t('bar.screens.stock-levels.show-low') },
   { value: 'below-zero', label: t('bar.screens.stock-levels.show-below-zero') },
 ])
-const levelAt = (i: Item, locationId: string) => i.levels.find(l => l.locationId === locationId)?.quantity ?? 0
-const shown = (i: Item) => location.value === ALL ? i.total : levelAt(i, location.value)
+// Null where the location has never held the item: shown as a dash, not as nought.
+const levelAt = (i: Item, locationId: string) => i.levels.find(l => l.locationId === locationId)?.quantity ?? null
+const shown = (i: Item) => location.value === ALL ? (i.levels.length ? i.total : null) : levelAt(i, location.value)
 const rows = computed(() => (data.value?.items ?? []).filter((i) => {
   const q = ((route.query.q as string | undefined) ?? '').toLowerCase()
   if (q && !i.name.toLowerCase().includes(q)) return false
@@ -61,8 +63,9 @@ const rows = computed(() => (data.value?.items ?? []).filter((i) => {
   return true
 }))
 
-// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words.
-function amount(i: Item, quantity: number): string {
+// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words; never held, a dash.
+function amount(i: Item, quantity: number | null): string {
+  if (quantity === null) return '—'
   const text = stockAmount(i, Math.abs(quantity))
   return quantity < 0 ? t('bar.screens.stock-levels.below-zero', { amount: text }) : text
 }
@@ -89,7 +92,7 @@ const baseQuantity = computed(() => {
   if (!a?.quantity) return 0
   return Math.round(a.quantity * (actUnits.value.find(u => u.value === a.unit)?.size ?? 1))
 })
-const held = computed(() => act.value ? levelAt(act.value.item, act.value.locationId) : 0)
+const held = computed(() => act.value ? levelAt(act.value.item, act.value.locationId) ?? 0 : 0)
 const takesTooMuch = computed(() => !!act.value?.locationId && baseQuantity.value > held.value)
 const otherLocations = computed(() => (data.value?.locations ?? []).filter(l => l.id !== act.value?.locationId).map(l => ({ value: l.id, label: l.name })))
 const reasonItems = computed(() => (data.value?.wastageReasons ?? []).map(r => ({ value: r.id, label: r.label })))
@@ -201,16 +204,21 @@ function actions(i: Item) {
           :data="rows"
           :columns="columns"
           :caption="t('bar.navigation.stock-levels.label')"
+          :ui="{ tr: 'cursor-pointer' }"
+          @select="(_e: Event, row: { original: Item }) => openHistory(row.original)"
         >
+          <template #name-cell="{ row }">
+            <span class="font-medium">{{ row.original.name }}</span>
+          </template>
           <template
             v-for="l in d.locations"
             :key="l.id"
             #[`at-${l.id}-cell`]="{ row }"
           >
-            <span :class="['tabular-nums', levelAt(row.original, l.id) < 0 && 'text-error']">{{ amount(row.original, levelAt(row.original, l.id)) }}</span>
+            <span :class="['tabular-nums', (levelAt(row.original, l.id) ?? 0) < 0 && 'text-error', levelAt(row.original, l.id) === null && 'text-muted']">{{ amount(row.original, levelAt(row.original, l.id)) }}</span>
           </template>
           <template #total-cell="{ row }">
-            <span :class="['font-medium tabular-nums', shown(row.original) < 0 && 'text-error']">{{ amount(row.original, shown(row.original)) }}</span>
+            <span :class="['font-medium tabular-nums', (shown(row.original) ?? 0) < 0 && 'text-error', shown(row.original) === null && 'text-muted']">{{ amount(row.original, shown(row.original)) }}</span>
           </template>
           <template #state-cell="{ row }">
             <StatusBadge
@@ -225,10 +233,13 @@ function actions(i: Item) {
             />
           </template>
           <template #actions-cell="{ row }">
-            <RowActions
-              :label="t('bar.screens.stock.item-actions', { name: row.original.name })"
-              :items="actions(row.original)"
-            />
+            <!-- The menu is its own control: pressing it does not also open the history. -->
+            <div @click.stop>
+              <RowActions
+                :label="t('bar.screens.stock.item-actions', { name: row.original.name })"
+                :items="actions(row.original)"
+              />
+            </div>
           </template>
         </UTable>
       </template>

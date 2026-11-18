@@ -5,7 +5,7 @@ import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { can, defineRoute, refuse, requireAbility } from '#kit'
 import { getVersion, requireForm } from '../../../../../forms'
-import { getResponse, readAnswers } from '../../../../../responses'
+import { getResponse, readAnswers, storedFigures } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
 import { hasStages, isDecision, questionsOf, stageOf } from '../../../../../../shared/engine'
 import { changedIn, historyOf, movesFor, stageIn } from '../../../../../stages'
@@ -41,6 +41,9 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
     definition,
     answers,
     restricted: answers.some(a => a.restricted),
+    // What the calculations came to when it was sent, as the server worked them out. They belong to
+    // the latest revision, so an earlier one shows none.
+    calculated: revision === response.currentRevision ? storedFigures(definition, response.calculated, open) : null,
     revision,
     revisions: response.currentRevision,
     // The questions whose answers differ from the revision before this one.

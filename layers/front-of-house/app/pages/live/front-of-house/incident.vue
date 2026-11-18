@@ -2,10 +2,11 @@
      steps, what happened (and what kind); when and where; who was involved; what was done straight
      away, first aid, emergency services and whether it is serious. The time is a day (today, or
      yesterday for something just before midnight) and a clock time, both in the theatre's time zone
-     whatever the phone's. Who is optional: someone on the system found by search, or anyone else by
-     name (an audience member, say) with a way to reach them, each with how they were involved.
-     Welfare details are left to whoever reviews it. Then "Sent" with its number. Sending needs a connection for now: while the device is offline the steps can
-     be filled in but the send button waits, and says why. -->
+     whatever the phone's. Who is optional: someone working the performance, found by search when the
+     report comes from its board, or anyone else by name (an audience member, say) with a way to
+     reach them, each with how they were involved. Welfare details are left to whoever reviews it.
+     Then "Sent" with its number. Sending needs a connection for now: while the device is offline
+     the steps can be filled in but the send button waits, and says why. -->
 <script setup lang="ts">
 import { CalendarDateTime, now as nowIn, Time, toZoned } from '@internationalized/date'
 import { useOnline } from '@vueuse/core'
@@ -33,14 +34,16 @@ const days = computed(() => (['today', 'yesterday'] as const).map(value => ({ va
 const form = ref({ whatHappened: '', whereNote: '', kind: 'incident' as 'incident' | 'near_miss', immediateAction: '', firstAidGiven: false, emergencyServicesCalled: false, serious: false })
 const step = ref(0)
 
-// Who was involved (IN-1). People are added one at a time: found on the system, or named.
+// Who was involved (IN-1). People are added one at a time: someone working the performance the report
+// is about, found by search, or anyone else by name. Without a performance there is no one to search.
 const people = ref<Named[]>([])
 const involvements = computed(() => (['affected', 'witness', 'helped', 'other'] as const).map(value => ({ value, label: t(`front-of-house.involvements.${value}`) })))
 const sources = computed(() => [
   { value: 'system', label: t('front-of-house.live.incident.who-system') },
   { value: 'other', label: t('front-of-house.live.incident.who-other') },
 ])
-const blank = () => ({ source: 'system' as 'system' | 'other', accountId: undefined as string | undefined, label: '', name: '', contact: '', involvement: 'affected' as Involvement })
+const crew = computed(() => board.value ? `/api/front-of-house/incidents/people?performance=${encodeURIComponent(board.value.performance.id)}` : null)
+const blank = () => ({ source: (crew.value ? 'system' : 'other') as 'system' | 'other', accountId: undefined as string | undefined, label: '', name: '', contact: '', involvement: 'affected' as Involvement })
 const person = ref(blank())
 const unnamed = ref(false)
 const picked = computed(() => people.value.flatMap(p => p.accountId ? [p.accountId] : []))
@@ -250,6 +253,7 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           </RecordList>
           <div class="space-y-4 rounded-md border border-default p-4">
             <URadioGroup
+              v-if="crew"
               v-model="person.source"
               :items="sources"
               orientation="horizontal"
@@ -258,13 +262,13 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
               :aria-label="t('front-of-house.live.incident.who-source')"
             />
             <UFormField
-              v-if="person.source === 'system'"
+              v-if="crew && person.source === 'system'"
               :label="t('front-of-house.live.incident.who-person')"
               :error="unnamed ? t('front-of-house.live.incident.who-choose') : undefined"
             >
               <PersonPicker
                 v-model="person.accountId"
-                endpoint="/api/front-of-house/incidents/people"
+                :endpoint="crew ?? undefined"
                 :exclude="picked"
                 size="xl"
                 @picked="p => person.label = p?.label ?? ''"

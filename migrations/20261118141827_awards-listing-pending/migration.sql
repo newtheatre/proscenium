@@ -1,0 +1,1 @@
+ALTER TABLE `awards_awards` ADD `listing_pending` integer DEFAULT false NOT NULL;

@@ -7,7 +7,7 @@ import { listTerms } from '#modules/core'
 import { chaseActions, sendDigest } from '../../server/incidents'
 import myReportsCount from '../../server/contributions/core.count/my-reports'
 import { env, inContext, person, rows, testAccess } from '../../../../tests/integration/helpers'
-import { notes, ready, req, setting } from './stage'
+import { duty, notes, performance, ready, req, setting, shift } from './stage'
 
 // holdersOf asks the access provider for each candidate's grants: these accounts hold incident.manage.
 const reviewers = new Set<string>()
@@ -82,11 +82,25 @@ describe('IN-1: who was involved', () => {
     await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, ?, \'self\', ?, ?)').bind(id, name, at, at).run()
     return id
   }
+  /** A performance with the given people on its rota. */
+  async function crewed(...names: string[]): Promise<{ performanceId: string, people: string[] }> {
+    const made = await performance()
+    const shiftId = await shift(made.id, await duty('Usher'), names.length + 1)
+    const people: string[] = []
+    for (const name of names) {
+      const id = await account(name)
+      const assigned = await req('POST', `/api/front-of-house/shifts/${shiftId}/assign`, { accountId: id, override: true })
+      expect(assigned.status, JSON.stringify(assigned.body)).toBe(200)
+      people.push(id)
+    }
+    setClock(undefined)
+    return { performanceId: made.id, people }
+  }
 
   it('stores the people the reporter names, and shows them to the reviewer and in My reports', async () => {
     const amy = reporter()
-    const usher = await account('Wendell Usherwood')
-    const made = await report(amy, { people: [
+    const { performanceId, people: [usher] } = await crewed('Wendell Usherwood')
+    const made = await report(amy, { performanceId, people: [
       { accountId: usher, involvement: 'helped' },
       { name: 'A patron in row F', contact: '07700 900123', involvement: 'affected' },
     ] })
@@ -106,22 +120,30 @@ describe('IN-1: who was involved', () => {
     expect(again.people.find((p: any) => p.name === 'Another patron').fromReport).toBe(false)
   })
 
-  it('refuses someone with neither an account nor a name, or an account that is not there, and keeps no report', async () => {
+  it('refuses someone unnamed, or an account not working the performance, and keeps no report', async () => {
     const amy = reporter()
-    const unnamed = await req('POST', '/api/front-of-house/incidents', { kind: 'incident', occurredAt: Date.now() - MINUTE, whatHappened: 'Unnamed', people: [{ involvement: 'witness' }] }, amy)
-    expect(unnamed.status).toBe(422)
-    const ghost = await req('POST', '/api/front-of-house/incidents', { kind: 'incident', occurredAt: Date.now() - MINUTE, whatHappened: 'Ghost', people: [{ accountId: newId('acc'), involvement: 'witness' }] }, amy)
-    expect(ghost.body.code).toBe('front-of-house.unknown-person')
+    const { performanceId } = await crewed('Rota Regular')
+    const outsider = await account('Not On Tonight')
+    const send = (extra: Record<string, unknown>) => req('POST', '/api/front-of-house/incidents', { kind: 'incident', occurredAt: Date.now() - MINUTE, whatHappened: 'Refused', ...extra }, amy)
+    expect((await send({ people: [{ involvement: 'witness' }] })).status).toBe(422)
+    expect((await send({ performanceId, people: [{ accountId: outsider, involvement: 'witness' }] })).body.code).toBe('front-of-house.person-not-working')
+    expect((await send({ performanceId, people: [{ accountId: newId('acc'), involvement: 'witness' }] })).body.code).toBe('front-of-house.person-not-working')
+    // Without a performance, nobody on the system can be named; a name is still fine.
+    expect((await send({ people: [{ accountId: outsider, involvement: 'witness' }] })).body.code).toBe('front-of-house.person-not-working')
     expect((await req('GET', '/api/front-of-house/incidents/mine', undefined, amy)).body.incidents).toEqual([])
+    expect((await send({ people: [{ name: 'A patron', involvement: 'witness' }] })).status).toBe(200)
   })
 
-  it('lets a reporter find people on the system by name, and nobody else', async () => {
-    await account('Ottoline Findable')
-    const found = await req('GET', '/api/front-of-house/incidents/people?q=Ottoline', undefined, reporter())
+  it('lets a reporter find only the people working the performance, and nobody without one', async () => {
+    const { performanceId } = await crewed('Ottoline Findable', 'Ottoline Elsewhere')
+    await account('Ottoline Outsider')
+    const found = await req('GET', `/api/front-of-house/incidents/people?performance=${performanceId}&q=Ottoline`, undefined, reporter())
     expect(found.status, JSON.stringify(found.body)).toBe(200)
-    expect(found.body.people.map((p: any) => p.label)).toContain('Ottoline Findable')
+    expect(found.body.people.map((p: any) => p.label).sort()).toEqual(['Ottoline Elsewhere', 'Ottoline Findable'])
+    expect((await req('GET', `/api/front-of-house/incidents/people?performance=${performanceId}&q=ottoline find`, undefined, reporter())).body.people.map((p: any) => p.label)).toEqual(['Ottoline Findable'])
     expect(JSON.stringify(found.body)).not.toContain('@')
-    expect((await req('GET', '/api/front-of-house/incidents/people?q=Ottoline', undefined, person([]))).status).toBe(403)
+    expect((await req('GET', '/api/front-of-house/incidents/people?q=Ottoline', undefined, reporter())).body.people).toEqual([])
+    expect((await req('GET', `/api/front-of-house/incidents/people?performance=${performanceId}&q=Ottoline`, undefined, person([]))).status).toBe(403)
   })
 })
 

@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { defineRoute, first, refuse, siteUrl, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findOrCreateAccount, notify } from '#modules/core'
-import { awardFields, startingVisibility, writeAward } from '../../../../awards'
+import { awardFields, listingHeldBack, startingVisibility, writeAward } from '../../../../awards'
 import { requireType } from '../../../../types'
 
 const input = awardFields.partial({ awardedFor: true, citation: true, productionId: true, decidedOn: true, decisionNote: true, visibility: true, recipientName: true }).extend({
@@ -47,7 +47,7 @@ export default defineRoute({
   if (input.productionId && !(await first('SELECT 1 FROM core_productions WHERE id = ?', input.productionId)))
     refuse('awards.award.no-production', 'There is no such production.', { status: 422, fields: { productionId: 'awards.award.no-production' } })
   const visibility = input.visibility ?? await startingVisibility(type, accountId, claimed)
-  const awardId = writeAward(unit, { type, accountId, recipientName: name!, awardedOn: input.awardedOn, awardedFor: input.awardedFor, citation: input.citation, productionId: input.productionId, decidedOn: input.decidedOn, decisionNote: input.decisionNote, visibility, source: 'direct', issuedBy: actor.accountId ?? null })
+  const awardId = writeAward(unit, { type, accountId, recipientName: name!, awardedOn: input.awardedOn, awardedFor: input.awardedFor, citation: input.citation, productionId: input.productionId, decidedOn: input.decidedOn, decisionNote: input.decisionNote, visibility, listingPending: !input.visibility && listingHeldBack(type, visibility), source: 'direct', issuedBy: actor.accountId ?? null })
   if (accountId && await useSetting('awards.issuing.tell-recipient'))
     await notify(unit, 'awards.awarded', { to: accountId, variables: { award: type.name, link: await siteUrl('/account/awards') }, subject: ['awards.award', awardId], dedupeKey: `awarded:${awardId}` })
   unit.audit({ action: 'create', record: ['awards.award', awardId], detail: { source: 'direct', linked: !!accountId } })

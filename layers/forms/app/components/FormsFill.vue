@@ -104,7 +104,9 @@ const otherOf = (from: Record<string, unknown>, id: string) => {
   return typeof text === 'string' ? text : undefined
 }
 const visible = (path: string) => evaluation.value.visible[path] !== false
-const calculated = computed(() => (props.definition.calculations ?? []).map(c => ({ key: c.key, value: evaluation.value.calculated[c.id] })).filter(c => c.value !== null && c.value !== undefined))
+// A calculation is shown on its own page only, after the questions, worked out as the answers change.
+const { figure, figureName } = useFormsFigures()
+const calculated = computed(() => (props.definition.calculations ?? []).filter(c => c.page === pageId.value).map(c => ({ id: c.id, name: figureName(c), text: figure(c, evaluation.value.calculated[c.id]) })))
 const questionsOf = (item: Definition['pages'][number]['items'][number]): Question[] => item.kind === 'question' ? [item] : item.kind === 'row' ? item.items : []
 </script>
 
@@ -285,18 +287,20 @@ const questionsOf = (item: Definition['pages'][number]['items'][number]): Questi
       </template>
       <dl
         v-if="calculated.length"
-        class="rounded-lg bg-elevated/50 p-3 text-sm"
+        class="divide-y divide-default rounded-lg bg-elevated/50 px-3 text-sm"
+        aria-live="polite"
       >
         <div
           v-for="c in calculated"
-          :key="c.key"
-          class="flex justify-between gap-4"
+          :key="c.id"
+          :data-calculation="c.id"
+          class="flex justify-between gap-4 py-2"
         >
-          <dt class="font-mono text-muted">
-            {{ c.key }}
+          <dt class="text-muted">
+            {{ c.name }}
           </dt>
-          <dd class="tabular-nums">
-            {{ c.value }}
+          <dd class="font-medium tabular-nums">
+            {{ c.text || '–' }}
           </dd>
         </div>
       </dl>

@@ -1,15 +1,32 @@
 <!-- The answers of one response, read back against the version of the form they were given on:
      page by page, in the form's order, with nothing shown for a question that was not answered.
-     A restricted answer says so and shows nothing else. -->
+     A restricted answer says so and shows nothing else. The calculated values the server worked out
+     when it was sent follow the answers of the page they were shown on; those shown nowhere come last,
+     for staff only. -->
 <script setup lang="ts">
 import type { DataClass, Definition, FileRef, Question, Value } from '../../shared/engine'
+import type { Figure } from '../../shared/figures'
 import { moneyWords } from '../../shared/words'
 
 export interface ShownAnswer { questionId: string, repeatIndex: number, dataClass: DataClass, restricted: boolean, value: Value, other: string | null, label: string | null }
 
-const props = defineProps<{ definition: Definition, answers: ShownAnswer[], /** Questions whose answers differ from the revision before: each is marked. */ changed?: string[] }>()
+const props = defineProps<{
+  definition: Definition
+  answers: ShownAnswer[]
+  /** Questions whose answers differ from the revision before: each is marked. */
+  changed?: string[]
+  /** The calculated values the server stored, by calculation id. Left out, none are shown. */
+  calculated?: Record<string, Figure> | null
+  /** Only the calculations the person answering was shown on a page, as on their own copy. */
+  placedOnly?: boolean
+}>()
 const { t } = useT()
 const { day, dateTime } = useDates()
+const { figure, figureName } = useFormsFigures()
+const figures = (onPage: (page: string | undefined) => boolean) => props.calculated
+  ? (props.definition.calculations ?? []).filter(c => onPage(c.page) && props.calculated![c.id] !== undefined).map(c => ({ key: `calc:${c.id}`, id: c.id, label: figureName(c), text: figure(c, props.calculated![c.id]) }))
+  : []
+const unplaced = computed(() => props.placedOnly ? [] : figures(page => !props.definition.pages.some(p => p.id === page)))
 const { data: settings } = usePublicSettings()
 const currency = computed(() => (settings.value?.['core.locale.currency']?.value as string | undefined) ?? 'GBP')
 
@@ -42,13 +59,14 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
     }))).sort((a, b) => (a.entry?.n ?? 0) - (b.entry?.n ?? 0))
       .map((row, i, rows) => ({ ...row, heading: row.entry && (i === 0 || rows[i - 1]!.entry?.n !== row.entry.n) ? row.entry : null }))
   }),
-})).filter(p => p.rows.length))
+  figures: figures(id => id === page.id),
+})).filter(p => p.rows.length || p.figures.length))
 </script>
 
 <template>
   <div class="space-y-6">
     <p
-      v-if="!pages.length"
+      v-if="!pages.length && !unplaced.length"
       class="text-muted"
     >
       {{ t('forms.screens.answers.none') }}
@@ -99,6 +117,42 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
             <template v-else>
               {{ row.text }}
             </template>
+          </dd>
+        </div>
+        <div
+          v-for="row in page.figures"
+          :key="row.key"
+          :data-calculation="row.id"
+          class="grid gap-1 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-4"
+        >
+          <dt class="text-sm text-muted">
+            {{ row.label }}
+          </dt>
+          <dd class="font-medium tabular-nums">
+            {{ row.text || '–' }}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      v-if="unplaced.length"
+      class="space-y-2"
+    >
+      <h3 class="text-sm font-medium text-muted">
+        {{ t('forms.screens.answers.worked-out') }}
+      </h3>
+      <dl class="divide-y divide-default">
+        <div
+          v-for="row in unplaced"
+          :key="row.key"
+          :data-calculation="row.id"
+          class="grid gap-1 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-4"
+        >
+          <dt class="text-sm text-muted">
+            {{ row.label }}
+          </dt>
+          <dd class="font-medium tabular-nums">
+            {{ row.text || '–' }}
           </dd>
         </div>
       </dl>

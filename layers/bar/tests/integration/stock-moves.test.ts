@@ -19,6 +19,7 @@ import receivePost from '../../server/api/bar/stock/deliveries/[id]/receive.post
 import wastagePost from '../../server/api/bar/stock/wastage.post'
 import transferPost from '../../server/api/bar/stock/transfers.post'
 import movementsGet from '../../server/api/bar/stock/movements.get'
+import suppliersPost from '../../server/api/bar/stock/suppliers.post'
 
 const NOW = Date.UTC(2026, 10, 18, 1) // not-policy: a test's moment
 const handle = server({
@@ -34,6 +35,7 @@ const handle = server({
   'POST /api/bar/stock/wastage': wastagePost,
   'POST /api/bar/stock/transfers': transferPost,
   'GET /api/bar/stock/movements': movementsGet,
+  'POST /api/bar/stock/suppliers': suppliersPost,
 })
 const manager = person(['bar.stock.manage', 'bar.stock.receive', 'bar.stock.waste'], { reassertedAt: NOW })
 const cellarHand = person(['bar.stock.receive'], { reassertedAt: NOW })
@@ -113,6 +115,16 @@ describe('a delivery', () => {
       locationId: s.cellar, lines: [{ stockItemId: s.cans, packs: 1, looseUnits: 0 }, { stockItemId: s.cans, packs: 0, looseUnits: 2 }],
     }, cellarHand)).status).toBe(422)
     expect((await send('POST', '/api/bar/stock/deliveries', { locationId: s.cellar, lines: [{ stockItemId: s.cans, packs: 0, looseUnits: 0 }] }, cellarHand)).status).toBe(422)
+  })
+})
+
+describe('suppliers', () => {
+  it('lets someone receiving stock add a supplier from the delivery form, once by name', async () => {
+    const made = await send('POST', '/api/bar/stock/suppliers', { label: 'Moves Brewers Ltd' }, cellarHand)
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    expect((await send('GET', '/api/bar/stock/deliveries', undefined, cellarHand)).body.suppliers).toContainEqual({ id: made.body.supplierTermId, label: 'Moves Brewers Ltd' })
+    expect((await send('POST', '/api/bar/stock/suppliers', { label: 'moves brewers ltd' }, cellarHand)).status).toBe(409)
+    expect((await send('POST', '/api/bar/stock/suppliers', { label: 'Moves Other' }, person(['bar.stock.view'], { reassertedAt: NOW }))).status).toBe(403)
   })
 })
 

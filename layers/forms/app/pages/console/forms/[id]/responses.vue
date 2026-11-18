@@ -5,16 +5,19 @@
 <script setup lang="ts">
 import { parseDate, toZoned } from '@internationalized/date'
 import type { ReviewResult } from '../../../../components/FormsReviewResult.vue'
-import type { Definition } from '../../../../../shared/engine'
+import type { CalculationType, Definition } from '../../../../../shared/engine'
+import type { Figure } from '../../../../../shared/figures'
 import type { ShownAnswer } from '../../../../components/FormsAnswers.vue'
 
 interface Column { questionId: string, key: string, label: string, type: string, dataClass: string, retired: boolean }
 interface Stage { key: string, name: string, kind: string }
 interface Move { key: string, label: string, to: string, toKind: string, decision: boolean, needsReason: boolean }
-interface Row { id: string, reference: string, version: number, who: string | null, submittedAt: number, stage: { key: string | null, name: string, kind: string } | null, cells: Record<string, { text: string, restricted: boolean }> }
+interface FigureColumn { id: string, key: string, label: string, type: CalculationType, restricted: boolean }
+interface Row { figures: Record<string, Figure>, id: string, reference: string, version: number, who: string | null, submittedAt: number, stage: { key: string | null, name: string, kind: string } | null, cells: Record<string, { text: string, restricted: boolean }> }
 interface Table {
   form: { id: string, title: string, slug: string, anonymous: boolean, status: string }
   columns: Column[]
+  calculations?: FigureColumn[]
   rows: Row[]
   stages: (Stage & { moves: Move[] })[]
   total: number
@@ -28,6 +31,7 @@ interface One {
   definition: Definition
   answers: ShownAnswer[]
   restricted: boolean
+  calculated?: Record<string, Figure> | null
   revision: number
   revisions: number
   changed: string[]
@@ -45,6 +49,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { dateTime, zone } = useDates()
+const { figure } = useFormsFigures()
 const { confirm } = useConfirm()
 const toast = useToast()
 const route = useRoute()
@@ -107,6 +112,7 @@ const columns = computed(() => [
   ...(data.value?.stages.length ? [{ accessorKey: 'stage', header: t('forms.screens.responses.stage') }] : []),
   ...(data.value?.form.anonymous ? [] : [{ accessorKey: 'who', header: t('forms.screens.responses.from') }]),
   ...(data.value?.columns ?? []).filter(c => !hidden.value.includes(c.questionId)).map(c => ({ accessorKey: `q:${c.questionId}`, header: c.retired ? t('forms.screens.responses.removed', { name: c.label || c.key }) : c.label || c.key })),
+  ...(data.value?.calculations ?? []).map(c => ({ accessorKey: `c:${c.id}`, header: c.label })),
 ])
 const rows = computed(() => (data.value?.rows ?? []).map(r => ({
   id: r.id,
@@ -115,6 +121,7 @@ const rows = computed(() => (data.value?.rows ?? []).map(r => ({
   who: r.who ?? '',
   stage: r.stage,
   ...Object.fromEntries((data.value?.columns ?? []).map(c => [`q:${c.questionId}`, r.cells[c.questionId]?.restricted ? t('forms.screens.answers.restricted') : r.cells[c.questionId]?.text ?? ''])),
+  ...Object.fromEntries((data.value?.calculations ?? []).map(c => [`c:${c.id}`, c.restricted ? t('forms.screens.answers.restricted') : figure(c, r.figures?.[c.id])])),
 })))
 const exportUrl = computed(() => {
   const params = new URLSearchParams(Object.entries(query.value).filter(([k]) => k !== 'page').map(([k, v]) => [k, String(v)]))
@@ -618,6 +625,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             :definition="one.definition"
             :answers="one.answers"
             :changed="one.changed"
+            :calculated="one.calculated"
           />
           <section
             v-if="one.history.length"

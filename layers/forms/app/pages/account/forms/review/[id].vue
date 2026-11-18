@@ -19,6 +19,7 @@ interface Asked {
   criteria: Criterion[]
   definition: Definition
   answers: ShownAnswer[]
+  calculated?: Record<string, string | number | null> | null
   mine: { status: 'assigned' | 'submitted', vote: Vote | null, scores: Record<string, number>, comment: string }
   open: boolean
   released: boolean
@@ -109,6 +110,7 @@ async function conflict() {
         <FormsAnswers
           :definition="asked.definition"
           :answers="asked.answers"
+          :calculated="asked.calculated"
         />
       </section>
 

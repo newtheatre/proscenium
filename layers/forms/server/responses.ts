@@ -5,7 +5,7 @@
 // answers, drops what logic hides, and refuses what is not valid.
 import { all, first, linkTokens, newId, openSpecial, refuse, sealSpecial, today, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import type { Answers, DataClass, Definition, Entry, Evaluation, Question, Stage, Value } from '../shared/engine'
+import type { Answers, CalculationType, DataClass, Definition, Entry, Evaluation, Question, Stage, Value } from '../shared/engine'
 import { moneyWords } from '../shared/words'
 import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questionsOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
@@ -13,6 +13,7 @@ import type { FormRow, VersionRow } from './forms'
 import { openRound } from './review'
 import { tellReceived } from './notices'
 import { recordLabels } from './sources'
+import { figureName, specialCalculations, type Figure } from '../shared/figures'
 import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
 
 // ---- the link ----
@@ -96,9 +97,11 @@ export interface ResponseRow {
   submittedAt: number | null
   decidedAt: number | null
   decisionReason: string | null
+  /** What the form's calculations came to, as the server worked them out when it was last sent (JSON). */
+  calculated: string | null
   createdAt: number
 }
-const RESPONSE = 'subject_type AS subjectType, subject_id AS subjectId, decided_at AS decidedAt, decision_reason AS decisionReason, id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
+const RESPONSE = 'calculated, subject_type AS subjectType, subject_id AS subjectId, decided_at AS decidedAt, decision_reason AS decisionReason, id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
 export const getResponse = (id: string) => first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE id = ?`, id)
 
 /** Whether a response is this person's: by account, across any merged into it. A signed-out response is nobody's to come back to. */
@@ -414,6 +417,26 @@ export function words(answer: StoredAnswer, type: string | undefined, currency?:
   return [v.line1, v.line2, v.town, v.county, v.postcode, v.country].filter(Boolean).join(', ')
 }
 
+/**
+ * The calculated values stored on a response, by calculation id: the server's own, never the
+ * browser's. Those worked out from special-category answers are left out unless `open`, as the
+ * answers are. Null when nothing was stored.
+ */
+export function storedFigures(def: Definition, calculated: string | null, open: boolean): Record<string, Figure> | null {
+  if (calculated === null) return null
+  const all = JSON.parse(calculated) as Record<string, Figure>
+  const shut = open ? new Set<string>() : specialCalculations(def)
+  return Object.fromEntries(Object.entries(all).filter(([id]) => !shut.has(id)))
+}
+
+export interface FigureColumn { id: string, key: string, label: string, type: CalculationType, restricted: boolean }
+/** A column per calculation of the live version, in its order; those read from special-category answers are marked. */
+export function figureColumns(live: Definition | null): FigureColumn[] {
+  if (!live) return []
+  const special = specialCalculations(live)
+  return (live.calculations ?? []).map(c => ({ id: c.id, key: c.key, label: figureName(c), type: c.type, restricted: special.has(c.id) }))
+}
+
 // ---- the responses of a form ----
 
 export interface ResponseFilter {
@@ -425,7 +448,7 @@ export interface ResponseFilter {
   /** The account reading: responses they have a conflict of interest on are left out (FB-406). */
   reader?: string
 }
-export interface ListedResponse { id: string, reference: string, versionId: string, stageKey: string | null, stageKind: string | null, versionNumber: number, personId: string | null, personName: string | null, respondentEmail: string | null, submittedAt: number }
+export interface ListedResponse { id: string, calculated: string | null, reference: string, versionId: string, stageKey: string | null, stageKind: string | null, versionNumber: number, personId: string | null, personName: string | null, respondentEmail: string | null, submittedAt: number }
 
 function where(formId: string, filter: ResponseFilter): { sql: string, params: unknown[] } {
   const parts = ['r.form_id = ?', 'r.state = \'submitted\'']
@@ -459,7 +482,7 @@ export async function listResponses(formId: string, filter: ResponseFilter, limi
   const w = where(formId, filter)
   const total = (await first<{ n: number }>(`SELECT COUNT(*) AS n FROM forms_responses r WHERE ${w.sql}`, ...w.params))!.n
   const rows = await all<ListedResponse>(
-    `SELECT r.id, r.reference, r.version_id AS versionId, r.stage_key AS stageKey, r.stage_kind AS stageKind, v.number AS versionNumber, r.person_id AS personId, a.name AS personName, r.respondent_email AS respondentEmail, r.submitted_at AS submittedAt
+    `SELECT r.id, r.calculated, r.reference, r.version_id AS versionId, r.stage_key AS stageKey, r.stage_kind AS stageKind, v.number AS versionNumber, r.person_id AS personId, a.name AS personName, r.respondent_email AS respondentEmail, r.submitted_at AS submittedAt
      FROM forms_responses r JOIN forms_versions v ON v.id = r.version_id LEFT JOIN core_accounts a ON a.id = r.person_id
      WHERE ${w.sql} ORDER BY r.submitted_at DESC, r.id DESC LIMIT ? OFFSET ?`, ...w.params, limit, offset)
   return { rows, total }
