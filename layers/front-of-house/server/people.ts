@@ -12,11 +12,11 @@ import { shiftWords } from './words'
 
 const live = LIVE_STATES.map(s => `'${s}'`).join(', ')
 
-export interface Assignment { id: string, shiftId: string, accountId: string, state: string, source: string }
+export interface Assignment { id: string, shiftId: string, accountId: string, state: string, source: string, movedAt: number | null }
 
 export async function getAssignment(id: string): Promise<Assignment | null> {
-  const row = await first<{ id: string, shift_id: string, account_id: string, state: string, source: string }>('SELECT id, shift_id, account_id, state, source FROM front_of_house_assignments WHERE id = ?', id)
-  return row ? { id: row.id, shiftId: row.shift_id, accountId: row.account_id, state: row.state, source: row.source } : null
+  const row = await first<{ id: string, shift_id: string, account_id: string, state: string, source: string, moved_at: number | null }>('SELECT id, shift_id, account_id, state, source, moved_at FROM front_of_house_assignments WHERE id = ?', id)
+  return row ? { id: row.id, shiftId: row.shift_id, accountId: row.account_id, state: row.state, source: row.source, movedAt: row.moved_at } : null
 }
 
 async function load(id: string): Promise<{ assignment: Assignment, shift: Shift }> {
@@ -103,7 +103,7 @@ export async function assignPerson(unit: UnitView, input: { shiftId: string, acc
     params: [input.accountId, id, shift.id, input.by, at, shift.callAt, shift.endsAt],
   }).expect(1, { code: 'front-of-house.shift-overlaps', reason: 'This person is already on a shift at that time.', remedy: 'Take them off the other shift first.' })
   unit.audit({ action: 'create', record: ['front-of-house.assignment', id], detail: { state: 'confirmed', source: 'assigned', override: !verdict.met } })
-  await confirmed(unit, { assignmentId: id, shift, accountId: input.accountId })
+  await confirmed(unit, { assignmentId: id, shift, accountId: input.accountId, by: input.by })
   return { assignmentId: id, warnings: verdict.unmet }
 }
 
@@ -128,12 +128,15 @@ export async function releasePlace(unit: UnitView, id: string, input: { accountI
   if (assignment.state !== 'confirmed') refuse('front-of-house.cannot-release', 'This place cannot be given up now.', { remedy: assignment.state === 'release_requested' ? 'You have already asked for cover.' : 'Speak to whoever is leading the night.' })
   const notice = await useSetting('front-of-house.shifts.release-notice') as number
   const second = 1000 // not-policy: settings are whole seconds
-  if (shift.callAt - nowMs() > notice * second) {
+  // A shift that changed its time or place after the person took it can be given up at any time (FH-11).
+  if (assignment.movedAt !== null || shift.callAt - nowMs() > notice * second) {
     move(unit, assignment, { from: ['confirmed'], to: 'released', by: input.accountId, free: true, reason: input.reason, refusal: MOVED_ON })
     released(unit, assignment)
+    await notify(unit, 'front-of-house.shift-released', { to: assignment.accountId, variables: await shiftWords(shift), dedupeKey: `released:${id}`, subject: ['front-of-house.assignment', id] })
     return { state: 'released' }
   }
   move(unit, assignment, { from: ['confirmed'], to: 'release_requested', by: null, free: false, reason: input.reason, refusal: MOVED_ON })
+  await notify(unit, 'front-of-house.shift-cover-asked', { to: assignment.accountId, variables: await shiftWords(shift), dedupeKey: `coverasked:${id}:${nowMs()}`, subject: ['front-of-house.assignment', id] })
   const managers = await holdersOf('front-of-house.shift.manage', shift.performanceId ? ['core.performance', shift.performanceId] as const : undefined)
   if (managers.length) await notify(unit, 'front-of-house.cover-needed', { to: managers, variables: await shiftWords(shift), dedupeKey: `cover:${id}` })
   return { state: 'release_requested' }

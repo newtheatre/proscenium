@@ -33,7 +33,7 @@ export async function markPaid(unit: UnitView, membershipId: string, options: { 
   }
   const scheme = await requireScheme(row!.scheme_id)
   const day = await today()
-  activatePending(unit, {
+  await activatePending(unit, {
     id: membershipId, scheme, accountId: row!.account_id, count: row!.count ?? 1, paid: true,
     startsOn: row!.renewed_ends ? renewalStarts(row!.renewed_ends, day) : day,
     ...(row!.entry_ends ? { endsOn: row!.entry_ends } : {}),

@@ -2,7 +2,7 @@
      which scheme and why it waits, and Pass and Decline. The server refuses a person checking
      their own, or without membership.membership.verify. -->
 <script setup lang="ts">
-interface Application { id: string, accountId: string, accountName: string | null, schemeId: string, schemeName: string, appliedAt: number, reason: string | null, listName: string | null }
+interface Application { id: string, accountId: string, accountName: string | null, schemeId: string, schemeName: string, appliedAt: number, reason: string | null, listName: string | null, claimedBy: { membershipId: string, name: string | null } | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -38,6 +38,7 @@ const describe = (a: Application) => [
   t('membership.screens.applications.applied', { date: day(new Date(a.appliedAt).toISOString().slice(0, 10)) }), // not-policy: the length of a date
   t(`membership.screens.applications.reasons.${a.reason ?? 'staff-check'}`),
   ...(a.listName ? [t('membership.screens.applications.list-name', { name: a.listName })] : []),
+  ...(a.claimedBy ? [t('membership.screens.applications.claimed-by', { name: a.claimedBy.name ?? t('membership.screens.applications.no-name') })] : []),
 ].join(' · ')
 </script>
 
@@ -100,6 +101,15 @@ const describe = (a: Application) => [
           @submit="decide"
         >
           <RefusalNotice :refusal="refusal" />
+          <UAlert
+            v-if="deciding?.outcome === 'pass' && deciding.application.claimedBy"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('membership.screens.applications.claimed-by', { name: deciding.application.claimedBy.name ?? t('membership.screens.applications.no-name') })"
+            :description="t('membership.screens.applications.claimed-by-help')"
+            :actions="[{ label: t('membership.screens.applications.claimed-by-open', { name: deciding.application.claimedBy.name ?? t('membership.screens.applications.no-name') }), to: `/console/membership/memberships/${deciding.application.claimedBy.membershipId}`, color: 'neutral', variant: 'outline', size: 'sm' }]"
+          />
           <p class="text-sm text-muted">
             {{ deciding ? t(`membership.screens.applications.consequence-${deciding.outcome}`) : '' }}
           </p>

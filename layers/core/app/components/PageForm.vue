@@ -57,9 +57,15 @@ const props = withDefaults(defineProps<{
   returnTo?: string
   /** Long forms keep a draft on the device under this key. */
   draftKey?: string
+  /** What the toast says once saved when "Saved" is too vague: "Venue added". */
+  done?: string
+  /** With `done`: reverses the save, from the toast's Undo. Leave out where it cannot be reversed. */
+  undo?: (result: unknown) => Promise<unknown>
   /** Panel mode: whether the panel is open. */
   open?: boolean
-}>(), { description: undefined, open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
+  /** What the toast says once saved, such as "Production created". Default: "Saved". */
+  savedTitle?: string
+}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined, done: undefined, undo: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -70,6 +76,7 @@ const { t } = useT()
 const router = useRouter()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 
 // A short form opens as a panel over the list when the list asks for one (it passes `open`); at its
 // own address, or when long, it is a page. The component decides from the field count, not taste.
@@ -167,8 +174,10 @@ function discardDraft() {
   catch { /* nothing to remove */ }
 }
 
+// One convention (L44): every problem shows beside its field; a long form, which opens as a page,
+// adds a summary at the top that links to each, and a short one in a panel shows only the fields.
 function onError(event: FormErrorEvent) {
-  summary.value = event.errors.map(e => ({ id: e.id, name: String(e.name), message: e.message }))
+  if (!panel.value) summary.value = event.errors.map(e => ({ id: e.id, name: String(e.name), message: e.message }))
   const first = event.errors[0]
   if (first?.id) document.getElementById(first.id)?.focus()
 }
@@ -182,7 +191,8 @@ async function onSubmit() {
     const result = await props.submit({ ...state }, version.value)
     saved.value = true
     discardDraft()
-    toast.add({ title: t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
+    if (props.done) offer(props.done, props.undo && (() => props.undo!(result)))
+    else toast.add({ title: props.savedTitle ?? t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
     emit('saved', result)
     if (panel.value) emit('update:open', false)
     else await (props.returnTo ? navigateTo(props.returnTo) : router.back())
@@ -210,7 +220,9 @@ async function onFailure(error: unknown) {
   }
   if (failure.fields) {
     form.value?.setErrors(fieldErrors(failure))
-    summary.value = fieldErrors(failure)
+    // A short form's own fields carry the message; one about a field it does not show is still said.
+    if (panel.value && Object.keys(failure.fields).every(name => props.fields.some(f => f.name === name))) return
+    if (!panel.value) summary.value = fieldErrors(failure)
   }
   refusal.value = failure
 }
@@ -342,8 +354,9 @@ useLeaveGuard(() => dirty.value && !saved.value)
                 v-for="g in row"
                 :key="g.name"
                 :name="g.name"
-                :label="ownsLabel(g) ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
-                :help="g.kind === 'checkbox' ? undefined : g.help"
+                :label="ownsLabel(g) ? undefined : g.label"
+                :hint="!ownsLabel(g) && g.optional ? t('core.form.optional') : undefined"
+                :help="g.kind === 'checkbox' || (g.kind === 'ticks' && g.heading) ? undefined : g.help"
                 :class="g.showIf && 'ms-7'"
               >
                 <UTextarea
@@ -386,6 +399,10 @@ useLeaveGuard(() => dirty.value && !saved.value)
                     <h2 :class="headingClass">
                       {{ g.label }}
                     </h2>
+                    <span
+                      v-if="g.help"
+                      class="mt-1 block text-sm font-normal text-muted"
+                    >{{ g.help }}</span>
                   </template>
                 </UCheckboxGroup>
                 <fieldset
@@ -399,6 +416,10 @@ useLeaveGuard(() => dirty.value && !saved.value)
                     <h2 :class="headingClass">
                       {{ g.label }}
                     </h2>
+                    <span
+                      v-if="g.help"
+                      class="mt-1 block text-sm font-normal text-muted"
+                    >{{ g.help }}</span>
                   </legend>
                   <legend
                     v-else

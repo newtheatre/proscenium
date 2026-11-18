@@ -15,8 +15,12 @@ import { entitle, type Buyer, type Requirement } from './entitlement'
 import { applyCode, judgeCode, redeem } from './promo-codes'
 import { sellableTypes, soldOn } from './ticket-types'
 
-/** `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs for a member price. */
-export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[] }
+/**
+ * `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs
+ * for a member price. `holders`, at the desk: the account named for each ticket in turn, found by
+ * their card or by name, for a type with requirements.
+ */
+export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[], holders?: string[] }
 /** `promoCode`, as the buyer typed it (BO-17). */
 export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string }
 
@@ -67,10 +71,11 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
   const each = asked.flatMap(l => Array.from({ length: l.quantity }, (_, n) => {
     const p = lowered.get(`${l.bandId} ${l.ticketTypeId}`) ?? price.get(`${l.bandId} ${l.ticketTypeId}`)!
     const reference = l.references?.[n]?.trim() || undefined
-    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor, ...(reference ? { reference } : {}) }
+    const holder = buyer.channel === 'desk' ? l.holders?.[n] || undefined : undefined
+    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor, ...(reference ? { reference } : {}), ...(holder ? { holder } : {}) }
   }))
   const entitled = await entitle(performanceId, each, types, buyer)
-  const lines = each.map(({ reference: _typed, ...l }, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
+  const lines = each.map(({ reference: _typed, holder: _named, ...l }, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
   return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
 }
 
@@ -158,7 +163,10 @@ export interface BasketView {
   expiresAt: number | null
   currency: string
   totalMinor: number
-  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number }[]
+  /** `listMinor` is the price before any promo code; `amountMinor` what is charged. */
+  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor: number }[]
+  /** The promo code the basket was held with and what it takes off, or null (BO-17). */
+  promo: { code: string, savingMinor: number } | null
 }
 
 /** A basket, for whoever holds its token. A lapsed basket holds nothing and says so. */
@@ -169,8 +177,12 @@ export async function basketByToken(orderId: string, token: string): Promise<Bas
   const lapsed = order.state === 'basket' && order.expires_at !== null && order.expires_at <= nowMs()
   const lines = lapsed
     ? []
-    : await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number }>(
-        "SELECT id, performance_id, band_id, ticket_type_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live' ORDER BY id", orderId)
+    : await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, list_minor: number, discount_minor: number, code: string | null }>(
+        `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, l.list_minor, l.discount_minor, c.code FROM box_office_order_lines l
+          LEFT JOIN box_office_promo_redemptions r ON r.id = l.promo_redemption_id LEFT JOIN box_office_promo_codes c ON c.id = r.promo_code_id
+          WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
+  const saving = lines.reduce((sum, l) => sum + l.discount_minor, 0)
+  const code = lines.find(l => l.code)?.code
   return {
     orderId: order.id,
     reference: order.reference,
@@ -178,7 +190,8 @@ export async function basketByToken(orderId: string, token: string): Promise<Bas
     expiresAt: order.expires_at,
     currency: order.currency,
     totalMinor: lapsed ? 0 : order.total_minor,
-    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, amountMinor: l.amount_minor })),
+    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, amountMinor: l.amount_minor, listMinor: l.list_minor })),
+    promo: code && saving > 0 ? { code, savingMinor: saving } : null,
   }
 }
 

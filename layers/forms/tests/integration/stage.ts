@@ -26,6 +26,7 @@ import responsesExport from '../../server/api/forms/forms/[id]/responses/export.
 import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
 import mineOnePut from '../../server/api/forms/mine/[id].put'
+import mineWithdraw from '../../server/api/forms/mine/[id]/withdraw.post'
 import changesGet from '../../server/api/forms/changes/[token].get'
 import changesPut from '../../server/api/forms/changes/[token].put'
 import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
@@ -75,6 +76,7 @@ export const handle = server({
   'GET /api/forms/mine': mineGet,
   'GET /api/forms/mine/:id': mineOneGet,
   'PUT /api/forms/mine/:id': mineOnePut,
+  'POST /api/forms/mine/:id/withdraw': mineWithdraw,
   'GET /api/forms/changes/:token': changesGet,
   'PUT /api/forms/changes/:token': changesPut,
   'POST /api/forms/changes/:token/files': changeFilePost,

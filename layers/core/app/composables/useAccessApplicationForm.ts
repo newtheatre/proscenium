@@ -18,6 +18,8 @@ export interface AccessApplicationValue {
   needs: { term: string, note?: string }[]
   companions: 0 | 1 | 2
   other?: string
+  /** The person's answer to a reviewer's question, sent with the application when they answer. */
+  answer?: string
 }
 
 /** A need the form can offer: the term's id, its key (slug), label and description. */
@@ -31,6 +33,8 @@ const OTHER_LIMIT = 1000 // not-policy: the server's bound on "anything else"
 export function useAccessApplicationForm(
   needs: MaybeRefOrGetter<AccessNeedOption[]>,
   allowNote: MaybeRefOrGetter<boolean>,
+  /** True while the form also answers a reviewer's question: an answer box comes first. */
+  answering: MaybeRefOrGetter<boolean> = false,
 ) {
   const { t } = useT()
 
@@ -50,12 +54,16 @@ export function useAccessApplicationForm(
     companion: z.boolean().optional(),
     companions: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     other: z.string().max(OTHER_LIMIT).optional(),
+    answer: z.string().max(OTHER_LIMIT).optional(),
   }).superRefine((v, ctx) => {
     if (v.wheelchair && askPreference.value && !v.preference)
       ctx.addIssue({ code: 'custom', path: ['preference'], message: t('core.access.form.preference-needed') })
   })
 
   const fields = computed<FormField[]>(() => [
+    ...(toValue(answering)
+      ? [{ name: 'answer', label: t('core.access.answer.label'), kind: 'textarea' } satisfies FormField]
+      : []),
     {
       name: 'needs',
       label: t('core.access.form.needs'),
@@ -131,6 +139,7 @@ export function useAccessApplicationForm(
   function toBody(values: Record<string, any>): AccessApplicationValue {
     const ticked = (values.needs ?? []) as { value: string, note?: string }[]
     const other = String(values.other ?? '').trim()
+    const answer = String(values.answer ?? '').trim()
     // With only one of the two wheelchair entries on the list, ticking the box means that one.
     const preference: Preference | undefined = values.wheelchair
       ? (askPreference.value ? values.preference : chair.value.stays ? 'stays' : 'transfers')
@@ -143,6 +152,7 @@ export function useAccessApplicationForm(
       ],
       companions: values.companion ? values.companions : 0,
       ...(other ? { other } : {}),
+      ...(answer ? { answer } : {}),
     }
   }
 

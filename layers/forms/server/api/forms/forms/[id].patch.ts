@@ -8,8 +8,8 @@ import { SLUG_LENGTH, TITLE_LENGTH, addressTaken, requireForm } from '../../../f
 
 const days = z.number().int().min(1).max(36500).nullable() // not-policy: a century, only to keep the number sane
 const slug = z.string().trim().toLowerCase().min(1).max(SLUG_LENGTH).regex(/^[a-z\d]+(?:-[a-z\d]+)*$/, 'forms.form.address-shape')
-const input = z.object({ slug, title: z.string().trim().min(1).max(TITLE_LENGTH), retentionDays: days, retentionDeclinedDays: days, anonymous: z.boolean() }).partial()
-const COLUMN = { slug: 'slug', title: 'title', retentionDays: 'retention_days', retentionDeclinedDays: 'retention_declined_days', anonymous: 'anonymous' } as const
+const input = z.object({ slug, title: z.string().trim().min(1).max(TITLE_LENGTH), retentionDays: days, retentionDeclinedDays: days, anonymous: z.boolean(), allowEdits: z.boolean() }).partial()
+const COLUMN = { slug: 'slug', title: 'title', retentionDays: 'retention_days', retentionDeclinedDays: 'retention_declined_days', anonymous: 'anonymous', allowEdits: 'allow_edits' } as const
 
 export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, unit }) => {
   const form = await requireForm(record!.id)

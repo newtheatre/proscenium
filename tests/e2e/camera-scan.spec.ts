@@ -108,7 +108,6 @@ test('the desk finds a reservation by scanning its box office code with the came
   const { browser, page } = await withCamera(playwright.chromium, cameraShowing(deskCode, `desk-${stamp}`))
   try {
     await visit(page, '/console/box-office/sell')
-    await page.getByRole('tab', { name: 'Collect a reservation' }).click()
     // Find and the icon-only scan button share the code box's row, lined up with it.
     const box = (await page.getByLabel(/^Booking reference, desk code or name/).boundingBox())!
     const scanButton = page.getByRole('button', { name: 'Scan with camera' })
@@ -212,6 +211,36 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.getByRole('button', { name: 'Resume camera' }).click()
     await page.waitForTimeout(500)
     await page.screenshot({ path: 'test-results/live-door-phone.png' })
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+test('the door keeps checking tickets offline from its copy, and sends what it admitted on reconnecting', async ({ playwright }) => {
+  const browser = await playwright.chromium.launch()
+  const context = await browser.newContext({ ...base, ...as(seller) })
+  const page = await context.newPage()
+  try {
+    const copied = page.waitForResponse(r => r.url().includes(`/performances/${performanceId}/door/offline`) && r.request().method() === 'GET')
+    await visit(page, `/live/door/${performanceId}`)
+    await copied
+    await context.setOffline(true)
+    await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeVisible()
+    const box = () => page.getByRole('dialog').getByLabel('Ticket code, booking reference or name')
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await box().fill(doorCode)
+    await box().press('Enter')
+    // Its signature is checked on the device and its ticket found in the copy: in, or in already.
+    const checked = page.getByRole('status').filter({ hasText: /Admitted|Already in/ })
+    await expect(checked).toContainText('Checked on this device')
+    // A code the theatre did not sign is caught without the server.
+    await page.getByRole('button', { name: 'Type a code or find someone' }).click()
+    await box().fill('tkt.nokey.NOTACODE.c2lnbmF0dXJl')
+    await box().press('Enter')
+    await expect(page.getByRole('status').filter({ hasText: 'Altered code' })).toBeVisible()
+    await context.setOffline(false)
+    await expect(page.getByText(/waiting to send/)).toHaveCount(0, { timeout: 15_000 })
   }
   finally {
     await browser.close()

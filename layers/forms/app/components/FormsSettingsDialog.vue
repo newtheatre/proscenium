@@ -9,7 +9,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const builder = useBuilder()
-const state = reactive({ slug: '', title: '', retentionDays: null as number | null, anonymous: false, introduction: '', confirmation: '', submitLabel: '' })
+const state = reactive({ slug: '', title: '', retentionDays: null as number | null, anonymous: false, allowEdits: false, introduction: '', confirmation: '', submitLabel: '' })
 // Custom fields are filled in on their record: nobody is greeted, thanked or asked to send.
 const fields = computed(() => props.form.mode === 'record')
 // Kept in whole days; asked for as a number and a unit, so two years is not typed as 730.
@@ -23,13 +23,13 @@ const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: str
 watch(open, (now) => {
   if (!now) return
   const shown = builder.definition.value.presentation
-  Object.assign(state, { slug: props.form.slug, title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous, introduction: shown?.introduction ?? '', confirmation: shown?.confirmation ?? '', submitLabel: shown?.submitLabel ?? '' })
+  Object.assign(state, { slug: props.form.slug, title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous, allowEdits: props.form.allowEdits, introduction: shown?.introduction ?? '', confirmation: shown?.confirmation ?? '', submitLabel: shown?.submitLabel ?? '' })
   refusal.value = null
 })
 async function save() {
   refusal.value = null
   try {
-    await $api(`/api/forms/forms/${props.form.id}`, { method: 'PATCH', body: { title: state.title, ...(!fields.value && state.slug.trim() !== props.form.slug ? { slug: state.slug.trim() } : {}), retentionDays: state.retentionDays, ...(props.form.liveVersion === null ? { anonymous: state.anonymous } : {}) } })
+    await $api(`/api/forms/forms/${props.form.id}`, { method: 'PATCH', body: { title: state.title, ...(!fields.value && state.slug.trim() !== props.form.slug ? { slug: state.slug.trim() } : {}), retentionDays: state.retentionDays, ...(fields.value ? {} : { allowEdits: state.allowEdits && !state.anonymous }), ...(props.form.liveVersion === null ? { anonymous: state.anonymous } : {}) } })
     // What people read before and after is part of the form itself: a change to the draft like any other, published with it.
     const was = builder.definition.value.presentation
     const words = { introduction: state.introduction.trim(), confirmation: state.confirmation.trim(), submitLabel: state.submitLabel.trim() }
@@ -146,6 +146,17 @@ async function save() {
             />
           </UFormField>
         </template>
+        <UFormField
+          v-if="!fields"
+          name="allowEdits"
+          :help="t(state.anonymous ? 'forms.screens.settings.allow-edits-anonymous' : 'forms.screens.settings.allow-edits-help')"
+        >
+          <USwitch
+            v-model="state.allowEdits"
+            :disabled="state.anonymous"
+            :label="t('forms.screens.settings.allow-edits')"
+          />
+        </UFormField>
         <UFormField
           name="anonymous"
           :help="t(form.liveVersion === null ? 'forms.screens.settings.anonymous-help' : 'forms.screens.settings.anonymous-fixed')"

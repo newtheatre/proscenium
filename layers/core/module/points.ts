@@ -24,7 +24,10 @@ export const points = {
       match: z.string().optional(),
       // A tab of a module's page in Admin: the console entries or groups whose settings window shows it.
       settingsIn: z.array(z.string()).min(1).optional(),
+      // An account entry where somebody who is not a member learns how to become one: the members' area sends them there.
+      forNonMembers: z.boolean().optional(),
     }).strict()
+      .refine(e => !e.forNonMembers || e.menu === 'account', { message: 'only an account entry may be forNonMembers', path: ['forNonMembers'] })
       .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
       .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] })
       .refine(e => e.menu !== 'admin' || e.group !== undefined || e.to === '/admin', { message: 'an admin entry names one of the admin groups; only the Overview, /admin, has none', path: ['group'] })
@@ -139,6 +142,9 @@ export const points = {
   // Something on My account's overview that needs the person (an address to confirm, a renewal
   // that is open), for the person asking. A notice that fails is left out, never the page.
   'core.account-notice': point({ kind: 'code', contract: 'account-notice' }),
+  // What the person has coming (a performance they hold tickets for, a shift they are on), for My
+  // account's Upcoming card, so core lists other modules' things without importing them.
+  'core.upcoming': point({ kind: 'code', contract: 'upcoming' }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

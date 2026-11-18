@@ -28,6 +28,8 @@ export interface SourceAnswer {
   /** An id the host stores with what it sold and may present again later. Never a secret. */
   evidence?: string
   help?: string
+  /** On a not-met verdict: where the person can put it right (join, renew), as a translated label and a page of the source's. */
+  remedy?: { label: string, to: string }
   /** On a met verdict: how many of the thing the host may grant on it, nought or more. */
   quantity?: number
   /**
@@ -88,6 +90,7 @@ export interface Answer {
   summary?: string
   evidence?: string
   help?: string
+  remedy?: { label: string, to: string }
   quantity?: number
   /**
    * On a met verdict, the account a presented value belongs to, if the source knows. Server only:

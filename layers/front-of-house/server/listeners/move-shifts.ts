@@ -8,5 +8,5 @@ export default defineListener(async (event, unit) => {
   const p = event.payload as { performanceId: string, oldStartsAt: number, oldEndsAt: number, startsAt: number, endsAt: number }
   const startDelta = p.startsAt - p.oldStartsAt
   moveShifts(unit, { performanceId: p.performanceId, startDelta, endDelta: p.endsAt - p.oldEndsAt })
-  await performanceRescheduled(unit, p.performanceId, { startDelta }, event.id)
+  await performanceRescheduled(unit, p.performanceId, { startDelta, endDelta: p.endsAt - p.oldEndsAt }, event.id)
 })

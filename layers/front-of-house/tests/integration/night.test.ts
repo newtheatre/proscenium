@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { setClock } from '#kit'
 import { listTerms } from '#modules/core'
 import { readFigure } from '../../server/night'
-import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { env, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { duty, performance, ready, req, setting, shift, shiftRow, volunteer, MINUTE } from './stage'
 
 beforeAll(ready)
@@ -124,6 +124,35 @@ describe('FH-22: timings', () => {
       await setting('front-of-house.checklists.block-house-open', false)
     }
     expect((await req('POST', `/api/front-of-house/performances/${s.p.id}/timings`, { kind: 'house_open' })).status).toBe(200)
+  })
+})
+
+describe('correcting the night', () => {
+  it('takes back a timing, for Undo and the lead\'s correction, and only for someone leading', async () => {
+    const s = await onShift()
+    setClock(s.p.startsAt)
+    await req('POST', `/api/front-of-house/performances/${s.p.id}/timings`, { kind: 'curtain_up' })
+    expect((await req('DELETE', `/api/front-of-house/performances/${s.p.id}/timings/curtain_up`, {}, s.amy)).status).toBe(403)
+    expect((await req('DELETE', `/api/front-of-house/performances/${s.p.id}/timings/curtain_up`, {})).status).toBe(200)
+    expect(await rows('SELECT kind FROM front_of_house_timings WHERE performance_id = ?', s.p.id)).toEqual([])
+    expect((await req('DELETE', `/api/front-of-house/performances/${s.p.id}/timings/nonsense`, {})).status).toBe(404)
+  })
+
+  it('lets the lead mark someone not coming, gives the lead their number, and keeps it from others', async () => {
+    const s = await onShift()
+    setClock(s.callAt)
+    await env.DB.prepare('UPDATE core_accounts SET phone = ? WHERE id = ?').bind('07700 900123', s.ben.accountId).run().catch(() => undefined)
+    const forLead = (await req('GET', `/api/front-of-house/performances/${s.p.id}/tonight`)).body
+    const forSteward = (await req('GET', `/api/front-of-house/performances/${s.p.id}/tonight`, undefined, s.amy)).body
+    expect(forLead.needs).toEqual([])
+    expect(forSteward.needs).toBeNull()
+    expect(forSteward.shifts.flatMap((x: any) => x.people).every((p: any) => p.phone === null)).toBe(true)
+    expect((await req('POST', `/api/front-of-house/assignments/${s.b}/not-coming`, {}, s.amy)).status).toBe(403)
+    expect((await req('POST', `/api/front-of-house/assignments/${s.b}/not-coming`, {})).status).toBe(200)
+    expect(await rows('SELECT state FROM front_of_house_assignments WHERE id = ?', s.b)).toEqual([{ state: 'no_show' }])
+    // Not once they have arrived.
+    await req('POST', `/api/front-of-house/assignments/${s.a}/check-in`, {}, s.amy)
+    expect((await req('POST', `/api/front-of-house/assignments/${s.a}/not-coming`, {})).body.code).toBe('front-of-house.assignment-ended')
   })
 })
 

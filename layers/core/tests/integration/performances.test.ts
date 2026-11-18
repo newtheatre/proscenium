@@ -20,6 +20,7 @@ import setEffects from '../../server/api/core/productions/[id]/effects.put'
 import impact from '../../server/api/core/performances/[id]/impact.get'
 import createVenue from '../../server/api/core/venues/index.post'
 import addSpace from '../../server/api/core/venues/[id]/spaces/index.post'
+import getVenue from '../../server/api/core/venues/[id]/index.get'
 import archiveVenue from '../../server/api/core/venues/[id]/archive.post'
 import archiveSpace from '../../server/api/core/venues/[id]/spaces/[space]/archive.post'
 import deleteSpace from '../../server/api/core/venues/[id]/spaces/[space]/index.delete'
@@ -29,6 +30,9 @@ import publishProduction from '../../server/api/core/productions/[id]/publish.po
 import cancelProduction from '../../server/api/core/productions/[id]/cancel.post'
 import restoreProduction from '../../server/api/core/productions/[id]/restore.post'
 import productionImpact from '../../server/api/core/productions/[id]/impact.get'
+import duplicateProduction from '../../server/api/core/productions/[id]/duplicate.post'
+import spaceOptions from '../../server/api/core/productions/space-options.get'
+import createSeason from '../../server/api/core/seasons/index.post'
 import { guidanceFor } from '../../server/programme/guidance'
 import { completeEnded } from '../../server/programme/performances'
 import { changeSetting, createUnit } from '#kit'
@@ -56,6 +60,7 @@ const handle = server({
   'GET /api/core/performances/:id/impact': impact,
   'POST /api/core/venues': createVenue,
   'POST /api/core/venues/:id/spaces': addSpace,
+  'GET /api/core/venues/:id': getVenue,
   'POST /api/core/venues/:id/archive': archiveVenue,
   'POST /api/core/venues/:id/spaces/:space/archive': archiveSpace,
   'DELETE /api/core/venues/:id/spaces/:space': deleteSpace,
@@ -65,8 +70,11 @@ const handle = server({
   'POST /api/core/productions/:id/cancel': cancelProduction,
   'POST /api/core/productions/:id/restore': restoreProduction,
   'GET /api/core/productions/:id/impact': productionImpact,
+  'POST /api/core/productions/:id/duplicate': duplicateProduction,
+  'GET /api/core/productions/space-options': spaceOptions,
+  'POST /api/core/seasons': createSeason,
 })
-const admin = person(['core.production.create', 'core.production.edit', 'core.production.publish', 'core.production.cancel', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.closure.manage'])
+const admin = person(['core.season.manage', 'core.production.create', 'core.production.edit', 'core.production.publish', 'core.production.cancel', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.closure.manage'])
 const scheduler = person(['core.performance.schedule'])
 const viewer = person(['core.production.view'])
 
@@ -108,6 +116,26 @@ afterEach(async () => {
     env.DB.prepare('DELETE FROM core_closures'),
     env.DB.prepare("DELETE FROM core_settings WHERE key = 'core.locale.time-zone'"),
   ])
+})
+
+describe('a production\'s usual space', () => {
+  it('is kept, checked, copied by Duplicate, offered first for new dates, and suggested for its season', async () => {
+    const s = await stage()
+    expect((await req('PATCH', `/api/core/productions/${s.productionId}`, { usualSpaceId: 'spc_nowhere' })).body).toMatchObject({ code: 'core.production.space-unknown', fields: { usualSpaceId: 'Choose a space from the list.' } })
+    expect((await req('PATCH', `/api/core/productions/${s.productionId}`, { usualSpaceId: s.studio })).status).toBe(200)
+    expect((await req('GET', `/api/core/productions/${s.productionId}`)).body.production.usualSpaceId).toBe(s.studio)
+    expect((await req('GET', `/api/core/productions/${s.productionId}/performances`)).body.defaults.usualSpaceId).toBe(s.studio)
+    const copy = (await req('POST', `/api/core/productions/${s.productionId}/duplicate`)).body.id
+    expect((await req('GET', `/api/core/productions/${copy}`)).body.production.usualSpaceId).toBe(s.studio)
+
+    // A new production in the same season is offered the space its latest production uses.
+    const season = (await req('POST', '/api/core/seasons', { name: `Usual season ${n}`, startsOn: '2027-01-01', endsOn: '2027-12-31' })).body.id
+    const made = await req('POST', '/api/core/productions', { title: `Usual ${n}`, kind: 'own', seasonId: season, usualSpaceId: s.studio })
+    expect(made.status).toBe(200)
+    const options = (await req('GET', '/api/core/productions/space-options')).body
+    expect(options.spaces.map((x: { id: string }) => x.id)).toEqual(expect.arrayContaining([s.main, s.studio]))
+    expect(options.suggested[season]).toBe(s.studio)
+  })
 })
 
 describe('staging effects not used at a performance (C-55)', () => {
@@ -281,6 +309,10 @@ describe('performances', () => {
     await req('POST', `/api/core/performances/${id}/schedule`, {})
     expect((await req('POST', `/api/core/venues/${s.venueId}/spaces/${s.studio}/archive`, {})).body.code).toBe('core.place.in-use')
     expect((await req('POST', `/api/core/venues/${s.venueId}/archive`, {})).body.code).toBe('core.place.in-use')
+    // The venue's page lists what is keeping it from being archived.
+    const page = (await req('GET', `/api/core/venues/${s.venueId}`)).body as { upcoming: { id: string }[], theatreCountry: string }
+    expect(page.upcoming.map(p => p.id)).toEqual([id])
+    expect(page.theatreCountry).toMatch(/^[A-Z]{2}$/)
     await req('POST', `/api/core/performances/${id}/cancel`, { reasonTermId: await term('core.cancel-reason', 'other') })
     expect((await req('POST', `/api/core/venues/${s.venueId}/spaces/${s.studio}/archive`, {})).status).toBe(200)
   })

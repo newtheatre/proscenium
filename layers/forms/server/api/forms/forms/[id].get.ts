@@ -28,7 +28,7 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     // Publishing waits on a retention period where the form asks for personal answers; nobody can answer until it is shared.
     requireRetention: await useSetting('forms.retention.require-choice'),
     shared: (await getLink(form.id)) !== null,
-    form: { id: form.id, slug: form.slug, title: form.title, mode: form.mode, status: form.status, anonymous: form.anonymous, retentionDays: form.retentionDays, retentionDeclinedDays: form.retentionDeclinedDays, liveVersion: live?.number ?? null, createdAt: form.createdAt, archivedAt: form.archivedAt },
+    form: { id: form.id, slug: form.slug, title: form.title, mode: form.mode, status: form.status, anonymous: form.anonymous, allowEdits: form.allowEdits, retentionDays: form.retentionDays, retentionDeclinedDays: form.retentionDeclinedDays, liveVersion: live?.number ?? null, createdAt: form.createdAt, archivedAt: form.archivedAt },
     draft: { definition, editRevision: draft.editRevision, editedBy: await accountName(draft.editedBy), updatedAt: draft.updatedAt },
     // What has been published of each question: its type is fixed and its data class only rises.
     fields: fields.map(f => ({ questionId: f.questionId, key: f.key, type: f.type, dataClass: f.dataClass, retired: f.retiredInVersion !== null })),

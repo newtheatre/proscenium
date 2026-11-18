@@ -4,7 +4,7 @@
 // code or a booking reference says Not paid and writes no scan row. A ticket sold on a requirement
 // is checked again before it is admitted (BO-45).
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, newId, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { listTerms } from '#modules/core'
 import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
@@ -169,6 +169,52 @@ describe('scanning at the door', () => {
     const [code] = await tickets(h, 1)
     expect((await scan(h, code!, undefined, person([]))).status).toBe(403)
     expect(await count('SELECT count(*) AS n FROM box_office_tickets WHERE performance_id = ? AND admitted_at IS NOT NULL', h.performanceId)).toBe(0)
+  })
+})
+
+describe('the door offline', () => {
+  const nextId = () => newId('scan')
+
+  it('gives the device the keys, each ticket\'s code hash and each booking, for whoever may admit', async () => {
+    const h = await freeHouse(4)
+    const codes = await tickets(h, 2)
+    await scan(h, codes[0]!)
+    const pack = await req('GET', `/api/box-office/performances/${h.performanceId}/door/offline`, undefined, steward)
+    expect(pack.status, JSON.stringify(pack.body)).toBe(200)
+    expect(pack.body.keys.length).toBeGreaterThan(0)
+    expect(pack.body.tickets).toHaveLength(2)
+    expect(pack.body.tickets.filter((t: { in: boolean }) => t.in)).toHaveLength(1)
+    expect(pack.body.bookings).toEqual([expect.objectContaining({ tickets: 2, admitted: 1 })])
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/offline`, undefined, person([]))).status).toBe(403)
+  })
+
+  it('takes admissions made offline at the device\'s time, once however often they are sent', async () => {
+    const h = await freeHouse(4)
+    const codes = await tickets(h, 3)
+    const listed = await req('GET', `/api/box-office/performances/${h.performanceId}/door`, undefined, steward)
+    const orderId = listed.body.rows[0].id as string
+    const first = nextId()
+    const second = nextId()
+    const named = [nextId()]
+    const items = [
+      { kind: 'code', id: first, code: codes[0]!, at: NOV_16 - 60_000 },
+      // Another device let the same ticket in first.
+      { kind: 'code', id: second, code: codes[0]!, at: NOV_16 - 30_000 },
+      { kind: 'name', ids: named, orderId, at: NOV_16 - 20_000 },
+    ]
+    const sent = await req('POST', `/api/box-office/performances/${h.performanceId}/door/offline`, { items, deviceLabel: 'Phone' }, steward)
+    expect(sent.status, JSON.stringify(sent.body)).toBe(200)
+    expect(sent.body.results).toEqual([
+      expect.objectContaining({ id: first, result: 'admitted' }),
+      expect.objectContaining({ id: second, result: 'already_admitted' }),
+      expect.objectContaining({ id: named[0], result: 'admitted', admitted: 1 }),
+    ])
+    expect(await rows('SELECT result, offline, scanned_at FROM box_office_scans WHERE id = ?', first)).toEqual([{ result: 'admitted', offline: 1, scanned_at: NOV_16 - 60_000 }])
+    // Sent again after a lost answer: nothing more happens.
+    const again = await req('POST', `/api/box-office/performances/${h.performanceId}/door/offline`, { items }, steward)
+    expect(again.body.results.map((r: { result: string }) => r.result)).toEqual(['sent', 'sent', 'sent'])
+    expect(await count('SELECT count(*) AS n FROM box_office_tickets WHERE performance_id = ? AND admitted_at IS NOT NULL', h.performanceId)).toBe(2)
+    expect(await count('SELECT count(*) AS n FROM box_office_scans WHERE performance_id = ?', h.performanceId)).toBe(3)
   })
 })
 

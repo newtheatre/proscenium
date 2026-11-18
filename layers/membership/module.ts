@@ -133,10 +133,25 @@ export default defineModule({
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
       { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5, count: 'membership.applications-waiting' },
       { id: 'membership.lists', menu: 'admin', group: 'modules', to: '/admin/modules/membership/lists', match: '/admin/modules/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
-      { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
+      { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35, forNonMembers: true },
     ],
     // Renewal reminders (R7 to R9): service messages about something the person holds.
     'core.notification-type': [{
+      // A new membership has started, by joining, an approved application, a paid fee or staff adding the person.
+      id: 'membership.welcome',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/account/membership',
+      variables: { scheme: 'text' as const, gives: 'text' as const, until: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Welcome to {{ scheme }}',
+          body: 'Welcome. You are now a member of **{{ scheme }}** at {{ theatre }}.\n\n{{ gives }}\n\n{{ until }} Your membership card is in your account: show it on your phone whenever you are asked for it.',
+          action: 'See my membership card',
+        },
+      },
+    }, {
       // P9: staff added the person to a scheme that requires payment and chose to send a link.
       id: 'membership.pay-link',
       category: 'transactional' as const,

@@ -28,9 +28,10 @@ export interface BookingPage {
      * the source's own words when they do not, and the type cannot be chosen, unless it takes a
      * `reference`: then the visitor may type one for each ticket instead, such as a student ID,
      * worded by the source ("NNT member? Enter your student ID"). `unmetHelp` is the source's own
-     * link for someone who could qualify, such as the access scheme's application.
+     * link for someone who could qualify, such as the access scheme's application. `remedy` is a
+     * labelled way to put it right (join, renew) where the source gives one.
      */
-    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, reference?: { label: string, field?: string, shape: string } }[]
+    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }[]
   }[]
 }
 
@@ -46,7 +47,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   // What the visitor may have of each type with requirements, judged for them alone. A type whose
   // source is off is withheld; a companion type is shown only to someone it is for.
   const account = useContext().actor.accountId ?? null
-  const judged = new Map<string, { most?: number, unmet?: string, unmetHelp?: string, reference?: { label: string, field?: string, shape: string } } | null>()
+  const judged = new Map<string, { most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } } | null>()
   for (const type of types.values()) {
     if (!type.requirementRefs.length) continue
     const answers = await requirements.check({ accounts: [account], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
@@ -57,9 +58,10 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
       const described = await requirements.describe(type.requirementRefs)
       const reference = type.requirementRefs.map(ref => described[ref]?.presentable).find(Boolean)
       const said = answers.find(a => a.reason)
+      const remedy = answers.find(a => a.remedy)?.remedy
       // Only a path on this site is passed on as a link.
       const help = said?.help?.startsWith('/') && !said.help.startsWith('//') ? said.help : undefined
-      judged.set(type.id, { unmet: said?.reason ?? 'Only for people who qualify.', ...(help ? { unmetHelp: help } : {}), ...(reference ? { reference } : {}) })
+      judged.set(type.id, { unmet: said?.reason ?? 'Only for people who qualify.', ...(help ? { unmetHelp: help } : {}), ...(remedy ? { remedy } : {}), ...(reference ? { reference } : {}) })
     }
   }
   return {
@@ -78,8 +80,8 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
         const type = types.get(p.ticketTypeId)
         // Complimentary tickets are given, never bought; a desk-only type is sold at the box office.
         if (!type || type.kind === 'complimentary' || type.channel === 'desk' || judged.get(type.id) === null) return []
-        return [{ ticketTypeId: type.id, name: type.name, kind: type.kind, proofNote: type.proofNote, needsPaidTicket: type.needsPaidTicket || type.kind === 'companion', amountMinor: p.amountMinor, sort: type.sort, ...judged.get(type.id) }]
-      }).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(({ sort: _, ...type }) => type),
+        return [{ ticketTypeId: type.id, name: type.name, kind: type.kind, proofNote: type.proofNote, needsPaidTicket: type.needsPaidTicket || type.kind === 'companion', amountMinor: p.amountMinor, sort: type.sort, restricted: type.requirementRefs.length ? 1 : 0, ...judged.get(type.id) }]
+      }).sort((a, b) => a.restricted - b.restricted || a.sort - b.sort || a.name.localeCompare(b.name)).map(({ sort: _, restricted: __, ...type }) => type),
     })).filter(b => b.types.length),
   }
 }

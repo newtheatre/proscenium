@@ -5,10 +5,12 @@
      public pages" tag where a content page shows it live. Changes save per section with a stated
      summary, asking again first for a setting declared onChange: 'confirm'. -->
 <script setup lang="ts">
+import type { Component } from 'vue'
 import { parseTime } from '@internationalized/date'
 import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
-import { durationParts } from '../../kit/duration'
+import { durationParts, type DurationUnit } from '../../kit/duration'
 import { catalogueLabel, searchable, type CatalogueName } from '../../shared/choices'
+import { inSentence } from '../utils/sentence'
 
 interface SettingView {
   key: string
@@ -19,6 +21,7 @@ interface SettingView {
   labelKey: string
   helpKey: string
   unitKey?: string
+  units?: DurationUnit[]
   value: unknown
   default: unknown
   overridden: boolean
@@ -74,7 +77,7 @@ const emit = defineEmits<{ saved: [keys: string[]] }>()
 const { t } = useT()
 const toast = useToast()
 const { confirm } = useConfirm()
-const { language, day: when } = useDates()
+const { language, day: when, dayOfYear: dayAndMonth } = useDates()
 const { data: publicSettings } = usePublicSettings()
 const currency = computed(() => (publicSettings.value?.['core.locale.currency']?.value as string | undefined) ?? 'GBP')
 const { data, status, error, refresh } = await useAPI<{ page: { id: string, module: string } | null, settings: SettingView[] }>('/api/core/settings', {
@@ -91,7 +94,8 @@ const problems = reactive<Record<string, string>>({})
 const saving = ref<string | null>(null)
 
 // "Changed" leaves only the settings that differ from their default, so a page of forty reads as a short list.
-const all = computed(() => (data.value?.settings ?? []).filter(s => !props.omit?.includes(s.key)))
+// A setting the system keeps (the brand's revision, a logo the Branding screen sets) is never drawn as a control.
+const all = computed(() => (data.value?.settings ?? []).filter(s => !s.managed && !props.omit?.includes(s.key)))
 const shown = computed(() => props.onlyChanged ? all.value.filter(s => s.overridden || resets[s.key]) : all.value)
 
 function load() {
@@ -130,18 +134,13 @@ async function save(sectionId: string, settings: SettingView[]) {
   // A setting declared onChange: 'confirm' shows what will change and asks again.
   const asking = changesIn(settings).filter(s => s.onChange === 'confirm')
   if (asking.length) {
-    const shown = (s: SettingView) => resets[s.key] ? defaultText(s) : controlText(s.kind, draft[s.key], words())
     const confirmed = await confirm({
       verb: t('core.settings-page.confirm-verb'),
-      thing: asking.map(s => t(s.labelKey)).join(', '),
-      // A setting with no value yet is set, not changed from nothing (AC-11).
-      consequence: asking.map((s) => {
-        const from = controlText(s.kind, toControl(s), words())
-        return from.trim() && from !== 'null' && from !== 'undefined'
-          ? t('core.settings-page.confirm-change', { setting: t(s.labelKey), from, to: shown(s) })
-          : t('core.settings-page.confirm-set', { setting: t(s.labelKey), to: shown(s) })
-      }).join(' '),
-      button: t('core.settings-page.confirm-button'),
+      thing: t('core.settings-page.confirm-thing', { count: asking.length }),
+      consequence: asking.map(confirmLine).join(' '),
+      button: t('core.settings-page.confirm-button', { count: asking.length }),
+      // Red only where the change takes something away: a setting cleared, or records kept for less time.
+      tone: asking.some(takesAway) ? 'danger' : 'primary',
     })
     if (!confirmed) return
   }
@@ -150,7 +149,8 @@ async function save(sectionId: string, settings: SettingView[]) {
   try {
     await $api('/api/core/settings', { method: 'PUT', body: { changes, confirm: asking.length > 0 || undefined } })
     toast.add({ title: t('core.settings-page.saved', { count: changes.length }), color: 'success', icon: 'i-lucide-circle-check' })
-    await refresh()
+    // The theatre's name, brand and public settings are drawn by the shells too: refresh them with the page.
+    await Promise.all([refresh(), refreshNuxtData(['core:brand', 'core:public-settings'])])
     emit('saved', changes.map(c => c.key))
   }
   catch (e) {
@@ -163,6 +163,34 @@ async function save(sectionId: string, settings: SettingView[]) {
   finally {
     saving.value = null
   }
+}
+
+/** A value as the confirmation names it: a choice by its label, and nothing as "not set". */
+function valueText(s: SettingView, control: unknown): string {
+  const items = itemsOf(s)
+  const label = (v: unknown) => items.find(i => i.value === v)?.label ?? String(v)
+  if (items.length && Array.isArray(control)) return control.length ? control.map(label).join(', ') : t('core.settings-page.not-set')
+  if (items.length && typeof control === 'string' && control) return label(control)
+  // A day of the year kept as 07-31, with its own editor, reads as 31 July.
+  const dayOfYear = typeof control === 'string' && editors.value[s.key] ? /^(\d{2})-(\d{2})$/.exec(control) : null
+  if (dayOfYear) return dayAndMonth(Number(dayOfYear[1]), Number(dayOfYear[2]))
+  return controlText(s.kind, control, words()) || t('core.settings-page.not-set')
+}
+const isBlank = (control: unknown) => control === null || control === undefined || control === '' || (Array.isArray(control) && !control.length)
+const before = (s: SettingView) => toControl(s)
+const after = (s: SettingView) => resets[s.key] ? toControl(s, s.default) : draft[s.key]
+/** One sentence for each setting the confirmation asks about, the setting first, so it keeps its own capital. */
+function confirmLine(s: SettingView): string {
+  const setting = t(s.labelKey)
+  if (isBlank(before(s))) return t('core.settings-page.confirm-set', { setting, to: valueText(s, after(s)) })
+  return t('core.settings-page.confirm-change', { setting, from: valueText(s, before(s)), to: valueText(s, after(s)) })
+}
+/** Whether a change takes something away: a value cleared, a switch turned off, or records kept for less time. */
+function takesAway(s: SettingView): boolean {
+  if (!isBlank(before(s)) && isBlank(after(s))) return true
+  if (s.kind === 'boolean') return before(s) === true && after(s) === false
+  const [was, now] = [before(s), after(s)]
+  return s.kind === 'duration' && /retention|keep/.test(s.key) && typeof was === 'number' && typeof now === 'number' && now < was
 }
 
 const limit = (s: SettingView, which: 'min' | 'max') => typeof s[which] === 'number' ? s[which] : undefined
@@ -185,7 +213,12 @@ const sharedAbility = (settings: SettingView[]) => {
   const first = settings[0]?.changeLabelKey
   return first && settings.every(s => s.changeLabelKey === first && s.canChange) ? first : null
 }
-const resettable = (settings: SettingView[]) => settings.filter(s => s.canChange && s.overridden && !resets[s.key])
+/**
+ * Whether Reset is offered. Not where the default is "not set" and a change is confirmed, such as the
+ * site's address or the time zone, which setup records: resetting would only break what depends on them.
+ */
+const mayReset = (s: SettingView) => s.canChange && !(s.unset && s.default == null && s.onChange === 'confirm')
+const resettable = (settings: SettingView[]) => settings.filter(s => mayReset(s) && s.overridden && !resets[s.key])
 function resetSection(settings: SettingView[]) {
   for (const s of resettable(settings)) resetToDefault(s)
 }
@@ -216,14 +249,16 @@ function durationWords(seconds: number): string {
   // The browser's own wording, so one hour is not "1 hours" in any language.
   return new Intl.NumberFormat(language.value, { style: 'unit', unit, unitDisplay: 'long' }).format(count)
 }
-// A custom setting's own control: a component in its module's app/setting-editors folder, named for
-// the key (finance.year.starts is SettingFinanceYearStarts). Without one it is typed as text.
+// A setting's own control: a component in its module's app/setting-editors folder, named for the key
+// (finance.year.starts is SettingFinanceYearStarts). A custom setting without one is typed as text; any
+// other kind may have one too, such as the year end's day and month. Editors are registered globally,
+// so a key without one is simply not among the app's components.
+const components = getCurrentInstance()!.appContext.components
 function editorOf(s: SettingView) {
   const name = `Setting${s.key.split(/[.-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')}`
-  const component = resolveComponent(name)
-  return typeof component === 'string' ? null : component
+  return name in components ? resolveComponent(name) as Component : null
 }
-const editors = computed(() => Object.fromEntries(shown.value.filter(s => s.kind === 'custom').map(s => [s.key, editorOf(s)])))
+const editors = computed(() => Object.fromEntries(shown.value.map(s => [s.key, editorOf(s)]).filter(([, editor]) => editor)))
 /** The default as the control shows it: a choice by its label, and nothing as "not set" rather than a blank. */
 function defaultText(s: SettingView): string {
   const value = s.default
@@ -286,8 +321,15 @@ onMounted(() => {
                 :error="problems[s.key]"
                 :name="s.key"
               >
+                <component
+                  :is="editors[s.key]"
+                  v-if="editors[s.key]"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event)"
+                />
                 <USwitch
-                  v-if="s.kind === 'boolean'"
+                  v-else-if="s.kind === 'boolean'"
                   :model-value="draft[s.key]"
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
@@ -298,7 +340,7 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   :min="limit(s, 'min')"
                   :max="limit(s, 'max')"
-                  class="w-48"
+                  class="w-32"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <FieldMoney
@@ -315,6 +357,7 @@ onMounted(() => {
                   :model-value="draft[s.key]"
                   :min="durationLimit(s, 'min')"
                   :max="durationLimit(s, 'max')"
+                  :units="s.units"
                   :disabled="!s.canChange"
                   :label="t(s.labelKey)"
                   @update:model-value="onEdit(s, $event ?? null)"
@@ -332,13 +375,6 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event ?? '')"
                 />
-                <component
-                  :is="editors[s.key]"
-                  v-else-if="s.kind === 'custom' && editors[s.key]"
-                  :model-value="draft[s.key]"
-                  :disabled="!s.canChange"
-                  @update:model-value="onEdit(s, $event)"
-                />
                 <!-- A setting with a fixed set of values is a dropdown, with a search box once the
                      list is long (shared/choices.ts); a list of them is square ticks. -->
                 <USelectMenu
@@ -350,7 +386,8 @@ onMounted(() => {
                   :placeholder="t('core.settings-page.choose')"
                   virtualize
                   :disabled="!s.canChange"
-                  class="max-w-md"
+                  role="combobox"
+                  class="w-72 max-w-full"
                   @update:model-value="onEdit(s, $event ?? '')"
                 />
                 <USelect
@@ -360,7 +397,7 @@ onMounted(() => {
                   value-key="value"
                   :placeholder="t('core.settings-page.choose')"
                   :disabled="!s.canChange"
-                  class="w-64"
+                  class="w-72 max-w-full"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <USelectMenu
@@ -373,7 +410,8 @@ onMounted(() => {
                   :placeholder="t('core.settings-page.choose')"
                   virtualize
                   :disabled="!s.canChange"
-                  class="max-w-md"
+                  role="combobox"
+                  class="w-72 max-w-full"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <UCheckboxGroup
@@ -400,7 +438,7 @@ onMounted(() => {
                     :min="limit(s, 'min')"
                     :max="limit(s, 'max')"
                     :aria-label="t('core.settings-page.rate-count', { setting: t(s.labelKey) })"
-                    class="w-40"
+                    class="w-32"
                     @update:model-value="onRate(s, { count: $event ?? undefined })"
                   />
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
@@ -418,7 +456,7 @@ onMounted(() => {
                   v-else-if="s.kind === 'time'"
                   :model-value="timeOf(draft[s.key])"
                   :disabled="!s.canChange"
-                  class="w-48"
+                  class="w-32"
                   @update:model-value="onEdit(s, $event ? $event.toString().slice(0, 5) : '')"
                 />
                 <UTextarea
@@ -463,10 +501,10 @@ onMounted(() => {
               />
 
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-                <span v-if="s.overridden || resets[s.key]">
+                <span v-if="(s.overridden || resets[s.key]) && (mayReset(s) || !s.canChange)">
                   {{ t('core.settings-page.default', { value: defaultText(s) }) }}
                   <UButton
-                    v-if="s.canChange && !resets[s.key]"
+                    v-if="mayReset(s) && !resets[s.key]"
                     color="neutral"
                     variant="link"
                     size="sm"
@@ -513,7 +551,7 @@ onMounted(() => {
             />
             <UButton
               type="submit"
-              :label="t('core.settings-page.save', { section: sectionTitle(section) })"
+              :label="t('core.settings-page.save', { section: inSentence(t(`${section.module}.settings-sections.${section.group}`), { article: false }) })"
               :loading="saving === section.id"
               :disabled="!changesIn(section.settings).length || saving !== null"
             />
