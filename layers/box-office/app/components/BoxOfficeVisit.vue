@@ -1,6 +1,7 @@
 <!-- One visit on My tickets: the show, when and where, the booking reference and how it stands, and,
      for a visit still to come that is paid for, each ticket's code to hold up at the door. A
-     reservation says what is still to pay at the box office instead. -->
+     reservation says what is still to pay at the box office instead. Manage opens the booking's own
+     page, as its link does, to see it in full or cancel what the theatre allows. -->
 <script setup lang="ts">
 import type { MyVisit } from '../utils/my-bookings'
 
@@ -90,6 +91,14 @@ const summary = computed(() => {
           {{ t('box-office.mine.codes-in-email') }}
         </p>
       </template>
+      <UButton
+        :to="{ path: '/book/order/mine', query: { order: visit.orderId } }"
+        variant="outline"
+        color="neutral"
+        icon="i-lucide-settings-2"
+        :label="t('box-office.mine.manage')"
+        :aria-label="t('box-office.mine.manage-label', { show: visit.production.title, reference: visit.reference })"
+      />
     </div>
   </UCard>
 </template>

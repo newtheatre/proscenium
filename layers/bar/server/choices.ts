@@ -4,7 +4,7 @@
 // amount to the line's unit price, and a restricted pick makes the line need the age check.
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
-import { CHOICE_SOURCES, MIXER_PRICING } from './db/schema'
+import type { groupInput, groupPatch, optionInput, optionPatch } from './input'
 
 const NAME_TAKEN = (what: string) => ({ code: 'bar.name-taken', reason: `There is already ${what} with that name.`, remedy: 'Choose another name.' })
 const GONE = (what: string) => ({ code: 'core.not-found', reason: `There is no such ${what}.` })
@@ -12,23 +12,8 @@ export const MIXER_MEASURE = 'Mixer measure'
 
 // ---- Input ---------------------------------------------------------------------------------------
 
-const name = z.string().trim().min(1).max(80) // not-policy: a name's bounds
 const id = z.string().min(1).max(64) // not-policy: an id's length
-const amount = z.number().int().min(0).max(1_000_000) // not-policy: a bound on a typed price
-const MAX_PICKS = 10 // not-policy: more picks than any drink needs
-
-export const groupInput = z.object({
-  name,
-  source: z.enum(CHOICE_SOURCES),
-  required: z.boolean().optional(),
-  maxPicks: z.number().int().min(1).max(MAX_PICKS).optional(),
-  mixerPricing: z.enum(MIXER_PRICING).nullable().optional(),
-  mixerFixedMinor: amount.nullable().optional(),
-}).strict()
-export const groupPatch = groupInput.omit({ source: true }).partial().extend({ defaultKey: id.nullable().optional(), active: z.boolean().optional() }).strict()
-// The stock item a recipe's slot for this group takes when this option is picked; none for "No mixer".
-export const optionInput = z.object({ name, deltaMinor: amount.optional(), ageRestricted: z.boolean().optional(), stockItemId: id.nullable().optional() }).strict()
-export const optionPatch = optionInput.partial().extend({ active: z.boolean().optional() }).strict()
+export { groupInput, groupPatch, optionInput, optionPatch } from './input'
 export const pickInput = z.object({ groupId: id, key: id }).strict()
 export type Pick = z.infer<typeof pickInput>
 

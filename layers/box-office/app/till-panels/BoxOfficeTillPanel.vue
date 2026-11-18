@@ -201,12 +201,15 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
   }
 }
 
-// The till empties every panel after a sale.
-watch(() => props.modelValue, (now) => {
+// The till empties every panel after a sale, and when the seller clears the sale.
+watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) => {
   if (now !== null && now !== undefined) {
     if (typeof now === 'object' && JSON.stringify(now) !== lastSaid) void restore(now as Record<string, unknown>)
     return
   }
+  // Emptied by the till rather than by this panel saying there is nothing.
+  const fromTill = lastSaid !== 'null'
+  lastSaid = 'null'
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}
@@ -214,7 +217,10 @@ watch(() => props.modelValue, (now) => {
   // The next buyer never sees who the last one was, nor uses their code.
   buyer.value = undefined
   dropCode()
-  if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
+  if (!order.value || mode.value !== 'collect') return
+  // After a sale the booking is found again, to show it paid; the receipt's Clear puts it away.
+  if (fromTill && !wasLocked) clear()
+  else if (order.value.state === 'reserved') void find(order.value.reference)
 })
 
 // After the sale (till proposal): what was made, with its reference and tickets, so the seller can
@@ -824,7 +830,9 @@ function clear() {
         <p class="font-medium">
           {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
         </p>
+        <!-- While the booking is in the sale, the receipt's Clear puts it away; one Clear at a time. -->
         <UButton
+          v-if="modelValue === null || modelValue === undefined"
           :label="t('box-office.screens.panel.clear')"
           color="neutral"
           variant="link"
