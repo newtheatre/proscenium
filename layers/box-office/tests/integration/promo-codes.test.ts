@@ -10,7 +10,7 @@ import codesPost from '../../server/api/box-office/promo-codes/index.post'
 import codePut from '../../server/api/box-office/promo-codes/[id].put'
 import codeActive from '../../server/api/box-office/promo-codes/[id]/active.post'
 import promoGet from '../../server/api/box-office/book/performances/[id]/promo.get'
-import { createBasket } from '../../server/baskets'
+import { basketByToken, createBasket } from '../../server/baskets'
 import { expireBasket } from '../../server/release'
 import { house, NOV_16, ready, type House } from './stage'
 
@@ -74,6 +74,10 @@ describe('a promo code', () => {
       { list_minor: 800, discount_minor: 200, amount_minor: 600 },
     ])
     expect(await used(c.id)).toBe(3)
+    // The basket says which code it was held with and what it saved, for Check and pay.
+    const seen = await inContext(() => basketByToken((b as { orderId: string }).orderId, (b as unknown as { token: string }).token))
+    expect(seen).toMatchObject({ promo: { code: c.code.toUpperCase(), savingMinor: 800 } })
+    expect(seen!.lines.map(l => l.listMinor).sort()).toEqual([1200, 1200, 800].sort())
   })
 
   it('takes an amount off, or sets a price, only on the type it is for, and never below nothing', async () => {
