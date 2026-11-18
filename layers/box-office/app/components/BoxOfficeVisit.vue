@@ -16,7 +16,7 @@ const coded = computed(() => props.visit.tickets.filter(x => x.doorCode))
 const summary = computed(() => {
   const counts = new Map<string, number>()
   for (const x of props.visit.tickets) counts.set(x.label, (counts.get(x.label) ?? 0) + 1)
-  return [...counts].map(([label, count]) => t('box-office.basket.line', { count, label })).join(', ')
+  return [...counts].map(([label, count]) => ticketsLine(t, count, label)).join(', ')
 })
 </script>
 
@@ -74,9 +74,9 @@ const summary = computed(() => {
           >
             <QrCode
               :value="ticket.doorCode!"
-              :label="t('box-office.mine.ticket-code', { n: i + 1, count: coded.length, label: ticket.label })"
+              :label="t(ticket.label ? 'box-office.mine.ticket-code' : 'box-office.mine.ticket-code-plain', { n: i + 1, count: coded.length, label: ticket.label })"
             />
-            <span class="text-sm">{{ t('box-office.mine.ticket', { n: i + 1, count: coded.length, label: ticket.label }) }}</span>
+            <span class="text-sm">{{ t(ticket.label ? 'box-office.mine.ticket' : 'box-office.mine.ticket-plain', { n: i + 1, count: coded.length, label: ticket.label }) }}</span>
             <StatusBadge
               v-if="ticket.admitted"
               tone="neutral"

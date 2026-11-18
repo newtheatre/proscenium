@@ -9,7 +9,7 @@ import type { BookingDoneOutcome } from '../../utils/booking'
 
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
 interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number, pass?: string }[], promo?: { code: string, savingMinor: number } | null }
-interface Page { performance: { startsAt: number, venue: string }, production: { title: string, ageMin: number | null, ageRestricted: boolean }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string }[] }[] }
+interface Page { performance: { startsAt: number, venue: string }, production: { title: string, ageMin: number | null, ageRestricted: boolean }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string, unmet?: string }[] }[] }
 type Outcome
   = | (BookingDoneOutcome & { state: 'confirmed', totalMinor: number })
     | (BookingDoneOutcome & { state: 'reserved' })
@@ -114,8 +114,12 @@ watch(announced, (v) => {
   if (v) spoken.value = v
 })
 
-// The part of the house is named only when the show prices more than one.
-const names = computed(() => new Map((page.value?.bands ?? []).flatMap(b => b.types.map(type => [`${b.bandId} ${type.ticketTypeId}`, page.value!.bands.length > 1 ? `${b.name}, ${type.name}` : type.name]))))
+// The part of the house is named only when the show prices more than one, and the kind of ticket
+// not at all where there is only one to book, as Choose tickets shows it.
+const names = computed(() => new Map((page.value?.bands ?? []).flatMap(b => b.types.map((type) => {
+  const only = page.value!.bands.length === 1 && !type.unmet && b.types.filter(x => !x.unmet).length === 1
+  return [`${b.bandId} ${type.ticketTypeId}`, only ? '' : page.value!.bands.length > 1 ? `${b.name}, ${type.name}` : type.name]
+}))))
 // Each line at its price before any promo code, which then has a line of its own above the total.
 const lines = computed(() => {
   const grouped = new Map<string, { label: string, count: number, amountMinor: number }>()
@@ -328,7 +332,7 @@ async function reserve() {
                   :key="line.label"
                   class="flex justify-between py-2"
                 >
-                  <span>{{ t('box-office.basket.line', { count: line.count, label: line.label }) }}</span>
+                  <span>{{ ticketsLine(t, line.count, line.label) }}</span>
                   <span>{{ amount(line.amountMinor) }}</span>
                 </li>
                 <li

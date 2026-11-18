@@ -5,8 +5,12 @@
 // request came to, which a route notes before its service runs. A payment is settled by a job with
 // no request to take it from, so the first address noted is remembered for that, and never
 // replaced: a later request on another host cannot change where those messages point.
+//
+// The kit's address is asked first: the one the site has recorded, or the request's own. So a
+// reservation paid at the till can be confirmed on a site where no booking has yet been made
+// online, which is where a theatre that brought its bookings from another system starts.
 import type { H3Event } from 'h3'
-import { cache, useContext } from '#kit'
+import { cache, siteUrl as kitSiteUrl, useContext } from '#kit'
 import { relyingParty } from '#modules/core'
 
 const KEY = 'box-office:site-origin'
@@ -18,6 +22,13 @@ export async function fromRequest(event: H3Event): Promise<void> {
 }
 
 export async function siteUrl(path: string): Promise<string> {
+  try {
+    return await kitSiteUrl(path)
+  }
+  catch (error: any) {
+    // No address recorded and no request at hand: the one a route noted earlier serves.
+    if (error?.code !== 'core.site.origin-unset') throw error
+  }
   const origin = useContext().cache[KEY] ?? await cache.get<string>(KEY)
   if (typeof origin !== 'string') throw new Error('No site address: no request has been noted yet')
   return `${origin}${path}`
