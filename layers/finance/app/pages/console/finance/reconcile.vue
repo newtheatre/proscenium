@@ -37,8 +37,11 @@ const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/ap
           :description="a.lastPayoutAt ? t('finance.screens.reconcile.last-payout', { day: day(a.lastPayoutAt), total: money(a.paidOutMinor, a.currency) }) : t('finance.screens.reconcile.no-payout')"
         >
           <template #name>
-            <ULink :to="{ path: '/console/finance/ledger', query: { accountId: a.accountId } }">
-              <span class="text-muted">{{ a.code }}</span> {{ a.name }}
+            <ULink
+              :to="{ path: '/console/finance/ledger', query: { account: a.accountId } }"
+              :title="a.code"
+            >
+              {{ a.name }}
             </ULink>
           </template>
           <div class="text-right">

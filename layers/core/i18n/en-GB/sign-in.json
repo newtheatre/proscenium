@@ -1,0 +1,21 @@
+{
+  "core.sign-in.page.title": "Sign in",
+  "core.sign-in.page.sent-title": "Check your email",
+  "core.sign-in.page.open-sign-up": "New here? Signing in with your email creates your account.",
+  "core.sign-in.page.address": "Email address",
+  "core.sign-in.page.send-link": "Email me a link",
+  "core.sign-in.page.or": "or",
+  "core.sign-in.page.passkey": "Sign in with a passkey",
+  "core.sign-in.page.provider": "Sign in with {provider}",
+  "core.sign-in.page.sent": "If {address} can sign in here, we have sent it a link and a six-digit code. The link works in this browser; the code works anywhere.",
+  "core.sign-in.page.code": "Six-digit code",
+  "core.sign-in.page.use-code": "Sign in",
+  "core.sign-in.page.different-address": "Use a different address",
+  "core.sign-in.page.your-provider": "Your provider",
+  "core.sign-in.page.error.provider-unverified": "{provider} has not confirmed this account's email address. Confirm it with {provider}, or sign in another way.",
+  "core.sign-in.page.error.provider-domain": "That {provider} account is not from an organisation that can sign in here. Choose another account.",
+  "core.sign-in.page.error.provider-cancelled": "{provider} sign-in was cancelled.",
+  "core.sign-in.page.error.closed": "This theatre is not taking new accounts at the moment.",
+  "core.sign-in.page.error.disabled": "This account is disabled. Contact the theatre to find out why.",
+  "core.sign-in.page.error.provider-other": "{provider} did not confirm who you are. Try again."
+}

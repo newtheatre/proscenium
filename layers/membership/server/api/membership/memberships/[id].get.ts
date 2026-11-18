@@ -2,7 +2,7 @@
 // the derived status, how it started and ended, every check made on it, and whether the reader may
 // change its dates.
 import { getRouterParam } from 'h3'
-import { all, can, defineRoute, first, refuse } from '#kit'
+import { all, can, defineRoute, first, isEnabled, refuse } from '#kit'
 import { accountLabel } from '#modules/core'
 import { derivedStatus } from '../../../dates'
 import { memberNumber, todayOrNull } from '../../../memberships'
@@ -22,13 +22,19 @@ export default defineRoute({
   )
   if (!m) refuse('core.not-found', 'There is no such membership.', { status: 404 })
   const day = await todayOrNull()
-  const checks = await all<{ verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number }>(
-    'SELECT verifier, outcome, reason, note, decided_by AS decidedBy, created_at AS createdAt FROM membership_verifications WHERE membership_id = ? ORDER BY created_at, id',
+  // The list a check used and the name it gives for the entry, for staff comparing it with the person (V18). The ID itself is only ever kept as a hash.
+  const checks = await all<{ verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null }>(
+    `SELECT v.verifier, v.outcome, v.reason, v.note, v.decided_by AS decidedBy, v.created_at AS createdAt, l.name AS listName, e.holder_name AS listedAs
+       FROM membership_verifications v
+       LEFT JOIN membership_verification_entries e ON e.id = v.entry_id
+       LEFT JOIN membership_verification_lists l ON l.id = e.list_id
+      WHERE v.membership_id = ? ORDER BY v.created_at, v.id`,
     m!.id,
   )
   const status = m!.state !== 'active' ? m!.state : day ? derivedStatus({ startsOn: m!.startsOn!, endsOn: m!.endsOn }, m!.graceDays, day) : 'upcoming'
   return {
     membership: { ...m, holderMayEnd: !!m!.holderMayEnd, status, name: await accountLabel(m!.accountId) },
+    feesOn: await isEnabled('membership-fees'),
     number: (await memberNumber(m!.accountId))?.label ?? null,
     canChangeDates: m!.state === 'active' && (await can(actor, 'membership.membership.update')).allowed,
     checks: await Promise.all(checks.map(async c => ({ ...c, decidedBy: c.decidedBy ? await accountLabel(c.decidedBy) : null }))),

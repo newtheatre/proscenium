@@ -133,6 +133,9 @@ export const points = {
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.
   'core.count': point({ kind: 'code', contract: 'count' }),
+  // A figure beside each of tonight's performances on the Tonight hub (sold, in, taken at the tills),
+  // read for one performance and left out for anyone without its ability there.
+  'core.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
   // Something on My account's overview that needs the person (an address to confirm, a renewal
   // that is open), for the person asking. A notice that fails is left out, never the page.
   'core.account-notice': point({ kind: 'code', contract: 'account-notice' }),
@@ -141,6 +144,21 @@ export const points = {
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),
   }),
   'core.health-check': point({ kind: 'code', contract: 'health-check' }),
+  // A role made the first time its module is switched on, so a fresh install has the usual ones. The
+  // key is the role's key: a theatre that has a role of that key already (archived too) keeps its own.
+  // From then on the role is the theatre's to change or archive. Abilities a module that is absent
+  // declares are left out.
+  'core.role-preset': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string().regex(/^[a-z][a-z0-9-]*\.[a-z0-9-]+$/),
+      key: z.string().regex(/^[a-z][a-z0-9-]*$/),
+      name: z.string().min(1).max(60), // not-policy: as a role's name
+      description: z.string().max(300).optional(), // not-policy: as a role's description
+      abilities: z.array(z.string()).min(1),
+      opensMembersArea: z.boolean().optional(),
+    }).strict(),
+  }),
   /** A source of verdicts on stored conditions, under its module's id (Formats tab, Requirements). */
   'core.requirement': point({ kind: 'code', contract: 'requirement-source' }),
   'core.erasure-handler': point({ kind: 'code', contract: 'erasure-handler' }),

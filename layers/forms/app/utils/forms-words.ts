@@ -82,3 +82,10 @@ export function formsProblemWords(def: Definition, p: { code: string, at: string
   }
   return t(`forms.problems.${p.code}`, p.params ?? {})
 }
+
+/** A file's size as people read it: "820 KB", "2.4 MB". */
+export function formsFileSize(bytes: number): string {
+  const KB = 1024 // not-policy: unit of size
+  if (bytes < KB * KB) return translate('forms.screens.fill.file-kb', { n: Math.max(1, Math.round(bytes / KB)) })
+  return translate('forms.screens.fill.file-mb', { n: (bytes / KB / KB).toFixed(1) })
+}
