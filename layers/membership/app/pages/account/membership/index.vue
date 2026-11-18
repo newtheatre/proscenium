@@ -36,7 +36,7 @@ const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => 
 /** A refusal about one field, shown under it; anything else shows above the form. */
 const fieldRefusal = (refusal: ReturnType<typeof toRefusal> | null | undefined, field: string) => refusal?.fields?.[field] ? refusal : null
 /** Why an application waits on the theatre, in the applicant's words: a reason for a check, or `approval` for the form's decision. */
-const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' || reason === 'approval' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
+const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' || reason === 'not-on-list' || reason === 'approval' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
 // One card: a membership that follows on from one held now is not shown as a second card.
 const cardFor = (m: Mine['memberships'][number]) => m.status === 'current' || m.status === 'in-grace' || (m.status === 'upcoming' && !(mine.data.value?.memberships ?? []).some(o => o.schemeId === m.schemeId && (o.status === 'current' || o.status === 'in-grace')))
 /** A held membership's line: when it starts if it has not yet, until when, and its renewal. */
@@ -73,12 +73,12 @@ function openJoin(s: Offered) {
   Object.assign(joinState, { lengthOptionId: undefined, reference: '' })
   joinRefusal.value = null
 }
-async function join() {
+async function join(askStaff = false) {
   const s = joining.value
   if (!s) return
   joinRefusal.value = null
   try {
-    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: s.endsByList ? null : joinState.lengthOptionId ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? joinState.reference.trim() : undefined } })
+    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: s.endsByList ? null : joinState.lengthOptionId ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? joinState.reference.trim() : undefined, ...(askStaff ? { askStaff: true } : {}) } })
     if (joined.waiting === 'payment') return navigateTo(`/account/membership/${joined.membershipId}/pay`)
     joining.value = null
     if (joined.pending) {
@@ -383,7 +383,7 @@ async function withdraw(a: Mine['applications'][number]) {
           :validate="() => needs({ lengthOptionId: joinOptions.length > 1 ? joinState.lengthOptionId : true, reference: joining?.asksFor ? joinState.reference : true })"
           class="space-y-4"
           novalidate
-          @submit="join"
+          @submit="join()"
         >
           <RefusalNotice :refusal="joinRefusal?.fields?.reference ? null : joinRefusal" />
           <UFormField
@@ -425,6 +425,15 @@ async function withdraw(a: Mine['applications'][number]) {
               />
             </template>
           </UFormField>
+          <UButton
+            v-if="joinRefusal?.code === 'membership.join.not-on-list' && joining.asksFor"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            loading-auto
+            :label="t('membership.join.ask-staff')"
+            @click="join(true)"
+          />
           <p
             v-if="joining.requiresPayment"
             class="text-sm text-muted"

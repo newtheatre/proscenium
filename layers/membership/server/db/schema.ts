@@ -221,6 +221,9 @@ export const verificationEntries = defineTable('membership_verification_entries'
   // The name on the issuer's file, for staff only, one entry at a time (rule V18).
   holderName: col.personal(text('holder_name')),
   usedBy: col.ref('membership_memberships', { nullable: true }),
+  // Added by staff, from an application they passed or by hand, rather than from the issuer's file.
+  // Loading a file leaves it in place until the file holds it too (Matt, 2026-11-17).
+  byHand: col.internal(integer('by_hand', { mode: 'boolean' }).notNull().default(false)),
   createdAt: col.createdAt(),
 }, {
   id: 'mve',

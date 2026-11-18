@@ -11,6 +11,7 @@
   "membership.join.holding": "You are already a member of {scheme}.",
   "membership.join.waiting": "Your application to join {scheme} is in.",
   "membership.join.waiting-payment": "It is waiting for your payment.",
+  "membership.join.ask-staff": "Ask the theatre to check it",
   "membership.join.form-unavailable": "The application form could not be loaded. Reload the page to try again.",
   "membership.join.form-shut": "The application form for this scheme is not taking answers at the moment. Contact the theatre to join.",
   "membership.join.pay": "Pay now",

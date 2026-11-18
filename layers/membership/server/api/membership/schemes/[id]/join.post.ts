@@ -24,6 +24,8 @@ export default defineRoute({
     lengthOptionId: z.string().nullish(),
     // The reference a list scheme checks, such as a student ID. Hashed, never stored (V10).
     reference: z.string().trim().max(254).nullish(), // not-policy: an address's bound
+    // A reference the list does not hold waits for staff to check it, rather than being refused.
+    askStaff: z.boolean().optional(),
     // The answers to the scheme's application form, when it has one (MEM-12).
     form: z.object({ formId: z.string(), answers: z.record(z.string(), z.unknown()) }).nullish(),
   }),
@@ -40,7 +42,7 @@ export default defineRoute({
   // J4. Renewing inside the window is a later slice.
   if (await holdsScheme(accountId, scheme.id)) refuse('membership.join.already-held', 'You already hold this membership.', { status: 409 })
   const day = await today()
-  const checked = await runVerifier(scheme, accountId, input.reference, day)
+  const checked = await runVerifier(scheme, accountId, input.reference, day, input.askStaff)
   // After the check, so a refused check sends nothing (it refuses rather than returning).
   const responseId = await answerApplication(unit, scheme, actor, input.form)
   const approving = scheme.needsApproval
