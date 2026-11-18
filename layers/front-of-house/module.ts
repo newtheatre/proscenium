@@ -173,13 +173,12 @@ export default defineModule({
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
-    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
     'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
     'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],
-    'core.count': [{ id: 'front-of-house.my-reports', file: 'my-reports' }],
     'core.notification-topic': [
       { id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 },
       { id: 'front-of-house.night-reports', side: 'members' as const, order: 61 },
