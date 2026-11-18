@@ -839,6 +839,5 @@
   "forms.screens.calculations.written-help": "It uses more than the builder can show, so it is kept as it is. Change it in Form as JSON, or start it again here.",
   "forms.screens.calculations.start-again": "Start again",
   "forms.screens.calculations.key-help": "The column name in exports. Letters, digits and underscores.",
-  "forms.screens.fields.create": "Create the set",
-  "forms.screens.fields.new-help": "Opens the builder. Add the questions, publish, then come back here to attach it."
+  "forms.screens.fields.create": "Create the set"
 }
