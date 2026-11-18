@@ -25,6 +25,8 @@ const props = defineProps<{
   title?: string
   /** A line under the heading saying where the keys come from. */
   description?: string
+  /** Names among `names` that get a Generate button, for a key that is only ever a long random string. */
+  generate?: string[]
 }>()
 /** After keys are saved or removed, with their names, so the page can refresh what depends on them. */
 const emit = defineEmits<{ saved: [names: string[]] }>()
@@ -40,7 +42,7 @@ const { data, refresh } = await useAPI<{ keys: Key[] }>('/api/core/credentials',
 })
 
 const keys = computed(() => data.value?.keys ?? [])
-const items = computed(() => keys.value.map(k => ({ ...k, label: t(k.labelKey), help: t(k.helpKey) })))
+const items = computed(() => keys.value.map(k => ({ ...k, label: t(k.labelKey), help: t(k.helpKey), generate: props.generate?.includes(k.name) })))
 const typed = ref<Record<string, string>>({})
 const saving = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)

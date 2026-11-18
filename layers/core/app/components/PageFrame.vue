@@ -50,6 +50,13 @@ const route = useRoute()
 const account = computed(() => shellOf(route.path) === 'account')
 // Beside the menu a page starts at the column's edge rather than centring in it.
 const accountWidths = { reading: 'max-w-2xl', standard: 'max-w-5xl', full: '' } as const
+// On a phone the navbar may grow a second line: when the title, status and actions do not fit
+// together the actions drop below the title instead of squeezing it and the status out.
+const navbarUi = {
+  root: 'max-sm:h-auto max-sm:min-h-(--ui-header-height) max-sm:flex-wrap max-sm:py-2',
+  left: 'max-sm:max-w-full',
+  right: 'max-sm:ms-auto',
+}
 const [DefineBody, ReuseBody] = createReusableTemplate()
 </script>
 
@@ -102,7 +109,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
     <template #header>
       <UDashboardNavbar
         :title="title"
-        :ui="longTitle ? { title: 'max-sm:sr-only' } : undefined"
+        :ui="longTitle ? { ...navbarUi, title: 'max-sm:sr-only' } : navbarUi"
       >
         <template #leading>
           <UDashboardSidebarCollapse />

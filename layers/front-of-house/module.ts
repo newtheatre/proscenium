@@ -81,9 +81,10 @@ export default defineModule({
 
   // Authority follows the rota (part 3, "The three facts"). Every answer is read from stored times.
   facts: defineFacts('front-of-house', {
-    'on-shift': factDecl({ on: 'core.performance', standing: true }),
-    'leading-shift': factDecl({ on: 'core.performance' }),
-    'rostered': factDecl({ standing: true }),
+    // Each brings the abilities part 7 suggests, mapped when the module is first switched on (FH-4).
+    'on-shift': factDecl({ on: 'core.performance', standing: true, defaults: ['front-of-house.shift.view', 'front-of-house.checklist.complete', 'front-of-house.incident.report'] }),
+    'leading-shift': factDecl({ on: 'core.performance', defaults: ['front-of-house.assignment.check-in', 'front-of-house.night-report.sign-off'] }),
+    'rostered': factDecl({ standing: true, defaults: ['front-of-house.emergency-card.view'] }),
   }),
 
   tables,
@@ -160,6 +161,8 @@ export default defineModule({
     }],
     'core.navigation': [
       { id: 'front-of-house.shifts', menu: 'members', to: '/members/front-of-house', icon: 'i-lucide-calendar-clock', ability: 'front-of-house.shift.sign-up', order: 30 },
+      // The reporter's own incidents (FH-8): shown once they have reported one.
+      { id: 'front-of-house.my-reports', menu: 'members', to: '/members/front-of-house/reports', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.report', order: 31, count: 'front-of-house.my-reports', hideEmpty: true },
       { id: 'front-of-house.tonight', menu: 'live', to: '/live/front-of-house', icon: 'i-lucide-drama', ability: ['front-of-house.shift.view', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], order: 10 },
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
@@ -171,8 +174,13 @@ export default defineModule({
       { id: 'front-of-house.emergency-cards', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/emergency-cards', icon: 'i-lucide-siren', ability: 'front-of-house.emergency-card.view', order: 90 },
     ],
     // Coming performances with no rota yet, on the console home of whoever runs the rota.
-    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }],
+    'core.count': [{ id: 'front-of-house.unrostered', file: 'unrostered' }, { id: 'front-of-house.my-reports', file: 'my-reports' }],
     'core.home-card': [{ id: 'front-of-house.unrostered', home: 'console', ability: 'front-of-house.shift.manage', component: 'FrontOfHouseUnrosteredCard', urgency: 'today', count: 'front-of-house.unrostered' }],
+    // The roles part 7 suggests, made when the module is first switched on (FH-4).
+    'core.role-preset': [
+      { id: 'front-of-house.volunteer', key: 'volunteer', name: 'Volunteer', description: 'Signs up for shifts, reports incidents and opens the emergency card.', abilities: ['front-of-house.shift.sign-up', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], opensMembersArea: true },
+      { id: 'front-of-house.manager', key: 'front-of-house-manager', name: 'Front of house manager', description: 'Runs the rota, duties and checklists, reviews incidents and reads night reports and hours.', abilities: ['front-of-house.shift.manage', 'front-of-house.checklist.manage', 'front-of-house.duty.manage', 'front-of-house.incident.manage', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view', 'front-of-house.hours.view', 'front-of-house.emergency-card.view'], opensMembersArea: true },
+    ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
@@ -194,6 +202,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Your shift has a new time: {{ show }}, {{ date }}',
           body: 'Your {{ duty }} shift for **{{ show }}** has moved. Please now arrive by **{{ when }}**.\n\n{{ details }}\n\nIf you can no longer do it, you can give it up at any time without the usual notice.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -207,6 +216,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Your shift has moved: {{ show }}, {{ date }}',
           body: 'The performance of **{{ show }}** you are on as {{ duty }} has moved to **{{ where }}**. Please arrive there by {{ when }}.\n\n{{ details }}\n\nIf you can no longer do it, you can give it up at any time without the usual notice.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -220,6 +230,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Shift cancelled: {{ show }}, {{ date }}',
           body: 'Your shift for **{{ show }}** on {{ when }} has been cancelled, so you are no longer needed. Thank you for signing up.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -233,6 +244,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You are on the rota: {{ show }}, {{ date }}',
           body: 'Thank you. You are confirmed as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\n{{ details }}\n\n[Add to calendar]({{ calendar }})\n\nIf you find you cannot do it, give it up as early as you can from your shifts, so someone else can take it.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -247,6 +259,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You have been put on the rota: {{ show }}, {{ date }}',
           body: '{{ by }} has put you on the rota as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.\n\n{{ details }}\n\n[Add to calendar]({{ calendar }})\n\nIf you cannot do it, you can give it up from your shifts, or tell {{ by }}.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -260,6 +273,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You have given up your shift: {{ show }}, {{ date }}',
           body: 'You have given up the {{ duty }} shift for **{{ show }}** on {{ when }}, and the place is free for someone else. Nothing more is needed.\n\nIf that was a mistake, find the shift in Open shifts and sign up again while places are free.',
+          action: 'See open shifts',
         },
       },
     }, {
@@ -273,6 +287,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You have asked for cover: {{ show }}, {{ date }}',
           body: 'You have asked to give up the {{ duty }} shift for **{{ show }}** on {{ when }}. It is close, so the place stays yours until someone else takes it, and the front-of-house manager has been told.\n\nIf you find you can do it after all, choose Keep my place on the shift.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -286,6 +301,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Reminder: your shift for {{ show }}, {{ date }}',
           body: 'A reminder that you are on as {{ duty }} for **{{ show }}**. Please arrive by **{{ when }}**.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -299,6 +315,7 @@ export default defineModule({
         'en-GB': {
           subject: 'You are no longer on a shift: {{ show }}, {{ date }}',
           body: 'You have been taken off the {{ duty }} shift for **{{ show }}** on {{ when }}, so you are not needed then. If you were not expecting this, ask the front-of-house manager.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -312,6 +329,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Your shift is covered: {{ show }}, {{ date }}',
           body: 'Someone has taken your {{ duty }} shift for **{{ show }}** on {{ when }}, so you are no longer needed then.',
+          action: 'See my shifts',
         },
       },
     }, {
@@ -327,6 +345,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Cover needed: {{ duty }}, {{ show }}, {{ date }}',
           body: 'Someone on the {{ duty }} shift for **{{ show }}** on {{ when }} has asked to give up their place. It stays theirs until someone takes it.',
+          action: 'See open shifts',
         },
       },
     }, {
@@ -358,6 +377,7 @@ export default defineModule({
         'en-GB': {
           subject: '{{ severity }} incident reported: {{ reference }}',
           body: '{{ kind }} {{ reference }} has been reported, marked **{{ severity }}**. Open it to review it.',
+          action: 'Open the incident',
         },
       },
     }, {
@@ -372,6 +392,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Incidents reported: {{ count }}',
           body: 'These incidents were reported since the last summary:\n\n{{ incidents }}\n\nOpen the incidents list to review them.',
+          action: 'Open the incidents',
         },
       },
     }, {
@@ -386,6 +407,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Due tomorrow: {{ what }}',
           body: 'The action "{{ what }}" from {{ incident }} is due tomorrow ({{ due }}). Mark it done when it is, or drop it with a reason.',
+          action: 'Open the incidents',
         },
       },
     }, {
@@ -430,6 +452,7 @@ export default defineModule({
         'en-GB': {
           subject: 'Overdue: {{ what }}',
           body: 'The action "{{ what }}" from {{ incident }} was due on {{ due }} and is still open. Mark it done when it is, or drop it with a reason.',
+          action: 'Open the incidents',
         },
       },
     }],

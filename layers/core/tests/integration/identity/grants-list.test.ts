@@ -56,5 +56,9 @@ describe('Who holds what', () => {
     const options = await browser.get('/api/core/grants/options')
     expect(options.body).toMatchObject({ manage: false, modules: expect.arrayContaining(['core']) })
     expect(options.body.roles.length).toBeGreaterThan(0)
+    // What giving a role needs: when each role's grants end, and where it can be given.
+    expect(options.body).toHaveProperty('yearEnd')
+    expect(typeof options.body.allowNoExpiry).toBe('boolean')
+    expect(options.body.roles[0]).toMatchObject({ owner: expect.any(Boolean), expiryRule: expect.any(String), modules: expect.any(Array) })
   })
 })
