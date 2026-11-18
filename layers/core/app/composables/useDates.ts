@@ -60,6 +60,9 @@ export function useDates() {
   /** A month's name from its number, 1 to 12: "August". */
   const monthName = (month: number) => new Intl.DateTimeFormat(language.value, { month: 'long', timeZone: 'UTC' }).format(Date.UTC(2001, month - 1, 1)) // not-policy: any year, to name a month
 
+  /** A day of any year from its month and day: "31 July", as a year end or a year's start reads. */
+  const dayOfYear = (month: number, dayOfMonth: number) => new Intl.DateTimeFormat(language.value, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(Date.UTC(2001, month - 1, dayOfMonth)) // not-policy: a year that is not a leap year
+
   /** The zone the date-time fields work in. */
   const zone = computed(() => timeZone.value ?? getLocalTimeZone())
   /** An instant as a local date and time in the theatre's zone ("2027-09-01T19:30"), as some routes take it. */
@@ -68,5 +71,5 @@ export function useDates() {
     return toCalendarDateTime(fromAbsolute(ms, zone.value)).toString().slice(0, 16) // not-policy: the length of a date and time to the minute
   }
 
-  return { language, timeZone, zone, monthName, day, dayLong, dayNamed, dateTime, brief, monthYear, time, range, toLocal }
+  return { language, timeZone, zone, monthName, dayOfYear, day, dayLong, dayNamed, dateTime, brief, monthYear, time, range, toLocal }
 }
