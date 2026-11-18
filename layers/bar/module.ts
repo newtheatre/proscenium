@@ -190,6 +190,10 @@ export default defineModule({
     // Sizes on sale whose labels are not all read, as a card on the console home for whoever records allergens.
     'core.count': [{ id: 'bar.allergens-unchecked', file: 'allergens-unchecked' }],
     'core.home-card': [{ id: 'bar.allergens', home: 'console', ability: 'bar.allergens.manage', component: 'BarAllergensCard', urgency: 'info', count: 'bar.allergens-unchecked' }],
+    // ::allergen-chart in a theatre's own page: a link to the public chart, there only while it is published.
+    'core.public-component': [
+      { id: 'allergen-chart', component: 'BarAllergenChartLink', alias: 'allergen-chart', description: 'A link to the public allergen chart, shown only while the chart is published (label, to change its words).' },
+    ],
     'core.navigation': [
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
