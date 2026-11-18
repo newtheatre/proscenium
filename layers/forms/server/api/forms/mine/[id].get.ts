@@ -6,7 +6,7 @@ import { getForm, getVersion } from '../../../forms'
 import { getResponse, owns, readAnswers, toAnswers } from '../../../responses'
 import type { Definition } from '../../../../shared/engine'
 import { questionsOf, withoutWorkflow } from '../../../../shared/engine'
-import { ownStatus } from '../../../stages'
+import { ownHistory, ownStatus } from '../../../stages'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
   const response = await getResponse(getRouterParam(event, 'id') ?? '')
@@ -26,6 +26,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     answers,
     // Where it is now, in the words the form chose for the person, and whether it is back with them to change.
     progress,
+    history: await ownHistory(definition, response),
     today: await today(),
   }
 })

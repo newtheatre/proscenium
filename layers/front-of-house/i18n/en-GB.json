@@ -1,4 +1,10 @@
 {
+  "front-of-house.upcoming.shift": "Your shift: {duty}",
+  "front-of-house.members-card.next": "Your next shift",
+  "front-of-house.members-card.none": "You have no shifts coming up.",
+  "front-of-house.members-card.open.one": "{count} open shift you could take.",
+  "front-of-house.members-card.open.other": "{count} open shifts you could take.",
+  "front-of-house.members-card.see-shift": "See the shift",
   "front-of-house.module.name": "Front of house",
   "front-of-house.module.description": "The people on each night: duties, the rota, sign-up, the authority a shift gives, and the record of how the night went.",
   "front-of-house.navigation.shifts.label": "Shifts",

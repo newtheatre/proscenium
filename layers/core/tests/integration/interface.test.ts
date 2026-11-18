@@ -15,6 +15,7 @@ import settingsPut from '../../server/api/core/settings/index.put'
 import settingsSearch from '../../server/api/core/settings/index-search.get'
 import moduleTabs from '../../server/api/core/modules/[id]/tabs.get'
 import settingsWindow from '../../server/api/core/settings-window.get'
+import gettingReady from '../../server/api/core/getting-ready.get'
 import { resetRateLimits } from '#kit/ratelimit'
 import { useSetting } from '#kit/settings-store'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
@@ -34,6 +35,7 @@ const handle = server({
   'GET /api/core/settings/index': settingsSearch,
   'GET /api/core/modules/:id/tabs': moduleTabs,
   'GET /api/core/settings-window': settingsWindow,
+  'GET /api/core/getting-ready': gettingReady,
 })
 
 const staff = () => person(['gallery.sample.view', 'gallery.sample.manage'])
@@ -198,6 +200,14 @@ describe("a module's page in Admin", () => {
     expect(await index(staff())).toBe('/console?settings=gallery')
     expect(await index(person(['core.settings.manage', 'gallery.sample.manage']))).toBe('/admin/modules/gallery')
   })
+
+  it('never offers a setting the system keeps, such as the brand\'s revision or its logos', async () => {
+    const found = ((await (await call(handle, 'GET', '/api/core/settings/index', { actor: person(['core.branding.edit']) })).json()) as { settings: { key: string }[] }).settings.map(s => s.key)
+    expect(found).toContain('core.brand.accent')
+    expect(found).not.toContain('core.brand.revision')
+    expect(found).not.toContain('core.brand.logo')
+    expect(found).not.toContain('core.brand.logo-dark')
+  })
 })
 
 describe("core's settings", () => {
@@ -222,6 +232,9 @@ describe("core's settings", () => {
     // A module id is every tab of that module, for an Admin address opened from the console.
     expect((await window('core', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core', '/admin/modules/core/people', '/admin/modules/core/seasons', '/admin/modules/core/run-presets', '/admin/modules/core/venues', '/admin/modules/core/closures'])
     expect((await call(handle, 'GET', '/api/core/settings-window?for=nothing.here', { actor: everything })).status).toBe(404)
+    // A producer who may change none of it gets no tabs, so the console shows no cog (L39).
+    const producer = person(['core.production.create', 'core.production.publish', 'core.performance.schedule'])
+    expect((await window('core.productions', producer)).tabs).toEqual([])
   })
 
   it('have no console page of their own: each group is on one page, mostly in Admin', async () => {
@@ -258,8 +271,10 @@ describe('Admin (R-33)', () => {
   it('opens to a person who holds the ability of an admin entry, and is not found for anyone else', async () => {
     expect((await decide('/admin', admin())).decision).toBe('allow')
     expect((await decide('/admin/advanced', admin())).decision).toBe('allow')
-    expect((await decide('/admin', staff())).decision).toBe('not-found')
-    expect((await decide('/admin/advanced', staff())).decision).toBe('not-found')
+    // Console staff are told they have no access, and whom to ask, rather than that it does not exist.
+    expect(await decide('/admin', staff())).toEqual({ decision: 'refused', refusal: expect.objectContaining({ code: 'core.access.no-admin' }) })
+    expect(await decide('/admin/advanced', staff())).toEqual({ decision: 'refused', refusal: expect.objectContaining({ code: 'core.access.no-admin' }) })
+    expect((await decide('/admin/advanced', audience())).decision).toBe('not-found')
     expect((await decide('/admin')).decision).toBe('sign-in')
   })
 
@@ -438,6 +453,20 @@ describe('home cards, record tabs and history (UI-12, UI-16)', () => {
     expect(entries.map((e: { action: string }) => e.action)).toEqual(['update', 'create'])
     expect(entries[1].detail).toEqual({ field: 'name' })
   })
+
+  it('gives Admin\'s overview "Get your theatre ready" and the email warning until they are settled', async () => {
+    const ids = async (actor: ReturnType<typeof person>) => (await get('/api/core/home?home=admin', actor)).cards.map((c: { id: string }) => c.id)
+    const settings = person(['core.settings.manage'])
+    const sender = person(['core.sender.manage'])
+    expect(await ids(settings)).toContain('core.getting-ready')
+    expect(await ids(sender)).not.toContain('core.getting-ready')
+    const { items } = await get('/api/core/getting-ready', settings)
+    expect(items.map((i: { id: string }) => i.id)).toEqual(['name', 'time-zone', 'email', 'branding', 'venue', 'modules', 'staff'])
+    expect(items.find((i: { id: string }) => i.id === 'time-zone').to).toBe('/admin/theatre?setting=core.locale.time-zone')
+    expect((await call(handle, 'GET', '/api/core/getting-ready', { actor: reader() })).status).toBe(403)
+    const verified = await inContext(() => useSetting('core.notifications.verified-domain'))
+    expect((await ids(sender)).includes('core.email-unverified')).toBe(!verified)
+  })
 })
 
 describe('Admin in the viewer (R-33)', () => {
@@ -449,8 +478,9 @@ describe('Admin in the viewer (R-33)', () => {
     expect(await sides(audience())).not.toContain('admin')
   })
 
-  it('answers /admin as a missing page to someone with no admin ability', async () => {
-    expect((await decide('/admin', staff())).decision).toBe('not-found')
+  it('answers /admin as a missing page to someone with no admin ability, and as no access to console staff', async () => {
+    expect((await decide('/admin', audience())).decision).toBe('not-found')
+    expect((await decide('/admin', staff())).decision).toBe('refused')
     expect((await decide('/admin', person(['core.settings.manage']))).decision).toBe('allow')
   })
 })

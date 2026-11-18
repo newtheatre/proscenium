@@ -16,6 +16,7 @@ const area = computed(() => viewer.value.membersName ?? t('core.menu.members'))
 const sections = computed(() => (navigation.value?.items ?? []).map(i => ({ ...i, active: isCurrent(i, route.path) })))
 // The bar along the bottom of a phone is for moving between places: with fewer than two it is left out.
 const tabbed = computed(() => sections.value.length > 1)
+// A count of nought shows no badge (AC-7).
 const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ label: t(i.label), icon: i.icon, to: i.to, active: i.active, badge: i.count || undefined })))
 </script>
 

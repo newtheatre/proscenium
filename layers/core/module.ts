@@ -35,7 +35,17 @@ export default defineModule({
     'core.file-slot': [...domain.contributes['core.file-slot'], ...identity.identityContributions['core.file-slot']],
     'core.public-component': [...domain.contributes['core.public-component'], ...identity.identityContributions['core.public-component']],
     'core.notification-type': [...identity.identityContributions['core.notification-type'], ...domain.contributes['core.notification-type']],
-    'core.count': [...identity.identityContributions['core.count'], ...domain.contributes['core.count']],
+    'core.count': [
+      ...identity.identityContributions['core.count'], ...domain.contributes['core.count'],
+      { id: 'core.getting-ready', file: 'getting-ready' },
+      { id: 'core.email-unverified', file: 'email-unverified' },
+    ],
+    // Admin's overview after setup: nothing is emailed until a domain is verified, and the first
+    // steps a new theatre takes. Each card goes once there is nothing left for it to say.
+    'core.home-card': [
+      { id: 'core.email-unverified', home: 'admin', ability: 'core.sender.manage', component: 'CoreEmailUnverifiedCard', urgency: 'today', count: 'core.email-unverified' },
+      { id: 'core.getting-ready', home: 'admin', ability: 'core.settings.manage', component: 'CoreGettingReadyCard', urgency: 'today', count: 'core.getting-ready' },
+    ],
     'core.account-notice': [...identity.identityContributions['core.account-notice']],
     'core.account-section': [...identity.identityContributions['core.account-section'], ...domain.contributes['core.account-section']],
     // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in

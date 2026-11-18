@@ -33,7 +33,7 @@ interface Menu { outletId: string, outlet: string, priceListId: string, priceLis
 interface Tile { key: string, productId: string, name: string, items: Item[], ageRestricted: boolean, fromMinor: number, choices: boolean, colour: string | null }
 interface Outlet { id: string, name: string, kind: string }
 
-const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, large?: boolean }>()
+const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, large?: boolean, settled?: string | null }>()
 const emit = defineEmits<{
   'update:modelValue': [unknown]
   /** The bar's lines for the till's receipt, the age answer to keep on it, and what was last added. */

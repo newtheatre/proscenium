@@ -21,7 +21,7 @@ const problems = computed(() => builder.problemsAt.value.get(props.at) ?? [])
         :name="p.level === 'error' ? 'i-lucide-circle-alert' : 'i-lucide-triangle-alert'"
         class="mt-0.5 shrink-0"
       />
-      <span>{{ t(`forms.problems.${p.code}`, p.params ?? {}) }}</span>
+      <span>{{ formsProblemWords(builder.definition.value, p, t) }}</span>
     </li>
   </ul>
 </template>

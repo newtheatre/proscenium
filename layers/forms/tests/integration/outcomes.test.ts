@@ -101,6 +101,29 @@ describe('attaching a form to a record', () => {
     expect((await req('PUT', at(subject, b.formId), TERMS, keeper)).body.code).toBe('forms.slot.full')
   })
 
+  it('tells a module which of a slot\'s forms the person looking could answer now', async () => {
+    const subject = newId('ven')
+    const other = newId('ven')
+    const a = await published(nomination(), 'Nominate somebody')
+    const b = await published(definition(question('name')), 'Open to all')
+    const here = (who: ReturnType<typeof person> | null, q = '') => req('GET', `/api/forms/slots/forms.test-slot/open${q}`, undefined, who)
+    const { placementId } = (await req('PUT', at(subject, a.formId), TERMS, keeper)).body
+    expect((await req('PUT', at(other, b.formId), OPEN, keeper)).status).toBe(200)
+
+    const mine = await here(member, `?subject=${subject}`)
+    expect(mine.status, JSON.stringify(mine.body)).toBe(200)
+    expect(mine.body.open).toEqual([expect.objectContaining({ subjectId: subject, formId: a.formId, title: 'Nominate somebody', address: `/forms/${a.slug}?place=${placementId}` })])
+    expect((await here(member)).body.open.map((f: any) => f.formId)).toEqual(expect.arrayContaining([a.formId, b.formId]))
+    // Somebody signed out is offered only what anyone may answer.
+    const out = (await here(null)).body.open.filter((f: any) => [subject, other].includes(f.subjectId))
+    expect(out.map((f: any) => f.formId)).toEqual([b.formId])
+    // A paused one is not offered.
+    expect((await req('PUT', at(subject, a.formId), { ...TERMS, status: 'paused' }, keeper)).status).toBe(200)
+    expect((await here(member, `?subject=${subject}`)).body.open).toEqual([])
+    expect((await here(member, '')).status).toBe(200)
+    expect((await req('GET', '/api/forms/slots/nowhere.slot/open', undefined, member)).status).toBe(404)
+  })
+
   it('is answered at its own place, on its own terms, and each response keeps the record it is about', async () => {
     const [venue] = await rows<{ id: string }>('INSERT INTO core_venues (id, name, state, created_at) VALUES (?, \'The Studio\', \'active\', 0) RETURNING id', newId('ven')).catch(() => [{ id: newId('ven') }])
     const { formId, slug } = await published(nomination())

@@ -58,7 +58,8 @@ async function share(page: Page, title: string) {
   // A form that asks for personal answers says how long they are kept before it is published.
   await page.getByRole('button', { name: 'Publish', exact: true }).click()
   await page.getByRole('button', { name: 'Form settings' }).click()
-  await page.getByRole('spinbutton', { name: /^Keep answers for/ }).fill('365')
+  // The period is a number and a unit, and the unit starts at years.
+  await page.getByRole('spinbutton', { name: /^Keep answers for/ }).fill('1')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Form settings' })).toBeHidden()
   await page.getByRole('button', { name: 'Publish', exact: true }).click()

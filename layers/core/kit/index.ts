@@ -28,7 +28,7 @@ export { credential, credentialEntry, credentialStatus, setCredential, clearCred
 export type { CredentialStatus } from './secrets'
 export { files, cache } from './stores'
 export { now, nowMs, setClock, advanceClock } from './clock'
-export { today, localDate, theatreTimeZone } from './dates'
+export { today, localDate, theatreTimeZone, TIME_ZONE_REMEDY } from './dates'
 export { siteOrigin, siteUrl } from './origin'
 export { log } from './log'
 export { useDb, all, first } from './database'
