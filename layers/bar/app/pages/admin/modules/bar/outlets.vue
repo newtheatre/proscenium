@@ -2,15 +2,17 @@
      price list it sells from and where it is. One outlet at most is the box office desk. An outlet
      that has sold is retired, not deleted. -->
 <script setup lang="ts">
+import { outletInput, outletPatch } from '../../../../../server/input'
+
 type Kind = 'bar' | 'kiosk' | 'desk'
 type Layout = 'chips' | 'folders' | 'rail'
 interface Outlet { id: string, name: string, kind: Kind, priceListId: string, priceList: string, spaceId: string | null, stockLocationId: string | null, tillLayout: Layout, favourites: string[], active: boolean }
 interface Option { id: string, name: string }
-interface Size { id: string, product: string, size: string, category: string }
+interface Size { id: string, product: string, size: string, category: string, pricedOn: string[] }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ outlets: Outlet[], lists: Option[], spaces: Option[], locations: Option[], sizes: Size[] }>('/api/bar/outlets', { key: 'bar:outlets' })
 
@@ -21,22 +23,29 @@ const locationItems = computed(() => [{ value: 'none', label: t('bar.screens.out
 const layoutItems = computed(() => (['chips', 'folders', 'rail'] as const).map(l => ({ value: l, label: t(`bar.screens.outlets.layouts.${l}`) })))
 // "Each" is never shown: a one-size product is just its name.
 const sizeLabel = (s: Size) => s.size === 'Each' ? s.product : `${s.product} · ${s.size}`
-const sizeItems = computed(() => (data.value?.sizes ?? []).map(s => ({ value: s.id, label: sizeLabel(s), description: s.category })))
+// Only sizes with a price on the outlet's list can be pinned: one with none is not on its till.
+const sizeItems = computed(() => (data.value?.sizes ?? []).filter(s => s.pricedOn.includes(form.value?.priceListId ?? '') || form.value?.favourites.includes(s.id)).map(s => ({ value: s.id, label: sizeLabel(s), description: s.category })))
 const spaceName = (id: string | null) => id ? data.value?.spaces.find(s => s.id === id)?.name ?? null : null
 const describe = (o: Outlet) => [t(`bar.screens.outlets.kinds.${o.kind}`), t('bar.screens.outlets.sells-from', { list: o.priceList }), spaceName(o.spaceId)].filter(Boolean).join(' · ')
 
 const form = ref<{ id: string | null, name: string, kind: Kind, priceListId: string, spaceId: string, stockLocationId: string, tillLayout: Layout, favourites: string[] } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+type FormRef = { setErrors: (errors: FieldError[]) => void }
+const formEl = useTemplateRef<FormRef>('formEl')
 function edit(o?: Outlet) {
   refusal.value = null
   form.value = o
     ? { id: o.id, name: o.name, kind: o.kind, priceListId: o.priceListId, spaceId: o.spaceId ?? 'none', stockLocationId: o.stockLocationId ?? 'none', tillLayout: o.tillLayout, favourites: [...o.favourites] }
     : { id: null, name: '', kind: 'bar', priceListId: listItems.value[0]?.value ?? '', spaceId: 'none', stockLocationId: data.value?.locations.length === 1 ? data.value.locations[0]!.id : 'none', tillLayout: 'chips', favourites: [] }
 }
+const outletBody = () => {
+  const f = form.value!
+  return { name: f.name, kind: f.kind, priceListId: f.priceListId || null, spaceId: f.spaceId === 'none' ? null : f.spaceId, stockLocationId: f.stockLocationId === 'none' ? null : f.stockLocationId, tillLayout: f.tillLayout }
+}
 async function save() {
   const f = form.value!
   refusal.value = null
-  const body = { name: f.name, kind: f.kind, priceListId: f.priceListId || null, spaceId: f.spaceId === 'none' ? null : f.spaceId, stockLocationId: f.stockLocationId === 'none' ? null : f.stockLocationId, tillLayout: f.tillLayout }
+  const body = outletBody()
   try {
     let id = f.id
     if (id) await $api(`/api/bar/outlets/${id}` as string, { method: 'PATCH', body })
@@ -49,6 +58,7 @@ async function save() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    formEl.value?.setErrors(fieldErrors(refusal.value))
   }
 }
 async function setActive(o: Outlet, active: boolean) {
@@ -118,7 +128,9 @@ async function setActive(o: Outlet, active: boolean) {
         <UForm
           v-if="form"
           id="bar-outlet"
+          ref="formEl"
           :state="form"
+          :validate="() => bodyErrors(form?.id ? outletPatch : outletInput, outletBody())"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -202,6 +214,7 @@ async function setActive(o: Outlet, active: boolean) {
         <UButton
           type="submit"
           form="bar-outlet"
+          loading-auto
           :label="t('bar.screens.save')"
         />
       </template>
