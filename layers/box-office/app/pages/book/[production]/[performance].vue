@@ -37,7 +37,7 @@ const counts = ref<Record<string, number>>({})
 const { viewer } = useViewer()
 // Each reference box has an id of its own, so its label never points at the stepper (UFormField's id).
 const referenceId = useId()
-// The stepper's buttons are named for the ticket ("Add a Member ticket"), not just "Increment".
+// The stepper's buttons are named for the ticket ("Add one Member ticket"), not just "Increment".
 const named = (label: string) => ({ 'aria-label': label }) as unknown as ButtonProps
 // Why a price cannot be chosen, and what to do: the source's way to put it right, or signing in.
 const remedyOf = (type: TicketType) => type.remedy ?? (type.unmet && !viewer.value.signedIn ? { label: t('box-office.book.sign-in'), to: `/sign-in?next=${encodeURIComponent(route.fullPath)}` } : undefined)
