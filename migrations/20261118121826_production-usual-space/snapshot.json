@@ -1,9 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "52e866ed-737a-482d-87f2-d7944ab83e12",
+  "id": "735fa12d-c9fe-433e-a40e-b3dc4bc2427b",
   "prevIds": [
-    "bdf1107d-e2b9-4231-86c7-5497df5fddfc"
+    "1e609b01-24b5-40ad-ae4c-d1ce99d9b81b",
+    "8a7d200f-533a-4758-bb61-19a80d496404"
   ],
   "ddl": [
     {
@@ -508,10 +509,6 @@
     },
     {
       "name": "forms_forms",
-      "entityType": "tables"
-    },
-    {
-      "name": "forms_old_addresses",
       "entityType": "tables"
     },
     {
@@ -10308,6 +10305,16 @@
     },
     {
       "table": "core_productions",
+      "name": "usual_space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
       "name": "external_booking_url",
       "type": "text",
       "notNull": false,
@@ -12618,26 +12625,6 @@
     },
     {
       "table": "forms_action_runs",
-      "name": "record_type",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_action_runs",
-      "name": "record_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_action_runs",
       "name": "job_id",
       "type": "text",
       "notNull": false,
@@ -13041,36 +13028,6 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_old_addresses",
-      "name": "slug",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_old_addresses",
-      "name": "form_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_old_addresses",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -21129,20 +21086,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "forms_old_addresses",
-      "name": "forms_old_addresses_form",
-      "columns": [
-        {
-          "value": "form_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "forms_placements",
       "name": "forms_placements_place",
       "columns": [
@@ -24248,6 +24191,21 @@
     },
     {
       "table": "core_productions",
+      "name": "fk_core_productions_usual_space_id_core_spaces_id_fk",
+      "columns": [
+        "usual_space_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
       "name": "fk_core_productions_cancel_reason_term_id_core_terms_id_fk",
       "columns": [
         "cancel_reason_term_id"
@@ -24553,21 +24511,6 @@
         "live_version_id"
       ],
       "tableTo": "forms_versions",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "forms_old_addresses",
-      "name": "fk_forms_old_addresses_form_id_forms_forms_id_fk",
-      "columns": [
-        "form_id"
-      ],
-      "tableTo": "forms_forms",
       "columnsTo": [
         "id"
       ],
@@ -25562,15 +25505,6 @@
       "columns": [
         "form_id",
         "question_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "forms_old_addresses",
-      "name": "forms_old_addresses_pk",
-      "columns": [
-        "slug"
       ],
       "nameExplicit": false,
       "entityType": "pks"

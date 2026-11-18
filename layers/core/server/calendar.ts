@@ -1,7 +1,7 @@
 // The operating day (C-37): a theatre's day runs from its day start (core.locale.day-start) to the next, so a show that
 // ends at 00:30 belongs to the evening it started. Every module asks here rather than doing its own
 // arithmetic with the time zone.
-import { all, createUnit, refuse, usePoint, useSetting } from '#kit'
+import { all, createUnit, refuse, TIME_ZONE_REMEDY, usePoint, useSetting } from '#kit'
 import { instantOfLocal, localDateOf, localParts, previousDate } from '#kit/clock'
 
 export interface DayRule { timeZone: string, rollover: string }
@@ -27,7 +27,7 @@ export async function dayRule(): Promise<DayRule | null> {
 }
 
 async function requireRule(): Promise<DayRule> {
-  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
+  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
 }
 
 /** The operating day of an instant, with the theatre's own settings. */

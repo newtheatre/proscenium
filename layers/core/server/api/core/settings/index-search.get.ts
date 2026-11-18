@@ -2,7 +2,8 @@
 // translations, which the browser holds, so this answers only where each setting is: its page and
 // that page's address, or the bespoke screen that manages it. The search itself runs where the
 // words are. A setting is found only when the viewer may open its page or screen, which is open to
-// anyone who may change one of the settings on it.
+// anyone who may change one of the settings on it. Sensitive settings and those the system keeps
+// (the brand's revision, the logos the Branding screen sets) are never offered.
 import { defineRoute } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
@@ -32,7 +33,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     return admin ? to : `/console?settings=${tabOf}`
   }
   for (const [key, { module, entry }] of registry.settings) {
-    if (!on.has(module) || entry.sensitive || (entry.whenModule && !on.has(entry.whenModule))) continue
+    if (!on.has(module) || entry.sensitive || entry.managed || (entry.whenModule && !on.has(entry.whenModule))) continue
     const where = homeOf(key)
     if (!open.has(where)) open.set(where, holds(await mayOpen(actor, { ability: [...changers.get(where)!] })))
     if (!open.get(where)) continue

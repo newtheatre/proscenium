@@ -323,6 +323,8 @@ export const productions = defineTable('core_productions', {
   intervalMinutes: col.public(integer('interval_minutes')),
   doorsBeforeMinutes: col.internal(integer('doors_before_minutes')),
   capacity: col.internal(integer('capacity')),
+  // The space it usually plays in: what adding a run or a performance offers first. Each date keeps its own.
+  usualSpaceId: col.internal(text('usual_space_id').references(() => spaces.id, { onDelete: 'set null' })),
   externalBookingUrl: col.public(text('external_booking_url')),
   creditsPublic: col.internal(integer('credits_public', { mode: 'boolean' }).notNull()),
   state: col.internal(text('state').notNull().default('draft')),
