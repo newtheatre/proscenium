@@ -57,11 +57,15 @@ const props = withDefaults(defineProps<{
   returnTo?: string
   /** Long forms keep a draft on the device under this key. */
   draftKey?: string
+  /** What the toast says once saved when "Saved" is too vague: "Venue added". */
+  done?: string
+  /** With `done`: reverses the save, from the toast's Undo. Leave out where it cannot be reversed. */
+  undo?: (result: unknown) => Promise<unknown>
   /** Panel mode: whether the panel is open. */
   open?: boolean
   /** What the toast says once saved, such as "Production created". Default: "Saved". */
   savedTitle?: string
-}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
+}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined, done: undefined, undo: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -72,6 +76,7 @@ const { t } = useT()
 const router = useRouter()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 
 // A short form opens as a panel over the list when the list asks for one (it passes `open`); at its
 // own address, or when long, it is a page. The component decides from the field count, not taste.
@@ -186,7 +191,8 @@ async function onSubmit() {
     const result = await props.submit({ ...state }, version.value)
     saved.value = true
     discardDraft()
-    toast.add({ title: props.savedTitle ?? t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
+    if (props.done) offer(props.done, props.undo && (() => props.undo!(result)))
+    else toast.add({ title: props.savedTitle ?? t('core.form.saved'), color: 'success', icon: 'i-lucide-circle-check' })
     emit('saved', result)
     if (panel.value) emit('update:open', false)
     else await (props.returnTo ? navigateTo(props.returnTo) : router.back())
@@ -348,7 +354,8 @@ useLeaveGuard(() => dirty.value && !saved.value)
                 v-for="g in row"
                 :key="g.name"
                 :name="g.name"
-                :label="ownsLabel(g) ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
+                :label="ownsLabel(g) ? undefined : g.label"
+                :hint="!ownsLabel(g) && g.optional ? t('core.form.optional') : undefined"
                 :help="g.kind === 'checkbox' ? undefined : g.help"
                 :class="g.showIf && 'ms-7'"
               >

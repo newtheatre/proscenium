@@ -214,6 +214,8 @@ export default defineModule({
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
     'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }, { id: 'box-office.order', file: 'order' }],
+    // Orders found by reference or buyer in the command palette.
+    'core.search-source': [{ id: 'box-office.orders', record: 'box-office.order', ability: 'box-office.order.view', route: '/api/box-office/search', shells: ['console'] }],
     // The Tickets tab and fact on a production's page (show walkthrough, decision 1).
     'core.record-tab': [{ id: 'box-office.production', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTickets', order: 10 }],
     'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],

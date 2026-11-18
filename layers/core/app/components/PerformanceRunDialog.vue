@@ -17,7 +17,7 @@ const props = defineProps<{
   productionId: string
   spaces: Space[]
   presets: Preset[]
-  defaults: { usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
+  defaults: { usualSpaceId: string | null, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
   defaultsIn: (spaceId: string) => ShowDefaultValues
   /** The first and last date a new run starts from, as "2027-09-01", or null for none. */
   suggested?: { start: string, end: string } | null
@@ -74,7 +74,8 @@ watch(open, (v) => {
   planned.value = null
   overrides.value = noOverrides()
   if (!form.value.dates.start && props.suggested) form.value.dates = { ...props.suggested }
-  form.value.spaceId ||= props.spaces[0]?.value ?? ''
+  // The production's usual space first, else the first one listed.
+  form.value.spaceId ||= props.spaces.find(s => s.value === props.defaults.usualSpaceId)?.value ?? props.spaces[0]?.value ?? ''
   form.value.scheduled = props.defaults.scheduleRuns
   usePreset(usualFor(form.value.spaceId))
 }, { immediate: true })

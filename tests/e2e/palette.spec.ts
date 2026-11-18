@@ -47,12 +47,34 @@ test.describe('staff with the gallery abilities', () => {
   })
 })
 
+test.describe('a producer who sets up venues', () => {
+  test.use(as(person('Pat Producer', [grant('core.production.create'), grant('core.venue.manage')])))
+
+  test('finds set-up screens that are tabs in Admin, and create actions', async ({ page }) => {
+    await visit(page, '/console')
+    await page.keyboard.press('Control+k')
+    const palette = page.getByRole('dialog')
+    await palette.getByRole('textbox').fill('venues')
+    await expect(palette.getByRole('option', { name: /Venues and spaces/ })).toBeVisible()
+    await palette.getByRole('textbox').fill('new production')
+    await expect(palette.getByRole('option', { name: /New production/ })).toBeVisible()
+  })
+
+  test('says what to try when nothing matches', async ({ page }) => {
+    await visit(page, '/console')
+    await page.keyboard.press('Control+k')
+    const palette = page.getByRole('dialog')
+    await palette.getByRole('textbox').fill('qqqxz')
+    await expect(palette.getByText('Nothing matches “qqqxz”. Try the name of a screen, a setting or a record.')).toBeVisible()
+  })
+})
+
 test.describe('an audience account', () => {
   test.use(as(person('Alex Audience', [])))
 
   test('is offered no actions or record types by the palette endpoint', async ({ request }) => {
     const body = await (await request.get('/api/core/palette')).json()
-    expect(body).toEqual({ sources: [], actions: [] })
+    expect(body).toEqual({ screens: [], sources: [], actions: [] })
     const records = await (await request.get('/api/core/records?type=gallery.production&ids=p1')).json()
     expect(records).toEqual({ records: [] })
   })

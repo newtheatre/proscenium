@@ -10,7 +10,7 @@ import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
 import { queueActions } from './actions'
 import { tellMoved } from './notices'
-import { closeRounds, conflicted, openRound } from './review'
+import { closeRounds, conflicted, namedIn, openRound } from './review'
 import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
 import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
@@ -65,6 +65,7 @@ export async function moveResponse(unit: UnitView, input: { form: FormRow, respo
   if (input.response.state !== 'submitted') return refuse('forms.stage.not-open', 'This response cannot be moved.', { status: CONFLICT })
   if (await owns(input.response, input.actor)) return refuse('forms.stage.own-response', 'You cannot move your own response.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
   if (await conflicted(input.actor, input.response.id)) return refuse('forms.review.conflicted', 'You have a conflict of interest on this response, so you cannot move it.', { status: 403 }) // not-policy: HTTP status
+  if (await namedIn(input.actor, input.def, input.response)) return refuse('forms.review.conflicted', 'You are named in this response, so you cannot move it.', { status: 403, remedy: 'Ask somebody else who looks after this form.' }) // not-policy: HTTP status
   const move = staffMoves(input.def, input.response.stageKey, true).find(t => t.key === input.transitionKey)
   if (!move) return refuse('forms.stage.not-open', 'This move is not open from where the response is now.', { status: CONFLICT, remedy: 'Open the response again to see where it is now.' })
   if (isDecision(input.def, move)) {
@@ -115,6 +116,21 @@ export async function changedIn(responseId: string, revision: number): Promise<s
   const now = new Map(rows.filter(r => r.revision === revision).map(r => [r.questionId, r.held]))
   const before = new Map(rows.filter(r => r.revision !== revision).map(r => [r.questionId, r.held]))
   return [...new Set([...now.keys(), ...before.keys()])].filter(id => now.get(id) !== before.get(id)).sort()
+}
+
+/**
+ * What has happened to a person's own response, oldest first, in the words the form chose for them:
+ * each change of status and when. Who moved it, and stages that read the same to them, are left out.
+ */
+export async function ownHistory(def: Definition, response: ResponseRow): Promise<{ at: number, status: string, kind: string }[]> {
+  if (!hasStages(def)) return []
+  const rows = await all<{ at: number, toStage: string, toKind: string }>('SELECT at, to_stage AS toStage, to_kind AS toKind FROM forms_stage_history WHERE response_id = ? ORDER BY at, id', response.id)
+  const out: { at: number, status: string, kind: string }[] = []
+  for (const r of rows) {
+    const status = statusOf(stageOf(def, r.toStage)) || r.toStage
+    if (out.at(-1)?.status !== status) out.push({ at: r.at, status, kind: r.toKind })
+  }
+  return out
 }
 
 /** What a person is shown about where their own response is. */
