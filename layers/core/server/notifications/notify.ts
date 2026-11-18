@@ -186,7 +186,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     const delivered = fresh.map((r, i) => ({ r, i })).filter(({ i }) => rows[i]!.state === 'sent')
     if (delivered.length) {
       const brand = await brandTokens()
-      const theatre = await theatreName('')
+      const theatre = await theatreName('The theatre')
       const keepFor = await useSetting('core.delivery.inbox-retention') as number
       unit.insertSet(inboxItems, delivered.map(({ r, i }) => {
         const message = render(type.wording[localeOf(r.accountId)]!, { values: r.values, kinds: type.variables, accent: brand.light.link, theatre })
