@@ -77,7 +77,7 @@ test.describe('someone who gives roles', () => {
 
   test('gives a role from Who holds what and from a person\'s page', async ({ page }) => {
     await visit(page, '/console/people/grants')
-    await page.getByRole('button', { name: 'Give a role' }).click()
+    await page.getByRole('button', { name: 'Give a role' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: 'Give a role' })).toBeVisible()
     await expect(dialog.getByText('Person')).toBeVisible()
