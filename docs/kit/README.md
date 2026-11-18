@@ -361,14 +361,15 @@ written the first time the text is found to differ from every version kept (`cur
 of wording, of a quoted setting or of which modules are on each makes one. Versions are listed at
 `/policies/<id>/versions`. What a person agreed to points at a version: a module calls
 `currentPolicyVersion('<policy>')` from `#modules/core` and stores the id, as the box office does on
-an order (`terms_version_id`) at checkout and when reserving.
+an order (`terms_version_id`) at checkout and when reserving, and core does on an account when a
+person first makes it theirs.
 
 **Readiness.** Site readiness lists what the policies still lack
 (`layers/core/server/policies/readiness.ts`): sections only the theatre can write, replacements the
 default wording has moved on from, facts the text would state if they were set, and default text
 not yet named in `core.policies.reviewed`.
 
-Not built yet: the version of the terms of use an account accepted, and packs of law for countries
+Not built yet: telling people when a policy they agreed to changes, and packs of law for countries
 other than the UK.
 
 ## External calls

@@ -129,3 +129,19 @@ describe('what the policies still lack (site readiness)', () => {
     await env.DB.prepare('DELETE FROM core_settings WHERE key = ?').bind('core.policies.reviewed').run()
   })
 })
+
+describe('what a person agreed to by making an account', () => {
+  it('keeps on the account the terms of use as they read then', async () => {
+    const { accountForProvenAddress } = await import('../../server/identity/accounts')
+    const made = await inContext(async () => {
+      const unit = createUnit()
+      const found = await accountForProvenAddress(unit.view(), 'terms-reader@example.org', 'self', { name: 'Terms Reader' })
+      await unit.commit()
+      return found
+    })
+    expect(made.created).toBe(true)
+    const row = await env.DB.prepare('SELECT v.policy, v.body FROM core_accounts a JOIN core_policy_versions v ON v.id = a.terms_version_id WHERE a.id = ?').bind(made.accountId).first<{ policy: string, body: string }>()
+    expect(row!.policy).toBe('terms')
+    expect(row!.body).toContain('## Your account')
+  })
+})

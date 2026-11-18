@@ -1,0 +1,1 @@
+ALTER TABLE `core_accounts` ADD `terms_version_id` text REFERENCES core_policy_versions(id);

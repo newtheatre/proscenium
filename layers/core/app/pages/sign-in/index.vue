@@ -26,5 +26,21 @@ const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean,
       v-model:sent="sent"
       :next="next"
     />
+    <!-- What making an account agrees to; the version in force is kept on the account. -->
+    <p
+      v-if="!sent && me?.signIn?.openSignUp"
+      class="mt-4 text-sm text-muted"
+    >
+      {{ t('core.sign-in.page.terms.before') }}
+      <ULink
+        to="/policies/terms"
+        class="underline underline-offset-2"
+      >{{ t('core.sign-in.page.terms.terms') }}</ULink>
+      {{ t('core.sign-in.page.terms.between') }}
+      <ULink
+        to="/policies/privacy"
+        class="underline underline-offset-2"
+      >{{ t('core.sign-in.page.terms.privacy') }}</ULink>{{ t('core.sign-in.page.terms.after') }}
+    </p>
   </IdentityCard>
 </template>
