@@ -9,6 +9,10 @@ import type { UnitView } from '#kit'
 import { inAccountScope } from '#kit/accounts'
 
 export type Side = 'audience' | 'members'
+/** Which messages a list or count covers: one side, or every side the person has (the one inbox, AC-2). */
+export type Sides = Side | readonly Side[]
+
+const sidesSql = (sides: Sides) => (typeof sides === 'string' ? sql`side = ${sides}` : sql`side IN (SELECT value FROM json_each(${JSON.stringify(sides)}))`)
 
 export interface InboxItem {
   id: string
@@ -29,21 +33,21 @@ interface Row { id: string, title: string, body: string | null, link: string | n
 
 const item = (r: Row): InboxItem => ({ id: r.id, title: r.title, body: r.body, link: r.link, read: r.read_at !== null, archived: r.archived_at !== null, createdAt: r.created_at })
 
-/** How many unread, unarchived messages the person has on one side: the bell's number. */
-export async function unreadCount(accountId: string, side: Side): Promise<number> {
+/** How many unread, unarchived messages the person has on these sides: the bell's number. */
+export async function unreadCount(accountId: string, side: Sides): Promise<number> {
   const row = await useDb().get<{ n: number }>(sql`SELECT count(*) AS n FROM core_inbox_items
-    WHERE ${inAccountScope('account_id', accountId)} AND side = ${side} AND read_at IS NULL AND archived_at IS NULL AND expires_at > ${nowMs()}`)
+    WHERE ${inAccountScope('account_id', accountId)} AND ${sidesSql(side)} AND read_at IS NULL AND archived_at IS NULL AND expires_at > ${nowMs()}`)
   return row?.n ?? 0
 }
 
 /** One page of messages, newest first: the current ones, or the archived ones. `before` is the last one's id. */
-export async function listInbox(accountId: string, side: Side, options: { archived?: boolean, before?: string, size: number }): Promise<InboxPage> {
+export async function listInbox(accountId: string, side: Sides, options: { archived?: boolean, before?: string, size: number }): Promise<InboxPage> {
   const now = nowMs()
   const after = options.before
     ? await useDb().get<{ created_at: number }>(sql`SELECT created_at FROM core_inbox_items WHERE id = ${options.before} AND ${inAccountScope('account_id', accountId)}`)
     : undefined
   const rows = await useDb().all<Row>(sql`SELECT id, title, body, link, read_at, archived_at, created_at FROM core_inbox_items
-    WHERE ${inAccountScope('account_id', accountId)} AND side = ${side} AND expires_at > ${now}
+    WHERE ${inAccountScope('account_id', accountId)} AND ${sidesSql(side)} AND expires_at > ${now}
       AND archived_at IS ${options.archived ? sql`NOT NULL` : sql`NULL`}
       ${after ? sql`AND (created_at < ${after.created_at} OR (created_at = ${after.created_at} AND id < ${options.before!}))` : sql``}
     ORDER BY created_at DESC, id DESC LIMIT ${options.size + 1}`)
@@ -62,10 +66,10 @@ export function markRead(unit: UnitView, accountId: string, id: string): void {
     WHERE id = ${id} AND ${inAccountScope('account_id', accountId)} AND expires_at > ${nowMs()}`).expect(1, NOT_FOUND)
 }
 
-/** Every unread message on one side, read. */
-export function markAllRead(unit: UnitView, accountId: string, side: Side): void {
+/** Every unread message on these sides, read. */
+export function markAllRead(unit: UnitView, accountId: string, side: Sides): void {
   unit.add(sql`UPDATE core_inbox_items SET read_at = ${nowMs()}
-    WHERE ${inAccountScope('account_id', accountId)} AND side = ${side} AND read_at IS NULL AND archived_at IS NULL`)
+    WHERE ${inAccountScope('account_id', accountId)} AND ${sidesSql(side)} AND read_at IS NULL AND archived_at IS NULL`)
 }
 
 /** Archive a message, or bring it back (the toast's Undo). Archiving marks it read. */
@@ -74,4 +78,9 @@ export function setArchived(unit: UnitView, accountId: string, id: string, archi
   unit.add(archived
     ? sql`UPDATE core_inbox_items SET archived_at = ${at}, read_at = coalesce(read_at, ${at}) WHERE id = ${id} AND ${inAccountScope('account_id', accountId)} AND expires_at > ${at}`
     : sql`UPDATE core_inbox_items SET archived_at = NULL WHERE id = ${id} AND ${inAccountScope('account_id', accountId)} AND expires_at > ${at}`).expect(1, NOT_FOUND)
+}
+
+/** The sides a person's one inbox shows: the members' side too for a member. */
+export function sidesOf(member: boolean): Side[] {
+  return member ? ['audience', 'members'] : ['audience']
 }
