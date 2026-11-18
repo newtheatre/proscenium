@@ -150,6 +150,10 @@ describe('exchanging tickets', () => {
     expect(await balance(DEFERRED, h.performanceId)).toBe(-2400)
     expect(await codesSent(o.orderId, 'box-office.order-exchanged')).toHaveLength(2)
     expect((await rows<{ state: string }>('SELECT state FROM box_office_exchanges WHERE order_id = ? ORDER BY created_at', o.orderId)).map(r => r.state)).toEqual(['released', 'completed'])
+    // The till shows the booking it took the difference on, as it does a sale.
+    const sold = await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, manager)
+    expect(sold.status, JSON.stringify(sold.body)).toBe(200)
+    expect(sold.body.orders.map((x: { orderId: string }) => x.orderId)).toEqual([o.orderId])
 
     // Cancelling it all refunds the whole price, from both payments: the difference first, then the rest.
     const cancelled = await req('POST', `/api/box-office/orders/${o.orderId}/cancel`, { refund: 'full', reasonTermId: reason }, manager)
