@@ -403,6 +403,12 @@ a layout, not a shell, and it has no navigation of its own.
   screens under its address, exactly as in the other shells. An ability held through a fact (such as
   being on shift) counts. Whoever holds the ability of at least one live entry gets the `live` side in
   the viewer and "Tonight" first in the account menu; for anyone else `/live` does not exist.
+- **The Tonight hub** (`/live`) lists the performances of the theatre's operating day (so a show
+  that runs past midnight stays until `core.locale.day-start`), each with its start time and the
+  figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
+  `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
+  minor units): Box office gives sold and in, Payments what the tills have taken. The screens'
+  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.

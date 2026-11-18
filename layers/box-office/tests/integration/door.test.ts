@@ -122,6 +122,31 @@ describe('scanning at the door', () => {
     expect(ids).toContain(today.performanceId)
     expect(ids).not.toContain(h.performanceId)
     expect((await tonight(person([]))).body.performances).toEqual([])
+
+    // The Tonight hub lists the day's performances with Box office's figures for whoever may admit.
+    const hub = await req('GET', '/api/core/live/tonight', undefined, steward)
+    expect(hub.status, JSON.stringify(hub.body)).toBe(200)
+    const listed = hub.body.performances.find((p: { id: string }) => p.id === today.performanceId)
+    expect(listed.figures).toEqual([
+      expect.objectContaining({ id: 'box-office.sold', value: 0, state: 'ok' }),
+      expect.objectContaining({ id: 'box-office.in', value: 0, to: `/live/door/${today.performanceId}` }),
+    ])
+    expect((await req('GET', '/api/core/live/tonight', undefined, person([]))).status).toBe(403)
+  })
+
+  it('keeps a late show at the door after midnight, until the theatre\'s day starts', async () => {
+    // 22:30 in London, and the clock moved on to 01:00 the next morning.
+    const late = await house(4, { startsAt: NOV_16 + 10.5 * 3_600_000 })
+    try {
+      setClock(NOV_16 + 13 * 3_600_000)
+      const ids = (await req('GET', '/api/box-office/door/tonight', undefined, steward)).body.performances.map((p: { id: string }) => p.id)
+      expect(ids).toContain(late.performanceId)
+      setClock(NOV_16 + 17 * 3_600_000)
+      expect((await req('GET', '/api/box-office/door/tonight', undefined, steward)).body.performances.map((p: { id: string }) => p.id)).not.toContain(late.performanceId)
+    }
+    finally {
+      setClock(NOV_16)
+    }
   })
 
   it('is for people who may admit', async () => {
