@@ -8,6 +8,8 @@ const { t } = useT()
 const { nameOf, listOf, screensOf } = useModuleWords()
 const screens = computed(() => props.view ? screensOf(props.view) : [])
 const version = computed(() => props.view ? [props.view.since, ...(props.view.stability === 'stable' ? [] : [t(`core.modules.stability.${props.view.stability}`).toLocaleLowerCase('en-GB')])].join(', ') : '')
+// What it uses, and the modules that add to it (Box office's figures on Front of house's board).
+const partners = computed(() => props.view ? [...props.view.uses, ...(props.view.worksWith ?? [])] : [])
 const needed = (n: 'always' | 'when-used' | 'optional') => t(`core.modules.about.needed.${n}`)
 </script>
 
@@ -26,16 +28,16 @@ const needed = (n: 'always' | 'when-used' | 'optional') => t(`core.modules.about
         <dt class="text-muted">
           {{ t('core.modules.about.requires') }}
         </dt>
-        <dd>{{ view.requires.length ? listOf(view.requires.map(nameOf)) : t('core.modules.about.nothing') }}</dd>
+        <dd>{{ view.requires.length ? listOf(view.requires.map(nameOf)) : module === 'core' ? t('core.modules.about.nothing') : t('core.modules.about.core-only') }}</dd>
         <dt class="text-muted">
           {{ t('core.modules.about.required-by') }}
         </dt>
         <dd>{{ view.requiredBy.length ? listOf(view.requiredBy.map(nameOf)) : t('core.modules.about.nothing') }}</dd>
-        <template v-if="view.uses.length">
+        <template v-if="partners.length">
           <dt class="text-muted">
             {{ t('core.modules.about.uses') }}
           </dt>
-          <dd>{{ listOf(view.uses.map(nameOf)) }}</dd>
+          <dd>{{ listOf(partners.map(nameOf)) }}</dd>
         </template>
         <dt class="text-muted">
           {{ t('core.modules.about.since') }}
