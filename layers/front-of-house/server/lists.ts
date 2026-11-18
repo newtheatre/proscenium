@@ -90,22 +90,25 @@ export interface MyShift { assignmentId: string, shiftId: string, state: string,
 /** The person's coming shifts, then past ones, and their minutes worked this calendar year. */
 export async function myShifts(accountId: string): Promise<{ coming: MyShift[], givenUp: MyShift[], past: MyShift[], minutesThisYear: number }> {
   const at = nowMs()
-  const rows = await all<{ id: string, shift_id: string, state: string, performance_id: string | null, production_title: string | null, title: string | null, duty_name: string, call_at: number, ends_at: number, window_closes_at: number, minutes_worked: number | null }>(
-    `SELECT a.id, a.shift_id, a.state, s.performance_id, p.title AS production_title, s.title, d.name AS duty_name, s.call_at, s.ends_at, s.window_closes_at, a.minutes_worked
+  const rows = await all<{ id: string, shift_id: string, state: string, performance_id: string | null, production_title: string | null, title: string | null, duty_name: string, call_at: number, ends_at: number, window_closes_at: number, minutes_worked: number | null, shift_state: string }>(
+    `SELECT a.id, a.shift_id, a.state, s.state AS shift_state, s.performance_id, p.title AS production_title, s.title, d.name AS duty_name, s.call_at, s.ends_at, s.window_closes_at, a.minutes_worked
        FROM front_of_house_assignments a JOIN front_of_house_shifts s ON s.id = a.shift_id JOIN front_of_house_duties d ON d.id = s.duty_id
        LEFT JOIN core_performances f ON f.id = s.performance_id LEFT JOIN core_productions p ON p.id = f.production_id
       WHERE a.account_id IN (${accountScopeSql('?1')}) AND a.state NOT IN ('declined', 'withdrawn')
       ORDER BY s.call_at DESC LIMIT ?2`,
     accountId, LIMIT)
-  const map = (r: typeof rows[number]): MyShift => ({ assignmentId: r.id, shiftId: r.shift_id, state: r.state, performanceId: r.performance_id, productionTitle: r.production_title, title: r.title, dutyName: r.duty_name, callAt: r.call_at, endsAt: r.ends_at, minutesWorked: r.minutes_worked })
+  // A shift the theatre cancelled reads as cancelled, not as given up by the person.
+  const map = (r: typeof rows[number]): MyShift => ({ assignmentId: r.id, shiftId: r.shift_id, state: r.shift_state === 'cancelled' && r.state === 'released' ? 'cancelled' : r.state, performanceId: r.performance_id, productionTitle: r.production_title, title: r.title, dutyName: r.duty_name, callAt: r.call_at, endsAt: r.ends_at, minutesWorked: r.minutes_worked })
   const yearOf = new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: await theatreTimeZone() })
   const year = yearOf.format(at)
   const inYear = (t: number) => yearOf.format(t) === year
+  const RESOLVED = ['worked', 'no_show']
   return {
     coming: rows.filter(r => r.window_closes_at >= at && (LIVE_STATES as readonly string[]).includes(r.state)).map(map).reverse(),
     // Places given up or taken away on shifts still to come are not "past": they are not on the person's rota.
-    givenUp: rows.filter(r => r.window_closes_at >= at && !(LIVE_STATES as readonly string[]).includes(r.state)).map(map).reverse(),
-    past: rows.filter(r => r.window_closes_at < at).map(map),
+    // A night already resolved (worked or did not come) is past, even before its window closes.
+    givenUp: rows.filter(r => r.window_closes_at >= at && !(LIVE_STATES as readonly string[]).includes(r.state) && !RESOLVED.includes(r.state)).map(map).reverse(),
+    past: rows.filter(r => r.window_closes_at < at || RESOLVED.includes(r.state)).map(map),
     minutesThisYear: rows.filter(r => r.state === 'worked' && inYear(r.call_at)).reduce((sum, r) => sum + (r.minutes_worked ?? 0), 0),
   }
 }

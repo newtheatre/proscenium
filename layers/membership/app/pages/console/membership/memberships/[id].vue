@@ -6,11 +6,12 @@
 definePageMeta({ layout: 'console' })
 
 interface Detail {
-  membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, lengthRule: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number }
+  membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, lengthRule: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number, responseId: string | null, awaitingApproval: boolean }
   number: string | null
   canChangeDates: boolean
+  canEditFields: boolean
   feesOn: boolean
-  checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null }[]
+  checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null, reference: string | null, noun: string | null }[]
 }
 
 const route = useRoute()
@@ -37,6 +38,15 @@ const facts = computed(() => {
     ...(x.endedAt ? [{ label: t('membership.membership.ended'), value: `${dateTime(x.endedAt)} (${t(`membership.membership.end-reasons.${x.endReason}`)})` }] : []),
   ]
 })
+
+// The application form's response, as forms names it, for those who may read responses (MEM-12).
+const answers = ref<{ title: string, to: string | null } | null>(null)
+watch(() => m.value?.responseId, async (responseId) => {
+  answers.value = null
+  if (!responseId) return
+  const found = await $api<{ records: { title: string, to: string | null }[] }>('/api/core/records', { query: { type: 'forms.response', ids: responseId } }).catch(() => ({ records: [] }))
+  answers.value = found.records[0] ?? null
+}, { immediate: true })
 
 const ending = ref(false)
 const note = ref('')
@@ -180,6 +190,36 @@ async function saveDates() {
           />
         </PageSection>
         <PageSection
+          v-if="data.canEditFields"
+          :title="t('membership.membership.fields')"
+        >
+          <FormsRecordFields
+            slot-id="membership.member-fields"
+            :subject="m.id"
+          />
+        </PageSection>
+        <PageSection
+          v-if="m.responseId"
+          :title="t('membership.membership.application')"
+          :description="m.awaitingApproval ? t('membership.membership.awaiting-approval') : undefined"
+        >
+          <UButton
+            v-if="answers?.to"
+            color="neutral"
+            variant="link"
+            class="px-0"
+            icon="i-lucide-file-text"
+            :to="answers.to"
+            :label="t('membership.membership.open-answers', { title: answers.title })"
+          />
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            {{ t('membership.membership.answers-hidden') }}
+          </p>
+        </PageSection>
+        <PageSection
           v-if="m.note"
           :title="t('membership.membership.note')"
         >
@@ -224,7 +264,7 @@ async function saveDates() {
               v-for="(c, i) in data.checks"
               :key="i"
               :name="t(`membership.membership.outcomes.${c.outcome}`)"
-              :description="[dateTime(c.createdAt), t(`membership.screens.verifiers.${c.verifier}`), c.listName ? t('membership.membership.from-list', { list: c.listName }) : '', c.listedAs ? t('membership.membership.listed-as', { name: c.listedAs }) : '', c.decidedBy ? t('membership.membership.by', { name: c.decidedBy }) : '', c.note ?? ''].filter(Boolean).join(' · ')"
+              :description="[dateTime(c.createdAt), t(`membership.screens.verifiers.${c.verifier}`), c.listName ? t('membership.membership.from-list', { list: c.listName }) : '', c.reference ? t('membership.membership.reference', { noun: c.noun ?? t('membership.membership.reference-noun'), reference: c.reference }) : '', c.listedAs ? t('membership.membership.listed-as', { name: c.listedAs }) : '', c.decidedBy ? t('membership.membership.by', { name: c.decidedBy }) : '', c.note ?? ''].filter(Boolean).join(' · ')"
             />
           </RecordList>
         </PageSection>

@@ -2,10 +2,11 @@
 // membership exists (S2). Other changes apply to memberships written afterwards (S3).
 import { getRouterParam } from 'h3'
 import { defineRoute, nowMs, refuse } from '#kit'
+import { slotDecides } from '#modules/forms'
 import { getList } from '../../../lists'
 import { charger } from '../../../charge'
 import { convertCount } from '../../../dates'
-import { checkLengthRule, hasMemberships, lengthOptions, requireScheme, schemeFields, verifierConfig } from '../../../schemes'
+import { APPLICATION_SLOT, checkLengthRule, hasMemberships, lengthOptions, requireScheme, schemeFields, verifierConfig } from '../../../schemes'
 
 const COLUMN: Record<string, string> = {
   key: 'key', name: 'name', summary: 'summary', side: 'side', joinMode: 'join_mode', lengthRule: 'length_rule', fixedEndMonth: 'fixed_end_month',
@@ -31,6 +32,9 @@ export default defineRoute({
   if (input.side !== undefined && input.side !== scheme.side && await hasMemberships(scheme.id))
     refuse('membership.scheme.side-fixed', 'The side cannot change once anybody has held this scheme: it would give or take away the members\' area for all of them.', { status: 409, remedy: 'Close this scheme and open another on the other side.', fields: { side: 'membership.scheme.side-fixed' } })
   if (input.requiresPayment && !scheme.requiresPayment && !(await charger())) refuseFeesOff()
+  // An open scheme that starts approving would turn everybody away until a form can approve them.
+  if (input.needsApproval && !scheme.needsApproval && scheme.state !== 'draft' && !(await slotDecides(APPLICATION_SLOT, scheme.id)))
+    refuse('membership.scheme.needs-application-form', 'Approval needs an application form whose workflow can approve or decline.', { status: 409, remedy: 'Attach the form under Application form first, then switch approval on.', fields: { needsApproval: 'membership.scheme.needs-application-form' } })
   const merged = { ...scheme, ...input }
   if (input.lengthRule !== undefined || input.fixedEndMonth !== undefined || input.fixedEndDay !== undefined) checkLengthRule(merged)
   // Lengths are a bare count in the rule's unit (months, or scheme years), so a change between the two

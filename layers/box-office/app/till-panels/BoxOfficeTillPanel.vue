@@ -10,7 +10,7 @@ interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, t
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
-interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
+interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired', released: boolean, currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
 
 /** `settled`: the till payment just taken that this panel sold something in, until the next customer. */
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
@@ -362,6 +362,24 @@ async function find(text = query.value) {
   }
 }
 
+// A reservation released unpaid, whose buyer has come after all: reserved again if seats are free.
+async function reinstate() {
+  if (!order.value) return
+  const reference = order.value.reference
+  busy.value = true
+  refusal.value = null
+  try {
+    await $api(`/api/box-office/orders/${order.value.orderId}/reinstate` as string, { method: 'POST', body: {} })
+    await find(reference)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = false
+  }
+}
+
 async function amend(body: Record<string, unknown>) {
   if (!order.value) return
   busy.value = true
@@ -689,6 +707,15 @@ function clear() {
         </li>
       </ul>
       <UAlert
+        v-if="order.released"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-clock-alert"
+        :title="t('box-office.screens.panel.released.title')"
+        :description="t('box-office.screens.panel.released.description')"
+        :actions="locked ? [] : [{ label: t('box-office.screens.panel.released.seat'), color: 'primary', loading: busy, onClick: () => { void reinstate() } }]"
+      />
+      <UAlert
         v-if="order.state === 'awaiting_payment' && order.intentId && !locked"
         color="warning"
         variant="subtle"
@@ -761,7 +788,10 @@ function clear() {
         icon="i-lucide-split"
         :description="t('box-office.screens.panel.split-rest', { reference: rest.reference, amount: money(rest.amountMinor, rest.currency) })"
       />
-      <p class="font-medium">
+      <p
+        v-if="!order.released"
+        class="font-medium"
+      >
         {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
       </p>
       <!-- While the booking is in the sale, the receipt's Clear puts it away; one Clear at a time. -->

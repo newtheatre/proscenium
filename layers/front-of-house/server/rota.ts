@@ -3,7 +3,7 @@
 // following the performance when the core moves or cancels it. A write that reaches many people is
 // set-wise; nobody is told twice about one change.
 import { all, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
-import { getPerformance, holdersOf, notify } from '#modules/core'
+import { getPerformance, holdersOf, notify, placeName } from '#modules/core'
 import { LIVE_STATES } from './db/schema'
 import { getShift, shiftTimes, type DutyInput, type Shift } from './shifts'
 import { formatter, partFormatters, shiftDetails, shiftWords } from './words'
@@ -224,7 +224,7 @@ export async function performanceCancelled(unit: UnitView, performanceId: string
 export async function performanceMoved(unit: UnitView, performanceId: string, eventId: string): Promise<void> {
   const performance = await getPerformance(performanceId)
   unit.add({ sql: 'UPDATE front_of_house_shifts SET venue_id = ?, updated_at = ? WHERE performance_id = ? AND state IN (\'draft\', \'published\')', params: [performance.venueId, nowMs(), performanceId] })
-  await tellPeople(unit, await liveShiftsOf(performanceId), `${performance.venueName}, ${performance.spaceName}`, eventId)
+  await tellPeople(unit, await liveShiftsOf(performanceId), await placeName(performance.spaceId) ?? performance.venueName, eventId)
 }
 
 /** core.performance.rescheduled: tell everyone on a shift of the performance its new call time. */

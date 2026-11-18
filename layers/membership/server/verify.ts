@@ -9,14 +9,19 @@ import { accountScopeSql } from '#kit/accounts'
 import { endedOn, findEntry, namesAgree, normalise, nounOf, schemeList, wellFormed, type ListRow, type Shape } from './lists'
 import { verifierConfig, type Scheme } from './schemes'
 
-export interface ListPass { entryId: string, endsOn: string | null, holderName?: string | null, claimed?: boolean }
+export interface ListPass { entryId: string, endsOn: string | null, holderName?: string | null, claimed?: boolean, reference?: string }
 
 export type Outcome
-  = | { outcome: 'passed', verifier: string, entryId?: string, endsOn?: string | null }
-    | { outcome: 'needs-staff' | 'failed', verifier: string, reason: string, entryId?: string }
+  = | { outcome: 'passed', verifier: string, entryId?: string, endsOn?: string | null, reference?: string }
+    | { outcome: 'needs-staff' | 'failed', verifier: string, reason: string, entryId?: string, reference?: string }
 
 /** Runs the scheme's verifier for somebody joining. Refuses on a failure; null when nothing is checked. */
-export async function runVerifier(scheme: Scheme, accountId: string, reference: string | null | undefined, day: string): Promise<Outcome | null> {
+/**
+ * Runs the scheme's check. With `askStaff`, a well-formed reference the list does not hold waits for
+ * staff (reason `not-on-list`) instead of being refused: for somebody whose ID the issuer's file has
+ * not caught up with. Passing it can add the ID to the list (Matt, 2026-11-17).
+ */
+export async function runVerifier(scheme: Scheme, accountId: string, reference: string | null | undefined, day: string, askStaff = false): Promise<Outcome | null> {
   if (!scheme.verifier) return null
   if (scheme.verifier === 'membership.staff') return { outcome: 'needs-staff', verifier: scheme.verifier, reason: 'staff-check' }
   if (scheme.verifier === 'membership.email-domain') {
@@ -33,15 +38,18 @@ export async function runVerifier(scheme: Scheme, accountId: string, reference: 
     // and a mismatch waits for staff rather than claiming the entry.
     if (!pass.claimed && pass.holderName) {
       const account = await first<{ name: string | null }>('SELECT name FROM core_accounts WHERE id = ?', accountId)
-      if (!namesAgree(pass.holderName, account?.name ?? null)) return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'name-differs', entryId: pass.entryId }
+      if (!namesAgree(pass.holderName, account?.name ?? null)) return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'name-differs', entryId: pass.entryId, reference: pass.reference }
     }
-    return { outcome: 'passed', verifier: 'membership.list', entryId: pass.entryId, endsOn: pass.endsOn }
+    return { outcome: 'passed', verifier: 'membership.list', entryId: pass.entryId, endsOn: pass.endsOn, reference: pass.reference }
   }
   catch (error) {
     // V4: an entry somebody else claimed waits for staff rather than refusing.
-    if ((error as { code?: string }).code !== 'membership.join.entry-already-used') throw error
+    const code = (error as { code?: string }).code
+    if (code === 'membership.join.not-on-list' && askStaff && list!.keyKind === 'reference')
+      return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'not-on-list', reference: normalise('reference', reference!) }
+    if (code !== 'membership.join.entry-already-used') throw error
     const entry = await findEntry(list!, reference!, day)
-    return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'entry-already-used', entryId: entry?.id }
+    return { outcome: 'needs-staff', verifier: 'membership.list', reason: 'entry-already-used', entryId: entry?.id, reference: list!.keyKind === 'reference' ? normalise('reference', reference!) : undefined }
   }
 }
 
@@ -53,8 +61,8 @@ async function verifiedAddresses(accountId: string): Promise<string[]> {
 /** The row every outcome writes (V1), in the unit that writes the membership. */
 export function recordOutcome(unit: UnitView, membershipId: string, outcome: Outcome, decidedBy: string | null = null, note: string | null = null): void {
   unit.add({
-    sql: 'INSERT INTO membership_verifications (id, membership_id, verifier, outcome, reason, entry_id, decided_by, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    params: [newId('mver'), membershipId, outcome.verifier, outcome.outcome, outcome.outcome === 'passed' ? null : outcome.reason, outcome.entryId ?? null, decidedBy, note, nowMs()],
+    sql: 'INSERT INTO membership_verifications (id, membership_id, verifier, outcome, reason, entry_id, reference, decided_by, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [newId('mver'), membershipId, outcome.verifier, outcome.outcome, outcome.outcome === 'passed' ? null : outcome.reason, outcome.entryId ?? null, outcome.reference ?? null, decidedBy, note, nowMs()],
   }).expect(1)
 }
 
@@ -99,7 +107,7 @@ export async function passList(list: ListRow, accountId: string, reference: stri
     // V4: somebody else claimed it. Staff settle that; the application queue is a later slice.
     if (!ours.length) refuse('membership.join.entry-already-used', `That ${noun} has already been used to join. Contact us and we will sort it out.`, { status: 409, remedy: help })
   }
-  return { entryId: entry!.id, endsOn: entry!.endsOn, holderName: entry!.holderName, claimed: !!entry!.usedBy }
+  return { entryId: entry!.id, endsOn: entry!.endsOn, holderName: entry!.holderName, claimed: !!entry!.usedBy, reference: list.keyKind === 'reference' ? normalise('reference', reference!) : undefined }
 }
 
 /** Claims the entry for the new membership and records the check. In the joining unit. */
@@ -108,5 +116,5 @@ export function recordPass(unit: UnitView, membershipId: string, accountId: stri
     sql: `UPDATE membership_verification_entries SET used_by = ?1 WHERE id = ?2 AND (used_by IS NULL OR used_by IN (SELECT id FROM membership_memberships WHERE account_id IN (${accountScopeSql('?3')})))`,
     params: [membershipId, pass.entryId, accountId],
   }).expect(1, { code: 'membership.join.entry-already-used', reason: 'That reference has just been used to join by somebody else.', remedy: 'Contact us and we will sort it out.' })
-  recordOutcome(unit, membershipId, { outcome: 'passed', verifier: 'membership.list', entryId: pass.entryId })
+  recordOutcome(unit, membershipId, { outcome: 'passed', verifier: 'membership.list', entryId: pass.entryId, reference: pass.reference })
 }

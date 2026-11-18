@@ -1,5 +1,6 @@
 // Accounts and addresses: finding the account behind an address, making one on first proof,
 // following a merge to the survivor, and the label other modules show for a person.
+import { currentVersion } from '../policies/versions'
 import { all, first, newId, nowMs, type UnitView } from '#kit'
 
 export interface AccountRow {
@@ -80,6 +81,8 @@ export async function accountForProvenAddress(unit: UnitView, address: string, o
   // An account first proven through Google is still one the person made themselves.
   const accountOrigin = origin === 'provider' ? 'self' : origin
   const existing = await addressRow(normal)
+  // What the person agrees to by making the account theirs: the terms of use as they read now.
+  const terms = async () => (await currentVersion('terms'))?.id ?? null
   if (existing) {
     const account = await accountById(existing.account_id)
     if (!existing.verified_at) {
@@ -88,7 +91,7 @@ export async function accountForProvenAddress(unit: UnitView, address: string, o
     }
     const claimed = !account?.first_signed_in_at
     if (claimed) {
-      unit.add({ sql: 'UPDATE core_accounts SET first_signed_in_at = ? WHERE id = ? AND first_signed_in_at IS NULL', params: [at, existing.account_id] })
+      unit.add({ sql: 'UPDATE core_accounts SET first_signed_in_at = ?, terms_version_id = ? WHERE id = ? AND first_signed_in_at IS NULL', params: [at, await terms(), existing.account_id] })
       unit.announce('core.account.claimed', { accountId: existing.account_id }, { record: ['core.account', existing.account_id] })
     }
     if (account && !account.audience_email_id) unit.add({ sql: 'UPDATE core_accounts SET audience_email_id = ? WHERE id = ? AND audience_email_id IS NULL', params: [existing.id, existing.account_id] })
@@ -97,8 +100,8 @@ export async function accountForProvenAddress(unit: UnitView, address: string, o
   const accountId = newId('acc')
   const emailId = newId('aem')
   unit.add({
-    sql: 'INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at, audience_email_id) VALUES (?, ?, ?, ?, ?, ?)',
-    params: [accountId, options.name ?? null, accountOrigin, at, at, emailId],
+    sql: 'INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at, audience_email_id, terms_version_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    params: [accountId, options.name ?? null, accountOrigin, at, at, emailId, await terms()],
   })
   // The unique address is the lock: if a second request made an account for this address a
   // moment ago, this insert fails and the whole unit with it, rather than making a second account.

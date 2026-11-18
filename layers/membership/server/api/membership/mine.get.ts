@@ -6,6 +6,7 @@
 // again), from the scheme itself: a closed scheme is renewed but is not among the open schemes.
 import { all, defineRoute, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
+import { recordFieldColumns } from '#modules/forms'
 import { derivedStatus } from '../../dates'
 import { memberNumber, todayOrNull } from '../../memberships'
 import { renewalWindow } from '../../renewal'
@@ -30,8 +31,9 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
       ORDER BY m.starts_on DESC, m.id`,
     accountId,
   )
-  const pending = await all<{ id: string, schemeId: string, schemeName: string, appliedAt: number, expiresAt: number | null, waitingOnStaff: number, reason: string | null }>(
+  const pending = await all<{ id: string, schemeId: string, schemeName: string, appliedAt: number, expiresAt: number | null, waitingOnStaff: number, waitingOnApproval: number, reason: string | null }>(
     `SELECT m.id, m.scheme_id AS schemeId, s.name AS schemeName, m.created_at AS appliedAt, m.expires_at AS expiresAt, (m.needs_verification = 1 AND m.verified_at IS NULL) AS waitingOnStaff,
+            (m.needs_approval = 1 AND m.approved_at IS NULL) AS waitingOnApproval,
             (SELECT v.reason FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC, v.id DESC LIMIT 1) AS reason
        FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id
       WHERE m.account_id IN (${accountScopeSql('?1')}) AND m.state = 'pending' ORDER BY m.created_at`,
@@ -80,10 +82,13 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     number: await memberNumber(accountId),
     // Whether My membership offers the card (membership.card.show); the code itself comes from Box office.
     card: await useSetting('membership.card.show') !== false,
-    // An open application waits on staff's check, or on its fee (A2: never both at once for the person).
-    applications: await Promise.all(pending.map(async ({ waitingOnStaff, ...p }) => {
+    // MEM-34: whether the theatre keeps details about its members, which a holder fills in here.
+    fields: (await recordFieldColumns('membership.member-fields')).length > 0,
+    // An open application waits on staff's check, its form's decision, or its fee (A2: never two at once for the person).
+    applications: await Promise.all(pending.map(async ({ waitingOnStaff, waitingOnApproval, ...p }) => {
       const charge = await fees?.status(p.id) ?? null
-      return { ...p, waiting: waitingOnStaff || !charge || charge.state !== 'open' ? 'staff' as const : 'payment' as const, charge }
+      const waiting = waitingOnStaff ? 'staff' as const : waitingOnApproval ? 'approval' as const : !charge || charge.state !== 'open' ? 'staff' as const : 'payment' as const
+      return { ...p, waiting, charge }
     })),
     memberships,
   }

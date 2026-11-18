@@ -9,9 +9,10 @@
 // the reserving. That link holds a random token and nothing else: its hash is on the basket with
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
+import { stampTerms } from './terms'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
-import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress } from '#modules/core'
+import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress, placeName } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
@@ -19,7 +20,7 @@ import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
 import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
-import { salesOf } from './setup'
+import { releaseTime, salesOf } from './setup'
 import { doorCodesForOrder, ticketNumbers } from './tickets'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
@@ -130,13 +131,13 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
 async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean, madeWith?: { address: string } | null): Promise<Reserved | Confirmed> {
+  await stampTerms(unit, order.id)
   // An order with nothing to pay never rests reserved: it is confirmed and its tickets issued at once.
   if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith } })
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
-  const releaseBefore = await useSetting('box-office.reservations.release-before') as number | null
   const words = await wordsFor(order, lines, order.total_minor)
-  const releaseAt = releaseBefore === null ? null : words.startsAt - releaseBefore * 1000 // not-policy: seconds to milliseconds
+  const releaseAt = await releaseTime(words.startsAt, (await salesOf(lines[0]!.performance_id))?.releaseMinutes ?? null)
 
   const byPerformance = new Map<string, number>()
   for (const line of lines) byPerformance.set(line.performance_id, (byPerformance.get(line.performance_id) ?? 0) + 1)
@@ -220,7 +221,7 @@ export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<
     productionSlug: production.slug,
     startsAt: performance.startsAt,
     endsAt: performance.endsAt,
-    venue: `${performance.venueName}, ${performance.spaceName}`,
+    venue: await placeName(performance.spaceId) ?? performance.venueName,
     venueSlug: listed ? venue!.slug : null,
     address,
     cancelled: performance.state === 'cancelled',

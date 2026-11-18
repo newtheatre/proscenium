@@ -1,0 +1,1 @@
+ALTER TABLE `membership_verification_entries` ADD `by_hand` integer DEFAULT false NOT NULL;

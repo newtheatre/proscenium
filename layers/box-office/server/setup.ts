@@ -2,7 +2,7 @@
 // story BO-01). Box office owns the sales record and the pools that divide the house into bands;
 // the core owns the performance and its capacity. Every guard is on the statement that it guards.
 import { sql } from 'drizzle-orm'
-import { all, can, first, newId, nowMs, refuse, type Actor, type UnitView } from '#kit'
+import { all, can, first, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { houseOf, reapply, setPerformanceChoice, type ChoiceInput } from './layouts'
@@ -19,6 +19,8 @@ export interface SalesRecord {
   offSaleAt: number | null
   maxPerOrder: number | null
   holdMinutes: number | null
+  /** Minutes before the start that unpaid reservations are released; null means the setting's. */
+  releaseMinutes: number | null
   paymentTiming: 'pay-now' | 'reserve' | 'buyer-chooses' | null
   /** The seating layout chosen or given (layouts.ts), or null. */
   layoutId: string | null
@@ -36,9 +38,19 @@ export const laidOut = (sales: SalesRecord | null) => !!sales && (sales.layoutId
 
 export interface Pool { id: string, bandId: string, bandName: string, bandKind: string, capacity: number, claimed: number }
 
-interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null, layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null, layout_own: number, seats_band_id: string | null }
+interface SalesRow { id: string, performance_id: string, seating: 'general' | 'allocated', state: SaleState, on_sale_at: number | null, off_sale_at: number | null, max_per_order: number | null, hold_minutes: number | null, release_minutes: number | null, payment_timing: 'pay-now' | 'reserve' | 'buyer-chooses' | null, layout_id: string | null, wheelchair_spaces: number | null, seats_per_space: number | null, layout_own: number, seats_band_id: string | null }
 
-const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, paymentTiming: r.payment_timing, layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, layoutOwn: !!r.layout_own, seatsBandId: r.seats_band_id })
+const toSales = (r: SalesRow): SalesRecord => ({ id: r.id, performanceId: r.performance_id, seating: r.seating, state: r.state, onSaleAt: r.on_sale_at, offSaleAt: r.off_sale_at, maxPerOrder: r.max_per_order, holdMinutes: r.hold_minutes, releaseMinutes: r.release_minutes, paymentTiming: r.payment_timing, layoutId: r.layout_id, wheelchairSpaces: r.wheelchair_spaces, seatsPerSpace: r.seats_per_space, layoutOwn: !!r.layout_own, seatsBandId: r.seats_band_id })
+
+/**
+ * When a performance's unpaid reservations are released: its own minutes before the start, or the
+ * setting's. Null when neither is set, and staff release them by hand.
+ */
+export async function releaseTime(startsAt: number, ownMinutes: number | null): Promise<number | null> {
+  if (ownMinutes !== null) return startsAt - ownMinutes * 60_000 // not-policy: minutes to milliseconds
+  const before = await useSetting('box-office.reservations.release-before') as number | null
+  return before === null ? null : startsAt - before * 1000 // not-policy: seconds to milliseconds
+}
 
 export async function salesOf(performanceId: string): Promise<SalesRecord | null> {
   const row = await first<SalesRow>('SELECT * FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
@@ -110,6 +122,7 @@ export interface SalesInput {
   offSaleAt?: number | null
   maxPerOrder?: number | null
   holdMinutes?: number | null
+  releaseMinutes?: number | null
   /** Says in so many words that the pools may hold more than the space does. */
   confirmOverVenue?: boolean
   /** Wheelchair spaces of its own (a copy's). Left out, a performance takes its run's or its space's usual. */
@@ -128,12 +141,19 @@ export async function saveSales(unit: UnitView, performanceId: string, input: Sa
   const before = await salesOf(performanceId)
   const has = (key: keyof SalesInput) => input[key] !== undefined
   unit.add({
-    sql: `INSERT INTO box_office_performance_sales (id, performance_id, seating, state, on_sale_at, off_sale_at, max_per_order, hold_minutes, created_at, updated_at)
-      VALUES (?, ?, 'general', 'draft', ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO box_office_performance_sales (id, performance_id, seating, state, on_sale_at, off_sale_at, max_per_order, hold_minutes, release_minutes, created_at, updated_at)
+      VALUES (?, ?, 'general', 'draft', ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (performance_id) DO UPDATE SET on_sale_at = CASE WHEN ? THEN excluded.on_sale_at ELSE on_sale_at END, off_sale_at = CASE WHEN ? THEN excluded.off_sale_at ELSE off_sale_at END,
-        max_per_order = CASE WHEN ? THEN excluded.max_per_order ELSE max_per_order END, hold_minutes = CASE WHEN ? THEN excluded.hold_minutes ELSE hold_minutes END, updated_at = excluded.updated_at`,
-    params: [newId('sale'), performanceId, input.onSaleAt ?? null, input.offSaleAt ?? null, input.maxPerOrder ?? null, input.holdMinutes ?? null, at, at, has('onSaleAt'), has('offSaleAt'), has('maxPerOrder'), has('holdMinutes')],
+        max_per_order = CASE WHEN ? THEN excluded.max_per_order ELSE max_per_order END, hold_minutes = CASE WHEN ? THEN excluded.hold_minutes ELSE hold_minutes END,
+        release_minutes = CASE WHEN ? THEN excluded.release_minutes ELSE release_minutes END, updated_at = excluded.updated_at`,
+    params: [newId('sale'), performanceId, input.onSaleAt ?? null, input.offSaleAt ?? null, input.maxPerOrder ?? null, input.holdMinutes ?? null, input.releaseMinutes ?? null, at, at, has('onSaleAt'), has('offSaleAt'), has('maxPerOrder'), has('holdMinutes'), has('releaseMinutes')],
   })
+  // Reservations already made move to the new release time; one marked to keep stays kept.
+  if (has('releaseMinutes')) {
+    const releaseAt = await releaseTime(performance.startsAt, input.releaseMinutes ?? null)
+    unit.add(sql`UPDATE box_office_orders SET release_at = ${releaseAt}, updated_at = ${at} WHERE state = 'reserved' AND id IN (
+      SELECT order_id FROM box_office_order_lines WHERE performance_id = ${performanceId} AND kind = 'ticket' AND state = 'live')`)
+  }
 
   const wanted = input.pools ?? []
   if (wanted.length) {

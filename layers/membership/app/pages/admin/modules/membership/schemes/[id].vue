@@ -26,6 +26,7 @@ interface Scheme {
   verifier: 'membership.staff' | 'membership.email-domain' | 'membership.list' | null
   verifierConfig: string | null
   requiresPayment: boolean
+  needsApproval: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
 interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, endsByList: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, feesModuleOn: boolean, canImport: boolean }
@@ -47,7 +48,7 @@ const missing = computed(() => (data.value?.checklist ?? []).filter(i => !i.done
 const unit = computed(() => t(`membership.screens.units.${scheme.value?.lengthRule === 'fixed' ? 'years' : 'months'}`))
 
 // Details: one form, saved as a whole.
-const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, requiresPayment: false, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
+const details = reactive({ name: '', key: '', summary: '', side: 'members' as Scheme['side'], joinMode: 'apply' as Scheme['joinMode'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, rolloverDays: 0, renewalOpensDays: 30, graceDays: 0, voting: false, holderMayEnd: true, requiresPayment: false, needsApproval: false, acceptsReference: false, checks: 'none' as 'none' | NonNullable<Scheme['verifier']>, listId: undefined as string | undefined, domains: '' })
 // The windows are stored as days and edited as a number and a unit, like the module's settings.
 const SECONDS_IN_DAY = 86400 // not-policy: seconds in a day
 const asDuration = (field: 'rolloverDays' | 'renewalOpensDays' | 'graceDays') => computed<number | null>({
@@ -397,6 +398,17 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
         </PageSection>
 
         <PageSection
+          v-if="scheme.joinMode === 'apply' && scheme.state !== 'archived'"
+          :title="t('membership.screens.scheme.application-form')"
+          :description="t(scheme.needsApproval ? 'membership.screens.scheme.application-form-approval' : 'membership.screens.scheme.application-form-help')"
+        >
+          <FormsSlotForms
+            slot-id="membership.application"
+            :subject="scheme.id"
+          />
+        </PageSection>
+
+        <PageSection
           :title="t('membership.screens.scheme.details')"
         >
           <UForm
@@ -547,6 +559,16 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                   {{ t('membership.screens.scheme.list-manage') }}
                 </ULink>
               </template>
+            </UFormField>
+            <UFormField
+              name="needsApproval"
+              :error="detailsRefusal?.fields?.needsApproval ? detailsRefusal.reason : undefined"
+            >
+              <USwitch
+                v-model="details.needsApproval"
+                :label="t('membership.screens.scheme.needs-approval')"
+                :description="t('membership.screens.scheme.needs-approval-help')"
+              />
             </UFormField>
             <USwitch
               :model-value="data.feesModuleOn && details.requiresPayment"

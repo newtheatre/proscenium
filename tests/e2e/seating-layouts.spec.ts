@@ -51,7 +51,9 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/core/performances/${performance.id}/schedule`, {})
   performanceId = performance.id
   const type = await post(api, '/api/box-office/ticket-types', { name: `Layout price ${stamp}` })
-  const band = await post(api, `/api/box-office/productions/${production.id}/bands`, { name: 'Stalls' })
+  // The theatre's usual ticket preset, if another test left one, may have made Stalls already.
+  const existing = (await (await api.get(`/api/box-office/productions/${production.id}/bands`)).json()).bands.find((b: { name: string }) => b.name === 'Stalls')
+  const band = existing ? { bandId: existing.id as string } : await post(api, `/api/box-office/productions/${production.id}/bands`, { name: 'Stalls' })
   expect((await api.put(`/api/box-office/performances/${performance.id}/sales`, { data: { pools: [{ bandId: band.bandId, capacity: 20 }] } })).ok()).toBe(true)
   await post(api, `/api/box-office/productions/${production.id}/prices`, { prices: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, amountMinor: 1000 }] })
   await post(api, '/api/payments/providers', { provider: 'cash', label: `Layout cash ${stamp}`, channels: ['desk'], mode: 'live' })

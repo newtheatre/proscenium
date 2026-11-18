@@ -390,12 +390,18 @@ const choosing = ref<{ tile: Tile, item: Item, picks: Choice[], open: Record<str
 const defaults = (i: Item): Choice[] => groupsOf(i).flatMap((g) => {
   const usual = g.options.find(o => o.key === g.defaultKey)
   if (!usual) return []
-  // Nor is anything age-restricted picked while a refusal stands.
-  const fits = (o: Option) => (!avoid.value.length || answerVerdict(avoid.value, facts(o.allergens)).kind === 'none-listed') && !(refused.value && o.ageRestricted)
   if (fits(usual)) return [{ groupId: g.id, key: usual.key }]
   const instead = g.required ? g.options.find(fits) : undefined
   return instead ? [{ groupId: g.id, key: instead.key }] : []
 })
+// Nor is anything age-restricted picked while a refusal stands.
+const fits = (o: Option) => (!avoid.value.length || answerVerdict(avoid.value, facts(o.allergens)).kind === 'none-listed') && !(refused.value && o.ageRestricted)
+/** What the choice window says about what is picked: the usual choice, or why it was left out. */
+function choiceHelp(i: Item): string {
+  const passedOver = groupsOf(i).map(g => g.options.find(o => o.key === g.defaultKey)).filter((o): o is Option => !!o && !fits(o))
+  if (!passedOver.length) return t('bar.desk.choices.help')
+  return t(passedOver.some(o => refused.value && o.ageRestricted) ? 'bar.desk.choices.help-refused' : 'bar.desk.choices.help-avoided')
+}
 function press(tile: Tile) {
   const first = tile.items[0]!
   if (tile.choices) choosing.value = { tile, item: first, picks: defaults(first), open: {}, search: {} }
@@ -1003,7 +1009,7 @@ watch([avoid, refused], keep, { deep: true })
     <UModal
       :open="!!choosing"
       :title="choosing?.tile.name"
-      :description="t('bar.desk.choices.help')"
+      :description="choosing ? choiceHelp(choosing.item) : undefined"
       @update:open="v => { if (!v) choosing = null }"
     >
       <template #body>

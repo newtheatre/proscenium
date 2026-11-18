@@ -1,4 +1,5 @@
 // Adds one entry by hand, or changes its end date and name if the value is already there (V19).
+// One added here is kept when a file is loaded that does not hold it, until a file does.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, newId, nowMs, refuse } from '#kit'
@@ -19,7 +20,7 @@ export default defineRoute({
     refuse('membership.list.not-well-formed', 'That does not look like a reference on this list.', { status: 422, fields: { value: 'membership.list.not-well-formed' } })
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO membership_verification_entries (id, list_id, key_hash, ends_on, holder_name, created_at) VALUES (?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO membership_verification_entries (id, list_id, key_hash, ends_on, holder_name, by_hand, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)
           ON CONFLICT (list_id, key_hash) DO UPDATE SET ends_on = excluded.ends_on, holder_name = excluded.holder_name`,
     params: [newId('mve'), list.id, await hashValue(list.keyKind, input.value), input.endsOn ?? null, input.name || null, at],
   })

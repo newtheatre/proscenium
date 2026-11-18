@@ -2,7 +2,7 @@
      which scheme and why it waits, and Pass and Decline. The server refuses a person checking
      their own, or without membership.membership.verify. -->
 <script setup lang="ts">
-interface Application { id: string, accountId: string, accountName: string | null, schemeId: string, schemeName: string, appliedAt: number, reason: string | null, listName: string | null, claimedBy: { membershipId: string, name: string | null } | null }
+interface Application { id: string, accountId: string, accountName: string | null, schemeId: string, schemeName: string, appliedAt: number, reason: string | null, reference: string | null, listName: string | null, claimedBy: { membershipId: string, name: string | null } | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -13,17 +13,20 @@ const { data, status, error, refresh } = await useAPI<{ applications: Applicatio
 
 const deciding = ref<{ application: Application, outcome: 'pass' | 'decline' } | null>(null)
 const note = ref('')
+// Passing an ID the list does not hold adds it to the list unless unticked.
+const addToList = ref(true)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function open(application: Application, outcome: 'pass' | 'decline') {
   deciding.value = { application, outcome }
   note.value = ''
+  addToList.value = true
   refusal.value = null
 }
 async function decide() {
   const { application, outcome } = deciding.value!
   refusal.value = null
   try {
-    await $api(`/api/membership/applications/${application.id}/decide` as string, { method: 'POST', body: { outcome, note: note.value.trim() || null } })
+    await $api(`/api/membership/applications/${application.id}/decide` as string, { method: 'POST', body: { outcome, note: note.value.trim() || null, ...(outcome === 'pass' && application.reason === 'not-on-list' ? { addToList: addToList.value } : {}) } })
     toast.add({ title: t(`membership.screens.applications.done-${outcome}`, { name: application.accountName ?? '' }), color: 'success' })
     deciding.value = null
     // The sidebar's count and the home card follow the decision.
@@ -37,6 +40,7 @@ const describe = (a: Application) => [
   a.schemeName,
   t('membership.screens.applications.applied', { date: day(new Date(a.appliedAt).toISOString().slice(0, 10)) }), // not-policy: the length of a date
   t(`membership.screens.applications.reasons.${a.reason ?? 'staff-check'}`),
+  ...(a.reason === 'not-on-list' && a.reference ? [t('membership.screens.applications.reference', { reference: a.reference })] : []),
   ...(a.listName ? [t('membership.screens.applications.list-name', { name: a.listName })] : []),
   ...(a.claimedBy ? [t('membership.screens.applications.claimed-by', { name: a.claimedBy.name ?? t('membership.screens.applications.no-name') })] : []),
 ].join(' · ')
@@ -113,6 +117,12 @@ const describe = (a: Application) => [
           <p class="text-sm text-muted">
             {{ deciding ? t(`membership.screens.applications.consequence-${deciding.outcome}`) : '' }}
           </p>
+          <UCheckbox
+            v-if="deciding?.outcome === 'pass' && deciding.application.reason === 'not-on-list' && deciding.application.reference"
+            v-model="addToList"
+            :label="t('membership.screens.applications.add-to-list', { reference: deciding.application.reference })"
+            :description="t('membership.screens.applications.add-to-list-help')"
+          />
           <UFormField
             :label="t('membership.screens.applications.note')"
             :help="t('membership.screens.applications.note-help')"

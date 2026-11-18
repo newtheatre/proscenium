@@ -5,10 +5,10 @@
 // waiting for that one payment; when the money arrives the settlement handler confirms it, issues
 // the tickets and, if the buyer is standing there, admits them, in Payments' one batch. A payment
 // that ends without the money puts a reservation back as it was and lets a new sale's seats go.
-import { and, inArray, sql } from 'drizzle-orm'
+import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, type AccessApplication, type DeskAccessForm } from '#modules/core'
+import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -203,6 +203,8 @@ export interface DeskOrder {
   amountDueMinor: number
   releaseAt: number | null
   keep: boolean
+  /** A reservation released unpaid: the buyer can be seated again if seats are free. */
+  released: boolean
   /** Who booked, as Identity names them, and for what: so the seller can tell they have the right booking. */
   buyer: string | null
   performance: { title: string, startsAt: number } | null
@@ -213,8 +215,8 @@ export interface DeskOrder {
 
 /** One order as the desk shows it. Nothing about the buyer: that is the account's, and Identity's to show. */
 export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
-  const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number, intent_id: string | null, account_id: string | null }>(
-    'SELECT id, reference, state, channel, currency, total_minor, release_at, keep, intent_id, account_id FROM box_office_orders WHERE id = ?', orderId)
+  const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number, intent_id: string | null, account_id: string | null, reserved_at: number | null }>(
+    'SELECT id, reference, state, channel, currency, total_minor, release_at, keep, intent_id, account_id, reserved_at FROM box_office_orders WHERE id = ?', orderId)
   if (!order) return null
   const lines = await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, type_name: string, amount_minor: number, admitted_at: number | null }>(
     `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, t.name AS type_name, l.amount_minor, k.admitted_at FROM box_office_order_lines l
@@ -230,6 +232,7 @@ export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
     amountDueMinor: order.state === 'reserved' || order.state === 'awaiting_payment' ? order.total_minor : 0,
     releaseAt: order.release_at,
     keep: !!order.keep,
+    released: order.state === 'expired' && order.reserved_at !== null,
     buyer: order.account_id ? await accountLabel(order.account_id) : null,
     performance: lines[0] ? await showOf(lines[0].performance_id) : null,
     intentId: order.state === 'awaiting_payment' ? order.intent_id : null,
@@ -241,6 +244,9 @@ async function showOf(performanceId: string): Promise<{ title: string, startsAt:
   const performance = await getPerformance(performanceId)
   return { title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt }
 }
+
+// A reservation released unpaid: still found, so the buyer can be seated again.
+const RELEASED = sql`(${orders.state} = 'expired' AND ${orders.reservedAt} IS NOT NULL)`
 
 const BY_NAME = 8 // not-policy: enough bookings under one name to pick from at the desk
 const SINCE = 6 * 3_600_000 // not-policy: a performance that began this evening still counts as tonight's
@@ -257,7 +263,7 @@ export async function findOrders(query: string, by?: { unit: UnitView, actor: Ac
   const showing = sql`(SELECT min(p.starts_at) FROM box_office_order_lines l JOIN core_performances p ON p.id = l.performance_id
     WHERE l.order_id = ${orders.id} AND l.kind = 'ticket' AND l.state = 'live')`
   const found = await useDb().select({ id: orders.id }).from(orders)
-    .where(and(inArray(orders.state, ['reserved', 'awaiting_payment', 'confirmed']), sql`${orders.accountId} IN (${buyers})`, sql`${showing} > ${nowMs() - SINCE}`))
+    .where(and(or(inArray(orders.state, ['reserved', 'awaiting_payment', 'confirmed']), RELEASED), sql`${orders.accountId} IN (${buyers})`, sql`${showing} > ${nowMs() - SINCE}`))
     .orderBy(showing).limit(BY_NAME)
   return (await Promise.all(found.map(o => deskOrder(o.id)))).filter(o => o !== null)
 }
@@ -266,7 +272,7 @@ async function findByCode(query: string): Promise<DeskOrder[]> {
   const typed = query.trim().toUpperCase()
   if (!typed) return []
   const found = await all<{ id: string }>(
-    "SELECT id FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment', 'confirmed', 'cancelled') AND (reference = ?1 OR desk_code_hash = ?2) ORDER BY created_at DESC LIMIT 5", // not-policy: both are unique, so one is expected
+    "SELECT id FROM box_office_orders WHERE (state IN ('reserved', 'awaiting_payment', 'confirmed', 'cancelled') OR (state = 'expired' AND reserved_at IS NOT NULL)) AND (reference = ?1 OR desk_code_hash = ?2) ORDER BY created_at DESC LIMIT 5", // not-policy: both are unique, so one is expected
     typed, await hashOf(typed))
   return (await Promise.all(found.map(o => deskOrder(o.id)))).filter(o => o !== null)
 }
@@ -563,7 +569,7 @@ export async function deskPrintable(orderId: string): Promise<{ reference: strin
   const shows = new Map<string, { production: string, startsAt: number, venue: string }>()
   for (const performanceId of new Set(lines.map(l => l.performance_id))) {
     const performance = await getPerformance(performanceId)
-    shows.set(performanceId, { production: performance.productionTitle, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}` })
+    shows.set(performanceId, { production: performance.productionTitle, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? performance.venueName })
   }
   const tickets = await Promise.all(lines.map(async (l, i) => ({
     lineId: l.id,

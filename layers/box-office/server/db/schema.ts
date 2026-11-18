@@ -36,6 +36,8 @@ export const performanceSales = defineTable('box_office_performance_sales', {
   offSaleAt: col.timestamp('off_sale_at'),
   maxPerOrder: col.public(integer('max_per_order')),
   holdMinutes: col.internal(integer('hold_minutes')),
+  // Minutes before the start that unpaid reservations are released; null means the setting's.
+  releaseMinutes: col.internal(integer('release_minutes')),
   paymentTiming: col.public(text('payment_timing', { enum: ['pay-now', 'reserve', 'buyer-chooses'] })),
   // What happens to tickets when the core cancels, reschedules or moves this performance (R-11).
   changeDecision: col.internal(text('change_decision', { enum: ['refund_all', 'offer_exchange', 'keep'] })),
@@ -339,6 +341,8 @@ export const orders = defineTable('box_office_orders', {
   // Null for a basket not yet checked out and for an anonymous desk sale (R-15).
   accountId: col.account('account_id', { role: 'subject', nullable: true }),
   signedIn: col.internal(integer('signed_in', { mode: 'boolean' }).notNull().default(false)),
+  // The tickets and booking terms as they read when the buyer checked out or reserved (/policies/tickets).
+  termsVersionId: col.ref('core_policy_versions', { nullable: true }),
   // A list of { term, note? } from core.access-need, copied for this booking. Never on an order with no account.
   accessNote: col.special('access_note'),
   currency: col.currency('currency').notNull(),

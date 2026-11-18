@@ -198,17 +198,17 @@ export function writeNumber(unit: UnitView, accountId: string, startsOn: string,
 }
 
 /**
- * An application (V2, V3, P1): pending, with what is outstanding. By default it waits on staff to
- * check it. One that has passed its check and waits only for its fee is `verified` and `paying`, and
+ * An application (V2, V3, P1, AP1): pending, with what is outstanding. By default it waits on staff to
+ * check it; `approving` makes it wait for the application form's decision too. One that has passed its check and waits only for its fee is `verified` and `paying`, and
  * expires at `expiresAt` because the next step is the applicant's (J5).
  */
-export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null, renewsId?: string | null, verified?: boolean, paying?: boolean, expiresAt?: number | null }): string {
+export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null, renewsId?: string | null, verified?: boolean, paying?: boolean, approving?: boolean, responseId?: string | null, expiresAt?: number | null }): string {
   const at = nowMs()
   const id = newId('mshp')
   unit.add({
-    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, renews_id, needs_verification, needs_approval, needs_payment, verified_at, expires_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
-    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.renewsId ? 'renewed' : 'applied', input.renewsId ?? null, input.verified ? 0 : 1, input.paying ? 1 : 0, input.verified ? at : null, input.expiresAt ?? null, at, at],
+    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, renews_id, needs_verification, needs_approval, needs_payment, verified_at, response_id, expires_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.renewsId ? 'renewed' : 'applied', input.renewsId ?? null, input.verified ? 0 : 1, input.approving ? 1 : 0, input.paying ? 1 : 0, input.verified ? at : null, input.responseId ?? null, input.expiresAt ?? null, at, at],
   }).expect(1)
   return id
 }

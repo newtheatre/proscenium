@@ -17,5 +17,10 @@
   "core.sign-in.page.error.provider-cancelled": "{provider} sign-in was cancelled.",
   "core.sign-in.page.error.closed": "This theatre is not taking new accounts at the moment.",
   "core.sign-in.page.error.disabled": "This account is disabled. Contact the theatre to find out why.",
-  "core.sign-in.page.error.provider-other": "{provider} did not confirm who you are. Try again."
+  "core.sign-in.page.error.provider-other": "{provider} did not confirm who you are. Try again.",
+  "core.sign-in.page.terms.before": "By creating an account you agree to our",
+  "core.sign-in.page.terms.terms": "terms of use",
+  "core.sign-in.page.terms.between": "and have read our",
+  "core.sign-in.page.terms.privacy": "privacy notice",
+  "core.sign-in.page.terms.after": "."
 }

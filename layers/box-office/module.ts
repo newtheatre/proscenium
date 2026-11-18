@@ -24,6 +24,14 @@ export default defineModule({
     'baskets.pay-within': setting.duration({ default: '15m', min: '5m', max: '60m', change, audience: 'public' }),
     'orders.desk-seat-cap': setting.integer({ default: 30, min: 1, max: 500, change, audience: 'staff' }),
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
+    // What the tickets and booking terms say (/policies/tickets): the youngest a buyer may be, whether
+    // tickets may be given away, whether the box office swaps tickets and until when, and how soon a
+    // refund is paid when the theatre cancels. The terms quote them; none is checked by the system.
+    'orders.buyer-minimum-age': setting.integer({ default: 18, min: 13, max: 21, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'tickets.transferable': setting.boolean({ default: true, change, audience: 'public', onChange: 'confirm' }),
+    'exchanges.offered': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
+    'exchanges.until-before': setting.duration({ default: '24h', min: '0m', max: '30d', change, audience: 'public', quotable: true }),
+    'refunds.pay-within': setting.duration({ default: '14d', min: '1d', max: '30d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // How long after curtain the desk may still sell, for latecomers.
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
     // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com"). Filed
@@ -37,7 +45,7 @@ export default defineModule({
     'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
-    'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'reservations.release-before': setting.duration({ default: '10m', min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Buyers cancelling their own paid tickets from the booking link; shipped off (Matt, question 6).
     'cancellations.by-buyer': setting.boolean({ default: false, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'cancellations.until-before': setting.duration({ default: '24h', min: '0m', max: '30d', change, audience: 'public', quotable: true }),
@@ -55,7 +63,7 @@ export default defineModule({
     // Seats for wheelchair spaces not yet booked are kept back from ordinary sale until this long before
     // the start, then go on general sale (show walkthrough, decision 6). Nought keeps none back.
     'wheelchair.keep-seats-before': setting.duration({ default: '24h', min: '0m', max: '7d', change, audience: 'staff' }),
-    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
+    'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
@@ -174,6 +182,15 @@ export default defineModule({
   },
 
   contributes: {
+    // The box office's lines of the privacy notice's "what we hold" table (/policies/privacy).
+    // The terms a buyer agrees to by booking. Their text is content/policies/tickets/*.md.
+    'core.policy': [
+      { id: 'tickets', title: 'Tickets and booking', summary: 'The terms for booking, paying, reserved tickets, cancelling and what happens if we cancel.', order: 15, kind: 'terms', accepted: 'checkout' },
+    ],
+    'core.privacy-record': [
+      { id: 'box-office.orders', holds: 'Your bookings: what you booked, what you paid, exchanges and cancellations, and when a ticket was scanned', why: 'To supply what you bought, and because the law requires records of sales', basis: 'To carry out our contract with you, and a legal duty (tax and accounting law)', keptFor: 'For as long as tax and accounting law requires', order: 100 },
+      { id: 'box-office.holds', holds: 'Tickets held in a basket and never bought', why: 'To keep seats from being sold twice, and to spot misuse', basis: 'Our legitimate interests in selling tickets fairly', keptFor: 'box-office.retention.holds', order: 110 },
+    ],
     // The ticket types whose rules Box office itself fixes. Companion tickets are for people on the
     // access scheme, up to the companions it allows them (core.access-scheme:companions); complimentary
     // tickets are issued only by approving a request, never sold.
@@ -351,7 +368,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'Your reservation has been released: {{ show }}, {{ when }}',
-          body: 'Your reservation **{{ reference }}** for **{{ show }}**, {{ when }}, was not paid for in time, so the seats have gone back on sale. Nothing was charged.\n\nIf you still want to come, ask the box office: there may be tickets left.',
+          body: 'Your reservation **{{ reference }}** for **{{ show }}**, {{ when }}, was not paid for in time, so the seats have gone back on sale. Nothing was charged.\n\nWe have kept your booking. If you still come, show your booking reference at the box office: if seats are still free, we will seat you and you pay then.',
         },
       },
     }, {

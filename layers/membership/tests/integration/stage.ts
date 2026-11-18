@@ -15,6 +15,7 @@ import optionsPost from '../../server/api/membership/schemes/[id]/options/index.
 import optionPatch from '../../server/api/membership/schemes/[id]/options/[optionId].patch'
 import membersPost from '../../server/api/membership/schemes/[id]/members.post'
 import joinPost from '../../server/api/membership/schemes/[id]/join.post'
+import formGet from '../../server/api/membership/schemes/[id]/form.get'
 import mineGet from '../../server/api/membership/mine.get'
 import accountNotices from '../../../core/server/api/core/account-notices.get'
 import listsGet from '../../server/api/membership/lists/index.get'
@@ -51,6 +52,7 @@ export const handle = server({
   'PATCH /api/membership/schemes/:id/options/:optionId': optionPatch,
   'POST /api/membership/schemes/:id/members': membersPost,
   'POST /api/membership/schemes/:id/join': joinPost,
+  'GET /api/membership/schemes/:id/form': formGet,
   'GET /api/membership/mine': mineGet,
   'GET /api/core/account-notices': accountNotices,
   'GET /api/membership/lists': listsGet,

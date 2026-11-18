@@ -167,6 +167,8 @@ describe('joining against a list', () => {
     const row = await inContext(() => first<{ used: string | null, outcome: string }>(
       'SELECT e.used_by AS used, v.outcome FROM membership_verifications v JOIN membership_verification_entries e ON e.id = v.entry_id WHERE v.membership_id = ?', added.body.membershipId))
     expect(row).toEqual({ used: added.body.membershipId, outcome: 'passed' })
+    // The ID as checked is on the record, for staff to compare with a card.
+    expect((await req('GET', `/api/membership/memberships/${added.body.membershipId}`)).body.checks).toMatchObject([{ outcome: 'passed', reference: '20123456', noun: 'student ID' }])
     expect((await add({ reference: '20123456' })).body.code).toBe('membership.join.entry-already-used')
     // Without a reference nothing is checked, as before.
     expect((await add({})).status).toBe(200)
