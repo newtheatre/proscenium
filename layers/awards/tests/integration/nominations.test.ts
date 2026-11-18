@@ -93,4 +93,13 @@ describe('nominations', () => {
     expect(await runs(responseId)).toEqual([{ state: 'waiting', action_key: 'awards.issue-award' }])
     expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(1)
   })
+
+  it('offers the open nomination form to a member, and says so on the roll and My awards', async () => {
+    const type = await awardType()
+    const at = await attached(type)
+    const open = await forms('GET', '/api/forms/slots/awards.nomination/open', undefined, member)
+    expect(open.status).toBe(200)
+    expect(open.body.open).toEqual(expect.arrayContaining([expect.objectContaining({ subjectId: type, formId: at.formId })]))
+    expect((await req('GET', '/api/awards/mine', undefined, member)).body.nominations).toBe(true)
+  })
 })
