@@ -189,6 +189,8 @@
   "payments.screens.till.due": "Still to pay: {amount}",
   "payments.screens.till.part": "Amount to take this way",
   "payments.screens.till.part-help": "Leave it empty to take all {amount}. Take the rest another way afterwards.",
+  "payments.screens.till.part-first-help": "How much to take the first way, out of {amount}. Take the rest another way afterwards.",
+  "payments.screens.till.split-back": "Do not split",
   "payments.screens.till.part-too-much": "Enter an amount above nothing and no more than {amount}.",
   "payments.screens.till.part-paid": "{amount} taken. Still to pay: {due}",
   "payments.screens.till.paid-so-far": "Paid so far: {amount}",
