@@ -441,6 +441,15 @@ async function reserve() {
                   :label="t('box-office.basket.age.confirm', { age: ageMin })"
                 />
               </UFormField>
+              <!-- What the buyer agrees to by booking: the policy the box office declares (/policies/tickets). -->
+              <p class="text-sm text-muted">
+                {{ t('box-office.basket.terms.before') }}
+                <ULink
+                  to="/policies/tickets"
+                  target="_blank"
+                  class="underline underline-offset-2"
+                >{{ t('box-office.basket.terms.link') }}</ULink>{{ t('box-office.basket.terms.after') }}
+              </p>
               <div class="flex flex-wrap gap-2">
                 <UButton
                   v-if="canPay"

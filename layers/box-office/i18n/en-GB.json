@@ -89,5 +89,21 @@
   "box-office.visit.ask": "If anything would make your visit easier, tell the box office before you come.",
   "box-office.settings-sections.wheelchair": "Wheelchair spaces",
   "box-office.settings.wheelchair.keep-seats-before.label": "Keep seats back for wheelchair spaces until",
-  "box-office.settings.wheelchair.keep-seats-before.help": "So the house cannot sell out and leave no room for a wheelchair user, the seats each unbooked wheelchair space takes the place of are not sold as ordinary tickets until this long before the start. After that they go on general sale. Nought keeps none back."
+  "box-office.settings.wheelchair.keep-seats-before.help": "So the house cannot sell out and leave no room for a wheelchair user, the seats each unbooked wheelchair space takes the place of are not sold as ordinary tickets until this long before the start. After that they go on general sale. Nought keeps none back.",
+  "box-office.settings-sections.tickets": "Tickets",
+  "box-office.settings-sections.exchanges": "Swapping tickets",
+  "box-office.settings-sections.refunds": "Refunds",
+  "box-office.settings.orders.buyer-minimum-age.label": "Youngest age to book",
+  "box-office.settings.orders.buyer-minimum-age.help": "Stated in the tickets and booking terms. It is not checked when someone books.",
+  "box-office.settings.tickets.transferable.label": "Tickets may be given to someone else",
+  "box-office.settings.tickets.transferable.help": "What the tickets and booking terms say about passing tickets on. Off, they say to ask the box office.",
+  "box-office.settings.exchanges.offered.label": "Swap tickets to another performance",
+  "box-office.settings.exchanges.offered.help": "On, the tickets and booking terms say the box office will swap tickets to another performance of the same show. Staff make the swap.",
+  "box-office.settings.exchanges.until-before.label": "Swap until this long before the start",
+  "box-office.settings.exchanges.until-before.help": "The latest a swap can be asked for, as the terms state it.",
+  "box-office.settings.refunds.pay-within.label": "Refund a cancelled performance within",
+  "box-office.settings.refunds.pay-within.help": "The time the terms promise for refunds when the theatre cancels a performance.",
+  "box-office.basket.terms.before": "By booking you agree to our",
+  "box-office.basket.terms.link": "tickets and booking terms",
+  "box-office.basket.terms.after": "."
 }

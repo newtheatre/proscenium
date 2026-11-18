@@ -28,7 +28,7 @@ export default defineModule({
     // Where the till opens a session when the device has not used one before: a core space's id.
     'sessions.default-space': setting.custom({ schema: z.string().min(1).max(40), unset: true, change, audience: 'staff' }), // not-policy: an id's length
     'sessions.close-when-quiet': setting.duration({ default: '2h', min: '15m', max: '12h', change, audience: 'staff' }),
-    'cash.enabled': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
+    'cash.enabled': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     // For a test instance only: a provider account in test mode takes payment for real sales, which
