@@ -365,6 +365,9 @@ export const actionRuns = defineTable('forms_action_runs', {
   state: col.internal(text('state', { enum: RUN_STATES }).notNull().default('waiting')),
   // Why it was skipped. Never anybody's words.
   detail: col.internal(text('detail')),
+  // What the action made, where it says: shown through the type's record resolver.
+  recordType: col.internal(text('record_type')),
+  recordId: col.internal(text('record_id')),
   jobId: col.internal(text('job_id')),
   createdAt: col.createdAt(),
   finishedAt: col.timestamp('finished_at'),

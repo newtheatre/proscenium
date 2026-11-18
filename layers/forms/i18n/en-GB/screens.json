@@ -837,5 +837,7 @@
   "forms.screens.link.elsewhere-help": "Responses sent through this link skip: {what}. That happens only for responses sent where the form is attached to a record, such as an award.",
   "forms.screens.settings.address": "Address",
   "forms.screens.settings.address-help": "Lower-case letters, numbers and hyphens.",
-  "forms.screens.settings.address-help-live": "Lower-case letters, numbers and hyphens. Links to the old address carry on working."
+  "forms.screens.settings.address-help-live": "Lower-case letters, numbers and hyphens. Links to the old address carry on working.",
+  "forms.screens.actions.preview": "This will also: {action}",
+  "forms.screens.actions.preview-blocked": "This will not happen"
 }
