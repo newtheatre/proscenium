@@ -257,6 +257,13 @@ describe('landing where I was going (ID-07)', () => {
     expect((await passkeySignIn(new Browser(), device, '/account')).body.next).toBe('/account')
   })
 
+  it('keeps a page\'s own return address, such as the access form opened from choosing tickets', async () => {
+    const browser = new Browser()
+    const next = `/account/access/apply?next=${encodeURIComponent('/whats-on/hamlet/book?performance=p1')}`
+    const { message } = await emailSignIn(browser, address(), next)
+    expect((await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.next).toBe(next)
+  })
+
   it('ignores a return address that is not a path on this site', async () => {
     for (const next of ['https://evil.example/x', '//evil.example/x', '/%2F%2Fevil.example', '/\\evil.example', 'javascript:alert(1)']) {
       const browser = new Browser()
