@@ -3,6 +3,8 @@
 // translation keys; what the questions say is the starting wording, which the theatre makes its own.
 import { FORMAT, type Definition, type Question } from './engine/types'
 import { reviewWorkflow } from './engine/workflow'
+import { parseDefinition } from './engine/definition'
+import { checkDefinition } from './engine/checks'
 
 export interface ShippedTemplate {
   key: string
@@ -124,3 +126,35 @@ export const SHIPPED_TEMPLATES: ShippedTemplate[] = [
   { key: 'forms.feedback-survey', name: 'forms.templates.feedback-survey.name', description: 'forms.templates.feedback-survey.description', retentionDays: 365, // not-policy: a starting value the theatre edits
     anonymous: true, definition: feedbackSurvey },
 ]
+
+/** A template another module ships, through the point forms.template (server/points/template.ts). */
+export interface ContributedTemplate extends Omit<ShippedTemplate, 'retentionDays'> {
+  /** How long answers are kept, in days, on a form started from it. Left out, the form's author must say before publishing. */
+  retentionDays?: number
+  /** `<module>.<name>`, such as `awards.nomination`. Never changes: a form made from it remembers it. */
+  key: string
+  /** `record` for a set of custom fields; a form people send when left out. */
+  mode?: 'submission' | 'record'
+  /** The slots it suits (`forms.slot` ids). It is offered first where a form is started for one of them. */
+  slots?: string[]
+}
+
+/**
+ * What is wrong with a contributed template, or nothing: the checks the shipped ones are held to
+ * (FB-208), a key in its module's name, and no clash with a shipped one. Sources and actions are
+ * not checked here: one whose module is off is a problem the builder shows, as for any form.
+ */
+export function templateFaults(t: Partial<ContributedTemplate> | undefined, module: string): string[] {
+  if (!t || typeof t !== 'object') return ['is not a template']
+  const faults: string[] = []
+  if (typeof t.key !== 'string' || !t.key.startsWith(`${module}.`)) faults.push(`key must start with "${module}."`)
+  if (SHIPPED_TEMPLATES.some(s => s.key === t.key)) faults.push('key is a shipped template\'s')
+  if (typeof t.name !== 'string' || !t.name) faults.push('needs a name')
+  if (typeof t.description !== 'string' || !t.description) faults.push('needs a description')
+  if (t.mode !== undefined && t.mode !== 'submission' && t.mode !== 'record') faults.push('mode must be submission or record')
+  if (t.slots !== undefined && !(Array.isArray(t.slots) && t.slots.every(s => typeof s === 'string'))) faults.push('slots must be slot ids')
+  const parsed = parseDefinition(t.definition)
+  if (!parsed.ok) return [...faults, ...parsed.faults.map(f => `definition${f.path.length ? `.${f.path.join('.')}` : ''} ${f.message}`)]
+  for (const p of checkDefinition(parsed.definition)) if (p.level === 'error') faults.push(`definition: ${p.code} at ${p.at}`)
+  return faults
+}

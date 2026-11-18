@@ -10,8 +10,8 @@ import { NOV_17, applicant, ready, req, scheme } from './stage'
 
 const handle = server({ 'POST /api/membership/schemes/:id/import': importPost })
 const importer = person(['membership.membership.import'], { reassertedAt: NOV_17 })
-async function send(schemeId: string, file: string, dryRun: boolean, actor = importer) {
-  const response = await call(handle, 'POST', `/api/membership/schemes/${schemeId}/import`, { actor, body: { file, dryRun }, headers: { 'idempotency-key': newId('req') } })
+async function send(schemeId: string, file: string, dryRun: boolean, actor = importer, skipEnded = false) {
+  const response = await call(handle, 'POST', `/api/membership/schemes/${schemeId}/import`, { actor, body: { file, dryRun, skipEnded }, headers: { 'idempotency-key': newId('req') } })
   return { status: response.status, body: await response.json() as any }
 }
 
@@ -63,6 +63,15 @@ describe('importing members', () => {
     // Run again, nothing new is written: every row is now held.
     const again = await send(id, file, true)
     expect(again.body.wouldImport).toBe(0)
+  })
+
+  it('counts rows that have already ended, and leaves them out on request', async () => {
+    const id = await scheme()
+    expect((await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })).status).toBe(200)
+    const file = 'old@example.org,Alex Old,2025-10-01,2026-10-01\nnew2@example.org,Nia New,,'
+    expect((await send(id, file, true)).body).toMatchObject({ wouldImport: 2, alreadyEnded: 1 })
+    expect((await send(id, file, true, importer, true)).body).toMatchObject({ wouldImport: 1, alreadyEnded: 1 })
+    expect((await send(id, file, false, importer, true)).body).toMatchObject({ queued: 1 })
   })
 
   it('refuses a row for the importer\'s own account', async () => {
