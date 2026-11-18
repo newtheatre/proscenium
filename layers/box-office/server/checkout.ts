@@ -60,9 +60,10 @@ export async function startCheckout(unit: UnitView, input: CheckoutInput): Promi
   const actor = useContext().actor
   const signedIn = actor.kind === 'person' && !!actor.accountId
   if (!signedIn && !input.email) refuse('box-office.checkout.email-needed', 'We need an email address to send your tickets to.', { status: 422, fields: { email: 'required' } })
-  const accountId = signedIn ? actor.accountId! : (await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })).accountId
+  const found = signedIn ? null : await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
+  const accountId = found ? found.accountId : actor.accountId!
 
-  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn } })
+  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith: found?.madeWith } })
 
   const expiresAt = at + (await useSetting('box-office.baskets.pay-within') as number) * 1000 // not-policy: seconds to milliseconds
   const { intentId } = await collect(unit, { parts: [{ owner: { module: 'box-office', record: order.id }, amountMinor: order.total_minor }], currency: order.currency, expiresAt })
