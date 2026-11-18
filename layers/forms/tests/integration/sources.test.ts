@@ -62,6 +62,17 @@ describe('a record from a source', () => {
     expect((await req('GET', '/api/forms/sources/nowhere.thing', undefined, searcher)).status).toBe(404)
   })
 
+  it('opens a question its author opened to anybody signed in, by most of a name, and to nobody signed out', async () => {
+    const { slug } = await offered(definition(nominee({ openSearch: true }), question('other', { type: 'record', source: 'core.person', dataClass: 'personal' })))
+    const ask = (query: string, actor: typeof member | null = member) => req('GET', `/api/forms/sources/core.person?form=${slug}&${query}`, undefined, actor)
+    expect((await ask('question=nominee&q=An')).body).toMatchObject({ allowed: true, letters: 3, results: [] })
+    const found = await ask('question=nominee&q=Ann')
+    expect(found.body.results).toEqual([{ id: ann.accountId, label: 'Ann Panel' }])
+    // The question beside it was not opened, and nobody signed out is shown anything.
+    expect((await ask('question=other&q=Ann')).body.allowed).toBe(false)
+    expect((await ask('question=nominee&q=Ann', null)).body.allowed).toBe(false)
+  })
+
   it('lists the sources for the builder', async () => {
     const formId = await form()
     const { body } = await req('GET', `/api/forms/forms/${formId}`)
@@ -82,5 +93,10 @@ describe('people involved', () => {
     expect(assigned.find(a => a.reviewer_id === ann.accountId)).toMatchObject({ status: 'conflicted', conflict: 'automatic' })
     expect(assigned.find(a => a.reviewer_id === ben.accountId)).toMatchObject({ status: 'assigned', conflict: null })
     expect((await req('GET', '/api/forms/reviews', undefined, ann)).body.reviews).toEqual([])
+    // Somebody named who looks after the form cannot move or decide the response either, reviewer or not.
+    const own = (await send(slug, { nominee: chair.accountId }, member)).body.responseId
+    const refused = await req('POST', `/api/forms/forms/${formId}/responses/${own}/move`, { move: 'start_review' }, chair)
+    expect(refused.status).toBe(403)
+    expect(refused.body.code).toBe('forms.review.conflicted')
   })
 })

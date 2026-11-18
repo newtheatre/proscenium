@@ -11,7 +11,7 @@ export type Buyer = { accountId: string, label: string } | { email: string }
 interface Person { id: string, label: string, since: number, claimed: boolean, disabled: boolean }
 interface Item { id: string, label: string, description?: string, icon?: string, buyer: Buyer }
 
-const props = defineProps<{ domains: string[], disabled?: boolean }>()
+const props = defineProps<{ domains: string[], disabled?: boolean, placeholder?: string }>()
 const model = defineModel<Buyer | undefined>()
 
 const { t } = useT()
@@ -114,7 +114,7 @@ const empty = computed(() => {
       ignore-filter
       :loading="loading"
       :disabled="disabled"
-      :placeholder="t('box-office.screens.panel.buyer.placeholder')"
+      :placeholder="placeholder ?? t('box-office.screens.panel.buyer.placeholder')"
       :search-input="{ placeholder: t('box-office.screens.panel.buyer.search'), icon: 'i-lucide-search' }"
       :icon="model && 'email' in model ? 'i-lucide-mail' : 'i-lucide-user-round'"
       class="flex-1"
@@ -128,7 +128,7 @@ const empty = computed(() => {
         <span
           v-else
           class="truncate text-muted"
-        >{{ t('box-office.screens.panel.buyer.placeholder') }}</span>
+        >{{ placeholder ?? t('box-office.screens.panel.buyer.placeholder') }}</span>
       </template>
       <template #empty>
         {{ empty }}

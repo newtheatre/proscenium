@@ -280,6 +280,31 @@ describe('selling at the desk', () => {
     expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('box-office.promo.unknown')
   })
 
+  it('shows what was sold after the payment, and emails the tickets afterwards', async () => {
+    const h = await house(4)
+    const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect((await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, seller)).body.orders).toEqual([])
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const sold = await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, seller)
+    expect(sold.status, JSON.stringify(sold.body)).toBe(200)
+    expect(sold.body.orders).toEqual([expect.objectContaining({ reference: expect.any(String), buyer: null, performance: expect.objectContaining({ id: h.performanceId }) })])
+    const o = sold.body.orders[0]
+    expect(o.lines).toEqual([expect.objectContaining({ ticketType: 'Full price', amountMinor: 1200, admitted: false }), expect.objectContaining({ admitted: false })])
+    const before = await rows<{ code_hash: string }>('SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? ORDER BY k.id', o.orderId)
+
+    expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'after@example.org' }, onlooker, { 'idempotency-key': `send-${o.orderId}-x` })).status).toBe(403)
+    const sent = await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'After.Sale@Example.org' }, seller, { 'idempotency-key': `send-${o.orderId}` })
+    expect(sent.status, JSON.stringify(sent.body)).toBe(200)
+    expect((await order(o.orderId)).account_id).toBeTruthy()
+    expect(await count("SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE 'box-office.order-confirmed%'", o.orderId)).toBe(1)
+    // The tickets keep their codes: the message links to the booking, which shows them.
+    const after = await rows<{ code_hash: string }>("SELECT k.code_hash FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE l.order_id = ? AND k.state = 'valid' ORDER BY k.id", o.orderId)
+    expect(after).toEqual(before)
+    // Sent once: a second send is refused rather than sending different codes again.
+    expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'other@example.org' }, seller, { 'idempotency-key': `send-${o.orderId}-2` })).body.code).toBe('box-office.desk.already-sent')
+  })
+
   it('keeps a code set "not with member or concession prices" off the concession at the till', async () => {
     const h = await house(5)
     const code = 'NOREQ' + h.performanceId.slice(-6).toUpperCase()

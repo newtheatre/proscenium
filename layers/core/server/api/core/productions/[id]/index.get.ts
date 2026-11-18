@@ -7,6 +7,7 @@ import { getProduction, listSeasons, publishingNeeds } from '../../../../program
 import { listTermGroups, listTerms } from '../../../../vocabularies/service'
 import { theatreDefaults } from '../../../../programme/performances'
 import { sellsHere } from '../../../../programme/booking'
+import { usualSpaceOptions } from '../../../../programme/usual-space'
 
 export default defineRoute({
   ability: 'core.production.view',
@@ -15,7 +16,7 @@ export default defineRoute({
   input: z.object({}),
 }, async (_event, { record }) => {
   const option = (t: { id: string, label: string, retired: boolean }) => ({ id: t.id, label: t.label, retired: t.retired })
-  const [production, needs, categories, advisories, groups, effects, reasons, seasons, theatre, sells] = await Promise.all([
+  const [production, needs, categories, advisories, groups, effects, reasons, seasons, theatre, sells, spaces] = await Promise.all([
     getProduction(record!.id),
     publishingNeeds(record!.id),
     listTerms('core.production-category', { includeRetired: true }),
@@ -26,6 +27,7 @@ export default defineRoute({
     listSeasons(),
     theatreDefaults(),
     sellsHere(),
+    usualSpaceOptions(),
   ])
   return {
     production,
@@ -33,6 +35,6 @@ export default defineRoute({
     // What the production's empty fields stand for, and whether anything here sells tickets (else it needs a booking link).
     theatre,
     sellsHere: sells,
-    options: { categories: categories.map(option), advisories: advisories.map(t => ({ ...option(t), description: t.description, groupId: t.groupId })), advisoryGroups: groups.map(g => ({ id: g.id, label: g.label })), effects: effects.map(t => ({ ...option(t), description: t.description, icon: t.icon })), reasons: reasons.map(option), seasons: seasons.filter(s => s.state !== 'archived' || s.id === production.seasonId).map(s => ({ id: s.id, name: s.name })) },
+    options: { categories: categories.map(option), advisories: advisories.map(t => ({ ...option(t), description: t.description, groupId: t.groupId })), advisoryGroups: groups.map(g => ({ id: g.id, label: g.label })), effects: effects.map(t => ({ ...option(t), description: t.description, icon: t.icon })), reasons: reasons.map(option), seasons: seasons.filter(s => s.state !== 'archived' || s.id === production.seasonId).map(s => ({ id: s.id, name: s.name })), spaces: (production.usualSpaceId && !spaces.some(s => s.id === production.usualSpaceId) ? await usualSpaceOptions(production.usualSpaceId) : spaces).map(({ id, label }) => ({ id, label })) },
   }
 })

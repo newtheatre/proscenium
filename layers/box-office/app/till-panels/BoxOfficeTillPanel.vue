@@ -4,14 +4,16 @@
      only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
+import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string } }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
 interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
 
-const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
+/** `settled`: the till payment just taken that this panel sold something in, until the next customer. */
+const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
 const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
 
 const { t } = useT()
@@ -70,9 +72,23 @@ function setReference(row: PerformanceRow, n: number, value: string) {
   list[n] = value
   references.value = { ...references.value, [keyOf(row)]: list }
 }
+// Who each ticket of a member or holder price is for (Matt, 17 November): named by card or by name.
+const holders = ref<Record<string, (Holder | undefined)[]>>({})
+function setHolder(row: PerformanceRow, n: number, value: Holder | undefined) {
+  const list = [...(holders.value[keyOf(row)] ?? [])]
+  list[n] = value
+  holders.value = { ...holders.value, [keyOf(row)]: list }
+}
+/** How many of a row's tickets still need their holder named, or a reference typed. */
+function unnamed(row: PerformanceRow): number {
+  if (!row.holder) return 0
+  const quantity = quantities.value[keyOf(row)] ?? 0
+  return Array.from({ length: quantity }, (_, n) => !holders.value[keyOf(row)]?.[n] && !references.value[keyOf(row)]?.[n]?.trim()).filter(Boolean).length
+}
 watch(performanceId, () => {
   quantities.value = {}
   references.value = {}
+  holders.value = {}
   dropCode()
 })
 
@@ -137,11 +153,13 @@ function say() {
     return
   }
   if (mode.value === 'sell') {
-    const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map((r) => {
+    // A member or holder ticket joins the sale once every ticket is named, by a holder or a typed reference.
+    const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r)).map((r) => {
       const quantity = quantities.value[keyOf(r)]!
-      // The buyer's references, when the seller typed one for every ticket; otherwise the seller has checked by hand.
-      const typed = (references.value[keyOf(r)] ?? []).slice(0, quantity).map(x => x.trim())
-      return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(r.reference && typed.filter(Boolean).length === quantity ? { references: typed } : {}) }
+      if (!r.holder) return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity }
+      const typed = Array.from({ length: quantity }, (_, n) => references.value[keyOf(r)]?.[n]?.trim() ?? '')
+      const named = Array.from({ length: quantity }, (_, n) => (typed[n] ? '' : holders.value[keyOf(r)]?.[n]?.accountId ?? ''))
+      return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(typed.some(Boolean) ? { references: typed } : {}), ...(named.some(Boolean) ? { holders: named } : {}) }
     })
     tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value, ...(promo.value ? { promoCode: promo.value.code } : {}) } : null)
   }
@@ -149,7 +167,7 @@ function say() {
     tell(order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, references, order, exchange, sendTo, promo], say, { deep: true })
+watch([mode, admit, quantities, references, holders, order, exchange, sendTo, promo], say, { deep: true })
 onMounted(() => {
   if (exchange.value) say()
   // Sent from the door with a reservation to pay for (`?collect=<reference>`): it is found at once.
@@ -195,6 +213,7 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}
+  if (Object.keys(holders.value).length) holders.value = {}
   // The next buyer never sees who the last one was, nor uses their code.
   buyer.value = undefined
   dropCode()
@@ -203,6 +222,52 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (fromTill && !wasLocked) clear()
   else if (order.value.state === 'reserved') void find(order.value.reference)
 })
+
+// After the sale (till proposal): what was made, with its reference and tickets, so the seller can
+// email them, admit the buyer, or open the booking, until the till moves on to the next customer.
+interface Sold { orderId: string, reference: string, buyer: string | null, performance: { id: string, title: string, startsAt: number } | null, lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[] }
+const sold = ref<Sold[]>([])
+const soldRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const emailTo = ref<Record<string, Buyer | undefined>>({})
+const soldBusy = ref<string | null>(null)
+async function loadSold(intent: string) {
+  try {
+    sold.value = (await $api<{ orders: Sold[] }>('/api/box-office/desk/sold', { query: { intent } })).orders
+  }
+  catch (e) {
+    soldRefusal.value = toRefusal(e)
+  }
+}
+watch(() => props.settled, (intent) => {
+  sold.value = []
+  emailTo.value = {}
+  soldRefusal.value = null
+  if (intent) void loadSold(intent)
+}, { immediate: true })
+const waitingIn = (o: Sold) => o.lines.filter(l => !l.admitted).length
+async function soldAction(o: Sold, fn: () => Promise<unknown>) {
+  soldBusy.value = o.orderId
+  soldRefusal.value = null
+  try {
+    await fn()
+    if (props.settled) await loadSold(props.settled)
+  }
+  catch (e) {
+    soldRefusal.value = toRefusal(e)
+  }
+  finally {
+    soldBusy.value = null
+  }
+}
+function emailSold(o: Sold) {
+  const to = emailTo.value[o.orderId]
+  if (!to) return
+  void soldAction(o, () => $api(`/api/box-office/desk/orders/${o.orderId}/send` as string, { method: 'POST', body: 'accountId' in to ? { accountId: to.accountId } : { email: to.email } }))
+}
+function admitSold(o: Sold) {
+  if (!o.performance) return
+  void soldAction(o, () => $api(`/api/box-office/performances/${o.performance!.id}/door/admit` as string, { method: 'POST', body: { orderId: o.orderId, count: waitingIn(o), deviceLabel: 'Desk' } }))
+}
 
 async function find(text = query.value) {
   if (!text.trim()) return
@@ -300,7 +365,103 @@ function clear() {
 
 <template>
   <div
-    v-if="exchange"
+    v-if="settled && sold.length"
+    class="space-y-4"
+  >
+    <RefusalNotice :refusal="soldRefusal" />
+    <div
+      v-for="o in sold"
+      :key="o.orderId"
+      class="space-y-3 rounded-lg border border-default p-4"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="text-lg font-semibold">
+          {{ t('box-office.screens.panel.order', { reference: o.reference }) }}
+        </h3>
+        <StatusBadge
+          tone="success"
+          :label="t('box-office.screens.panel.states.confirmed')"
+        />
+      </div>
+      <p
+        v-if="o.performance"
+        class="text-sm text-muted"
+      >
+        {{ o.performance.title }}, {{ dateTime(o.performance.startsAt) }}
+      </p>
+      <ul
+        class="divide-y divide-default"
+        :aria-label="t('box-office.screens.panel.sold.tickets')"
+      >
+        <li
+          v-for="line in o.lines"
+          :key="line.id"
+          class="flex items-center justify-between gap-2 py-1.5"
+        >
+          <span>{{ line.band ? t('box-office.screens.panel.sold.line', { band: line.band, type: line.ticketType }) : line.ticketType }}</span>
+          <span class="flex shrink-0 items-center gap-2">
+            <UBadge
+              v-if="line.admitted"
+              color="success"
+              variant="subtle"
+              :label="t('box-office.screens.panel.admitted')"
+            />
+            <span class="tabular-nums">{{ money(line.amountMinor) }}</span>
+          </span>
+        </li>
+      </ul>
+      <p
+        v-if="o.buyer"
+        class="flex items-center gap-2 text-sm"
+      >
+        <UIcon
+          name="i-lucide-mail-check"
+          class="size-4 text-success"
+        />{{ t('box-office.screens.panel.sold.emailed', { name: o.buyer }) }}
+      </p>
+      <UFormField
+        v-else
+        :label="t('box-office.screens.panel.sold.email')"
+        :help="t('box-office.screens.panel.sold.email-help')"
+      >
+        <div class="flex flex-wrap gap-2">
+          <BoxOfficeBuyerPicker
+            v-model="emailTo[o.orderId]"
+            :domains="data?.emailDomains ?? []"
+            :disabled="soldBusy === o.orderId"
+            class="min-w-64 flex-1"
+          />
+          <UButton
+            icon="i-lucide-send"
+            :label="t('box-office.screens.panel.sold.send')"
+            :loading="soldBusy === o.orderId"
+            :disabled="!emailTo[o.orderId]"
+            @click="emailSold(o)"
+          />
+        </div>
+      </UFormField>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          v-if="waitingIn(o) && o.performance"
+          icon="i-lucide-door-open"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.screens.panel.sold.admit', { count: waitingIn(o) })"
+          :loading="soldBusy === o.orderId"
+          @click="admitSold(o)"
+        />
+        <UButton
+          :to="`/console/box-office/orders/${o.orderId}`"
+          icon="i-lucide-external-link"
+          color="neutral"
+          variant="ghost"
+          :label="t('box-office.screens.panel.sold.open')"
+        />
+      </div>
+    </div>
+  </div>
+  <div
+    v-else-if="exchange"
     class="space-y-3 rounded-lg border border-default p-4"
   >
     <h3 class="font-medium">
@@ -369,21 +530,39 @@ function clear() {
                 :disabled="locked"
                 @update:model-value="setQuantity(row, $event)"
               />
-              <template v-if="row.reference && (quantities[keyOf(row)] ?? 0) > 0">
-                <UInput
+              <template v-if="row.holder && (quantities[keyOf(row)] ?? 0) > 0">
+                <div
                   v-for="n in quantities[keyOf(row)]"
                   :key="n"
-                  :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                  :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
-                  :placeholder="t('box-office.screens.panel.reference-placeholder', { n })"
-                  :disabled="locked"
-                  autocomplete="off"
-                  maxlength="64"
-                  class="block w-64"
-                  @update:model-value="setReference(row, n - 1, String($event))"
-                />
-                <p class="text-xs text-muted">
-                  {{ t('box-office.screens.panel.reference-help') }}
+                  class="space-y-1"
+                >
+                  <BoxOfficeHolderPicker
+                    v-if="!references[keyOf(row)]?.[n - 1]?.trim()"
+                    :model-value="holders[keyOf(row)]?.[n - 1]"
+                    :performance-id="performance!.performanceId"
+                    :ticket-type-id="row.ticketTypeId"
+                    :label="t('box-office.screens.panel.holder.ticket', { n })"
+                    :disabled="locked"
+                    @update:model-value="(h: Holder | undefined) => setHolder(row, n - 1, h)"
+                  />
+                  <UInput
+                    v-if="row.reference && !holders[keyOf(row)]?.[n - 1]"
+                    :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
+                    :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
+                    :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.field ?? row.reference.label })"
+                    :disabled="locked"
+                    autocomplete="off"
+                    maxlength="64"
+                    class="block w-64"
+                    @update:model-value="setReference(row, n - 1, String($event))"
+                  />
+                </div>
+                <p
+                  v-if="unnamed(row)"
+                  class="text-sm text-warning"
+                  role="status"
+                >
+                  {{ t('box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
                 </p>
               </template>
             </div>

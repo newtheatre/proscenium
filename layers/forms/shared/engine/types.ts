@@ -93,6 +93,8 @@ export interface Question {
   dataClass: DataClass
   /** A `record` question of people who are involved: a reviewer named in it is locked out (FB-406). */
   peopleInvolved?: boolean
+  /** A `record` question anybody signed in may search while answering, whatever they may search elsewhere. The author's choice. */
+  openSearch?: boolean
 }
 /** A repeating group: the questions are answered once per entry. */
 export interface Group {
@@ -203,7 +205,7 @@ export interface Definition {
   calculations?: Calculation[]
   endings?: Ending[]
   workflow?: Workflow
-  presentation?: { submitLabel?: string, confirmation?: string, progress?: boolean }
+  presentation?: { introduction?: string, submitLabel?: string, confirmation?: string, progress?: boolean }
 }
 
 // ---- answers and results ----

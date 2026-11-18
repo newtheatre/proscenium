@@ -142,6 +142,9 @@ export const points = {
   // Something on My account's overview that needs the person (an address to confirm, a renewal
   // that is open), for the person asking. A notice that fails is left out, never the page.
   'core.account-notice': point({ kind: 'code', contract: 'account-notice' }),
+  // What the person has coming (a performance they hold tickets for, a shift they are on), for My
+  // account's Upcoming card, so core lists other modules' things without importing them.
+  'core.upcoming': point({ kind: 'code', contract: 'upcoming' }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

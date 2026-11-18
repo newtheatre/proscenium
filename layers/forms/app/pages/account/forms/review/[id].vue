@@ -11,6 +11,9 @@ interface Asked {
   id: string
   form: { title: string }
   response: { reference: string, submittedAt: number }
+  about: { label: string, name: string | null } | null
+  from: string | null
+  next: string | null
   stage: string
   mode: 'scores' | 'vote'
   criteria: Criterion[]
@@ -49,8 +52,13 @@ async function save() {
   saving.value = true
   try {
     await $api(address.value, { method: 'PUT', body: asked.value.mode === 'vote' ? { vote: state.vote, comment: state.comment } : { scores: state.marks, comment: state.comment } })
-    toast.add({ title: t('forms.screens.review.saved'), color: 'success' })
-    await refresh()
+    await Promise.all([refresh(), refreshNuxtData('forms:mine')])
+    const next = asked.value.next
+    toast.add({
+      title: t('forms.screens.review.saved'),
+      color: 'success',
+      actions: next ? [{ label: t('forms.screens.review.next'), color: 'neutral' as const, variant: 'outline' as const, onClick: () => { navigateTo(`/account/forms/review/${next}`) } }] : undefined,
+    })
   }
   catch (e) {
     const refusal = toRefusal(e)
@@ -86,6 +94,18 @@ async function conflict() {
         <h2 class="font-medium">
           {{ t('forms.screens.review.what-was-sent') }}
         </h2>
+        <p
+          v-if="asked.about?.name"
+          class="text-sm"
+        >
+          <span class="font-medium">{{ t(asked.about.label) }}:</span> {{ asked.about.name }}
+        </p>
+        <p
+          v-if="asked.from"
+          class="text-sm text-muted"
+        >
+          {{ t('forms.screens.review.from', { who: asked.from }) }}
+        </p>
         <FormsAnswers
           :definition="asked.definition"
           :answers="asked.answers"
@@ -121,7 +141,7 @@ async function conflict() {
           <UFormField
             v-if="asked.mode === 'vote'"
             name="vote"
-            :label="t('forms.screens.review.your-vote')"
+            :label="t('forms.screens.review.vote-on')"
             required
           >
             <URadioGroup
@@ -176,6 +196,14 @@ async function conflict() {
               @click="conflict"
             />
           </div>
+          <UButton
+            v-if="asked.mine.status === 'submitted' && asked.next"
+            :label="t('forms.screens.review.next')"
+            trailing-icon="i-lucide-arrow-right"
+            color="neutral"
+            variant="subtle"
+            :to="`/account/forms/review/${asked.next}`"
+          />
         </UForm>
       </section>
 

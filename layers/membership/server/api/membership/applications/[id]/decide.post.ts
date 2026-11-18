@@ -51,7 +51,7 @@ export default defineRoute({
     return { state: 'pending', waiting: unpaid ? 'payment' : 'approval' }
   }
   const scheme = await requireScheme(row!.scheme_id)
-  const dates = activatePending(unit, {
+  const dates = await activatePending(unit, {
     id: record!.id, scheme, accountId: row!.account_id, count: row!.count ?? 1, startsOn: await today(),
     ...(row!.entry_ends ? { endsOn: row!.entry_ends } : {}),
   })
