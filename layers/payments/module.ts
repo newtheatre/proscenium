@@ -131,6 +131,9 @@ export default defineModule({
     'finance.system-account': [
       { id: 'cash', name: 'Cash in tills', kind: 'asset' },
       { id: 'card-clearing', name: 'Card clearing', kind: 'asset', scoped: true },
+      // Money taken some other way at the desk (a voucher, a bank transfer, an invoice): no card
+      // machine pays it out, so it is kept apart from card clearing until the treasurer moves it.
+      { id: 'other', name: 'Other payments taken', kind: 'asset' },
       { id: 'bank', name: 'Bank', kind: 'asset' },
       { id: 'provider-fees', name: 'Payment provider fees', kind: 'expense' },
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
