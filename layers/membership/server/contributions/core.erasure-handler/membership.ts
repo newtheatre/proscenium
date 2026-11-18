@@ -1,5 +1,5 @@
 // Erasure (rule X4): the person's live memberships and open applications end with the reason
-// `erased`, in the erasure's own batch. Everything else is the registry's: the rows stay with their
+// `erased`, in a stage of the erasure. Everything else is the registry's: the rows stay with their
 // scheme and dates so counts by year stay true, notes are redacted, the member number is kept so it
 // is never issued again.
 //

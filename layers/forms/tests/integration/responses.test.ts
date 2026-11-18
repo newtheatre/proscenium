@@ -2,7 +2,7 @@
 // answered by the people the link allows, within its dates and its cap; sending stores everything
 // together and once; special-category answers are held sealed and opened only on purpose.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { advanceClock, createUnit, newId } from '#kit'
+import { advanceClock, newId } from '#kit'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { eraseAccount } from '../../../core/server/identity/erasure'
 import { NOV_17, account, definition, offered, question, raw, ready, req, send } from './stage'
@@ -269,11 +269,7 @@ describe('erasing a person', () => {
     await req('PUT', `/api/forms/open/${kept.slug}/draft`, { responseId: draftId, answers: { name: 'Gil' }, pageId: null }, gone)
     const bystander = await send(sent.slug, { name: 'Mo', about: 'Stays as it is' }, member)
 
-    await inContext(async () => {
-      const unit = createUnit()
-      await eraseAccount(unit.view(), gone.accountId!)
-      await unit.commit()
-    })
+    await inContext(() => eraseAccount(gone.accountId!))
 
     const answers = Object.fromEntries((await rows<any>('SELECT question_id, value_text, value_cipher, label_snapshot FROM forms_answers WHERE response_id = ?', response.body.responseId)).map(a => [a.question_id, a]))
     expect(answers.name.value_text).toBe('Former member')

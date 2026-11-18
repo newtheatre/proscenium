@@ -12,7 +12,7 @@ import { notify } from '../notifications/notify'
 import { notifyAddress } from '../notifications/send'
 import { accountById } from './accounts'
 import { digest, randomToken } from './crypto'
-import { eraseAccount, erasureHolds } from './erasure'
+import { eraseStage, erasureHolds, erasureStarted } from './erasure'
 import { fileUrl } from '../files/service'
 import type { IDENTITY_CHECKS } from '../db/identity'
 
@@ -128,7 +128,8 @@ export async function cancelRequest(unit: UnitView, request: DataRequestRow, byS
 
 /**
  * The hourly review (core.review-data-requests): a confirmed or held erasure whose cooling-off is
- * over runs if nothing holds it, and is held, with the codes, if something does.
+ * over runs if nothing holds it, and is held, with the codes, if something does. A run that stopped
+ * part-way is started again.
  */
 export async function reviewDataRequests(unit: UnitView): Promise<void> {
   const due = await all<DataRequestRow>('SELECT * FROM core_data_requests WHERE kind = \'erasure\' AND state IN (\'confirmed\', \'held\') AND not_before <= ? ORDER BY not_before LIMIT 20', nowMs()) // not-policy: a batch per run, well inside one unit
@@ -138,24 +139,44 @@ export async function reviewDataRequests(unit: UnitView): Promise<void> {
     else if (JSON.stringify(holds) !== request.holds || request.state !== 'held')
       unit.add({ sql: 'UPDATE core_data_requests SET state = \'held\', holds = ? WHERE id = ? AND state IN (\'confirmed\', \'held\')', params: [JSON.stringify(holds), request.id] })
   }
+  // A run whose job died part-way (no stage of it queued or running) starts again from the top; the
+  // stages it already ran find nothing left to do.
+  const stalled = await all<{ id: string }>(
+    `SELECT r.id FROM core_data_requests r
+      WHERE r.kind = 'erasure' AND r.state = 'running'
+        AND NOT EXISTS (SELECT 1 FROM core_jobs j WHERE j.name = 'core.run-erasure' AND j.state IN ('queued', 'running') AND json_extract(j.payload, '$.requestId') = r.id)
+      LIMIT 20`, // not-policy: a batch per run, well inside one unit
+  )
+  for (const { id } of stalled) unit.enqueue('core.run-erasure', { requestId: id })
 }
 
+/** The job's payload: the request, and where in the staged run it is (stage 0 when absent). */
+export interface RunErasurePayload { requestId: string, stage?: number, pass?: number }
+
 /**
- * The job: runs one erasure. A hold that appeared since the review sends it back to waiting. A
- * second run on a finished request, or on a tombstone, writes nothing.
+ * The job: runs one stage of an erasure and queues the next. Before the run has started, a hold
+ * that appeared since the review sends it back to waiting; once it has, it goes on to the end. A
+ * second run of any stage, on a finished request, or on a tombstone, writes nothing.
  */
-export async function runErasure(unit: UnitView, requestId: string): Promise<void> {
-  const request = await requestById(requestId)
+export async function runErasure(unit: UnitView, payload: RunErasurePayload): Promise<void> {
+  const request = await requestById(payload.requestId)
   if (!request || request.state !== 'running') return
-  const holds = await erasureHolds(request.account_id)
-  if (holds.length) {
-    unit.add({ sql: 'UPDATE core_data_requests SET state = \'held\', holds = ? WHERE id = ? AND state = \'running\'', params: [JSON.stringify(holds), request.id] })
+  const stage = payload.stage ?? 0
+  if (stage === 0 && !(await erasureStarted(request.account_id))) {
+    const holds = await erasureHolds(request.account_id)
+    if (holds.length) {
+      unit.add({ sql: 'UPDATE core_data_requests SET state = \'held\', holds = ? WHERE id = ? AND state = \'running\'', params: [JSON.stringify(holds), request.id] })
+      return
+    }
+  }
+  const result = await eraseStage(unit, request.account_id, stage, payload.pass ?? 0)
+  if (result.next) {
+    unit.enqueue('core.run-erasure', { requestId: request.id, ...result.next }, { dedupeKey: `${request.id}:${result.next.pass}:${result.next.stage}` })
     return
   }
-  const erased = await eraseAccount(unit, request.account_id)
   unit.add({ sql: 'UPDATE core_data_requests SET state = \'done\', finished_at = ? WHERE id = ? AND state = \'running\'', params: [nowMs(), request.id] }).expect(1)
   unit.announce('core.data-request.finished', { requestId: request.id, kind: 'erasure' }, { record: ['core.data-request', request.id] })
-  const address = erased?.address
+  const address = result.erased?.address
   // Told once, at the address as it was, after the erasure has committed.
   if (address) {
     unit.afterCommit(async () => {

@@ -1,9 +1,17 @@
-// Erasure (ID-16; part 3, "Export and erasure"). One batch, built from the registry: every table
-// that holds rows about the person has them deleted or its personal columns cleared, as each column
-// declared. Erasure is anonymisation: sales, attendance and safety records stay as rows about nobody,
-// and the account stays as a tombstone. The batch asserts its own completeness, and a second run on
-// a tombstone writes nothing.
-import { all, nowMs, usePoint, type UnitView } from '#kit'
+// Erasure (ID-16; part 3, "Export and erasure"), built from the registry: every table that holds rows
+// about the person has them deleted or its personal columns cleared, as each column declared.
+// Erasure is anonymisation: sales, attendance and safety records stay as rows about nobody, and the
+// account stays as a tombstone.
+//
+// It runs in stages, each its own unit of work, so it never outgrows core.units.statement-limit
+// however many modules hold personal data. Stage 0 locks the account (it cannot sign in, its
+// sessions and live grants end); then each module's erasure handler gets a stage; then the plan's
+// steps, a share per stage, children before parents; and the last stage erases the person's
+// addresses and the account itself, checks that nothing the plan reaches is left, and unlocks the
+// tombstone. To the person it is all or nothing: locked out from the first stage, a tombstone after
+// the last. Every statement only touches what is still there to erase, so any stage, or the whole
+// run, can be repeated and do no harm; a second run on a tombstone writes nothing.
+import { all, createUnit, first, nowMs, usePoint, useSetting, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { ERASED, type TableMeta } from '#kit/db'
 import { accountScopeSql } from '#kit/accounts'
@@ -11,6 +19,7 @@ import type { ErasureHandler } from '../points/erasure-handler'
 import type { ErasureHold } from '../points/erasure-hold'
 import { accountById, verifiedAddressesOf } from './accounts'
 import { guardLastOwner, isOwner, LIVE } from './grants'
+import { endSessionsOf } from './sessions'
 
 /** What erasure does to one table's rows about the person. */
 export interface ErasureStep {
@@ -101,41 +110,126 @@ export async function erasureHolds(accountId: string): Promise<string[]> {
   return [...new Set(codes)].sort()
 }
 
+/** Statements a stage keeps free for its own bookkeeping: its check, the next stage, the audit. */
+const RESERVE = 10 // not-policy: headroom inside core.units.statement-limit
+
 /**
- * Erases an account in the caller's unit. Returns the address the account wrote to, so the caller
- * can tell it once after the commit, or null when there was nothing to erase (already a tombstone).
- * Holds are the caller's to check first; the last-Owner rule is asserted here as well.
+ * Tables the last stage erases: the person's addresses, which every earlier stage finds rows by
+ * (?2), and the account, which every stage finds itself by.
  */
-export async function eraseAccount(unit: UnitView, accountId: string): Promise<{ address: string | null } | null> {
-  const account = await accountById(accountId)
-  if (!account || account.anonymised_at) return null
-  const at = nowMs()
-  const emails = await verifiedAddressesOf(accountId)
-  const audience = account.audience_email_id ? (await all<{ address: string }>('SELECT address FROM core_account_emails WHERE id = ? AND verified_at IS NOT NULL', account.audience_email_id))[0]?.address ?? null : null
-  const owner = await isOwner(accountId)
-  const params = [accountId, JSON.stringify(emails), at]
-  // Live grants end, as history: core_grants is append-only and keeps who held what.
-  unit.add(bound(`INSERT INTO core_grant_ends (grant_id, ended_at, ended_by, ended_reason) SELECT g.id, ?3, NULL, 'account_closed' FROM core_grants g WHERE g.account_id ${SCOPE} AND ${LIVE.replaceAll('?', '?3')}`, params))
-  for (const handler of await usePoint<ErasureHandler>('core.erasure-handler')) await handler.value.erase(unit, { accountId, emails })
+const LAST = new Set(['core_account_emails', 'core_accounts'])
+
+/** How often the last stage sends the run round again for rows written while it ran. */
+const PASSES = 3 // not-policy: a guard against a loop
+
+/** The marker on an account while it is being erased: disabled, so it cannot sign in. */
+export const ERASING = 'erasing'
+
+interface Stages { handlers: ErasureHandler[], shares: ErasureStep[][], last: ErasureStep[], plan: ErasureStep[] }
+
+async function stages(): Promise<Stages> {
   const plan = erasurePlan()
-  for (const step of plan) {
-    if (step.action === 'delete') {
-      unit.add(bound(`DELETE FROM ${q(step.table)} WHERE ${step.match}`, params))
-      continue
-    }
-    const set = step.set.map(c => `${q(c.column)} = ${VALUE[c.to]}`)
-    if (step.table === 'core_accounts') set.push('audience_email_id = NULL', 'members_email_id = NULL', 'anonymised_at = ?3')
-    unit.add(bound(`UPDATE ${q(step.table)} SET ${set.join(', ')} WHERE (${step.match})${step.table === 'core_accounts' ? ' AND anonymised_at IS NULL' : ''}`, params))
+  const limit = await useSetting('core.units.statement-limit') as number
+  const size = Math.max(1, limit - RESERVE)
+  const middle = plan.filter(s => !LAST.has(s.table))
+  const shares: ErasureStep[][] = []
+  for (let i = 0; i < middle.length; i += size) shares.push(middle.slice(i, i + size))
+  const handlers = (await usePoint<ErasureHandler>('core.erasure-handler')).map(h => h.value)
+  return { handlers, shares, last: plan.filter(s => LAST.has(s.table)), plan }
+}
+
+/** The statement for one step. */
+function statementOf(step: ErasureStep, params: unknown[]): { sql: string, params: unknown[] } {
+  if (step.action === 'delete') return bound(`DELETE FROM ${q(step.table)} WHERE ${step.match}`, params)
+  const set = step.set.map(c => `${q(c.column)} = ${VALUE[c.to]}`)
+  if (step.table === 'core_accounts') {
+    set.push('audience_email_id = NULL', 'members_email_id = NULL', 'anonymised_at = ?3')
+    // The lock comes off: a tombstone is out of use by being one.
+    set.push(`disabled_at = CASE WHEN disabled_reason = '${ERASING}' THEN NULL ELSE disabled_at END`, `disabled_reason = CASE WHEN disabled_reason = '${ERASING}' THEN NULL ELSE disabled_reason END`)
   }
-  // The batch checks itself: nothing it should have removed is still there, or nothing commits.
-  const remaining = plan.filter(s => s.table !== 'core_accounts' && (s.action === 'delete' || s.set.length)).map(s =>
+  return bound(`UPDATE ${q(step.table)} SET ${set.join(', ')} WHERE (${step.match})${step.table === 'core_accounts' ? ' AND anonymised_at IS NULL' : ''}`, params)
+}
+
+/** SQL that is true while none of `steps` has anything left to erase. */
+function noneLeft(steps: ErasureStep[]): string {
+  return steps.filter(s => s.table !== 'core_accounts' && (s.action === 'delete' || s.set.length)).map(s =>
     s.action === 'delete'
       ? `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE ${s.match})`
-      : `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE (${s.match}) AND (${s.set.map(leftOver).join(' OR ')}))`)
-  unit.add(bound(`UPDATE core_accounts SET anonymised_at = anonymised_at WHERE id = ?1 AND anonymised_at IS NOT NULL AND ${remaining.join(' AND ') || '1'}`, params))
-    .expect(1, { code: 'core.erasure.incomplete', reason: 'The erasure did not clear everything, so nothing was changed.', remedy: 'Report this; the request will be tried again.' })
-  if (owner) guardLastOwner(unit)
+      : `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE (${s.match}) AND (${s.set.map(leftOver).join(' OR ')}))`).join(' AND ') || '1'
+}
+
+const INCOMPLETE = { code: 'core.erasure.incomplete', reason: 'The erasure did not clear everything, so nothing was changed.', remedy: 'Report this; the request will be tried again.' }
+
+/** Where a run goes next: a stage, and which pass through the stages it is on. */
+export interface ErasureNext { stage: number, pass: number }
+
+/** What one stage did: the next stage to run, or, after the last, the address the account wrote to. */
+export type ErasureStageResult = { next: ErasureNext } | { next: null, erased: { address: string | null } | null }
+
+/** Whether the account's erasure has started: it carries the lock. */
+export async function erasureStarted(accountId: string): Promise<boolean> {
+  return !!(await first('SELECT 1 FROM core_accounts WHERE id = ? AND disabled_reason = ? AND anonymised_at IS NULL', accountId, ERASING))
+}
+
+/**
+ * Runs one stage of an account's erasure in the caller's unit. Holds are the caller's to check
+ * before stage 0; the last-Owner rule is asserted here as well. `erased` is null when there was
+ * nothing to erase (already a tombstone).
+ */
+export async function eraseStage(unit: UnitView, accountId: string, stage: number, pass = 0): Promise<ErasureStageResult> {
+  const account = await accountById(accountId)
+  if (!account || account.anonymised_at) return { next: null, erased: null }
+  const { handlers, shares, last, plan } = await stages()
+  const at = nowMs()
+  const emails = await verifiedAddressesOf(accountId)
+  const params = [accountId, JSON.stringify(emails), at]
+  const next = { next: { stage: stage + 1, pass } }
+
+  if (stage === 0) {
+    // The lock: no new session, and the ones open end. Live grants end, as history: core_grants is
+    // append-only and keeps who held what.
+    unit.add({ sql: 'UPDATE core_accounts SET disabled_at = coalesce(disabled_at, ?), disabled_reason = ? WHERE id = ? AND anonymised_at IS NULL', params: [at, ERASING, accountId] }).expect(1, INCOMPLETE)
+    endSessionsOf(unit, accountId, 'erased')
+    unit.add(bound(`INSERT INTO core_grant_ends (grant_id, ended_at, ended_by, ended_reason) SELECT g.id, ?3, NULL, 'account_closed' FROM core_grants g WHERE g.account_id ${SCOPE} AND ${LIVE.replaceAll('?', '?3')}`, params))
+    if (await isOwner(accountId)) guardLastOwner(unit)
+    return next
+  }
+  if (stage <= handlers.length) {
+    await handlers[stage - 1]!.erase(unit, { accountId, emails })
+    return next
+  }
+  const share = shares[stage - 1 - handlers.length]
+  if (share) {
+    for (const step of share) unit.add(statementOf(step, params))
+    // Each share checks itself, so a fault shows in the stage that has it.
+    unit.add(bound(`UPDATE core_accounts SET id = id WHERE id = ?1 AND ${noneLeft(share)}`, params)).expect(1, INCOMPLETE)
+    return next
+  }
+
+  // The last stage. Rows written about the person while the run went on send it round again.
+  const middle = plan.filter(s => !LAST.has(s.table))
+  const check = bound(`SELECT ${noneLeft(middle)} AS clear`, params)
+  if (pass + 1 < PASSES && !(await first<{ clear: number }>(check.sql, ...check.params))?.clear) return { next: { stage: 1, pass: pass + 1 } }
+  const audience = account.audience_email_id ? (await all<{ address: string }>('SELECT address FROM core_account_emails WHERE id = ? AND verified_at IS NOT NULL', account.audience_email_id))[0]?.address ?? null : null
+  for (const step of last) unit.add(statementOf(step, params))
+  // The run checks itself: nothing it should have removed is still there, or the tombstone is not made.
+  unit.add(bound(`UPDATE core_accounts SET anonymised_at = anonymised_at WHERE id = ?1 AND anonymised_at IS NOT NULL AND ${noneLeft(plan)}`, params)).expect(1, INCOMPLETE)
   unit.announce('core.account.erased', { accountId }, { record: ['core.account', accountId] })
-  unit.audit({ action: 'erase', record: ['core.account', accountId], detail: { tables: plan.length } })
-  return { address: audience }
+  unit.audit({ action: 'erase', record: ['core.account', accountId], detail: { tables: plan.length, stages: stage + 1 } })
+  return { next: null, erased: { address: audience } }
+}
+
+/**
+ * Erases an account now, every stage in its own unit, one after another. For callers outside a
+ * data request, such as tests; a request runs its stages as jobs (core.run-erasure).
+ */
+export async function eraseAccount(accountId: string): Promise<{ address: string | null } | null> {
+  let at: ErasureNext = { stage: 0, pass: 0 }
+  for (;;) {
+    const unit = createUnit()
+    const result = await eraseStage(unit.view(), accountId, at.stage, at.pass)
+    await unit.commit()
+    if (!result.next) return result.erased
+    at = result.next
+  }
 }
