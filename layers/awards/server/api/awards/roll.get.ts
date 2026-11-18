@@ -1,5 +1,5 @@
 // The roll of honour, for the public page and the ::awards-roll component: listed awards by type,
-// or one type's by its short code. "Not found" while the roll is not public. Somebody with a
+// or one type's by its web address. "Not found" while the roll is not public. Somebody with a
 // members' standing also sees the awards listed to members only.
 import { getQuery } from 'h3'
 import { defineRoute, fact, refuse, useSetting } from '#kit'

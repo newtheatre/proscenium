@@ -11,7 +11,8 @@ import { sellableTypes } from './ticket-types'
 
 export interface BookingPage {
   performance: { id: string, startsAt: number, venue: string, state: string }
-  production: { id: string, slug: string, title: string, subtitle: string | null }
+  /** Age guidance: `ageRestricted` means only people of `ageMin` and over may come; otherwise `ageMin` is a recommendation. */
+  production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
   state: 'none' | 'draft' | 'on_sale' | 'paused' | 'closed'
   onSaleAt: number | null
   currency: string | null
@@ -62,7 +63,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   }
   return {
     performance: { id: performance.id, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}`, state: performance.state },
-    production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle },
+    production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle, ageMin: production.ageMin, ageRestricted: production.ageRestricted && production.ageMin !== null },
     state: found.state,
     onSaleAt: found.onSaleAt,
     currency: found.currency,

@@ -45,6 +45,7 @@
   "core.picker.type-more": "Type at least three letters of a name, or a whole email address.",
   "core.picker.none": "Nobody matches.",
   "core.picker.failed": "The search did not work. Try again in a moment.",
+  "core.picker.refused": "You can't search people. Ask an administrator for “Find people by name or address”.",
   "core.picker.since": "Has signed in, since {date}",
   "core.picker.unclaimed": "Has never signed in",
   "core.picker.disabled": "Disabled"

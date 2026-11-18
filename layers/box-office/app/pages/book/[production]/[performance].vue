@@ -10,7 +10,7 @@ import type { ButtonProps } from '@nuxt/ui'
 interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string }
-  production: { id: string, slug: string, title: string, subtitle: string | null }
+  production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
   state: 'none' | 'draft' | 'on_sale' | 'paused' | 'closed'
   onSaleAt: number | null
   currency: string | null
@@ -134,6 +134,17 @@ async function hold() {
       />
       <UPageBody>
         <div class="max-w-2xl space-y-6">
+          <p
+            v-if="data.production.ageMin !== null"
+            class="flex items-center gap-2"
+            :class="data.production.ageRestricted ? 'font-medium' : 'text-sm text-muted'"
+          >
+            <UIcon
+              :name="data.production.ageRestricted ? 'i-lucide-id-card' : 'i-lucide-info'"
+              class="shrink-0"
+            />
+            {{ data.production.ageRestricted ? t('box-office.book.age.restricted', { age: data.production.ageMin }) : t('box-office.book.age.recommended', { age: data.production.ageMin }) }}
+          </p>
           <UAlert
             v-if="data.state !== 'on_sale'"
             color="neutral"
