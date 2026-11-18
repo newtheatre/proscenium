@@ -16,6 +16,8 @@ import addSpace from '../../../core/server/api/core/venues/[id]/spaces/index.pos
 import createSeason from '../../../core/server/api/core/seasons/index.post'
 import seasonState from '../../../core/server/api/core/seasons/[id]/state.post'
 import readVenue from '../../server/api/public-site/venues/[slug].get'
+import readVenues from '../../server/api/public-site/venues/index.get'
+import readProduction from '../../server/api/public-site/productions/[slug].get'
 import readSeason from '../../server/api/public-site/seasons/[slug].get'
 import { changeSetting, createUnit } from '#kit'
 import { publicProgrammePaths } from '#modules/core'
@@ -38,7 +40,9 @@ const handle = server({
   'POST /api/core/venues/:id/spaces': addSpace,
   'POST /api/core/seasons': createSeason,
   'POST /api/core/seasons/:id/state': seasonState,
+  'GET /api/public-site/venues': readVenues,
   'GET /api/public-site/venues/:slug': readVenue,
+  'GET /api/public-site/productions/:slug': readProduction,
   'GET /api/public-site/seasons/:slug': readSeason,
 })
 const admin = person(['core.production.create', 'core.production.edit', 'core.production.publish', 'core.performance.schedule', 'core.venue.manage', 'core.season.manage'])
@@ -127,6 +131,24 @@ describe('a venue\'s public page', () => {
     expect(body.productions.map((p: { id: string }) => p.id)).toEqual([play])
     // No internal field reaches the public.
     expect(Object.keys(body.venue.spaces[1]).sort()).toEqual(['access', 'accessInfo', 'description', 'findingIt', 'id', 'name', 'slug'])
+  })
+
+  it('lists active venues in brief on the index, and gives a production\'s venues for Getting here', async () => {
+    const at = await ok('POST', '/api/core/venues', { name: `The Quayside ${Math.random()}`, addressLines: '2 Quay Street', locality: 'Nottingham', postcode: 'NG2 2BB' })
+    await ok('PUT', `/api/core/venues/${at.venueId}/access`, { spaceId: null, features: [{ termId: await term('core.place-access', 'step-free'), note: null }] })
+    const gone = await ok('POST', '/api/core/venues', { name: `The Gone Hall ${Math.random()}` })
+    await ok('POST', `/api/core/venues/${gone.venueId}/archive`, {})
+    const { status, body } = await visit('/api/public-site/venues')
+    expect(status, JSON.stringify(body)).toBe(200)
+    const listed = body.venues.find((v: { id: string }) => v.id === at.venueId)
+    expect(listed).toMatchObject({ address: { lines: ['2 Quay Street'], locality: 'Nottingham', postcode: 'NG2 2BB' }, access: [{ label: 'Step-free access' }] })
+    expect(body.venues.map((v: { id: string }) => v.id)).not.toContain(gone.venueId)
+
+    const play = await show('A Quayside Play')
+    await date(play, at, '2030-06-01T18:30:00Z')
+    const production = await visit(`/api/public-site/productions/${await slugOf('core_productions', play)}`)
+    expect(production.status, JSON.stringify(production.body)).toBe(200)
+    expect(production.body.venues).toEqual([listed])
   })
 
   it('answers not found for an unknown or archived venue', async () => {

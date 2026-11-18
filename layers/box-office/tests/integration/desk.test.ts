@@ -9,6 +9,7 @@ import { findOrCreateAccount } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
 import releaseReservations from '../../server/tasks/release-reservations'
+import { createPromoCode } from '../../server/promo-codes'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
@@ -258,6 +259,25 @@ describe('selling at the desk', () => {
     expect(made!.account_id).toBe(accountId)
     expect((await till({ ...input, email: 'both@example.org' })).status).toBe(422)
     expect((await till({ ...input, accountId: 'acc_nobody' })).body.code).toBe('box-office.desk.no-address')
+  })
+
+  it('takes a promo code the buyer gives, on the dearest tickets first, and gives its uses back when the payment is cancelled', async () => {
+    const h = await house(5)
+    const code = 'DESK' + h.performanceId.slice(-6).toUpperCase()
+    await commit(unit => createPromoCode(unit.view(), { code, effect: 'percent_off', value: 5000, maxPerOrder: 1 }, null))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }], promoCode: code.toLowerCase() }
+    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
+    expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 600 + 800, panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 600 }, { label: 'Concession', amountMinor: 800 }] }] })
+    const sale = await till(input)
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(sale.body.amountMinor).toBe(1400)
+    const [made] = await rows<{ id: string }>('SELECT id FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(await rows('SELECT list_minor, discount_minor, amount_minor, promo_redemption_id IS NOT NULL AS redeemed FROM box_office_order_lines WHERE order_id = ? ORDER BY list_minor DESC', made!.id))
+      .toEqual([{ list_minor: 1200, discount_minor: 600, amount_minor: 600, redeemed: 1 }, { list_minor: 800, discount_minor: 0, amount_minor: 800, redeemed: 0 }])
+    expect(await count('SELECT used AS n FROM box_office_promo_codes WHERE code = ?', code)).toBe(1)
+    await commit(unit => cancelIntent(unit.view(), sale.body.intentId))
+    expect(await count('SELECT used AS n FROM box_office_promo_codes WHERE code = ?', code)).toBe(0)
+    expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('box-office.promo.unknown')
   })
 
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {
