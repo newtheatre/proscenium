@@ -83,6 +83,8 @@ export default defineRoute({
       min: entry.kind === 'rate' ? RATE_COUNT.min : entry.min,
       max: entry.kind === 'rate' ? RATE_COUNT.max : entry.max,
       maxLength: entry.maxLength,
+      /** A duration's units, when it offers only some. */
+      units: entry.kind === 'duration' ? entry.units : undefined,
       multiline: entry.multiline === true,
       /** A rate's period limits, written like 1m and 1d, for the period control. */
       periodMin: entry.kind === 'rate' ? RATE_PERIOD.min : undefined,

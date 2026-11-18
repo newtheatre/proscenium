@@ -131,6 +131,9 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await cash(page).click()
   await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
   await page.getByLabel(/^Cash handed over/).fill('10')
+  await page.getByLabel(/^Cash handed over/).blur()
+  // The change shows while the cash is typed, before the sale is done.
+  await expect(page.getByText('Change: £4.00')).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()

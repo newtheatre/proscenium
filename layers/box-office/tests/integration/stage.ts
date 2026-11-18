@@ -27,6 +27,7 @@ import reservePost from '../../server/api/box-office/baskets/[id]/reserve.post'
 import checkoutPost from '../../server/api/box-office/baskets/[id]/checkout.post'
 import payPost from '../../server/api/box-office/baskets/[id]/pay.post'
 import checkPost from '../../server/api/box-office/baskets/[id]/check.post'
+import basketReleasePost from '../../server/api/box-office/baskets/[id]/release.post'
 import confirmPost from '../../server/api/box-office/reservations/confirm.post'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
@@ -41,6 +42,8 @@ import doorOverride from '../../server/api/box-office/performances/[id]/door/ove
 import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.post'
 import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
+import doorOfflineGet from '../../server/api/box-office/performances/[id]/door/offline.get'
+import doorOfflinePost from '../../server/api/box-office/performances/[id]/door/offline.post'
 import doorTonight from '../../server/api/box-office/door/tonight.get'
 import liveTonight from '../../../core/server/api/core/live/tonight.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
@@ -102,12 +105,15 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/checkout': checkoutPost,
   'POST /api/box-office/baskets/:id/pay': payPost,
   'POST /api/box-office/baskets/:id/check': checkPost,
+  'POST /api/box-office/baskets/:id/release': basketReleasePost,
   'POST /api/box-office/reservations/confirm': confirmPost,
   'GET /api/box-office/orders/link': orderLinkGet,
   'GET /api/box-office/orders': ordersGet,
   'GET /api/box-office/performances': performancesGet,
   'GET /api/box-office/performances/:id/door': doorGet,
   'POST /api/box-office/performances/:id/door/admit': doorAdmit,
+  'GET /api/box-office/performances/:id/door/offline': doorOfflineGet,
+  'POST /api/box-office/performances/:id/door/offline': doorOfflinePost,
   'POST /api/box-office/performances/:id/door/override': doorOverride,
   'POST /api/box-office/performances/:id/sales/copy': copyPost,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
