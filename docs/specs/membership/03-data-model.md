@@ -203,6 +203,7 @@ The number is given in the same batch as the first activation. The next number i
 | `uploaded_at` | timestamp | not null | internal | keep | Of the latest upload |
 | `created_at` | timestamp | not null | internal | keep |  |
 | reference\_label | text | up to 120 characters; required when key\_kind is reference | public | keep | The whole phrase shown as the field's label, naming the scheme and the issuer: "NNT member? Enter your University of Nottingham student ID". Never a bare noun (rule V13) |
+| reference\_noun | text | up to 40 characters; required when key\_kind is reference (lists made before it read "reference") | public | keep | The short noun that messages use in a sentence ("student ID"): "Your student ID is 8 digits", "That student ID has already been used". Messages never splice the whole reference\_label in (rule V13) |
 | reference\_shape | text | nullable; one of digits, letters-and-digits, with a minimum and maximum length | internal | keep | What a well-formed reference looks like. Used only to tell a mistyped reference from one that is well formed but not on the list (rule V15). Not a free pattern |
 
 ## membership\_verification\_entries

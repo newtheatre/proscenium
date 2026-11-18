@@ -6,7 +6,7 @@
 // staff. A failure refuses the request, so nothing is written and the person can try again.
 import { all, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { findEntry, normalise, schemeList, wellFormed, type ListRow, type Shape } from './lists'
+import { findEntry, normalise, nounOf, schemeList, wellFormed, type ListRow, type Shape } from './lists'
 import { verifierConfig, type Scheme } from './schemes'
 
 export interface ListPass { entryId: string, endsOn: string | null }
@@ -52,17 +52,20 @@ export function recordOutcome(unit: UnitView, membershipId: string, outcome: Out
   }).expect(1)
 }
 
-/** How a well-formed reference reads, for a message that says what one looks like (V15). */
-export function shapeText(label: string, shape: Shape | null): string {
-  if (!shape) return `Enter your ${label}.`
+/**
+ * How a well-formed reference reads, for a message that says what one looks like (V15). `noun` is
+ * the list's short noun ("student ID"), never its whole question.
+ */
+export function shapeText(noun: string, shape: Shape | null): string {
+  if (!shape) return `Enter your ${noun}.`
   const length = shape.min === shape.max ? `${shape.min}` : `${shape.min} to ${shape.max}`
-  return `Your ${label} is ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
+  return `Your ${noun} is ${length} ${shape.kind === 'digits' ? 'digits' : 'letters and digits'}.`
 }
 
 /** The entry that lets this account join, or a refusal saying why not. */
 export async function passList(list: ListRow, accountId: string, reference: string | null | undefined, day: string): Promise<ListPass> {
   const help = String(await useSetting('membership.help.link') ?? '') || undefined
-  const label = list.referenceLabel ?? 'reference'
+  const noun = nounOf(list)
   let entry: Awaited<ReturnType<typeof findEntry>> = null
   if (list.keyKind === 'email') {
     for (const address of await verifiedAddresses(accountId)) {
@@ -72,17 +75,17 @@ export async function passList(list: ListRow, accountId: string, reference: stri
     if (!entry) refuse('membership.join.not-on-list', 'We could not find a membership for any of your verified email addresses. Have a membership? Contact us.', { status: 422, remedy: help })
   }
   else {
-    if (!reference) refuse('membership.join.needs-reference', `Enter your ${label}.`, { status: 422, fields: { reference: 'membership.join.needs-reference' } })
+    if (!reference) refuse('membership.join.needs-reference', `Enter your ${noun}.`, { status: 422, fields: { reference: 'membership.join.needs-reference' } })
     if (!wellFormed(list.referenceShape, normalise('reference', reference!)))
-      refuse('membership.join.not-well-formed', shapeText(label, list.referenceShape), { status: 422, fields: { reference: 'membership.join.not-well-formed' } })
+      refuse('membership.join.not-well-formed', shapeText(noun, list.referenceShape), { status: 422, fields: { reference: 'membership.join.not-well-formed' } })
     entry = await findEntry(list, reference!, day)
     // V15: the miss speaks of the membership, not the ID.
-    if (!entry) refuse('membership.join.not-on-list', `We could not find a membership for that ${label}. Have a membership? Contact us.`, { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
+    if (!entry) refuse('membership.join.not-on-list', `We could not find a membership for that ${noun}. Have a membership? Contact us.`, { status: 422, remedy: help, fields: { reference: 'membership.join.not-on-list' } })
   }
   if (entry!.usedBy) {
     const ours = await all<{ id: string }>(`SELECT id FROM membership_memberships WHERE id = ?1 AND account_id IN (${accountScopeSql('?2')})`, entry!.usedBy, accountId)
     // V4: somebody else claimed it. Staff settle that; the application queue is a later slice.
-    if (!ours.length) refuse('membership.join.entry-already-used', `That ${label} has already been used to join. Contact us and we will sort it out.`, { status: 409, remedy: help })
+    if (!ours.length) refuse('membership.join.entry-already-used', `That ${noun} has already been used to join. Contact us and we will sort it out.`, { status: 409, remedy: help })
   }
   return { entryId: entry!.id, endsOn: entry!.endsOn }
 }

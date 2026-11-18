@@ -11,7 +11,7 @@ beforeAll(ready)
 const FILE = 'Student ID,Ends,Name\n20123456,31/07/2027,Ada Lovelace\n20654321,2027-07-31,Alan Turing\n123,2027-07-31,Too Short\n20123456,2027-07-31,Twice\n20999999,soon,Bad Date\n'
 
 async function makeList(file = FILE) {
-  const made = await req('POST', '/api/membership/lists', { name: 'Union 2026–27', keyKind: 'reference', referenceLabel: 'University of Nottingham student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
+  const made = await req('POST', '/api/membership/lists', { name: 'Union 2026–27', keyKind: 'reference', referenceLabel: 'NNT member? Enter your University of Nottingham student ID', referenceNoun: 'student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
   expect(made.status, JSON.stringify(made.body)).toBe(200)
   const id = made.body.listId as string
   expect((await req('POST', `/api/membership/lists/${id}/import`, { file })).status).toBe(200)
@@ -29,7 +29,7 @@ const check = (listId: string, value: string) => req('POST', `/api/membership/li
 
 describe('a verification list', () => {
   it('loads a file after a dry run, keeping no ID, and says which lines it left out', async () => {
-    const made = await req('POST', '/api/membership/lists', { name: 'Dry', keyKind: 'reference', referenceLabel: 'University of Nottingham student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
+    const made = await req('POST', '/api/membership/lists', { name: 'Dry', keyKind: 'reference', referenceLabel: 'NNT member? Enter your University of Nottingham student ID', referenceNoun: 'student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
     const id = made.body.listId
     const dry = await req('POST', `/api/membership/lists/${id}/import`, { file: FILE, dryRun: true })
     expect(dry.body).toMatchObject({ loaded: 0, wouldLoad: 2 })
@@ -60,6 +60,15 @@ describe('a verification list', () => {
     expect((await req('GET', `/api/membership/lists/${id}`)).body.list.entryCount).toBe(1)
   })
 
+  it('needs a short noun for a reference list, used in sentences in place of the question', async () => {
+    const missing = await req('POST', '/api/membership/lists', { name: 'No noun', keyKind: 'reference', referenceLabel: 'NNT member? Enter your University of Nottingham student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
+    expect(missing.body).toMatchObject({ code: 'membership.list.noun-needed', fields: { referenceNoun: 'membership.list.noun-needed' } })
+    const id = await makeList()
+    expect((await req('PATCH', `/api/membership/lists/${id}`, { referenceNoun: 'union number' })).status).toBe(200)
+    expect((await req('GET', `/api/membership/lists/${id}`)).body.list).toMatchObject({ referenceNoun: 'union number', referenceLabel: 'NNT member? Enter your University of Nottingham student ID' })
+    expect((await req('PATCH', `/api/membership/lists/${id}`, { referenceNoun: null })).body.code).toBe('membership.list.noun-needed')
+  })
+
   it('is managed only with membership.verification-list.manage', async () => {
     const id = await makeList()
     expect((await req('POST', `/api/membership/lists/${id}/import`, { file: FILE }, person(['membership.verification-list.check']))).status).toBe(403)
@@ -73,8 +82,10 @@ describe('joining against a list', () => {
     const { id } = await listScheme()
     const student = person([])
     expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.code).toBe('membership.join.needs-reference')
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'Your University of Nottingham student ID is 8 digits.' })
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20000000' }, student)).body.code).toBe('membership.join.not-on-list')
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'Your student ID is 8 digits.' })
+    // The list's question is the field's label; sentences use its short noun (finding: never splice the question in).
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.reason).toBe('Enter your student ID.')
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20000000' }, student)).body).toMatchObject({ code: 'membership.join.not-on-list', reason: 'We could not find a membership for that student ID. Have a membership? Contact us.' })
     const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, student)
     expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ startsOn: '2026-11-17', endsOn: '2027-07-31', opensMembersArea: true })
     const row = await inContext(() => first<{ length_option_id: string | null, used: string | null, outcome: string }>(
@@ -104,7 +115,7 @@ describe('the member price by student ID', () => {
     const [unclaimed] = await typed('20123456')
     expect(unclaimed).toMatchObject({ verdict: 'met', evidence: entry!.id })
     expect(unclaimed).not.toHaveProperty('holderAccountId')
-    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'Your University of Nottingham student ID is 8 digits.' })
+    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'Your student ID is 8 digits.' })
     expect((await typed('20000000'))[0]!.verdict).toBe('not-met')
 
     const student = person([])
@@ -114,7 +125,7 @@ describe('the member price by student ID', () => {
     expect((await inContext(() => requirements.check({ accounts: [null], refs: [ref], presented: [{ ref, evidence: entry!.id }], whenUnavailable: 'not-met' }), buyer))[0]!.verdict).toBe('met')
 
     const described = await inContext(() => requirements.describe([ref]), buyer)
-    expect(described[ref]!.presentable!.label).toBe(`${described[ref]!.label}? Enter your University of Nottingham student ID`)
+    expect(described[ref]!.presentable!.label).toBe('NNT member? Enter your University of Nottingham student ID. You can use your member number instead.')
 
     const door = person(['membership.verification-list.check'])
     expect(await inContext(() => requirements.holder(ref, entry!.id), door)).toBe('Ada Lovelace')
