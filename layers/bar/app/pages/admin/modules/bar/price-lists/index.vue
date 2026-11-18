@@ -1,6 +1,7 @@
 <!-- Price lists (S12): Standard, which always exists, and any others such as Committee or Staff. A
      list is priced by hand, falling back to Standard where it has no price, or is a percentage off
-     Standard with no prices of its own. A restricted list needs its own ability to choose at the till. -->
+     Standard with no prices of its own. A restricted list needs its own ability to choose at the till.
+     Retired lists sit below a divider. -->
 <script setup lang="ts">
 import { priceListInput, priceListPatch } from '../../../../../../server/input'
 
@@ -10,6 +11,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
+const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<{ lists: List[] }>('/api/bar/price-lists', { key: 'bar:price-lists' })
 
 function describe(l: List): string {
@@ -18,6 +20,13 @@ function describe(l: List): string {
     : l.percentOff !== null ? t('bar.screens.lists.percent', { percent: l.percentOff }) : l.fallsBack ? t('bar.screens.lists.by-hand-falls-back') : t('bar.screens.lists.by-hand')
   return [how, l.restricted ? t('bar.screens.lists.restricted') : null].filter(Boolean).join(' · ')
 }
+
+const query = ref('')
+const searching = ref(false)
+const showRetired = ref(false)
+const shown = computed(() => (data.value?.lists ?? []).filter(l => l.name.toLowerCase().includes(query.value.trim().toLowerCase())))
+const current = computed(() => shown.value.filter(l => l.active))
+const retired = computed(() => shown.value.filter(l => !l.active))
 
 const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean, pricing: 'hand' | 'percent', percentOff: number | null } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -46,9 +55,20 @@ async function save() {
   refusal.value = null
   const body = listBody()
   try {
-    if (f.id) await $api(`/api/bar/price-lists/${f.id}` as string, { method: 'PATCH', body })
-    else await $api('/api/bar/price-lists', { method: 'POST', body })
-    toast.add({ title: t('bar.screens.lists.saved'), color: 'success' })
+    if (f.id) {
+      // Undo puts back what it was.
+      const was = data.value?.lists.find(l => l.id === f.id)
+      const id = f.id
+      await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body })
+      offer(t('bar.screens.lists.saved'), was && (async () => {
+        await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body: was.standard ? { name: was.name, restricted: was.restricted } : { name: was.name, restricted: was.restricted, fallsBack: was.fallsBack, percentOff: was.percentOff } })
+        await refresh()
+      }))
+    }
+    else {
+      await $api('/api/bar/price-lists', { method: 'POST', body })
+      toast.add({ title: t('bar.screens.lists.saved'), color: 'success' })
+    }
     form.value = null
     await refresh()
   }
@@ -61,6 +81,10 @@ async function setActive(l: List, active: boolean) {
   try {
     await $api(`/api/bar/price-lists/${l.id}` as string, { method: 'PATCH', body: { active } })
     await refresh()
+    offer(active ? t('bar.screens.lists.restored', { name: l.name }) : t('bar.screens.lists.retired', { name: l.name }), async () => {
+      await $api(`/api/bar/price-lists/${l.id}` as string, { method: 'PATCH', body: { active: !active } })
+      await refresh()
+    })
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })
@@ -71,11 +95,19 @@ async function setActive(l: List, active: boolean) {
 <template>
   <PageFrame :title="t('bar.navigation.price-lists.label')">
     <template #primary>
-      <UButton
-        icon="i-lucide-plus"
-        :label="t('bar.screens.lists.new')"
-        @click="edit()"
-      />
+      <div class="flex items-center gap-2">
+        <SearchToggle
+          v-model="query"
+          v-model:open="searching"
+          :label="t('bar.screens.lists.search')"
+        />
+        <UButton
+          icon="i-lucide-plus"
+          :label="t('bar.screens.lists.new')"
+          :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
+          @click="edit()"
+        />
+      </div>
     </template>
     <DataBoundary
       :data="data"
@@ -83,32 +115,89 @@ async function setActive(l: List, active: boolean) {
       :error="error"
       @retry="refresh()"
     >
-      <RecordList
-        v-if="data"
-        :label="t('bar.navigation.price-lists.label')"
-      >
-        <RecordListItem
-          v-for="l in data.lists"
-          :key="l.id"
-          :description="describe(l)"
-          :muted="!l.active"
+      <template v-if="data">
+        <EmptyState
+          v-if="!data.lists.length"
+          icon="i-lucide-tags"
+          :title="t('bar.screens.lists.empty-title')"
+          :description="t('bar.screens.lists.empty')"
         >
-          <template #name>
-            <ULink :to="`/admin/modules/bar/price-lists/${l.id}`">
-              {{ l.active ? l.name : t('bar.screens.products.retired-name', { name: l.name }) }}
-            </ULink>
+          <template #actions>
+            <UButton
+              icon="i-lucide-plus"
+              :label="t('bar.screens.lists.new')"
+              @click="edit()"
+            />
           </template>
-          <RowActions
-            :label="t('bar.screens.lists.actions', { name: l.name })"
-            :items="[
-              { label: t('bar.screens.lists.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(l) },
-              ...(l.standard ? [] : [l.active
-                ? { label: t('bar.screens.lists.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(l, false) }
-                : { label: t('bar.screens.lists.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(l, true) }]),
-            ]"
-          />
-        </RecordListItem>
-      </RecordList>
+        </EmptyState>
+        <div
+          v-else
+          class="space-y-4"
+        >
+          <p
+            v-if="!shown.length"
+            class="text-sm text-muted"
+          >
+            {{ t('bar.screens.lists.no-match') }}
+          </p>
+          <RecordList
+            v-if="current.length"
+            :label="t('bar.navigation.price-lists.label')"
+          >
+            <RecordListItem
+              v-for="l in current"
+              :key="l.id"
+              :description="describe(l)"
+              :muted="!l.active"
+            >
+              <template #name>
+                <ULink :to="`/admin/modules/bar/price-lists/${l.id}`">
+                  {{ l.name }}
+                </ULink>
+              </template>
+              <RowActions
+                :label="t('bar.screens.lists.actions', { name: l.name })"
+                :items="[
+                  { label: t('bar.screens.lists.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(l) },
+                  ...(l.standard ? [] : [l.active
+                    ? { label: t('bar.screens.lists.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(l, false) }
+                    : { label: t('bar.screens.lists.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(l, true) }]),
+                ]"
+              />
+            </RecordListItem>
+          </RecordList>
+          <CollapsibleDivider
+            :open="showRetired || !!query.trim()"
+            :label="t('bar.screens.lists.retired-list')"
+            :count="retired.length"
+            @update:open="v => showRetired = v"
+          >
+            <RecordList :label="t('bar.screens.lists.retired-list')">
+              <RecordListItem
+                v-for="l in retired"
+                :key="l.id"
+                :description="describe(l)"
+                :muted="!l.active"
+              >
+                <template #name>
+                  <ULink :to="`/admin/modules/bar/price-lists/${l.id}`">
+                    {{ l.name }}
+                  </ULink>
+                </template>
+                <RowActions
+                  :label="t('bar.screens.lists.actions', { name: l.name })"
+                  :items="[
+                    { label: t('bar.screens.lists.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(l) },
+                    ...(l.standard ? [] : [l.active
+                      ? { label: t('bar.screens.lists.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(l, false) }
+                      : { label: t('bar.screens.lists.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(l, true) }]),
+                  ]"
+                />
+              </RecordListItem>
+            </RecordList>
+          </CollapsibleDivider>
+        </div>
+      </template>
     </DataBoundary>
 
     <UModal

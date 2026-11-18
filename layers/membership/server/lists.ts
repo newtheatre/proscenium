@@ -13,6 +13,7 @@ export interface ListRow {
   entryCount: number
   validUntil: string | null
   referenceLabel: string | null
+  referenceNoun: string | null
   referenceShape: Shape | null
   uploadedAt: number
   /** Whether a file has ever been loaded: a new list's upload time is 0 until one is. */
@@ -22,12 +23,15 @@ export interface ListRow {
 /** What a well-formed reference looks like (V15). Never a free pattern. */
 export interface Shape { kind: 'digits' | 'letters-and-digits', min: number, max: number }
 
-const LIST_COLUMNS = `id, name, key_kind AS keyKind, entry_count AS entryCount, valid_until AS validUntil, reference_label AS referenceLabel,
+const LIST_COLUMNS = `id, name, key_kind AS keyKind, entry_count AS entryCount, valid_until AS validUntil, reference_label AS referenceLabel, reference_noun AS referenceNoun,
   reference_shape AS referenceShape, uploaded_at AS uploadedAt, uploaded_at > 0 AS loaded`
 
 function toList(row: Record<string, unknown>): ListRow {
   return { ...row, loaded: !!row.loaded, referenceShape: row.referenceShape ? JSON.parse(String(row.referenceShape)) as Shape : null } as ListRow
 }
+
+/** The noun a sentence uses for the list's reference: "student ID", or "reference" on an older list. */
+export const nounOf = (list: Pick<ListRow, 'referenceNoun'>): string => list.referenceNoun ?? 'reference'
 
 export async function getList(id: string | undefined): Promise<ListRow | null> {
   if (!id) return null
@@ -161,13 +165,32 @@ export function parseFile(kind: ListRow['keyKind'], shape: Shape | null, text: s
 }
 
 /** An entry that matches a value on a day: on the list, not past its end, and the list still valid. */
-export async function findEntry(list: ListRow, value: string, day: string): Promise<{ id: string, endsOn: string | null, usedBy: string | null } | null> {
+export async function findEntry(list: ListRow, value: string, day: string): Promise<{ id: string, endsOn: string | null, usedBy: string | null, holderName: string | null } | null> {
   if (list.validUntil && list.validUntil < day) return null
   const hash = await hashValue(list.keyKind, value)
-  return first<{ id: string, endsOn: string | null, usedBy: string | null }>(
-    'SELECT id, ends_on AS endsOn, used_by AS usedBy FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND (ends_on IS NULL OR ends_on >= ?3)',
+  return first<{ id: string, endsOn: string | null, usedBy: string | null, holderName: string | null }>(
+    'SELECT id, ends_on AS endsOn, used_by AS usedBy, holder_name AS holderName FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND (ends_on IS NULL OR ends_on >= ?3)',
     list.id, hash, day,
   )
+}
+
+/** The date an entry for a value ended, when it is on the list but past its end: told apart from a miss. */
+export async function endedOn(list: ListRow, value: string, day: string): Promise<string | null> {
+  const hash = await hashValue(list.keyKind, value)
+  return (await first<{ endsOn: string }>('SELECT ends_on AS endsOn FROM membership_verification_entries WHERE list_id = ?1 AND key_hash = ?2 AND ends_on < ?3', list.id, hash, day))?.endsOn ?? null
+}
+
+/**
+ * Whether the name on a list and the name on an account could be the same person, loosely: the
+ * surname of one appears in the other, ignoring case, accents and punctuation. An empty name on
+ * either side is not held against anybody.
+ */
+export function namesAgree(listName: string | null, accountName: string | null): boolean {
+  const words = (name: string) => name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 1)
+  const a = words(listName ?? '')
+  const b = words(accountName ?? '')
+  if (!a.length || !b.length) return true
+  return b.includes(a.at(-1)!) || a.includes(b.at(-1)!)
 }
 
 /**

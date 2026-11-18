@@ -202,5 +202,8 @@ describe('productions', () => {
     expect(found.body.rows.map((p: { title: string }) => p.title)).toEqual(['Uncle Vanya'])
     const drafts = await req('GET', '/api/core/productions?state=draft&size=100', undefined, viewer)
     expect(drafts.body.rows.every((p: { state: string }) => p.state === 'draft')).toBe(true)
+    // Each row says when it is next on and where; with no dates, neither.
+    expect(found.body.rows[0]).toMatchObject({ next: null, space: null, firstStartsAt: null })
+    expect((await req('GET', '/api/core/productions?sort=dates&order=asc', undefined, viewer)).status).toBe(200)
   })
 })
