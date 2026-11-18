@@ -1,7 +1,7 @@
 // Scanning with the camera, in a real browser with a pretend camera that shows a QR code: at the desk
 // a reservation's box office code is scanned and the booking opens; at the door a ticket is scanned
 // and admitted, then scanned again and found already in. The door in live mode opens with the camera
-// running, admits a ticket at once, and sends an unpaid reservation to the box office or the bar. Chromium's fake camera plays a Y4M file,
+// running, admits a ticket at once, and sends an unpaid reservation to the till. Chromium's fake camera plays a Y4M file,
 // which is made here from the code, so what the camera "sees" is a real QR code read by the page.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -170,7 +170,7 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.getByRole('dialog').getByLabel('Ticket code, booking reference or name').press('Enter')
     const unpaid = page.getByRole('status').filter({ hasText: 'Not paid' })
     await expect(unpaid).toBeVisible()
-    await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the box office or the bar to pay.`)
+    await expect(unpaid).toContainText(`1 ticket, £12.00 to pay, booking ${reference}. Send them to the till to pay.`)
     await expect(page.getByRole('dialog')).toBeHidden()
 
     // A member whose membership has lapsed is sent to the box office with the members list's own words.

@@ -166,6 +166,15 @@ function say() {
 watch([mode, admit, quantities, references, holders, order, exchange, sendTo, promo], say, { deep: true })
 onMounted(() => {
   if (exchange.value) say()
+  // Sent from the door with a reservation to pay for (`?collect=<reference>`): it is found at once.
+  const collect = route.query.collect
+  if (typeof collect === 'string' && collect.trim()) {
+    mode.value = 'collect'
+    query.value = collect
+    void find(collect)
+    const { collect: _, ...rest } = route.query
+    void router.replace({ query: rest })
+  }
 })
 
 // The till empties every panel after a sale.
