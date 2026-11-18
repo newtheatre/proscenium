@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
 import list from '../../server/api/core/policies/index.get'
-import one from '../../server/api/core/policies/[id].get'
+import one from '../../server/api/core/policies/[id]/index.get'
 import pageContext from '../../server/api/core/policies/context.get'
 import { listPolicies, policyContext, policyText, resolvePolicy } from '../../server/policies/service'
 import { call, env, inContext, server } from '../../../../tests/integration/helpers'
@@ -90,5 +90,26 @@ describe('policies', () => {
     // Google is named only while its sign-in is on.
     expect(body.tables.suppliers!.rows.map(r => r[0])).not.toContain('Google')
     expect(body.tables['privacy-records']!.rows.length).toBeGreaterThan(3)
+  })
+})
+
+describe('versions of a policy', () => {
+  it('writes a version the first time the text reads so, and not again', async () => {
+    const { currentVersion, versionsOf, versionText } = await import('../../server/policies/versions')
+    const first = await inContext(() => currentVersion('visiting'))
+    const again = await inContext(() => currentVersion('visiting'))
+    expect(again).toEqual(first)
+    await set('core.visiting.latecomers', 'not-admitted')
+    const changed = await inContext(() => currentVersion('visiting'))
+    expect(changed!.id).not.toBe(first!.id)
+    expect(changed!.number).toBe(first!.number + 1)
+    // Going back to the earlier wording is the earlier version, not a new one.
+    await env.DB.prepare('DELETE FROM core_settings WHERE key = ?').bind('core.visiting.latecomers').run()
+    expect((await inContext(() => currentVersion('visiting')))!.id).toBe(first!.id)
+    const kept = await inContext(() => versionsOf('visiting'))
+    expect(kept.map(v => v.number)).toEqual([changed!.number, first!.number])
+    const old = await inContext(() => versionText('visiting', changed!.number))
+    expect(old!.body).toContain('Once a performance has started we cannot let anyone in')
+    expect(await inContext(() => currentVersion('nonsense'))).toBeNull()
   })
 })

@@ -54,11 +54,13 @@ useSeoMeta({ title: () => policy.value.title, description: () => policy.value.su
             class="me-2"
           >{{ t('core.policies.revised', { date: day(data.revised) }) }}</span>
           <ULink
+            :to="`/policies/${policy.id}/versions`"
+            class="me-2 underline underline-offset-2"
+          >{{ t('core.policies.versions.link') }}</ULink>
+          <ULink
             to="/policies"
             class="underline underline-offset-2"
-          >
-            {{ t('core.policies.all') }}
-          </ULink>
+          >{{ t('core.policies.all') }}</ULink>
         </p>
       </UPageBody>
       <template

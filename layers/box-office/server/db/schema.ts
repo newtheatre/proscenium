@@ -341,6 +341,8 @@ export const orders = defineTable('box_office_orders', {
   // Null for a basket not yet checked out and for an anonymous desk sale (R-15).
   accountId: col.account('account_id', { role: 'subject', nullable: true }),
   signedIn: col.internal(integer('signed_in', { mode: 'boolean' }).notNull().default(false)),
+  // The tickets and booking terms as they read when the buyer checked out or reserved (/policies/tickets).
+  termsVersionId: col.ref('core_policy_versions', { nullable: true }),
   // A list of { term, note? } from core.access-need, copied for this booking. Never on an order with no account.
   accessNote: col.special('access_note'),
   currency: col.currency('currency').notNull(),
