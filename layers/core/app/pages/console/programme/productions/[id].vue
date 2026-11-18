@@ -94,15 +94,17 @@ const detailsForm = useTemplateRef('detailsForm')
 const detailsSchema = computed(() => elsewhere.value
   ? blankAsNull(productionPatch.extend({ externalBookingUrl: productionPatch.shape.externalBookingUrl.unwrap().unwrap() }))
   : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
-watch(production, (p) => {
-  if (!p) return
-  Object.assign(details, {
-    title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
-    seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
-    intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
-    bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
-  })
-}, { immediate: true })
+const detailsFrom = (p: Production) => ({
+  title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
+  seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
+  intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
+  bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
+})
+const resetDetails = () => production.value && Object.assign(details, detailsFrom(production.value))
+watch(production, resetDetails, { immediate: true })
+// Leaving the Details tab, or the page, with changes asks first; leaving drops them.
+const detailsDirty = computed(() => !!production.value && JSON.stringify({ ...details }) !== JSON.stringify(detailsFrom(production.value)))
+useLeaveGuard(detailsDirty, { query: ['tab'], thing: 'this tab', discard: resetDetails })
 const saveDetails = () => run(() => api('', 'PATCH', {
   ...(({ bookedElsewhere: _, ...rest }) => rest)(details),
   categoryTermId: details.categoryTermId || null,

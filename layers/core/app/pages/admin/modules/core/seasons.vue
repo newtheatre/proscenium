@@ -88,7 +88,7 @@ const actions = (s: Season) => [[
 <template>
   <PageFrame
     title="Seasons"
-    description="A season groups productions under a name and dates. Archived seasons leave what's on and stay in the archive."
+    description="A season groups productions under a name and dates. A new season is a draft: only staff see it. Publish it to show its name on its productions on the public site. Archived seasons leave what's on and stay in the archive."
     width="reading"
   >
     <template #primary>
@@ -142,6 +142,16 @@ const actions = (s: Season) => [[
               <StatusBadge
                 :tone="TONES[s.state]"
                 :label="t(`core.states.${s.state}`)"
+              />
+              <UButton
+                v-if="s.state === 'draft'"
+                label="Publish"
+                icon="i-lucide-globe"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                :aria-label="`Publish ${s.name}`"
+                @click="move(s, 'published', 'Season published')"
               />
               <RowActions
                 :items="actions(s)"

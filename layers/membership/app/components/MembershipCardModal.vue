@@ -51,6 +51,7 @@ const qr = computed(() => {
           {{ viewer.name }}
         </p>
         <FactStrip
+          centred
           :facts="[
             ...(number ? [{ label: t('membership.screens.mine.number'), value: number }] : []),
             { label: t('membership.screens.mine.valid-until'), value: membership.endsOn ? day(membership.endsOn) : t('membership.screens.mine.no-end') },
@@ -70,7 +71,7 @@ const qr = computed(() => {
           />
         </svg>
         <p class="text-sm text-muted">
-          {{ t(qr ? 'membership.screens.mine.card-help' : 'membership.screens.mine.card-no-code') }}
+          {{ t(qr ? 'core.card.show' : 'core.card.show-no-code') }}
         </p>
       </div>
     </template>
