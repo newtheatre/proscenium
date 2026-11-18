@@ -7,7 +7,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import { ledgerList } from '../../../../shared/lists'
 
 interface Entry { accountId: string, code: string, name: string, amountMinor: number, currency: string, productionId: string | null, performanceId: string | null }
-interface Row { id: string, kind: string, source: { module: string, type: string, id: string }, reversesId: string | null, periodId: string, occurredAt: number, postedAt: number, entries: Entry[], canReverse: boolean }
+interface Row { id: string, kind: string, source: { module: string, type: string, id: string, title?: string, to?: string }, reversesId: string | null, periodId: string, occurredAt: number, postedAt: number, postedByName: string | null, performances: { id: string, title: string, startsAt: number | null }[], entries: Entry[], canReverse: boolean }
 
 const ROUTE = '/api/finance/postings'
 
@@ -15,7 +15,7 @@ const { t, te } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const { money } = await useMoney()
-const { day } = useDates()
+const { day, dateTime } = useDates()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
@@ -41,7 +41,7 @@ const list = computed(() => ({
 }))
 // A production keeps a row for each currency it took; the filter wants it once.
 const filterOptions = computed(() => ({
-  account: (accounts.value?.accounts ?? []).map(a => ({ value: a.id, label: `${a.code} · ${a.name}` })),
+  account: (accounts.value?.accounts ?? []).map(a => ({ value: a.id, label: a.name })),
   period: (periods.value?.periods ?? []).map(p => ({ value: p.id, label: p.label })),
   production: [...new Map((productions.value?.productions ?? []).map(p => [p.productionId, p.title]))].map(([value, label]) => ({ value, label })),
 }))
@@ -100,7 +100,32 @@ const rowActions = (p: Row): DropdownMenuItem[] => (p.canReverse
       {{ day(row.occurredAt) }}
     </template>
     <template #cell-source="{ row }">
-      <span class="text-muted">{{ sourceLabel(row) }} {{ row.source.id }}</span>
+      <template v-if="row.source.title">
+        <ULink
+          v-if="row.source.to"
+          :to="row.source.to"
+          class="font-medium"
+        >
+          {{ row.source.title }}
+        </ULink>
+        <span
+          v-else
+          class="font-medium"
+        >{{ row.source.title }}</span>
+      </template>
+      <span
+        v-else
+        class="text-muted"
+      >{{ sourceLabel(row) }}</span>
+      <span
+        v-for="p in row.performances"
+        :key="p.id"
+        class="block text-sm text-muted"
+      >{{ p.startsAt ? t('finance.screens.ledger.performance', { title: p.title, when: dateTime(p.startsAt) }) : p.title }}</span>
+      <span
+        v-if="row.postedByName"
+        class="block text-sm text-muted"
+      >{{ t('finance.screens.ledger.posted-by', { person: row.postedByName }) }}</span>
     </template>
     <template #cell-amount="{ row }">
       <span class="tabular-nums">{{ amountOf(row) }}</span>
@@ -129,8 +154,11 @@ const rowActions = (p: Row): DropdownMenuItem[] => (p.canReverse
             :key="n"
           >
             <td class="py-1">
-              <ULink :to="{ query: { ...route.query, account: entry.accountId, page: undefined } }">
-                <span class="text-muted">{{ entry.code }}</span> {{ entry.name }}
+              <ULink
+                :to="{ query: { ...route.query, account: entry.accountId, page: undefined } }"
+                :title="entry.code"
+              >
+                {{ entry.name }}
               </ULink>
             </td>
             <td class="w-32 py-1 text-right tabular-nums">

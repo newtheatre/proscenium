@@ -375,6 +375,7 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
             <UFormField :label="t('front-of-house.rota.person')">
               <PersonPicker
                 v-model="person"
+                :endpoint="adding ? `/api/front-of-house/shifts/${encodeURIComponent(adding.id)}/people` : undefined"
                 :exclude="adding?.people.map(p => p.accountId)"
                 @update:model-value="needsOverride = false"
               />

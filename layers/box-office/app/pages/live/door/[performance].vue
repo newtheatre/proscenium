@@ -23,7 +23,7 @@ interface Scan {
   ticketPerformance?: DoorElsewhere
   reference?: string
 }
-interface Row { id: string, reference: string, buyer: string | null, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
+interface Row { id: string, reference: string, buyer: string | null, channel?: string, at?: number, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
 type Tone = 'success' | 'warning' | 'info' | 'error'
 // `who` names the booking a result was about, for Last scans; `collect` is a reservation to send to the till.
 interface Shown { tone: Tone, icon: string, headline: string, line: string, at: number, who?: string, collect?: string, override?: { ticketId: string, ticketType: string, reason: string | null } }
@@ -46,6 +46,7 @@ const { toRefusal } = useRefusal()
 const { time } = useDates()
 const { money } = await useMoney()
 const elsewhere = useDoorElsewhere()
+const nameOf = useDoorName()
 const online = useOnline()
 const route = useRoute()
 const id = computed(() => String(route.params.performance))
@@ -202,7 +203,7 @@ async function admit(row: Row, count: number) {
   admitting.value = row.id
   try {
     const { admitted } = await $api<{ admitted: number }>(`${base.value}/door/admit`, { method: 'POST', body: { orderId: row.id, count } })
-    show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: t('box-office.door.admitted-now', { count: admitted }), at: Date.now(), who: [row.buyer, row.reference].filter(Boolean).join(' · ') })
+    show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: t('box-office.door.admitted-now', { count: admitted }), at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     await refresh()
     await search()
   }
@@ -232,12 +233,14 @@ async function admit(row: Row, count: number) {
         <template #default="{ data: d }">
           <div class="flex flex-1 flex-col gap-3 lg:flex-row">
             <div class="flex flex-1 flex-col gap-3">
-              <p class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: d.admitted, tickets: d.tickets + d.unpaid }) }}</span>
+              <p class="flex flex-wrap items-baseline gap-x-2">
+                <span class="whitespace-nowrap text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: d.admitted, tickets: d.tickets + d.unpaid }) }}</span>
                 <span class="text-muted">{{ t('box-office.live-door.to-come', { count: d.tickets + d.unpaid - d.admitted }) }}<template v-if="d.unpaid"> · {{ t('box-office.live-door.unpaid', { count: d.unpaid }) }}</template></span>
               </p>
+              <!-- With no camera there is nothing to frame: the area collapses to the result and the warning. -->
               <section
-                class="relative flex min-h-[55vh] flex-1 items-center lg:min-h-[70vh] justify-center overflow-hidden rounded-lg bg-black"
+                class="flex"
+                :class="problem ? 'flex-col gap-3' : 'relative min-h-[55vh] flex-1 items-center justify-center overflow-hidden rounded-lg bg-black lg:min-h-[70vh]'"
                 :aria-label="t('core.scan.camera')"
               >
                 <video
@@ -261,14 +264,14 @@ async function admit(row: Row, count: number) {
                   {{ t('core.scan.starting') }}
                 </p>
                 <p
-                  v-if="!running"
+                  v-if="!running && !problem"
                   class="text-lg text-white"
                 >
                   {{ t('box-office.live-door.paused') }}
                 </p>
                 <UAlert
                   v-if="problem"
-                  class="m-4"
+                  class="order-last"
                   color="warning"
                   icon="i-lucide-camera-off"
                   role="alert"
@@ -278,7 +281,7 @@ async function admit(row: Row, count: number) {
                 <div
                   role="status"
                   aria-live="polite"
-                  class="absolute inset-x-3 top-3"
+                  :class="problem ? undefined : 'absolute inset-x-3 top-3'"
                 >
                   <div
                     v-if="shown"
@@ -479,7 +482,7 @@ async function admit(row: Row, count: number) {
               class="flex flex-wrap items-center justify-between gap-2 py-3"
             >
               <span class="flex flex-col">
-                <span class="font-medium">{{ row.buyer ?? t('box-office.orders.no-buyer') }}</span>
+                <span class="font-medium">{{ nameOf(row) }}</span>
                 <span
                   v-if="row.unpaid"
                   class="flex flex-wrap items-center gap-2 text-sm text-muted"

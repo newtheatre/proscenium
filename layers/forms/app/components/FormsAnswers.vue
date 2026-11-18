@@ -2,7 +2,7 @@
      page by page, in the form's order, with nothing shown for a question that was not answered.
      A restricted answer says so and shows nothing else. -->
 <script setup lang="ts">
-import type { DataClass, Definition, Question, Value } from '../../shared/engine'
+import type { DataClass, Definition, FileRef, Question, Value } from '../../shared/engine'
 import { moneyWords } from '../../shared/words'
 
 export interface ShownAnswer { questionId: string, repeatIndex: number, dataClass: DataClass, restricted: boolean, value: Value, other: string | null, label: string | null }
@@ -37,6 +37,8 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
       restricted: a.restricted,
       changed: !!props.changed?.includes(q.id),
       text: a.restricted ? '' : words(q, a),
+      // A file answer reads as links to the files, which open for whoever may read the response.
+      files: !a.restricted && q.type === 'file' && Array.isArray(a.value) ? a.value as FileRef[] : null,
     }))).sort((a, b) => (a.entry?.n ?? 0) - (b.entry?.n ?? 0))
       .map((row, i, rows) => ({ ...row, heading: row.entry && (i === 0 || rows[i - 1]!.entry?.n !== row.entry.n) ? row.entry : null }))
   }),
@@ -88,6 +90,11 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
               v-if="row.restricted"
               tone="neutral"
               :label="t('forms.screens.answers.restricted')"
+            />
+            <FormsFileList
+              v-else-if="row.files"
+              :files="row.files"
+              linked
             />
             <template v-else>
               {{ row.text }}

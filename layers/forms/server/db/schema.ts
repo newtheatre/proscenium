@@ -194,6 +194,11 @@ export const responses = defineTable('forms_responses', {
   remindedWaitingAt: col.timestamp('reminded_waiting_at'),
   // When the person was reminded that the form closes soon. Once only.
   remindedClosingAt: col.timestamp('reminded_closing_at'),
+  // The emailed link through which somebody who answered signed out sends the changes asked for
+  // (R-19): the keyed hash of its token, never the token, and when it stops working. A new return
+  // replaces it, and any move clears it, so sending the changes spends it.
+  changeTokenHash: col.personal(text('change_token_hash'), { erase: 'clear' }),
+  changeTokenExpiresAt: col.timestamp('change_token_expires_at'),
 }, {
   id: 'fres',
   realm: { column: 'realm' },
@@ -205,6 +210,7 @@ export const responses = defineTable('forms_responses', {
     index('forms_responses_person').on(t.personId),
     index('forms_responses_retention').on(t.retentionDueAt),
     index('forms_responses_waiting').on(t.state, t.stageKind),
+    uniqueIndex('forms_responses_change_token').on(t.changeTokenHash).where(sql`change_token_hash IS NOT NULL`),
     check('forms_responses_state', sql`${t.state} IN (${inList(RESPONSE_STATES)})`),
     check('forms_responses_stage', sql`${t.stageKind} IS NULL OR ${t.stageKind} IN (${inList(STAGE_KINDS)})`),
     check('forms_responses_realm', sql`${t.realm} IN (${inList(RESPONSE_REALMS)})`),

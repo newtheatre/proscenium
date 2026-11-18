@@ -1,13 +1,15 @@
 <!-- A stocktake (S10). While counting: a line per item, counted in the unit people count in (a part
-     is fine: 2.5 bottles), or weighed in grams for an item with full and empty weights; a line can be
-     taken out of the count. The level is shown beside it unless counts are blind. Submitting reads
-     what was expected from the levels at that moment. Once submitted, the review: expected, counted,
-     the difference and its value, and a reason for each line that differs; someone who approves
-     counts approves it (changing the levels) or sends it back. Approved or abandoned, it is a record. -->
+     is fine: 2.5 bottles); for an item with full and empty weights, the full ones are counted and the
+     open one weighed, and the two are added. Each line is saved a moment after it is typed and keeps
+     the level at that moment as what was expected, so a sale made after a line was counted is allowed
+     for. The level is shown beside it unless counts are blind; a line can be taken out of the count.
+     Once submitted, the review: expected, counted, the difference and its value, and a reason for
+     each line that differs (needed above a set value); someone who approves counts approves it, after
+     seeing what was found and what is missing, or sends it back. Approved or abandoned, it is a
+     record. -->
 <script setup lang="ts">
-type Unit = 'each' | 'ml' | 'g'
 type State = 'counting' | 'submitted' | 'approved' | 'abandoned'
-interface Line { id: string, stockItemId: string, name: string, baseUnit: Unit, countUnitSize: number, packSize: number, weighable: boolean, counted: number | null, expected: number | null, level: number | null, varianceValueMinor: number | null, reasonTermId: string | null }
+interface Line { id: string, stockItemId: string, name: string, baseUnit: StockUnit, countUnitSize: number, packSize: number, packName: string, weighable: boolean, fullWeightG: number | null, emptyWeightG: number | null, counted: number | null, expected: number | null, level: number | null, varianceValueMinor: number | null, reasonTermId: string | null }
 interface Stocktake { id: string, locationId: string, location: string, state: State, category: string | null, startedBy: string, submittedBy: string | null, approvedBy: string | null, startedAt: number, submittedAt: number | null, approvedAt: number | null, varianceValueMinor: number | null }
 
 const { t } = useT()
@@ -18,43 +20,62 @@ const { money } = await useMoney()
 const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
+const { number, unitLabel, base, countWord, counted: countedText, amount } = useStockAmounts()
 const toast = useToast()
 
 const id = computed(() => route.params.id as string)
-const { data, status, error, refresh } = await useAPI<{ stocktake: Stocktake, lines: Line[], blind: boolean, reasons: { id: string, label: string }[], can: { approve: boolean } }>(
+const { data, status, error, refresh } = await useAPI<{ stocktake: Stocktake, lines: Line[], blind: boolean, reasons: { id: string, label: string }[], can: { approve: boolean, ownCount: boolean }, selfApproveUnderMinor: number, reasonOverMinor: number }>(
   () => `/api/bar/stocktakes/${id.value}`,
   { key: `bar:stocktake:${id.value}` },
 )
 const state = computed(() => data.value?.stocktake.state)
 const tone = (s: State) => ({ counting: 'info', submitted: 'warning', approved: 'success', abandoned: 'neutral' } as const)[s]
 
-const number = (n: number, digits = 2) => n.toLocaleString(undefined, { maximumFractionDigits: digits })
-const unitLabel = (u: Unit) => t(`bar.screens.stock.units.${u}`)
-function amount(l: Line, quantity: number): string {
-  const base = `${number(Math.abs(quantity), 0)} ${unitLabel(l.baseUnit)}`
-  const text = l.countUnitSize === 1 ? base : t('bar.screens.stock.counted', { count: number(Math.abs(quantity) / l.countUnitSize), base })
-  return quantity < 0 ? `−${text}` : text
-}
-// What one count unit is, beside the box: "each", or "of 750 ml".
-const countUnit = (l: Line) => l.countUnitSize === 1 ? unitLabel(l.baseUnit) : t('bar.screens.stocktakes.of-size', { size: number(l.countUnitSize, 0), unit: unitLabel(l.baseUnit) })
+// A signed amount for the review: "−1.5 bottles (1,050 ml)".
+const signedAmount = (l: Line, quantity: number) => `${quantity < 0 ? '−' : ''}${amount(l, Math.abs(quantity))}`
 
-// Counting: what is typed, by line. A weight, when given, wins over a count.
-const entries = ref<Record<string, { count: number | null, weighed: number | null }>>({})
+// Counting: what is typed, by line. For an item with weights, the count is of the full ones and the
+// weight is of the open one; the two are added.
+interface Entry { count: number | null, weighed: number | null }
+const entries = ref<Record<string, Entry>>({})
+// What was last saved of each line, so only a line that changed is sent.
+const saved = ref<Record<string, string>>({})
+const signature = (e: Entry | undefined) => JSON.stringify(e ?? null)
 watch(data, (d) => {
   if (!d) return
-  entries.value = Object.fromEntries(d.lines.map(l => [l.id, { count: l.counted === null ? null : l.counted / l.countUnitSize, weighed: null }]))
+  const fresh: Record<string, Entry> = Object.fromEntries(d.lines.map(l => [l.id, { count: l.counted === null ? null : l.counted / l.countUnitSize, weighed: null }]))
+  saved.value = Object.fromEntries(Object.entries(fresh).map(([lineId, e]) => [lineId, signature(e)]))
+  entries.value = fresh
 }, { immediate: true })
-type Change = { lineId: string, weighedG: number } | { lineId: string, counted: number | null }
-function changes(): Change[] {
-  return (data.value?.lines ?? []).flatMap((l): Change[] => {
-    const e = entries.value[l.id]
-    if (!e) return []
-    if (e.weighed !== null && l.weighable) return [{ lineId: l.id, weighedG: Math.round(e.weighed) }]
-    const counted = e.count === null ? null : Math.round(e.count * l.countUnitSize)
-    return counted === l.counted ? [] : [{ lineId: l.id, counted }]
-  })
+
+/** What is left in an open one from its weight, in base units, never below nought. */
+function leftByWeight(l: Line, grams: number): number {
+  if (l.fullWeightG === null || l.emptyWeightG === null) return 0
+  return Math.max(0, (grams - l.emptyWeightG) / (l.fullWeightG - l.emptyWeightG) * l.countUnitSize)
 }
-const counted = computed(() => (data.value?.lines ?? []).filter(l => entries.value[l.id]?.count !== null || entries.value[l.id]?.weighed !== null).length)
+/** The line's count in base units as typed, or null while nothing is typed. */
+function worked(l: Line): number | null {
+  const e = entries.value[l.id]
+  if (!e) return null
+  if (e.weighed !== null && l.weighable) return Math.round((e.count ?? 0) * l.countUnitSize + leftByWeight(l, e.weighed))
+  return e.count === null ? null : Math.round(e.count * l.countUnitSize)
+}
+/** "2 full + 350 ml open = 2.5 bottles", or the count as it will be recorded. */
+function workedText(l: Line): string {
+  const total = worked(l)
+  if (total === null) return ''
+  const e = entries.value[l.id]!
+  if (e.weighed !== null && l.weighable)
+    return t('bar.screens.stocktakes.worked', { full: number(e.count ?? 0), open: base(l, Math.round(leftByWeight(l, e.weighed))), total: countedText(l, total / l.countUnitSize) })
+  return amount(l, total)
+}
+type Change = { lineId: string, weighedG: number, fullUnits: number } | { lineId: string, counted: number | null }
+function changeOf(l: Line): Change {
+  const e = entries.value[l.id]!
+  if (e.weighed !== null && l.weighable) return { lineId: l.id, weighedG: Math.round(e.weighed), fullUnits: e.count ?? 0 }
+  return { lineId: l.id, counted: e.count === null ? null : Math.round(e.count * l.countUnitSize) }
+}
+const counted = computed(() => (data.value?.lines ?? []).filter(l => worked(l) !== null).length)
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
@@ -71,24 +92,61 @@ async function attempt(work: () => Promise<void>) {
     busy.value = false
   }
 }
-async function saveCounts() {
-  const lines = changes()
-  if (lines.length) await $api(`/api/bar/stocktakes/${id.value}/counts` as string, { method: 'POST', body: { lines } })
+
+// Each line is saved a moment after it is typed, so nothing is lost on a reload and what was
+// expected is read when the line was counted.
+const SAVE_AFTER_MS = 800 // not-policy: a pause in typing
+const timers = new Map<string, ReturnType<typeof setTimeout>>()
+const saving = ref(0)
+async function flush(lineIds: string[]) {
+  const lines = (data.value?.lines ?? []).filter(l => lineIds.includes(l.id) && signature(entries.value[l.id]) !== saved.value[l.id])
+  if (!lines.length || state.value !== 'counting') return
+  const sent = Object.fromEntries(lines.map(l => [l.id, signature(entries.value[l.id])]))
+  saving.value++
+  try {
+    await $api(`/api/bar/stocktakes/${id.value}/counts` as string, { method: 'POST', body: { lines: lines.map(changeOf) } })
+    Object.assign(saved.value, sent)
+    refusal.value = null
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    throw e
+  }
+  finally {
+    saving.value--
+  }
 }
-const save = () => attempt(async () => {
-  await saveCounts()
-  toast.add({ title: t('bar.screens.stocktakes.saved'), color: 'success' })
-  await refresh()
-})
+function schedule(lineId: string) {
+  clearTimeout(timers.get(lineId))
+  timers.set(lineId, setTimeout(() => {
+    timers.delete(lineId)
+    flush([lineId]).catch(() => {})
+  }, SAVE_AFTER_MS))
+}
+watch(entries, (now) => {
+  for (const [lineId, e] of Object.entries(now)) if (signature(e) !== saved.value[lineId]) schedule(lineId)
+}, { deep: true })
+/** Sends whatever is waiting, at once. */
+async function flushAll() {
+  for (const timer of timers.values()) clearTimeout(timer)
+  timers.clear()
+  await flush(Object.keys(entries.value))
+}
+onBeforeUnmount(() => void flushAll().catch(() => {}))
+
 const submit = () => attempt(async () => {
-  await saveCounts()
+  await flushAll()
   await $api(`/api/bar/stocktakes/${id.value}/submit` as string, { method: 'POST', body: {} })
   toast.add({ title: t('bar.screens.stocktakes.submitted'), color: 'success' })
   await refresh()
 })
 const takeOut = (l: Line) => attempt(async () => {
+  clearTimeout(timers.get(l.id))
+  timers.delete(l.id)
   await $api(`/api/bar/stocktakes/${id.value}/counts` as string, { method: 'POST', body: { lines: [{ lineId: l.id, notCounted: true }] } })
   toast.add({ title: t('bar.screens.stocktakes.taken-out', { name: l.name }), color: 'success' })
+  saved.value[l.id] = signature(entries.value[l.id])
+  await flushAll()
   await refresh()
 })
 
@@ -101,11 +159,33 @@ const setReason = (l: Line, value: string) => attempt(async () => {
 })
 const differs = (l: Line) => l.counted !== null && l.expected !== null && l.counted !== l.expected
 const changing = computed(() => (data.value?.lines ?? []).filter(differs).length)
-const approve = () => attempt(async () => {
-  const answer = await $api<{ changed: number }>(`/api/bar/stocktakes/${id.value}/approve` as string, { method: 'POST', body: {} })
-  toast.add({ title: t('bar.screens.stocktakes.approved', { count: answer.changed }), color: 'success' })
-  await refresh()
-})
+// What the count found and what is missing, by value, apart: a net figure hides both.
+const found = computed(() => (data.value?.lines ?? []).reduce((sum, l) => sum + Math.max(0, l.varianceValueMinor ?? 0), 0))
+const missing = computed(() => (data.value?.lines ?? []).reduce((sum, l) => sum - Math.min(0, l.varianceValueMinor ?? 0), 0))
+const needsReason = (l: Line) => differs(l) && !l.reasonTermId && Math.abs(l.varianceValueMinor ?? 0) > (data.value?.reasonOverMinor ?? Infinity)
+const askedForReasons = ref(false)
+const reasonError = (l: Line) => askedForReasons.value && needsReason(l) ? t('bar.screens.stocktakes.reason-needed', { amount: money(data.value!.reasonOverMinor) }) : undefined
+async function approve() {
+  refusal.value = null
+  const unexplained = (data.value?.lines ?? []).filter(needsReason).length
+  if (unexplained) {
+    askedForReasons.value = true
+    refusal.value = { status: 422, code: 'bar.stocktake.reason-needed', reason: t('bar.screens.stocktakes.reasons-needed', { count: unexplained, amount: money(data.value!.reasonOverMinor) }) }
+    return
+  }
+  const ok = await confirm({
+    verb: t('bar.screens.stocktakes.approve-verb'),
+    thing: t('bar.screens.stocktakes.this-count'),
+    consequence: t('bar.screens.stocktakes.approve-consequence', { count: changing.value, found: money(found.value), missing: money(missing.value), net: money(found.value - missing.value) }),
+    button: t('bar.screens.stocktakes.approve', { count: changing.value }),
+  })
+  if (!ok) return
+  await attempt(async () => {
+    const answer = await $api<{ changed: number }>(`/api/bar/stocktakes/${id.value}/approve` as string, { method: 'POST', body: {} })
+    toast.add({ title: t('bar.screens.stocktakes.approved', { count: answer.changed }), color: 'success' })
+    await refresh()
+  })
+}
 const sendBack = () => attempt(async () => {
   await $api(`/api/bar/stocktakes/${id.value}/send-back` as string, { method: 'POST', body: {} })
   toast.add({ title: t('bar.screens.stocktakes.sent-back'), color: 'success' })
@@ -120,11 +200,13 @@ async function abandon() {
   })
 }
 
+const anyWeighable = computed(() => (data.value?.lines ?? []).some(l => l.weighable))
 const countColumns = computed(() => [
   { accessorKey: 'name', header: t('bar.screens.stocktakes.item') },
   ...(data.value?.blind ? [] : [{ id: 'level', header: t('bar.screens.stocktakes.level') }]),
   { id: 'count', header: t('bar.screens.stocktakes.count') },
-  ...((data.value?.lines ?? []).some(l => l.weighable) ? [{ id: 'weighed', header: t('bar.screens.stocktakes.weighed') }] : []),
+  ...(anyWeighable.value ? [{ id: 'weighed', header: t('bar.screens.stocktakes.weighed') }] : []),
+  { id: 'total', header: t('bar.screens.stocktakes.total') },
   { id: 'remove', header: '' },
 ])
 const reviewColumns = computed(() => [
@@ -139,6 +221,7 @@ const reasonLabel = (termId: string | null) => data.value?.reasons.find(r => r.i
 const title = computed(() => data.value
   ? t('bar.screens.stocktakes.title', { location: data.value.stocktake.location, what: data.value.stocktake.category ?? t('bar.screens.stocktakes.everything') })
   : t('bar.navigation.stocktakes.label'))
+const showReview = computed(() => state.value !== 'counting' && (data.value?.lines ?? []).some(l => l.expected !== null))
 const facts = computed(() => {
   const s = data.value?.stocktake
   if (!s) return []
@@ -146,10 +229,10 @@ const facts = computed(() => {
     { label: t('bar.screens.stocktakes.started'), value: `${dateTime(s.startedAt)} · ${s.startedBy}` },
     ...(s.submittedAt ? [{ label: t('bar.screens.stocktakes.submitted-at'), value: `${dateTime(s.submittedAt)} · ${s.submittedBy ?? ''}` }] : []),
     ...(s.approvedAt ? [{ label: t('bar.screens.stocktakes.approved-at'), value: `${dateTime(s.approvedAt)} · ${s.approvedBy ?? ''}` }] : []),
+    ...(showReview.value ? [{ label: t('bar.screens.stocktakes.found'), value: money(found.value) }, { label: t('bar.screens.stocktakes.missing'), value: money(missing.value) }] : []),
     ...(s.varianceValueMinor !== null && s.state !== 'counting' ? [{ label: t('bar.screens.stocktakes.difference'), value: money(s.varianceValueMinor) }] : []),
   ]
 })
-const showReview = computed(() => state.value !== 'counting' && (data.value?.lines ?? []).some(l => l.expected !== null))
 </script>
 
 <template>
@@ -184,7 +267,7 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
           >
             <PageSection
               :title="t('bar.screens.stocktakes.counting')"
-              :description="d.blind ? t('bar.screens.stocktakes.counting-blind') : t('bar.screens.stocktakes.counting-help')"
+              :description="[d.blind ? t('bar.screens.stocktakes.counting-blind') : t('bar.screens.stocktakes.counting-help'), anyWeighable ? t('bar.screens.stocktakes.counting-weighed') : ''].filter(Boolean).join(' ')"
             >
               <UTable
                 :data="d.lines"
@@ -195,7 +278,7 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
                   <span class="font-medium">{{ row.original.name }}</span>
                 </template>
                 <template #level-cell="{ row }">
-                  <span class="tabular-nums">{{ row.original.level === null ? '' : amount(row.original, row.original.level) }}</span>
+                  <span class="tabular-nums">{{ row.original.level === null ? '' : signedAmount(row.original, row.original.level) }}</span>
                 </template>
                 <template #count-cell="{ row }">
                   <UFieldGroup v-if="entries[row.original.id]">
@@ -204,13 +287,13 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
                       :min="0"
                       :step="row.original.countUnitSize === 1 ? 1 : 0.1"
                       :format-options="{ maximumFractionDigits: row.original.countUnitSize === 1 ? 0 : 2 }"
-                      :aria-label="t('bar.screens.stocktakes.count-of', { name: row.original.name })"
+                      :aria-label="row.original.weighable ? t('bar.screens.stocktakes.full-of', { name: row.original.name }) : t('bar.screens.stocktakes.count-of', { name: row.original.name })"
                     />
                     <UBadge
                       color="neutral"
                       variant="outline"
                       size="lg"
-                      :label="countUnit(row.original)"
+                      :label="row.original.weighable ? t('bar.screens.stocktakes.full', { unit: countWord(row.original, 2) }) : countWord(row.original, 2)"
                     />
                   </UFieldGroup>
                 </template>
@@ -229,6 +312,9 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
                     />
                   </UFieldGroup>
                 </template>
+                <template #total-cell="{ row }">
+                  <span class="text-sm tabular-nums">{{ workedText(row.original) }}</span>
+                </template>
                 <template #remove-cell="{ row }">
                   <IconButton
                     icon="i-lucide-x"
@@ -243,7 +329,7 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
           <PageSection
             v-else-if="showReview"
             :title="t('bar.screens.stocktakes.review')"
-            :description="d.stocktake.state === 'submitted' ? t('bar.screens.stocktakes.review-help') : undefined"
+            :description="d.stocktake.state === 'submitted' ? t('bar.screens.stocktakes.review-help', { amount: money(d.reasonOverMinor) }) : undefined"
           >
             <UTable
               :data="d.lines"
@@ -258,16 +344,16 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
                 >{{ reasonLabel(row.original.reasonTermId) }}</span>
               </template>
               <template #expected-cell="{ row }">
-                <span class="tabular-nums">{{ row.original.expected === null ? '' : amount(row.original, row.original.expected) }}</span>
+                <span class="tabular-nums">{{ row.original.expected === null ? '' : signedAmount(row.original, row.original.expected) }}</span>
               </template>
               <template #counted-cell="{ row }">
-                <span class="tabular-nums">{{ row.original.counted === null ? '' : amount(row.original, row.original.counted) }}</span>
+                <span class="tabular-nums">{{ row.original.counted === null ? '' : signedAmount(row.original, row.original.counted) }}</span>
               </template>
               <template #difference-cell="{ row }">
                 <span
                   v-if="differs(row.original)"
                   :class="['tabular-nums', row.original.counted! < row.original.expected! ? 'text-error' : 'text-success']"
-                >{{ row.original.counted! > row.original.expected! ? '+' : '' }}{{ amount(row.original, row.original.counted! - row.original.expected!) }}</span>
+                >{{ row.original.counted! > row.original.expected! ? '+' : '' }}{{ signedAmount(row.original, row.original.counted! - row.original.expected!) }}</span>
                 <span
                   v-else
                   class="text-muted"
@@ -281,6 +367,7 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
                   v-if="differs(row.original)"
                   :label="t('bar.screens.stocktakes.reason-for', { name: row.original.name })"
                   :name="`reason-${row.original.id}`"
+                  :error="reasonError(row.original)"
                   :ui="{ label: 'sr-only' }"
                 >
                   <USelect
@@ -298,6 +385,12 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
             class="text-sm text-muted"
           >
             {{ t('bar.screens.stocktakes.waiting') }}
+          </p>
+          <p
+            v-if="d.stocktake.state === 'submitted' && d.can.approve && d.can.ownCount"
+            class="text-sm text-muted"
+          >
+            {{ t('bar.screens.stocktakes.own-count', { amount: money(Math.abs(d.stocktake.varianceValueMinor ?? 0)), limit: money(d.selfApproveUnderMinor) }) }}
           </p>
           <p
             v-if="d.stocktake.state === 'abandoned'"
@@ -320,16 +413,14 @@ const showReview = computed(() => state.value !== 'counting' && (data.value?.lin
             :loading="busy"
             :label="t('bar.screens.stocktakes.submit', { counted, total: data?.lines.length ?? 0 })"
           />
-          <UButton
-            color="neutral"
-            variant="outline"
-            :loading="busy"
-            :label="t('bar.screens.stocktakes.save')"
-            @click="save"
-          />
+          <span
+            class="text-sm text-muted"
+            role="status"
+          >{{ saving ? t('bar.screens.stocktakes.saving') : t('bar.screens.stocktakes.saves-as-typed') }}</span>
         </template>
         <template v-else-if="data?.can.approve">
           <UButton
+            v-if="!data.can.ownCount"
             :loading="busy"
             :label="t('bar.screens.stocktakes.approve', { count: changing })"
             @click="approve"
