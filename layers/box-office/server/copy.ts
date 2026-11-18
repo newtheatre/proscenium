@@ -51,8 +51,11 @@ export async function copySetup(unit: UnitView, targetPerformanceId: string, sou
 
   const { map, made } = await matchBands(target.id, source.id)
   const sales = await salesOf(source.id)
+  // Wheelchair spaces come from the seating layout: the source's where the space is the same, else the target's own.
+  const sameSpace = source.spaceId === target.spaceId
   await saveSales(unit, target.id, {
-    pools: pools.map(p => ({ bandId: map.get(p.bandId)!, capacity: p.capacity })),
+    pools: pools.filter(p => !(sales?.layoutId && p.bandKind === 'wheelchair')).map(p => ({ bandId: map.get(p.bandId)!, capacity: p.capacity })),
+    ...(sales?.layoutId && sameSpace ? { layoutId: sales.layoutId } : {}),
     ...(sales?.maxPerOrder != null ? { maxPerOrder: sales.maxPerOrder } : {}),
     ...(sales?.holdMinutes != null ? { holdMinutes: sales.holdMinutes } : {}),
     confirmOverVenue: options.confirmOverVenue,

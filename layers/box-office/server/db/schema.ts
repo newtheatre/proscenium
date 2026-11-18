@@ -14,6 +14,10 @@ export const performanceSales = defineTable('box_office_performance_sales', {
   seating: col.public(text('seating', { enum: ['general', 'allocated'] }).notNull().default('general')),
   // A seating plan, with allocated seating (a later phase).
   planId: col.internal(text('plan_id')),
+  // The seating layout of its space the performance uses (box_office_seating_layouts): how many
+  // wheelchair spaces it has and the seats each takes. Null until one is chosen or the space's usual
+  // one is applied; a space with no layouts leaves it null.
+  layoutId: col.internal(text('layout_id')),
   state: col.public(text('state', { enum: ['draft', 'on_sale', 'paused', 'closed'] }).notNull().default('draft')),
   onSaleAt: col.timestamp('on_sale_at'),
   // Null means the setting's default before curtain.
@@ -154,6 +158,36 @@ export const ticketPresets = defineTable('box_office_ticket_presets', {
   extra: t => [
     uniqueIndex('box_office_ticket_presets_name').on(sql`lower(${t.name})`),
     check('box_office_ticket_presets_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+})
+
+/**
+ * A way a space is set out (Matt, 2026-11-17): "End-on", "In the round". Each says how many seats it
+ * holds, how many wheelchair spaces it has, and how many seats each space takes the place of (none
+ * for spaces kept apart from the seats). A performance picks one; a space's usual one is used when
+ * nobody chooses. A layout belongs to a space by id only. When seating plans are drawn, a plan is a
+ * layout with a drawing.
+ */
+export const seatingLayouts = defineTable('box_office_seating_layouts', {
+  id: col.id(),
+  spaceId: col.internal(text('space_id').notNull()),
+  name: col.internal(text('name').notNull()),
+  // Null means what the space itself holds.
+  seats: col.internal(integer('seats')),
+  wheelchairSpaces: col.internal(integer('wheelchair_spaces').notNull().default(0)),
+  seatsPerSpace: col.internal(integer('seats_per_space').notNull().default(2)),
+  usual: col.internal(integer('usual', { mode: 'boolean' }).notNull().default(false)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'lay',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('box_office_seating_layouts_name').on(t.spaceId, sql`lower(${t.name})`),
+    uniqueIndex('box_office_seating_layouts_usual').on(t.spaceId).where(sql`usual = 1`),
+    check('box_office_seating_layouts_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('box_office_seating_layouts_numbers', sql`(${t.seats} IS NULL OR ${t.seats} >= 0) AND ${t.wheelchairSpaces} >= 0 AND ${t.seatsPerSpace} >= 0`),
   ],
 })
 
@@ -599,4 +633,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, promoCodes, promoRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, promoCodes, promoRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }

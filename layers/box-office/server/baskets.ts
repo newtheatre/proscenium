@@ -80,8 +80,8 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
 }
 
 /**
- * A Wheelchair space costs the lowest price the buyer can have in its band: its own price is the
- * lowest open to everyone, and a signed-in buyer who qualifies for a cheaper type, such as Member,
+ * A Wheelchair space costs the lowest price the buyer can have in its band, or anywhere in the house
+ * where a seating layout counts the spaces: its own price is the lowest open to everyone, and a signed-in buyer who qualifies for a cheaper type, such as Member,
  * pays that instead. Only the cheaper types are asked about, cheapest first.
  */
 async function lowestFor(performanceId: string, asked: BasketLineInput[], prices: Price[], types: Awaited<ReturnType<typeof sellableTypes>>, buyer: { channel: 'online' | 'desk', account: string | null }): Promise<Map<string, Price>> {
@@ -92,7 +92,7 @@ async function lowestFor(performanceId: string, asked: BasketLineInput[], prices
     if (!own?.derived) continue
     const cheaper = prices.filter((p) => {
       const type = types.get(p.ticketTypeId)
-      return p.bandId === line.bandId && !p.derived && p.amountMinor < own.amountMinor && type && type.requirementRefs.length
+      return (own.house || p.bandId === line.bandId) && !p.derived && p.amountMinor < own.amountMinor && type && type.requirementRefs.length
         && type.kind !== 'companion' && type.kind !== 'complimentary' && !type.needsPaidTicket && soldOn(type.channel, 'online')
     }).sort((a, b) => a.amountMinor - b.amountMinor)
     for (const p of cheaper) {

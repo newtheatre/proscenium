@@ -18,10 +18,12 @@ async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promi
   const [sales, free, slugs] = await Promise.all([
     all<Sale>('SELECT performance_id, state, on_sale_at, off_sale_at FROM box_office_performance_sales WHERE performance_id IN (SELECT value FROM json_each(?))', ids),
     // Free seats as a buyer would find them: a lapsed hold nobody has swept is free (see availability.ts).
+    // Wheelchair spaces are not seats, and are offered beside them.
     all<{ performance_id: string, free: number }>(
       `SELECT o.performance_id, sum(max(0, o.capacity - o.claimed + (SELECT count(*) FROM box_office_claims c JOIN box_office_holds h ON h.id = c.hold_id
           WHERE c.pool_id = o.id AND c.state = 'held' AND c.expires_at IS NOT NULL AND c.expires_at <= ?1 AND h.kind <> 'payment'))) AS free
-        FROM box_office_pools o WHERE o.performance_id IN (SELECT value FROM json_each(?2)) GROUP BY o.performance_id`, at, ids),
+        FROM box_office_pools o WHERE o.performance_id IN (SELECT value FROM json_each(?2))
+          AND o.band_id NOT IN (SELECT id FROM box_office_bands WHERE kind = 'wheelchair') GROUP BY o.performance_id`, at, ids),
     all<{ id: string, slug: string }>('SELECT id, slug FROM core_productions WHERE id IN (SELECT value FROM json_each(?))', productionIds),
   ])
   const saleOf = new Map(sales.map(s => [s.performance_id, s]))

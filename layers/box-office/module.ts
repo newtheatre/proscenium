@@ -51,6 +51,9 @@ export default defineModule({
     'presets.usual': setting.custom({ schema: z.string().regex(/^tps_[2-7a-z]{26}$/), unset: true, change: 'box-office.pricing.manage', audience: 'staff' }),
     // A date added to a run that is on sale goes on sale too, with the run's seats and prices (show walkthrough, decision 3).
     'runs.open-new-dates': setting.boolean({ default: true, change, audience: 'staff' }),
+    // Seats for wheelchair spaces not yet booked are kept back from ordinary sale until this long before
+    // the start, then go on general sale (show walkthrough, decision 6). Nought keeps none back.
+    'wheelchair.keep-seats-before': setting.duration({ default: '24h', min: '0m', max: '7d', change, audience: 'staff' }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
@@ -58,6 +61,7 @@ export default defineModule({
     'order': { table: 'box_office_orders', owner: 'account_id' },
     'ticket-type': { table: 'box_office_ticket_types' },
     'ticket-preset': { table: 'box_office_ticket_presets' },
+    'seating-layout': { table: 'box_office_seating_layouts' },
     'promo-code': { table: 'box_office_promo_codes' },
     // The requester owns the request; a grant on a performance or its production reaches it.
     'comp-request': { table: 'box_office_comp_requests', parent: 'core.performance', owner: 'requested_by' },
@@ -213,6 +217,8 @@ export default defineModule({
       // The person's own bookings, in My account (C3).
       { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
+      // Each space's seating layouts and wheelchair spaces, beside Venues in the programme's settings (decision 10).
+      { id: 'box-office.seating-layouts', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/seating-layouts', icon: 'i-lucide-armchair', ability: 'box-office.pricing.manage', order: 42, settingsIn: ['programme', 'box-office.performances'] },
     ],
     // Your next visit, first among the cards on My account's overview.
     'core.account-section': [

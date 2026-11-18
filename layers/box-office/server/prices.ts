@@ -24,17 +24,25 @@ export const PRICES_IN_FORCE = `SELECT p.id, p.band_id, p.ticket_type_id, p.amou
     AND (p.performance_id IS NOT NULL OR NOT EXISTS (SELECT 1 FROM box_office_prices s WHERE s.band_id = p.band_id
       AND s.ticket_type_id = p.ticket_type_id AND s.performance_id = ?1 AND s.effective_from <= ?2 AND s.inherits = 0 AND ${NEWEST('s')}))`
 
-/** `derived` marks a price no one set: the Wheelchair space's, taken from another type's (wheelchairPrices). */
-export interface Price { id: string, bandId: string, ticketTypeId: string, amountMinor: number, currency: string, derived?: true }
+/**
+ * `derived` marks a price no one set: the Wheelchair space's, taken from another type's
+ * (wheelchairPrices). `house` marks one taken from anywhere in the house rather than its own band.
+ */
+export interface Price { id: string, bandId: string, ticketTypeId: string, amountMinor: number, currency: string, derived?: true, house?: true }
 
 /** The Wheelchair space type Box office keeps, while the access scheme runs. */
 export const WHEELCHAIR_TYPE = 'box-office.wheelchair'
 
 /** What each ticket type costs in each pooled band at this performance, now. Withdrawn prices are left out. */
 export async function pricesFor(performanceId: string, at = nowMs()): Promise<Price[]> {
-  const rows = await all<{ id: string, band_id: string, ticket_type_id: string, amount_minor: number | null, currency: string }>(PRICES_IN_FORCE, performanceId, at)
+  const [rows, wheelchairBands] = await Promise.all([
+    all<{ id: string, band_id: string, ticket_type_id: string, amount_minor: number | null, currency: string }>(PRICES_IN_FORCE, performanceId, at),
+    // With a seating layout, the production's wheelchair band holds the performance's wheelchair spaces (layouts.ts).
+    all<{ band_id: string }>(`SELECT o.band_id FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id JOIN box_office_performance_sales s ON s.performance_id = o.performance_id
+      WHERE o.performance_id = ? AND b.kind = 'wheelchair' AND s.layout_id IS NOT NULL`, performanceId),
+  ])
   const set = rows.filter(r => r.amount_minor !== null).map(r => ({ id: r.id, bandId: r.band_id, ticketTypeId: r.ticket_type_id, amountMinor: r.amount_minor!, currency: r.currency }))
-  return [...set, ...await wheelchairPrices(set)]
+  return wheelchairPrices(set, new Set(wheelchairBands.map(b => b.band_id)))
 }
 
 /**
@@ -42,22 +50,44 @@ export async function pricesFor(performanceId: string, at = nowMs()): Promise<Pr
  * cheapest type sold everywhere that asks for nothing, such as Concession. A buyer who qualifies for
  * a cheaper type, such as Member, pays that instead (baskets.ts). Its price row is the one it is
  * taken from. A band where the theatre has set a Wheelchair space price of its own keeps that.
+ *
+ * With a seating layout the spaces are counted in the wheelchair band: there, and only there, a
+ * Wheelchair space is sold, at the lowest such price anywhere in the house, and nothing else is.
  */
-async function wheelchairPrices(set: Price[]): Promise<Price[]> {
-  if (!set.length || !await useSetting('core.access-scheme.enabled')) return []
-  const types = await all<{ id: string, managed_by: string | null, requirement_refs: string | null, kind: string, channel: string, active: number }>(
-    'SELECT id, managed_by, requirement_refs, kind, channel, active FROM box_office_ticket_types')
+async function wheelchairPrices(set: Price[], wheelchairBands: Set<string>): Promise<Price[]> {
+  const enabled = set.length > 0 && await useSetting('core.access-scheme.enabled')
+  const types = enabled
+    ? await all<{ id: string, managed_by: string | null, requirement_refs: string | null, kind: string, channel: string, active: number }>(
+        'SELECT id, managed_by, requirement_refs, kind, channel, active FROM box_office_ticket_types')
+    : []
   const wheelchair = types.find(t => t.managed_by === WHEELCHAIR_TYPE && t.active)
-  if (!wheelchair) return []
-  const open = new Set(types.filter(t => t.active && t.channel === 'all' && (t.kind === 'standard' || t.kind === 'concession') && t.id !== wheelchair.id
-    && (!t.requirement_refs || t.requirement_refs === '[]')).map(t => t.id))
+  if (wheelchairBands.size) {
+    const seats = set.filter(p => !wheelchairBands.has(p.bandId) && p.ticketTypeId !== wheelchair?.id)
+    if (!wheelchair) return seats
+    const open = openTypes(types, wheelchair.id)
+    const lowest = seats.filter(p => open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
+    const spaces = [...wheelchairBands].flatMap((bandId) => {
+      const own = set.find(p => p.bandId === bandId && p.ticketTypeId === wheelchair.id)
+      if (own) return [own]
+      return lowest ? [{ ...lowest, bandId, ticketTypeId: wheelchair.id, derived: true as const, house: true as const }] : []
+    })
+    return [...seats, ...spaces]
+  }
+  if (!wheelchair) return set
+  const open = openTypes(types, wheelchair.id)
   const out: Price[] = []
   for (const bandId of new Set(set.map(p => p.bandId))) {
     if (set.some(p => p.bandId === bandId && p.ticketTypeId === wheelchair.id)) continue
     const lowest = set.filter(p => p.bandId === bandId && open.has(p.ticketTypeId)).sort((a, b) => a.amountMinor - b.amountMinor)[0]
     if (lowest) out.push({ ...lowest, ticketTypeId: wheelchair.id, derived: true })
   }
-  return out
+  return [...set, ...out]
+}
+
+/** The types anyone may choose a Wheelchair space's price from: sold everywhere, asking for nothing. */
+function openTypes(types: { id: string, requirement_refs: string | null, kind: string, channel: string, active: number }[], wheelchairId: string): Set<string> {
+  return new Set(types.filter(t => t.active && t.channel === 'all' && (t.kind === 'standard' || t.kind === 'concession') && t.id !== wheelchairId
+    && (!t.requirement_refs || t.requirement_refs === '[]')).map(t => t.id))
 }
 
 export interface PriceInput {
