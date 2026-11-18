@@ -322,7 +322,7 @@ export const contributes = {
     },
   }],
   // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
-  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }, { id: 'core.inbox-unread-members', file: 'inbox-unread-members' }],
+  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }],
   'core.account-section': [
     { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
   ],
