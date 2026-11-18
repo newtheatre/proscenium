@@ -66,12 +66,62 @@ describe('FH-27: reporting', () => {
     const mine = await report(amy)
     await report(reporter())
     const listed = (await req('GET', '/api/front-of-house/incidents/mine', undefined, amy)).body.incidents
-    expect(listed).toEqual([{ id: mine.incidentId, reference: mine.reference, kind: 'incident', state: 'reported', occurredAt: expect.any(Number), whatHappened: 'A patron slipped on the foyer stairs.' }])
+    expect(listed).toEqual([{ id: mine.incidentId, reference: mine.reference, kind: 'incident', state: 'reported', occurredAt: expect.any(Number), whatHappened: 'A patron slipped on the foyer stairs.', people: [] }])
     expect((await req('GET', `/api/front-of-house/incidents/${mine.incidentId}`, undefined, amy)).status).toBe(403)
     expect((await req('GET', '/api/front-of-house/incidents', undefined, amy)).status).toBe(403)
     // My reports appears in the members' area once there is one to show.
     expect(await inContext(() => myReportsCount.value(amy))).toBe(1)
     expect(await inContext(() => myReportsCount.value(reporter()))).toBe(0)
+  })
+})
+
+describe('IN-1: who was involved', () => {
+  async function account(name: string): Promise<string> {
+    const id = newId('acc')
+    const at = Date.now()
+    await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, ?, \'self\', ?, ?)').bind(id, name, at, at).run()
+    return id
+  }
+
+  it('stores the people the reporter names, and shows them to the reviewer and in My reports', async () => {
+    const amy = reporter()
+    const usher = await account('Wendell Usherwood')
+    const made = await report(amy, { people: [
+      { accountId: usher, involvement: 'helped' },
+      { name: 'A patron in row F', contact: '07700 900123', involvement: 'affected' },
+    ] })
+    const read = (await req('GET', `/api/front-of-house/incidents/${made.incidentId}`, undefined, reviewer())).body
+    expect(read.people.map((p: any) => ({ accountId: p.accountId, name: p.name, contact: p.contact, involvement: p.involvement, fromReport: p.fromReport }))).toEqual([
+      { accountId: usher, name: 'Wendell Usherwood', contact: null, involvement: 'helped', fromReport: true },
+      { accountId: null, name: 'A patron in row F', contact: '07700 900123', involvement: 'affected', fromReport: true },
+    ])
+    const mine = (await req('GET', '/api/front-of-house/incidents/mine', undefined, amy)).body.incidents
+    expect(mine[0].people).toEqual([{ name: 'Wendell Usherwood', involvement: 'helped' }, { name: 'A patron in row F', involvement: 'affected' }])
+
+    // Someone a reviewer adds later is not the reporter's to see.
+    const added = await req('POST', `/api/front-of-house/incidents/${made.incidentId}/people`, { name: 'Another patron', involvement: 'witness' }, reviewer())
+    expect(added.status, JSON.stringify(added.body)).toBe(200)
+    expect((await req('GET', '/api/front-of-house/incidents/mine', undefined, amy)).body.incidents[0].people).toHaveLength(2)
+    const again = (await req('GET', `/api/front-of-house/incidents/${made.incidentId}`, undefined, reviewer())).body
+    expect(again.people.find((p: any) => p.name === 'Another patron').fromReport).toBe(false)
+  })
+
+  it('refuses someone with neither an account nor a name, or an account that is not there, and keeps no report', async () => {
+    const amy = reporter()
+    const unnamed = await req('POST', '/api/front-of-house/incidents', { kind: 'incident', occurredAt: Date.now() - MINUTE, whatHappened: 'Unnamed', people: [{ involvement: 'witness' }] }, amy)
+    expect(unnamed.status).toBe(422)
+    const ghost = await req('POST', '/api/front-of-house/incidents', { kind: 'incident', occurredAt: Date.now() - MINUTE, whatHappened: 'Ghost', people: [{ accountId: newId('acc'), involvement: 'witness' }] }, amy)
+    expect(ghost.body.code).toBe('front-of-house.unknown-person')
+    expect((await req('GET', '/api/front-of-house/incidents/mine', undefined, amy)).body.incidents).toEqual([])
+  })
+
+  it('lets a reporter find people on the system by name, and nobody else', async () => {
+    await account('Ottoline Findable')
+    const found = await req('GET', '/api/front-of-house/incidents/people?q=Ottoline', undefined, reporter())
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.people.map((p: any) => p.label)).toContain('Ottoline Findable')
+    expect(JSON.stringify(found.body)).not.toContain('@')
+    expect((await req('GET', '/api/front-of-house/incidents/people?q=Ottoline', undefined, person([]))).status).toBe(403)
   })
 })
 

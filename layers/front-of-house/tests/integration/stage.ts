@@ -65,6 +65,7 @@ import cardPut from '../../server/api/front-of-house/emergency-cards/[venueId].p
 import incidentsPost from '../../server/api/front-of-house/incidents/index.post'
 import incidentsGet from '../../server/api/front-of-house/incidents/index.get'
 import incidentsMine from '../../server/api/front-of-house/incidents/mine.get'
+import incidentsPeopleGet from '../../server/api/front-of-house/incidents/people.get'
 import incidentGet from '../../server/api/front-of-house/incidents/[id]/index.get'
 import incidentOpen from '../../server/api/front-of-house/incidents/[id]/open.post'
 import incidentReview from '../../server/api/front-of-house/incidents/[id]/review.post'
@@ -162,6 +163,7 @@ export const handle = server({
   'POST /api/front-of-house/incidents': incidentsPost,
   'GET /api/front-of-house/incidents': incidentsGet,
   'GET /api/front-of-house/incidents/mine': incidentsMine,
+  'GET /api/front-of-house/incidents/people': incidentsPeopleGet,
   'GET /api/front-of-house/incidents/:id': incidentGet,
   'POST /api/front-of-house/incidents/:id/open': incidentOpen,
   'POST /api/front-of-house/incidents/:id/review': incidentReview,
