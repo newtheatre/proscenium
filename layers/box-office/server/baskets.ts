@@ -12,7 +12,7 @@ import { hashOf, newReference, randomToken } from './codes'
 import { pricesFor, type Price } from './prices'
 import { poolsOf, salesOf } from './setup'
 import { entitle, type Buyer, type Requirement } from './entitlement'
-import { applyCode, judgeCode, redeem } from './promo-codes'
+import { describeSavings, priceTickets, redeemTickets } from './promotions'
 import { sellableTypes, soldOn } from './ticket-types'
 import { addPassSales, carryOwed, passSalesOn, planPassBuys, type PassBuy } from './pass-sales'
 import { judgePasses, letGoBaskets, passEntryTypeId, redeemPasses, type JudgedPass, type PassAsk } from './pass-entries'
@@ -172,14 +172,15 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const priced = await pricedLines(input.performanceId, [...input.lines, ...passes.asks], at, { channel: 'online', account }, asks.length)
   const { pool, currency, guard } = priced
   const bought = priced.lines.length - passes.asks.length
-  const typedCode = input.promoCode?.trim()
-  const discounted = [...(typedCode ? await applyCode(await judgeCode(typedCode, input.performanceId, at), input.performanceId, priced.lines.slice(0, bought)) : priced.lines.slice(0, bought).map(() => null)), ...asks.map(() => null)]
+  // Priced once, through Payments' pricing: a code the buyer typed, and any offer that applies on its own.
+  const tickets = await priceTickets(input.performanceId, priced.lines.slice(0, bought), 'online', input.promoCode)
+  const discounted = [...tickets.discounts, ...asks.map(() => 0)]
   const ordinary = passes.entries.filter(e => !e.wheelchair)
   const entryTypeId = ordinary.length ? await passEntryTypeId() : ''
   const lines: (Omit<PricedLine, 'priceId'> & { priceId: string | null })[] = [...priced.lines, ...ordinary.map(e => ({ bandId: e.bandId, ticketTypeId: entryTypeId, priceId: null, amountMinor: 0, requirement: null }))]
   // The pass each line is an entry of, in the lines' order: wheelchair entries first, as they were asked.
   const entryOf: (JudgedPass | null)[] = [...priced.lines.slice(0, bought).map(() => null), ...passes.entries.filter(e => e.wheelchair).map(e => e.pass), ...ordinary.map(e => e.pass)]
-  const charged = lines.map((l, i) => entryOf[i] ? 0 : l.amountMinor - (discounted[i]?.discountMinor ?? 0))
+  const charged = lines.map((l, i) => entryOf[i] ? 0 : l.amountMinor - (discounted[i] ?? 0))
 
   unit.add({ sql: "UPDATE box_office_performance_sales SET updated_at = updated_at WHERE id = ? AND state = 'on_sale' AND (off_sale_at IS NULL OR off_sale_at > ?)", params: [sales.id, at] })
     .expect(1, NOT_ON_SALE.paused)
@@ -208,13 +209,13 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const requests = [...[...input.lines, ...passes.asks].map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), ...ordinary.map(e => ({ poolId: pool.get(e.bandId)!.id, quantity: 1 }))]
   const claimed = (await claimSeats(unit, { holdId, requests, expiresAt })).flat()
   guard(unit)
-  const redemptions = redeem(unit, orderId, discounted.slice(0, bought), claimed)
+  const redemptions = await redeemTickets(unit, tickets, orderId, claimed.slice(0, bought))
   const entries = redeemPasses(unit, orderId, input.performanceId, performance.productionId, entryOf.flatMap((pass, i) => pass ? [{ pass, claimId: claimed[i]! }] : []))
   let entry = 0
   const lineIds = unit.insertSet(orderLines, lines.map((l, i) => ({
     orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor,
     // A pass covers the whole of its ticket's price, which is nothing except for a wheelchair space's.
-    discountMinor: entryOf[i] ? l.amountMinor : discounted[i]?.discountMinor ?? 0, amountMinor: charged[i]!, state: 'live',
+    discountMinor: entryOf[i] ? l.amountMinor : discounted[i] ?? 0, amountMinor: charged[i]!, state: 'live',
     requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null, requirementEvidenceId: l.requirement?.evidence ?? null, promoRedemptionId: redemptions[i] ?? null, passRedemptionId: entryOf[i] ? entries[entry++]! : null,
   })))
   unit.expect(lines.length)
@@ -244,13 +245,15 @@ export async function basketByToken(orderId: string, token: string): Promise<Bas
   const lapsed = order.state === 'basket' && order.expires_at !== null && order.expires_at <= nowMs()
   const lines = lapsed
     ? []
-    : await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, list_minor: number, discount_minor: number, code: string | null, pass: string | null }>(
-        `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, l.list_minor, CASE WHEN l.pass_redemption_id IS NULL THEN l.discount_minor ELSE 0 END AS discount_minor, c.code, y.name AS pass FROM box_office_order_lines l
-          LEFT JOIN box_office_promo_redemptions r ON r.id = l.promo_redemption_id LEFT JOIN box_office_promo_codes c ON c.id = r.promo_code_id
+    : await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, list_minor: number, discount_minor: number, promo_redemption_id: string | null, pass: string | null }>(
+        `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, l.amount_minor, l.list_minor, CASE WHEN l.pass_redemption_id IS NULL THEN l.discount_minor ELSE 0 END AS discount_minor, l.promo_redemption_id, y.name AS pass FROM box_office_order_lines l
           LEFT JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id LEFT JOIN box_office_passes p ON p.id = d.pass_id LEFT JOIN box_office_pass_types y ON y.id = p.pass_type_id
           WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, orderId)
   const saving = lines.reduce((sum, l) => sum + l.discount_minor, 0)
-  const code = lines.find(l => l.code)?.code
+  // Named by the code it was held with, or by the offer's own label when it applied on its own.
+  const said = await describeSavings([...new Set(lines.flatMap(l => l.promo_redemption_id ? [l.promo_redemption_id] : []))])
+  const named = [...said.values()][0]
+  const code = named ? named.code ?? named.label : undefined
   return {
     orderId: order.id,
     reference: order.reference,
