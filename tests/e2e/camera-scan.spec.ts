@@ -108,7 +108,6 @@ test('the desk finds a reservation by scanning its box office code with the came
   const { browser, page } = await withCamera(playwright.chromium, cameraShowing(deskCode, `desk-${stamp}`))
   try {
     await visit(page, '/console/box-office/sell')
-    await page.getByRole('tab', { name: 'Collect a reservation' }).click()
     // Find and the icon-only scan button share the code box's row, lined up with it.
     const box = (await page.getByLabel(/^Booking reference, desk code or name/).boundingBox())!
     const scanButton = page.getByRole('button', { name: 'Scan with camera' })
