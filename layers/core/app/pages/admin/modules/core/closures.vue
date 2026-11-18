@@ -12,6 +12,7 @@ const dates = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 // An all-day closure ends at the start of the day after its last; show the last day itself.
@@ -45,10 +46,13 @@ async function add() {
   // The route takes days, or local dates and times in the theatre's time zone.
   const [from, to] = form.allDay ? [form.days.start, form.days.end || form.days.start] : [dates.toLocal(form.from), dates.toLocal(form.to)]
   try {
-    await $api('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from, to, blocksPerformances: form.blocksPerformances } })
+    const { id } = await $api<{ id: string }>('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from, to, blocksPerformances: form.blocksPerformances } })
     adding.value = false
     await refresh()
-    toast.add({ title: 'Closure recorded', color: 'success' })
+    offer('Closure added', async () => {
+      await $api(`/api/core/closures/${id}` as string, { method: 'DELETE' })
+      await refresh()
+    })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -94,7 +98,7 @@ async function remove(c: Closure) {
         <EmptyState
           v-if="!data?.rows.length"
           title="No closures coming up"
-          description="Record a closure for a holiday shutdown, building work or anything else that keeps the doors shut."
+          description="Add a closure for a holiday shutdown, building work or anything else that keeps the doors shut."
           icon="i-lucide-calendar-x"
         />
         <RecordList
@@ -162,15 +166,16 @@ async function remove(c: Closure) {
               :items="scopes"
             />
           </UFormField>
-          <USwitch
+          <UCheckbox
             v-model="form.allDay"
             label="Whole days"
+            description="Untick to give a start and an end time."
           />
           <UFormField
             v-if="form.allDay"
             name="days"
-            label="First and last day"
-            help="For a single day, choose it twice."
+            label="Days"
+            help="Choose one day, or a first and a last day."
             required
           >
             <FieldDateRange v-model="form.days" />
@@ -208,7 +213,7 @@ async function remove(c: Closure) {
         <UButton
           type="submit"
           form="new-closure"
-          label="Record closure"
+          label="Add closure"
         />
       </template>
     </UModal>

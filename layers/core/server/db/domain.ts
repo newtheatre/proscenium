@@ -617,6 +617,8 @@ export const performanceRuns = defineTable('core_performance_runs', {
   done: col.internal(integer('done').notNull().default(0)),
   state: col.internal(text('state').notNull().default('running')),
   stopReason: col.internal(text('stop_reason')),
+  /** The pattern the run was made from (dates, start times, space, running time), as JSON, so it can be edited. */
+  pattern: col.internal(text('pattern')),
   createdAt: col.createdAt(),
   updatedAt: col.internal(integer('updated_at').notNull()),
 }, {
