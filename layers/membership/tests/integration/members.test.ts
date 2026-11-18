@@ -28,6 +28,8 @@ describe('the members list', () => {
     expect(current.rows[0]!.number).toMatch(/\d+$/)
     const lapsed = await members(`scheme=${id}&status=lapsed`)
     expect(lapsed.rows.map(r => r.id)).toEqual([added.body.membershipId])
+    // Joined is the earliest start date, not when the record was made.
+    expect((lapsed.rows[0] as { joined?: string }).joined).toBe('2025-01-01')
     expect((await members(`scheme=${id}&view=all`)).total).toBe(2)
 
     const byNumber = await members(`q=${encodeURIComponent(current.rows[0]!.number!)}&view=all`)
