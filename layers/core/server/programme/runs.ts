@@ -6,7 +6,7 @@
 // becomes a run, which the core.create-run job saves in chunks, each its own unit and safe to
 // repeat. A run that stops part way can be finished or removed.
 import { sql, type SQL } from 'drizzle-orm'
-import { all, createUnit, first, isRefusal, newId, nowMs, refuse, useSetting } from '#kit'
+import { all, createUnit, first, isRefusal, newId, nowMs, refuse, TIME_ZONE_REMEDY, useSetting } from '#kit'
 import type { UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
@@ -79,7 +79,7 @@ const rows = async () => await useSetting('core.units.set-rows-limit') as number
 const toStatus = (r: RunRow): RunStatus => ({ id: r.id, total: r.total, done: r.done, state: r.state, stopReason: r.stop_reason, scheduled: !!r.scheduled })
 
 async function rule(): Promise<DayRule> {
-  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
+  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
 }
 
 function* dates(from: string, to: string): Generator<{ date: string, weekday: number }> {

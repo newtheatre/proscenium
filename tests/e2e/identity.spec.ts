@@ -15,9 +15,15 @@ test('a Google refusal is explained on the sign-in page', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('not from an organisation that can sign in here')
 })
 
-test('first-run setup asks for the first Owner', async ({ page }) => {
+test('first-run setup asks for the first Owner, then the theatre and its time zone', async ({ page }) => {
   await page.goto('/setup')
   await expect(page.getByLabel('Your name')).toBeVisible()
+  await page.getByLabel('Your name').fill('Olive Owner')
+  await page.getByLabel('Your email address').fill('olive@example.org')
+  await page.getByRole('button', { name: 'Next' }).click()
+  await expect(page.getByLabel('The theatre\'s name')).toBeVisible()
+  await expect(page.getByText('Time zone', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Contact email address')).toHaveValue('olive@example.org')
   await expect(page.getByRole('button', { name: 'Make my passkey' })).toBeVisible()
 })
 
