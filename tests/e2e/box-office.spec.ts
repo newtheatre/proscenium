@@ -65,27 +65,33 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await api.dispose()
 
+  // Each reservation is made by its own buyer, in a browser of their own: one person may only
+  // reserve so many tickets for a performance, and a guest stays signed in to the account their
+  // first booking made, so a shared buyer would soon reach that limit.
+  const basketFor = async (quantity: number) => {
+    const buyer = await playwright.request.newContext(base)
+    const basket = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity }] })
+    return { buyer, basket }
+  }
+  const reserve = async (held: Awaited<ReturnType<typeof basketFor>>, who: string) => {
+    const { buyer, basket } = held
+    const reserved = await post(buyer, `/api/box-office/baskets/${basket.orderId}/reserve`, { expectedTotalMinor: basket.totalMinor, email: `desk.${who.toLowerCase()}.${stamp}@example.org`, name: `Desk ${who}` }, { 'x-basket-token': basket.token })
+    await buyer.dispose()
+    expect(reserved.state).toBe('reserved')
+    return reserved.reference as string
+  }
   // Somebody reserves one ticket online, to pay for on arrival.
-  const buyer = await playwright.request.newContext(base)
-  const basket = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 1 }] })
-  const reserved = await post(buyer, `/api/box-office/baskets/${basket.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.buyer@example.org', name: 'Desk Buyer' }, { 'x-basket-token': basket.token })
-  expect(reserved.state).toBe('reserved')
-  reference = reserved.reference
+  reference = await reserve(await basketFor(1), 'Buyer')
   // And another, to pay for and then exchange for a dearer ticket.
-  const second = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 1 }] })
-  swapping = (await post(buyer, `/api/box-office/baskets/${second.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.swapper@example.org', name: 'Desk Swapper' }, { 'x-basket-token': second.token })).reference
+  swapping = await reserve(await basketFor(1), 'Swapper')
   // And three for a group who will pay separately.
-  const third = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 3 }] })
-  group = (await post(buyer, `/api/box-office/baskets/${third.orderId}/reserve`, { expectedTotalMinor: 3600, email: 'desk.group@example.org', name: 'Desk Group' }, { 'x-basket-token': third.token })).reference
-  // And two for a couple who turn up wanting something different.
-  const fourth = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 2 }] })
-  const fifth = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 1 }] })
-  unfinished = (await post(buyer, `/api/box-office/baskets/${fifth.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.unfinished@example.org', name: 'Desk Unfinished' }, { 'x-basket-token': fifth.token })).reference
-  amending = (await post(buyer, `/api/box-office/baskets/${fourth.orderId}/reserve`, { expectedTotalMinor: 2400, email: 'desk.couple@example.org', name: 'Desk Couple' }, { 'x-basket-token': fourth.token })).reference
+  group = await reserve(await basketFor(3), 'Group')
+  // And two for a couple who turn up wanting something different; their basket is made before the next one's.
+  const couple = await basketFor(2)
+  unfinished = await reserve(await basketFor(1), 'Unfinished')
+  amending = await reserve(couple, 'Couple')
   // And two that are cancelled from the order page.
-  const sixth = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 2 }] })
-  cancelling = (await post(buyer, `/api/box-office/baskets/${sixth.orderId}/reserve`, { expectedTotalMinor: 2400, email: 'desk.cancelling@example.org', name: 'Desk Cancelling' }, { 'x-basket-token': sixth.token })).reference
-  await buyer.dispose()
+  cancelling = await reserve(await basketFor(2), 'Cancelling')
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
   expect([200, 409]).toContain((await till.post('/api/payments/sessions', { data: { pointLabel: 'Box office desk' }, headers: key() })).status())
