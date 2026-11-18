@@ -123,3 +123,25 @@ describe('releasing reservations', () => {
     expect((await req('POST', `/api/box-office/orders/${r.orderId}/keep`, { keep: true }, staff)).status).toBe(409)
   })
 })
+
+describe('a buyer letting their basket go', () => {
+  beforeAll(async () => {
+    setClock(NOV_16)
+    resetRateLimits()
+    await ready()
+  })
+
+  it('puts the seats back on sale at once, only for the basket\'s token, and is no error twice', async () => {
+    const h = await house(4)
+    const b = await basket(h, 2)
+    expect((await pool(h)).claimed).toBe(2)
+    expect((await req('POST', `/api/box-office/baskets/${b.orderId}/release`, {}, null, { 'x-basket-token': 'not-the-token' })).status).toBe(404)
+    const let_go = await req('POST', `/api/box-office/baskets/${b.orderId}/release`, {}, null, { 'x-basket-token': b.token })
+    expect(let_go.status, JSON.stringify(let_go.body)).toBe(200)
+    expect(let_go.body).toEqual({ state: 'expired' })
+    expect((await pool(h)).claimed).toBe(0)
+    expect(await order(b.orderId)).toMatchObject({ state: 'expired' })
+    expect(await count("SELECT count(*) AS n FROM box_office_claims WHERE release_reason = 'abandoned' AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ?)", b.orderId)).toBe(2)
+    expect((await req('POST', `/api/box-office/baskets/${b.orderId}/release`, {}, null, { 'x-basket-token': b.token })).body).toEqual({ state: 'expired' })
+  })
+})

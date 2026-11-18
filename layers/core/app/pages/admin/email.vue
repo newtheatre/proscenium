@@ -188,7 +188,7 @@ async function setUp() {
               {{ theatreName }}
             </p>
             <p class="mb-3">
-              Thank you for booking with us. Your tickets are attached.
+              Thank you for booking with us. We look forward to seeing you.
             </p>
             <p
               v-if="typeof value === 'string' && value.trim()"

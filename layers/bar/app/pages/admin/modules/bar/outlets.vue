@@ -1,6 +1,6 @@
 <!-- Outlets (S13): the places that sell, such as the foyer bar or an interval kiosk, each with the
      price list it sells from and where it is. One outlet at most is the box office desk. An outlet
-     that has sold is retired, not deleted. -->
+     that has sold is retired, not deleted; retired ones sit below a divider. -->
 <script setup lang="ts">
 import { outletInput, outletPatch } from '../../../../../server/input'
 
@@ -14,11 +14,12 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
+const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<{ outlets: Outlet[], lists: Option[], spaces: Option[], locations: Option[], sizes: Size[] }>('/api/bar/outlets', { key: 'bar:outlets' })
 
 const kindItems = computed(() => (['bar', 'kiosk', 'desk'] as const).map(k => ({ value: k, label: t(`bar.screens.outlets.kinds.${k}`) })))
 const listItems = computed(() => (data.value?.lists ?? []).map(l => ({ value: l.id, label: l.name })))
-const spaceItems = computed(() => [{ value: 'none', label: t('bar.screens.outlets.no-space') }, ...(data.value?.spaces ?? []).map(s => ({ value: s.id, label: s.name }))])
+const spaceItems = computed(() => [{ value: 'none', label: data.value?.spaces.length ? t('bar.screens.outlets.no-space') : t('bar.screens.outlets.no-spaces') }, ...(data.value?.spaces ?? []).map(s => ({ value: s.id, label: s.name }))])
 const locationItems = computed(() => [{ value: 'none', label: t('bar.screens.outlets.no-stock') }, ...(data.value?.locations ?? []).map(l => ({ value: l.id, label: l.name }))])
 const layoutItems = computed(() => (['chips', 'folders', 'rail'] as const).map(l => ({ value: l, label: t(`bar.screens.outlets.layouts.${l}`) })))
 // "Each" is never shown: a one-size product is just its name.
@@ -26,7 +27,20 @@ const sizeLabel = (s: Size) => s.size === 'Each' ? s.product : `${s.product} · 
 // Only sizes with a price on the outlet's list can be pinned: one with none is not on its till.
 const sizeItems = computed(() => (data.value?.sizes ?? []).filter(s => s.pricedOn.includes(form.value?.priceListId ?? '') || form.value?.favourites.includes(s.id)).map(s => ({ value: s.id, label: sizeLabel(s), description: s.category })))
 const spaceName = (id: string | null) => id ? data.value?.spaces.find(s => s.id === id)?.name ?? null : null
-const describe = (o: Outlet) => [t(`bar.screens.outlets.kinds.${o.kind}`), t('bar.screens.outlets.sells-from', { list: o.priceList }), spaceName(o.spaceId)].filter(Boolean).join(' · ')
+const describe = (o: Outlet) => [
+  t(`bar.screens.outlets.kinds.${o.kind}`),
+  t('bar.screens.outlets.sells-from', { list: o.priceList }),
+  spaceName(o.spaceId),
+  t(`bar.screens.outlets.layouts.${o.tillLayout}`),
+  o.favourites.length ? t('bar.screens.outlets.favourite-count', { count: o.favourites.length }) : null,
+].filter(Boolean).join(' · ')
+
+const query = ref('')
+const searching = ref(false)
+const showRetired = ref(false)
+const shown = computed(() => (data.value?.outlets ?? []).filter(o => o.name.toLowerCase().includes(query.value.trim().toLowerCase())))
+const current = computed(() => shown.value.filter(o => o.active))
+const retired = computed(() => shown.value.filter(o => !o.active))
 
 const form = ref<{ id: string | null, name: string, kind: Kind, priceListId: string, spaceId: string, stockLocationId: string, tillLayout: Layout, favourites: string[] } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -65,6 +79,10 @@ async function setActive(o: Outlet, active: boolean) {
   try {
     await $api(`/api/bar/outlets/${o.id}` as string, { method: 'PATCH', body: { active } })
     await refresh()
+    offer(active ? t('bar.screens.outlets.restored', { name: o.name }) : t('bar.screens.outlets.retired', { name: o.name }), async () => {
+      await $api(`/api/bar/outlets/${o.id}` as string, { method: 'PATCH', body: { active: !active } })
+      await refresh()
+    })
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })
@@ -75,11 +93,19 @@ async function setActive(o: Outlet, active: boolean) {
 <template>
   <PageFrame :title="t('bar.navigation.outlets.label')">
     <template #primary>
-      <UButton
-        icon="i-lucide-plus"
-        :label="t('bar.screens.outlets.new')"
-        @click="edit()"
-      />
+      <div class="flex items-center gap-2">
+        <SearchToggle
+          v-model="query"
+          v-model:open="searching"
+          :label="t('bar.screens.outlets.search')"
+        />
+        <UButton
+          icon="i-lucide-plus"
+          :label="t('bar.screens.outlets.new')"
+          :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
+          @click="edit()"
+        />
+      </div>
     </template>
     <DataBoundary
       :data="data"
@@ -93,29 +119,69 @@ async function setActive(o: Outlet, active: boolean) {
           icon="i-lucide-store"
           :title="t('bar.screens.outlets.empty-title')"
           :description="t('bar.screens.outlets.empty')"
-        />
-        <RecordList
-          v-else
-          :label="t('bar.navigation.outlets.label')"
         >
-          <RecordListItem
-            v-for="o in data.outlets"
-            :key="o.id"
-            :name="o.active ? o.name : t('bar.screens.products.retired-name', { name: o.name })"
-            :description="describe(o)"
-            :muted="!o.active"
-          >
-            <RowActions
-              :label="t('bar.screens.outlets.actions', { name: o.name })"
-              :items="[
-                { label: t('bar.screens.outlets.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(o) },
-                o.active
-                  ? { label: t('bar.screens.outlets.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(o, false) }
-                  : { label: t('bar.screens.outlets.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(o, true) },
-              ]"
+          <template #actions>
+            <UButton
+              icon="i-lucide-plus"
+              :label="t('bar.screens.outlets.new')"
+              @click="edit()"
             />
-          </RecordListItem>
-        </RecordList>
+          </template>
+        </EmptyState>
+        <div
+          v-else
+          class="space-y-4"
+        >
+          <p
+            v-if="!shown.length"
+            class="text-sm text-muted"
+          >
+            {{ t('bar.screens.outlets.no-match') }}
+          </p>
+          <RecordList
+            v-if="current.length"
+            :label="t('bar.navigation.outlets.label')"
+          >
+            <RecordListItem
+              v-for="o in current"
+              :key="o.id"
+              :name="o.name"
+              :description="describe(o)"
+            >
+              <RowActions
+                :label="t('bar.screens.outlets.actions', { name: o.name })"
+                :items="[
+                  { label: t('bar.screens.outlets.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(o) },
+                  { label: t('bar.screens.outlets.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(o, false) },
+                ]"
+              />
+            </RecordListItem>
+          </RecordList>
+          <CollapsibleDivider
+            :open="showRetired || !!query.trim()"
+            :label="t('bar.screens.outlets.retired-list')"
+            :count="retired.length"
+            @update:open="v => showRetired = v"
+          >
+            <RecordList :label="t('bar.screens.outlets.retired-list')">
+              <RecordListItem
+                v-for="o in retired"
+                :key="o.id"
+                :name="o.name"
+                :description="describe(o)"
+                muted
+              >
+                <RowActions
+                  :label="t('bar.screens.outlets.actions', { name: o.name })"
+                  :items="[
+                    { label: t('bar.screens.outlets.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(o) },
+                    { label: t('bar.screens.outlets.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(o, true) },
+                  ]"
+                />
+              </RecordListItem>
+            </RecordList>
+          </CollapsibleDivider>
+        </div>
       </template>
     </DataBoundary>
 
