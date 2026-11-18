@@ -30,13 +30,15 @@ export default defineRoute({ ability: 'box-office.order.view', rateLimit: 'defau
 
   const rows = []
   for (const o of found) {
-    const line = await first<{ performance_id: string }>('SELECT performance_id FROM box_office_order_lines WHERE order_id = ? ORDER BY id LIMIT 1', o.id)
+    const line = await first<{ performance_id: string, comp: number }>('SELECT performance_id, comp_request_id IS NOT NULL AS comp FROM box_office_order_lines WHERE order_id = ? ORDER BY id LIMIT 1', o.id)
     const performance = line ? await getPerformance(line.performance_id) : null
     rows.push({
       ...o,
       buyer: o.accountId ? await accountLabel(o.accountId) : null,
       show: performance ? (await getProduction(performance.productionId)).title : null,
       startsAt: performance?.startsAt ?? null,
+      // Issued free from a request for complimentary tickets: shown as such, not as paid.
+      complimentary: !!line?.comp,
     })
   }
   return { rows, total, dropped: read.dropped, ignoredWords, searchTooShort }
