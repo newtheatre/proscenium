@@ -13,6 +13,8 @@ export interface ConfirmRequest {
   button?: string
   /** 'danger' (the default) draws the button red, for an act that takes something away; 'primary' for one that does not. */
   tone?: 'danger' | 'primary'
+  /** A tick box under the consequence for something to do as well, such as emptying the basket, and whether it starts ticked. */
+  tick?: { label: string, ticked: boolean }
 }
 
 export function useConfirm() {
@@ -21,7 +23,15 @@ export function useConfirm() {
   async function confirm(request: ConfirmRequest): Promise<boolean> {
     const { default: component } = await import('../components/ConfirmDialog.vue')
     const dialog = overlay.create(component, { destroyOnClose: true })
-    return (await dialog.open(request).result) === true
+    const answer = await dialog.open(request).result
+    return answer === true || (typeof answer === 'object' && answer !== null)
   }
-  return { confirm }
+  /** As confirm, with the request's tick box: false when not confirmed, otherwise whether the box was left ticked. */
+  async function confirmTicked(request: ConfirmRequest & { tick: NonNullable<ConfirmRequest['tick']> }): Promise<false | { ticked: boolean }> {
+    const { default: component } = await import('../components/ConfirmDialog.vue')
+    const dialog = overlay.create(component, { destroyOnClose: true })
+    const answer: unknown = await dialog.open(request).result
+    return typeof answer === 'object' && answer !== null && 'ticked' in answer ? { ticked: (answer as { ticked: boolean }).ticked } : false
+  }
+  return { confirm, confirmTicked }
 }
