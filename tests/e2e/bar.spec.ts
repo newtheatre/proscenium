@@ -239,7 +239,7 @@ test('an outlet set to folders opens on its favourites, and a folder opens its s
     await page.getByRole('button', { name: 'Back' }).click()
     await expect(page.getByRole('button', { name: new RegExp(`^Chocolate ${run}`) })).toBeVisible()
 
-    // The side list shows a category at a time, the first to begin with.
+    // The side list shows a category at a time, the favourites first and open to begin with.
     await layout('rail')
     await visit(page, '/live/till')
     await expect(page.getByRole('group', { name: 'Categories' }).getByRole('button').first()).toHaveAttribute('aria-pressed', 'true')

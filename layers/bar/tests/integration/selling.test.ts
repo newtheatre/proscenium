@@ -11,7 +11,7 @@ import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import closePost from '../../server/api/bar/openings/[id]/close.post'
 import standardListener from '../../server/listeners/standard-price-list'
-import { addCategory, addOutlet, addProduct } from '../../server/catalogue'
+import { addCategory, addOutlet, addPriceList, addProduct } from '../../server/catalogue'
 
 const NOW = Date.UTC(2026, 10, 17, 19) // not-policy: a test's moment
 const handle = server({
@@ -127,5 +127,20 @@ describe('selling drinks in the till', () => {
     const paid = await sale('paid-1-xxxxxxxx')
     await expect(env.DB.prepare('UPDATE bar_sale_lines SET quantity = 9, amount_minor = 4050 WHERE sale_id = ?').bind(paid!.id).run()).rejects.toThrow(/only while the sale is open/)
     await expect(env.DB.prepare("UPDATE bar_sales SET state = 'open' WHERE id = ?").bind(paid!.id).run()).rejects.toThrow(/life cycle/)
+  })
+})
+
+describe('a restricted price list', () => {
+  it('is sold from only by someone allowed to use it (T-I11)', async () => {
+    const committee = person(['payments.session.open', 'bar.sale.sell', 'bar.sale.use-restricted-price-list'], { reassertedAt: NOW })
+    await commit(unit => openSession(unit.view(), { accountId: committee.accountId!, pointLabel: 'Bar', floatMinor: 0 }))
+    const outlet = await commit(async (unit) => {
+      const v = unit.view()
+      return addOutlet(v, { name: 'Committee bar', kind: 'bar', priceListId: addPriceList(v, { name: 'Committee', restricted: true, percentOff: 25 }) })
+    })
+    const input = (key: string) => ({ outletId: outlet, clientKey: key, lines: [{ variantId: stock.crisps, quantity: 1 }], expectedTotalMinor: 90 })
+    expect((await till(input('committee-1-xxxx'))).status).toBe(403)
+    const allowed = await till(input('committee-2-xxxx'), committee)
+    expect(allowed.status, JSON.stringify(allowed.body)).toBe(200)
   })
 })

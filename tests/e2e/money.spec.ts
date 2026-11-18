@@ -107,7 +107,7 @@ test('coming to the till opens no session: it waits for the first sale', async (
   const looker = { ...treasurer, accountId: 'acc_tilllooker', name: 'Lou Looker', grants: ['payments.session.open', 'gallery.sample.view'].map(grant) }
   await page.context().setExtraHTTPHeaders(as(looker).extraHTTPHeaders)
   await visit(page, '/live/till')
-  await expect(page.getByText('Your session opens with the first sale, at')).toBeVisible()
+  await expect(page.getByText('Your session opens with your first sale, at')).toBeVisible()
   await expect(page.getByLabel('Place: Unknown')).toBeVisible()
   await noViolations(page)
   await visit(page, '/console/payments/sessions')
