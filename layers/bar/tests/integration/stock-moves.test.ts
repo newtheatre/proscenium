@@ -9,7 +9,7 @@ import { addTerm, ensureVocabularies } from '../../../core/server/vocabularies/s
 import { call, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import stockGet from '../../server/api/bar/stock/index.get'
 import itemPost from '../../server/api/bar/stock/items/index.post'
-import itemPatch from '../../server/api/bar/stock/items/[id].patch'
+import itemPatch from '../../server/api/bar/stock/items/[id]/index.patch'
 import locationPost from '../../server/api/bar/stock/locations/index.post'
 import deliveriesGet from '../../server/api/bar/stock/deliveries/index.get'
 import deliveryPost from '../../server/api/bar/stock/deliveries/index.post'
