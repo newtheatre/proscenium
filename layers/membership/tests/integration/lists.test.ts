@@ -17,9 +17,9 @@ async function makeList(file = FILE) {
   expect((await req('POST', `/api/membership/lists/${id}/import`, { file })).status).toBe(200)
   return id
 }
-async function listScheme(fields: Record<string, unknown> = {}) {
+async function listScheme(fields: Record<string, unknown> = {}, lengths?: number[]) {
   const listId = await makeList()
-  const id = await scheme(fields)
+  const id = await scheme(fields, lengths)
   expect((await req('PATCH', `/api/membership/schemes/${id}`, { verifier: 'membership.list', listId })).status).toBe(200)
   const opened = await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
   expect(opened.status, JSON.stringify(opened.body)).toBe(200)
@@ -34,8 +34,9 @@ describe('a verification list', () => {
     const dry = await req('POST', `/api/membership/lists/${id}/import`, { file: FILE, dryRun: true })
     expect(dry.body).toMatchObject({ loaded: 0, wouldLoad: 2 })
     expect(dry.body.refused.map((r: { reason: string }) => r.reason)).toEqual(['not-well-formed', 'repeated', 'bad-date'])
-    expect((await req('GET', `/api/membership/lists/${id}`)).body.list.entryCount).toBe(0)
+    expect((await req('GET', `/api/membership/lists/${id}`)).body.list).toMatchObject({ entryCount: 0, loaded: false })
     await req('POST', `/api/membership/lists/${id}/import`, { file: FILE })
+    expect((await req('GET', `/api/membership/lists/${id}`)).body.list.loaded).toBe(true)
     expect((await req('GET', `/api/membership/lists/${id}`)).body.list.entryCount).toBe(2)
     const stored = await inContext(() => first<{ n: number }>('SELECT count(*) AS n FROM membership_verification_entries WHERE list_id = ? AND key_hash LIKE \'%20123456%\'', id))
     expect(stored!.n).toBe(0)
@@ -45,6 +46,8 @@ describe('a verification list', () => {
     const id = await makeList()
     expect((await check(id, '20123456')).body).toMatchObject({ found: true, current: true, endsOn: '2027-07-31', name: 'Ada Lovelace' })
     expect((await check(id, '20000000')).body).toEqual({ found: false })
+    // A value of the wrong shape is a typo, not somebody missing from the list.
+    expect((await check(id, '2041234')).body).toMatchObject({ found: false, malformed: true, shape: { kind: 'digits', min: 8, max: 8 } })
     expect((await req('POST', `/api/membership/lists/${id}/entries`, { value: '20000000', endsOn: '2026-12-31', name: 'Grace Hopper' })).status).toBe(200)
     expect((await check(id, ' 2000 0000 ')).body).toMatchObject({ found: true, name: 'Grace Hopper' })
     expect((await req('POST', `/api/membership/lists/${id}/entries`, { value: '123' })).body.code).toBe('membership.list.not-well-formed')
@@ -73,7 +76,7 @@ describe('joining against a list', () => {
     const { id } = await listScheme()
     const student = person([])
     expect((await req('POST', `/api/membership/schemes/${id}/join`, {}, student)).body.code).toBe('membership.join.needs-reference')
-    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'Your University of Nottingham student ID is 8 digits.' })
+    expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '123' }, student)).body).toMatchObject({ code: 'membership.join.not-well-formed', reason: 'That reference should be 8 digits.' })
     expect((await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20000000' }, student)).body.code).toBe('membership.join.not-on-list')
     const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, student)
     expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ startsOn: '2026-11-17', endsOn: '2027-07-31', opensMembersArea: true })
@@ -85,6 +88,30 @@ describe('joining against a list', () => {
     // V4: a second account typing the same ID waits for staff, who see the list's name for it.
     const other = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20123456' }, person([]))
     expect(other.body).toMatchObject({ pending: true, waiting: 'entry-already-used' })
+  })
+
+  it('asks for no length where the list sets the end date (D9)', async () => {
+    const { id } = await listScheme({}, [12, 36])
+    const offered = (await req('GET', '/api/membership/schemes', undefined, person([]))).body.schemes.find((s: { id: string }) => s.id === id)
+    expect(offered.endsByList).toBe(true)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.endsByList).toBe(true)
+    const joined = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20654321' }, person([]))
+    expect(joined.body, JSON.stringify(joined.body)).toMatchObject({ endsOn: '2027-07-31', pending: false })
+  })
+
+  it('lets staff add a member with a student ID, checking and claiming the entry', async () => {
+    const { id } = await listScheme()
+    const add = (body: Record<string, unknown>) => req('POST', `/api/membership/schemes/${id}/members`, { address: `ada${Math.random().toString(36).slice(2)}@example.org`, ...body })
+    expect((await add({ reference: '123' })).body.code).toBe('membership.join.not-well-formed')
+    expect((await add({ reference: '20000000' })).body.code).toBe('membership.join.not-on-list')
+    const added = await add({ reference: '20123456' })
+    expect(added.body, JSON.stringify(added.body)).toMatchObject({ endsOn: '2027-07-31' })
+    const row = await inContext(() => first<{ used: string | null, outcome: string }>(
+      'SELECT e.used_by AS used, v.outcome FROM membership_verifications v JOIN membership_verification_entries e ON e.id = v.entry_id WHERE v.membership_id = ?', added.body.membershipId))
+    expect(row).toEqual({ used: added.body.membershipId, outcome: 'passed' })
+    expect((await add({ reference: '20123456' })).body.code).toBe('membership.join.entry-already-used')
+    // Without a reference nothing is checked, as before.
+    expect((await add({})).status).toBe(200)
   })
 
   it('cannot open until the scheme has a list', async () => {
@@ -104,7 +131,7 @@ describe('the member price by student ID', () => {
     const [unclaimed] = await typed('20123456')
     expect(unclaimed).toMatchObject({ verdict: 'met', evidence: entry!.id })
     expect(unclaimed).not.toHaveProperty('holderAccountId')
-    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'Your University of Nottingham student ID is 8 digits.' })
+    expect((await typed('12'))[0]).toMatchObject({ verdict: 'not-met', reason: 'That reference should be 8 digits.' })
     expect((await typed('20000000'))[0]!.verdict).toBe('not-met')
 
     const student = person([])
@@ -114,7 +141,7 @@ describe('the member price by student ID', () => {
     expect((await inContext(() => requirements.check({ accounts: [null], refs: [ref], presented: [{ ref, evidence: entry!.id }], whenUnavailable: 'not-met' }), buyer))[0]!.verdict).toBe('met')
 
     const described = await inContext(() => requirements.describe([ref]), buyer)
-    expect(described[ref]!.presentable!.label).toBe(`${described[ref]!.label}? Enter your University of Nottingham student ID`)
+    expect(described[ref]!.presentable).toMatchObject({ label: `${described[ref]!.label}: type your reference to get this price`, field: 'University of Nottingham student ID' })
 
     const door = person(['membership.verification-list.check'])
     expect(await inContext(() => requirements.holder(ref, entry!.id), door)).toBe('Ada Lovelace')

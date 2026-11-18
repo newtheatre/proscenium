@@ -33,7 +33,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     return admin ? to : `/console?settings=${tabOf}`
   }
   for (const [key, { module, entry }] of registry.settings) {
-    if (!on.has(module) || entry.sensitive || entry.managed) continue
+    if (!on.has(module) || entry.sensitive || entry.managed || (entry.whenModule && !on.has(entry.whenModule))) continue
     const where = homeOf(key)
     if (!open.has(where)) open.set(where, holds(await mayOpen(actor, { ability: [...changers.get(where)!] })))
     if (!open.get(where)) continue

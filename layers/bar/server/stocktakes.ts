@@ -1,9 +1,10 @@
 // Stocktakes (Bar specification, tab 3, "A stocktake"; tab 10, "Counting by weight"). A count starts
 // with a line per item in use (in a category, or all), each counted in base units: typed as count
-// units and a part, or weighed. Submitting reads what was expected from the levels at that moment, so
-// sales made while counting are already in it. Approving writes one adjustment per line that differs,
-// on top of whatever has moved since: the variance is a fact about the moment of submission. The
-// approver is not the person who submitted, unless the value of the difference is small.
+// units and a part, or as full ones and an open one weighed. What was expected is read from the level
+// at the moment each line is counted, so a sale made after a line was typed is not mistaken for stock
+// found. Approving writes one adjustment per line that differs, on top of whatever has moved since. The
+// approver is not the person who submitted, unless the value of the difference is small, and a large
+// difference on a line needs a reason.
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { accountLabel, listTerms } from '#modules/core'
@@ -18,10 +19,11 @@ const MAX_LINES = 500 // not-policy: matches core.units.set-rows-limit's default
 export const startInput = z.object({ locationId: id, categoryId: id.nullable().optional() }).strict()
 export type StartInput = z.infer<typeof startInput>
 
-// A line is counted in base units, or weighed in grams (for an item with weights), or taken out.
+// A line is counted in base units, or weighed in grams (for an item with weights) with any full ones
+// counted beside the open one, or taken out.
 const countLine = z.union([
   z.object({ lineId: id, counted: z.number().int().min(0).max(100_000_000) }).strict(), // not-policy: a bound on a typed quantity
-  z.object({ lineId: id, weighedG: z.number().int().min(0).max(1_000_000) }).strict(), // not-policy: a bound on a typed weight (a tonne)
+  z.object({ lineId: id, weighedG: z.number().int().min(0).max(1_000_000), fullUnits: z.number().min(0).max(100_000).optional() }).strict(), // not-policy: a bound on a typed weight (a tonne) and count
   z.object({ lineId: id, counted: z.null() }).strict(),
   z.object({ lineId: id, notCounted: z.literal(true) }).strict(),
 ])
@@ -38,7 +40,10 @@ export interface StocktakeLine {
   baseUnit: 'each' | 'ml' | 'g'
   countUnitSize: number
   packSize: number
+  packName: string
   weighable: boolean
+  fullWeightG: number | null
+  emptyWeightG: number | null
   counted: number | null
   // Shown to a counter only when counts are not blind; to an approver always once submitted.
   expected: number | null
@@ -82,8 +87,8 @@ export async function stocktake(stocktakeId: string, view: { approver: boolean }
   const [s] = await list(stocktakeId, 1)
   if (!s) refuse(GONE.code, GONE.reason, { status: 404 })
   const blind = await useSetting('bar.stocktake.blind') as boolean
-  const rows = await all<{ id: string, stock_item_id: string, name: string, base_unit: 'each' | 'ml' | 'g', count_unit_size: number, pack_size: number, cost_minor: number | null, full_weight_g: number | null, counted: number | null, expected: number | null, level: number | null, reason: string | null }>(
-    `SELECT l.id, l.stock_item_id, i.name, i.base_unit, i.count_unit_size, i.pack_size, i.cost_minor, i.full_weight_g, l.counted, l.expected,
+  const rows = await all<{ id: string, stock_item_id: string, name: string, base_unit: 'each' | 'ml' | 'g', count_unit_size: number, pack_size: number, pack_name: string, cost_minor: number | null, full_weight_g: number | null, empty_weight_g: number | null, counted: number | null, expected: number | null, level: number | null, reason: string | null }>(
+    `SELECT l.id, l.stock_item_id, i.name, i.base_unit, i.count_unit_size, i.pack_size, i.pack_name, i.cost_minor, i.full_weight_g, i.empty_weight_g, l.counted, l.expected,
             (SELECT v.quantity FROM bar_stock_levels v WHERE v.stock_item_id = l.stock_item_id AND v.location_id = ?) AS level, l.variance_reason_term AS reason
        FROM bar_stocktake_lines l JOIN bar_stock_items i ON i.id = l.stock_item_id WHERE l.stocktake_id = ? ORDER BY lower(i.name), l.id`,
     s!.locationId, stocktakeId,
@@ -98,7 +103,7 @@ export async function stocktake(stocktakeId: string, view: { approver: boolean }
     reasons: (await listTerms(VARIANCE_REASONS)).map(t => ({ id: t.id, label: t.label })),
     lines: rows.map(r => ({
       id: r.id, stockItemId: r.stock_item_id, name: r.name, baseUnit: r.base_unit, countUnitSize: r.count_unit_size, packSize: r.pack_size,
-      weighable: r.full_weight_g !== null, counted: r.counted,
+      packName: r.pack_name, weighable: r.full_weight_g !== null, fullWeightG: r.full_weight_g, emptyWeightG: r.empty_weight_g, counted: r.counted,
       expected: showExpected ? r.expected : null,
       level: showLevel ? r.level ?? 0 : null,
       varianceValueMinor: showExpected && r.counted !== null && r.expected !== null ? valueOf(r.counted - r.expected, r.cost_minor, r.pack_size) : null,
@@ -159,8 +164,10 @@ export async function startStocktake(unit: UnitView, input: StartInput, by: stri
 
 /**
  * Enters counts while counting. A weighed line becomes base units from the item's full and empty
- * weights (one count unit each): left = (weighed - empty) / (full - empty) x count unit size, at
- * least nought. A line taken out is no longer part of the count.
+ * weights (one count unit each): the full ones counted beside it, plus what is left in the open one,
+ * (weighed - empty) / (full - empty) x count unit size, at least nought. Each line counted takes what
+ * was expected from its level now, so what sells after it was counted is allowed for. A line taken
+ * out is no longer part of the count.
  */
 export async function enterCounts(unit: UnitView, stocktakeId: string, input: CountInput): Promise<void> {
   const s = await row(stocktakeId)
@@ -176,8 +183,8 @@ export async function enterCounts(unit: UnitView, stocktakeId: string, input: Co
     if ('notCounted' in l) out.push(l.lineId)
     else if ('weighedG' in l) {
       if (line!.full_weight_g === null) refuse('bar.stocktake.not-weighed', 'That item has no full and empty weights, so it cannot be weighed.', { status: 422, remedy: 'Count it instead, or give it weights in Admin.' })
-      const left = (l.weighedG - line!.empty_weight_g!) / (line!.full_weight_g! - line!.empty_weight_g!) * line!.count_unit_size
-      set.push({ id: l.lineId, counted: Math.max(0, Math.round(left)) })
+      const left = Math.max(0, (l.weighedG - line!.empty_weight_g!) / (line!.full_weight_g! - line!.empty_weight_g!) * line!.count_unit_size)
+      set.push({ id: l.lineId, counted: Math.round((l.fullUnits ?? 0) * line!.count_unit_size + left) })
     }
     else set.push({ id: l.lineId, counted: l.counted })
   }
@@ -185,10 +192,13 @@ export async function enterCounts(unit: UnitView, stocktakeId: string, input: Co
   if (set.length) {
     const json = JSON.stringify(set.map(x => ({ id: x.id, c: x.counted })))
     unit.add({
-      sql: `UPDATE bar_stocktake_lines SET counted = (SELECT json_extract(j.value, '$.c') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = bar_stocktake_lines.id), updated_at = ?
+      sql: `UPDATE bar_stocktake_lines SET counted = (SELECT json_extract(j.value, '$.c') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = bar_stocktake_lines.id),
+              expected = CASE WHEN (SELECT json_extract(j.value, '$.c') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = bar_stocktake_lines.id) IS NULL THEN NULL
+                ELSE coalesce((SELECT v.quantity FROM bar_stock_levels v WHERE v.stock_item_id = bar_stocktake_lines.stock_item_id AND v.location_id = ?), 0) END,
+              updated_at = ?
             WHERE stocktake_id = ? AND id IN (SELECT json_extract(j.value, '$.id') FROM json_each(?) j)
             AND EXISTS (SELECT 1 FROM bar_stocktakes WHERE id = ? AND state = 'counting')`,
-      params: [json, at, stocktakeId, json, stocktakeId],
+      params: [json, json, s.location_id, at, stocktakeId, json, stocktakeId],
     }).expect(set.length, not('counting'))
   }
   if (out.length) {
@@ -201,7 +211,7 @@ export async function enterCounts(unit: UnitView, stocktakeId: string, input: Co
   unit.add({ sql: 'UPDATE bar_stocktakes SET updated_at = ? WHERE id = ? AND state = \'counting\'', params: [at, stocktakeId] }).expect(1, not('counting'))
 }
 
-/** Submits a count with every line counted: what was expected is read from the levels now. */
+/** Submits a count with every line counted. A line counted before what was expected was kept with it takes the level now. */
 export async function submitStocktake(unit: UnitView, stocktakeId: string, by: string): Promise<void> {
   const s = await row(stocktakeId)
   if (s.state !== 'counting') refuse(not('counting').code, not('counting').reason, { status: 409, remedy: not('counting').remedy })
@@ -211,7 +221,7 @@ export async function submitStocktake(unit: UnitView, stocktakeId: string, by: s
   const at = nowMs()
   unit.add({
     sql: `UPDATE bar_stocktake_lines SET expected = coalesce((SELECT v.quantity FROM bar_stock_levels v WHERE v.stock_item_id = bar_stocktake_lines.stock_item_id AND v.location_id = ?), 0), updated_at = ?
-          WHERE stocktake_id = ?`,
+          WHERE stocktake_id = ? AND expected IS NULL`,
     params: [s.location_id, at, stocktakeId],
   })
   unit.add({
@@ -239,20 +249,35 @@ export async function setReasons(unit: UnitView, stocktakeId: string, input: Rea
   }).expect(input.lines.length, { code: 'bar.stocktake.reason', reason: 'A line is not on this count, or a reason is not on the list.', remedy: 'Reload the count and pick reasons from the list.' })
 }
 
-/** Sends a submitted count back to be counted again; what was expected is cleared. */
+/** Sends a submitted count back to be counted again. Each line keeps what was expected when it was counted, until it is counted again. */
 export async function sendBack(unit: UnitView, stocktakeId: string): Promise<void> {
   const s = await row(stocktakeId)
   if (s.state !== 'submitted') refuse(not('submitted').code, not('submitted').reason, { status: 409, remedy: not('submitted').remedy })
   const at = nowMs()
   unit.add({ sql: 'UPDATE bar_stocktakes SET state = \'counting\', submitted_by = NULL, submitted_at = NULL, variance_value_minor = NULL, updated_at = ? WHERE id = ? AND state = \'submitted\'', params: [at, stocktakeId] }).expect(1, not('submitted'))
-  unit.add({ sql: 'UPDATE bar_stocktake_lines SET expected = NULL, updated_at = ? WHERE stocktake_id = ?', params: [at, stocktakeId] })
   unit.audit({ action: 'update', record: ['bar.stocktake', stocktakeId], detail: { state: 'counting' } })
 }
 
 /**
+ * Whether this person may approve a submitted count of their own, and the values the screen needs to
+ * say so: the person who submitted may approve only when the value of the difference is at most
+ * bar.stocktake.self-approve-under; a line whose difference is worth more than
+ * bar.stocktake.reason-over needs a reason first.
+ */
+export async function approval(stocktakeId: string, accountId: string | null): Promise<{ ownCount: boolean, selfApproveUnderMinor: number, reasonOverMinor: number }> {
+  const s = await row(stocktakeId)
+  const selfApproveUnderMinor = await useSetting('bar.stocktake.self-approve-under') as number
+  return {
+    ownCount: s.state === 'submitted' && !!accountId && s.submitted_by === accountId && Math.abs(s.variance_value_minor ?? 0) > selfApproveUnderMinor,
+    selfApproveUnderMinor,
+    reasonOverMinor: await useSetting('bar.stocktake.reason-over') as number,
+  }
+}
+
+/**
  * Approves a submitted count: an adjustment per line that differs, the counted date on every line's
- * level, in one batch. The person who submitted may approve only when the value of the difference is
- * at most bar.stocktake.self-approve-under.
+ * level, in one batch. The person who submitted may approve only a small difference, and every line
+ * whose difference is worth more than bar.stocktake.reason-over must have a reason.
  */
 export async function approveStocktake(unit: UnitView, stocktakeId: string, by: string): Promise<{ changed: number }> {
   const s = await row(stocktakeId)
@@ -260,9 +285,14 @@ export async function approveStocktake(unit: UnitView, stocktakeId: string, by: 
   const limit = await useSetting('bar.stocktake.self-approve-under') as number
   if (s.submitted_by === by && Math.abs(s.variance_value_minor ?? 0) > limit)
     refuse('bar.stocktake.own-count', 'You submitted this count, and its difference is too large to approve yourself.', { status: 403, remedy: 'Ask someone else who can approve counts.' })
-  const lines = await all<{ id: string, stock_item_id: string, counted: number, expected: number }>(
-    'SELECT id, stock_item_id, counted, expected FROM bar_stocktake_lines WHERE stocktake_id = ? AND counted <> expected ORDER BY id', stocktakeId,
+  const lines = await all<{ id: string, stock_item_id: string, counted: number, expected: number, reason: string | null, cost_minor: number | null, pack_size: number }>(
+    `SELECT l.id, l.stock_item_id, l.counted, l.expected, l.variance_reason_term AS reason, i.cost_minor, i.pack_size
+       FROM bar_stocktake_lines l JOIN bar_stock_items i ON i.id = l.stock_item_id WHERE l.stocktake_id = ? AND l.counted <> l.expected ORDER BY l.id`, stocktakeId,
   )
+  const reasonOver = await useSetting('bar.stocktake.reason-over') as number
+  const unexplained = lines.filter(l => !l.reason && Math.abs(valueOf(l.counted - l.expected, l.cost_minor, l.pack_size)) > reasonOver).length
+  if (unexplained)
+    refuse('bar.stocktake.reason-needed', `${unexplained} of the differences are too large to approve without a reason.`, { status: 422, remedy: 'Give each large difference a reason, then approve.' })
   const limitRows = await useSetting('core.units.set-rows-limit') as number
   if (lines.length > limitRows) refuse('bar.stocktake.too-many', `At most ${limitRows} levels change in one go.`, { status: 422, remedy: 'Count by category.' })
   const at = nowMs()

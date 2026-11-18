@@ -31,7 +31,16 @@ export interface AbilityDecl {
   fresh?: string | boolean
   grantAt?: ('site' | 'module' | 'record')[]
 }
-export interface FactDecl { on?: string, standing?: boolean }
+export interface FactDecl {
+  on?: string
+  standing?: boolean
+  /**
+   * Abilities mapped to the fact the first time its module is switched on, so a fresh install works
+   * before anyone edits the facts: the module's own or core's, of risk normal. From then on the
+   * mapping is the theatre's, and a fact it has emptied is left empty.
+   */
+  defaults?: readonly string[]
+}
 
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
 

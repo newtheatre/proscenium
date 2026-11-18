@@ -5,10 +5,12 @@
      price the visitor is not signed in for can take a reference instead, such as a student ID: one
      box for each ticket, worded by Membership, shown only on that ticket type. -->
 <script setup lang="ts">
-interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, reference?: { label: string, shape: string } }
+import type { ButtonProps } from '@nuxt/ui'
+
+interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, reference?: { label: string, field?: string, shape: string } }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string }
-  production: { id: string, slug: string, title: string, subtitle: string | null }
+  production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
   state: 'none' | 'draft' | 'on_sale' | 'paused' | 'closed'
   onSaleAt: number | null
   currency: string | null
@@ -70,8 +72,39 @@ const totalMinor = computed(() => {
 const currency = computed(() => data.value?.currency ?? undefined)
 const companionAlone = computed(() => chosen.value.length > 0 && chosen.value.every(c => c.type.needsPaidTicket))
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
+const atLimit = computed(() => !!data.value && quantity.value >= data.value.maxPerOrder)
+// The most of one type the steppers allow: what the visitor may have, and what is left of the order's limit.
+function mostOf(bandId: string, type: TicketType): number {
+  const most = data.value!.maxPerOrder
+  const own = counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0
+  return Math.max(own, Math.min(type.most ?? most, most - quantity.value + own))
+}
+// An amount, or "free" when there is nothing to pay.
+const price = (minor: number) => (minor === 0 ? t('box-office.book.free') : money(minor, currency.value))
+// The types the visitor can book now, in the theatre's order; then the ones they need something for
+// (a membership, the access scheme), under Other tickets.
+const groupsOf = (band: Page['bands'][number]) => ({ own: band.types.filter(type => !type.unmet), other: band.types.filter(type => !!type.unmet) })
+const rowsOf = (band: Page['bands'][number]) => {
+  const { own, other } = groupsOf(band)
+  return [...own.map(type => ({ type, otherStart: false })), ...other.map((type, i) => ({ type, otherStart: i === 0 && own.length > 0 }))]
+}
+const allSoldOut = computed(() => !!data.value?.bands.length && data.value.bands.every(b => b.soldOut))
+// A link the source gives for someone who could qualify, which comes back here afterwards.
+const helpLink = (help: string) => `${help}${help.includes('?') ? '&' : '?'}next=${encodeURIComponent(route.fullPath)}`
+// With one type to book there is no need to name it.
+function labelOf(band: Page['bands'][number], type: TicketType): string {
+  const only = groupsOf(band).own.length === 1 && !type.unmet
+  const promoted = promoPrice(band.bandId, type.ticketTypeId)
+  if (promoted !== undefined) return t('box-office.book.type-with-code', { type: only ? t('box-office.book.tickets') : type.name, price: price(promoted), was: price(type.amountMinor) })
+  return only ? t('box-office.book.only-type', { price: price(type.amountMinor) }) : t('box-office.book.type', { type: type.name, price: price(type.amountMinor) })
+}
+// Nuxt UI passes the stepper's button props through, attributes included; its type lists props only.
+const named = (label: string) => ({ 'aria-label': label }) as unknown as ButtonProps
+// The stepper's buttons, named for the type ("Add a Full price ticket"), or plainly when there is one type.
+const stepLabel = (band: Page['bands'][number], type: TicketType, way: 'add' | 'remove') => (groupsOf(band).own.length === 1 && !type.unmet ? t(`box-office.book.${way}-ticket`) : t(`box-office.book.${way}`, { type: type.name }))
 const siteKey = useRuntimeConfig().public.turnstile?.siteKey
 const challenge = ref('')
+const turnstile = useTemplateRef<{ reset: () => void }>('turnstile')
 // References typed for a type the visitor may have only by giving one, one for each ticket in turn.
 const references = ref<Record<string, string[]>>({})
 const typing = (type: TicketType) => !!type.unmet && !!type.reference
@@ -80,10 +113,13 @@ function setReference(bandId: string, typeId: string, n: number, value: string) 
   const list = [...(references.value[keyOf(bandId, typeId)] ?? [])]
   list[n] = value
   references.value = { ...references.value, [keyOf(bandId, typeId)]: list }
+  if (referenceRefusal.value) refusal.value = null
 }
 const referencesMissing = computed(() => chosen.value.some(c => typing(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).filter(Boolean).length < c.quantity))
 const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && (!siteKey || !!challenge.value))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A refused reference is said beside the references typed; the notice at the top is for the rest.
+const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
 const busy = ref(false)
 
 async function hold() {
@@ -100,7 +136,8 @@ async function hold() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-    challenge.value = ''
+    // The token was used up by the refused hold: run the check again for a new one.
+    turnstile.value?.reset()
   }
   finally {
     busy.value = false
@@ -117,6 +154,17 @@ async function hold() {
       />
       <UPageBody>
         <div class="max-w-2xl space-y-6">
+          <p
+            v-if="data.production.ageMin !== null"
+            class="flex items-center gap-2"
+            :class="data.production.ageRestricted ? 'font-medium' : 'text-sm text-muted'"
+          >
+            <UIcon
+              :name="data.production.ageRestricted ? 'i-lucide-id-card' : 'i-lucide-info'"
+              class="shrink-0"
+            />
+            {{ data.production.ageRestricted ? t('box-office.book.age.restricted', { age: data.production.ageMin }) : t('box-office.book.age.recommended', { age: data.production.ageMin }) }}
+          </p>
           <UAlert
             v-if="data.state !== 'on_sale'"
             color="neutral"
@@ -124,52 +172,99 @@ async function hold() {
             icon="i-lucide-info"
             :title="t(`box-office.book.state.${data.state}`, { when: data.onSaleAt ? dateTime(data.onSaleAt) : '' })"
           />
+          <template v-else-if="allSoldOut">
+            <UAlert
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-ticket-x"
+              :title="t('box-office.book.all-sold-out')"
+              :description="t('box-office.book.all-sold-out-remedy')"
+            />
+            <UButton
+              :to="`/whats-on/${data.production.slug}`"
+              color="neutral"
+              variant="outline"
+              :label="t('box-office.book.other-dates')"
+            />
+          </template>
           <template v-else>
-            <RefusalNotice :refusal="refusal" />
+            <RefusalNotice :refusal="referenceRefusal ? null : refusal" />
             <section
               v-for="band in data.bands"
               :key="band.bandId"
               class="space-y-3"
             >
-              <h2 class="text-lg font-semibold">
+              <h2
+                v-if="data.bands.length > 1"
+                class="text-lg font-semibold"
+              >
                 {{ band.name }}
               </h2>
               <p
                 v-if="band.soldOut"
                 class="text-sm text-muted"
               >
-                {{ t('box-office.book.sold-out') }}
+                {{ data.bands.length > 1 ? t('box-office.book.sold-out') : t('box-office.book.all-sold-out') }}
               </p>
               <template v-else>
-                <UFormField
-                  v-for="type in band.types"
+                <template
+                  v-for="{ type, otherStart } in rowsOf(band)"
                   :key="type.ticketTypeId"
-                  :label="promoPrice(band.bandId, type.ticketTypeId) !== undefined ? t('box-office.book.type-with-code', { type: type.name, price: money(promoPrice(band.bandId, type.ticketTypeId)!, currency), was: money(type.amountMinor, currency) }) : t('box-office.book.type', { type: type.name, price: money(type.amountMinor, currency) })"
-                  :help="typing(type) ? type.reference!.label : (type.unmet ?? type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
                 >
-                  <div class="space-y-2">
-                    <UInputNumber
-                      v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
-                      :min="0"
-                      :max="type.unmet && !typing(type) ? 0 : Math.min(data.maxPerOrder, type.most ?? data.maxPerOrder)"
-                      :disabled="!!type.unmet && !typing(type)"
-                      :default-value="0"
-                    />
-                    <template v-if="typing(type)">
-                      <UInput
-                        v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
-                        :key="n"
-                        :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
-                        :aria-label="t('box-office.book.reference', { label: type.reference!.label, n })"
-                        :placeholder="t('box-office.book.reference-placeholder', { n })"
-                        autocomplete="off"
-                        maxlength="64"
-                        class="block w-64"
-                        @update:model-value="setReference(band.bandId, type.ticketTypeId, n - 1, String($event))"
-                      />
+                  <h3
+                    v-if="otherStart"
+                    class="pt-2 text-sm font-medium text-muted"
+                  >
+                    {{ t('box-office.book.other-tickets') }}
+                  </h3>
+                  <!-- A type the visitor cannot have and cannot qualify for here is one line, saying how they might. -->
+                  <p
+                    v-if="type.unmet && !typing(type)"
+                    class="text-sm"
+                  >
+                    <ULink
+                      v-if="type.unmetHelp"
+                      :to="helpLink(type.unmetHelp)"
+                      class="text-primary underline"
+                    >
+                      {{ type.unmet }}
+                    </ULink>
+                    <template v-else>
+                      <span class="font-medium">{{ type.name }}</span>: <span class="text-muted">{{ type.unmet }}</span>
                     </template>
-                  </div>
-                </UFormField>
+                  </p>
+                  <UFormField
+                    v-else
+                    :label="labelOf(band, type)"
+                    :help="typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
+                    :error="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)] ? referenceRefusal?.reason : undefined"
+                  >
+                    <div class="space-y-2">
+                      <UInputNumber
+                        v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
+                        :min="0"
+                        :max="mostOf(band.bandId, type)"
+                        :default-value="0"
+                        :increment="named(stepLabel(band, type, 'add'))"
+                        :decrement="named(stepLabel(band, type, 'remove'))"
+                        :ui="{ increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
+                      />
+                      <template v-if="typing(type)">
+                        <UInput
+                          v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
+                          :key="n"
+                          :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
+                          :aria-label="t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"
+                          :placeholder="t('box-office.book.reference-placeholder', { n })"
+                          autocomplete="off"
+                          maxlength="64"
+                          class="block w-64"
+                          @update:model-value="setReference(band.bandId, type.ticketTypeId, n - 1, String($event))"
+                        />
+                      </template>
+                    </div>
+                  </UFormField>
+                </template>
               </template>
             </section>
             <UFormField
@@ -219,18 +314,22 @@ async function hold() {
               {{ t('box-office.book.references-missing') }}
             </p>
             <p
-              v-if="tooMany"
-              class="text-sm text-error"
-              role="alert"
+              v-if="atLimit"
+              class="text-sm"
+              :class="tooMany ? 'text-error' : 'text-muted'"
+              :role="tooMany ? 'alert' : 'status'"
             >
               {{ t('box-office.book.too-many', { count: data.maxPerOrder }) }}
             </p>
-            <TurnstileCheck @token="challenge = $event" />
+            <TurnstileCheck
+              ref="turnstile"
+              @token="challenge = $event"
+            />
             <UButton
               size="lg"
               :loading="busy"
               :disabled="!ready"
-              :label="quantity ? t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) }) : t('box-office.book.choose')"
+              :label="quantity ? (totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
               @click="hold"
             />
           </template>

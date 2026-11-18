@@ -83,6 +83,24 @@ describe('holding a scheme', () => {
     expect(mine.memberships).toMatchObject([{ schemeName: 'Student member', length: '36 months', status: 'current' }])
   })
 
+  it('restates the lengths when the rule changes between months and scheme years, and refuses what cannot be', async () => {
+    const id = await scheme({}, [12, 36])
+    const fixed = await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'fixed', fixedEndMonth: 7, fixedEndDay: 31 })
+    expect(fixed.status, JSON.stringify(fixed.body)).toBe(200)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.options.map((o: any) => o.count)).toEqual([1, 3])
+    const back = await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'rolling', fixedEndMonth: null, fixedEndDay: null })
+    expect(back.status, JSON.stringify(back.body)).toBe(200)
+    expect((await req('GET', `/api/membership/schemes/${id}`)).body.options.map((o: any) => o.count)).toEqual([12, 36])
+
+    // 6 months is not a whole number of scheme years; nothing is changed.
+    const odd = await scheme({}, [6])
+    const refused = await req('PATCH', `/api/membership/schemes/${odd}`, { lengthRule: 'fixed', fixedEndMonth: 7, fixedEndDay: 31 })
+    expect(refused.body.code).toBe('membership.scheme.lengths-fixed')
+    expect((await req('GET', `/api/membership/schemes/${odd}`)).body.scheme.lengthRule).toBe('rolling')
+    // Indefinite has no unit to restate them in.
+    expect((await req('PATCH', `/api/membership/schemes/${id}`, { lengthRule: 'indefinite' })).body.code).toBe('membership.scheme.lengths-fixed')
+  })
+
   it('gives a supporters\' scheme its benefits and never the members\' area (MEM-07)', async () => {
     const id = await scheme({ side: 'audience', lengthRule: 'indefinite' }, [])
     await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
@@ -93,6 +111,16 @@ describe('holding a scheme', () => {
     expect(await holds(friend.accountId!, 'core.member')).toBe(false)
     // S2: the side is fixed once anybody has held it.
     expect((await req('PATCH', `/api/membership/schemes/${id}`, { side: 'members' })).body.code).toBe('membership.scheme.side-fixed')
+  })
+
+  it('offers staff only the lengths on sale, and asks for none when both dates are given', async () => {
+    const id = await scheme({ joinMode: 'staff-only' }, [12, 36])
+    await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
+    const options = (await req('GET', `/api/membership/schemes/${id}`)).body.options
+    await req('PATCH', `/api/membership/schemes/${id}/options/${options[1].id}`, { state: 'withdrawn' })
+    const address = () => `staff${Math.random().toString(36).slice(2)}@example.org`
+    expect((await req('POST', `/api/membership/schemes/${id}/members`, { address: address(), lengthOptionId: options[1].id })).body.code).toBe('membership.option.unknown')
+    expect((await req('POST', `/api/membership/schemes/${id}/members`, { address: address(), startsOn: '2026-09-01', endsOn: '2027-08-31' })).status).toBe(200)
   })
 
   it('lets staff add a member by address, with dates by hand, and never to themselves (MEM-24)', async () => {

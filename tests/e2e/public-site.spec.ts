@@ -166,13 +166,19 @@ test('the production page shows its dates, the booking link, the cancelled date 
   await expect(page.getByRole('img', { name: 'A red stage curtain' })).toBeVisible()
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/files\//)
   await expect(page.getByText('This production has no staging effects or content warnings.')).toBeVisible()
-  const dates = page.getByRole('region', { name: 'Dates' })
-  const book = dates.getByRole('link', { name: /^Book for / })
+  const dates = page.getByRole('region', { name: 'Dates and tickets' })
+  // The theatre's own outside link says it leaves the site.
+  const book = dates.getByRole('link', { name: /^Book elsewhere for .+\(opens in a new tab\)$/ })
   await expect(book).toHaveCount(1)
   await expect(book).toHaveAttribute('href', 'https://tickets.example/public-show')
   await expect(dates.getByText('Captioned')).toBeVisible()
   await expect(dates.locator('.line-through')).toHaveCount(1)
   await expect(dates.getByText('Cancelled', { exact: true })).toBeVisible()
+  // The venue's name links to its page, and Getting here gives its address and access in brief.
+  const gettingHere = page.getByRole('region', { name: 'Getting here' })
+  await expect(gettingHere.getByText('1 Theatre Street, Nottingham NG1 1AA')).toBeVisible()
+  await expect(gettingHere.getByText('Step-free access')).toBeVisible()
+  await expect(page.getByRole('link', { name: `Public Theatre ${stamp}`, exact: true }).first()).toHaveAttribute('href', `/venues/${venueSlug}`)
 
   // The description's Markdown is drawn, and what looks like HTML stays text.
   const about = page.getByRole('region', { name: 'About the production' })
@@ -255,6 +261,13 @@ test('a venue\'s page shows its address, getting here, access with labels, and w
   await expect(page.getByRole('region', { name: 'On here' }).getByRole('link', { name: new RegExp(title) })).toHaveAttribute('href', `/whats-on/${slug}`)
   await noViolations(page)
   await page.emulateMedia({ colorScheme: 'dark' })
+  await noViolations(page)
+})
+
+test('the venues index lists each venue with its address and access, opening its page', async ({ page }) => {
+  await visit(page, '/venues')
+  await expect(page.getByRole('heading', { name: 'Venues', level: 1 })).toBeVisible()
+  await expect(page.getByRole('link', { name: new RegExp(`Public Theatre ${stamp}`) })).toHaveAttribute('href', `/venues/${venueSlug}`)
   await noViolations(page)
 })
 

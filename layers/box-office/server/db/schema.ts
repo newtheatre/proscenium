@@ -190,6 +190,9 @@ export const promoCodes = defineTable('box_office_promo_codes', {
   used: col.internal(integer('used').notNull().default(0)),
   // Tickets one order may have at the code's price; null means every eligible ticket in it.
   maxPerOrder: col.internal(integer('max_per_order')),
+  // When set, the code leaves alone ticket types that carry a requirement (a membership, proof or a
+  // concession), so it does not stack on a price already reduced for who the buyer is.
+  notWithRequirements: col.internal(integer('not_with_requirements', { mode: 'boolean' }).notNull().default(false)),
   validFrom: col.timestamp('valid_from'),
   validUntil: col.timestamp('valid_until'),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
@@ -430,6 +433,10 @@ export const tickets = defineTable('box_office_tickets', {
   // Copied, so the door reads one table.
   performanceId: col.internal(text('performance_id').notNull()),
   codeHash: col.internal(text('code_hash').notNull()),
+  // The code part itself, sealed with the core key, so the buyer's booking page and My account can
+  // show the ticket again: it is signed afresh each time it is shown. Null for a ticket issued before
+  // this was kept; cleared with the person.
+  doorCode: col.internal(text('door_code'), { encrypted: true, erase: 'clear' }),
   // The kit signing key that signed the door code, under the purpose box-office.door-code.
   keyId: col.internal(text('key_id').notNull()),
   state: col.internal(text('state', { enum: ['valid', 'void'] }).notNull().default('valid')),

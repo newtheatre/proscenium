@@ -400,6 +400,7 @@ onMounted(() => {
                   />
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
                   <DurationInput
+                    :id="`setting-${s.key}-per`"
                     :model-value="rate(s).per"
                     :min="s.periodMin"
                     :max="s.periodMax"
