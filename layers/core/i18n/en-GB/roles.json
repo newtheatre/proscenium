@@ -92,5 +92,7 @@
   "core.facts.show-all": "Show every ability ({count} more)",
   "core.facts.member.label": "Is a member: holds a standing now",
   "core.facts.access-scheme.label": "Is on the access scheme",
-  "core.facts.production-team.label": "Is on the production's team"
+  "core.facts.production-team.label": "Is on the production's team",
+  "core.roles.notice.until": "It lasts until {date}.",
+  "core.roles.notice.no-end": "It has no end date."
 }
