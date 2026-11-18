@@ -1,0 +1,1 @@
+ALTER TABLE `core_performance_runs` ADD `pattern` text;

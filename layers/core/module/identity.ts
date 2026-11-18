@@ -302,11 +302,11 @@ export const identityContributions = {
     channels: ['email' as const],
     lane: 'prompt' as const,
     // Both sign the person in, so both are sealed.
-    variables: { link: 'sealed' as const, code: 'sealed' as const },
+    variables: { link: 'sealed' as const, code: 'sealed' as const, lasts: 'text' as const },
     wording: {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
-        body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+        body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nThe link and the code work for {{ lasts }}.\n\nIf you did not ask to sign in, you can ignore this email.',
       },
     },
   }, {
@@ -432,11 +432,13 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { what: 'text' as const },
+    variables: { what: 'text' as const, when: 'text' as const, device: 'text' as const },
+    link: '/account/sign-in',
     wording: {
       'en-GB': {
         subject: 'Your sign-in at {{ theatre }} has changed',
-        body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+        body: 'This was added to your account: **{{ what }}**.\n\nWhen: {{ when }}\n\nFrom: {{ device }}\n\nIf this was you, there is nothing to do. If it was not, someone else may be able to sign in as you: sign in, remove anything you do not recognise under Signing in, and contact the theatre straight away.',
+        action: 'Check how I sign in',
       },
     },
   }, {
@@ -517,6 +519,36 @@ export const identityContributions = {
       },
     },
   }, {
+    // A role given to a person who already has an account (an invitation says so itself) (EM-13).
+    id: 'core.role-given',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { role: 'text' as const, until: 'text' as const },
+    link: '/account',
+    wording: {
+      'en-GB': {
+        subject: 'You have a new role at {{ theatre }}: {{ role }}',
+        body: '{{ theatre }} has given you the role **{{ role }}**. {{ until }}\n\nWhat it lets you do is there the next time you sign in. If you were not expecting this, ask whoever looks after roles at {{ theatre }}.',
+        action: 'Sign in',
+      },
+    },
+  }, {
+    // A role ended by someone, not one that lapsed or was replaced by a change (EM-13).
+    id: 'core.role-ended',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { role: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your role at {{ theatre }} has ended: {{ role }}',
+        body: '{{ theatre }} has ended your role **{{ role }}**, so what it let you do has stopped.\n\nIf you were not expecting this, ask whoever looks after roles at {{ theatre }}.',
+      },
+    },
+  }, {
     id: 'core.address-changed',
     category: 'transactional' as const,
     side: 'audience' as const,
@@ -584,5 +616,6 @@ export const identityContributions = {
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },
     { id: 'core.owner-recovery', file: 'owner-recovery' },
     { id: 'core.merges', file: 'merges' },
+    { id: 'core.privacy-contact', file: 'privacy-contact' },
   ],
 }

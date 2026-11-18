@@ -36,6 +36,11 @@ export default defineRoute({
     return { state: 'declined' }
   }
   recordOutcome(unit, record!.id, { outcome: 'passed', verifier }, actor.accountId, note)
+  // An entry nobody has claimed (its name differed from the applicant's) is claimed on passing.
+  unit.add({
+    sql: 'UPDATE membership_verification_entries SET used_by = ?1 WHERE used_by IS NULL AND id = (SELECT entry_id FROM membership_verifications WHERE membership_id = ?1 AND entry_id IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 1)',
+    params: [record!.id],
+  })
   // A2: with the fee still to pay, the applicant is now asked to pay, and the application expires if
   // they do not (J5). Approval is not built yet.
   const unpaid = !!row!.needs_payment && row!.paid_at === null
@@ -46,7 +51,7 @@ export default defineRoute({
     return { state: 'pending', waiting: unpaid ? 'payment' : 'approval' }
   }
   const scheme = await requireScheme(row!.scheme_id)
-  const dates = activatePending(unit, {
+  const dates = await activatePending(unit, {
     id: record!.id, scheme, accountId: row!.account_id, count: row!.count ?? 1, startsOn: await today(),
     ...(row!.entry_ends ? { endsOn: row!.entry_ends } : {}),
   })
