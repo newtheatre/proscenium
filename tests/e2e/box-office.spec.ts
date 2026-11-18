@@ -1,7 +1,7 @@
 // The desk in a real browser: Sell is the till with Box office's panel first. A seller sells
 // tickets to somebody at the desk for cash, then finds a reservation by its reference and takes
 // payment for it, and the screen has no accessibility violations on the way.
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { test, expect, type APIRequestContext, type ConsoleMessage, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -328,9 +328,17 @@ test.describe('the box office console', () => {
     await expect(page.getByText('1 admitted').first()).toBeVisible()
     await expect(page.getByRole('button', { name: `Admit one ticket for ${reference}` })).toHaveCount(0)
 
+    // The report is drawn the same on the server and in the browser: no hydration mismatch.
+    const mismatches: string[] = []
+    const listen = (message: ConsoleMessage) => {
+      if (/hydrat/i.test(message.text())) mismatches.push(message.text())
+    }
+    page.on('console', listen)
     await visit(page, '/console/box-office/reports/sales')
     await expect(page.getByRole('heading', { level: 1, name: 'Sales report' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Download as CSV' })).toBeVisible()
+    page.off('console', listen)
+    expect(mismatches).toEqual([])
     await noViolations(page)
 
     await visit(page, '/admin/modules/box-office/ticket-types')
