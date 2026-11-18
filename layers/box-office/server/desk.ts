@@ -8,7 +8,7 @@
 import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, type AccessApplication, type DeskAccessForm } from '#modules/core'
+import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeOf, type AccessApplication, type DeskAccessForm } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -569,7 +569,7 @@ export async function deskPrintable(orderId: string): Promise<{ reference: strin
   const shows = new Map<string, { production: string, startsAt: number, venue: string }>()
   for (const performanceId of new Set(lines.map(l => l.performance_id))) {
     const performance = await getPerformance(performanceId)
-    shows.set(performanceId, { production: performance.productionTitle, startsAt: performance.startsAt, venue: `${performance.venueName}, ${performance.spaceName}` })
+    shows.set(performanceId, { production: performance.productionTitle, startsAt: performance.startsAt, venue: placeOf(performance.spaceName, performance.venueName) })
   }
   const tickets = await Promise.all(lines.map(async (l, i) => ({
     lineId: l.id,

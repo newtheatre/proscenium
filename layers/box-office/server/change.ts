@@ -9,7 +9,7 @@
 // without that decision. A decision is used once and then cleared, so the next change asks again.
 import { sql } from 'drizzle-orm'
 import { all, first, nowMs, refuse, type Actor, type UnitView } from '#kit'
-import { getPerformance, notify } from '#modules/core'
+import { getPerformance, notify, placeOf } from '#modules/core'
 import { cancelLines } from './cancel'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
 
@@ -167,7 +167,7 @@ async function tell(unit: UnitView, order: OrderRow, performanceId: string, what
       reference: order.reference,
       show: words.show,
       what,
-      now: performance.state === 'cancelled' ? `It was to be on ${words.when}, at ${performance.venueName}, ${performance.spaceName}.` : `It is now on ${words.when}, at ${performance.venueName}, ${performance.spaceName}.`,
+      now: performance.state === 'cancelled' ? `It was to be on ${words.when}, at ${placeOf(performance.spaceName, performance.venueName)}.` : `It is now on ${words.when}, at ${placeOf(performance.spaceName, performance.venueName)}.`,
       next,
     },
     subject: ['box-office.order', order.id],
