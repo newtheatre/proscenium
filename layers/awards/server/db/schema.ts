@@ -10,6 +10,8 @@ export const TYPE_STATES = ['active', 'archived'] as const
 export const VISIBILITIES = ['public', 'members', 'hidden'] as const
 export const AWARD_STATES = ['current', 'revoked'] as const
 export const SOURCES = ['direct', 'nomination', 'import'] as const
+/** Whether the date of an award is known to the day, or only to the year (an imported "1998"). */
+export const PRECISIONS = ['day', 'year'] as const
 
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 
@@ -52,6 +54,8 @@ export const awards = defineTable('awards_awards', {
   // The name as printed on the roll of honour.
   recipientName: col.public(text('recipient_name').notNull(), { erase: 'anonymise' }),
   awardedOn: col.localDate('awarded_on').notNull(),
+  // A year alone is kept as 1 January of it; this says the day is not known, so it is shown as the year.
+  awardedPrecision: col.internal(text('awarded_precision', { enum: PRECISIONS }).notNull().default('day')),
   // A short line naming what it is for when that is not a show: "Running the workshop programme, 2025".
   awardedFor: col.public(text('awarded_for'), { erase: 'anonymise' }),
   // Published on the roll, so public; about the person, so erasure blanks it.

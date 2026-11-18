@@ -4,7 +4,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, factHolders, newId, setClock } from '#kit'
 import { signUp } from '../../server/assignments'
-import { deliver, inContext, rows, setModule } from '../../../../tests/integration/helpers'
+import { deliver, env, inContext, rows, setModule } from '../../../../tests/integration/helpers'
 import { duty, holds, manager, performance, ready, req, setting, shift, shiftRow, volunteer, MINUTE } from './stage'
 
 beforeAll(ready)
@@ -232,5 +232,19 @@ describe('applying a template twice', () => {
     const second = await req('POST', `/api/front-of-house/performances/${p.id}/shifts/apply`, { templateId: template.body.templateId })
     expect(second.status).toBe(200)
     expect(second.body).toMatchObject({ added: [], skipped: [{ performanceId: p.id, reason: 'nothing-new' }] })
+  })
+})
+
+describe('FH-2: finding someone to put on a shift', () => {
+  it('lets whoever runs the rota search people on the shift\'s own picker, and nobody else', async () => {
+    const p = await performance()
+    const id = await shift(p.id, await duty('Steward'))
+    const accountId = newId('acc')
+    await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, \'Zebedee Rotafinder\', \'staff\', ?)').bind(accountId, Date.now()).run()
+    const found = await req('GET', `/api/front-of-house/shifts/${id}/people?q=Rotafinder`)
+    expect(found.status, JSON.stringify(found.body)).toBe(200)
+    expect(found.body.people).toEqual([expect.objectContaining({ id: accountId, label: 'Zebedee Rotafinder' })])
+    expect(JSON.stringify(found.body)).not.toContain('@')
+    expect((await req('GET', `/api/front-of-house/shifts/${id}/people?q=Rotafinder`, undefined, volunteer())).status).toBe(403)
   })
 })

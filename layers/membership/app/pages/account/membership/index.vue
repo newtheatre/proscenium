@@ -7,9 +7,10 @@
      a reference the list does not hold is said beside its field. The card (MEM-33, MEM-51) opens full screen with a code that
      Box office signs each time it is opened; without Box office it shows no code. -->
 <script setup lang="ts">
-interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Fee { amountMinor: number, currency: string }
-interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null }
+interface RenewAsks { options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, asksFor: string | null, endsByList: boolean, online: boolean }
+interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null, endsByList: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -22,6 +23,14 @@ const offered = await useAPI<{ schemes: Offered[] }>('/api/membership/schemes', 
 const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 'lapsed': 'neutral' } as const
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
+// One card: a membership that follows on from one held now is not shown as a second card.
+const cardFor = (m: Mine['memberships'][number]) => m.status === 'current' || m.status === 'in-grace' || (m.status === 'upcoming' && !(mine.data.value?.memberships ?? []).some(o => o.schemeId === m.schemeId && (o.status === 'current' || o.status === 'in-grace')))
+/** A held membership's line: when it starts if it has not yet, until when, and its renewal. */
+const heldLine = (m: Mine['memberships'][number]) => [
+  m.status === 'upcoming' ? t('membership.screens.mine.from', { date: day(m.startsOn) }) : '',
+  m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end'),
+  m.renewed ? t('membership.screens.mine.already-renewed') : m.renewal && !m.renewal.open && m.status !== 'lapsed' ? t('membership.screens.mine.renewal-opens', { date: day(m.renewal.opensOn) }) : '',
+].filter(Boolean).join(' · ')
 const money = (fee: Fee) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: fee.currency }).format(fee.amountMinor / 100) // not-policy: minor units to units
 /** How long a scheme lasts and what it costs, under its name: each length with its price. */
 function terms(s: Offered): string {
@@ -36,7 +45,8 @@ const joining = ref<Offered | null>(null)
 const joinState = reactive({ lengthOptionId: undefined as string | undefined, reference: '' })
 const joinRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const joinForm = useTemplateRef('joinForm')
-const joinOptions = computed(() => joining.value?.options ?? [])
+// A list that sets the end date leaves no length to choose (finding: a chosen length was ignored).
+const joinOptions = computed(() => joining.value?.endsByList ? [] : joining.value?.options ?? [])
 /** The price of the length chosen, or of the scheme, for the dialog. */
 const joinPrice = computed(() => {
   const s = joining.value
@@ -65,7 +75,7 @@ async function join() {
   if (!s) return
   joinRefusal.value = null
   try {
-    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: joinState.lengthOptionId ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? joinState.reference.trim() : undefined } })
+    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: s.endsByList ? null : joinState.lengthOptionId ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? joinState.reference.trim() : undefined } })
     if (joined.waiting === 'payment') return navigateTo(`/account/membership/${joined.membershipId}/pay`)
     joining.value = null
     if (joined.pending) {
@@ -95,10 +105,12 @@ async function endMine(m: Mine['memberships'][number]) {
     toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })
   }
 }
-// Renewing: the same scheme's lengths and, where it checks a reference again, the reference.
+// Renewing: the scheme's own lengths and, where it checks a reference again, the reference. These
+// come with the membership, so a closed scheme, which is not among the open ones, still renews.
 const renewing = ref<Mine['memberships'][number] | null>(null)
 const renewChoice = reactive({ lengthOptionId: undefined as string | undefined, reference: '' })
-const renewScheme = computed(() => (offered.data.value?.schemes ?? []).find(s => s.id === renewing.value?.schemeId))
+const renewScheme = computed(() => renewing.value?.renewal?.asks ?? null)
+const optionLabel = (o: { name: string, fee: Fee | null }) => o.fee ? `${o.name}, ${money(o.fee)}` : o.name
 const renewRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function openRenew(m: Mine['memberships'][number]) {
   renewing.value = m
@@ -111,7 +123,7 @@ async function renew() {
     const done = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/mine/${renewing.value!.id}/renew` as string, {
       method: 'POST',
       headers: { 'idempotency-key': crypto.randomUUID() },
-      body: { lengthOptionId: renewChoice.lengthOptionId ?? null, reference: renewChoice.reference.trim() || undefined },
+      body: { lengthOptionId: renewScheme.value?.endsByList ? null : renewChoice.lengthOptionId ?? (renewScheme.value?.options.length === 1 ? renewScheme.value.options[0]!.id : null), reference: renewChoice.reference.trim() || undefined },
     })
     if (done.waiting === 'payment') return navigateTo(`/account/membership/${done.membershipId}/pay`)
     toast.add({ title: t(done.pending ? 'membership.screens.mine.renew-pending' : 'membership.screens.mine.renewed', { scheme: renewing.value!.schemeName }), color: 'success' })
@@ -161,7 +173,7 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="m in mine.data.value.memberships"
               :key="m.id"
               :name="m.schemeName"
-              :description="[m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end'), m.renewed ? t('membership.screens.mine.already-renewed') : m.renewal && !m.renewal.open && m.status !== 'lapsed' ? t('membership.screens.mine.renewal-opens', { date: day(m.renewal.opensOn) }) : ''].filter(Boolean).join(' · ')"
+              :description="heldLine(m)"
               :muted="m.status === 'lapsed'"
             >
               <div class="flex flex-wrap items-center gap-2">
@@ -170,7 +182,7 @@ async function withdraw(a: Mine['applications'][number]) {
                   :label="t(`membership.screens.derived.${m.status}`)"
                 />
                 <UButton
-                  v-if="mine.data.value.card && m.status !== 'lapsed'"
+                  v-if="mine.data.value.card && cardFor(m)"
                   color="neutral"
                   variant="outline"
                   size="sm"
@@ -274,14 +286,22 @@ async function withdraw(a: Mine['applications'][number]) {
         >
           <RefusalNotice :refusal="renewRefusal" />
           <UFormField
-            v-if="(renewScheme?.options.length ?? 0) > 1"
+            v-if="!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1"
+            name="lengthOptionId"
             :label="t('membership.screens.mine.choose-length')"
+            :error="renewRefusal?.fields?.lengthOptionId ? renewRefusal.reason : undefined"
           >
             <USelect
               v-model="renewChoice.lengthOptionId"
-              :items="renewScheme!.options.map(o => ({ value: o.id, label: o.name }))"
+              :items="renewScheme!.options.map(o => ({ value: o.id, label: optionLabel(o) }))"
             />
           </UFormField>
+          <p
+            v-if="renewScheme?.fee"
+            class="text-sm"
+          >
+            {{ t('membership.screens.mine.fee', { amount: money(renewScheme.fee) }) }}
+          </p>
           <UFormField
             v-if="renewScheme?.asksFor"
             :label="renewScheme.asksFor"
@@ -293,7 +313,7 @@ async function withdraw(a: Mine['applications'][number]) {
             />
           </UFormField>
           <p class="text-sm text-muted">
-            {{ t('membership.screens.mine.renew-help') }}
+            {{ t(renewScheme?.endsByList ? 'membership.screens.mine.renew-help-list' : 'membership.screens.mine.renew-help') }}
           </p>
         </UForm>
       </template>
@@ -337,7 +357,7 @@ async function withdraw(a: Mine['applications'][number]) {
           </UFormField>
           <FactStrip
             :facts="[
-              ...(joinOptions.length === 1 ? [{ label: t('membership.screens.mine.length'), value: joinOptions[0]!.name }] : joinOptions.length ? [] : [{ label: t('membership.screens.mine.length'), value: t('membership.screens.mine.no-end') }]),
+              ...(joining.endsByList ? [{ label: t('membership.screens.mine.length'), value: t('membership.screens.mine.ends-by-list') }] : joinOptions.length === 1 ? [{ label: t('membership.screens.mine.length'), value: joinOptions[0]!.name }] : joinOptions.length ? [] : [{ label: t('membership.screens.mine.length'), value: t('membership.screens.mine.no-end') }]),
               ...(joinPrice ? [{ label: t('membership.screens.mine.price'), value: joinPrice }] : []),
             ]"
           />
