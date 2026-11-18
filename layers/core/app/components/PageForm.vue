@@ -169,8 +169,10 @@ function discardDraft() {
   catch { /* nothing to remove */ }
 }
 
+// One convention (L44): every problem shows beside its field; a long form, which opens as a page,
+// adds a summary at the top that links to each, and a short one in a panel shows only the fields.
 function onError(event: FormErrorEvent) {
-  summary.value = event.errors.map(e => ({ id: e.id, name: String(e.name), message: e.message }))
+  if (!panel.value) summary.value = event.errors.map(e => ({ id: e.id, name: String(e.name), message: e.message }))
   const first = event.errors[0]
   if (first?.id) document.getElementById(first.id)?.focus()
 }
@@ -212,7 +214,9 @@ async function onFailure(error: unknown) {
   }
   if (failure.fields) {
     form.value?.setErrors(fieldErrors(failure))
-    summary.value = fieldErrors(failure)
+    // A short form's own fields carry the message; one about a field it does not show is still said.
+    if (panel.value && Object.keys(failure.fields).every(name => props.fields.some(f => f.name === name))) return
+    if (!panel.value) summary.value = fieldErrors(failure)
   }
   refusal.value = failure
 }
