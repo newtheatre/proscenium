@@ -20,7 +20,7 @@ import { carryPassEntries } from './pass-entries'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
 import { siteUrl } from './links'
-import { DOOR_CODE_PURPOSE, doorCodesForOrder, signedPart, ticketNumbers } from './tickets'
+import { DOOR_CODE_PURPOSE, doorCodesForOrder, issueTickets, signedPart, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
@@ -110,15 +110,15 @@ export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<st
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
-export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number, key?: string }[], amountMinor: number }> {
   const input = panelInput(context.input)
   if ('exchange' in input) {
     const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
     return exchangeDifference(orderId, target)
   }
-  let lines: { label: string, amountMinor: number }[]
+  let lines: { label: string, amountMinor: number, key?: string }[]
   if ('reservation' in input) {
-    lines = (await reservation(input.reservation.orderId)).lines.map(l => ({ label: l.type_name, amountMinor: l.amount_minor }))
+    lines = (await reservation(input.reservation.orderId)).lines.map(l => ({ label: l.type_name, amountMinor: l.amount_minor, key: l.id }))
   }
   else {
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
@@ -129,38 +129,6 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
     lines = priced.map((l, i) => ({ label: discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor - (discounts[i]?.discountMinor ?? 0) }))
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
-}
-
-/**
- * The panel's sale narrowed to some of its tickets, for a till sale split between people (Matt,
- * 18 November): each person's tickets become a booking of their own, so the link on their receipt
- * shows theirs alone. The summary has a line for each ticket, in the order the sale's lines give
- * them, so line n is the nth ticket. A reservation or an exchange is one booking already: null.
- */
-export function deskNarrow(input: unknown, lines: { line: number, quantity: number }[]): unknown | null {
-  const parsed = panelInput(input)
-  if (!('sale' in parsed)) return null
-  const sale = parsed.sale
-  // A promo code takes off the dearest tickets of the whole sale, so splitting it could change the price: one booking.
-  if (sale.promoCode) return null
-  const tickets = sale.lines.flatMap((l, at) => Array.from({ length: l.quantity }, (_, n) => ({ at, n })))
-  const picked = new Set<number>()
-  for (const l of lines) {
-    if (l.quantity !== 1 || !tickets[l.line] || picked.has(l.line)) return null
-    picked.add(l.line)
-  }
-  const narrowed = sale.lines.flatMap((l, at) => {
-    const ns = tickets.flatMap((t, i) => (t.at === at && picked.has(i) ? [t.n] : []))
-    if (!ns.length) return []
-    return [{
-      bandId: l.bandId,
-      ticketTypeId: l.ticketTypeId,
-      quantity: ns.length,
-      ...(l.references ? { references: ns.map(n => l.references![n] ?? '') } : {}),
-      ...(l.holders ? { holders: ns.map(n => l.holders![n] ?? '') } : {}),
-    }]
-  })
-  return { ...sale, lines: narrowed }
 }
 
 /** Makes the panel's sale real but unpaid, as an order waiting for the till's payment. */
@@ -569,22 +537,100 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
 }
 
 /**
- * The till's receipt is going to these people, for a sale with this order in it (Matt, 18 November:
- * one receipt, which carries the tickets). A desk sale made with nobody's details joins the first
- * person's account, as if given at the sale, and the receipt links to the booking, which shows the
- * tickets' codes, so no separate tickets email is sent. An order that already has a buyer was sent
- * its tickets when it was confirmed, so it adds nothing.
+ * The till's receipt is going to one person, for a paid sale with this order in it (Matt, 18
+ * November: one receipt, which carries the tickets). The receipt links to a booking showing that
+ * person's tickets and their codes, so no separate tickets email is sent:
+ * - the whole sale's buyer, or the last person of a split sale to have their receipt sent, gets this
+ *   booking, when it was made with nobody's details, as if they had been given at the sale;
+ * - anyone else of a split sale has their tickets moved to a booking of their own, made for them now
+ *   (each receipt is sent in a unit of its own, so this has room), at the prices they paid.
+ * A booking that already has a buyer (a reservation, or a sale to someone the seller found) was sent
+ * its tickets when it was confirmed: its first person keeps them there, and the receipt adds nothing.
+ * A share is left where it is rather than leave a companion ticket without the ticket it accompanies.
  */
-export async function deskReceiptLink(unit: UnitView, orderId: string, to: { accountId?: string, email?: string }[]): Promise<{ label: string, url: string } | null> {
-  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
-  if (!order || order.account_id || !to.length) return null
-  const buyer = to[0]!
+export async function deskReceiptLink(unit: UnitView, orderId: string, person: { position: number, to: { accountId?: string, email?: string }, items: { line: number, key: string | null, quantity: number }[] }): Promise<{ label: string, url: string } | null> {
+  const order = await first<OrderRow & { split_from_id: string | null }>(`${ORDER.replace(' FROM ', ', split_from_id FROM ')} WHERE id = ?`, orderId)
+  if (!order || order.state !== 'confirmed') return null
+  // Every ticket line the order was made with, in the order the till's summary listed them; those
+  // given to someone else since are no longer live here.
+  const made = await all<{ id: string, state: string, ticket_type_id: string, performance_id: string, amount_minor: number }>(
+    "SELECT id, state, ticket_type_id, performance_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY rowid", order.id)
+  const live = made.filter(l => l.state === 'live')
+  const mine = person.position === 0
+    ? live
+    : [...new Set(person.items.flatMap(i => (i.key ? [made.find(l => l.id === i.key)] : made.slice(i.line, i.line + i.quantity))))].flatMap(l => (l && l.state === 'live' ? [l] : []))
+  if (!mine.length) return null
+  const rest = live.filter(l => !mine.includes(l))
+  if (order.account_id) {
+    if (person.position <= 1) return null
+  }
+  else if (!rest.length) return joinBuyer(unit, order.id, person.to)
+  const companions = new Set((await all<{ id: string }>("SELECT id FROM box_office_ticket_types WHERE kind = 'companion' OR needs_paid_ticket = 1")).map(t => t.id))
+  const alone = (ls: typeof live) => ls.every(l => companions.has(l.ticket_type_id))
+  if (alone(mine) || alone(rest)) return null
+  const accountId = person.to.accountId ?? (await findOrCreateAccount(unit, { address: person.to.email!, origin: 'guest' })).accountId
+  const { token } = await splitPaid(unit, order, mine.map(l => l.id), accountId)
+  return { label: 'Show my tickets', url: await siteUrl(`/book/order/${token}`) }
+}
+
+/** Gives a desk booking nobody owns yet to the person its receipt goes to, and the link to it. */
+async function joinBuyer(unit: UnitView, orderId: string, buyer: { accountId?: string, email?: string }): Promise<{ label: string, url: string }> {
   const accountId = buyer.accountId ?? (await findOrCreateAccount(unit, { address: buyer.email!, origin: 'guest' })).accountId
   const token = randomToken()
   unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${nowMs()}
-    WHERE id = ${order.id} AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
-  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentWithReceipt: true } })
+    WHERE id = ${orderId} AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
+  unit.audit({ action: 'update', record: ['box-office.order', orderId], detail: { sentWithReceipt: true } })
   return { label: 'Show my tickets', url: await siteUrl(`/book/order/${token}`) }
+}
+
+const MOVED = { code: 'box-office.order.lines-changed', reason: 'These tickets have just changed.' }
+
+/**
+ * Moves some tickets of a paid booking to a new booking of their own for `accountId`, paid by the
+ * same payment (one person's share of a split till sale). As splitting a reservation does, a line
+ * keeps its order and its claim, so each ticket moves as a new line saying which it replaces, at the
+ * same price, with its seat let go and taken again and any promo code's use moved with it in the
+ * same batch. The old tickets are void and new ones issued, admitted if the sale was; nobody has
+ * been sent the old ones. The booking's total and deferred income are unchanged in sum.
+ */
+async function splitPaid(unit: UnitView, order: OrderRow, lineIds: string[], accountId: string): Promise<{ orderId: string, token: string }> {
+  const at = nowMs()
+  const ids = JSON.stringify(lineIds)
+  const lines = await all<{ id: string, performance_id: string, amount_minor: number, pool_id: string, promo_code_id: string | null }>(
+    `SELECT l.id, l.performance_id, l.amount_minor, c.pool_id, r.promo_code_id FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
+      LEFT JOIN box_office_promo_redemptions r ON r.id = l.promo_redemption_id AND r.state = 'live'
+      WHERE l.order_id = ? AND l.state = 'live' AND l.id IN (SELECT value FROM json_each(?)) ORDER BY l.rowid`, order.id, ids)
+  if (lines.length !== lineIds.length) refuse(MOVED.code, MOVED.reason, { status: 409 })
+  const orderId = newId('ord')
+  const holdId = newId('hold')
+  const token = randomToken()
+  const movedMinor = lines.reduce((sum, l) => sum + l.amount_minor, 0)
+  unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, access_note, currency, total_minor, reserved_at, split_from_id, intent_id, session_id, sold_by, admit_on_payment, keep, created_at, updated_at)
+    SELECT ${orderId}, ${newReference()}, channel, 'basket', ${accountId}, 0, access_note, currency, ${movedMinor}, reserved_at, id, intent_id, session_id, sold_by, admit_on_payment, 0, ${at}, ${at}
+      FROM box_office_orders WHERE id = ${order.id} AND state = 'confirmed'`).expect(1, MOVED)
+  unit.add(sql`UPDATE box_office_orders SET state = 'confirmed', confirmed_at = ${at}, link_token_hash = ${await hashOf(token)} WHERE id = ${orderId} AND state = 'basket'`).expect(1)
+  unit.add(sql`UPDATE box_office_orders SET total_minor = total_minor - ${movedMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'confirmed'`).expect(1, MOVED)
+  unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'payment', ${orderId}, ${order.sold_by}, ${at}, ${at})`)
+  unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = 'reissued', updated_at = ${at} WHERE state = 'valid' AND order_line_id IN (SELECT value FROM json_each(${ids}))`)
+  unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = 'exchanged'
+    WHERE state = 'confirmed' AND id IN (SELECT claim_id FROM box_office_order_lines WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids})))`).expect(lines.length, MOVED)
+  unit.add(sql`UPDATE box_office_order_lines SET state = 'exchanged', updated_at = ${at}
+    WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(lines.length, MOVED)
+  const claimed = (await claimSeats(unit, { holdId, requests: lines.map(l => ({ poolId: l.pool_id, quantity: 1 })), state: 'confirmed', expiresAt: null })).flat()
+  // A promo code's use goes with the seat it was given for: the old one was let go with its claim.
+  const moved = lines.map((l, i) => ({ old: l.id, id: newId('orl'), claim: claimed[i]!, redemption: l.promo_code_id ? newId('prr') : null, code: l.promo_code_id }))
+  const redeemed = moved.filter(m => m.redemption)
+  if (redeemed.length) {
+    unit.add(sql`INSERT INTO box_office_promo_redemptions (id, promo_code_id, order_id, claim_id, state, created_at, updated_at)
+      SELECT json_extract(value, '$.redemption'), json_extract(value, '$.code'), ${orderId}, json_extract(value, '$.claim'), 'live', ${at}, ${at} FROM json_each(${JSON.stringify(redeemed)})`).expect(redeemed.length, MOVED)
+  }
+  unit.add(sql`INSERT INTO box_office_order_lines (id, order_id, kind, performance_id, band_id, ticket_type_id, claim_id, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, replaces_line_id, state, created_at, updated_at)
+    SELECT json_extract(m.value, '$.id'), ${orderId}, l.kind, l.performance_id, l.band_id, l.ticket_type_id, json_extract(m.value, '$.claim'), l.price_id, l.list_minor, l.discount_minor, l.amount_minor, json_extract(m.value, '$.redemption'), l.pass_redemption_id, l.comp_request_id, l.requirement_ref, l.requirement_account_id, l.requirement_evidence_id, l.id, 'live', ${at}, ${at}
+      FROM json_each(${JSON.stringify(moved)}) m JOIN box_office_order_lines l ON l.id = json_extract(m.value, '$.old')`).expect(lines.length, MOVED)
+  await issueTickets(unit, moved.map((m, i) => ({ id: m.id, performance_id: lines[i]!.performance_id })), order.admit_on_payment && order.sold_by ? { by: order.sold_by, at } : undefined)
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { splitTo: orderId, tickets: lines.length, paidApart: true } })
+  unit.announce('box-office.order.confirmed', { orderId, performanceIds: [...new Set(lines.map(l => l.performance_id))] }, { record: ['box-office.order', orderId] })
+  return { orderId, token }
 }
 
 export interface PrintedTicket {
