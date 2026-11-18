@@ -483,7 +483,7 @@ in the specification's "As built" list; this guide is the reference from here on
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
   old history is the daily task `core.prune-history`.
 - Rate limits (F-36): each class's allowance is the `rate` setting `core.rate-limits.<class>`, a
-  count in a period. `sign-in`, `public-form` and `presented-value` count in the RateLimitCounter
+  count in a period. `sign-in`, `sign-in-network`, `public-form` and `presented-value` count in the RateLimitCounter
   Durable Object (binding `RATE_LIMITS`), one object per class and caller, shared by every
   instance; the others count in memory in each instance. Cloudflare's rate limiting binding was
   evaluated and not used: its period is fixed at deploy to 10 or 60 seconds and its counts are
