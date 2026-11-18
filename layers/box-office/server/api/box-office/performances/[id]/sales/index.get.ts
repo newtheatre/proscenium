@@ -2,7 +2,8 @@
 // sale, the performance itself, and every band of its production.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { capacityOf, getPerformance, getProduction } from '#modules/core'
+import { getPerformance, getProduction } from '#modules/core'
+import { houseOf } from '../../../../../layouts'
 import { priceLayers, scheduledPrices } from '../../../../../prices'
 import { checklist, listBands, salesOf } from '../../../../../setup'
 
@@ -11,12 +12,15 @@ export default defineRoute({
   record: event => ['core.performance', getRouterParam(event, 'id')],
   rateLimit: 'default',
 }, async (_event, { record }) => {
-  const [sales, list, houseCapacity, performance] = await Promise.all([salesOf(record!.id), checklist(record!.id), capacityOf(record!.id), getPerformance(record!.id)])
+  const [sales, list, houseCapacity, performance] = await Promise.all([salesOf(record!.id), checklist(record!.id), houseOf(record!.id), getPerformance(record!.id)])
   const production = await getProduction(performance.productionId)
+  // With a seating layout the wheelchair spaces are the layout's, shown and chosen on their own (layout.get.ts).
+  const laidOut = !!sales?.layoutId
+  const shown = <T extends { kind?: string, bandKind?: string }>(rows: T[]) => laidOut ? rows.filter(r => (r.kind ?? r.bandKind) !== 'wheelchair') : rows
   return {
     sales,
     houseCapacity,
-    pools: list.pools,
+    pools: shown(list.pools),
     prices: list.prices,
     // Where each price comes from: every performance of the production, or this one's own.
     priceLayers: await priceLayers(production.id, performance.id),
@@ -25,6 +29,6 @@ export default defineRoute({
     checklist: list.items,
     // For the set-up screen: what the performance is, and every band its production has.
     performance: { id: performance.id, productionId: production.id, productionState: production.state, title: production.title, label: performance.label, startsAt: performance.startsAt, state: performance.state },
-    bands: await listBands(production.id),
+    bands: shown(await listBands(production.id)),
   }
 })

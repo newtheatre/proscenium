@@ -627,6 +627,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </template>
           </PageSection>
 
+          <BoxOfficeSeatingLayout
+            :performance-id="d.performance.id"
+            @changed="refresh()"
+          />
+
           <PageSection
             :title="t('box-office.setup.prices.title')"
             :description="t('box-office.setup.prices.description')"

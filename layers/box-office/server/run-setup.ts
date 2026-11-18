@@ -7,11 +7,15 @@
 // sections, its prices the production's, and its seats this performance's. A date added to a run
 // already on sale then goes on sale too, unless the theatre has turned that off.
 import { all, can, createUnit, first, refuse, useContext, useSetting, type Actor, type UnitView } from '#kit'
-import { capacityOf, getPerformance, listPerformances } from '#modules/core'
+import { getPerformance, listPerformances } from '#modules/core'
 import { copySetup } from './copy'
+import { houseOf } from './layouts'
 import { priceLayers, setPrices, type PriceInput } from './prices'
 import { checklist, createBand, listBands, openSales, poolsOf, salesOf, saveSales } from './setup'
 import { presetFor, type TicketPreset } from './ticket-presets'
+
+/** The seats a performance's pools sell: wheelchair spaces are counted apart. */
+const seatsOf = (pools: { bandKind: string, capacity: number }[]) => pools.filter(p => p.bandKind !== 'wheelchair').reduce((sum, p) => sum + p.capacity, 0)
 
 /** What a lone, unnamed section of a preset is called once it is a production's section. */
 const WHOLE_HOUSE = 'All seats'
@@ -60,7 +64,7 @@ async function applyPreset(performanceId: string, preset: TicketPreset): Promise
   }
   if (prices.length) setPrices(unit.view(), productionId, await useSetting('core.locale.currency') as string, prices, null)
 
-  const house = await capacityOf(performanceId)
+  const house = await houseOf(performanceId)
   const counted = preset.sections.reduce((sum, s) => sum + (s.seats ?? 0), 0)
   const pools = preset.sections.flatMap((s) => {
     const band = bandOf(s.name)
@@ -88,8 +92,8 @@ export async function setUpFromRun(unit: UnitView, performanceId: string): Promi
     const sibling = await setUpSibling(performance.productionId, performanceId)
     if (sibling) {
       const pools = await poolsOf(sibling)
-      const house = await capacityOf(performanceId)
-      if (house === null || pools.reduce((sum, p) => sum + p.capacity, 0) <= house) {
+      const house = await houseOf(performanceId)
+      if (house === null || seatsOf(pools) <= house) {
         const copying = createUnit()
         await copySetup(copying.view(), performanceId, sibling, useContext().actor)
         await copying.commit()
@@ -131,11 +135,11 @@ export async function copyToRun(unit: UnitView, sourcePerformanceId: string, act
   const source = await getPerformance(sourcePerformanceId)
   if (!(await poolsOf(source.id)).length) refuse('box-office.copy.nothing', 'This performance has not been set up for sale, so there is nothing to copy.', { status: 422 })
   const result: RunResult = { done: 0, skipped: [] }
-  const capacity = (await poolsOf(source.id)).reduce((sum, p) => sum + p.capacity, 0)
+  const capacity = seatsOf(await poolsOf(source.id))
   for (const target of await runOf(source.productionId)) {
     if (target.id === source.id || (await poolsOf(target.id)).length) continue
     if (!(await can(actor, 'box-office.performance.manage', ['core.performance', target.id])).allowed) continue
-    const house = await capacityOf(target.id)
+    const house = await houseOf(target.id)
     if (house !== null && capacity > house && !options.confirmOverVenue) {
       result.skipped.push({ performanceId: target.id, reason: `The space holds ${house}, fewer than the ${capacity} seats being copied.` })
       continue
@@ -209,7 +213,7 @@ export async function setRunSeats(unit: UnitView, productionId: string, input: {
       result.skipped.push({ performanceId: p.id, reason: 'below-claimed' })
       continue
     }
-    const house = await capacityOf(p.id)
+    const house = await houseOf(p.id)
     if (house !== null && input.pools.reduce((sum, w) => sum + w.capacity, 0) > house && !input.confirmOverVenue) {
       result.skipped.push({ performanceId: p.id, reason: 'over-venue' })
       continue

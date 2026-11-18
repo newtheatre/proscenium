@@ -66,7 +66,7 @@ export async function releaseReservation(unit: UnitView, orderId: string, by: 't
   unit.add(sql`UPDATE box_office_orders SET state = 'expired', release_at = NULL, updated_at = ${at}
     WHERE id = ${orderId} AND state = 'reserved' AND ${by === 'task' ? sql`keep = 0 AND release_at <= ${at}` : sql`TRUE`}`).expect(1, not)
   unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = ${by === 'task' ? 'expired' : 'staff'}
-    WHERE state = 'confirmed' AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${orderId})`).expect(lines.length, not)
+    WHERE state = 'confirmed' AND displaced_for_id IS NULL AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${orderId})`).expect(lines.length, not)
   unit.announce('box-office.order.expired', { orderId }, { record: ['box-office.order', orderId] })
   if (by === 'staff') unit.audit({ action: 'release', record: ['box-office.order', orderId] })
   const words = await wordsFor(order, lines, order.total_minor)

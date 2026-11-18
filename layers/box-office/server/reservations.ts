@@ -159,7 +159,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
     .expect(1, RAN_OUT)
   // Every seat of the basket is still held: none lapsed and was taken while the buyer read their email.
   unit.add(sql`UPDATE box_office_claims SET state = 'confirmed', expires_at = NULL
-    WHERE state = 'held' AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
+    WHERE state = 'held' AND displaced_for_id IS NULL AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
     .expect(lines.length, RAN_OUT)
   unit.add(sql`UPDATE box_office_holds SET kind = 'reservation', updated_at = ${at} WHERE order_id = ${order.id} AND kind = 'basket'`).expect(1, RAN_OUT)
 

@@ -54,7 +54,7 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
     .expect(1, options.from === 'basket' ? RAN_OUT : GONE)
   // Every seat is still this order's: held until now, or confirmed already by a reservation.
   unit.add(sql`UPDATE box_office_claims SET state = 'confirmed', expires_at = NULL
-    WHERE state IN ('held', 'confirmed') AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
+    WHERE state IN ('held', 'confirmed') AND displaced_for_id IS NULL AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`)
     .expect(lines.length, options.from === 'basket' ? RAN_OUT : GONE)
 
   // Paid at the desk with the buyer standing there: admitted in the same batch, by whoever sold it.

@@ -75,7 +75,7 @@ export async function startCheckout(unit: UnitView, input: CheckoutInput): Promi
     WHERE id = ${order.id} AND state = 'basket' AND expires_at > ${at} AND total_minor = ${order.total_minor}`).expect(1, RAN_OUT)
   // The seats move into the payment window, all of them still held.
   unit.add(sql`UPDATE box_office_claims SET expires_at = ${expiresAt}
-    WHERE state = 'held' AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`).expect(lines.length, RAN_OUT)
+    WHERE state = 'held' AND displaced_for_id IS NULL AND hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ${order.id})`).expect(lines.length, RAN_OUT)
   unit.add(sql`UPDATE box_office_holds SET kind = 'payment', updated_at = ${at} WHERE order_id = ${order.id} AND kind = 'basket'`).expect(1, RAN_OUT)
   return { state: 'awaiting_payment', orderId: order.id, intentId, currency: order.currency, amountMinor: order.total_minor, expiresAt }
 }

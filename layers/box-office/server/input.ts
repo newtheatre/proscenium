@@ -11,3 +11,12 @@ export const compsInput = z.object({
   name: z.string().trim().max(120).optional(), // not-policy: shape bound
   reasonTermId: z.string().min(1).max(64), // not-policy: shape bound
 }).strict()
+
+/** A seating layout of a space (layouts.ts): its seats, wheelchair spaces and the seats each space takes the place of. */
+export const layoutInput = z.object({
+  spaceId: z.string().min(3).max(40), // not-policy: an id's length
+  name: z.string().trim().min(1).max(80), // not-policy: the table's own bound on a name
+  seats: z.number().int().min(0).max(100_000).nullable(), // not-policy: a sanity bound, larger than any house
+  wheelchairSpaces: z.number().int().min(0).max(500), // not-policy: a sanity bound
+  seatsPerSpace: z.number().int().min(0).max(20), // not-policy: a sanity bound on seats taken out for one space
+}).strict()
