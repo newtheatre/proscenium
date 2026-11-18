@@ -3,9 +3,8 @@
 // moved on from, facts about the theatre the text would state if it knew them, and default text
 // nobody has yet said they reviewed.
 import { useSetting } from '#kit'
-import { sections as allSections } from '#policies'
 import { sectionTokens } from '../../shared/policies'
-import { listPolicies, policyContext, resolvePolicy } from './service'
+import { listPolicies, policyBundle, policyContext, resolvePolicy } from './service'
 
 export interface PolicyReadinessItem {
   kind: 'unwritten' | 'stale' | 'setting' | 'unreviewed'
@@ -26,6 +25,7 @@ const REVIEWED = '/admin/theatre?setting=core.policies.reviewed'
 export async function policyReadiness(): Promise<PolicyReadinessItem[]> {
   const items: PolicyReadinessItem[] = []
   const context = await policyContext()
+  const { sections: allSections } = await policyBundle()
   const reviewed = new Set(await useSetting('core.policies.reviewed') as string[])
   const wanted = new Set<string>()
   for (const policy of await listPolicies()) {
