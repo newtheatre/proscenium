@@ -75,6 +75,8 @@ describe('email sign-in (ID-01)', () => {
     const browser = new Browser()
     const to = address()
     const { message } = await emailSignIn(browser, to)
+    // The email says how long the link and code last (EM-9).
+    expect(message!.text).toMatch(/The link and the code work for \d+ (minutes|hours)\./)
     const used = await browser.post('/api/core/sign-in/code', { address: to, code: message!.variables.code })
     expect(used.status).toBe(200)
     expect((await browser.get('/api/core/me')).body.signedIn).toBe(true)

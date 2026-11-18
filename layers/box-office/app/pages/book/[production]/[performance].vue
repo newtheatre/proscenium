@@ -122,6 +122,32 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
 const busy = ref(false)
 
+// Tickets already held in this tab for this performance: a banner with the time left, and with
+// Change tickets (?change=1) the choices filled in again.
+const held = ref<{ expiresAt: number } | null>(null)
+const now = ref(Date.now())
+let timer: ReturnType<typeof setInterval> | undefined
+onMounted(async () => {
+  const remembered = recallBasket()
+  if (!remembered || remembered.back.split('?')[0] !== route.path) return
+  const basket = await $api<{ state: string, expiresAt: number | null }>(`/api/box-office/baskets/${encodeURIComponent(remembered.orderId)}`, { headers: { 'x-basket-token': remembered.token } }).catch(() => null)
+  if (basket?.state !== 'basket' || !basket.expiresAt || basket.expiresAt <= Date.now()) return
+  held.value = { expiresAt: basket.expiresAt }
+  timer = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
+  if (route.query.change && remembered.choices) {
+    counts.value = Object.fromEntries(remembered.choices.map(c => [keyOf(c.bandId, c.ticketTypeId), c.quantity]))
+    if (remembered.promoCode) {
+      promoInput.value = remembered.promoCode
+      await tryCode()
+    }
+  }
+})
+onBeforeUnmount(() => clearInterval(timer))
+const heldLeft = computed(() => held.value ? Math.max(0, Math.floor((held.value.expiresAt - now.value) / 1000)) : 0)
+const heldClock = computed(() => `${Math.floor(heldLeft.value / 60)}:${String(heldLeft.value % 60).padStart(2, '0')}`)
+
 async function hold() {
   refusal.value = null
   busy.value = true
@@ -131,7 +157,11 @@ async function hold() {
       body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
-    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.fullPath })
+    // Changing tickets: the new ones are held, so the old basket is let go.
+    const before = recallBasket()
+    if (before && before.orderId !== basket.orderId)
+      void $api(`/api/box-office/baskets/${encodeURIComponent(before.orderId)}/release`, { method: 'POST', body: {}, headers: { 'x-basket-token': before.token } }).catch(() => undefined)
+    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code })
     await navigateTo('/book/basket')
   }
   catch (e) {
@@ -165,6 +195,14 @@ async function hold() {
             />
             {{ data.production.ageRestricted ? t('box-office.book.age.restricted', { age: data.production.ageMin }) : t('box-office.book.age.recommended', { age: data.production.ageMin }) }}
           </p>
+          <UAlert
+            v-if="heldLeft > 0"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-timer"
+            :title="t('box-office.book.held.title', { time: heldClock })"
+            :actions="[{ label: t('box-office.book.held.go'), to: '/book/basket', color: 'neutral', variant: 'outline' }]"
+          />
           <UAlert
             v-if="data.state !== 'on_sale'"
             color="neutral"

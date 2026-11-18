@@ -123,6 +123,8 @@ async function add() {
     const answer = await $api<{ created: number, ids: string[] } | { run: { id: string, total: number } }>(`/api/core/productions/${props.productionId}/performances/run` as string, {
       method: 'POST',
       body: {
+        // Kept with the run, so it can be edited as a whole later.
+        pattern: { from: form.value.dates.start, to: form.value.dates.end || form.value.dates.start, slots: slots.value, minutes: o.runningMinutes, doorsBeforeMinutes: o.doorsBeforeMinutes },
         venueId: s.venueId,
         spaceId: s.value,
         scheduled: form.value.scheduled,
