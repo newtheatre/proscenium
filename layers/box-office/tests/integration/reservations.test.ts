@@ -33,9 +33,9 @@ async function basket(h: House, quantity: number) {
 let guests = 0
 const address = () => `guest${++guests}@example.org`
 
-/** Presses Reserve as a guest. */
+/** Presses Reserve as a guest, with the age box ticked (only an 18+ show asks for it). */
 function reserve(b: { orderId: string, token: string, totalMinor: number }, email: string | undefined, actor: ReturnType<typeof person> | null = null, total = b.totalMinor) {
-  return req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: total, ...(email ? { email, name: 'Guest Buyer' } : {}) }, actor, { 'x-basket-token': b.token })
+  return req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: total, ageConfirmed: true, ...(email ? { email, name: 'Guest Buyer' } : {}) }, actor, { 'x-basket-token': b.token })
 }
 
 /** The sealed variables of the newest message of a type about an order, as the buyer's email shows them. */

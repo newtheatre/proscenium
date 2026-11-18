@@ -9,7 +9,8 @@ interface Detail {
   membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, lengthRule: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number }
   number: string | null
   canChangeDates: boolean
-  checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number }[]
+  feesOn: boolean
+  checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null }[]
 }
 
 const route = useRoute()
@@ -55,7 +56,9 @@ async function end() {
 
 // The fee, from the fees module when it is on. Absent when it is off or the reader may not see fees.
 interface Fee { charge: { id: string, state: 'open' | 'paid' | 'void' | 'refunded' | 'part-refunded', amountMinor: number, refundedMinor: number, currency: string, paidAt: number | null } | null, canWaive: boolean, canRefund: boolean }
-const fee = await useAPI<Fee>(() => `/api/membership-fees/memberships/${id.value}/charge`, { key: `membership:fee:${id.value}`, default: () => ({ charge: null, canWaive: false, canRefund: false }) })
+const fee = await useAPI<Fee>(() => `/api/membership-fees/memberships/${id.value}/charge`, { key: `membership:fee:${id.value}`, default: () => ({ charge: null, canWaive: false, canRefund: false }), immediate: false })
+// Not asked while Membership fees is off: there is nothing there to answer.
+if (data.value?.feesOn) await fee.execute()
 const charge = computed(() => fee.error.value ? null : fee.data.value?.charge ?? null)
 const money = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(minor / 100) // not-policy: minor units to units
 const feeLine = computed(() => {
@@ -122,7 +125,10 @@ async function saveDates() {
 </script>
 
 <template>
-  <PageFrame :title="m?.name ?? t('membership.navigation.members.label')">
+  <PageFrame
+    :title="m?.name ?? t('membership.navigation.members.label')"
+    :trail="[{ label: t('membership.navigation.members.label'), to: '/console/membership' }]"
+  >
     <template
       v-if="m"
       #status
@@ -163,6 +169,16 @@ async function saveDates() {
         class="space-y-6"
       >
         <FactStrip :facts="facts" />
+        <PageSection :title="t('membership.membership.holder')">
+          <UButton
+            color="neutral"
+            variant="link"
+            class="px-0"
+            icon="i-lucide-user"
+            :to="`/console/people/${m.accountId}`"
+            :label="t('membership.membership.open-person')"
+          />
+        </PageSection>
         <PageSection
           v-if="m.note"
           :title="t('membership.membership.note')"
@@ -208,7 +224,7 @@ async function saveDates() {
               v-for="(c, i) in data.checks"
               :key="i"
               :name="t(`membership.membership.outcomes.${c.outcome}`)"
-              :description="[dateTime(c.createdAt), t(`membership.screens.verifiers.${c.verifier}`), c.decidedBy ? t('membership.membership.by', { name: c.decidedBy }) : '', c.note ?? ''].filter(Boolean).join(' · ')"
+              :description="[dateTime(c.createdAt), t(`membership.screens.verifiers.${c.verifier}`), c.listName ? t('membership.membership.from-list', { list: c.listName }) : '', c.listedAs ? t('membership.membership.listed-as', { name: c.listedAs }) : '', c.decidedBy ? t('membership.membership.by', { name: c.decidedBy }) : '', c.note ?? ''].filter(Boolean).join(' · ')"
             />
           </RecordList>
         </PageSection>

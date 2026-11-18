@@ -7,7 +7,7 @@ import { ordersList } from '../../../../../shared/lists'
 definePageMeta({ layout: 'console' })
 
 type State = 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired'
-interface Row { id: string, reference: string, state: State, channel: string, buyer: string | null, show: string | null, startsAt: number | null, currency: string, totalMinor: number, createdAt: number }
+interface Row { id: string, reference: string, state: State, channel: string, buyer: string | null, show: string | null, startsAt: number | null, currency: string, totalMinor: number, createdAt: number, complimentary?: boolean }
 
 const { t } = useT()
 const { dateTime, day } = useDates()
@@ -48,7 +48,7 @@ const list = computed(() => ({
     <template #cell-state="{ row }">
       <StatusBadge
         :tone="TONES[row.state as State]"
-        :label="t(`box-office.orders.state.${row.state}`)"
+        :label="t(`box-office.orders.state.${row.state === 'confirmed' && row.complimentary ? 'complimentary' : row.state}`)"
       />
     </template>
     <template #cell-total="{ row }">

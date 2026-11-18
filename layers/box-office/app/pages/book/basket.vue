@@ -9,7 +9,7 @@ import type { BookingDoneOutcome } from '../../utils/booking'
 
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
 interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number }[] }
-interface Page { performance: { startsAt: number, venue: string }, production: { title: string }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string }[] }[] }
+interface Page { performance: { startsAt: number, venue: string }, production: { title: string, ageMin: number | null, ageRestricted: boolean }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string }[] }[] }
 type Outcome
   = | (BookingDoneOutcome & { state: 'confirmed', totalMinor: number })
     | (BookingDoneOutcome & { state: 'reserved' })
@@ -39,7 +39,7 @@ const busy = ref(false)
 const card = ref<CardStep | null>(null)
 const checking = ref(false)
 const returnUrl = ref('')
-const form = ref({ name: '', email: '' })
+const form = ref({ name: '', email: '', ageConfirmed: false })
 // The bot check was passed when the seats were held; the basket's token carries that to here.
 const headers = computed(() => ({ 'x-basket-token': remembered.value?.token ?? '' }))
 
@@ -130,12 +130,17 @@ const free = computed(() => basket.value?.totalMinor === 0)
 const canPay = computed(() => free.value || page.value?.timing !== 'reserve')
 const canReserve = computed(() => !free.value && page.value?.timing !== 'pay-now' && basket.value?.state === 'basket')
 const detailsNeeded = computed(() => !viewer.value.signedIn)
+// A production only for people over an age: the buyer says everyone using the tickets is.
+const ageMin = computed(() => page.value?.production.ageRestricted ? page.value.production.ageMin : null)
 // The buyer's details, checked as the reserve and checkout routes check them, beside each field.
-const detailsSchema = z.object({ name: z.string().trim().max(120), email: z.string().trim().email().max(254) }) // not-policy: the routes' bounds
+const detailsSchema = computed(() => z.object({
+  ...(detailsNeeded.value ? { name: z.string().trim().max(120), email: z.string().trim().email().max(254) } : {}), // not-policy: the routes' bounds
+  ...(ageMin.value !== null ? { ageConfirmed: z.literal(true, { error: t('box-office.basket.age.needed') }) } : {}),
+}))
 const detailsForm = useTemplateRef('detailsForm')
 /** Shows each problem beside its field; false while there is one. */
 async function detailsValid(): Promise<boolean> {
-  if (!detailsNeeded.value) return true
+  if (!detailsNeeded.value && ageMin.value === null) return true
   try {
     await detailsForm.value?.validate({})
     return true
@@ -144,7 +149,7 @@ async function detailsValid(): Promise<boolean> {
     return false
   }
 }
-const body = computed(() => ({ expectedTotalMinor: basket.value!.totalMinor, ...(detailsNeeded.value ? { email: form.value.email.trim(), name: form.value.name.trim() || undefined } : {}) }))
+const body = computed(() => ({ expectedTotalMinor: basket.value!.totalMinor, ...(ageMin.value !== null ? { ageConfirmed: form.value.ageConfirmed } : {}), ...(detailsNeeded.value ? { email: form.value.email.trim(), name: form.value.name.trim() || undefined } : {}) }))
 
 function done(result: Outcome) {
   outcome.value = result
@@ -268,6 +273,16 @@ async function reserve() {
               <p class="text-sm text-muted">
                 {{ t('box-office.book.when', { when: dateTime(page.performance.startsAt), venue: page.performance.venue }) }}
               </p>
+              <p
+                v-if="ageMin !== null"
+                class="flex items-center gap-2 text-sm font-medium"
+              >
+                <UIcon
+                  name="i-lucide-id-card"
+                  class="shrink-0"
+                />
+                {{ t('box-office.book.age.restricted', { age: ageMin }) }}
+              </p>
               <ul class="divide-y divide-default">
                 <li
                   v-for="line in lines"
@@ -311,7 +326,7 @@ async function reserve() {
               v-else
               ref="detailsForm"
               class="space-y-4"
-              :schema="detailsNeeded ? detailsSchema : undefined"
+              :schema="detailsSchema"
               :state="form"
               novalidate
               @submit="canPay ? pay() : reserve()"
@@ -348,6 +363,15 @@ async function reserve() {
               >
                 {{ t('box-office.basket.signed-in', { name: viewer.name ?? '' }) }}
               </p>
+              <UFormField
+                v-if="ageMin !== null"
+                name="ageConfirmed"
+              >
+                <UCheckbox
+                  v-model="form.ageConfirmed"
+                  :label="t('box-office.basket.age.confirm', { age: ageMin })"
+                />
+              </UFormField>
               <div class="flex flex-wrap gap-2">
                 <UButton
                   v-if="canPay"
