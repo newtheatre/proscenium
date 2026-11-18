@@ -2,10 +2,12 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
-test('the home page renders from content and quotes a setting', async ({ page }) => {
+test('the home page renders from content, with What\'s on first in a menu that has no Home link', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Welcome' })).toBeVisible()
-  await expect(page.locator('[data-setting]')).toHaveText('GBP')
+  const menu = page.getByRole('navigation', { name: 'Main' }).first()
+  await expect(menu.getByRole('link').first()).toHaveText('What\'s on')
+  await expect(menu.getByRole('link', { name: 'Home', exact: true })).toHaveCount(0)
 })
 
 test('the home page has no accessibility violations', async ({ page }) => {
