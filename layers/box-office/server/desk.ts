@@ -19,6 +19,7 @@ import { claimSeats } from './capacity'
 import { carryPassEntries } from './pass-entries'
 import { hashOf, newReference, randomToken } from './codes'
 import { sendTickets } from './confirm'
+import { siteUrl } from './links'
 import { DOOR_CODE_PURPOSE, doorCodesForOrder, signedPart, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
@@ -128,6 +129,38 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
     lines = priced.map((l, i) => ({ label: discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: l.amountMinor - (discounts[i]?.discountMinor ?? 0) }))
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
+}
+
+/**
+ * The panel's sale narrowed to some of its tickets, for a till sale split between people (Matt,
+ * 18 November): each person's tickets become a booking of their own, so the link on their receipt
+ * shows theirs alone. The summary has a line for each ticket, in the order the sale's lines give
+ * them, so line n is the nth ticket. A reservation or an exchange is one booking already: null.
+ */
+export function deskNarrow(input: unknown, lines: { line: number, quantity: number }[]): unknown | null {
+  const parsed = panelInput(input)
+  if (!('sale' in parsed)) return null
+  const sale = parsed.sale
+  // A promo code takes off the dearest tickets of the whole sale, so splitting it could change the price: one booking.
+  if (sale.promoCode) return null
+  const tickets = sale.lines.flatMap((l, at) => Array.from({ length: l.quantity }, (_, n) => ({ at, n })))
+  const picked = new Set<number>()
+  for (const l of lines) {
+    if (l.quantity !== 1 || !tickets[l.line] || picked.has(l.line)) return null
+    picked.add(l.line)
+  }
+  const narrowed = sale.lines.flatMap((l, at) => {
+    const ns = tickets.flatMap((t, i) => (t.at === at && picked.has(i) ? [t.n] : []))
+    if (!ns.length) return []
+    return [{
+      bandId: l.bandId,
+      ticketTypeId: l.ticketTypeId,
+      quantity: ns.length,
+      ...(l.references ? { references: ns.map(n => l.references![n] ?? '') } : {}),
+      ...(l.holders ? { holders: ns.map(n => l.holders![n] ?? '') } : {}),
+    }]
+  })
+  return { ...sale, lines: narrowed }
 }
 
 /** Makes the panel's sale real but unpaid, as an order waiting for the till's payment. */
@@ -430,7 +463,7 @@ export interface DeskPerformance {
    * `reference`, on a member price: what the buyer may give instead of the seller checking by hand,
    * worded by its source. `holder`: each ticket is for someone who qualifies, named at the till.
    */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true }[]
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }[]
 }
 
 /**
@@ -451,8 +484,10 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
   const sold = new Map((await all<{ performance_id: string, state: string }>("SELECT performance_id, state FROM box_office_performance_sales WHERE state <> 'draft'")).map(r => [r.performance_id, r.state]))
   const coming = (await listPerformances({ state: 'scheduled', from: at - until, to: at + AHEAD })).filter(p => sold.has(p.id) && p.startsAt + until > at).slice(0, MOST)
   // An online-only type is not offered at the desk.
-  const kinds = await all<{ id: string, name: string, requirement_refs: string | null }>("SELECT id, name, requirement_refs FROM box_office_ticket_types WHERE channel <> 'online'")
+  const kinds = await all<{ id: string, name: string, kind: string, requirement_refs: string | null }>("SELECT id, name, kind, requirement_refs FROM box_office_ticket_types WHERE channel <> 'online'")
   const names = new Map(kinds.map(t => [t.id, t.name]))
+  // A companion ticket is named for the person on the access scheme it goes with, not the companion.
+  const companions = new Set(kinds.filter(t => t.kind === 'companion').map(t => t.id))
   // A member price can take the buyer's reference, such as a student ID, typed by the seller in place of checking by hand.
   const refsOf = new Map(kinds.map(t => [t.id, t.requirement_refs ? JSON.parse(t.requirement_refs) as string[] : []]))
   const described = await requirements.describe([...new Set([...refsOf.values()].flat())])
@@ -467,7 +502,7 @@ export async function deskPerformances(): Promise<DeskPerformance[]> {
       currency: available.currency,
       rows: available.bands.flatMap(b => b.prices.filter(x => names.has(x.ticketTypeId)).map((x) => {
         const reference = referenceOf(x.ticketTypeId)
-        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}), ...(refsOf.get(x.ticketTypeId)?.length ? { holder: true as const } : {}) }
+        return { bandId: b.bandId, band: b.name, ticketTypeId: x.ticketTypeId, ticketType: names.get(x.ticketTypeId) ?? '', amountMinor: x.amountMinor, free: b.free, ...(reference ? { reference } : {}), ...(refsOf.get(x.ticketTypeId)?.length ? { holder: true as const } : {}), ...(companions.has(x.ticketTypeId) ? { companion: true as const } : {}) }
       })),
     }
   }))
@@ -531,6 +566,25 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
   await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}` })
   unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentAfterSale: true } })
   return { buyer: await accountLabel(accountId) }
+}
+
+/**
+ * The till's receipt is going to these people, for a sale with this order in it (Matt, 18 November:
+ * one receipt, which carries the tickets). A desk sale made with nobody's details joins the first
+ * person's account, as if given at the sale, and the receipt links to the booking, which shows the
+ * tickets' codes, so no separate tickets email is sent. An order that already has a buyer was sent
+ * its tickets when it was confirmed, so it adds nothing.
+ */
+export async function deskReceiptLink(unit: UnitView, orderId: string, to: { accountId?: string, email?: string }[]): Promise<{ label: string, url: string } | null> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order || order.account_id || !to.length) return null
+  const buyer = to[0]!
+  const accountId = buyer.accountId ?? (await findOrCreateAccount(unit, { address: buyer.email!, origin: 'guest' })).accountId
+  const token = randomToken()
+  unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = ${await hashOf(token)}, updated_at = ${nowMs()}
+    WHERE id = ${order.id} AND account_id IS NULL`).expect(1, { code: 'box-office.desk.already-sent', reason: 'These tickets were sent to the buyer already.' })
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { sentWithReceipt: true } })
+  return { label: 'Show my tickets', url: await siteUrl(`/book/order/${token}`) }
 }
 
 export interface PrintedTicket {

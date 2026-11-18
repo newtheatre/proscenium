@@ -3,14 +3,16 @@
      whether they qualify. Where they do not, a seller who may check by hand can sell it to them
      anyway; nobody is sold one without being named. The sale checks everything again. For a ticket
      that needs the access scheme, such as a wheelchair space, somebody who has never applied can
-     have the application filled in with them here; once sent, it is enough to sell them one. -->
+     have the application filled in with them here; once sent, it is enough to sell them one. A
+     companion ticket is named for the person on the access scheme it goes with (Matt, 18 November),
+     so the words ask for them, not the companion. -->
 <script setup lang="ts">
 import type { Buyer } from './BoxOfficeBuyerPicker.vue'
 
 export interface Holder { accountId: string, label: string, byHand: boolean }
 interface Answer { accountId: string, label: string, met: boolean, reason: string | null, mayOverride: boolean, mayApply: boolean }
 
-const props = defineProps<{ performanceId: string, ticketTypeId: string, label: string, disabled?: boolean }>()
+const props = defineProps<{ performanceId: string, ticketTypeId: string, label: string, companion?: boolean, disabled?: boolean }>()
 const model = defineModel<Holder | undefined>()
 
 const { t } = useT()
@@ -110,7 +112,7 @@ function change() {
         <BoxOfficeBuyerPicker
           v-model="picked"
           :domains="[]"
-          :placeholder="t('box-office.screens.panel.holder.placeholder')"
+          :placeholder="t(companion ? 'box-office.screens.panel.holder.companion-placeholder' : 'box-office.screens.panel.holder.placeholder')"
           :disabled="disabled || busy"
           class="min-w-0 flex-1"
         />
@@ -126,7 +128,7 @@ function change() {
       color="warning"
       variant="subtle"
       icon="i-lucide-circle-alert"
-      :title="t('box-office.screens.panel.holder.not-met', { name: answer.label })"
+      :title="t(companion ? 'box-office.screens.panel.holder.companion-not-met' : 'box-office.screens.panel.holder.not-met', { name: answer.label })"
       :description="answer.reason ?? undefined"
       :actions="actions"
     />

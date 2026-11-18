@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute, Refusal } from '#kit'
 import { intentStatus } from '../../../intents'
+import { splitStatus } from '../../../splits'
 
 export default defineRoute({
   ability: 'payments.attempt.attest',
@@ -12,5 +13,7 @@ export default defineRoute({
   const id = getRouterParam(event, 'id') ?? ''
   const status = await intentStatus(id)
   if (!status) throw new Refusal('core.not-found', 'There is no such payment.', { status: 404 })
-  return status
+  // A till sale split between people says what each person pays for, and who has paid.
+  const splits = await splitStatus(id)
+  return splits.length ? { ...status, splits } : status
 })
