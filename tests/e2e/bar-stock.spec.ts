@@ -42,6 +42,8 @@ async function visit(page: Page, url: string) {
   return response
 }
 async function noViolations(page: Page) {
+  // A select's list stays in the page for a moment while it closes; let it go first.
+  await expect(page.getByRole('listbox')).toHaveCount(0)
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
