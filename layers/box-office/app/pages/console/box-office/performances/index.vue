@@ -1,14 +1,16 @@
-<!-- Performances (Box office specification, part 6): those still to come, soonest first, with their
+<!-- Performances (Box office specification, part 6): those still to come, grouped by production, the
+     production with the soonest performance first and each production's soonest first, with their
      sale state and how many seats are taken. Each opens its sales set-up. -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
-type Sales = 'draft' | 'on_sale' | 'paused' | 'closed'
-interface Row { id: string, title: string, label: string | null, startsAt: number, scheduled: boolean, sales: Sales | null, capacity: number, taken: number }
+interface Row { id: string, productionId: string, title: string, label: string | null, startsAt: number, scheduled: boolean, sales: SaleState | null, capacity: number, taken: number }
 
 const { t } = useT()
 const { dateTime } = useDates()
 const { data, status, error, refresh } = await useAPI<{ performances: Row[] }>('/api/box-office/performances', { key: 'box-office:performances' })
+// A set-up changed a moment ago shows here on coming back, not what the list said before.
+onMounted(() => { if (data.value) void refresh() })
 
 // A search that opens from its icon, by title or label.
 const search = ref('')
@@ -16,13 +18,21 @@ const matching = computed(() => {
   const words = search.value.trim().toLowerCase()
   return (data.value?.performances ?? []).filter(p => !words || `${p.title} ${p.label ?? ''}`.toLowerCase().includes(words))
 })
+// One group a production, in the order its first performance comes.
+const groups = computed(() => {
+  const byProduction = new Map<string, { id: string, title: string, rows: Row[] }>()
+  for (const row of matching.value) {
+    const group = byProduction.get(row.productionId) ?? { id: row.productionId, title: row.title, rows: [] }
+    group.rows.push(row)
+    byProduction.set(row.productionId, group)
+  }
+  return [...byProduction.values()]
+})
 
-const TONES = { draft: 'neutral', on_sale: 'success', paused: 'warning', closed: 'neutral' } as const
 const badge = (row: Row) => !row.scheduled
   ? { tone: 'neutral' as const, label: t('box-office.performances.not-scheduled') }
-  : row.sales
-    ? { tone: TONES[row.sales], label: t(`box-office.performances.sales.${row.sales}`) }
-    : { tone: 'neutral' as const, label: t('box-office.performances.not-set-up') }
+  : saleStateBadge(row.sales, row.capacity, t)
+const when = (row: Row) => row.label ? `${dateTime(row.startsAt)}, ${row.label}` : dateTime(row.startsAt)
 </script>
 
 <template>
@@ -56,23 +66,37 @@ const badge = (row: Row) => !row.scheduled
         >
           {{ t('box-office.performances.no-match', { words: search.trim() }) }}
         </p>
-        <RecordList
+        <div
           v-else
-          :label="t('box-office.navigation.performances.label')"
+          class="space-y-6"
         >
-          <RecordListItem
-            v-for="row in matching"
-            :key="row.id"
-            :to="`/console/box-office/performances/${encodeURIComponent(row.id)}`"
-            :name="row.label ? `${row.title}, ${row.label}` : row.title"
-            :description="row.capacity ? t('box-office.performances.taken', { taken: row.taken, capacity: row.capacity, when: dateTime(row.startsAt) }) : dateTime(row.startsAt)"
+          <section
+            v-for="group in groups"
+            :key="group.id"
+            :aria-labelledby="`production-${group.id}`"
           >
-            <StatusBadge
-              :tone="badge(row).tone"
-              :label="badge(row).label"
-            />
-          </RecordListItem>
-        </RecordList>
+            <h2
+              :id="`production-${group.id}`"
+              class="mb-2 text-sm font-semibold text-highlighted"
+            >
+              {{ group.title }}
+            </h2>
+            <RecordList :label="group.title">
+              <RecordListItem
+                v-for="row in group.rows"
+                :key="row.id"
+                :to="`/console/box-office/performances/${encodeURIComponent(row.id)}`"
+                :name="when(row)"
+                :description="row.capacity ? t('box-office.performances.taken', { taken: row.taken, capacity: row.capacity }) : undefined"
+              >
+                <StatusBadge
+                  :tone="badge(row).tone"
+                  :label="badge(row).label"
+                />
+              </RecordListItem>
+            </RecordList>
+          </section>
+        </div>
       </template>
     </DataBoundary>
   </PageFrame>

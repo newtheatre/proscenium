@@ -202,7 +202,8 @@ describe('reviewing (ID-40)', () => {
   it('accepting fewer companions needs a reason; accepted puts the person on the scheme', async () => {
     const { browser, accountId, need } = await applicant()
     await browser.post('/api/core/me/access', { needs: [{ term: need['essential-companion'] }], companions: 2 })
-    expect((await companionsAnswer(accountId))[0]).toMatchObject({ verdict: 'not-met' })
+    // While it waits, the companions asked for count, flagged, as the wheelchair space does.
+    expect((await companionsAnswer(accountId))[0]).toMatchObject({ verdict: 'met', quantity: 2, evidence: 'pending' })
     const desk = await reviewer()
     expect((await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept', companions: 1 })).body.code).toBe('core.access.message-needed')
     expect((await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept', companions: 1, message: 'One companion covers what you describe.' })).status).toBe(200)
@@ -312,7 +313,7 @@ describe('the wheelchair question and the entries the form sets (ID-38)', () => 
   it('makes a wheelchair user a holder of core.access-scheme:wheelchair, flagged as pending until the application is decided', async () => {
     const { browser, accountId, need } = await applicant()
     const wheelchair = () => inContext(() => requirements.check({ accounts: [accountId], refs: ['core.access-scheme:wheelchair'], whenUnavailable: 'not-met' }), { kind: 'person', accountId, assurance: 'strong' })
-    expect((await wheelchair())[0]).toMatchObject({ verdict: 'not-met', help: '/account/access' })
+    expect((await wheelchair())[0]).toMatchObject({ verdict: 'not-met', help: '/account/access/apply' })
     await browser.post('/api/core/me/access', { needs: [{ term: need['wheelchair-stays'] }], companions: 0 })
     expect((await wheelchair())[0]).toMatchObject({ verdict: 'met', evidence: 'pending' })
     const desk = await reviewer()
@@ -320,6 +321,14 @@ describe('the wheelchair question and the entries the form sets (ID-38)', () => 
     const accepted = (await wheelchair())[0]!
     expect(accepted.verdict).toBe('met')
     expect(accepted.evidence).toBeUndefined()
+  })
+
+  it('meets core.access-scheme:companions while the application waits, flagged as pending, as for the wheelchair space', async () => {
+    const { browser, accountId, need } = await applicant()
+    const companions = () => companionsAnswer(accountId)
+    expect((await companions())[0]!.verdict).toBe('not-met')
+    await browser.post('/api/core/me/access', { needs: [{ term: need['wheelchair-stays'] }], companions: 1 })
+    expect((await companions())[0]).toMatchObject({ verdict: 'met', quantity: 1, evidence: 'pending' })
   })
 
   it('does not count someone who transfers out of their wheelchair', async () => {
