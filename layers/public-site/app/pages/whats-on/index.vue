@@ -11,11 +11,13 @@ interface Listing {
   category: { label: string } | null
   age: string | null
   hasEffects: boolean
+  hasWarnings: boolean
   nextStartsAt: number
+  lastStartsAt: number
   lastEndsAt: number
   venues: string[]
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
-  price: { currency: string, fromMinor: number | null, others: { label: string, amountMinor: number }[] } | null
+  price: PriceSummaryView | null
 }
 interface Filters {
   categories: { slug: string, label: string }[]
@@ -121,9 +123,10 @@ const groups = computed(() => {
               :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
               :price="p.price"
-              :when="range(p.nextStartsAt, p.lastEndsAt)"
+              :when="range(p.nextStartsAt, p.lastStartsAt)"
               :age="p.age"
               :effects="p.hasEffects"
+              :warnings="p.hasWarnings"
               :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
             />
           </li>
