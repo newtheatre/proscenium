@@ -44,6 +44,12 @@ export interface DeskBasket {
    * before these statements, so a foreign key to it holds.
    */
   attach?: (unit: UnitView, record: string, intentId: string) => Promise<void> | void
+  /**
+   * Where the sale in the panel happens, such as the space of tonight's performance it sells for, or
+   * null when it does not say. A session opened by this sale opens there when the device has no
+   * place of its own. Reads only.
+   */
+  space?: (context: Pick<DeskContext, 'input'>) => Promise<string | null>
   /** Lines and an amount for display. Reads only, and comes before any session is open. */
   summary: (context: Pick<DeskContext, 'input'>) => Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }>
 }
