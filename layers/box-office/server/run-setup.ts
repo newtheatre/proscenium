@@ -166,3 +166,57 @@ export async function openRun(unit: UnitView, productionId: string, actor: Actor
   }
   return result
 }
+
+/**
+ * The run's seats, as the Tickets tab shows them: the seats per section most of the run's
+ * performances have, and those whose seats differ, which have their own (a per-night override).
+ * A performance with nothing set up follows the run.
+ */
+export function runSeats(performances: { id: string, pools: { band_id: string, capacity: number }[] }[]): { seats: Record<string, number>, own: Set<string> } {
+  const key = (pools: { band_id: string, capacity: number }[]) => JSON.stringify([...pools].sort((a, b) => a.band_id.localeCompare(b.band_id)).map(p => [p.band_id, p.capacity]))
+  const counts = new Map<string, { n: number, pools: { band_id: string, capacity: number }[] }>()
+  for (const p of performances) {
+    if (!p.pools.length) continue
+    const k = key(p.pools)
+    counts.set(k, { n: (counts.get(k)?.n ?? 0) + 1, pools: p.pools })
+  }
+  const usual = [...counts.entries()].sort((a, b) => b[1].n - a[1].n)[0]
+  if (!usual) return { seats: {}, own: new Set() }
+  return {
+    seats: Object.fromEntries(usual[1].pools.map(p => [p.band_id, p.capacity])),
+    own: new Set(performances.filter(p => p.pools.length && key(p.pools) !== usual[0]).map(p => p.id)),
+  }
+}
+
+/**
+ * Sets the seats of every performance of the run that follows the run (or of those named), in one
+ * go (the Tickets tab). A performance with seats of its own keeps them unless named; one that has
+ * sold more than its new count in a section is left as it is and named.
+ */
+export async function setRunSeats(unit: UnitView, productionId: string, input: { pools: { bandId: string, capacity: number }[], performanceIds?: string[], confirmOverVenue?: boolean }, actor: Actor): Promise<RunResult & { performanceIds: string[] }> {
+  const performances = await runOf(productionId)
+  const pools = await all<{ performance_id: string, band_id: string, capacity: number, claimed: number }>(
+    'SELECT performance_id, band_id, capacity, claimed FROM box_office_pools WHERE performance_id IN (SELECT value FROM json_each(?))', JSON.stringify(performances.map(p => p.id)))
+  const of = (id: string) => pools.filter(o => o.performance_id === id)
+  const { own } = runSeats(performances.map(p => ({ id: p.id, pools: of(p.id) })))
+  const wanted = input.performanceIds ? new Set(input.performanceIds) : null
+  const result: RunResult & { performanceIds: string[] } = { done: 0, skipped: [], performanceIds: [] }
+  for (const p of performances) {
+    if (wanted ? !wanted.has(p.id) : own.has(p.id)) continue
+    if (!(await can(actor, 'box-office.performance.manage', ['core.performance', p.id])).allowed) continue
+    const short = input.pools.find(w => (of(p.id).find(o => o.band_id === w.bandId)?.claimed ?? 0) > w.capacity)
+    if (short) {
+      result.skipped.push({ performanceId: p.id, reason: 'below-claimed' })
+      continue
+    }
+    const house = await capacityOf(p.id)
+    if (house !== null && input.pools.reduce((sum, w) => sum + w.capacity, 0) > house && !input.confirmOverVenue) {
+      result.skipped.push({ performanceId: p.id, reason: 'over-venue' })
+      continue
+    }
+    await saveSales(unit, p.id, { pools: input.pools, confirmOverVenue: input.confirmOverVenue }, actor)
+    result.done++
+    result.performanceIds.push(p.id)
+  }
+  return result
+}
