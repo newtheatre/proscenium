@@ -350,6 +350,8 @@
   "membership.membership.holder": "Holder",
   "membership.membership.open-person": "Open their record",
   "membership.membership.from-list": "On the list {list}",
+  "membership.membership.reference": "{noun} {reference}",
+  "membership.membership.reference-noun": "Reference",
   "membership.membership.listed-as": "Listed as {name}",
   "membership.membership.checks": "Checks",
   "membership.membership.no-checks": "Nothing was checked for this membership.",
