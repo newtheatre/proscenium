@@ -22,10 +22,15 @@ const issue: OutcomeAction = {
   label: 'forms.test.issue',
   slot: 'forms.test-slot',
   inputs: [{ key: 'name', label: 'forms.test.name', required: true, types: ['text.short'] }, { key: 'why', label: 'forms.test.why' }],
+  async preview(call) {
+    return { lines: [{ label: 'forms.test.name', value: call.input.name?.text ?? '' }], warnings: call.input.why ? [] : ['No reason was given.'], ...(call.input.name?.text === 'Nobody' ? { blocked: 'Nobody can be given this.' } : {}) }
+  },
   async run(unit, call) {
     if (failing) throw new Error('The award could not be issued')
     calls.push(call)
     unit.audit({ action: 'update', record: ['forms.response', call.response.id], detail: { issued: call.runId } })
+    // What it made: here the form itself, which has a resolver, stands in for an award.
+    return { record: ['forms.form', call.response.formId] }
   },
 }
 
@@ -182,6 +187,12 @@ describe('an action on a move', () => {
     calls.length = 0
     await move(formId, responseId, 'start_review')
     expect(await runs(responseId)).toEqual([])
+    // Whoever is about to approve is shown what approving would do, and asking changes nothing.
+    const preview = (key: string, who = decider) => req('GET', `/api/forms/forms/${formId}/responses/${responseId}/preview?move=${key}`, undefined, who)
+    expect((await preview('approve')).body.previews).toEqual([{ action: 'forms.test-issue', label: 'forms.test.issue', lines: [{ label: 'forms.test.name', value: 'Ann Awarded' }], warnings: [] }])
+    expect((await preview('decline')).body.previews).toEqual([])
+    expect((await preview('approve', member)).status).toBe(403)
+    expect(await runs(responseId)).toEqual([])
     const approved = await move(formId, responseId, 'approve')
     expect(approved.status, JSON.stringify(approved.body)).toBe(200)
     expect(await runs(responseId)).toMatchObject([{ state: 'waiting', action_key: 'forms.test-issue' }])
@@ -199,6 +210,8 @@ describe('an action on a move', () => {
     expect(calls[0]!.response.decidedAt).not.toBeNull()
     const [run] = await runs(responseId)
     expect(run).toMatchObject({ state: 'done', id: calls[0]!.runId })
+    // What the action made is linked from the response, as its own module names it.
+    expect((await req('GET', `/api/forms/forms/${formId}/responses/${responseId}`, undefined, decider)).body.actions[0].record).toMatchObject({ type: 'forms.form', id: formId, to: `/console/forms/${formId}` })
     // The same message delivered again, and the job run by hand again, do nothing more.
     sent.push(...jobs)
     await deliver()

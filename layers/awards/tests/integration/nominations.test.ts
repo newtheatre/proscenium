@@ -82,7 +82,7 @@ describe('nominations', () => {
     expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(1)
   })
 
-  it('leaves the run waiting when the nominee already holds a once-only award', async () => {
+  it('ends the run with the reason when the nominee already holds a once-only award', async () => {
     const type = await awardType()
     await issue(type, { accountId: nominee.accountId })
     const at = await attached(type)
@@ -90,7 +90,8 @@ describe('nominations', () => {
     await move(at.formId, responseId, 'start_review')
     await move(at.formId, responseId, 'approve')
     await deliver()
-    expect(await runs(responseId)).toEqual([{ state: 'waiting', action_key: 'awards.issue-award' }])
+    expect(await runs(responseId)).toEqual([{ state: 'skipped', action_key: 'awards.issue-award' }])
+    expect(await rows('SELECT detail FROM forms_action_runs WHERE response_id = ?', responseId)).toEqual([{ detail: expect.stringMatching(/already holds/) }])
     expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(1)
   })
 
@@ -101,5 +102,37 @@ describe('nominations', () => {
     expect(open.status).toBe(200)
     expect(open.body.open).toEqual(expect.arrayContaining([expect.objectContaining({ subjectId: type, formId: at.formId })]))
     expect((await req('GET', '/api/awards/mine', undefined, member)).body.nominations).toBe(true)
+  })
+
+  it('issues nothing, and says why, when the person approving is the nominee', async () => {
+    const type = await awardType()
+    const at = await attached(type)
+    const responseId = await nominated(at, decider.accountId!)
+    await move(at.formId, responseId, 'start_review')
+    await move(at.formId, responseId, 'approve')
+    await deliver()
+    expect(await rows('SELECT state, detail FROM forms_action_runs WHERE response_id = ?', responseId)).toEqual([{ state: 'skipped', detail: expect.stringMatching(/their own account/) }])
+    expect(await rows('SELECT 1 FROM awards_awards WHERE type_id = ?', type)).toHaveLength(0)
+  })
+
+  it('shows whoever is about to approve what would be issued, and why nothing would be', async () => {
+    const type = await awardType()
+    const at = await attached(type)
+    const preview = async (responseId: string) => (await forms('GET', `/api/forms/forms/${at.formId}/responses/${responseId}/preview?move=approve`, undefined, decider)).body.previews
+    const first = await nominated(at, nominee.accountId!)
+    await move(at.formId, first, 'start_review')
+    const [shown] = await preview(first)
+    expect(shown.blocked).toBeUndefined()
+    expect(shown.lines.map((l: { value: string }) => l.value)).toEqual(expect.arrayContaining(['Nell Nominee', 'Twenty years backstage', 'Always the last to leave.']))
+    expect(shown.warnings).toContain('awards.forms.issue-award.preview.wording')
+    await move(at.formId, first, 'approve')
+    await deliver()
+    // The run names the award it made, so the nomination links to it.
+    const [award] = await rows<{ id: string }>('SELECT id FROM awards_awards WHERE type_id = ?', type)
+    expect(JSON.stringify(await rows('SELECT * FROM forms_action_runs WHERE response_id = ?', first))).toContain(award!.id)
+
+    const own = await nominated(at, decider.accountId!)
+    await move(at.formId, own, 'start_review')
+    expect((await preview(own))[0].blocked).toMatch(/No award will be issued: nobody can approve an award for their own account/)
   })
 })

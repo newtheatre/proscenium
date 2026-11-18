@@ -120,7 +120,10 @@ const qr = computed(() => {
           <p class="text-2xl font-semibold">
             {{ showing.recipientName }}
           </p>
-          <FactStrip :facts="[{ label: t('awards.screens.award.awarded-on'), value: day(showing.awardedOn) }]" />
+          <FactStrip
+            centred
+            :facts="[{ label: t('awards.screens.award.awarded-on'), value: day(showing.awardedOn) }]"
+          />
           <svg
             v-if="qr"
             :viewBox="`0 0 ${qr.size} ${qr.size}`"
@@ -135,7 +138,7 @@ const qr = computed(() => {
             />
           </svg>
           <p class="text-sm text-muted">
-            {{ t(qr ? 'awards.screens.mine.card-help' : 'awards.screens.mine.card-no-code') }}
+            {{ t(qr ? 'core.card.show' : 'core.card.show-no-code') }}
           </p>
         </div>
       </template>

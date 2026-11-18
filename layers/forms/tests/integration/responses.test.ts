@@ -66,6 +66,26 @@ describe('a form on a link', () => {
   })
 })
 
+describe('changing a form\'s address', () => {
+  it('sends an old link on, keeps the old address for that form alone, and lets it be taken back', async () => {
+    const { formId, slug } = await offered(simple())
+    const other = await offered(simple())
+    const to = `moved-${slug}`
+    const editor = person(['forms.form.edit'])
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug: 'Not an address!' }, editor)).status).toBe(422)
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug: other.slug }, editor)).body).toMatchObject({ code: 'forms.form.address-taken', fields: { slug: 'forms.form.address-taken' } })
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug: to }, editor)).body).toMatchObject({ formId, slug: to })
+
+    expect((await req('GET', `/api/forms/open/${to}`, undefined, member)).body.state).toBe('open')
+    expect((await req('GET', `/api/forms/open/${slug}`, undefined, member)).body).toEqual({ movedTo: to })
+    // The address it left is still its own: nobody else's form may move in behind it.
+    expect((await req('PATCH', `/api/forms/forms/${other.formId}`, { slug }, editor)).body.code).toBe('forms.form.address-taken')
+    expect((await req('PATCH', `/api/forms/forms/${formId}`, { slug }, editor)).status).toBe(200)
+    expect((await req('GET', `/api/forms/open/${slug}`, undefined, member)).body.state).toBe('open')
+    expect((await req('GET', `/api/forms/open/${to}`, undefined, member)).body).toEqual({ movedTo: slug })
+  })
+})
+
 describe('sending', () => {
   it('stores the response and one row per answer, drops what logic hides and seals special answers', async () => {
     const { formId, slug } = await offered(simple())

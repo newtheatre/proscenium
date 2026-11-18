@@ -188,6 +188,12 @@ export const responses = defineTable('forms_responses', {
   updatedAt: col.updatedAt(),
   retentionDueAt: col.timestamp('retention_due_at'),
   anonymisedAt: col.timestamp('anonymised_at'),
+  // When the person was last reminded that it waits on them: an unfinished working copy left
+  // untouched, or a response returned for changes. A returned response counts as reminded only
+  // when this is later than the move that returned it, so each return earns one reminder.
+  remindedWaitingAt: col.timestamp('reminded_waiting_at'),
+  // When the person was reminded that the form closes soon. Once only.
+  remindedClosingAt: col.timestamp('reminded_closing_at'),
 }, {
   id: 'fres',
   realm: { column: 'realm' },
@@ -198,6 +204,7 @@ export const responses = defineTable('forms_responses', {
     index('forms_responses_form').on(t.formId, t.state, t.submittedAt),
     index('forms_responses_person').on(t.personId),
     index('forms_responses_retention').on(t.retentionDueAt),
+    index('forms_responses_waiting').on(t.state, t.stageKind),
     check('forms_responses_state', sql`${t.state} IN (${inList(RESPONSE_STATES)})`),
     check('forms_responses_stage', sql`${t.stageKind} IS NULL OR ${t.stageKind} IN (${inList(STAGE_KINDS)})`),
     check('forms_responses_realm', sql`${t.realm} IN (${inList(RESPONSE_REALMS)})`),
@@ -321,6 +328,8 @@ export const reviewAssignments = defineTable('forms_review_assignments', {
   comment: col.freeText(text('comment'), { erase: 'clear' }),
   submittedAt: col.timestamp('submitted_at'),
   createdAt: col.createdAt(),
+  // When the reviewer was reminded that their review is still owed. Once a round.
+  remindedAt: col.timestamp('reminded_at'),
 }, {
   id: 'fasg',
   realm: 'operational',
@@ -356,6 +365,9 @@ export const actionRuns = defineTable('forms_action_runs', {
   state: col.internal(text('state', { enum: RUN_STATES }).notNull().default('waiting')),
   // Why it was skipped. Never anybody's words.
   detail: col.internal(text('detail')),
+  // What the action made, where it says: shown through the type's record resolver.
+  recordType: col.internal(text('record_type')),
+  recordId: col.internal(text('record_id')),
   jobId: col.internal(text('job_id')),
   createdAt: col.createdAt(),
   finishedAt: col.timestamp('finished_at'),
@@ -383,4 +395,18 @@ export const templates = defineTable('forms_templates', {
   subject: 'none',
 })
 
-export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }
+/**
+ * An address a form used to be reached by. Somebody following an old link is sent on to the form's
+ * address now, so changing an address never breaks a link already handed out.
+ */
+export const oldAddresses = defineTable('forms_old_addresses', {
+  slug: col.internal(text('slug').notNull()),
+  formId: col.ref('forms_forms'),
+  createdAt: col.createdAt(),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [primaryKey({ columns: [t.slug] }), index('forms_old_addresses_form').on(t.formId)],
+})
+
+export const tables = { oldAddresses, forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }

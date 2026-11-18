@@ -41,6 +41,17 @@ export async function getFormBySlug(slug: string | undefined): Promise<FormRow |
   return row ? { ...row, anonymous: !!row.anonymous } : null
 }
 
+/** The address now of the form that used to be at this one, for sending an old link on. */
+export async function movedFrom(slug: string | undefined): Promise<string | null> {
+  if (!slug) return null
+  return (await first<{ slug: string }>('SELECT f.slug FROM forms_old_addresses o JOIN forms_forms f ON f.id = o.form_id WHERE o.slug = ?', slug))?.slug ?? null
+}
+
+/** Whether another form is at this address, or was: an old address stays its form's, so old links never lead to a stranger's form. */
+export async function addressTaken(slug: string, formId: string): Promise<boolean> {
+  return !!(await first<{ n: number }>('SELECT 1 AS n FROM forms_forms WHERE slug = ?1 AND id <> ?2 UNION ALL SELECT 1 FROM forms_old_addresses WHERE slug = ?1 AND form_id <> ?2', slug, formId))
+}
+
 export async function requireForm(id: string | undefined): Promise<FormRow> {
   return await getForm(id) ?? refuse('forms.form.not-found', 'There is no form here.', { status: 404 })
 }
@@ -95,14 +106,14 @@ export function slugOf(title: string): string {
   const slug = title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z\d]+/g, '-').replace(/^-+|-+$/g, '').slice(0, SLUG_LENGTH).replace(/-+$/, '')
   return slug || 'form'
 }
-const SLUG_LENGTH = 60 // not-policy: a readable address
+export const SLUG_LENGTH = 60 // not-policy: a readable address
 /** The longest title a form may have. */
 export const TITLE_LENGTH = 120 // not-policy: fits a list row and a page heading
 
 /** The first free address from the title: `auditions`, then `auditions-2`, and so on. */
 export async function freeSlug(title: string): Promise<string> {
   const base = slugOf(title)
-  const taken = new Set((await all<{ slug: string }>('SELECT slug FROM forms_forms WHERE slug = ? OR slug LIKE ?', base, `${base}-%`)).map(r => r.slug))
+  const taken = new Set((await all<{ slug: string }>('SELECT slug FROM forms_forms WHERE slug = ?1 OR slug LIKE ?2 UNION SELECT slug FROM forms_old_addresses WHERE slug = ?1 OR slug LIKE ?2', base, `${base}-%`)).map(r => r.slug))
   if (!taken.has(base)) return base
   let n = 2
   while (taken.has(`${base}-${n}`)) n++

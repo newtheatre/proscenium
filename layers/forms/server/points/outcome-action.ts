@@ -45,6 +45,16 @@ export interface ActionCall {
   at: number
 }
 
+/** What an action would do with a response as it stands, for whoever is about to make the move. */
+export interface ActionPreview {
+  /** What it would make, a line at a time: a translation key or plain words, and the value in plain words. */
+  lines: { label: string, value: string }[]
+  /** Things worth knowing before going ahead, in plain words or as translation keys. */
+  warnings?: string[]
+  /** Why it would not do anything at all, in plain words or as a translation key. The move can still be made. */
+  blocked?: string
+}
+
 export interface OutcomeAction {
   /** `<module>.<name>`, such as `awards.issue-award`. Never changes. */
   key: string
@@ -53,6 +63,17 @@ export interface OutcomeAction {
   /** Runs only for responses answered in this slot; elsewhere it is skipped, and the response says so. */
   slot?: string
   inputs: ActionInput[]
-  /** Adds what the action does to the unit. A refusal or a throw leaves the run waiting, and the job tries again. */
-  run: (unit: UnitView, call: ActionCall) => Promise<void>
+  /**
+   * Says what `run` would do, without doing it: shown to whoever is about to make the move. It
+   * reads only, is handed the answers as they stand now, and may be asked any number of times.
+   */
+  preview?: (call: Omit<ActionCall, 'runId'>) => Promise<ActionPreview | undefined>
+  /**
+   * Does the work in the job's unit. A refusal or a throw leaves the run waiting, and the job tries
+   * again. Answering `{ skipped }` ends the run as not done, with that reason shown to staff in plain
+   * words. Answering `{ record }` names what it made, by type and id, and the response links to it
+   * through the type's `core.record-resolver`.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- an action with nothing to say returns nothing
+  run: (unit: UnitView, call: ActionCall) => Promise<{ skipped: string } | { record: [type: string, id: string] } | undefined | void>
 }
