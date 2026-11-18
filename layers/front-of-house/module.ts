@@ -160,6 +160,8 @@ export default defineModule({
     }],
     'core.navigation': [
       { id: 'front-of-house.shifts', menu: 'members', to: '/members/front-of-house', icon: 'i-lucide-calendar-clock', ability: 'front-of-house.shift.sign-up', order: 30 },
+      // The reporter's own incidents (FH-8): shown once they have reported one.
+      { id: 'front-of-house.my-reports', menu: 'members', to: '/members/front-of-house/reports', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.report', order: 31, count: 'front-of-house.my-reports', hideEmpty: true },
       { id: 'front-of-house.tonight', menu: 'live', to: '/live/front-of-house', icon: 'i-lucide-drama', ability: ['front-of-house.shift.view', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], order: 10 },
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
@@ -177,6 +179,7 @@ export default defineModule({
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
     'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],
+    'core.count': [{ id: 'front-of-house.my-reports', file: 'my-reports' }],
     'core.notification-topic': [
       { id: 'front-of-house.cover-needed', side: 'members' as const, order: 60 },
       { id: 'front-of-house.night-reports', side: 'members' as const, order: 61 },
