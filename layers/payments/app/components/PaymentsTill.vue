@@ -49,7 +49,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const router = useRouter()
-const { currency, money, toMinor } = await useMoney()
+const { currency, money, toMinor, toMajor } = await useMoney()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -68,7 +68,9 @@ function deviceSpace(): string | null {
   catch { return null }
 }
 const nextPlace = ref<string | null>(null)
-onMounted(() => { nextPlace.value = deviceSpace() })
+// With no place of its own, the device shows where the session would open: the default space, or
+// the theatre's only space.
+onMounted(() => { nextPlace.value = deviceSpace() ?? session.value?.defaultSpaceId ?? null })
 /** Opens the seller's session if none is open, at this device's place. True once one is. */
 async function ensureSession(): Promise<boolean> {
   if (open.value) return true
@@ -334,6 +336,17 @@ const choice = ref<string | undefined>(undefined)
 const chosen = computed(() => methods.value.find(m => key(m) === choice.value))
 const key = (m: Offer) => `${m.providerAccountId}:${m.method}`
 const tendered = ref<number | undefined>(undefined)
+const tenderedMinor = computed(() => (tendered.value === undefined || tendered.value === null ? undefined : toMinor(tendered.value)))
+// The change, shown while the cash is typed; nothing while the box is empty.
+const change = computed(() => (tenderedMinor.value === undefined ? null : tenderedMinor.value - taken.value))
+// Quick amounts handed over: the exact sum and the next notes up.
+const NOTES = [5, 10, 20, 50] // not-policy: the notes a seller is usually handed, in the major unit
+const quickTender = computed(() => NOTES.map(n => toMinor(n)).filter(n => n > taken.value).slice(0, 3))
+function tender(minor: number) {
+  tendered.value = toMajor(minor)
+}
+// What an "other" payment was, such as a voucher number or an invoice.
+const otherNote = ref('')
 const readerId = ref<string | undefined>(undefined)
 // Part of what is due, taken by this way of paying; empty takes it all. The rest is then taken another way.
 const part = ref<number | undefined>(undefined)
@@ -345,9 +358,14 @@ const partMissing = computed(() => splitting.value && !paidInPart.value && partM
 watch([splitting, part], () => keep())
 watch(chosen, (m) => {
   tendered.value = undefined
+  otherNote.value = ''
   readerId.value = m?.readers?.length === 1 ? m.readers[0]!.id : undefined
 })
-const methodLabel = (m: Offer) => (m.method === 'cash' ? t('payments.screens.methods.cash') : `${t(`payments.screens.methods.${m.method}`)} · ${m.label}`)
+// A way to pay is named by its method alone ("Card", "Other"); the provider's name is in its tooltip,
+// and joins the name only where two providers offer the same method.
+const plainName = (m: Offer) => t(`payments.screens.till.method.${m.method}`)
+const shared = (m: Offer) => methods.value.filter(o => plainName(o) === plainName(m)).length > 1
+const methodLabel = (m: Offer) => (shared(m) ? `${plainName(m)} · ${m.label}` : plainName(m))
 
 async function check() {
   if (!sale.value) return
@@ -383,10 +401,10 @@ async function pay(succeeded = true) {
   result.value = null
   try {
     if (m.method === 'cash' || m.method.endsWith('_attested')) {
-      const tenderedMinor = m.method === 'cash' && tendered.value !== undefined ? toMinor(tendered.value) : undefined
+      const handed = m.method === 'cash' ? tenderedMinor.value : undefined
       const answer = await $api<{ settled: boolean, unfulfilled: boolean, changeMinor: number }>(`/api/payments/intents/${sale.value.intentId}/attest` as string, {
         method: 'POST',
-        body: { providerAccountId: m.providerAccountId, method: m.method, amountMinor: partMinor.value, tenderedMinor, succeeded: m.method === 'cash' ? undefined : succeeded },
+        body: { providerAccountId: m.providerAccountId, method: m.method, amountMinor: partMinor.value, tenderedMinor: handed, note: m.method === 'other_attested' ? otherNote.value.trim() || undefined : undefined, succeeded: m.method === 'cash' ? undefined : succeeded },
         headers: { 'idempotency-key': sale.value.key },
       })
       sale.value.key = crypto.randomUUID()
@@ -761,19 +779,23 @@ function ended() {
                   :aria-label="t('payments.screens.till.how')"
                   class="grid grid-cols-2 gap-2"
                 >
-                  <UButton
+                  <UTooltip
                     v-for="m in methods"
                     :key="key(m)"
-                    block
-                    size="lg"
-                    color="neutral"
-                    variant="outline"
-                    :icon="methodIcon(m)"
-                    :loading="taking && choice === key(m)"
-                    :disabled="!payable || taking || partMissing || partTooMuch"
-                    :label="methodLabel(m)"
-                    @click="payWith(m)"
-                  />
+                    :text="m.label"
+                  >
+                    <UButton
+                      block
+                      size="lg"
+                      color="neutral"
+                      variant="outline"
+                      :icon="methodIcon(m)"
+                      :loading="taking && choice === key(m)"
+                      :disabled="!payable || taking || partMissing || partTooMuch"
+                      :label="methodLabel(m)"
+                      @click="payWith(m)"
+                    />
+                  </UTooltip>
                 </div>
                 <UButton
                   color="neutral"
@@ -798,18 +820,22 @@ function ended() {
                     @click="payWith(methods[0]!)"
                   />
                   <div class="grid grid-cols-2 gap-2">
-                    <UButton
+                    <UTooltip
                       v-for="m in methods.slice(1)"
                       :key="key(m)"
-                      block
-                      size="lg"
-                      color="neutral"
-                      variant="outline"
-                      :icon="methodIcon(m)"
-                      :disabled="!payable || taking"
-                      :label="methodLabel(m)"
-                      @click="payWith(m)"
-                    />
+                      :text="m.label"
+                    >
+                      <UButton
+                        block
+                        size="lg"
+                        color="neutral"
+                        variant="outline"
+                        :icon="methodIcon(m)"
+                        :disabled="!payable || taking"
+                        :label="methodLabel(m)"
+                        @click="payWith(m)"
+                      />
+                    </UTooltip>
                     <UButton
                       block
                       size="lg"
@@ -930,6 +956,10 @@ function ended() {
                       @click="choose(m)"
                     >
                       <span class="flex-1 text-start">{{ methodLabel(m) }}</span>
+                      <span
+                        v-if="!shared(m) && m.method !== 'cash'"
+                        class="text-sm text-muted"
+                      >{{ m.label }}</span>
                       <UBadge
                         v-if="m.mode === 'test'"
                         color="warning"
@@ -945,6 +975,10 @@ function ended() {
                         :name="methodIcon(chosen)"
                         class="size-5"
                       />{{ methodLabel(chosen) }}
+                      <span
+                        v-if="!shared(chosen) && chosen.method !== 'cash'"
+                        class="text-sm font-normal text-muted"
+                      >{{ chosen.label }}</span>
                     </p>
                     <UFormField
                       v-if="chosen.method === 'cash'"
@@ -952,11 +986,58 @@ function ended() {
                       :hint="t('payments.screens.optional')"
                       :help="t('payments.screens.till.tendered-help')"
                     >
-                      <UInputNumber
-                        v-model="tendered"
-                        :min="0"
-                        :step="0.01"
-                        :format-options="{ style: 'currency', currency }"
+                      <div class="space-y-2">
+                        <UInputNumber
+                          v-model="tendered"
+                          :min="0"
+                          :step="0.01"
+                          :increment="false"
+                          :decrement="false"
+                          :format-options="{ style: 'currency', currency }"
+                          class="w-36"
+                        />
+                        <div
+                          class="flex flex-wrap gap-2"
+                          role="group"
+                          :aria-label="t('payments.screens.till.quick-tender')"
+                        >
+                          <UButton
+                            size="sm"
+                            color="neutral"
+                            variant="outline"
+                            :label="t('payments.screens.till.exact')"
+                            @click="tender(taken)"
+                          />
+                          <UButton
+                            v-for="n in quickTender"
+                            :key="n"
+                            size="sm"
+                            color="neutral"
+                            variant="outline"
+                            :label="money(n)"
+                            @click="tender(n)"
+                          />
+                        </div>
+                        <p
+                          v-if="change !== null"
+                          class="font-medium"
+                          :class="change < 0 ? 'text-error' : undefined"
+                          aria-live="polite"
+                        >
+                          {{ change < 0 ? t('payments.screens.till.short', { amount: money(-change) }) : t('payments.screens.till.change-live', { amount: money(change) }) }}
+                        </p>
+                      </div>
+                    </UFormField>
+                    <UFormField
+                      v-if="chosen.method === 'other_attested'"
+                      :label="t('payments.screens.till.other-note')"
+                      :hint="t('payments.screens.optional')"
+                      :help="t('payments.screens.till.other-note-help')"
+                    >
+                      <UInput
+                        v-model="otherNote"
+                        maxlength="200"
+                        autocomplete="off"
                       />
                     </UFormField>
                     <UFormField
@@ -974,12 +1055,12 @@ function ended() {
                       <UButton
                         size="lg"
                         :loading="taking"
-                        :disabled="partTooMuch || partMissing || (chosen.method === 'card_reader' && !readerId)"
-                        :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
+                        :disabled="partTooMuch || partMissing || (chosen.method === 'card_reader' && !readerId) || (chosen.method === 'cash' && change !== null && change < 0)"
+                        :label="chosen.method === 'other_attested' ? t('payments.screens.till.received', { amount: money(taken) }) : chosen.method === 'card_attested' ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
                         @click="pay()"
                       />
                       <UButton
-                        v-if="chosen.method.endsWith('_attested')"
+                        v-if="chosen.method === 'card_attested'"
                         size="lg"
                         color="neutral"
                         variant="outline"
