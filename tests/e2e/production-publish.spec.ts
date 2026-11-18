@@ -30,7 +30,9 @@ test('publish lists what is left, asks first, and the published page says so', a
   const dialog = page.getByRole('dialog', { name: 'Not ready to publish yet' })
   await expect(dialog.getByRole('listitem').filter({ hasText: 'A summary' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Publish' })).toHaveCount(0)
-  await dialog.getByRole('button', { name: 'Close' }).click()
+  // The window has the corner cross and a Close button, both called Close: the button is last.
+  await dialog.getByRole('button', { name: 'Close' }).last().click()
+  await expect(dialog).toBeHidden()
 
   const { options } = await (await request.get(`/api/core/productions/${productionId}`)).json()
   await request.patch(`/api/core/productions/${productionId}`, { data: { summary: 'A play about publishing.', categoryTermId: options.categories[0].id, effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: 'https://tickets.example.org/published' } })
