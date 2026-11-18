@@ -468,6 +468,7 @@
   "core.members.nothing": "Nothing here yet",
   "core.members.nothing-description": "Places for members appear here as the theatre switches them on.",
   "core.account.title": "My account",
+  "core.account.upcoming.title": "Coming up",
   "core.account.empty": "Nothing to show yet",
   "core.account.empty-description": "Your tickets and details appear here once there is something to show.",
   "core.account.overview": "Overview",

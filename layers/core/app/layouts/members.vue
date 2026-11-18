@@ -14,7 +14,8 @@ const name = computed(() => brandData.value?.name ?? t('core.public.default-name
 const area = computed(() => viewer.value.membersName ?? t('core.menu.members'))
 
 const sections = computed(() => (navigation.value?.items ?? []).map(i => ({ ...i, active: isCurrent(i, route.path) })))
-const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ label: t(i.label), icon: i.icon, to: i.to, active: i.active, badge: i.count })))
+// A count of nought shows no badge (AC-7).
+const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ label: t(i.label), icon: i.icon, to: i.to, active: i.active, badge: i.count || undefined })))
 </script>
 
 <template>

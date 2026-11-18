@@ -322,8 +322,9 @@ export const contributes = {
     },
   }],
   // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
-  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }, { id: 'core.inbox-unread-members', file: 'inbox-unread-members' }],
+  'core.count': [{ id: 'core.upcoming', file: 'upcoming' }, { id: 'core.my-credits', file: 'my-credits' }, { id: 'core.inbox-unread', file: 'inbox-unread' }, { id: 'core.inbox-unread-members', file: 'inbox-unread-members' }],
   'core.account-section': [
+    { id: 'core.upcoming', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreUpcoming', order: 5, icon: 'i-lucide-calendar-days', count: 'core.upcoming', hideEmpty: true },
     { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
   ],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }, { id: 'core.guidance', file: 'guidance' }],
