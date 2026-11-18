@@ -39,8 +39,10 @@ interface Answer {
     reasons: Option[]
     effects: { id: string, label: string }[]
     presets: { id: string, name: string, slots: RunSlot[] }[]
+    /** Whole days closed to performances, which the date fields grey out. */
+    closed?: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number }[]
   }
-  defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
+  defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualSpaceId: string | null, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
 }
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
@@ -52,8 +54,6 @@ const emit = defineEmits<{ changed: [] }>()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<Answer>(() => `/api/core/productions/${props.productionId}/performances`, { key: `core:production:${props.productionId}:performances` })
 const dates = useDates()
-// Whole-day closures that block performances grey out their days in the date fields; the server still decides.
-const { data: closures } = useAPI<{ rows: { venueId: string | null, spaceId: string | null, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean }[] }>('/api/core/closures', { key: 'core:closures', lazy: true, server: false })
 const { toRefusal, fieldErrors } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -77,6 +77,8 @@ function defaultsIn(spaceId: string): ShowDefaultValues {
     externalBookingUrl: d.externalBookingUrl,
   }
 }
+// The production's usual space, when it is still one a date can be in: what a new date starts in.
+const usualSpace = () => spaces.value.find(s => s.value === data.value?.defaults.usualSpaceId)?.value
 const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?.label ?? 'A space no longer listed'
 /** Whether every performance is in the one space, which is then said once above the list. */
 const oneSpace = computed(() => new Set(performances.value.map(p => p.spaceId)).size === 1)
@@ -138,11 +140,11 @@ const open = ref(false)
 const form = ref({ spaceId: '', startsAt: null as number | null })
 const overrides = ref<ShowOverrides>(noOverrides())
 const shown = computed(() => form.value.spaceId && data.value ? defaultsIn(form.value.spaceId) : null)
-/** Whether a whole-day closure that blocks performances covers this day for the chosen space. */
+/** Whether a whole-day closure that blocks performances covers this day for the chosen space. The
+ *  closures come with the performances, so nobody needs the right to manage closures; the server still decides. */
 function closed(day: string): boolean {
   const space = spaces.value.find(x => x.value === form.value.spaceId)
-  return (closures.value?.rows ?? []).some(c => c.allDay && c.blocksPerformances
-    && (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
+  return (data.value?.options.closed ?? []).some(c => (!c.venueId || (c.venueId === space?.venueId && (!c.spaceId || c.spaceId === space.value)))
     && dates.toLocal(c.startsAt).slice(0, 10) <= day && day <= dates.toLocal(c.endsAt - 1).slice(0, 10)) // not-policy: the length of a date
 }
 // Checked beside each field: a space, a start, and a booking link that is a web address.
@@ -158,7 +160,7 @@ function checkPerformance() {
 function start(p: Performance | null) {
   refusal.value = null
   editing.value = p
-  form.value = { spaceId: p?.spaceId ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
+  form.value = { spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
   overrides.value = noOverrides()
   if (p) {
     // A performance shows as changed only where it differs from the show's defaults.
@@ -456,6 +458,14 @@ async function saveBulkCancel() {
 
 // Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
 const addingRun = ref(false)
+// The palette's "Add a run" arrives with ?run=1: the window opens once there is a space to put it in.
+const runRoute = useRoute()
+watch(spaces, (list) => {
+  if (import.meta.server || runRoute.query.run !== '1' || !list.length) return
+  addingRun.value = true
+  const { run: _, ...rest } = runRoute.query
+  void navigateTo({ query: rest }, { replace: true })
+}, { immediate: true })
 const runs = computed(() => data.value?.runs ?? [])
 const moving = computed(() => runs.value.some(r => r.state === 'running' || r.state === 'removing'))
 let timer: ReturnType<typeof setInterval> | undefined

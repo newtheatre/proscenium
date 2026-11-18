@@ -21,11 +21,13 @@ test.describe('a site owner with no console', () => {
 
   test('has the Admin mark, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
-    await expect(page).toHaveTitle(/^Admin/)
+    await expect(page).toHaveTitle(/^Overview · Admin · /)
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
-    await expect(page.getByText('Nothing needs attention')).toBeVisible()
+    // A new site's first steps, each a link to where it is done until it is.
+    await expect(page.getByText('Get your theatre ready')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Add a logo and colours' })).toHaveAttribute('href', '/admin/branding')
     await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('button', { name: 'Upkeep' }).click()
     await expect(page.getByRole('navigation', { name: 'Admin', exact: true })).toContainText('Advanced')
     await noViolations(page)
@@ -127,7 +129,8 @@ test.describe('a site owner with no console', () => {
 
   test('a setting with a fixed set of values is a dropdown, searchable when the list is long', async ({ page }) => {
     await visit(page, '/admin/theatre')
-    const zone = page.getByRole('button', { name: 'Time zone' })
+    // Every dropdown, searchable or not, is a combobox to assistive technology.
+    const zone = page.getByRole('combobox', { name: 'Time zone' })
     await zone.click()
     await page.getByPlaceholder('Search…').fill('London')
     await expect(page.getByRole('option', { name: /^Europe\/London \(GMT/ })).toBeVisible()
@@ -137,13 +140,34 @@ test.describe('a site owner with no console', () => {
     await language.click()
     await expect(page.getByRole('option')).toHaveText(['British English'])
     await page.keyboard.press('Escape')
-    await expect(page.getByRole('button', { name: 'Currency' })).toContainText('GBP: British Pound')
+    await expect(page.getByRole('combobox', { name: 'Currency' })).toContainText('GBP: British Pound')
     await noViolations(page)
   })
 
   test('is not offered the console', async ({ page }) => {
     await visit(page, '/admin')
     expect((await page.goto('/console'))?.status()).toBe(404)
+  })
+})
+
+test.describe('the organisation\'s year end', () => {
+  test.use(as(siteOwner('Orla Org', ['core.organisation.edit'])))
+
+  test('is a day and a month, and saving it asks in plain words with a button that is not red', async ({ page }) => {
+    await visit(page, '/admin/theatre')
+    // The site's address was recorded by setup: there is no Reset to "not set" beside it.
+    await expect(page.getByRole('button', { name: "Reset The site's address to its default" })).toHaveCount(0)
+    const yearEnd = page.locator('[id="setting-core.organisation.year-end"]')
+    await yearEnd.getByRole('combobox', { name: 'Month' }).click()
+    await page.getByRole('option', { name: 'July' }).click()
+    await expect(yearEnd.getByRole('spinbutton', { name: 'Day' })).toHaveValue('31')
+    await page.getByRole('button', { name: 'Save organisation settings' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Save this change?')
+    await expect(dialog).toContainText(/Year end (is set to|goes from .+ to) 31 July\./)
+    await expect(dialog.getByRole('button', { name: 'Save the change' })).not.toHaveClass(/bg-error/)
+    await dialog.getByRole('button', { name: 'Save the change' }).click()
+    await expect(page.getByText('Saved 1 change', { exact: true }).first()).toBeVisible()
   })
 })
 
@@ -173,8 +197,9 @@ test.describe('staff who also run the console', () => {
 test.describe('a person with no admin ability', () => {
   test.use(as(person('Nia None', [grant('gallery.sample.view')])))
 
-  test('finds /admin is not there, and no menu entry for it', async ({ page }) => {
-    expect((await page.goto('/admin'))?.status()).toBe(404)
+  test('is told they have no access to /admin and whom to ask, and has no menu entry for it', async ({ page }) => {
+    expect((await page.goto('/admin'))?.status()).toBe(403)
+    await expect(page.getByText('Ask an Owner to give you a role that includes it.')).toBeVisible()
     await visit(page, '/console')
     await page.getByRole('button', { name: /Open the menu for Nia None/ }).first().click()
     await expect(page.getByRole('menuitem', { name: 'Admin', exact: true })).toHaveCount(0)
@@ -221,5 +246,28 @@ test.describe('keys typed into the app', () => {
     await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
     await expect(card.getByLabel('Turnstile secret key')).toHaveValue('')
     await expect(card.getByText('Not set').first()).toBeVisible()
+  })
+})
+
+test.describe('the Branding screen', () => {
+  test.use(as(siteOwner('Bea Brand', ['core.branding.edit'])))
+
+  test('offers logo uploads and a preview before saving, and hides what the system keeps', async ({ page }) => {
+    await visit(page, '/admin/branding')
+    await expect(page.getByRole('heading', { level: 1, name: 'Branding' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Upload a logo' })).toHaveCount(2)
+    await expect(page.getByText('Brand revision')).toHaveCount(0)
+    await expect(page.getByText('Set on the brand screen')).toHaveCount(0)
+    // Who may change the brand is said once for each section, not under every field.
+    await expect(page.getByText('Changed by people who can: Change the brand.')).toHaveCount(2)
+    await expect(page.getByRole('figure').filter({ hasText: 'Light' })).toBeVisible()
+    await page.getByRole('combobox', { name: 'Corners' }).click()
+    await page.getByRole('option', { name: 'Square' }).click()
+    await expect(page.getByText('1 change', { exact: true })).toBeVisible()
+    // Check once the menu has closed: while it is open the rest of the page is hidden from assistive tech.
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    // The email preview is a sandboxed frame that runs no scripts, so axe cannot enter it and would wait until the test times out.
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).exclude('iframe[title="Email preview"]').analyze()
+    expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
   })
 })

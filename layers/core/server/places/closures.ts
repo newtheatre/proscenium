@@ -4,7 +4,7 @@
 // a show that ends at 00:30 belongs to the evening it started, as everywhere else.
 // Listing the performances a new closure covers, as a warning, arrives with the programme slice.
 import { sql, type SQL } from 'drizzle-orm'
-import { all, first, newId, nowMs, refuse } from '#kit'
+import { all, first, newId, nowMs, refuse, TIME_ZONE_REMEDY } from '#kit'
 import type { UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { dayBounds, dayRule } from '../calendar'
@@ -42,7 +42,7 @@ const toClosure = (r: ClosureRow): Closure => ({
 
 /** The instants a closure covers, in the theatre's time zone. */
 async function period(input: ClosureInput): Promise<{ startsAt: number, endsAt: number }> {
-  const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
+  const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
   const bounds = input.allDay
     ? { startsAt: (await dayBounds(input.from)).start, endsAt: (await dayBounds(input.to)).end }
     : { startsAt: instantOfLocal(input.from.slice(0, 10), input.from.slice(11, 16), rule.timeZone), endsAt: instantOfLocal(input.to.slice(0, 10), input.to.slice(11, 16), rule.timeZone) } // not-policy: positions in YYYY-MM-DDTHH:mm

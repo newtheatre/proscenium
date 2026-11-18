@@ -37,6 +37,20 @@ test.describe('someone who reads roles and sets up sign-in', () => {
     await noViolations(page)
   })
 
+  test('a new role starts from a template, groups Core by task, and a failed create goes to the problem', async ({ page }) => {
+    await visit(page, '/admin/roles/new')
+    for (const name of ['Programme', 'People', 'Settings', 'Messages']) await expect(page.getByRole('group', { name, exact: true })).toBeVisible()
+    // The button stays at the foot of the page; pressing it with no name goes to the name.
+    await page.getByRole('button', { name: 'Create role' }).click()
+    await expect(page.getByRole('textbox', { name: /^Name/ })).toBeFocused()
+
+    await page.getByRole('combobox', { name: 'Starting point' }).click()
+    await page.getByRole('option', { name: 'Producer' }).click()
+    await expect(page.getByRole('textbox', { name: /^Name/ })).toHaveValue('Producer')
+    await expect(page.getByText(/abilities were left out/)).toBeVisible()
+    await noViolations(page)
+  })
+
   // Facts and Sign-in are separate tests: Sign-in is a long page of settings, and visiting and
   // checking both pages with axe in one test overran the 30-second limit on a busy CI runner.
   test('facts open', async ({ page }) => {
