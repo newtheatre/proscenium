@@ -5,6 +5,7 @@ import { createUnit } from '#kit/unit'
 import { Browser, deliver, env, grantDirectly, leaveIdentity, reset, setSetting, clearSetting, staff, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
+import { countOf } from '../../../server/interface/counts'
 import { accessNeedsFor, sweepAccessScheme } from '../../../server/identity/access-scheme'
 
 const sent: OutgoingEmail[] = []
@@ -118,6 +119,15 @@ describe('reviewing (ID-40)', () => {
     expect((await desk.browser.post(`/api/core/access-scheme/${desk.accountId}/decision`, { action: 'accept' })).body.code).toBe('core.access.own-record')
   })
 
+  it('counts waiting applications for a reviewer signed in without a passkey', async () => {
+    const { browser, accountId, need } = await applicant()
+    await browser.post('/api/core/me/access', { needs: [{ term: need.standing }], companions: 0 })
+    const desk = await reviewer()
+    const count = await inContext(() => countOf('core.access-scheme-waiting', { kind: 'person', accountId: desk.accountId, assurance: 'basic' }), { kind: 'person', accountId: desk.accountId, assurance: 'basic' })
+    expect(count).toBeGreaterThanOrEqual(1)
+    expect(accountId).not.toBe(desk.accountId)
+  })
+
   it('an application waiting past reply-within is flagged in the queue and the reviewers are told once', async () => {
     const { browser, accountId, need } = await applicant()
     await browser.post('/api/core/me/access', { needs: [{ term: need.distance }], companions: 0 })
@@ -136,7 +146,7 @@ describe('reviewing (ID-40)', () => {
     }
     await sweep()
     await sweep()
-    expect(to(desks!).map(e => e.subject)).toEqual(['Applications to the Access scheme are waiting'])
+    expect(to(desks!).map(e => e.subject)).toEqual(['Access scheme applications are waiting for review'])
     expect(to(desks!)[0]!.text).not.toContain('Ada')
     expect((await desk.browser.get('/api/core/access-scheme')).body.rows.find((a: any) => a.accountId === accountId)).toMatchObject({ overdue: true })
     const [row] = await rows<{ flagged_at: number | null }>('SELECT flagged_at FROM core_access_profiles WHERE account_id = ?', accountId)
@@ -169,6 +179,24 @@ describe('reviewing (ID-40)', () => {
     expect((await browser.get('/api/core/me/access')).body.application).toMatchObject({ status: 'more-info', message: 'What would help on the night?' })
     await browser.post('/api/core/me/access', { needs: [{ term: need.other, note: 'A seat near the aisle' }], companions: 0 })
     expect((await browser.get('/api/core/me/access')).body.application.status).toBe('submitted')
+  })
+
+  it('answering a question sends a thank-you for the answer, shows it to the reviewer and keeps it out of what is accepted', async () => {
+    const { browser, accountId, mine, need } = await applicant()
+    await browser.post('/api/core/me/access', { needs: [{ term: need.other }], companions: 0 })
+    const desk = await reviewer()
+    await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'ask', message: 'What would help on the night?' })
+    await deliver()
+    sent.length = 0
+    const answered = await browser.post('/api/core/me/access', { needs: [{ term: need.other }], companions: 0, answer: 'A seat near the aisle' })
+    expect(answered.status).toBe(200)
+    await deliver()
+    expect(to(mine).map(e => e.subject)).toEqual(['Thanks, we\'ve got your answer'])
+    expect((await desk.browser.get(`/api/core/access-scheme/${accountId}`)).body.application.pending).toMatchObject({ answer: 'A seat near the aisle' })
+    await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })
+    const mineNow = (await browser.get('/api/core/me/access')).body.application
+    expect(mineNow.status).toBe('accepted')
+    expect(mineNow.inForce.answer).toBeUndefined()
   })
 
   it('accepting fewer companions needs a reason; accepted puts the person on the scheme', async () => {

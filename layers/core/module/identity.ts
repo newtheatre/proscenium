@@ -333,6 +333,21 @@ export const identityContributions = {
       },
     },
   }, {
+    // Sent instead of the one above when the person answers a reviewer's question.
+    id: 'core.access-answer-received',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { scheme: 'text' as const },
+    link: '/account',
+    wording: {
+      'en-GB': {
+        subject: 'Thanks, we\'ve got your answer',
+        body: 'Thank you for answering. {{ theatre }} has your answer about your application to the {{ scheme }}, and the people who run it will read it and let you know.\n\nYou can see where it is in your account.',
+      },
+    },
+  }, {
     // To the reviewers, once, when an application has waited longer than reply-within (ID-40).
     id: 'core.access-application-waiting',
     category: 'transactional' as const,
@@ -343,8 +358,8 @@ export const identityContributions = {
     link: '/console/people/access-scheme',
     wording: {
       'en-GB': {
-        subject: 'Applications to the {{ scheme }} are waiting',
-        body: 'Applications waiting longer than {{ theatre }} aims to answer: {{ count }}. The queue shows which.',
+        subject: 'Access scheme applications are waiting for review',
+        body: 'Applications to the {{ scheme }} waiting for review for longer than {{ theatre }} aims to take to answer: {{ count }}. The queue shows which.',
       },
     },
   }, {

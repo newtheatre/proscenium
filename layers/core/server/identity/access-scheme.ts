@@ -28,6 +28,8 @@ export const applicationInput = z.object({
   needs: z.array(z.object({ term: z.string().max(40), note: z.string().max(MAX_NOTE).optional() }).strict()).max(40), // not-policy: an id is short, and the list is short
   companions: z.union([z.literal(0), z.literal(1), z.literal(2)]),
   other: z.string().max(MAX_OTHER).optional(),
+  // The answer to a reviewer's question; read only while the application is waiting on one.
+  answer: z.string().max(MAX_OTHER).optional(),
 }).strict()
 
 /** What a person says: ticks against core.access-need (by term id), notes, companions, anything else. */
@@ -35,6 +37,8 @@ export interface Application {
   needs: { term: string, note?: string }[]
   companions: 0 | 1 | 2
   other?: string
+  /** What the person answered to a reviewer's question. Kept on the pending application only. */
+  answer?: string
 }
 
 export interface ProfileRow {
@@ -124,7 +128,8 @@ async function checked(input: Application): Promise<Application> {
     }
   }
   if (!needs.length && !input.companions) refuse('core.access.empty', 'Tick at least one need, or ask for a companion.', { status: 422, fields: { needs: 'required' } })
-  return { needs, companions: input.companions, ...(other ? { other } : {}) }
+  const answer = input.answer?.trim()
+  return { needs, companions: input.companions, ...(other ? { other } : {}), ...(answer ? { answer } : {}) }
 }
 
 async function purposes(): Promise<{ module: string, value: Purpose }[]> {
@@ -144,9 +149,12 @@ export async function apply(unit: UnitView, actor: Actor, accountId: string, inp
   if (!isUsable(account)) refuse('core.not-found', 'There is no such person.', { status: 404 })
   const app = await checked(input)
   const at = nowMs()
+  const existing = await profileOf(accountId)
+  // An answer only means something to a question that is open.
+  if (existing?.status !== 'more-info') delete app.answer
   const byStaff = actor.accountId !== accountId
   const via = byStaff ? 'staff' : 'self'
-  const existing = await profileOf(accountId)
+  const answering = existing?.status === 'more-info'
   const sealed = await sealApp(app)
   if (!existing || existing.status === 'rejected') {
     if (existing) unit.add({ sql: 'DELETE FROM core_access_profiles WHERE account_id = ? AND status = \'rejected\'', params: [accountId] })
@@ -170,7 +178,7 @@ export async function apply(unit: UnitView, actor: Actor, accountId: string, inp
     })
   }
   unit.audit({ action: existing ? 'update' : 'create', ...(byStaff ? { ability: 'core.access-scheme.review' } : {}), record: ['core.account', accountId], detail: { accessApplication: via } })
-  await notify(unit, 'core.access-application-received', { to: accountId, variables: { scheme: await schemeName() } })
+  await notify(unit, answering ? 'core.access-answer-received' : 'core.access-application-received', { to: accountId, variables: { scheme: await schemeName() } })
   return { status: existing?.status === 'accepted' ? 'accepted' : 'submitted' }
 }
 
@@ -199,7 +207,8 @@ export async function decide(unit: UnitView, actor: Actor, accountId: string, de
   if (decision.action === 'accept') {
     const companions = Math.min(decision.companions ?? pending.companions, pending.companions) as 0 | 1 | 2
     if (companions < pending.companions && !message) refuse('core.access.message-needed', 'Say why fewer companions were accepted.', { status: 422, fields: { message: 'required' } })
-    const inForce = { ...pending, companions }
+    const { answer: _answer, ...rest } = pending
+    const inForce = { ...rest, companions }
     const reviewAfter = await useSetting('core.access-scheme.review-after') as number
     // A different number of companions needs seeing again before it counts as verified.
     const keepVerified = row.verified_at && row.verified_companions !== null && row.verified_companions >= companions
@@ -326,10 +335,17 @@ export async function readsOfApplication(accountId: string) {
       WHERE record_type = 'core.account' AND record_id = ? AND action = 'read'
         AND (ability IN ('core.access-scheme.read', 'core.access-scheme.review', 'core.access-profile.read') OR detail LIKE '%"purpose"%')
       ORDER BY at DESC LIMIT 200`, accountId) // not-policy: a page of the history
-  return rows.map((r) => {
+  // Newest first, so the first of each kind of reader is the latest; each shows once.
+  const seen = new Set<string>()
+  const out: { at: number, capacity: string | null, purpose: string | null }[] = []
+  for (const r of rows) {
     const detail = r.detail ? JSON.parse(r.detail) as { purpose?: string } : {}
-    return { at: r.at, capacity: r.ability, purpose: detail.purpose ?? null }
-  })
+    const key = detail.purpose ?? `capacity:${r.ability ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ at: r.at, capacity: r.ability, purpose: detail.purpose ?? null })
+  }
+  return out
 }
 
 /**
