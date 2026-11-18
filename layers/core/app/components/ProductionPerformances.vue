@@ -456,6 +456,14 @@ async function saveBulkCancel() {
 
 // Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
 const addingRun = ref(false)
+// The palette's "Add a run" arrives with ?run=1: the window opens once there is a space to put it in.
+const runRoute = useRoute()
+watch(spaces, (list) => {
+  if (import.meta.server || runRoute.query.run !== '1' || !list.length) return
+  addingRun.value = true
+  const { run: _, ...rest } = runRoute.query
+  void navigateTo({ query: rest }, { replace: true })
+}, { immediate: true })
 const runs = computed(() => data.value?.runs ?? [])
 const moving = computed(() => runs.value.some(r => r.state === 'running' || r.state === 'removing'))
 let timer: ReturnType<typeof setInterval> | undefined

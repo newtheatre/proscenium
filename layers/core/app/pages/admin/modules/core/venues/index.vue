@@ -34,6 +34,14 @@ const undoCreate = async (result: unknown) => {
   await Promise.all([refresh(), refreshOld()])
 }
 const created = (result: unknown) => navigateTo(`/admin/modules/core/venues/${(result as { venueId: string }).venueId}`)
+// The palette's New venue arrives with ?new=1.
+const route = useRoute()
+onMounted(() => {
+  if (route.query.new !== '1') return
+  creating.value = true
+  const { new: _, ...rest } = route.query
+  void navigateTo({ query: rest }, { replace: true })
+})
 
 const line = (row: Row) => {
   const spaces = row.spaces.filter(s => !s.archived)

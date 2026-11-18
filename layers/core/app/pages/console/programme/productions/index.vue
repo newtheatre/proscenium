@@ -60,6 +60,18 @@ const create = (values: Record<string, unknown>) => $api<{ id: string }>('/api/c
   body: { title: values.title, kind: values.kind, seasonId: !values.seasonId || values.seasonId === NONE ? null : values.seasonId },
 })
 const created = (result: unknown) => navigateTo(`/console/programme/productions/${(result as { id: string }).id}`)
+
+// The palette's actions arrive here: ?new=1 opens New production; ?run=1 asks which production a
+// run is for, and each row then opens that production's Dates with Add a run.
+const route = useRoute()
+const choosingForRun = computed(() => route.query.run === '1')
+onMounted(() => {
+  if (route.query.new !== '1') return
+  creating.value = true
+  const { new: _, ...rest } = route.query
+  void navigateTo({ query: rest }, { replace: true })
+})
+const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productions/${row.id}?tab=dates&run=1` : `/console/programme/productions/${row.id}`
 </script>
 
 <template>
@@ -69,7 +81,7 @@ const created = (result: unknown) => navigateTo(`/console/programme/productions/
     :columns="columns"
     :filters="filters"
     :row-label="(row: Row) => row.title"
-    :row-to="(row: Row) => `/console/programme/productions/${row.id}`"
+    :row-to="rowTo"
     :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"
   >
     <template #primary>
@@ -77,6 +89,18 @@ const created = (result: unknown) => navigateTo(`/console/programme/productions/
         label="New production"
         icon="i-lucide-plus"
         @click="creating = true"
+      />
+    </template>
+    <template
+      v-if="choosingForRun"
+      #before
+    >
+      <UAlert
+        icon="i-lucide-calendar-plus"
+        title="Which production is the run for?"
+        description="Choose one below and its dates open with Add a run."
+        close
+        @update:open="navigateTo({ query: { ...route.query, run: undefined } }, { replace: true })"
       />
     </template>
     <template #cell-title="{ row }">
