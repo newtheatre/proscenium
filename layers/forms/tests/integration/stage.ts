@@ -21,6 +21,8 @@ import responseGet from '../../server/api/forms/forms/[id]/responses/[response].
 import responsesExport from '../../server/api/forms/forms/[id]/responses/export.get'
 import mineGet from '../../server/api/forms/mine/index.get'
 import mineOneGet from '../../server/api/forms/mine/[id].get'
+import mineOnePut from '../../server/api/forms/mine/[id].put'
+import movePost from '../../server/api/forms/forms/[id]/responses/[response]/move.post'
 import type { Definition, Question } from '../../shared/engine'
 
 export const handle = server({
@@ -42,6 +44,8 @@ export const handle = server({
   'GET /api/forms/forms/:id/responses/:response': responseGet,
   'GET /api/forms/mine': mineGet,
   'GET /api/forms/mine/:id': mineOneGet,
+  'PUT /api/forms/mine/:id': mineOnePut,
+  'POST /api/forms/forms/:id/responses/:response/move': movePost,
 })
 
 export const NOV_17 = Date.UTC(2026, 10, 17, 12)

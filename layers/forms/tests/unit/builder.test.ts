@@ -2,7 +2,7 @@
 // warnings of the problems list (FB-206).
 import { describe, expect, it } from 'vitest'
 import { addItem, addPage, blankQuestion, change, dependents, duplicate, earlier, find, freshId, keyFrom, moveItem, movePage, nextOptionId, pair, removeItem, removePage, unpair } from '../../shared/builder/edit'
-import { certainty, checkDefinition, parseDefinition, publishable } from '../../shared/engine'
+import { RECEIVED, certainty, checkDefinition, firstStage, hasStages, isFinal, movesFrom, parseDefinition, publishable, resubmitMove, reviewWorkflow, stageOf, statusOf } from '../../shared/engine'
 import type { Condition, Definition, Question } from '../../shared/engine'
 
 const q = (id: string, more: Partial<Question> = {}): Question => ({ kind: 'question', id, key: id, type: 'text.short', label: id, dataClass: 'internal', ...more })
@@ -141,5 +141,46 @@ describe('what can never be reached', () => {
     def.pages[0]!.routes = [{ when: { none: [{ all: [is('a', 'x'), is('a', 'y')] }] }, to: { page: 'p3' } }]
     def.pages[1]!.items[0] = q('c', { visibleWhen: { all: [is('a', 'x'), is('a', 'y')] } })
     expect(checkDefinition(def).map(p => `${p.code}@${p.at}`)).toEqual(['never-reached@p2'])
+  })
+})
+
+describe('stages', () => {
+  const names = { received: 'Received', review: 'In review', returned: 'Returned', approved: 'Approved', declined: 'Declined', start: 'Start review', back: 'Return for changes', resubmit: 'Send changes', approve: 'Approve', decline: 'Decline' }
+  const staged = (): Definition => ({ ...two(), workflow: reviewWorkflow(names) })
+  const codes = (def: Definition) => checkDefinition(def).map(p => `${p.level}:${p.code}@${p.at}`)
+
+  it('a form with no stages has one, Received, which is closed and final', () => {
+    expect(hasStages(two())).toBe(false)
+    expect(firstStage(two())).toMatchObject({ key: RECEIVED, kind: 'closed' })
+    expect(isFinal(firstStage(two()).kind)).toBe(true)
+    expect(movesFrom(two(), RECEIVED, 'staff')).toEqual([])
+  })
+
+  it('the review starting point parses, has no problems, and offers each mover only their own moves', () => {
+    const def = staged()
+    expect(parseDefinition(def).ok).toBe(true)
+    expect(codes(def)).toEqual([])
+    expect(firstStage(def).key).toBe('received')
+    expect(movesFrom(def, 'in_review', 'staff').map(t => t.key)).toEqual(['return', 'approve', 'decline'])
+    expect(movesFrom(def, 'in_review', 'submitter')).toEqual([])
+    expect(resubmitMove(def, 'returned')?.to).toBe('in_review')
+    expect(resubmitMove(def, 'in_review')).toBeUndefined()
+    expect(statusOf(stageOf(def, 'returned'))).toBe('Returned')
+    expect(statusOf({ key: 'x', name: 'Panel', kind: 'in_review', status: ' Being considered ' })).toBe('Being considered')
+  })
+
+  it('lists what is wrong with stages and moves', () => {
+    const def = staged()
+    const flow = def.workflow!
+    flow.stages[1]!.name = ' '
+    flow.transitions = flow.transitions.filter(t => t.key !== 'resubmit')
+    flow.transitions.push({ key: 'approve', from: 'received', to: 'nowhere', label: '', who: 'staff' }, { key: 'loop', from: 'received', to: 'received', label: 'Loop', who: 'staff' })
+    flow.stages.push({ key: 'archive', name: 'Archive', kind: 'closed' }, { key: 'waiting', name: 'Waiting', kind: 'pending' })
+    flow.transitions.push({ key: 'park', from: 'received', to: 'waiting', label: 'Park', who: 'staff' })
+    expect(codes(def).sort()).toEqual([
+      'error:move-duplicate@move:approve', 'error:move-no-label@move:approve', 'error:move-unknown-stage@move:approve',
+      'error:move-nowhere@move:loop', 'error:returned-no-way-back@stage:returned', 'error:stage-no-name@stage:in_review',
+      'warning:stage-dead-end@stage:waiting', 'warning:stage-unreachable@stage:archive',
+    ].sort())
   })
 })
