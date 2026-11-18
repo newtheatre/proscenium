@@ -203,6 +203,22 @@ describe('one move on several responses', () => {
     expect(await rows('SELECT transition_key FROM forms_stage_history WHERE response_id = ? ORDER BY at, id', first)).toEqual([{ transition_key: 'submit' }, { transition_key: 'start_review' }])
   })
 
+  it('moves a long selection: each response is saved on its own, so the number chosen is not a limit', async () => {
+    const { formId, slug } = await offered(staged())
+    const ids: string[] = []
+    // More than one unit of work could hold, each from its own sender so no sender's rate limit is met.
+    for (let i = 0; i < 14; i++) { // not-policy: a test size
+      const who = person([], { name: `Sender ${i}` })
+      await account(who)
+      ids.push((await send(slug, { name: who.name }, who)).body.responseId)
+    }
+    const done = await many(formId, { responses: ids, move: 'start_review', note: 'We have started.' })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toEqual({ moved: 14, skipped: [] })
+    const table = await req('GET', `/api/forms/forms/${formId}/responses`, undefined, reader)
+    expect(table.body.rows.every((r: { stage: { name: string } }) => r.stage.name === 'In review')).toBe(true)
+  })
+
   it('is refused whole when the mover may not decide, or for somebody who may not move at all', async () => {
     const { formId, slug } = await offered(staged())
     const id = (await send(slug, { name: 'Mo' }, member)).body.responseId

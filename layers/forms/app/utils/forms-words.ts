@@ -1,6 +1,7 @@
 // Words for the builder: a question type's icon, and a condition read back as a sentence (FB-204).
 import type { Condition, Definition, Operand, Question, QuestionType } from '../../shared/engine'
 import { questionsOf } from '../../shared/engine'
+import { find } from '../../shared/builder/edit'
 import { FORMS_QUESTION_ICONS } from '../components/FormsQuestionIcon.vue'
 
 export const formsQuestionIcon = (type: QuestionType): string => FORMS_QUESTION_ICONS[type]
@@ -54,4 +55,15 @@ export function formsConditionSentence(condition: Condition, def: Definition): s
 /** The colour a stage of each kind is shown in, wherever a stage is named. */
 export function formsStageTone(kind: string | null | undefined): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
   return kind === 'approved' ? 'success' : kind === 'declined' ? 'danger' : kind === 'returned' ? 'warning' : kind === 'in_review' || kind === 'pending' ? 'info' : 'neutral'
+}
+
+/** What a problem is about, in the author's words: the question, page, stage or move it points at. */
+export function formsProblemName(def: Definition, at: string, t: (key: string, params?: Record<string, unknown>) => string): string {
+  if (at.startsWith('stage:')) return def.workflow?.stages.find(s => s.key === at.slice(6))?.name.trim() || t('forms.screens.stages.a-stage') // not-policy: the length of "stage:"
+  if (at.startsWith('move:')) return def.workflow?.transitions.find(m => m.key === at.slice(5))?.label.trim() || t('forms.screens.stages.a-move') // not-policy: the length of "move:"
+  const found = find(def, at)
+  if (!found) return def.calculations?.find(c => c.id === at)?.key ?? at
+  if (found.kind === 'page') return found.page.title.trim() || t('forms.screens.builder.page-n', { n: found.pageIndex + 1 })
+  const item = found.item
+  return item.kind === 'question' ? formsQuestionName(item) : item.kind === 'group' ? item.label.trim() || t('forms.screens.builder.untitled-group') : t(`forms.screens.details.kind-${item.kind}`)
 }

@@ -3,8 +3,9 @@
 // notify in the unit of the change itself, so a message goes exactly when the change holds.
 // Somebody who answered signed out is told by email alone, at the address they gave; an anonymous
 // form tells nobody, because it does not know who answered. Nothing anybody wrote is put in a
-// message: it says what happened and where to read the rest.
-import { siteUrl, type UnitView } from '#kit'
+// message: it says what happened and where to read the rest. A message that cannot be prepared is
+// logged and left out: the change it tells of still holds, because no answer should be lost to it.
+import { log, siteUrl, type UnitView } from '#kit'
 import { notify, notifyAddress } from '#modules/core'
 import type { Stage } from '../shared/engine'
 import { statusOf } from '../shared/engine'
@@ -12,12 +13,22 @@ import { statusOf } from '../shared/engine'
 interface About { id: string, reference: string, personId: string | null, respondentEmail: string | null }
 const record = (id: string) => ['forms.response', id] as const
 const mine = (id: string) => siteUrl(`/account/forms/${id}`)
+async function quietly(what: string, responseId: string, tell: () => Promise<void>): Promise<void> {
+  try {
+    await tell()
+  }
+  catch (error) {
+    log.warn('forms.notice-failed', { notice: what, responseId, error: String((error as Error)?.message ?? error) })
+  }
+}
 
 /** A receipt for a response just sent. */
 export async function tellReceived(unit: UnitView, form: { title: string }, response: About): Promise<void> {
   const variables = { form: form.title, reference: response.reference }
-  if (response.personId) await notify(unit, 'forms.received', { to: response.personId, variables: { ...variables, link: await mine(response.id) }, subject: record(response.id), dedupeKey: `received:${response.id}` })
-  else if (response.respondentEmail) await notifyAddress(unit, 'forms.received-guest', { address: response.respondentEmail, variables, record: record(response.id), dedupeKey: `received:${response.id}` })
+  await quietly('received', response.id, async () => {
+    if (response.personId) await notify(unit, 'forms.received', { to: response.personId, variables: { ...variables, link: await mine(response.id) }, subject: record(response.id), dedupeKey: `received:${response.id}` })
+    else if (response.respondentEmail) await notifyAddress(unit, 'forms.received-guest', { address: response.respondentEmail, variables, record: record(response.id), dedupeKey: `received:${response.id}` })
+  })
 }
 
 /**
@@ -29,17 +40,17 @@ export async function tellMoved(unit: UnitView, form: { title: string }, respons
   if (move.from && statusOf(move.from) === status) return
   const dedupeKey = `moved:${response.id}:${move.key}:${move.at}`
   const variables = { form: form.title, reference: response.reference, status }
-  if (response.personId) {
-    await notify(unit, move.to.kind === 'returned' ? 'forms.returned' : 'forms.status', { to: response.personId, variables: { ...variables, link: await mine(response.id) }, subject: record(response.id), dedupeKey })
-  }
-  else if (response.respondentEmail) {
-    await notifyAddress(unit, 'forms.status-guest', { address: response.respondentEmail, variables, record: record(response.id), dedupeKey })
-  }
+  await quietly('moved', response.id, async () => {
+    if (response.personId) await notify(unit, move.to.kind === 'returned' ? 'forms.returned' : 'forms.status', { to: response.personId, variables: { ...variables, link: await mine(response.id) }, subject: record(response.id), dedupeKey })
+    else if (response.respondentEmail) await notifyAddress(unit, 'forms.status-guest', { address: response.respondentEmail, variables, record: record(response.id), dedupeKey })
+  })
 }
 
 /** Asks each reviewer of a round that has just opened. `assigned` is reviewer by assignment id. */
 export async function tellReviewers(unit: UnitView, form: { title: string }, responseId: string, assigned: { assignmentId: string, reviewerId: string }[]): Promise<void> {
   if (!assigned.length) return
-  const to = await Promise.all(assigned.map(async a => ({ accountId: a.reviewerId, variables: { link: await siteUrl(`/account/forms/review/${a.assignmentId}`) }, dedupeKey: `review:${a.assignmentId}` })))
-  await notify(unit, 'forms.review-requested', { to, variables: { form: form.title }, subject: record(responseId) })
+  await quietly('review-requested', responseId, async () => {
+    const to = await Promise.all(assigned.map(async a => ({ accountId: a.reviewerId, variables: { link: await siteUrl(`/account/forms/review/${a.assignmentId}`) }, dedupeKey: `review:${a.assignmentId}` })))
+    await notify(unit, 'forms.review-requested', { to, variables: { form: form.title }, subject: record(responseId) })
+  })
 }

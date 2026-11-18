@@ -7,7 +7,7 @@ interface Change { kind: 'added' | 'retired' | 'changed', impact: 'safe' | 'caut
 interface Plan { editRevision: number, number: number, unchanged: boolean, problems: Problem[], refusals: { code: string, reason: string, questionId?: string }[], impact: Change['impact'], changes: Change[] }
 
 const props = defineProps<{ formId: string }>()
-const emit = defineEmits<{ published: [number: number], settings: [] }>()
+const emit = defineEmits<{ published: [number: number], settings: [], go: [at: string] }>()
 const open = defineModel<boolean>('open', { default: false })
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -41,6 +41,10 @@ function goTo(id?: string) {
   if (!id) return
   builder.select(id)
   open.value = false
+}
+function toProblem(at: string) {
+  open.value = false
+  emit('go', at)
 }
 function toSettings() {
   open.value = false
@@ -87,6 +91,27 @@ async function publish() {
             :title="t('forms.screens.publish.problems', { count: errors.length })"
             :description="t('forms.screens.publish.problems-help')"
           />
+          <ul
+            v-if="errors.length"
+            class="space-y-1"
+          >
+            <li
+              v-for="(p, i) in errors"
+              :key="i"
+            >
+              <button
+                type="button"
+                class="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-elevated"
+                @click="toProblem(p.at)"
+              >
+                <UIcon
+                  name="i-lucide-circle-alert"
+                  class="mt-0.5 shrink-0 text-error"
+                />
+                <span><span class="font-medium">{{ formsProblemName(builder.definition.value, p.at, t) }}</span><br>{{ t(`forms.problems.${p.code}`, p.params ?? {}) }}</span>
+              </button>
+            </li>
+          </ul>
           <UAlert
             v-for="r in plan.refusals"
             :key="r.code + (r.questionId ?? '')"

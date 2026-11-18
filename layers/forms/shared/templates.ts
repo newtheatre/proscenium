@@ -11,6 +11,8 @@ export interface ShippedTemplate {
   description: string
   /** The form starts out anonymous. */
   anonymous?: boolean
+  /** How long answers are kept, to start with: the theatre changes it in the form's settings. */
+  retentionDays: number
   definition: Definition
 }
 
@@ -115,7 +117,10 @@ const feedbackSurvey: Definition = {
 }
 
 export const SHIPPED_TEMPLATES: ShippedTemplate[] = [
-  { key: 'forms.show-proposal', name: 'forms.templates.show-proposal.name', description: 'forms.templates.show-proposal.description', definition: showProposal },
-  { key: 'forms.access-requirements', name: 'forms.templates.access-requirements.name', description: 'forms.templates.access-requirements.description', definition: accessRequirements },
-  { key: 'forms.feedback-survey', name: 'forms.templates.feedback-survey.name', description: 'forms.templates.feedback-survey.description', anonymous: true, definition: feedbackSurvey },
+  { key: 'forms.show-proposal', name: 'forms.templates.show-proposal.name', description: 'forms.templates.show-proposal.description', retentionDays: 730, // not-policy: a starting value the theatre edits
+    definition: showProposal },
+  { key: 'forms.access-requirements', name: 'forms.templates.access-requirements.name', description: 'forms.templates.access-requirements.description', retentionDays: 365, // not-policy: a starting value the theatre edits
+    definition: accessRequirements },
+  { key: 'forms.feedback-survey', name: 'forms.templates.feedback-survey.name', description: 'forms.templates.feedback-survey.description', retentionDays: 365, // not-policy: a starting value the theatre edits
+    anonymous: true, definition: feedbackSurvey },
 ]

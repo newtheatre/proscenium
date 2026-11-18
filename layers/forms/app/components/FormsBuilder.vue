@@ -3,7 +3,7 @@
 import { useMediaQuery } from '@vueuse/core'
 import { find } from '../../shared/builder/edit'
 import { FORM_BUILDER, useFormBuilder, type BuilderData } from '../composables/useFormBuilder'
-import type { Answers } from '../../shared/engine'
+import { questionsOf, type Answers } from '../../shared/engine'
 
 const props = defineProps<{ data: BuilderData }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -38,18 +38,17 @@ const selectedName = computed(() => {
   return t(`forms.screens.details.kind-${found.item.kind}`)
 })
 
-const errors = computed(() => builder.problems.value.filter(p => p.level === 'error').length)
-const problemName = (at: string) => {
-  const flow = builder.definition.value.workflow
-  if (at.startsWith('stage:')) return flow?.stages.find(s => s.key === at.slice(6))?.name.trim() || t('forms.screens.stages.a-stage') // not-policy: the length of "stage:"
-  if (at.startsWith('move:')) return flow?.transitions.find(m => m.key === at.slice(5))?.label.trim() || t('forms.screens.stages.a-move') // not-policy: the length of "move:"
-  const found = find(builder.definition.value, at)
-  if (!found) return builder.definition.value.calculations?.find(c => c.id === at)?.key ?? at
-  if (found.kind === 'page') return found.page.title.trim() || t('forms.screens.builder.page-n', { n: found.pageIndex + 1 })
-  const item = found.item
-  return item.kind === 'question' ? formsQuestionName(item) : item.kind === 'group' ? item.label.trim() || t('forms.screens.builder.untitled-group') : t(`forms.screens.details.kind-${item.kind}`)
-}
+// What stops publishing that is not in the definition: a form that asks for personal answers must say how long it keeps them.
+const PERSONAL = ['personal', 'free-text', 'special']
+const problems = computed<{ level: 'error' | 'warning', code: string, at: string, params?: Record<string, string> }[]>(() => {
+  const needs = !fields.value && props.data.requireRetention && form.value.retentionDays === null
+    && questionsOf(builder.definition.value).some(q => PERSONAL.includes(q.question.dataClass))
+  return [...(needs ? [{ level: 'error' as const, code: 'retention-needed', at: 'settings' }] : []), ...builder.problems.value]
+})
+const errors = computed(() => problems.value.filter(p => p.level === 'error').length)
+const problemName = (at: string) => at === 'settings' ? t('forms.screens.settings.title') : formsProblemName(builder.definition.value, at, t)
 function goTo(at: string) {
+  if (at === 'settings') return void (settings.value = true)
   view.value = 'build'
   if (at.startsWith('stage:') || at.startsWith('move:')) return void (stages.value = true)
   builder.select(at)
@@ -67,6 +66,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', leaving))
 
 // Custom fields are filled in on their record: nobody is sent them, and they have no stages.
 const fields = computed(() => form.value.mode === 'record')
+// Published but offered to nobody yet, and whether the live version is taking answers at all.
+const unshared = computed(() => !fields.value && form.value.liveVersion !== null && props.data.shared === false && form.value.status === 'live')
+const taking = computed(() => fields.value || (form.value.status === 'live' && !unshared.value))
 const more = computed(() => [[
   ...(fields.value ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
   { label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` },
@@ -121,8 +123,13 @@ const reload = () => window.location.reload()
   >
     <template #status>
       <StatusBadge
-        :tone="form.liveVersion === null ? 'neutral' : 'success'"
-        :label="form.liveVersion === null ? t('forms.screens.status.draft') : t('forms.screens.builder.version', { n: form.liveVersion })"
+        :tone="form.liveVersion === null ? 'neutral' : taking ? 'success' : 'info'"
+        :label="form.liveVersion === null ? t('forms.screens.status.draft') : t(taking ? 'forms.screens.builder.version' : 'forms.screens.builder.version-only', { n: form.liveVersion })"
+      />
+      <StatusBadge
+        v-if="unshared"
+        tone="warning"
+        :label="t('forms.screens.builder.not-shared')"
       />
       <StatusBadge
         v-if="fields"
@@ -136,6 +143,14 @@ const reload = () => window.location.reload()
       />
     </template>
     <template #primary>
+      <UButton
+        v-if="unshared"
+        :label="t('forms.screens.link.share')"
+        icon="i-lucide-share-2"
+        color="neutral"
+        variant="outline"
+        @click="sharing = true"
+      />
       <UButton
         :label="t('forms.screens.publish.button')"
         icon="i-lucide-send"
@@ -170,15 +185,15 @@ const reload = () => window.location.reload()
         />
         <UPopover :ui="{ content: 'w-96 max-w-[90vw]' }">
           <UButton
-            :label="t('forms.screens.problems.button', { count: builder.problems.value.length })"
-            :icon="errors ? 'i-lucide-circle-alert' : builder.problems.value.length ? 'i-lucide-triangle-alert' : 'i-lucide-circle-check'"
-            :color="errors ? 'error' : builder.problems.value.length ? 'warning' : 'neutral'"
+            :label="t('forms.screens.problems.button', { count: problems.length })"
+            :icon="errors ? 'i-lucide-circle-alert' : problems.length ? 'i-lucide-triangle-alert' : 'i-lucide-circle-check'"
+            :color="errors ? 'error' : problems.length ? 'warning' : 'neutral'"
             variant="subtle"
           />
           <template #content>
             <div class="max-h-96 overflow-y-auto p-2">
               <p
-                v-if="!builder.problems.value.length"
+                v-if="!problems.length"
                 class="p-2 text-sm text-muted"
               >
                 {{ t('forms.screens.problems.none') }}
@@ -190,7 +205,7 @@ const reload = () => window.location.reload()
                 {{ t('forms.screens.problems.help') }}
               </p>
               <button
-                v-for="(p, i) in builder.problems.value"
+                v-for="(p, i) in problems"
                 :key="i"
                 type="button"
                 class="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-elevated"
@@ -320,6 +335,7 @@ const reload = () => window.location.reload()
       :form-id="form.id"
       @published="published"
       @settings="settings = true"
+      @go="goTo"
     />
     <FormsJsonDialog
       v-model:open="json"
@@ -335,6 +351,7 @@ const reload = () => window.location.reload()
       v-model:open="sharing"
       :form-id="form.id"
       :anonymous="form.anonymous"
+      @saved="emit('changed')"
     />
     <FormsStagesDialog
       v-model:open="stages"

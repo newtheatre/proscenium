@@ -30,12 +30,12 @@ export async function listTemplates(): Promise<TemplateInfo[]> {
 }
 
 /** What a form started from this template begins with. A copy: changing it changes nothing else. */
-export async function startFrom(key: string): Promise<{ definition: Definition, anonymous: boolean }> {
+export async function startFrom(key: string): Promise<{ definition: Definition, anonymous: boolean, retentionDays: number | null }> {
   const shipped = SHIPPED_TEMPLATES.find(t => t.key === key)
-  if (shipped) return { definition: structuredClone(shipped.definition), anonymous: !!shipped.anonymous }
+  if (shipped) return { definition: structuredClone(shipped.definition), anonymous: !!shipped.anonymous, retentionDays: shipped.retentionDays }
   const row = await first<Row>('SELECT id, name, description, definition FROM forms_templates WHERE id = ?', key)
   if (!row) return refuse('forms.template.not-found', 'This template is no longer there.', { status: 404, remedy: 'Choose another, or start with a blank form.' }) // not-policy: HTTP status
-  return { definition: await parseOrRefuse(JSON.parse(row.definition)), anonymous: false }
+  return { definition: await parseOrRefuse(JSON.parse(row.definition)), anonymous: false, retentionDays: null }
 }
 
 /**
