@@ -15,6 +15,7 @@ export default defineRoute({
     offSaleAt: z.number().int().nullable().optional(),
     maxPerOrder: z.number().int().min(1).max(500).nullable().optional(), // not-policy: the widest the desk cap setting allows
     holdMinutes: z.number().int().min(1).max(60).nullable().optional(), // not-policy: the widest the hold setting allows
+    releaseMinutes: z.number().int().min(0).max(1440).nullable().optional(), // not-policy: the widest the release setting allows
     confirmOverVenue: z.boolean().optional(),
   }).strict(),
 }, async (_event, { input, record, actor, unit }) => {

@@ -18,7 +18,7 @@ interface TicketType { id: string, name: string, kind: string, active: boolean, 
 interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
 interface ScheduledPrice { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }
 interface Setup {
-  sales: { state: SaleState, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
+  sales: { state: SaleState, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null, releaseMinutes: number | null } | null
   houseCapacity: number | null
   pools: Pool[]
   prices: Price[]
@@ -80,13 +80,13 @@ const whens = computed(() => (['now', 'later'] as const).map(value => ({ value, 
 const from = ref<number | null>(null)
 const soon = Date.now()
 // The sale window and limits.
-const windowForm = ref({ onSaleAt: null as number | null, offSaleAt: null as number | null, maxPerOrder: null as number | null, holdMinutes: null as number | null })
+const windowForm = ref({ onSaleAt: null as number | null, offSaleAt: null as number | null, maxPerOrder: null as number | null, holdMinutes: null as number | null, releaseMinutes: null as number | null })
 const cell = (bandId: string, typeId: string) => `${bandId} ${typeId}`
 watch(data, (d) => {
   if (!d) return
   capacity.value = Object.fromEntries(d.bands.map(b => [b.id, d.pools.find(p => p.bandId === b.id)?.capacity ?? 0]))
   seedPrices()
-  windowForm.value = { onSaleAt: d.sales?.onSaleAt ?? null, offSaleAt: d.sales?.offSaleAt ?? null, maxPerOrder: d.sales?.maxPerOrder ?? null, holdMinutes: d.sales?.holdMinutes ?? null }
+  windowForm.value = { onSaleAt: d.sales?.onSaleAt ?? null, offSaleAt: d.sales?.offSaleAt ?? null, maxPerOrder: d.sales?.maxPerOrder ?? null, holdMinutes: d.sales?.holdMinutes ?? null, releaseMinutes: d.sales?.releaseMinutes ?? null }
 }, { immediate: true })
 
 // One price throughout: a production with no more than one section. With none yet, the seats are
@@ -137,7 +137,7 @@ async function saveCapacity(confirmOverVenue = false, typed?: Record<string, num
 }
 async function saveWindow() {
   const s = data.value?.sales
-  const before = { onSaleAt: s?.onSaleAt ?? null, offSaleAt: s?.offSaleAt ?? null, maxPerOrder: s?.maxPerOrder ?? null, holdMinutes: s?.holdMinutes ?? null }
+  const before = { onSaleAt: s?.onSaleAt ?? null, offSaleAt: s?.offSaleAt ?? null, maxPerOrder: s?.maxPerOrder ?? null, holdMinutes: s?.holdMinutes ?? null, releaseMinutes: s?.releaseMinutes ?? null }
   await act(() => $api(base.value, { method: 'PUT', body: windowForm.value }), t('box-office.setup.window.saved'), () => $api(base.value, { method: 'PUT', body: before }))
 }
 function layer(bandId: string, typeId: string): PriceLayer {
@@ -357,7 +357,7 @@ const dirty = computed(() => {
   const seats = d.bands.some(b => (capacity.value[b.id] ?? 0) !== (d.pools.find(p => p.bandId === b.id)?.capacity ?? 0)) || (!d.bands.length && !!wholeSeats.value)
   const priced = d.bands.some(b => activeTypes.value.some(type => (prices.value[cell(b.id, type.id)] ?? null) !== shown(layer(b.id, type.id))))
   const s = d.sales
-  const windowChanged = (['onSaleAt', 'offSaleAt', 'maxPerOrder', 'holdMinutes'] as const).some(k => (windowForm.value[k] ?? null) !== (s?.[k] ?? null))
+  const windowChanged = (['onSaleAt', 'offSaleAt', 'maxPerOrder', 'holdMinutes', 'releaseMinutes'] as const).some(k => (windowForm.value[k] ?? null) !== (s?.[k] ?? null))
   return seats || priced || windowChanged
 })
 onBeforeRouteLeave(async () => {
@@ -804,6 +804,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   v-model="windowForm.holdMinutes"
                   :min="1"
                   :max="60"
+                />
+              </UFormField>
+              <UFormField
+                :label="t('box-office.setup.window.release')"
+                :help="t('box-office.setup.window.release-help')"
+              >
+                <UInputNumber
+                  v-model="windowForm.releaseMinutes"
+                  :min="0"
+                  :max="1440"
                 />
               </UFormField>
               <UButton

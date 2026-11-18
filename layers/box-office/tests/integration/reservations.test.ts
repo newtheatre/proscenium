@@ -71,7 +71,7 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     expect(confirm.link).toMatch(/^http:\/\/test\/book\/confirm\//)
     const done = await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(confirm.link!) }, null)
     expect(done.status, JSON.stringify(done.body)).toBe(200)
-    expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId, reference: b.reference, amountDueMinor: b.totalMinor, releaseAt: null })
+    expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId, reference: b.reference, amountDueMinor: b.totalMinor, releaseAt: expect.any(Number) }) // released ten minutes before the start, by default
 
     const o = await order(b.orderId)
     expect(o).toMatchObject({ state: 'reserved', signed_in: 0, expires_at: null, intent_id: null, total_minor: b.totalMinor, confirm_token_hash: null, confirm_email: null, confirm_name: null, confirm_expires_at: null })
