@@ -834,5 +834,8 @@
   "forms.screens.fields.name-help": "Shown above the fields on each record, such as \"Technical details\".",
   "forms.screens.fields.create": "Create and open the builder",
   "forms.screens.link.elsewhere": "Part of this form only works where it is attached",
-  "forms.screens.link.elsewhere-help": "Responses sent through this link skip: {what}. That happens only for responses sent where the form is attached to a record, such as an award."
+  "forms.screens.link.elsewhere-help": "Responses sent through this link skip: {what}. That happens only for responses sent where the form is attached to a record, such as an award.",
+  "forms.screens.settings.address": "Address",
+  "forms.screens.settings.address-help": "Lower-case letters, numbers and hyphens.",
+  "forms.screens.settings.address-help-live": "Lower-case letters, numbers and hyphens. Links to the old address carry on working."
 }

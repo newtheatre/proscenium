@@ -32,5 +32,8 @@
   "forms.abilities.response.read-special.label": "Open restricted answers",
   "forms.abilities.response.move.label": "Move responses between stages",
   "forms.abilities.response.decide.label": "Approve or decline responses, and release reviews",
-  "forms.records.response": "Form responses"
+  "forms.records.response": "Form responses",
+  "forms.form.address-taken": "Another form has that address, or used to.",
+  "forms.form.address-shape": "Use lower-case letters, numbers and hyphens only.",
+  "forms.link.dates": "The form must close after it opens."
 }

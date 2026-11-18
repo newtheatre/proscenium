@@ -9,7 +9,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const builder = useBuilder()
-const state = reactive({ title: '', retentionDays: null as number | null, anonymous: false, introduction: '', confirmation: '', submitLabel: '' })
+const state = reactive({ slug: '', title: '', retentionDays: null as number | null, anonymous: false, introduction: '', confirmation: '', submitLabel: '' })
 // Custom fields are filled in on their record: nobody is greeted, thanked or asked to send.
 const fields = computed(() => props.form.mode === 'record')
 // Kept in whole days; asked for as a number and a unit, so two years is not typed as 730.
@@ -23,13 +23,13 @@ const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: str
 watch(open, (now) => {
   if (!now) return
   const shown = builder.definition.value.presentation
-  Object.assign(state, { title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous, introduction: shown?.introduction ?? '', confirmation: shown?.confirmation ?? '', submitLabel: shown?.submitLabel ?? '' })
+  Object.assign(state, { slug: props.form.slug, title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous, introduction: shown?.introduction ?? '', confirmation: shown?.confirmation ?? '', submitLabel: shown?.submitLabel ?? '' })
   refusal.value = null
 })
 async function save() {
   refusal.value = null
   try {
-    await $api(`/api/forms/forms/${props.form.id}`, { method: 'PATCH', body: { title: state.title, retentionDays: state.retentionDays, ...(props.form.liveVersion === null ? { anonymous: state.anonymous } : {}) } })
+    await $api(`/api/forms/forms/${props.form.id}`, { method: 'PATCH', body: { title: state.title, ...(!fields.value && state.slug.trim() !== props.form.slug ? { slug: state.slug.trim() } : {}), retentionDays: state.retentionDays, ...(props.form.liveVersion === null ? { anonymous: state.anonymous } : {}) } })
     // What people read before and after is part of the form itself: a change to the draft like any other, published with it.
     const was = builder.definition.value.presentation
     const words = { introduction: state.introduction.trim(), confirmation: state.confirmation.trim(), submitLabel: state.submitLabel.trim() }
@@ -75,6 +75,27 @@ async function save() {
             v-model="state.title"
             maxlength="120"
           />
+        </UFormField>
+        <UFormField
+          v-if="!fields"
+          name="slug"
+          :label="t('forms.screens.settings.address')"
+          :help="t(form.liveVersion === null ? 'forms.screens.settings.address-help' : 'forms.screens.settings.address-help-live')"
+        >
+          <UFieldGroup>
+            <UBadge
+              color="neutral"
+              variant="outline"
+              size="lg"
+              label="/forms/"
+            />
+            <UInput
+              v-model="state.slug"
+              maxlength="60"
+              autocapitalize="none"
+              spellcheck="false"
+            />
+          </UFieldGroup>
         </UFormField>
         <UFormField
           name="retentionDays"

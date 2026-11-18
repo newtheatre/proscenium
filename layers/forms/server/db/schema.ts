@@ -383,4 +383,18 @@ export const templates = defineTable('forms_templates', {
   subject: 'none',
 })
 
-export const tables = { forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }
+/**
+ * An address a form used to be reached by. Somebody following an old link is sent on to the form's
+ * address now, so changing an address never breaks a link already handed out.
+ */
+export const oldAddresses = defineTable('forms_old_addresses', {
+  slug: col.internal(text('slug').notNull()),
+  formId: col.ref('forms_forms'),
+  createdAt: col.createdAt(),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [primaryKey({ columns: [t.slug] }), index('forms_old_addresses_form').on(t.formId)],
+})
+
+export const tables = { oldAddresses, forms, drafts, versions, fields, placements, responses, responseDrafts, answers, stageHistory, reviewRounds, reviewAssignments, actionRuns, templates }
