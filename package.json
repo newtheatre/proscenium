@@ -28,6 +28,10 @@
     "verify": "bun run check && bun run test && bun run test:browser"
   },
   "dependencies": {
+    "@dnd-kit/abstract": "^0.5.3",
+    "@dnd-kit/collision": "^0.5.3",
+    "@dnd-kit/helpers": "^0.5.3",
+    "@dnd-kit/vue": "^0.5.3",
     "@iconify-json/lucide": "^1.2.155",
     "@internationalized/date": "3.12.4",
     "@nuxt/content": "3.16.2",

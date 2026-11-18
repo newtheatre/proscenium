@@ -23,13 +23,15 @@ const operand = z.union([
 const comparison = z.strictObject({
   left: operand,
   op: z.enum(OPERATORS),
-  right: z.union([operand, z.array(operand).min(1).max(50)]).optional(),
+  right: z.union([operand, z.array(operand).max(50)]).optional(),
   days: z.number().int().min(0).max(3660).optional(),
 })
+// A draft may hold a condition group, a list of options to compare with, or a repeating group that is
+// still empty; the problems list stops one being published (checks.ts).
 const condition: z.ZodType<Condition> = z.lazy(() => z.union([
-  z.strictObject({ all: z.array(condition).min(1).max(20) }),
-  z.strictObject({ any: z.array(condition).min(1).max(20) }),
-  z.strictObject({ none: z.array(condition).min(1).max(20) }),
+  z.strictObject({ all: z.array(condition).max(20) }),
+  z.strictObject({ any: z.array(condition).max(20) }),
+  z.strictObject({ none: z.array(condition).max(20) }),
   comparison,
 ]))
 
@@ -67,7 +69,7 @@ const group = z.strictObject({
   min: z.number().int().min(0).optional(),
   max: z.number().int().min(1).optional(),
   visibleWhen: condition.optional(),
-  items: z.array(question).min(1).max(30),
+  items: z.array(question).max(30),
 }) satisfies z.ZodType<Group>
 
 const item = z.discriminatedUnion('kind', [

@@ -21,6 +21,5 @@
   "forms.abilities.form.create.label": "Start a new form",
   "forms.abilities.form.edit.label": "Build and edit a form",
   "forms.abilities.form.publish.label": "Publish a form",
-  "forms.abilities.settings.manage.label": "Change the forms settings",
-  "forms.navigation.groups.forms.label": "Forms"
+  "forms.abilities.settings.manage.label": "Change the forms settings"
 }

@@ -55,6 +55,7 @@ export default defineModule({
       { id: 'gallery.feedback', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/feedback', icon: 'i-lucide-message-square', ability: 'gallery.sample.view', order: 40 },
       { id: 'gallery.denied', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/denied', icon: 'i-lucide-lock', ability: 'gallery.sample.admin', order: 50 },
       { id: 'gallery.drafts', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/drafts', icon: 'i-lucide-file-pen', ability: 'gallery.sample.view', order: 60, count: 'gallery.drafts', hideEmpty: true },
+      { id: 'gallery.forms-cases', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/forms-cases', icon: 'i-lucide-flask-conical', ability: 'gallery.sample.view', order: 70 },
       { id: 'gallery.live', menu: 'live', to: '/live/gallery', icon: 'i-lucide-scan-line', ability: 'gallery.sample.manage', order: 10 },
       { id: 'gallery.account', menu: 'account', to: '/account/gallery', icon: 'i-lucide-ticket', order: 10 },
     ],
