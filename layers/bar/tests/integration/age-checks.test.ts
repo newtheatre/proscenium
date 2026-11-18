@@ -4,7 +4,7 @@
 // and never reaches the audit log, and a signature records the refusals it covered.
 import { env } from 'cloudflare:test'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, newId, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, newId, setClock } from '#kit'
 import { ensureVocabularies } from '../../../core/server/vocabularies/service'
 import { openSession } from '../../../payments/server/services'
 import { call, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
@@ -16,6 +16,7 @@ import erasePost from '../../server/api/bar/age-checks/[id]/erase-description.po
 import saleGet from '../../server/api/bar/sales/[reference]/index.get'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addProduct } from '../../server/catalogue'
+import { overdueDays } from '../../server/age-checks'
 
 const NOW = Date.UTC(2026, 10, 17, 20) // not-policy: a test's moment
 const handle = server({
@@ -173,5 +174,60 @@ describe('the register', () => {
     expect(signed.status, JSON.stringify(signed.body)).toBe(200)
     expect(signed.body.refusals).toBe(4)
     expect((await send('GET', '/api/bar/age-checks', undefined, manager)).body.reviews).toMatchObject([{ fromDay: '2026-11-17', toDay: '2026-11-17', refusals: 4 }])
+  })
+})
+
+describe('what the register shows', () => {
+  it('keeps a product only where it needed the check, and marks the rest a whole-sale refusal', async () => {
+    const key = 'age-6-basket-xxxxxxx'
+    const whole = await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, variantId: stock.crisps, reasonTermId: stock.reason, basketKey: key, scope: 'all' })
+    expect(whole.status, JSON.stringify(whole.body)).toBe(200)
+    const standalone = await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, variantId: stock.wine, reasonTermId: stock.reason, scope: 'all' })
+    const listed = (await send('GET', '/api/bar/age-checks?outcome=refused', undefined, manager)).body.rows
+    expect(listed.find((r: any) => r.id === whole.body.id)).toMatchObject({ product: null, scope: 'all' })
+    expect(listed.find((r: any) => r.id === standalone.body.id)).toMatchObject({ product: 'Checks red, 175ml', scope: 'all' })
+  })
+
+  it('shows the type of ID that was seen, on the register and the sale', async () => {
+    const key = 'age-7-xxxxxxxxx'
+    const sold = await post('/api/payments/till/sale', { panels: [{ basket: 'bar', input: { outletId: stock.outlet, clientKey: key, lines: [{ variantId: stock.wine, quantity: 1 }], expectedTotalMinor: 600, ageCheck: 'id_checked', idType: 'passport' } }] })
+    expect(sold.status, JSON.stringify(sold.body)).toBe(200)
+    const listed = (await send('GET', '/api/bar/age-checks?outcome=id_checked', undefined, manager)).body
+    expect(listed.rows.filter((r: any) => r.idType === 'passport').length).toBe(1)
+    expect(listed.ages).toEqual({ minimum: 18, challenge: 25 })
+    const reference = (await rows<{ reference: string }>('SELECT reference FROM bar_sales WHERE client_key = ?', key))[0]!.reference
+    expect((await send('GET', `/api/bar/sales/${reference}`, undefined, manager)).body.ageChecks).toMatchObject([{ outcome: 'id_checked', idType: 'passport' }])
+  })
+
+  it('names a real account as the person who recorded a row', async () => {
+    const id = newId('acc')
+    await env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, ?, \'self\', ?)').bind(id, 'Sam Seller', NOW).run()
+    const named = person(['payments.session.open', 'bar.sale.sell'], { accountId: id, reassertedAt: NOW })
+    const refused = await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, reasonTermId: stock.reason }, named)
+    const row = (await send('GET', '/api/bar/age-checks?outcome=refused', undefined, manager)).body.rows.find((r: any) => r.id === refused.body.id)
+    expect(row.by).toBe('Sam Seller')
+  })
+
+  it('is overdue once the register has gone past review-every without a signature', async () => {
+    // The earlier tests signed the register at NOW and recorded rows after it.
+    advanceClock(3600 * 1000)
+    await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, reasonTermId: stock.reason })
+    expect(await inContext(overdueDays)).toBe(0)
+    advanceClock(8 * 86400 * 1000)
+    expect(await inContext(overdueDays)).toBe(8)
+    await setSetting('bar.age-check.enabled', false)
+    expect(await inContext(overdueDays)).toBe(0)
+    await setSetting('bar.age-check.enabled', true)
+    setClock(NOW)
+  })
+})
+
+describe('a refusal that stands', () => {
+  it('stands on the basket: an age-restricted drink cannot then be sold from it', async () => {
+    const key = 'age-8-basket-xxxxxxx'
+    expect((await post('/api/bar/age-checks/refusals', { outletId: stock.outlet, variantId: stock.wine, reasonTermId: stock.reason, basketKey: key, scope: 'restricted' })).status).toBe(200)
+    const again = await till(key, [[stock.crisps, 1], [stock.wine, 1]], 720, 'not_needed')
+    expect(again.body.code).toBe('bar.age-check.refused-basket')
+    expect((await till(key, [[stock.crisps, 1]], 120)).status).toBe(200)
   })
 })

@@ -190,8 +190,12 @@ export default defineModule({
     ],
     // The console's Bar group for everyday work; set-up screens are tabs of the bar's page in Admin.
     // Sizes on sale whose labels are not all read, as a card on the console home for whoever records allergens.
-    'core.count': [{ id: 'bar.allergens-unchecked', file: 'allergens-unchecked' }],
-    'core.home-card': [{ id: 'bar.allergens', home: 'console', ability: 'bar.allergens.manage', component: 'BarAllergensCard', urgency: 'info', count: 'bar.allergens-unchecked' }],
+    // A refusals register not signed within bar.age-check.review-every, as an overdue card for whoever may sign it.
+    'core.count': [{ id: 'bar.allergens-unchecked', file: 'allergens-unchecked' }, { id: 'bar.register-overdue', file: 'register-overdue' }],
+    'core.home-card': [
+      { id: 'bar.allergens', home: 'console', ability: 'bar.allergens.manage', component: 'BarAllergensCard', urgency: 'info', count: 'bar.allergens-unchecked' },
+      { id: 'bar.register', home: 'console', ability: 'bar.age-check.review', component: 'BarRegisterCard', urgency: 'overdue', count: 'bar.register-overdue' },
+    ],
     'core.navigation': [
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
@@ -200,7 +204,7 @@ export default defineModule({
       { id: 'bar.deliveries', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/deliveries', match: '/console/bar/deliveries', icon: 'i-lucide-truck', ability: 'bar.stock.receive', order: 26 },
       { id: 'bar.stocktakes', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stocktakes', match: '/console/bar/stocktakes', icon: 'i-lucide-clipboard-list', ability: 'bar.stock.count', order: 27 },
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
-      { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
+      { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-wine', ability: 'bar.product.manage', order: 10 },
       { id: 'bar.choices', menu: 'admin', group: 'modules', to: '/admin/modules/bar/choices', icon: 'i-lucide-list-checks', ability: 'bar.product.manage', order: 15 },
       { id: 'bar.price-lists', menu: 'admin', group: 'modules', to: '/admin/modules/bar/price-lists', match: '/admin/modules/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
       { id: 'bar.age-checks', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/age-checks', icon: 'i-lucide-id-card', ability: 'bar.age-check.view', order: 40 },

@@ -228,15 +228,7 @@ async function cancel() {
 }
 
 // Leaving with unsaved changes asks once.
-onBeforeRouteLeave(async () => {
-  if (saved.value || !dirty.value) return true
-  return confirm({ verb: t('core.form.leave'), thing: t('core.form.leave-thing'), consequence: t('core.form.leave-consequence') })
-})
-function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value && !saved.value) event.preventDefault()
-}
-onMounted(() => window.addEventListener('beforeunload', beforeUnload))
-onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
+useLeaveGuard(() => dirty.value && !saved.value)
 </script>
 
 <template>
