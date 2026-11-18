@@ -88,6 +88,10 @@ export default defineModule({
     // An erased person's awards leave the roll in the erasure's own batch.
     'core.erasure-handler': [{ id: 'awards', file: 'awards' }],
     'core.requirement': [{ id: 'awards', file: 'awards' }],
+    // Nominations: a published form attached to an award type, whose approval can issue the award.
+    'forms.slot': [{ id: 'awards.nomination', subject: 'awards.type', attach: 'awards.type.manage', label: 'awards.forms.nomination.label', source: 'awards.type' }],
+    'forms.source': [{ id: 'awards.type', file: 'type' }],
+    'forms.outcome-action': [{ id: 'awards.issue-award', file: 'issue-award' }],
     // ::awards-roll in a theatre's own page.
     'core.public-component': [
       { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its short code).' },

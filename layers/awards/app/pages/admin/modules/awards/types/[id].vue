@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { TypeForm } from '../../../../../components/AwardsTypeFields.vue'
 
-interface Detail { type: TypeForm & { id: string, state: 'active' | 'archived' }, holders: number, deletable: boolean, canManage: boolean }
+interface Detail { type: TypeForm & { id: string, state: 'active' | 'archived' }, holders: number, deletable: boolean, canManage: boolean, nominations: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -104,6 +104,16 @@ async function remove() {
               :label="t('awards.screens.type.save')"
             />
           </template>
+        </PageSection>
+        <PageSection
+          v-if="data.nominations && data.canManage && type.state === 'active'"
+          :title="t('awards.screens.type.nominations')"
+          :description="t('awards.screens.type.nominations-help')"
+        >
+          <FormsSlotForms
+            slot-id="awards.nomination"
+            :subject="type.id"
+          />
         </PageSection>
         <PageSection
           :title="t(type.state === 'active' ? 'awards.screens.type.retire' : 'awards.screens.type.restore')"
