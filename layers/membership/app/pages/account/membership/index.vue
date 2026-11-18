@@ -1,7 +1,7 @@
 <!-- My membership (MEM-10, MEM-11, MEM-33): what the person holds and until when, their member
      number, and the schemes they can join. A free scheme with nothing to check is joined here in one
-     step, as is one that checks a list (a student ID, or a verified address); other schemes say how to
-     join until applications are built. A scheme that requires payment shows its fee, and joining it
+     step, as is one that checks a list (a student ID, or a verified address); a scheme with an
+     application form is applied for on its join page, where the form is. A scheme that requires payment shows its fee, and joining it
      goes on to the Pay page; an application waiting for its fee offers Pay from here. Each scheme says
      how long it lasts and what it costs, and Join asks once more, in a dialog, before anything happens;
      a reference the list does not hold is said beside its field. The card (MEM-33, MEM-51) opens full screen with a code that
@@ -9,8 +9,8 @@
 <script setup lang="ts">
 interface Fee { amountMinor: number, currency: string }
 interface RenewAsks { options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, asksFor: string | null, endsByList: boolean, online: boolean }
-interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', reason: string | null, charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
-interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null, endsByList: boolean }
+interface Mine { card: boolean, fields: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'approval' | 'payment', reason: string | null, charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean, asks?: RenewAsks | null } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Offered { id: string, key: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null, endsByList: boolean, applicationForm?: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -29,12 +29,14 @@ const lastEnded = computed(() => {
   if (all.some(m => m.status !== 'lapsed')) return null
   return all.filter(m => m.status === 'lapsed' && m.endsOn).sort((a, b) => b.endsOn!.localeCompare(a.endsOn!))[0] ?? null
 })
+// The membership whose details are filled in here (MEM-34): the one held now, or the next.
+const detailsFor = computed(() => (mine.data.value?.memberships ?? []).find(m => m.status !== 'lapsed') ?? null)
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
 /** A refusal about one field, shown under it; anything else shows above the form. */
 const fieldRefusal = (refusal: ReturnType<typeof toRefusal> | null | undefined, field: string) => refusal?.fields?.[field] ? refusal : null
-/** Why an application waits on the theatre, in the applicant's words. */
-const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
+/** Why an application waits on the theatre, in the applicant's words: a reason for a check, or `approval` for the form's decision. */
+const waitingText = (reason: string | null | undefined) => t(reason === 'entry-already-used' || reason === 'name-differs' || reason === 'approval' ? `membership.screens.mine.waiting-${reason}` : 'membership.screens.mine.waiting-staff')
 // One card: a membership that follows on from one held now is not shown as a second card.
 const cardFor = (m: Mine['memberships'][number]) => m.status === 'current' || m.status === 'in-grace' || (m.status === 'upcoming' && !(mine.data.value?.memberships ?? []).some(o => o.schemeId === m.schemeId && (o.status === 'current' || o.status === 'in-grace')))
 /** A held membership's line: when it starts if it has not yet, until when, and its renewal. */
@@ -213,6 +215,17 @@ async function withdraw(a: Mine['applications'][number]) {
         </PageSection>
 
         <PageSection
+          v-if="mine.data.value?.fields && detailsFor"
+          :title="t('membership.screens.mine.details')"
+          :description="t('membership.screens.mine.details-help')"
+        >
+          <FormsRecordFields
+            slot-id="membership.member-fields"
+            :subject="detailsFor.id"
+          />
+        </PageSection>
+
+        <PageSection
           v-if="mine.data.value?.applications.length"
           :title="t('membership.screens.mine.applications')"
         >
@@ -221,7 +234,7 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="a in mine.data.value.applications"
               :key="a.id"
               :name="a.schemeName"
-              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : waitingText(a.reason)"
+              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : waitingText(a.waiting === 'approval' ? 'approval' : a.reason)"
             >
               <UButton
                 v-if="a.waiting === 'payment' && a.charge"
@@ -267,6 +280,12 @@ async function withdraw(a: Mine['applications'][number]) {
                 v-else-if="!s.online"
                 class="text-sm text-muted"
               >{{ t('membership.screens.mine.not-online') }}</span>
+              <UButton
+                v-else-if="s.applicationForm"
+                :label="t('membership.screens.mine.apply')"
+                :aria-label="t('membership.screens.mine.apply-scheme', { scheme: s.name })"
+                :to="`/join/${s.key}`"
+              />
               <UButton
                 v-else
                 :label="t('membership.screens.mine.join')"

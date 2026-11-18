@@ -6,9 +6,10 @@
 definePageMeta({ layout: 'console' })
 
 interface Detail {
-  membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, lengthRule: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number }
+  membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, lengthRule: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number, responseId: string | null, awaitingApproval: boolean }
   number: string | null
   canChangeDates: boolean
+  canEditFields: boolean
   feesOn: boolean
   checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number, listName: string | null, listedAs: string | null }[]
 }
@@ -37,6 +38,15 @@ const facts = computed(() => {
     ...(x.endedAt ? [{ label: t('membership.membership.ended'), value: `${dateTime(x.endedAt)} (${t(`membership.membership.end-reasons.${x.endReason}`)})` }] : []),
   ]
 })
+
+// The application form's response, as forms names it, for those who may read responses (MEM-12).
+const answers = ref<{ title: string, to: string | null } | null>(null)
+watch(() => m.value?.responseId, async (responseId) => {
+  answers.value = null
+  if (!responseId) return
+  const found = await $api<{ records: { title: string, to: string | null }[] }>('/api/core/records', { query: { type: 'forms.response', ids: responseId } }).catch(() => ({ records: [] }))
+  answers.value = found.records[0] ?? null
+}, { immediate: true })
 
 const ending = ref(false)
 const note = ref('')
@@ -178,6 +188,36 @@ async function saveDates() {
             :to="`/console/people/${m.accountId}`"
             :label="t('membership.membership.open-person')"
           />
+        </PageSection>
+        <PageSection
+          v-if="data.canEditFields"
+          :title="t('membership.membership.fields')"
+        >
+          <FormsRecordFields
+            slot-id="membership.member-fields"
+            :subject="m.id"
+          />
+        </PageSection>
+        <PageSection
+          v-if="m.responseId"
+          :title="t('membership.membership.application')"
+          :description="m.awaitingApproval ? t('membership.membership.awaiting-approval') : undefined"
+        >
+          <UButton
+            v-if="answers?.to"
+            color="neutral"
+            variant="link"
+            class="px-0"
+            icon="i-lucide-file-text"
+            :to="answers.to"
+            :label="t('membership.membership.open-answers', { title: answers.title })"
+          />
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            {{ t('membership.membership.answers-hidden') }}
+          </p>
         </PageSection>
         <PageSection
           v-if="m.note"

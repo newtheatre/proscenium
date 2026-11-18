@@ -1,6 +1,6 @@
 // One membership for its console page (tab 5, "A membership"): the person, the scheme, the dates,
-// the derived status, how it started and ended, every check made on it, and whether the reader may
-// change its dates.
+// the derived status, how it started and ended, every check made on it, the application form's
+// response it was applied for with, and whether the reader may change its dates.
 import { getRouterParam } from 'h3'
 import { all, can, defineRoute, first, isEnabled, refuse } from '#kit'
 import { accountLabel } from '#modules/core'
@@ -12,10 +12,11 @@ export default defineRoute({
   record: event => ['membership.membership', getRouterParam(event, 'id')],
   rateLimit: 'default',
 }, async (_event, { actor, record }) => {
-  const m = await first<{ id: string, accountId: string, schemeId: string, schemeName: string, side: string, graceDays: number, holderMayEnd: number, lengthRule: string, state: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, activatedAt: number | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number }>(
+  const m = await first<{ id: string, accountId: string, schemeId: string, schemeName: string, side: string, graceDays: number, holderMayEnd: number, lengthRule: string, state: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, activatedAt: number | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number, responseId: string | null, awaitingApproval: number }>(
     `SELECT m.id, m.account_id AS accountId, m.scheme_id AS schemeId, s.name AS schemeName, s.side, s.grace_days AS graceDays, s.holder_may_end AS holderMayEnd, s.length_rule AS lengthRule,
             m.state, m.origin, o.name AS lengthName, m.starts_on AS startsOn, m.ends_on AS endsOn, m.activated_at AS activatedAt, m.ended_at AS endedAt,
-            m.end_reason AS endReason, m.note, m.created_at AS createdAt
+            m.end_reason AS endReason, m.note, m.created_at AS createdAt, m.response_id AS responseId,
+            (m.state = 'pending' AND m.needs_approval = 1 AND m.approved_at IS NULL) AS awaitingApproval
        FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id LEFT JOIN membership_length_options o ON o.id = m.length_option_id
       WHERE m.id = ?`,
     record!.id,
@@ -33,10 +34,12 @@ export default defineRoute({
   )
   const status = m!.state !== 'active' ? m!.state : day ? derivedStatus({ startsOn: m!.startsOn!, endsOn: m!.endsOn }, m!.graceDays, day) : 'upcoming'
   return {
-    membership: { ...m, holderMayEnd: !!m!.holderMayEnd, status, name: await accountLabel(m!.accountId) },
+    membership: { ...m, holderMayEnd: !!m!.holderMayEnd, awaitingApproval: !!m!.awaitingApproval, status, name: await accountLabel(m!.accountId) },
     feesOn: await isEnabled('membership-fees'),
     number: (await memberNumber(m!.accountId))?.label ?? null,
     canChangeDates: m!.state === 'active' && (await can(actor, 'membership.membership.update')).allowed,
+    // MEM-34: the details kept about members, for those who may fill them in.
+    canEditFields: (await can(actor, 'membership.membership.fields', ['membership.membership', m!.id])).allowed,
     checks: await Promise.all(checks.map(async c => ({ ...c, decidedBy: c.decidedBy ? await accountLabel(c.decidedBy) : null }))),
   }
 })

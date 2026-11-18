@@ -1,9 +1,11 @@
 // Retention of ended and lapsed memberships (membership.retention.ended-after, counted from ends_on
 // or ended_at, whichever is later). The row stays, with its scheme and dates, so counts by year stay
 // true and the member's history keeps its shape; what goes is the free text: the membership's note
-// and the notes on its checks. A current membership is never touched.
-import { defineTask, nowMs, retentionSeconds } from '#kit'
+// and the notes on its checks, and the personal and free-text details kept about the member (MEM-34).
+// A current membership is never touched.
+import { all, defineTask, nowMs, retentionSeconds } from '#kit'
 import { ERASED } from '#kit/db'
+import { eraseRecordFields } from '#modules/forms'
 import { memberships } from '../db/schema'
 import { addDays } from '../dates'
 import { todayOrNull } from '../memberships'
@@ -29,4 +31,5 @@ export default defineTask(async (unit) => {
     sql: `UPDATE membership_memberships SET note = '${ERASED.redact}', updated_at = ?1 WHERE note IS NOT NULL AND note <> '${ERASED.redact}' AND id IN (${due('?2', '?3')})`,
     params: [at, cutAt, cutDay],
   })
+  for (const m of await all<{ id: string }>(due('?1', '?2'), cutAt, cutDay)) await eraseRecordFields(unit, 'membership.member-fields', m.id)
 })

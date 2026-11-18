@@ -1,11 +1,15 @@
 // Schemes and their length options (Membership specification, tab 2 and tab 3, S1 to S5).
 import { z } from 'zod'
 import { all, first, refuse, useSetting } from '#kit'
+import { slotDecides } from '#modules/forms'
 import { charger } from './charge'
 import { endsOnFor } from './dates'
 import { todayOrNull } from './memberships'
 import { hasListKey, schemeList } from './lists'
 import { JOIN_MODES, LENGTH_RULES, SIDES } from './db/schema'
+
+/** The forms slot an application form is attached to a scheme through (MEM-03). */
+export const APPLICATION_SLOT = 'membership.application'
 
 export interface Scheme {
   id: string
@@ -135,8 +139,8 @@ export interface ChecklistItem { code: string, done: boolean }
 
 /**
  * What opening a scheme needs (rule S4, and the rule that a members' scheme needs the members'
- * area). Application forms are a later slice: until they exist, a scheme that asks for one cannot
- * be opened, and the checklist says why. A scheme that requires payment needs the fees module on and
+ * area). A scheme that approves applicants needs an application form attached whose workflow can
+ * approve (MEM-16), since the form's decision is what approves them. A scheme that requires payment needs the fees module on and
  * a price in force today for joining at every length offered (S5).
  */
 export async function openChecklist(scheme: Scheme): Promise<ChecklistItem[]> {
@@ -147,7 +151,7 @@ export async function openChecklist(scheme: Scheme): Promise<ChecklistItem[]> {
   // A list needs its list and the key it is hashed with; a domain check needs a domain.
   if (scheme.verifier === 'membership.list') items.push({ code: 'verifier', done: !!(await schemeList(scheme)) && await hasListKey() })
   if (scheme.verifier === 'membership.email-domain') items.push({ code: 'verifier-domains', done: !!verifierConfig(scheme).domains?.length })
-  if (scheme.needsApproval) items.push({ code: 'application-form', done: false })
+  if (scheme.needsApproval) items.push({ code: 'application-form', done: await slotDecides(APPLICATION_SLOT, scheme.id) })
   if (scheme.requiresPayment) {
     const fees = await charger()
     const day = await todayOrNull()
