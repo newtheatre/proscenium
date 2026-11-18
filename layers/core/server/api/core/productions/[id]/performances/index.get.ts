@@ -35,7 +35,7 @@ export default defineRoute({
     useSetting('core.programme.schedule-runs') as Promise<boolean>,
     sellsHere(),
   ])
-  const own = await first<{ doors_before_minutes: number | null, capacity: number | null }>('SELECT doors_before_minutes, capacity FROM core_productions WHERE id = ?', record!.id)
+  const own = await first<{ doors_before_minutes: number | null, capacity: number | null, usual_space_id: string | null }>('SELECT doors_before_minutes, capacity, usual_space_id FROM core_productions WHERE id = ?', record!.id)
   const used = new Set(performances.flatMap(p => [p.venueId, p.spaceId]))
   return {
     performances,
@@ -50,6 +50,6 @@ export default defineRoute({
       presets: presets.map(({ id, name, slots }) => ({ id, name, slots })),
     },
     // The production's own (null where it has none) beside the theatre's, so a screen can say where a value comes from.
-    defaults: { ...defaults, productionDoorsBeforeMinutes: own?.doors_before_minutes ?? null, productionCapacity: own?.capacity ?? null, theatreDoorsBeforeMinutes: theatre.doorsBeforeMinutes, usualPreset, scheduleRuns, sellsHere: sells },
+    defaults: { ...defaults, productionDoorsBeforeMinutes: own?.doors_before_minutes ?? null, productionCapacity: own?.capacity ?? null, theatreDoorsBeforeMinutes: theatre.doorsBeforeMinutes, usualSpaceId: own?.usual_space_id ?? null, usualPreset, scheduleRuns, sellsHere: sells },
   }
 })

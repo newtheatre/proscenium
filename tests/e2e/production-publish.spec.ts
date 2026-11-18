@@ -48,3 +48,18 @@ test('publish lists what is left, asks first, and the published page says so', a
   await expect(side.getByRole('heading', { name: 'Ready to publish?' })).toHaveCount(0)
   await expect(side.getByRole('button', { name: 'Withdraw' })).toBeVisible()
 })
+
+test('inherited lengths read as the theatre default with Change, and moves that do not apply say why', async ({ page, request }) => {
+  const draft = (await (await request.post('/api/core/productions', { data: { title: `The Default Play ${Date.now().toString(36)}`, kind: 'own' } })).json()).id
+  await visit(page, `/console/programme/productions/${draft}?tab=details`)
+  const form = page.locator('#production-details')
+  await expect(form.getByText('Theatre default').first()).toBeVisible()
+  await form.getByRole('button', { name: 'Change doors open before' }).click()
+  await form.getByRole('button', { name: /^Use theatre default/ }).click()
+  await expect(form.getByRole('button', { name: 'Change doors open before' })).toBeVisible()
+
+  await page.getByRole('button', { name: /^More actions for/ }).click()
+  await expect(page.getByRole('menuitem', { name: /Withdraw/ })).toBeDisabled()
+  await expect(page.getByRole('menuitem', { name: /Cancel production/ })).toContainText('Delete it instead')
+  await expect(page.getByRole('menuitem', { name: /Duplicate/ })).toBeEnabled()
+})

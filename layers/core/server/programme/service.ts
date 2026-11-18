@@ -131,6 +131,7 @@ export interface ProductionInput {
   externalBookingUrl?: string | null
   creditsPublic?: boolean
   listed?: boolean
+  usualSpaceId?: string | null
 }
 
 export interface Production {
@@ -154,6 +155,8 @@ export interface Production {
   intervalMinutes: number | null
   doorsBeforeMinutes: number | null
   capacity: number | null
+  /** The space it usually plays in, offered first when dates are added. */
+  usualSpaceId: string | null
   externalBookingUrl: string | null
   creditsPublic: boolean
   listed: boolean
@@ -191,6 +194,7 @@ interface ProductionRow {
   interval_minutes: number | null
   doors_before_minutes: number | null
   capacity: number | null
+  usual_space_id: string | null
   external_booking_url: string | null
   credits_public: number
   listed: number
@@ -205,7 +209,7 @@ const toProduction = (r: ProductionRow): Production => ({
   id: r.id, slug: r.slug, title: r.title, subtitle: r.subtitle, summary: r.summary, description: r.description, kind: r.kind,
   categoryTermId: r.category_term_id, seasonId: r.season_id, companyName: r.company_name, ageMin: r.age_min,
   ageRestricted: !!r.age_restricted, effectsConfirmedNone: !!r.effects_confirmed_none, advisoriesConfirmedNone: !!r.advisories_confirmed_none, contentNote: r.content_note, runningMinutes: r.running_minutes,
-  intervalCount: r.interval_count, intervalMinutes: r.interval_minutes, doorsBeforeMinutes: r.doors_before_minutes, capacity: r.capacity, externalBookingUrl: r.external_booking_url, creditsPublic: !!r.credits_public, listed: !!r.listed,
+  intervalCount: r.interval_count, intervalMinutes: r.interval_minutes, doorsBeforeMinutes: r.doors_before_minutes, capacity: r.capacity, usualSpaceId: r.usual_space_id, externalBookingUrl: r.external_booking_url, creditsPublic: !!r.credits_public, listed: !!r.listed,
   state: r.state, cancelReasonTermId: r.cancel_reason_term_id, publishedAt: r.published_at, firstStartsAt: r.first_starts_at, lastEndsAt: r.last_ends_at,
 })
 
@@ -214,7 +218,7 @@ const FIELDS: [keyof ProductionInput, keyof ProductionRow, boolean][] = [
   ['title', 'title', true], ['subtitle', 'subtitle', true], ['summary', 'summary', true], ['description', 'description', true], ['kind', 'kind', false],
   ['categoryTermId', 'category_term_id', true], ['seasonId', 'season_id', true], ['companyName', 'company_name', true], ['ageMin', 'age_min', true], ['ageRestricted', 'age_restricted', true],
   ['effectsConfirmedNone', 'effects_confirmed_none', true], ['advisoriesConfirmedNone', 'advisories_confirmed_none', true], ['contentNote', 'content_note', true], ['runningMinutes', 'running_minutes', true],
-  ['intervalCount', 'interval_count', true], ['intervalMinutes', 'interval_minutes', true], ['doorsBeforeMinutes', 'doors_before_minutes', true], ['capacity', 'capacity', false], ['externalBookingUrl', 'external_booking_url', true], ['creditsPublic', 'credits_public', true], ['listed', 'listed', true],
+  ['intervalCount', 'interval_count', true], ['intervalMinutes', 'interval_minutes', true], ['doorsBeforeMinutes', 'doors_before_minutes', true], ['capacity', 'capacity', false], ['usualSpaceId', 'usual_space_id', false], ['externalBookingUrl', 'external_booking_url', true], ['creditsPublic', 'credits_public', true], ['listed', 'listed', true],
 ]
 
 const AGE_REFUSED = { code: 'core.production.age-needed', reason: 'A restriction needs a minimum age.', fields: { ageMin: 'Set the age, or make it a recommendation.' } }
@@ -224,6 +228,12 @@ function refuseRestrictionWithoutAge(restricted: boolean | undefined, ageMin: nu
 
 const CATEGORY_REFUSED = { code: 'core.production.category-unknown', reason: 'Choose a category from the list.' }
 const SEASON_REFUSED = { code: 'core.production.season-unknown', reason: 'There is no such season.' }
+
+/** A usual space is one that exists and can hold performances. */
+async function refuseUnknownSpace(spaceId: string) {
+  if (!await first("SELECT 1 FROM core_spaces WHERE id = ? AND performable = 1 AND state = 'active'", spaceId))
+    refuse('core.production.space-unknown', 'Choose a space from the list.', { status: 422, fields: { usualSpaceId: 'Choose a space from the list.' } })
+}
 
 async function productionRow(id: string): Promise<ProductionRow> {
   const row = await first<ProductionRow>('SELECT * FROM core_productions WHERE id = ?', id)
@@ -306,14 +316,15 @@ export async function createProduction(unit: UnitView, input: ProductionInput, a
   const slug = input.slug ?? await freeSlug(slugFrom(input.title, 'production'), s => productionSlugTaken(s))
   if (input.slug && await productionSlugTaken(input.slug)) refuse('core.production.slug-taken', 'A production has, or once had, that web address.', { status: 409, fields: { slug: 'Choose a different web address.' } })
   if (input.seasonId && !await first('SELECT 1 FROM core_seasons WHERE id = ?', input.seasonId)) refuse(SEASON_REFUSED.code, SEASON_REFUSED.reason, { status: 422 })
+  if (input.usualSpaceId) await refuseUnknownSpace(input.usualSpaceId)
   refuseRestrictionWithoutAge(input.ageRestricted, input.ageMin ?? null)
   const creditsPublic = input.creditsPublic ?? await useSetting('core.programme.credits-public') as boolean
   const at = nowMs()
   unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_min, age_restricted,
-      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, state, listed, created_by, created_at)
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, usual_space_id, external_booking_url, credits_public, state, listed, created_by, created_at)
     SELECT ${id}, ${slug}, ${input.title}, ${input.subtitle ?? null}, ${input.summary ?? null}, ${input.description ?? null}, ${input.kind}, ${input.categoryTermId ?? null},
       ${input.seasonId ?? null}, ${input.companyName ?? null}, ${input.ageMin ?? null}, ${input.ageRestricted ? 1 : 0}, ${input.effectsConfirmedNone ? 1 : 0}, ${input.advisoriesConfirmedNone ? 1 : 0}, ${input.contentNote ?? null},
-      ${input.runningMinutes ?? null}, ${input.intervalCount ?? await useSetting('core.programme.intervals') as number}, ${input.intervalMinutes ?? null}, ${input.doorsBeforeMinutes ?? null}, ${input.capacity ?? null}, ${input.externalBookingUrl ?? null}, ${creditsPublic ? 1 : 0}, 'draft', ${input.listed === false ? 0 : 1}, ${actorId}, ${at}
+      ${input.runningMinutes ?? null}, ${input.intervalCount ?? await useSetting('core.programme.intervals') as number}, ${input.intervalMinutes ?? null}, ${input.doorsBeforeMinutes ?? null}, ${input.capacity ?? null}, ${input.usualSpaceId ?? null}, ${input.externalBookingUrl ?? null}, ${creditsPublic ? 1 : 0}, 'draft', ${input.listed === false ? 0 : 1}, ${actorId}, ${at}
     WHERE ${input.categoryTermId ? assertTerm(input.categoryTermId, 'core.production-category') : sql`1`}`).expect(1, CATEGORY_REFUSED)
   unit.audit({ action: 'create', record: ['core.production', id] })
   return id
@@ -330,9 +341,9 @@ export async function duplicateProduction(unit: UnitView, id: string, actorId: s
   const title = `${row.title} (copy)`.slice(0, 200) // not-policy: the table's bound on a title
   const slug = await freeSlug(slugFrom(title, 'production'), s => productionSlugTaken(s))
   unit.add(sql`INSERT INTO core_productions (id, slug, title, subtitle, summary, description, kind, category_term_id, season_id, company_name, age_min, age_restricted,
-      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, state, listed, created_by, created_at)
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, usual_space_id, external_booking_url, credits_public, state, listed, created_by, created_at)
     SELECT ${copy}, ${slug}, ${title}, subtitle, summary, description, kind, category_term_id, NULL, company_name, age_min, age_restricted,
-      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, external_booking_url, credits_public, 'draft', listed, ${actorId}, ${nowMs()}
+      effects_confirmed_none, advisories_confirmed_none, content_note, running_minutes, interval_count, interval_minutes, doors_before_minutes, capacity, usual_space_id, external_booking_url, credits_public, 'draft', listed, ${actorId}, ${nowMs()}
     FROM core_productions WHERE id = ${id}`).expect(1, { code: 'core.production.changed', reason: 'Someone else changed this production just now.', remedy: 'Refresh and try again.' })
   unit.add(sql`INSERT INTO core_production_advisories (production_id, term_id, level, level_assumed, detail)
     SELECT ${copy}, term_id, level, level_assumed, detail FROM core_production_advisories WHERE production_id = ${id}`)
@@ -355,6 +366,7 @@ export async function updateProduction(unit: UnitView, id: string, input: Partia
   if (!changed.length && !slugChanged) return []
   if (slugChanged && await productionSlugTaken(input.slug!, id)) refuse('core.production.slug-taken', 'A production has, or once had, that web address.', { status: 409, fields: { slug: 'Choose a different web address.' } })
   if (input.seasonId && input.seasonId !== row.season_id && !await first('SELECT 1 FROM core_seasons WHERE id = ?', input.seasonId)) refuse(SEASON_REFUSED.code, SEASON_REFUSED.reason, { status: 422 })
+  if (input.usualSpaceId && input.usualSpaceId !== row.usual_space_id) await refuseUnknownSpace(input.usualSpaceId)
 
   refuseRestrictionWithoutAge(input.ageRestricted ?? !!row.age_restricted, input.ageMin === undefined ? row.age_min : input.ageMin)
   const sets = changed.map(([key, column]) => sql`${sql.raw(column)} = ${value(input[key])}`)

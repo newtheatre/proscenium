@@ -16,7 +16,7 @@ const props = defineProps<{
   productionId: string
   spaces: Space[]
   presets: Preset[]
-  defaults: { usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
+  defaults: { usualSpaceId: string | null, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
   defaultsIn: (spaceId: string) => ShowDefaultValues
 }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -58,7 +58,8 @@ watch(open, (v) => {
   refusal.value = null
   planned.value = null
   overrides.value = noOverrides()
-  form.value.spaceId ||= props.spaces[0]?.value ?? ''
+  // The production's usual space first, else the first one listed.
+  form.value.spaceId ||= props.spaces.find(s => s.value === props.defaults.usualSpaceId)?.value ?? props.spaces[0]?.value ?? ''
   form.value.scheduled = props.defaults.scheduleRuns
   usePreset(usualFor(form.value.spaceId))
 }, { immediate: true })
