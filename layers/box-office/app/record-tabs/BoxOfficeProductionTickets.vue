@@ -296,6 +296,11 @@ async function openRun() {
           </UForm>
         </PageSection>
 
+        <BoxOfficeRunLayout
+          :production-id="props.recordId"
+          @changed="refresh()"
+        />
+
         <RecordList :label="t('box-office.record-tabs.production.label')">
           <RecordListItem
             v-for="row in data.performances"

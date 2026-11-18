@@ -1,9 +1,10 @@
-// A performance's seating layout: the layouts its space has, the one it uses, and how its wheelchair
-// spaces stand: how many are booked, the seats each takes, and the seats kept back until when.
+// A performance's wheelchair spaces: the layouts its space has, its own choice if it has one, what
+// its run (or its space's usual layout) would give it, and how they stand: how many are booked, the
+// seats each takes, and the seats kept back until when.
 import { getRouterParam } from 'h3'
 import { all, defineRoute, nowMs } from '#kit'
 import { getPerformance } from '#modules/core'
-import { displacementsFor, layoutOf, listLayouts } from '../../../../layouts'
+import { arrangementFor, displacementsFor, listLayouts, type Arrangement } from '../../../../layouts'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
@@ -11,7 +12,9 @@ export default defineRoute({
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const performance = await getPerformance(record!.id)
-  const [layouts, { layout, chosen }] = await Promise.all([listLayouts(performance.spaceId), layoutOf(performance.id)])
+  const [layouts, now, inherited] = await Promise.all([listLayouts(performance.spaceId), arrangementFor(performance.id), arrangementFor(performance.id, { ignoreOwn: true })])
+  const own = now.from === 'performance' ? now.arrangement : null
+  const describe = (a: Arrangement | null) => a && { layoutId: a.layout?.id ?? null, name: a.layout?.name ?? null, wheelchairSpaces: a.spaces, seatsPerSpace: a.seatsEach }
   const pools = await all<{ id: string, kind: string, name: string, capacity: number, claimed: number }>(
     'SELECT o.id, b.kind, b.name, o.capacity, o.claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ?', performance.id)
   const [plan] = await displacementsFor(pools.map(p => p.id))
@@ -21,9 +24,11 @@ export default defineRoute({
   return {
     spaceId: performance.spaceId,
     layouts,
-    layoutId: layout?.id ?? null,
-    // Whether someone chose it for this performance, or it is the space's usual one.
-    chosen,
+    layoutId: now.arrangement?.layout?.id ?? null,
+    // The performance's own choice, overriding its run's; null when it takes its run's.
+    own: describe(own),
+    // What it takes without one: its run's choice, or its space's usual layout.
+    inherited: inherited.arrangement ? { ...describe(inherited.arrangement)!, from: inherited.from } : null,
     wheelchair: wheelchair
       ? {
           spaces: wheelchair.capacity,

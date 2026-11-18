@@ -7,7 +7,7 @@
 import { can, createUnit, refuse, type Actor, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { priceLayers, pricesFor, setPrices, type PriceInput } from './prices'
-import { createBand, listBands, poolsOf, salesOf, saveSales } from './setup'
+import { createBand, laidOut, listBands, poolsOf, salesOf, saveSales } from './setup'
 
 export interface Copied { bands: number, pools: number, prices: number }
 
@@ -51,11 +51,12 @@ export async function copySetup(unit: UnitView, targetPerformanceId: string, sou
 
   const { map, made } = await matchBands(target.id, source.id)
   const sales = await salesOf(source.id)
-  // Wheelchair spaces come from the seating layout: the source's where the space is the same, else the target's own.
+  // Wheelchair spaces: the source's own where it has them (a layout only in the same space), else the target's run's or space's.
   const sameSpace = source.spaceId === target.spaceId
+  const own = sales?.layoutOwn ? (sales.layoutId ? (sameSpace ? { use: 'layout' as const, layoutId: sales.layoutId } : undefined) : { use: 'numbers' as const, wheelchairSpaces: sales.wheelchairSpaces ?? 0, seatsPerSpace: sales.seatsPerSpace ?? 0 }) : undefined
   await saveSales(unit, target.id, {
-    pools: pools.filter(p => !(sales?.layoutId && p.bandKind === 'wheelchair')).map(p => ({ bandId: map.get(p.bandId)!, capacity: p.capacity })),
-    ...(sales?.layoutId && sameSpace ? { layoutId: sales.layoutId } : {}),
+    pools: pools.filter(p => !(laidOut(sales) && p.bandKind === 'wheelchair')).map(p => ({ bandId: map.get(p.bandId)!, capacity: p.capacity })),
+    ...(own ? { wheelchair: own } : {}),
     ...(sales?.maxPerOrder != null ? { maxPerOrder: sales.maxPerOrder } : {}),
     ...(sales?.holdMinutes != null ? { holdMinutes: sales.holdMinutes } : {}),
     confirmOverVenue: options.confirmOverVenue,

@@ -17,6 +17,7 @@ const title = `The Layout Show ${stamp}`
 const venueName = `Layout Theatre ${stamp}`
 let performanceId = ''
 let slug = ''
+let productionId = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, method: 'post' | 'patch' = 'post') {
   const response = await api[method](path, { data, headers: { 'idempotency-key': crypto.randomUUID() } })
@@ -42,6 +43,7 @@ test.beforeAll(async ({ playwright }) => {
   const api = await playwright.request.newContext({ ...base, ...as(manager) })
   const production = await post(api, '/api/core/productions', { title, kind: 'own' })
   slug = production.slug
+  productionId = production.id
   await post(api, `/api/core/productions/${production.id}`, { summary: 'A show with wheelchair spaces.', categoryTermId: categories.terms[0].id, effectsConfirmedNone: true, advisoriesConfirmedNone: true }, 'patch')
   const venue = await post(api, '/api/core/venues', { name: venueName })
   // Three days ahead, so the seats of unbooked spaces are still kept back.
@@ -103,8 +105,9 @@ test('a manager gives a space a seating layout, and its performance takes the wh
 
   // The performance there uses the space's usual layout without anyone choosing it.
   await visit(page, `/console/box-office/performances/${performanceId}`)
-  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Seating layout' }) })
-  await expect(section.getByRole('combobox', { name: 'Layout' })).toContainText('End-on (usual)')
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
+  await expect(section.getByRole('radio', { name: 'As the run' })).toBeChecked()
+  await expect(section.getByText('The space\'s usual layout, End-on: 2 wheelchair spaces, each in place of 2 seats')).toBeVisible()
   await expect(section.getByText('0 of 2 booked')).toBeVisible()
   await expect(section.getByText(/^4 seats until /)).toBeVisible()
   await noViolations(page)
@@ -129,8 +132,35 @@ test('a wheelchair user books a space online, and the performance counts it', as
 
   // Booking the space took it and the two seats it stands in place of; two more are kept for the other.
   await visit(page, `/console/box-office/performances/${performanceId}`)
-  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Seating layout' }) })
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
   await expect(section.getByText('1 of 2 booked')).toBeVisible()
   await expect(section.getByText(/^2 seats until /)).toBeVisible()
   await expect(page.getByText('2 taken')).toBeVisible()
+})
+
+test('the run types its own numbers on the Tickets tab, and one performance overrides them', async ({ page }) => {
+  await visit(page, `/console/programme/productions/${productionId}?tab=box-office.production`)
+  const run = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
+  await expect(run.getByRole('radio', { name: /Each space's usual layout/ })).toBeChecked()
+  await run.getByRole('radio', { name: 'Numbers typed in' }).check()
+  await run.getByRole('spinbutton', { name: 'Wheelchair spaces' }).fill('3')
+  await run.getByRole('spinbutton', { name: 'Seats each space takes the place of' }).fill('1')
+  await noViolations(page)
+  await run.getByRole('button', { name: 'Save wheelchair spaces' }).click()
+  await expect(page.getByText('Wheelchair spaces saved', { exact: true })).toBeVisible()
+
+  // The performance follows the run; then this night has its own.
+  await visit(page, `/console/box-office/performances/${performanceId}`)
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
+  await expect(section.getByText('3 wheelchair spaces, each in place of 1 seat')).toBeVisible()
+  await expect(section.getByText('1 of 3 booked')).toBeVisible()
+  await section.getByRole('radio', { name: 'Numbers typed in' }).check()
+  await section.getByRole('spinbutton', { name: 'Wheelchair spaces' }).fill('2')
+  await section.getByRole('button', { name: 'Save wheelchair spaces' }).click()
+  await expect(section.getByText('1 of 2 booked')).toBeVisible()
+  await noViolations(page)
+
+  // The Tickets tab says one night has its own.
+  await visit(page, `/console/programme/productions/${productionId}?tab=box-office.production`)
+  await expect(page.getByText('1 performance has wheelchair spaces of its own, which this leaves as they are.')).toBeVisible()
 })

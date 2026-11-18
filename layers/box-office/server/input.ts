@@ -20,3 +20,18 @@ export const layoutInput = z.object({
   wheelchairSpaces: z.number().int().min(0).max(500), // not-policy: a sanity bound
   seatsPerSpace: z.number().int().min(0).max(20), // not-policy: a sanity bound on seats taken out for one space
 }).strict()
+
+/**
+ * A run's or a performance's wheelchair spaces (Matt 2026-11-17, 21:58): a layout of the space, or
+ * numbers typed in. `inherit` hands the choice back: a run to each space's usual layout, a
+ * performance to its run.
+ */
+export const wheelchairChoice = z.discriminatedUnion('use', [
+  z.object({ use: z.literal('inherit') }).strict(),
+  z.object({ use: z.literal('layout'), layoutId: z.string().min(3).max(40) }).strict(), // not-policy: an id's length
+  z.object({
+    use: z.literal('numbers'),
+    wheelchairSpaces: z.number().int().min(0).max(500), // not-policy: a sanity bound, as a layout's
+    seatsPerSpace: z.number().int().min(0).max(20), // not-policy: a sanity bound, as a layout's
+  }).strict(),
+])
