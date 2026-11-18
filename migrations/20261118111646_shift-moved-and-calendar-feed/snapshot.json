@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "5b3a9d11-16f1-4c8a-8ecd-7643ecfe2068",
+  "id": "f20971a7-4285-4f89-a7ce-badc6a09e02a",
   "prevIds": [
-    "a9c62906-73f5-4354-8041-082e3980f307",
-    "ff2b3a77-53fb-401d-8052-4516177527ff"
+    "274c2793-7965-4b1f-90f7-c25541e7b394"
   ],
   "ddl": [
     {
@@ -5992,6 +5991,16 @@
       "name": "code_hash",
       "type": "text",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "door_code",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -13448,6 +13457,26 @@
       "entityType": "columns"
     },
     {
+      "table": "forms_responses",
+      "name": "reminded_waiting_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "reminded_closing_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "forms_review_assignments",
       "name": "id",
       "type": "text",
@@ -13562,6 +13591,16 @@
       "name": "created_at",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_review_assignments",
+      "name": "reminded_at",
+      "type": "integer",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -21133,6 +21172,24 @@
       "columns": [
         {
           "value": "retention_due_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "forms_responses",
+      "name": "forms_responses_waiting",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "stage_kind",
           "isExpression": false
         }
       ],
