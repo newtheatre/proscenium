@@ -125,5 +125,15 @@
   "core.me.data.cancel-thing": "your erasure",
   "core.me.data.cancel-consequence": "Your account stays as it is.",
   "core.me.data.cancelled": "Your erasure is cancelled.",
-  "core.me.data.expired": "The download has gone. You can make another."
+  "core.me.data.expired": "The download has gone. You can make another.",
+
+  "core.navigation.account-notifications.label": "Notifications",
+  "core.me.notifications.title": "Notifications",
+  "core.me.notifications.intro": "Choose which optional messages you get, by email and in your inbox. Messages about your own bookings, shifts and account always come.",
+  "core.me.notifications.none": "Nothing to choose",
+  "core.me.notifications.none-help": "Every message the theatre sends you is about your own bookings, shifts or account, so they all come.",
+  "core.me.notifications.now-on": "You will get {topic} again",
+  "core.me.notifications.now-off": "You will no longer get {topic}",
+  "core.notification-topics.credits.label": "New credits",
+  "core.notification-topics.credits.description": "When the theatre credits you on a production."
 }

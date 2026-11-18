@@ -95,7 +95,7 @@ export default defineModule({
     'forms.template': [{ id: 'awards.nomination', file: 'nomination' }],
     // ::awards-roll in a theatre's own page.
     'core.public-component': [
-      { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its short code).' },
+      { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its web address).' },
     ],
     // The holder's card, read by the door and the desk.
     'box-office.door-code': [{ id: 'awards.card', file: 'card' }],
@@ -111,7 +111,7 @@ export default defineModule({
         importId: z.string(),
         typeId: z.string(),
         importedBy: z.string().nullable(),
-        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
+        rows: z.array(z.object({ line: z.number(), name: z.string(), awardedOn: z.string(), awardedPrecision: z.enum(['day', 'year']).optional(), awardedFor: z.string().nullable(), citation: z.string().nullable(), address: z.string().nullable() })),
       }),
       lane: 'bulk',
     }),

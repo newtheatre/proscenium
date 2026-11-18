@@ -47,7 +47,7 @@
   "core.access.form.note": "Anything we should know about this? (optional)",
   "core.access.form.optional": "Optional",
   "core.access.form.more": "More about your visit",
-  "core.access.form.companion": "I require a companion/carer",
+  "core.access.form.companion": "I come with a companion or carer",
   "core.access.form.companions-how-many": "How many people come with you?",
   "core.access.form.companions-help": "A companion comes with you to help during your visit. Their ticket is free.",
   "core.access.form.companions-0": "No",

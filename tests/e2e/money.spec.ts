@@ -179,6 +179,33 @@ test('the Till takes part of the total one way and the rest another', async ({ p
   await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
 })
 
+test('Split asks for the first amount before starting the sale, and a reload keeps the split and its lines', async ({ page }) => {
+  await visit(page, '/live/till')
+  await page.getByLabel('Programmes sold').fill('2')
+  await page.getByLabel('Programmes sold').blur()
+  await page.getByRole('button', { name: 'Split' }).click()
+  // Nothing is started yet: the way back leaves the sale as it was.
+  await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
+  await expect(cash(page)).toBeDisabled() // a split needs its first amount
+  await amount(page.getByLabel(/^Amount to take this way/), '2')
+  await cash(page).click()
+  await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
+  // Reloaded before the first part is taken: the split and what the sale is for are still there.
+  await page.reload()
+  await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+  await expect(page.getByText('A payment of £6.00 was not finished').first()).toBeVisible()
+  await expect(page.getByText('Programmes × 2')).toBeVisible()
+  await expect(page.getByLabel(/^Amount to take this way/)).toHaveValue('£2.00')
+  await cash(page).click()
+  await page.getByRole('button', { name: 'Cash taken: £2.00' }).click()
+  await expect(page.getByText('Paid so far: £2.00')).toBeVisible()
+  await cash(page).click()
+  await page.getByRole('button', { name: 'Cash taken: £4.00' }).click()
+  await expect(page.getByText('Paid £6.00', { exact: true })).toBeVisible()
+  // The note about the unfinished payment goes once it is paid.
+  await expect(page.getByText('A payment of £6.00 was not finished')).toHaveCount(0)
+})
+
 test('the Till gives back what was taken when the customer leaves a sale paid in part', async ({ page }) => {
   await visit(page, '/live/till')
   await page.getByLabel('Programmes sold').fill('1')

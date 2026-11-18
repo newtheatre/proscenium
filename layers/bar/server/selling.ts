@@ -135,6 +135,9 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   const checks = await ageCheckSettings()
   if (restricted && checks.enabled && !input.ageCheck)
     refuse('bar.age-check.unanswered', `${restricted.label} needs an age check.`, { status: 409, remedy: 'Answer the age check, or refuse the sale.' })
+  // A customer refused from this basket is not served age-restricted drinks from it afterwards.
+  if (restricted && await first('SELECT 1 FROM bar_age_checks WHERE basket_key = ? AND outcome = \'refused\'', input.clientKey))
+    refuse('bar.age-check.refused-basket', `${restricted.label} cannot be sold: this customer was refused.`, { status: 409, remedy: 'Take the age-restricted drinks off, or start a new customer.' })
 
   const at = nowMs()
   const existing = await first<{ id: string, state: string, opening_id: string }>('SELECT id, state, opening_id FROM bar_sales WHERE client_key = ?', input.clientKey)

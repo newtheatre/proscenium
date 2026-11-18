@@ -4,7 +4,7 @@
 // after a few wrong tries. Neither can make a session strong.
 import type { H3Event } from 'h3'
 import { first, newId, nowMs, refuse, useContext, useSetting, siteUrl, type UnitView } from '#kit'
-import { countAgainstRate } from '#kit/ratelimit'
+import { countAgainstRate, waitRemedy } from '#kit/ratelimit'
 import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
 import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAddress } from './accounts'
 import { BROWSER_COOKIE, readCookie, setShortCookie } from './web'
@@ -51,7 +51,7 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
   // The per-address limit: over it, the same screen and no email.
-  if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) return quiet
+  if (!(await countAgainstRate('sign-in-link', `address:${address}`)).allowed) return quiet
 
   const existing = await addressRow(address)
   if (!existing && !(await useSetting('core.sign-in.open-sign-up'))) return quiet
@@ -146,6 +146,9 @@ const WRONG = { code: 'core.sign-in.code-wrong', reason: 'That code is not right
  */
 export async function useCode(unit: UnitView, event: H3Event, input: { address: string, code: string }): Promise<SignedIn> {
   const address = normaliseAddress(input.address)
+  // Tries for one address, counted apart from asking for links, so asking again never spends them.
+  const rate = await countAgainstRate('sign-in-code', `address:${address}`)
+  if (!rate.allowed) refuse('core.rate-limit.reached', 'Too many codes were tried for this address.', { status: 429, remedy: waitRemedy(rate.retryAfter) })
   const at = nowMs()
   const row = await first<TokenRow>(
     'SELECT * FROM core_account_tokens WHERE purpose = \'sign_in\' AND address = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1',

@@ -30,6 +30,7 @@ interface Run { id: string, total: number, done: number, state: 'running' | 'sto
 interface Answer {
   performances: Performance[]
   runs: Run[]
+  season: { startsOn: string, endsOn: string } | null
   options: {
     venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null, doorsBeforeMinutes: number | null, runPresetId: string | null }[] }[]
     access: Option[]
@@ -59,7 +60,8 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const TONES = { draft: 'neutral', scheduled: 'success', cancelled: 'danger', completed: 'info' } as const
 const performances = computed(() => data.value?.performances ?? [])
-const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId }))))
+// A space named as its venue is shown by the venue's name alone.
+const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: s.name === v.name ? v.name : `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity, doorsBeforeMinutes: s.doorsBeforeMinutes, runPresetId: s.runPresetId }))))
 /** What a performance in this space takes when it says nothing: the production's own over the space's over the theatre's. */
 function defaultsIn(spaceId: string): ShowDefaultValues {
   const d = data.value!.defaults
@@ -464,11 +466,36 @@ watch(moving, (on) => {
   }
 }, { immediate: true })
 onBeforeUnmount(() => clearInterval(timer))
-async function added(answer: { created: number } | { run: { id: string, total: number } }) {
+async function added(answer: { created: number, ids: string[] } | { run: { id: string, total: number } }) {
   await refresh()
   emit('changed')
-  toast.add({ title: 'created' in answer ? `${answer.created} performances added` : `Adding ${answer.run.total} performances`, color: 'success' })
+  if (!('created' in answer)) {
+    toast.add({ title: `Adding ${answer.run.total} performances`, color: 'success' })
+    return
+  }
+  // Undo removes what the run just added, drafts and scheduled alike.
+  offer(t('core.counts.performances-added', { count: answer.created }), async () => {
+    await $api<unknown>(`/api/core/productions/${props.productionId}/performances/undo` as string, { method: 'POST', body: { ids: answer.ids } })
+    await refresh()
+    emit('changed')
+  })
 }
+/** Where a new run's dates start: the day after the last performance, for a week, else the production's season. */
+const DAY = 86_400_000 // not-policy: milliseconds in a day
+const WEEK = 6 // not-policy: a suggested run's last date, six days after its first
+const shiftDay = (day: string, by: number) => new Date(Date.parse(`${day}T00:00:00Z`) + by * DAY).toISOString().slice(0, 10) // not-policy: the length of a date
+const suggestedRun = computed(() => {
+  const today = dates.toLocal(Date.now()).slice(0, 10) // not-policy: the length of a date
+  const last = performances.value.filter(p => p.state !== 'cancelled').at(-1)
+  if (last) {
+    const lastDay = dates.toLocal(last.startsAt).slice(0, 10) // not-policy: the length of a date
+    const start = shiftDay(lastDay > today ? lastDay : today, 1)
+    return { start, end: shiftDay(start, WEEK) }
+  }
+  const season = data.value?.season
+  if (season && season.endsOn > today) return { start: season.startsOn > today ? season.startsOn : shiftDay(today, 1), end: season.endsOn }
+  return null
+})
 const finishRun = (r: Run) => run(() => $api<unknown>(`/api/core/productions/${props.productionId}/runs/${r.id}/finish` as string, { method: 'POST', body: {} }), 'Finishing the run')
 async function removeRun(r: Run) {
   if (!await confirm({ verb: 'Remove', thing: `the ${r.done} performances this run added`, consequence: 'Drafts are deleted and scheduled performances are cancelled, as if each were cancelled.', button: 'Remove them' })) return
@@ -493,7 +520,7 @@ function actions(p: Performance) {
 <template>
   <PageSection
     title="Performances"
-    description="Each starts as a draft and is public once scheduled."
+    description="Each starts as a draft. Scheduled dates go public when the production is published."
   >
     <template #actions>
       <div class="flex flex-wrap gap-2">
@@ -656,7 +683,7 @@ function actions(p: Performance) {
     <UModal
       v-model:open="open"
       :title="editing ? 'Edit performance' : 'Add performance'"
-      :description="editing?.state === 'scheduled' ? 'It is scheduled, so a new time or space must be free.' : 'It starts as a draft. Nothing is public until it is scheduled.'"
+      :description="editing?.state === 'scheduled' ? 'It is scheduled, so a new time or space must be free.' : 'It starts as a draft. Scheduled dates go public when the production is published.'"
     >
       <template #body>
         <UForm
@@ -1040,6 +1067,7 @@ function actions(p: Performance) {
       :presets="data.options.presets"
       :defaults="data.defaults"
       :defaults-in="defaultsIn"
+      :suggested="suggestedRun"
       @added="added"
       @presets-changed="refresh()"
     />

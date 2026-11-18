@@ -1,5 +1,5 @@
 // Performances for box office staff (Box office specification, part 6, "Performances"): those still
-// to come, soonest first, each with its sale state and how many of its seats are taken, so a
+// to come, soonest first, each with its production, its sale state and how many of its seats are taken, so a
 // manager sees at a glance what is not yet on sale and what is selling.
 import { all, defineRoute, nowMs } from '#kit'
 import { getProduction, listPerformances } from '#modules/core'
@@ -19,6 +19,7 @@ export default defineRoute({ ability: 'box-office.performance.manage', rateLimit
   return {
     performances: coming.map(p => ({
       id: p.id,
+      productionId: p.productionId,
       title: titles.get(p.productionId)!,
       label: p.label,
       startsAt: p.startsAt,

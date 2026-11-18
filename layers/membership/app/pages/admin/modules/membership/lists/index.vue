@@ -88,6 +88,7 @@ const describe = (l: List) => [
       <KeysCard
         class="mt-6"
         :names="['MEMBERSHIP_LIST_KEY']"
+        :generate="['MEMBERSHIP_LIST_KEY']"
         @saved="refresh()"
       />
     </DataBoundary>
@@ -100,7 +101,7 @@ const describe = (l: List) => [
         <UForm
           id="membership-new-list"
           :state="form"
-          :validate="() => needs({ name: form.name })"
+          :validate="() => listErrors({ name: form.name, referenceLabel: form.keyKind === 'reference' ? form.referenceLabel : undefined })"
           class="space-y-4"
           novalidate
           @submit="create"
