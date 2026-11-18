@@ -1,7 +1,7 @@
 <!-- A response somebody answered signed out, opened through the link they were emailed when it was
      returned for changes (R-19): what they sent, the note to them, and, while it is back with them,
      their answers to change and send again. The link may be opened as often as they like; sending
-     the changes spends it. -->
+     the changes spends it. Files can be added to file questions through the link too. -->
 <script setup lang="ts">
 import type { Answers, Definition } from '../../../../shared/engine'
 import type { ShownAnswer } from '../../../components/FormsAnswers.vue'
@@ -24,6 +24,7 @@ const { dateTime } = useDates()
 const route = useRoute()
 const token = computed(() => String(route.params.token))
 const { data } = await useAPI<Opened>(() => `/api/forms/changes/${encodeURIComponent(token.value)}`, { key: `forms:changes:${token.value}` })
+provideChangeLinkUploads(token)
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }, { name: 'robots', content: 'noindex' }] })
 
 const changing = ref(false)

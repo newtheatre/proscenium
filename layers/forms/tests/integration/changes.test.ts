@@ -3,9 +3,9 @@
 // it, and sends their changes once. A new link replaces the one before; only its hash is stored.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, openSpecial, setClock } from '#kit'
-import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { deliver, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { sendReminders } from '../../server/reminders'
-import { NOV_17, account, definition, offered, question, ready, req, send } from './stage'
+import { NOV_17, account, definition, handle, offered, question, ready, req, send } from './stage'
 import type { Definition } from '../../shared/engine'
 import { reviewWorkflow } from '../../shared/engine'
 
@@ -116,5 +116,37 @@ describe('the link for changes', () => {
     expect((await move(other.formId, other.responseId, 'give_up')).status).toBe(200)
     expect((await req('GET', `/api/forms/changes/${theirs}`, undefined, null)).status).toBe(404)
     expect((await req('GET', '/api/forms/changes/nonsense', undefined, null)).status).toBe(404)
+  })
+})
+
+describe('files sent through the link', () => {
+  const PDF = new TextEncoder().encode('%PDF-1.7\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF')
+  const upload = async (token: string, question: string) => {
+    const q = new URLSearchParams({ question, name: 'script.pdf', type: 'application/pdf' })
+    const response = await handle(new Request(`http://test/api/forms/changes/${token}/files?${q}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'host': 'test' }, body: PDF }))
+    return { status: response.status, body: await response.json() as any }
+  }
+
+  it('are added to a file question, checked, and kept with the changes', async () => {
+    setClock(NOV_17)
+    const def = { ...definition(question('name', { required: true }), question('script', { type: 'file', dataClass: 'personal' })), workflow: staged().workflow }
+    const { formId, slug } = await offered(def, {}, { title: 'Scripts' })
+    const { responseId } = (await send(slug, { name: 'Gia' }, null, { email: 'gia.files@example.org' })).body
+    await move(formId, responseId, 'start_review')
+    await move(formId, responseId, 'return', 'Please attach your script.')
+    const token = await linkIn('forms.returned-guest', responseId)
+
+    expect((await upload(token, 'name')).body.code).toBe('forms.files.not-a-file-question')
+    expect((await upload('not-a-link', 'script')).status).toBe(404)
+    const up = await upload(token, 'script')
+    expect(up.status, JSON.stringify(up.body)).toBe(200)
+    await deliver()
+    expect((await req('GET', `/api/forms/changes/${token}/files/${up.body.id}`, undefined, null)).body).toMatchObject({ state: 'ready' })
+
+    const changed = await req('PUT', `/api/forms/changes/${token}`, { answers: { name: 'Gia', script: [{ id: up.body.id, name: 'x', size: 1, type: 'x' }] } }, null)
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200)
+    expect(await rows('SELECT state, attached_at IS NOT NULL AS attached FROM core_files WHERE id = ?', up.body.id)).toEqual([{ state: 'ready', attached: 1 }])
+    // The link is spent, so nothing more can be uploaded with it.
+    expect((await upload(token, 'script')).status).toBe(404)
   })
 })
