@@ -3,7 +3,7 @@
 // conditional update that stamps the ticket with the scan's id, so a ticket is admitted exactly
 // once however many devices scan it together, and the scan row written next in the same batch takes
 // its result from that stamp: admitted if the stamp is its own id, already admitted otherwise. A desk code or a
-// booking reference admits nobody and writes no scan row.
+// booking reference admits nobody and writes no scan row; one for another performance says which.
 //
 // A ticket sold on a requirement, such as a member's price, is checked again before it is admitted
 // (part 5, "Checking again at entry"): when its type rechecks, and always when it was met by a typed
@@ -17,7 +17,7 @@ import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
 
-export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed'
+export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed' | 'reference'
 
 export interface ScanOutcome {
   result: ScanResult
@@ -31,10 +31,14 @@ export interface ScanOutcome {
   voidReason?: string
   /** Wrong performance: the one the ticket is for. */
   ticketPerformanceId?: string
+  /** Wrong performance: what the steward tells the customer, the show and when it starts. */
+  ticketPerformance?: { id: string, title: string, label: string | null, startsAt: number, venue: string }
   /** A code of another kind (box-office.door-code), such as a membership card: what it says. */
   card?: { kind: string, headline: string, line: string, state: 'ok' | 'attention' }
   /** Admitted or already in: the ticket and how much of its booking is in now. */
   booking?: { reference: string, ticketType: string, admitted: number, tickets: number }
+  /** A paid booking's reference for this performance: the door finds it in the list, where it can admit them. */
+  reference?: string
   /** Not paid: the reservation the door sends to the box office or the bar, and what is owed. */
   reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
   /** Requirement not met: the source's words, such as "Membership not current", and the ticket's type. */
@@ -95,6 +99,20 @@ async function bookingOf(ticketId: string, performanceId: string): Promise<ScanO
   return { reference: row.reference, ticketType: row.type_name, admitted: Number(counts?.admitted ?? 0), tickets: Number(counts?.tickets ?? 0) }
 }
 
+/** The performance a ticket or booking is for, as the door names it to the customer. */
+async function performanceOf(performanceId: string): Promise<ScanOutcome['ticketPerformance']> {
+  const row = await first<{ id: string, title: string, label: string | null, starts_at: number, venue: string }>(
+    `SELECT f.id, p.title, f.label, f.starts_at, v.name AS venue FROM core_performances f JOIN core_productions p ON p.id = f.production_id
+      JOIN core_venues v ON v.id = f.venue_id WHERE f.id = ?`, performanceId)
+  return row ? { id: row.id, title: row.title, label: row.label, startsAt: row.starts_at, venue: row.venue } : undefined
+}
+
+/** Another performance's ticket or booking: which one it is for, so the steward can say. */
+async function elsewhere(performanceId: string): Promise<Pick<ScanOutcome, 'ticketPerformanceId' | 'ticketPerformance'>> {
+  const ticketPerformance = await performanceOf(performanceId)
+  return { ticketPerformanceId: performanceId, ...ticketPerformance ? { ticketPerformance } : {} }
+}
+
 export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null }
 
 interface TicketRow { id: string, performance_id: string, state: 'valid' | 'void', void_reason: string | null, admitted_at: number | null }
@@ -130,13 +148,16 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
     return said ? { result: 'card', scanId: null, card: { kind, ...said } } : { result: 'unknown', scanId: null }
   }
   if (parts.length !== PARTS || parts[0] !== TICKET_KIND) {
-    // What a reservation's message carries is not a ticket: the desk takes the payment first.
-    const reservation = await first<{ id: string, reference: string, total_minor: number, currency: string }>("SELECT id, reference, total_minor, currency FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
-    if (reservation) {
-      const lines = await all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live'", reservation.id)
-      // A reservation for another night is that, whether paid or not.
-      if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ticketPerformanceId: lines[0]!.performance_id }
-      return { result: 'not_paid', scanId: null, reservation: { reference: reservation.reference, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: reservation.total_minor, currency: reservation.currency } }
+    // What a reservation's message carries is not a ticket: the desk takes the payment first. A paid
+    // booking's reference is ours too: for another night it says which, and for tonight the door
+    // finds the booking in its list, where its tickets can be admitted.
+    const order = await first<{ id: string, reference: string, state: string, total_minor: number, currency: string }>("SELECT id, reference, state, total_minor, currency FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment', 'confirmed') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
+    if (order) {
+      const lines = await all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live' ORDER BY performance_id", order.id)
+      // A booking for another night is that, whether paid or not.
+      if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ...await elsewhere(lines[0]!.performance_id) }
+      if (order.state === 'confirmed') return lines.length ? { result: 'reference', scanId: null, reference: order.reference } : recorded({ result: 'unknown' })
+      return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: order.total_minor, currency: order.currency } }
     }
     return recorded({ result: 'unknown' })
   }
@@ -146,7 +167,7 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   const ticket = await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE code_hash = ?', await hashOf(random))
   if (!ticket) return recorded({ result: 'unknown' })
   if (ticket.state === 'void') return recorded({ result: 'void', ticketId: ticket.id, voidReason: ticket.void_reason ?? undefined }, ticket.id)
-  if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ticketPerformanceId: ticket.performance_id }, ticket.id)
+  if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ...await elsewhere(ticket.performance_id) }, ticket.id)
   // A ticket already in is said so without asking again; one not yet in is checked before it is admitted.
   const checked = ticket.admitted_at === null ? await recheck(ticket.id, input.performanceId) : { verdict: 'met' as const }
   if (checked.verdict === 'not-met') {
