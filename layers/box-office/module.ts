@@ -49,6 +49,8 @@ export default defineModule({
     'comps.per-performance': setting.integer({ unset: true, min: 0, max: 1000, change, audience: 'staff' }),
     // The theatre's usual ticket preset, which a new show's tickets start from (show walkthrough, decision 2).
     'presets.usual': setting.custom({ schema: z.string().regex(/^tps_[2-7a-z]{26}$/), unset: true, change: 'box-office.pricing.manage', audience: 'staff' }),
+    // A date added to a run that is on sale goes on sale too, with the run's seats and prices (show walkthrough, decision 3).
+    'runs.open-new-dates': setting.boolean({ default: true, change, audience: 'staff' }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
@@ -142,6 +144,8 @@ export default defineModule({
       'core.performance.cancelled': 'follow-cancel',
       'core.performance.rescheduled': 'follow-reschedule',
       'core.performance.moved': 'follow-move',
+      // A newly scheduled performance takes its run's set-up, or its ticket preset, and goes on sale with the run.
+      'core.performance.scheduled': 'follow-schedule',
       'core.production.updated': 'follow-guidance',
     },
   },
@@ -222,6 +226,9 @@ export default defineModule({
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
     'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }, { id: 'box-office.order', file: 'order' }],
+    // The Tickets tab and fact on a production's page (show walkthrough, decision 1).
+    'core.record-tab': [{ id: 'box-office.production', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTickets', order: 10 }],
+    'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
     'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
@@ -281,11 +288,11 @@ export default defineModule({
       channels: ['email' as const],
       lane: 'prompt' as const,
       // The box office code finds the order and the link changes it, so both are sealed.
-      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, amountDue: 'text' as const, deskCode: 'sealed' as const, link: 'sealed' as const },
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, where: 'text' as const, doors: 'text' as const, access: 'text' as const, tickets: 'text' as const, amountDue: 'text' as const, deskCode: 'sealed' as const, link: 'sealed' as const },
       wording: {
         'en-GB': {
           subject: 'Reserved: {{ show }}, {{ when }}',
-          body: 'Your tickets are reserved. Nothing has been paid yet: you pay at the box office when you arrive.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nTo pay on arrival: **{{ amountDue }}**\n\nBooking reference: **{{ reference }}**\n\nBox office code: **{{ deskCode }}**\n\nShow the reference or the box office code at the box office. They are not tickets and will not let you in at the door.\n\nIf you cannot come, or need fewer tickets, please let them go so somebody else can have them:\n\n[Change or cancel my reservation]({{ link }})\n\nThis link works until the reservation is paid for. Once you have paid, your tickets come with a new one.',
+          body: 'Your tickets are reserved. Nothing has been paid yet: you pay at the box office when you arrive.\n\n**{{ show }}**, {{ when }}\n\n{{ where }}. Doors open at {{ doors }}.\n\n{{ access }}\n\nTickets: {{ tickets }}\n\nTo pay on arrival: **{{ amountDue }}**\n\nBooking reference: **{{ reference }}**\n\nBox office code: **{{ deskCode }}**\n\nShow the reference or the box office code at the box office. They are not tickets and will not let you in at the door.\n\n[Show my reservation]({{ link }})\n\nThat page has the box office code as a QR code to be scanned at the box office. If you cannot come, or need fewer tickets, you can let them go there so somebody else can have them.\n\nThis link works until the reservation is paid for. Once you have paid, your tickets come with a new one.',
         },
       },
     }, {
@@ -295,11 +302,11 @@ export default defineModule({
       channels: ['email' as const],
       lane: 'prompt' as const,
       // The reservation for a buyer who has never signed in: the same, with core's link that opens their account.
-      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, amountDue: 'text' as const, deskCode: 'sealed' as const, link: 'sealed' as const, account: 'sealed' as const },
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, where: 'text' as const, doors: 'text' as const, access: 'text' as const, tickets: 'text' as const, amountDue: 'text' as const, deskCode: 'sealed' as const, link: 'sealed' as const, account: 'sealed' as const },
       wording: {
         'en-GB': {
           subject: 'Reserved: {{ show }}, {{ when }}',
-          body: 'Your tickets are reserved. Nothing has been paid yet: you pay at the box office when you arrive.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nTo pay on arrival: **{{ amountDue }}**\n\nBooking reference: **{{ reference }}**\n\nBox office code: **{{ deskCode }}**\n\nShow the reference or the box office code at the box office. They are not tickets and will not let you in at the door.\n\nIf you cannot come, or need fewer tickets, please let them go so somebody else can have them:\n\n[Change or cancel my reservation]({{ link }})\n\nThis link works until the reservation is paid for. Once you have paid, your tickets come with a new one.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
+          body: 'Your tickets are reserved. Nothing has been paid yet: you pay at the box office when you arrive.\n\n**{{ show }}**, {{ when }}\n\n{{ where }}. Doors open at {{ doors }}.\n\n{{ access }}\n\nTickets: {{ tickets }}\n\nTo pay on arrival: **{{ amountDue }}**\n\nBooking reference: **{{ reference }}**\n\nBox office code: **{{ deskCode }}**\n\nShow the reference or the box office code at the box office. They are not tickets and will not let you in at the door.\n\n[Show my reservation]({{ link }})\n\nThat page has the box office code as a QR code to be scanned at the box office. If you cannot come, or need fewer tickets, you can let them go there so somebody else can have them.\n\nThis link works until the reservation is paid for. Once you have paid, your tickets come with a new one.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
         },
       },
     }, {
@@ -320,12 +327,13 @@ export default defineModule({
       side: 'audience' as const,
       channels: ['email' as const],
       lane: 'prompt' as const,
-      // A door code lets its holder in and the link changes the booking, so both are sealed.
-      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, paid: 'text' as const, codes: 'sealed' as const, link: 'sealed' as const },
+      // The link shows the tickets, whose codes let their holder in, and changes the booking, so it is sealed.
+      // The email never carries a door code itself: a QR on the page is what the door scans.
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, where: 'text' as const, doors: 'text' as const, access: 'text' as const, tickets: 'text' as const, paid: 'text' as const, numbers: 'text' as const, link: 'sealed' as const },
       wording: {
         'en-GB': {
           subject: 'Your tickets: {{ show }}, {{ when }}',
-          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nTotal: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.',
+          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\n{{ where }}. Doors open at {{ doors }}.\n\n{{ access }}\n\nTickets: {{ tickets }}\n\nTotal: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nYour tickets are on that page, each with its own code to be scanned at the door. Open it on your phone when you arrive, or print it.\n\nTicket numbers: {{ numbers }}\n\nAnyone with the link can use the tickets, so only pass this email on to the people you are bringing.',
         },
       },
     }, {
@@ -335,11 +343,11 @@ export default defineModule({
       channels: ['email' as const],
       lane: 'prompt' as const,
       // The confirmation for a buyer who has never signed in: the same, with core's link that opens their account.
-      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, paid: 'text' as const, codes: 'sealed' as const, link: 'sealed' as const, account: 'sealed' as const },
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, where: 'text' as const, doors: 'text' as const, access: 'text' as const, tickets: 'text' as const, paid: 'text' as const, numbers: 'text' as const, link: 'sealed' as const, account: 'sealed' as const },
       wording: {
         'en-GB': {
           subject: 'Your tickets: {{ show }}, {{ when }}',
-          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nTotal: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
+          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\n{{ where }}. Doors open at {{ doors }}.\n\n{{ access }}\n\nTickets: {{ tickets }}\n\nTotal: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nYour tickets are on that page, each with its own code to be scanned at the door. Open it on your phone when you arrive, or print it.\n\nTicket numbers: {{ numbers }}\n\nAnyone with the link can use the tickets, so only pass this email on to the people you are bringing.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
         },
       },
     }, {
@@ -348,12 +356,12 @@ export default defineModule({
       side: 'audience' as const,
       channels: ['email' as const],
       lane: 'prompt' as const,
-      // The new door codes let their holder in, so they are sealed.
-      variables: { reference: 'text' as const, was: 'text' as const, now: 'text' as const, money: 'text' as const, codes: 'sealed' as const },
+      // The link shows the new tickets, whose codes let their holder in, so it is sealed.
+      variables: { reference: 'text' as const, was: 'text' as const, now: 'text' as const, money: 'text' as const, next: 'text' as const, link: 'sealed' as const },
       wording: {
         'en-GB': {
           subject: 'Your tickets have been exchanged: {{ reference }}',
-          body: 'We have exchanged tickets on booking **{{ reference }}**.\n\nWas: {{ was }}\n\nNow: **{{ now }}**\n\n{{ money }}\n\nThe old tickets no longer work. Your new tickets:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.',
+          body: 'We have exchanged tickets on booking **{{ reference }}**.\n\nWas: {{ was }}\n\nNow: **{{ now }}**\n\n{{ money }}\n\n{{ next }}\n\n[Show my booking]({{ link }})',
         },
       },
     }, {

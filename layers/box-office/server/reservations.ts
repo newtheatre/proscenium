@@ -10,16 +10,17 @@
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
-import { first, inAccountScope, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
-import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, notify, notifyAddress } from '#modules/core'
+import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
+import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
-import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, wordsFor, type LineRow, type OrderRow } from './orders'
+import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { salesOf } from './setup'
+import { doorCodesForOrder, ticketNumbers } from './tickets'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
 
@@ -163,7 +164,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   unit.add(sql`UPDATE box_office_holds SET kind = 'reservation', updated_at = ${at} WHERE order_id = ${order.id} AND kind = 'basket'`).expect(1, RAN_OUT)
 
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
-  const variables = { reference: order.reference, show: words.show, when: words.when, tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
+  const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
   // A buyer who has never signed in also gets the link that opens their account (core's claim link).
   const account = await claimLink(unit, accountId, madeWith)
   await notify(unit, account ? 'box-office.order-reserved-guest' : 'box-office.order-reserved', {
@@ -193,6 +194,52 @@ export interface OrderView {
   buyerCancel: { feeMinor: number, until: number } | null
   /** The buyer has never signed in, so the page may offer to open their account. Says nothing else about them. */
   accountUnclaimed?: boolean
+  /**
+   * A confirmed booking's valid tickets, each with its door code to be shown as a QR code, and the
+   * number a person reads off it. doorCode is null for a ticket issued before codes were kept: its
+   * code is only in the confirmation email.
+   */
+  tickets?: ShownOrderTicket[]
+  /** What the booking is for: null only for an order with no ticket lines ever. */
+  show?: OrderShow | null
+}
+
+/** What the booking is for, so a page can lead with it. venueSlug is set when the venue has a public page. */
+export interface OrderShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
+
+/** The performance an order's tickets are for (the first, where it has more than one). */
+export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<OrderShow | null> {
+  if (!lines.length) return null
+  const performance = await getPerformance(lines[0]!.performance_id)
+  const production = await getProduction(performance.productionId)
+  const venue = await getVenue(performance.venueId).catch(() => null)
+  const listed = !!venue && !venue.archived && await isEnabled('public-site')
+  const address = venue ? [venue.addressLines?.replace(/\n+/g, ', '), venue.locality, venue.postcode].filter(Boolean).join(', ') || null : null
+  return {
+    title: production.title,
+    productionSlug: production.slug,
+    startsAt: performance.startsAt,
+    endsAt: performance.endsAt,
+    venue: `${performance.venueName}, ${performance.spaceName}`,
+    venueSlug: listed ? venue!.slug : null,
+    address,
+    cancelled: performance.state === 'cancelled',
+  }
+}
+
+export interface ShownOrderTicket { lineId: string, number: string, doorCode: string | null, admitted: boolean }
+
+// A cancelled order has no live lines: what it was for is still its lines'.
+function everyLine(orderId: string): Promise<{ performance_id: string }[]> {
+  return all<{ performance_id: string }>("SELECT performance_id FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY id LIMIT 1", orderId) // not-policy: the first is enough
+}
+
+/** The tickets of a confirmed order to show to whoever may see it, with their numbers, in the order they were made. */
+export async function ticketsToShow(order: Pick<OrderRow, 'id' | 'reference' | 'state'>, keep?: readonly string[]): Promise<ShownOrderTicket[]> {
+  if (order.state !== 'confirmed') return []
+  const shown = (await doorCodesForOrder(order.id)).filter(t => !keep || keep.includes(t.lineId)).sort((a, b) => (a.lineId < b.lineId ? -1 : 1))
+  const numbers = await ticketNumbers(order, shown.map(t => t.lineId))
+  return shown.map((t, i) => ({ lineId: t.lineId, number: numbers[i]!, doorCode: t.doorCode, admitted: t.admitted }))
 }
 
 /**
@@ -219,11 +266,26 @@ export async function buyerCancelTerms(order: Pick<OrderRow, 'state' | 'sold_by'
 }
 
 /**
- * An order, for whoever holds the link from its message, in any state it reaches after the basket.
- * No sign-in, and no name or address shown.
+ * How a booking is opened: by the token in the link from its messages, or by its id for the signed-in
+ * person whose booking it is (through the account scope, so a booking on an account merged into
+ * theirs opens too). Anyone else gets what a wrong link gets, so an id tells them nothing.
  */
-export async function orderByLink(token: string): Promise<OrderView | null> {
-  const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ? AND state <> 'basket'`, await hashOf(token)) : null
+export type OrderKey = { token: string } | { orderId: string, accountId: string | null }
+
+async function orderFor(key: OrderKey): Promise<OrderRow | null> {
+  if ('token' in key) return key.token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ? AND state <> 'basket'`, await hashOf(key.token)) : null
+  if (!key.orderId || !key.accountId) return null
+  const own = await useDb().get<{ id: string }>(sql`SELECT id FROM box_office_orders
+    WHERE id = ${key.orderId} AND state <> 'basket' AND ${inAccountScope('account_id', key.accountId)}`)
+  return own ? await first<OrderRow>(`${ORDER} WHERE id = ?`, own.id) : null
+}
+
+/**
+ * An order, for whoever holds the link from its message or for its signed-in owner, in any state it
+ * reaches after the basket. No name or address shown.
+ */
+export async function orderByLink(key: OrderKey): Promise<OrderView | null> {
+  const order = await orderFor(key)
   if (!order) return null
   const lines = await liveLines(order.id)
   return {
@@ -238,18 +300,20 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
     buyerCancel: await buyerCancelTerms(order, lines),
     // Only where the booking's email could carry the link that opens it, so the page never promises one that did not come.
     accountUnclaimed: order.account_id ? await canSendClaimLink(order.account_id) : false,
+    tickets: await ticketsToShow(order),
+    show: await showOf(lines.length ? lines : await everyLine(order.id)),
   }
 }
 
 /**
- * Cancel or reduce a booking from its link (R-2): the seats go back on sale in the same batch. With
+ * Cancel or reduce a booking from its link, or by its signed-in owner (R-2): the seats go back on sale in the same batch. With
  * no lines named, the whole booking is cancelled. A reservation was not paid for, so nothing is
  * refunded. A paid booking can be cancelled here only on the terms of buyerCancelTerms, and the
  * price less the cancellation fee goes back the way it was paid.
  */
-export async function cancelFromLink(unit: UnitView, token: string, lineIds?: string[]): Promise<OrderView> {
-  const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ?`, await hashOf(token)) : null
-  if (!order || order.state === 'basket') refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
+export async function cancelFromLink(unit: UnitView, key: OrderKey, lineIds?: string[]): Promise<OrderView> {
+  const order = await orderFor(key)
+  if (!order) refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
   if (order.state === 'confirmed' && await buyerCancelTerms(order, await liveLines(order.id))) {
     const done = await cancelLines(unit, order.id, { lineIds, refund: 'less-fee', by: null, kind: 'customer' })
     const kept = (await liveLines(order.id)).filter(l => !lineIds || !lineIds.includes(l.id))
@@ -263,6 +327,9 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
       releaseAt: null,
       lines: done.state === 'cancelled' ? [] : kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
       buyerCancel: done.state === 'cancelled' ? null : await buyerCancelTerms(order, kept),
+      // Read before the cancellation is written, so only the tickets kept are shown.
+      tickets: done.state === 'cancelled' ? [] : await ticketsToShow(order, kept.map(l => l.id)),
+      show: await showOf(await liveLines(order.id)),
     }
   }
   if (order.state !== 'reserved')
@@ -285,7 +352,7 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
     ? sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`
     : sql`UPDATE box_office_orders SET state = 'cancelled', total_minor = ${totalMinor}, cancelled_at = ${at}, release_at = NULL, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`)
     .expect(1, changed)
-  // By nobody the platform can name: whoever held the link.
+  // Recorded as the buyer's own, with no one named, however the booking was opened.
   const [cancellationId] = unit.insertSet(cancellations, [{ orderId: order.id, kind: 'customer', lineIds: ids, feeMinor: 0, by: null }])
 
   unit.announce('box-office.order.cancelled', { orderId: order.id, cancellationId: cancellationId! }, { record: ['box-office.order', order.id] })
@@ -312,5 +379,6 @@ export async function cancelFromLink(unit: UnitView, token: string, lineIds?: st
     releaseAt: kept.length ? order.release_at : null,
     lines: kept.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor })),
     buyerCancel: null,
+    show: await showOf(lines),
   }
 }

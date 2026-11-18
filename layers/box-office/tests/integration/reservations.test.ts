@@ -33,9 +33,9 @@ async function basket(h: House, quantity: number) {
 let guests = 0
 const address = () => `guest${++guests}@example.org`
 
-/** Presses Reserve as a guest. */
+/** Presses Reserve as a guest, with the age box ticked (only an 18+ show asks for it). */
 function reserve(b: { orderId: string, token: string, totalMinor: number }, email: string | undefined, actor: ReturnType<typeof person> | null = null, total = b.totalMinor) {
-  return req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: total, ...(email ? { email, name: 'Guest Buyer' } : {}) }, actor, { 'x-basket-token': b.token })
+  return req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: total, ageConfirmed: true, ...(email ? { email, name: 'Guest Buyer' } : {}) }, actor, { 'x-basket-token': b.token })
 }
 
 /** The sealed variables of the newest message of a type about an order, as the buyer's email shows them. */
@@ -89,6 +89,7 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     const told = await mail('box-office.order-reserved', b.orderId)
     expect(told).toMatchObject({ reference: b.reference, tickets: '2 × Full price', deskCode: done.body.deskCode })
     expect(told.amountDue).toContain('24.00')
+    expect(told.doors).toMatch(/\d/)
     expect(tokenOf(told.link!)).toBe(done.body.token)
     // With no site address recorded there is no link to open the account, so nothing promises one.
     expect(told.account).toBeUndefined()
@@ -234,6 +235,9 @@ describe('the link in the reservation message', () => {
     expect(seen.status, JSON.stringify(seen.body)).toBe(200)
     expect(seen.body).toMatchObject({ reference: done.body.reference, state: 'reserved', amountDueMinor: 3600 })
     expect(seen.body.lines).toHaveLength(3)
+    // What it is for leads the page; a reservation has no tickets yet.
+    expect(seen.body.show).toMatchObject({ title: expect.stringMatching(/^Box office show/), venue: expect.stringMatching(/^Box office venue/), cancelled: false })
+    expect(seen.body.tickets).toEqual([])
     // One band: no part of the house to name. With a second, each ticket says which part it is in.
     expect(seen.body.lines[0].band).toBeNull()
     expect((await req('POST', `/api/box-office/productions/${h.productionId}/bands`, { name: 'Wheelchair spaces' })).status).toBe(200)

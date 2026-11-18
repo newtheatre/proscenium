@@ -6,7 +6,7 @@
 import { z } from 'zod'
 import type { RefusalView } from '../../utils/refusal'
 
-interface Address { id: string, address: string, verified: boolean, audience: boolean, members: boolean }
+interface Address { id: string, address: string, verified: boolean, audience: boolean, members: boolean, resendAt?: number }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -41,6 +41,32 @@ async function remove(address: Address) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+  }
+}
+
+// Sending a link again goes through the same route as adding; the server keeps a pause between sends.
+const now = ref(new Date())
+let ticking: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  ticking = setInterval(() => (now.value = new Date()), 1000) // not-policy: a once-a-second countdown
+})
+onBeforeUnmount(() => clearInterval(ticking))
+const resending = ref<string | null>(null)
+const waitSeconds = (a: Address) => a.resendAt ? Math.max(0, Math.ceil((a.resendAt - now.value.getTime()) / 1000)) : 0 // not-policy: milliseconds to whole seconds
+
+async function resend(address: Address) {
+  resending.value = address.id
+  refusal.value = null
+  try {
+    await $api('/api/core/me/addresses', { method: 'POST', body: { address: address.address } })
+    toast.add({ title: t('core.me.email.sent', { address: address.address }), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    resending.value = null
   }
 }
 
@@ -114,6 +140,18 @@ async function add() {
               </span>
             </template>
             <div class="flex flex-wrap justify-end gap-2">
+              <UButton
+                v-if="!a.verified"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-send"
+                :loading="resending === a.id"
+                :disabled="waitSeconds(a) > 0"
+                :label="waitSeconds(a) > 0 ? t('core.me.email.resend-in', { count: waitSeconds(a) }) : t('core.me.email.resend')"
+                :aria-label="`${t('core.me.email.resend')} ${a.address}`"
+                @click="resend(a)"
+              />
               <UButton
                 v-if="a.verified && !a.audience"
                 size="sm"
