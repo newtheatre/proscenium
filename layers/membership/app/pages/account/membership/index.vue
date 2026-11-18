@@ -21,6 +21,14 @@ const mine = await useAPI<Mine>('/api/membership/mine', { key: 'membership:mine'
 const offered = await useAPI<{ schemes: Offered[] }>('/api/membership/schemes', { key: 'membership:offered' })
 
 const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 'lapsed': 'neutral' } as const
+// Sent here from the members' area, which is for members only: say why, and when theirs ended.
+const route = useRoute()
+const fromMembersArea = computed(() => route.query.from === 'members')
+const lastEnded = computed(() => {
+  const all = mine.data.value?.memberships ?? []
+  if (all.some(m => m.status !== 'lapsed')) return null
+  return all.filter(m => m.status === 'lapsed' && m.endsOn).sort((a, b) => b.endsOn!.localeCompare(a.endsOn!))[0] ?? null
+})
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
 /** A refusal about one field, shown under it; anything else shows above the form. */
@@ -151,6 +159,14 @@ async function withdraw(a: Mine['applications'][number]) {
       @retry="mine.refresh()"
     >
       <div class="space-y-6">
+        <UAlert
+          v-if="fromMembersArea"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-id-card"
+          :title="lastEnded ? t('membership.members-area.ended', { scheme: lastEnded.schemeName, date: day(lastEnded.endsOn!) }) : t('membership.members-area.not-member')"
+          :description="lastEnded ? t('membership.members-area.ended-help') : t('membership.members-area.not-member-help')"
+        />
         <PageSection
           v-if="mine.data.value?.memberships.length"
           :title="t('membership.screens.mine.held')"
