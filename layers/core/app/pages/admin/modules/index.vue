@@ -79,7 +79,7 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
           icon="i-lucide-search"
           :placeholder="t('core.modules.search')"
           :aria-label="t('core.modules.search')"
-          class="w-full sm:w-56"
+          class="sm:w-56"
         />
       </div>
       <EmptyState
