@@ -63,6 +63,13 @@ describe('the guard for addresses under a shell (UI-07, UI-08)', () => {
     expect((await decide('/console', audience())).decision).toBe('not-found')
   })
 
+  it('sends someone whose only work is in live mode from the console to Tonight', async () => {
+    const steward = person(['gallery.sample.manage'])
+    expect(await decide('/console', steward)).toEqual({ decision: 'redirect', to: '/live' })
+    expect(await decide('/console/gallery/list', steward)).toEqual({ decision: 'redirect', to: '/live' })
+    expect((await decide('/live', steward)).decision).toBe('allow')
+  })
+
   it('tells someone in the console who lacks the ability why, and what would let them through', async () => {
     const result = await decide('/console/gallery/denied', reader())
     expect(result.decision).toBe('refused')

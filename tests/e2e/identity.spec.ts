@@ -4,10 +4,16 @@ import AxeBuilder from '@axe-core/playwright'
 
 const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
-test('the sign-in page offers a passkey first', async ({ page }) => {
+test('the sign-in page asks for an email address first, with a passkey as another way', async ({ page }) => {
   await page.goto('/sign-in')
   await expect(page.getByText('Sign in', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Email address' })).toBeVisible()
+  const link = page.getByRole('button', { name: 'Email me a link' })
+  const passkey = page.getByRole('button', { name: 'Sign in with a passkey' })
+  await expect(link).toBeVisible()
+  await expect(passkey).toBeVisible()
+  // The emailed link comes first.
+  expect((await link.boundingBox())!.y).toBeLessThan((await passkey.boundingBox())!.y)
 })
 
 test('a Google refusal is explained on the sign-in page', async ({ page }) => {

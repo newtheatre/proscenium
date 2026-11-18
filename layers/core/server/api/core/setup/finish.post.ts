@@ -5,6 +5,7 @@ import { normaliseOrigin, requestUrl } from '#kit/origin'
 import { clearTicket, readTicket, requireSetupNeeded, writeOwner } from '../../../identity/setup'
 import { digest, normaliseRecoveryCode } from '../../../identity/crypto'
 import { startSession } from '../../../identity/sessions'
+import { ensureModuleDefaults } from '../../../identity/defaults'
 
 export default defineRoute({
   public: true,
@@ -33,5 +34,9 @@ export default defineRoute({
     if (ticket.theatre.contactEmail) await changeSetting(unit, 'core.organisation.contact-email', ticket.theatre.contactEmail)
   }
   unit.afterCommit(() => clearTicket(event))
+  // Core is always on, so its roles and fact mappings are made with the site rather than on a switch.
+  unit.afterCommit(async () => {
+    await ensureModuleDefaults('core', accountId)
+  })
   return { next: '/admin' }
 })

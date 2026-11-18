@@ -1,10 +1,10 @@
 // The "Your session" card on Sessions: my open session, if any, with the cash expected in it so far,
 // when it closes itself if nothing more is sold, and the payments in it still waiting for an answer;
-// and my sessions that stopped and await their count. cashTaken says whether to ask for a float.
+// what it has taken by each way of paying and its latest sales; and my sessions that stopped and await their count. cashTaken says whether to ask for a float.
 // mayOpen and mayViewAll say what the page shows: the card, the list of every session, or both.
 import { z } from 'zod'
 import { can, defineRoute, useSetting } from '#kit'
-import { awaitingCountOf, closesAt, lastSaleIn, sessionOf, summarise, unfinishedIn, waitingIn } from '../../sessions'
+import { awaitingCountOf, closesAt, defaultSpace, lastSaleIn, salesIn, sessionOf, summarise, takingsIn, unfinishedIn, waitingIn } from '../../sessions'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -23,6 +23,10 @@ export default defineRoute({
     session: session ? { ...await summarise(session, undefined, cashTaken), lastSaleAt: await lastSaleIn(session), closesAt: await closesAt(session) } : null,
     waiting: session ? await waitingIn(session.id) : [],
     unfinished: session?.state === 'open' ? await unfinishedIn(session.id) : null,
+    takings: session ? await takingsIn(session.id) : [],
+    // Where a session opens when the device has no place of its own, for the till to show.
+    defaultSpaceId: mayOpen && !session ? await defaultSpace() : null,
+    sales: session ? await salesIn(session.id) : [],
     awaiting: await Promise.all(awaiting.map(s => summarise(s, undefined, cashTaken))),
   }
 })
