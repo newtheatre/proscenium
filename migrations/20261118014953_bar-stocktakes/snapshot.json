@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7f7a6229-8c87-4816-9cce-258719b5651c",
+  "id": "25104b33-79ae-4644-b6dd-a65344440aae",
   "prevIds": [
     "bf585f8b-07b7-4857-a04d-69f78b89cd42",
     "f16694ca-f01c-498a-b295-4710fcc8a010"
@@ -117,6 +117,14 @@
     },
     {
       "name": "bar_stock_movements",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_stocktake_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_stocktakes",
       "entityType": "tables"
     },
     {
@@ -505,10 +513,6 @@
     },
     {
       "name": "forms_responses",
-      "entityType": "tables"
-    },
-    {
-      "name": "forms_stage_history",
       "entityType": "tables"
     },
     {
@@ -3388,6 +3392,236 @@
     {
       "table": "bar_stock_movements",
       "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "stocktake_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "stock_item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "counted",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "expected",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "variance_reason_term",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "location_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "scope",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "category_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "started_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "submitted_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "approved_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "started_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "submitted_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "approved_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "variance_value_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "updated_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -12847,16 +13081,6 @@
     },
     {
       "table": "forms_responses",
-      "name": "stage_note",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_responses",
       "name": "unique_key",
       "type": "text",
       "notNull": false,
@@ -12940,96 +13164,6 @@
       "name": "anonymised_at",
       "type": "integer",
       "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "response_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "from_stage",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "to_stage",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "to_kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "transition_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "revision",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "actor_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "at",
-      "type": "integer",
-      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -17764,6 +17898,56 @@
       "entityType": "indexes"
     },
     {
+      "table": "bar_stocktake_lines",
+      "name": "bar_stocktake_lines_item",
+      "columns": [
+        {
+          "value": "stocktake_id",
+          "isExpression": false
+        },
+        {
+          "value": "stock_item_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "bar_stocktakes_live",
+      "columns": [
+        {
+          "value": "location_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state IN ('counting', 'submitted')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "bar_stocktakes_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "started_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "bar_variants",
       "name": "bar_variants_name",
       "columns": [
@@ -20216,24 +20400,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "forms_stage_history",
-      "name": "forms_stage_history_response",
-      "columns": [
-        {
-          "value": "response_id",
-          "isExpression": false
-        },
-        {
-          "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "forms_versions",
       "name": "forms_versions_number",
       "columns": [
@@ -21952,6 +22118,81 @@
       "entityType": "fks"
     },
     {
+      "table": "bar_stocktake_lines",
+      "name": "fk_bar_stocktake_lines_stocktake_id_bar_stocktakes_id_fk",
+      "columns": [
+        "stocktake_id"
+      ],
+      "tableTo": "bar_stocktakes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "fk_bar_stocktake_lines_stock_item_id_bar_stock_items_id_fk",
+      "columns": [
+        "stock_item_id"
+      ],
+      "tableTo": "bar_stock_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "fk_bar_stocktake_lines_variance_reason_term_core_terms_id_fk",
+      "columns": [
+        "variance_reason_term"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "fk_bar_stocktakes_location_id_bar_stock_locations_id_fk",
+      "columns": [
+        "location_id"
+      ],
+      "tableTo": "bar_stock_locations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "fk_bar_stocktakes_category_id_bar_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "bar_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "bar_variants",
       "name": "fk_bar_variants_product_id_bar_products_id_fk",
       "columns": [
@@ -23353,21 +23594,6 @@
       "entityType": "fks"
     },
     {
-      "table": "forms_stage_history",
-      "name": "fk_forms_stage_history_response_id_forms_responses_id_fk",
-      "columns": [
-        "response_id"
-      ],
-      "tableTo": "forms_responses",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "forms_versions",
       "name": "fk_forms_versions_form_id_forms_forms_id_fk",
       "columns": [
@@ -24455,6 +24681,24 @@
       "entityType": "pks"
     },
     {
+      "table": "bar_stocktake_lines",
+      "name": "bar_stocktake_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "bar_stocktakes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "bar_variants",
       "name": "bar_variants_pk",
       "columns": [
@@ -25123,15 +25367,6 @@
     {
       "table": "forms_responses",
       "name": "forms_responses_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "forms_stage_history_pk",
       "columns": [
         "id"
       ],
@@ -25811,6 +26046,24 @@
       "table": "bar_stock_movements",
       "name": "bar_stock_movements_wastage",
       "value": "\"kind\" <> 'wastage' OR \"reason_term\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_stocktake_lines",
+      "name": "bar_stocktake_lines_counted",
+      "value": "\"counted\" IS NULL OR \"counted\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "bar_stocktakes_state",
+      "value": "\"state\" IN ('counting', 'submitted', 'approved', 'abandoned')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_stocktakes",
+      "name": "bar_stocktakes_scope",
+      "value": "\"scope\" IN ('full', 'category') AND (\"scope\" = 'category') = (\"category_id\" IS NOT NULL)",
       "entityType": "checks"
     },
     {
@@ -26699,12 +26952,6 @@
       "table": "forms_responses",
       "name": "forms_responses_realm",
       "value": "\"realm\" IN ('audience', 'members')",
-      "entityType": "checks"
-    },
-    {
-      "table": "forms_stage_history",
-      "name": "forms_stage_history_kind",
-      "value": "\"to_kind\" IN ('pending', 'in_review', 'returned', 'approved', 'declined', 'closed')",
       "entityType": "checks"
     },
     {

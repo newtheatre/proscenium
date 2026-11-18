@@ -238,7 +238,7 @@ export async function setRecipe(unit: UnitView, variantId: string, input: Recipe
   unit.audit({ action: 'update', record: ['bar.product', (await first<{ product_id: string }>('SELECT product_id FROM bar_variants WHERE id = ?', variantId))!.product_id], detail: { recipe: variantId } })
 }
 
-export interface Movement { itemId: string, locationId: string, kind: 'sale' | 'sale_reversal' | 'delivery' | 'wastage' | 'transfer_out' | 'transfer_in', quantity: number, reasonTerm?: string | null, sourceType: string, sourceId: string, key: string, by: string | null }
+export interface Movement { itemId: string, locationId: string, kind: 'sale' | 'sale_reversal' | 'delivery' | 'wastage' | 'transfer_out' | 'transfer_in' | 'adjustment', quantity: number, reasonTerm?: string | null, sourceType: string, sourceId: string, key: string, by: string | null }
 
 /** Writes movements in one statement whatever their number; one already written (by its key) is passed over. */
 export function writeMovements(unit: UnitView, rows: Movement[], at: number): void {
