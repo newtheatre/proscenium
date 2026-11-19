@@ -15,6 +15,8 @@ export interface OfferedScheme {
   requiresPayment: boolean
   online: boolean
   asksFor: string | null
+  /** The list sets the end date, so there is no length to choose. */
+  endsByList?: boolean
   /** Joining asks the scheme's application form (MEM-12). */
   applicationForm?: boolean
 }
