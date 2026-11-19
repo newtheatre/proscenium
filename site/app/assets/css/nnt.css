@@ -158,7 +158,9 @@ html:root:root .dark {
 }
 
 /* A limelight beam on stage black: heroes, show pages, the centenary. */
-.nnt-spotlight {
+.nnt-spotlight,
+.public-show-top.public-show-top,
+.public-spotlight.public-spotlight {
   background-color: var(--color-ash-950);
   background-image:
     radial-gradient(ellipse 45% 48% at 66% 40%, color-mix(in oklab, var(--color-gold-400) 26%, transparent), transparent 72%),
@@ -223,15 +225,18 @@ html.dark .nnt-button-poster:hover {
 
 /* The marquee: the one call to action that matters on a view, with running-light bulbs. */
 .nnt-button-marquee,
-.nnt-marquee-actions a.inline-flex {
+.nnt-marquee-actions a.inline-flex,
+.public-show-book,
+.public-show-actions a.inline-flex,
+.public-spotlight-book {
   background: var(--color-gold-400) !important;
   color: var(--color-ash-950) !important;
   outline: 2px dotted var(--color-gold-400);
   outline-offset: 3px;
   transition: transform 120ms;
 }
-.nnt-button-marquee:hover, .nnt-marquee-actions a.inline-flex:hover { transform: scale(1.03); }
-.nnt-button-marquee:active, .nnt-marquee-actions a.inline-flex:active { transform: scale(0.98); }
+.nnt-button-marquee:hover, .nnt-marquee-actions a.inline-flex:hover, .public-show-book:hover, .public-show-actions a.inline-flex:hover, .public-spotlight-book:hover { transform: scale(1.03); }
+.nnt-button-marquee:active, .nnt-marquee-actions a.inline-flex:active, .public-show-book:active, .public-show-actions a.inline-flex:active, .public-spotlight-book:active { transform: scale(0.98); }
 
 /* The sticker: tilted, gold, one per view. */
 .nnt-sticker {
@@ -256,11 +261,22 @@ html.dark .nnt-button-poster:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nnt-button-poster, .nnt-button-marquee, .nnt-marquee-actions a.inline-flex { transition: none; }
-  .nnt-button-poster:hover, .nnt-button-poster:active, .nnt-button-marquee:hover, .nnt-button-marquee:active, .nnt-marquee-actions a.inline-flex:hover, .nnt-marquee-actions a.inline-flex:active { transform: none; }
+  .nnt-button-poster, .nnt-button-marquee, .nnt-marquee-actions a.inline-flex, .public-show-book, .public-show-actions a.inline-flex, .public-spotlight-book { transition: none; }
+  .nnt-button-poster:hover, .nnt-button-poster:active, .nnt-button-marquee:hover, .nnt-button-marquee:active, .nnt-marquee-actions a.inline-flex:hover, .nnt-marquee-actions a.inline-flex:active,
+  .public-show-book:hover, .public-show-book:active, .public-show-actions a.inline-flex:hover, .public-show-actions a.inline-flex:active, .public-spotlight-book:hover, .public-spotlight-book:active { transform: none; }
 }
 
 /* What's on: the layout draws the band with the page's heading, so upstream's plain header goes,
    and the filters become pills. */
 .nnt-whats-on [data-slot="root"]:has(> [data-slot="container"] > [data-slot="wrapper"] > h1) { display: none; }
 .nnt-whats-on nav ul a { border-radius: 9999px; }
+
+/* Upstream's show top and what's on spotlight, in the house's dress: the spotlight on stage black,
+   square corners, the poster in a gold frame and the name in the display face. */
+.public-spotlight.public-spotlight { border-radius: 0; }
+.public-show-poster.public-show-poster,
+.public-spotlight-poster.public-spotlight-poster { border-radius: 0; box-shadow: 0 0 0 2px var(--color-gold-400); }
+.public-show-title,
+.public-spotlight-title { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
+.public-show-top .text-primary,
+.public-spotlight .text-primary { color: var(--color-gold-400); }

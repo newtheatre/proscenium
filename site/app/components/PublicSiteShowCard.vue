@@ -18,7 +18,7 @@ const props = defineProps<{
   price?: PriceSummaryView | null
 }>()
 const { t } = useT()
-const priceLine = computed(() => fromPrice(props.price, t))
+const priceLine = computed(() => (props.price ? priceSummary(props.price, t) : ''))
 // The artless frame's two hues come from the show's name, so a show keeps its colours.
 const tint = computed(() => {
   let h = 0
