@@ -16,12 +16,13 @@ defineProps<{ facts: Fact[], /** A border round the strip, when it stands alone 
     <div
       v-for="fact in facts"
       :key="fact.label"
+      class="min-w-0"
     >
       <dt class="text-xs text-muted">
         {{ fact.label }}
       </dt>
       <dd
-        class="tabular-nums text-highlighted"
+        class="tabular-nums text-highlighted wrap-anywhere"
         :class="fact.strong !== false && 'font-medium'"
       >
         <ULink
