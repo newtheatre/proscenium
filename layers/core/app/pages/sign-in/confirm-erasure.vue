@@ -1,25 +1,30 @@
 <!-- Where the link that confirms an erasure lands (ID-16). It sits with the sign-in pages because the
      link works without a session. The token is in the fragment, so it never reaches a server log,
-     and the page posts it, so a mail scanner that opens the link confirms nothing. -->
+     and it is posted only on a press, because mail scanners open links in a real browser. -->
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
-useSeoMeta({ title: 'Confirming erasure' })
+useSeoMeta({ title: 'Confirm erasure' })
 const refusal = ref<Refusal | null>(null)
 const answer = ref<{ notBefore: number, holds: string[] } | null>(null)
+const token = ref('')
 
-onMounted(async () => {
-  const token = window.location.hash.slice(1)
+onMounted(() => {
+  token.value = window.location.hash.slice(1)
   // Vue Router keeps its own data in the history state, so it is passed back rather than cleared.
   history.replaceState(history.state, '', window.location.pathname + window.location.search)
-  const result = await callIdentity<{ notBefore: number, holds: string[] }>('/api/core/me/data-requests/confirm', { token })
+})
+
+async function finish() {
+  refusal.value = null
+  const result = await callIdentity<{ notBefore: number, holds: string[] }>('/api/core/me/data-requests/confirm', { token: token.value })
   if (!result.ok) refusal.value = result.refusal
   else answer.value = result.data
-})
+}
 </script>
 
 <template>
-  <IdentityCard title="Confirming erasure">
+  <IdentityCard title="Confirm erasure">
     <RefusalNotice :refusal="refusal" />
     <div
       v-if="answer"
@@ -39,12 +44,16 @@ onMounted(async () => {
         Something needs to be settled first. Your account shows what it is.
       </p>
     </div>
-    <p
-      v-else-if="!refusal"
-      class="text-sm text-muted"
-      aria-live="polite"
-    >
-      One moment.
-    </p>
+    <template v-else-if="!refusal">
+      <p class="text-sm text-muted">
+        Press Confirm erasure to confirm that you want your account erased.
+      </p>
+      <UButton
+        block
+        label="Confirm erasure"
+        loading-auto
+        @click="finish()"
+      />
+    </template>
   </IdentityCard>
 </template>
