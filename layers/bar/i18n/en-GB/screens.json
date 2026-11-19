@@ -785,5 +785,10 @@
   "bar.screens.deliveries.check-label-of": "Check the label of {name}",
   "bar.screens.register-card.overdue.one": "The refusals register has not been signed as checked for {count} day",
   "bar.screens.register-card.overdue.other": "The refusals register has not been signed as checked for {count} days",
-  "bar.screens.register-card.action": "Sign the register"
+  "bar.screens.register-card.action": "Sign the register",
+  "bar.promotions.items": "Bar products",
+  "bar.promotions.category": "Category",
+  "bar.promotions.product": "Product",
+  "bar.promotions.size": "Size",
+  "bar.promotions.outlet": "Outlet"
 }

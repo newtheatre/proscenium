@@ -17,6 +17,7 @@ export default defineModule({
   since: '0.1.0',
   stability: 'experimental',
   requires: ['payments', 'finance'],
+  uses: ['promotions'],
 
   settings: defineSettings('bar', {
     // Starts a bar sale's reference, so it is not mistaken for a booking reference.
@@ -180,6 +181,8 @@ export default defineModule({
     // Drinks paid for at the till, alone or on the same payment as tickets (tab 4).
     'payments.settlement': [{ id: 'bar' }],
     'payments.desk-basket': [{ id: 'bar' }],
+    // Products, as something a promotion can take money off (the unified promotions design).
+    'promotions.target': [{ id: 'bar.item', file: 'item' }],
     // Bar income, in full on the day the money is taken (tab 3, "What is posted to the ledger").
     'finance.system-account': [{ id: 'income', name: 'Bar income', kind: 'income' }],
     // Setting up the bar (BAR-05): products and an outlet are required; other price lists and who may sell are not.

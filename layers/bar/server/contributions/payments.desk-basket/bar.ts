@@ -2,7 +2,7 @@
 // their own, or beside tickets on one payment. What prepare makes is let go by the settlement
 // handler's release.
 import type { DeskBasket } from '#modules/payments'
-import { deskAttach, deskPrepare, deskSummary } from '../../selling'
+import { deskAttach, deskItems, deskPrepare, deskSummary } from '../../selling'
 
 export default {
   label: 'bar.desk.label',
@@ -15,4 +15,6 @@ export default {
   prepare: deskPrepare,
   attach: deskAttach,
   summary: deskSummary,
+  // Its lines, for the till to price with the rest of the sale (payments.pricing).
+  items: deskItems,
 } satisfies DeskBasket

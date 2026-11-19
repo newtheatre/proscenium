@@ -17,7 +17,7 @@ export default defineModule({
   stability: 'experimental',
   requires: ['payments', 'finance'],
   // Form builder joins this list with the checkout questions (R-17), once its module id exists.
-  uses: ['front-of-house', 'communications', 'promotions'],
+  uses: ['front-of-house', 'communications', 'promotions', 'maintenance'],
 
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
@@ -182,6 +182,14 @@ export default defineModule({
   },
 
   contributes: {
+    // Links already sent by email keep working while maintenance mode closes the site: a booking's
+    // tickets (and cancelling from them) and confirming a reservation.
+    'maintenance.open-address': [
+      { id: 'box-office.order-page', prefix: '/book/order/' },
+      { id: 'box-office.order-link', prefix: '/api/box-office/orders/link' },
+      { id: 'box-office.confirm-page', prefix: '/book/confirm/' },
+      { id: 'box-office.confirm', prefix: '/api/box-office/reservations/confirm' },
+    ],
     // Tickets, as a kind of item a promotion can apply to or require.
     'promotions.target': [{ id: 'box-office.ticket', file: 'ticket' }],
     // The box office's lines of the privacy notice's "what we hold" table (/policies/privacy).
