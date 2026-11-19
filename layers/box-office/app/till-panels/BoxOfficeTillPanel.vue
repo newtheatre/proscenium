@@ -6,7 +6,7 @@
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 import type { TillPass, TillPassBuy } from '../components/BoxOfficeTillPasses.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, noun?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -179,7 +179,7 @@ function foundPass(pass: TillPass) {
 }
 const passBody = () => ({
   ...(passEntries.value.length ? { passes: passEntries.value.map(p => ({ code: p.code })) } : {}),
-  ...(passBuys.value.length ? { buy: passBuys.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.entry ? {} : { entry: false }), ...(b.holder ? ('email' in b.holder ? { email: b.holder.email } : { accountId: b.holder.accountId }) : {}) })) } : {}),
+  ...(passBuys.value.length ? { buy: passBuys.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.entry ? {} : { entry: false }), ...(b.holder ? ('email' in b.holder ? { email: b.holder.email } : { accountId: b.holder.accountId }) : {}), ...(b.reference ? { reference: b.reference } : {}) })) } : {}),
   ...(passCollect.value.length ? { collect: passCollect.value.map(p => p.code) } : {}),
 })
 const passReceipt = (detail: string): ReceiptLine[] => [
@@ -322,12 +322,12 @@ async function restorePasses(value: { passes?: unknown, buy?: unknown, collect?:
   passCollect.value = await look(value.collect)
   if (!Array.isArray(value.buy) || !value.buy.length || !performanceId.value) return
   const onSale = (await $api<{ passes: { id: string, name: string, prices: { id: string, name: string, amountMinor: number }[] }[] }>('/api/box-office/desk/passes', { query: { performanceId: performanceId.value } })).passes
-  passBuys.value = (value.buy as { passTypeId: string, passPriceId: string, entry?: boolean, accountId?: string, email?: string }[]).flatMap((b) => {
+  passBuys.value = (value.buy as { passTypeId: string, passPriceId: string, entry?: boolean, accountId?: string, email?: string, reference?: string }[]).flatMap((b) => {
     const type = onSale.find(x => x.id === b.passTypeId)
     const price = type?.prices.find(p => p.id === b.passPriceId)
     if (!type || !price) return []
     const holder = b.email ? { email: b.email } : b.accountId ? { accountId: b.accountId, label: t('box-office.screens.panel.holder.restored') } : undefined
-    return [{ passTypeId: type.id, passPriceId: price.id, name: type.name, priceName: price.name, amountMinor: price.amountMinor, entry: b.entry !== false, ...(holder ? { holder } : {}) }]
+    return [{ passTypeId: type.id, passPriceId: price.id, name: type.name, priceName: price.name, amountMinor: price.amountMinor, entry: b.entry !== false, ...(holder ? { holder } : {}), ...(b.reference ? { reference: b.reference } : {}) }]
   })
 }
 
@@ -996,8 +996,8 @@ function clear() {
               <UInput
                 v-if="row.reference && !holders[keyOf(row)]?.[n - 1]"
                 :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
-                :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.field ?? row.reference.label })"
+                :aria-label="t('box-office.screens.panel.reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label, n })"
+                :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label })"
                 :disabled="locked"
                 autocomplete="off"
                 maxlength="64"
