@@ -56,6 +56,7 @@ describe('policies', () => {
     expect(before).toContain('our usual practice is to let latecomers in at a suitable point')
     for (const way of ['Let in at any time', 'Let in at a suitable point', 'Let in at the interval', 'Not let in']) expect(before).toContain(way)
     expect(before).toContain('Children under 14 must come with an adult')
+    expect(before).toContain('We sometimes film our own performances')
     await set('core.visiting.latecomers', 'not-admitted')
     const after = await inContext(async () => policyText((await resolvePolicy('visiting'))!))
     expect(after).toContain('our usual practice is not to let latecomers in')
