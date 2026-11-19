@@ -191,6 +191,28 @@ describe('notify', () => {
     expect(theirs.ids[1]).toEqual(first.ids[0])
   })
 
+  it('writes to the account a merged one went into, at its address (R-34)', async () => {
+    const survivor = await account('kept@example.org')
+    const merged = await account('folded@example.org')
+    await env.DB.prepare('UPDATE core_accounts SET merged_into_id = ? WHERE id = ?').bind(survivor, merged).run()
+    const { ids } = await send('notify.receipt', { to: merged, variables: { order: 'MS1' } })
+    const [row] = await rows<{ account_id: string }>('SELECT account_id FROM core_notifications WHERE id = ?', ids[0])
+    expect(row!.account_id).toBe(survivor)
+    expect(await rows('SELECT 1 FROM core_inbox_items WHERE account_id = ?', survivor)).toHaveLength(1)
+    expect(await deliver()).toEqual(['done'])
+    expect(mails.map(m => m.to)).toEqual(['kept@example.org'])
+  })
+
+  it('sends an email queued before its account was merged to the survivor\'s address (R-34)', async () => {
+    const survivor = await account('after@example.org')
+    const merged = await account('before@example.org')
+    const { ids } = await send('notify.receipt', { to: merged, variables: { order: 'MS2' } })
+    await env.DB.prepare('UPDATE core_accounts SET merged_into_id = ? WHERE id = ?').bind(survivor, merged).run()
+    expect(await deliver()).toEqual(['done'])
+    expect(mails.map(m => m.to)).toEqual(['after@example.org'])
+    expect((await deliveriesOf(ids))[0]).toMatchObject({ channel: 'email', state: 'sent' })
+  })
+
   it('leaves nothing behind when the caller\'s unit fails', async () => {
     const to = await account()
     const outcome = await inContext(async () => {

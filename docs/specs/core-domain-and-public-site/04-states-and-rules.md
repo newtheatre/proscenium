@@ -163,6 +163,7 @@ Bounced, Complained and Failed are final. A repeat or a late report changes noth
 Rules:
 
 - **The message is recorded before it is sent.** `notify()` adds rows to the caller's batch. If the booking is not saved, no receipt exists. If it is saved, the receipt exists even if the queue loses the message, because a task every five minutes re-queues anything left Queued too long.
+- **A message reaches the person, not the alias.** A record keeps the account it was made on (R-34), which a merge may since have folded into another. `notify()` writes the notification to the survivor, and the send job reads the survivor's address, so a pass or booking held on a merged account still reaches its holder.
 - **A transactional message cannot be muted.** It has no topic, so no preference can match it. The paper and Proscenium's decision 0013 both require this.
 - **A stuck Sending row is released.** If a send job dies mid-flight, the sweep returns the row to Retrying after ten minutes. The provider is given the delivery's id so a repeat is recognised where the provider supports that.
 - **Failed is loud.** A Failed delivery of a transactional type announces `core.delivery.failed`, appears on the delivery-health screen, and can be retried by hand.

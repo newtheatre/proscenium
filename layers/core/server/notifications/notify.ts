@@ -53,6 +53,15 @@ async function dedupeHash(typeKey: string, key: string): Promise<string> {
   return `ntf:${[...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')}` // not-policy: hexadecimal
 }
 
+/** Each account mapped to the one it was merged into, or to itself; merged_into_id always names the final survivor. */
+export async function survivorsOf(accountIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (!accountIds.length) return out
+  for (const row of await all<{ id: string, live: string }>('SELECT id, coalesce(merged_into_id, id) AS live FROM core_accounts WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify([...new Set(accountIds)])))
+    out.set(row.id, row.live)
+  return out
+}
+
 function recordOf(subject?: RecordRef): { type: string | null, id: string | null } {
   if (!subject) return { type: null, id: null }
   return Array.isArray(subject) ? { type: subject[0], id: subject[1] ?? null } : { type: (subject as any).type, id: (subject as any).id ?? null }
@@ -67,8 +76,11 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
   const declared = declaredType(typeKey) ?? refuse('core.notifications.unknown-type', `No module declares a message called ${typeKey}.`, { status: 500 })
   const { type, module } = declared
   const list = typeof options.to === 'string' ? [options.to] : options.to
-  const recipients = list.map(r => (typeof r === 'string' ? { accountId: r } : r)).map(r => ({
-    accountId: r.accountId,
+  const given = list.map(r => (typeof r === 'string' ? { accountId: r } : r))
+  // Records keep the account they were made on, which a merge may since have folded into another.
+  const live = await survivorsOf(given.map(r => r.accountId))
+  const recipients = given.map(r => ({
+    accountId: live.get(r.accountId) ?? r.accountId,
     values: checkVariables(type.variables, { ...options.variables, ...r.variables }),
     dedupeKey: r.dedupeKey ?? options.dedupeKey,
   }))
