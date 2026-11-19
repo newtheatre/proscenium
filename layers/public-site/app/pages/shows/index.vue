@@ -27,7 +27,7 @@ interface Archive {
   productions: Entry[]
 }
 const { t } = useT()
-const { range } = useDates()
+const { span } = useDates()
 const route = useRoute()
 const year = computed(() => (typeof route.query.year === 'string' ? route.query.year : undefined))
 const q = computed(() => (typeof route.query.q === 'string' ? route.query.q : undefined))
@@ -139,7 +139,7 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
                 :title="p.title"
                 :description="p.subtitle ?? (p.companyName ? t('public-site.production.presented-by', { company: p.companyName }) : undefined)"
                 :poster="p.poster"
-                :when="range(p.openedAt, p.lastStartsAt)"
+                :when="span(p.openedAt, p.lastStartsAt)"
                 :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
                 :cancelled="p.cancelled"
                 :age="p.age"

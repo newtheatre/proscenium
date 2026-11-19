@@ -33,7 +33,7 @@ interface Listing {
 }
 
 const { t } = useT()
-const { range } = useDates()
+const { span } = useDates()
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const { data } = await useAPI<{ venue: Venue, productions: Listing[] }>(() => `/api/public-site/venues/${encodeURIComponent(slug.value)}`, { key: `public-site:venue:${slug.value}` })
@@ -198,7 +198,7 @@ useHead(() => ({
               :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
               :price="p.price"
-              :when="range(p.nextStartsAt, p.lastStartsAt)"
+              :when="span(p.nextStartsAt, p.lastStartsAt)"
               :details="p.category?.label"
               :age="p.age"
               :effects="p.hasEffects"

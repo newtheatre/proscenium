@@ -13,6 +13,8 @@ const SHAPES = {
   dayLong: { day: 'numeric', month: 'long', year: 'numeric' },
   /** Wed 1 Sept 2027 */
   dayNamed: { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' },
+  /** Wed 1 Sept: a date that is plainly this year or next, as on a button. */
+  dayBrief: { weekday: 'short', day: 'numeric', month: 'short' },
   /** Wed 1 Sept 2027, 19:30 */
   dateTime: { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' },
   /** 1 Sept, 19:30: for a chart's axis and other tight places, where the year is plain from what is around it. */
@@ -47,6 +49,7 @@ export function useDates() {
   const day = (value: DateInput) => format('day', value)
   const dayLong = (value: DateInput) => format('dayLong', value)
   const dayNamed = (value: DateInput) => format('dayNamed', value)
+  const dayBrief = (value: DateInput) => format('dayBrief', value)
   const dateTime = (value: number | Date) => format('dateTime', value)
   const brief = (value: number | Date) => format('brief', value)
   const monthYear = (value: DateInput) => format('monthYear', value)
@@ -79,5 +82,5 @@ export function useDates() {
     return toCalendarDateTime(fromAbsolute(ms, zone.value)).toString().slice(0, 16) // not-policy: the length of a date and time to the minute
   }
 
-  return { language, timeZone, zone, monthName, dayOfYear, day, dayLong, dayNamed, dateTime, brief, monthYear, time, range, span, toLocal }
+  return { language, timeZone, zone, monthName, dayOfYear, day, dayLong, dayNamed, dayBrief, dateTime, brief, monthYear, time, range, span, toLocal }
 }

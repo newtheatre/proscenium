@@ -1,5 +1,5 @@
-/* Nuxt UI v4 on Tailwind CSS v4. A theatre's colours come from its branding settings later; until
-   then Nuxt UI's defaults apply. Tailwind scans this layer and the theatre's site/. */
+/* Nuxt UI v4 on Tailwind CSS v4. The brand's stylesheet (app.vue, C-35) overrides the colours below
+   in every shell; they apply only until it loads. Tailwind scans this layer and the theatre's site/. */
 @import "tailwindcss";
 @import "@nuxt/ui";
 
@@ -18,6 +18,9 @@
 
 /* Primary is the default button colour in every shell: Admin, the console and the console's
    settings window draw the same control the same way (L24, L36). */
+
+/* The brand's heading font (C-35), on the public shell's headings and the name in its header only. */
+.public-shell :is(h1, h2, h3, header [data-slot="title"]) { font-family: var(--brand-display-font, inherit); }
 
 /* The touch target of a control used on the move or at the door (the members' tab bar, live mode). */
 :root {

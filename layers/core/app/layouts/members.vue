@@ -29,9 +29,9 @@ const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ labe
       <template #left>
         <ULink
           to="/"
-          class="shrink-0 text-xl font-bold text-highlighted"
+          class="flex min-w-0 shrink-0 items-center text-xl font-bold text-highlighted"
         >
-          {{ name }}
+          <BrandMark />
         </ULink>
         <UBadge
           :label="area"

@@ -1,7 +1,7 @@
 <!-- The Admin shell (R-33): the console's frame, with an "Admin" mark at the start of every page's
      navbar so it says where you are at every width, the theatre's mark where it is in the console and
-     "Back to console" at the foot of the sidebar, neutral buttons (no brand colour), and no Tonight or
-     work queue. Below 1024 pixels the sidebar is a drawer, opened from the navbar's one menu button. -->
+     "Back to console" at the foot of the sidebar, the brand's colours as in every shell (C-35), and no
+     Tonight or work queue. Below 1024 pixels the sidebar is a drawer, opened from the navbar's one menu button. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
@@ -18,7 +18,7 @@ const module = computed(() => /^\/admin\/modules\/([a-z][a-z0-9-]*)(?:\/|$)/.exe
 watch(() => route.fullPath, () => { open.value = false })
 
 // The browser title is the one pattern every page follows, the page, then the area, then the theatre
-// ("Branding · Admin · Nottingham New Theatre"), and the buttons stay neutral (see main.css).
+// ("Branding · Admin · Nottingham New Theatre").
 useHead({
   titleTemplate: (title) => {
     const area = t('core.admin.title')
@@ -48,9 +48,12 @@ const groups = computed<NavigationMenuItem[]>(() => [
       <template #header="{ collapsed }">
         <NuxtLink
           to="/admin"
-          class="truncate font-semibold"
+          class="flex min-w-0 items-center font-semibold"
         >
-          <span v-if="!collapsed">{{ brand.name }}</span>
+          <BrandMark
+            v-if="!collapsed"
+            size="sm"
+          />
           <UIcon
             v-else
             name="i-lucide-drama"

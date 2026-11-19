@@ -2,7 +2,7 @@
 // light and dark that every shell, email and PDF reads. Whatever colour is chosen, the derived link
 // and button colours reach 4.5 to 1. Status colours are fixed, so a brand never hides a warning.
 import { first, useSetting } from '#kit'
-import { nearestShade, solidFill } from '../../shared/colour'
+import { fillUnder, nearestShade, solidFill } from '../../shared/colour'
 
 const NEUTRALS = {
   slate: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8', '#64748b', '#475569', '#334155', '#1e293b', '#0f172a', '#020617'],
@@ -112,14 +112,16 @@ function block(t: ModeTokens, grey: readonly string[], inverted: string): string
     `--brand-solid:${t.solid}`, `--brand-on-solid:${t.onSolid}`,
     `--brand-success:${t.success}`, `--brand-warning:${t.warning}`, `--brand-danger:${t.danger}`, `--brand-info:${t.info}`,
     // Nuxt UI uses its primary both as text on the page and as a fill under its inverted text
-    // (white in light mode, the grey at 900 in dark). A shade that reaches 4.5 to 1 against the
-    // inverted text also reaches it against the page, which is no lighter in dark mode and the
-    // same white in light, so that shade serves for both. Its greys are the brand's.
-    `--ui-primary:${nearestShade(t.link, inverted)}`,
+    // (white in light mode, the grey at 900 in dark), and a filled button under the pointer is the
+    // fill at 90% over the page (app.config.ts). The shade reaches 4.5 to 1 against the inverted
+    // text in both states, and so against the page too. Its greys are the brand's.
+    `--ui-primary:${fillUnder(t.link, inverted, t.background, HOVER_ALPHA)}`,
     ...SCALE.map((step, i) => `--ui-color-neutral-${step}:${grey[i]}`),
   ].join(';')
 }
 
+// The tint of a filled button under the pointer, as app.config.ts draws it.
+const HOVER_ALPHA = 0.9 // not-policy: app.config.ts draws the hover tint
 const SCALE = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']
 
 /**

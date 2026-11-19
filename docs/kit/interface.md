@@ -15,6 +15,16 @@ here is stable before 1.0.
 | Admin | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
 | Live mode | `/live` | people holding the ability of at least one live entry (a tile on the Tonight hub); not found for anyone else. A layout, not a shell: see "Live mode" below |
 
+Every shell and live mode wear the brand (C-35): `app.vue` puts the brand's stylesheet (primary,
+greys, radius, already shaded to reach 4.5 to 1 in light and dark) in the head of every page, so a layout
+never loads it itself, and each header draws the theatre's logo, or its name when there is none, with
+`BrandMark`. The heading font (`core.brand.display-font`) is the public shell's alone: `layouts/default.vue`
+sets `public-shell` on `body` and `main.css` gives its `h1` to `h3` and the header's name
+`--brand-display-font`; the other shells keep the system font. The choices are font stacks the device
+already has, so nothing is downloaded. Fonts the site serves itself and remote fonts (such as Google
+Fonts) are not supported yet; adding one means a choice with a source as well as a stack, and a
+`@font-face` or stylesheet link from `themeCss`.
+
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks
 `GET /api/core/access?path=...`. The order never varies:
@@ -399,7 +409,7 @@ anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the 
 "Admin" mark at the start of every page's navbar that says where you are at every width (PageFrame
 draws it when the layout provides `ADMIN_SHELL`; there is no second bar, and below 1024 pixels the
 navbar's own menu button opens the drawer), a "Back to console" (or "Back to the site") row where the theatre's mark is,
-the same primary colour as the console, so a control looks the same in either shell and in the
+the same primary colour as the console (the brand's, as in every shell, C-35), so a control looks the same in either shell and in the
 console's settings window (the `admin-shell` class on `body` is kept as a hook), and a browser title
 that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
 
@@ -465,6 +475,19 @@ a layout, not a shell, and it has no navigation of its own.
   door codes against the public keys on the device. A screen without them still cannot send changes
   offline and should disable its writes rather than lose them. Pages are not cached for offline
   loading, so a screen must be open before the connection goes.
+
+## The public show page and what's on
+
+A show's page opens with the same dark band as the spotlight at the top of what's on (concept A,
+"Spotlight", chosen by Matt on 19 November 2026): the poster, the title, four facts (dates, running
+time, tickets, guidance) shown only when known, the venue, and the next few dates as buttons
+(`PublicSiteDateButtons`), each opening the booking drawer when the booking answer names one. On a
+phone the poster sits small beside the title, so the title, the facts and Book are on the first screen.
+
+A theatre restyles the band with CSS rather than copying the component. The hooks are
+`public-show-top` (the band), `public-show-poster`, `public-show-title`, `public-show-actions` and
+`public-show-book` on the show's page, and `public-spotlight`, `public-spotlight-poster`,
+`public-spotlight-title` and `public-spotlight-book` on what's on.
 
 ## Seams for Identity
 

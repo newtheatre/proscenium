@@ -109,6 +109,19 @@ test('what\'s on lists the production and opens its page', async ({ page }) => {
   await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible()
 })
 
+test('what\'s on bills the soonest show at the top with its next dates, and not while filtered', async ({ page }) => {
+  await visit(page, '/whats-on')
+  const spotlight = page.locator('section[aria-labelledby="spotlight-title"]')
+  await expect(spotlight).toHaveCount(1)
+  const show = await spotlight.getByRole('heading', { level: 2 }).getByRole('link').getAttribute('href')
+  expect(show).toMatch(/^\/whats-on\//)
+  await expect(spotlight.getByRole('link', { name: 'Book tickets' })).toHaveAttribute('href', `${show}#dates`)
+  await expect(spotlight.getByRole('link', { name: 'About the show' })).toHaveAttribute('href', show!)
+  await expect(page.getByRole('heading', { level: 2 }).filter({ hasText: /\d{4}$/ }).first()).toBeVisible()
+  await visit(page, '/whats-on?month=2031-03')
+  await expect(spotlight).toHaveCount(0)
+})
+
 test('what\'s on narrows by month and venue, and says when nothing matches', async ({ page }) => {
   await visit(page, '/whats-on?month=2031-03')
   await expect(page.getByRole('link', { name: new RegExp(title) })).toHaveAttribute('href', `/whats-on/${slug}`)
@@ -163,6 +176,10 @@ test('the production page shows its dates, the booking link, the cancelled date 
   await visit(page, `/whats-on/${slug}`)
   await expect(page.getByText(`Spring ${stamp} · Play`, { exact: true })).toBeVisible()
   await expect(page.getByText(/2 hours 15 minutes, with an interval/)).toBeVisible()
+  // The top states the facts somebody decides on, each under its own label.
+  const top = page.getByRole('region', { name: title })
+  await expect(top.getByRole('heading', { level: 1, name: title })).toBeVisible()
+  await expect(top.getByText('Running time', { exact: true })).toBeVisible()
   await expect(page.getByRole('img', { name: 'A red stage curtain' })).toBeVisible()
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/files\//)
   await expect(page.getByText('This production has no staging effects or content warnings.')).toBeVisible()

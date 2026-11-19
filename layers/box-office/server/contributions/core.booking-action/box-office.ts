@@ -5,8 +5,11 @@
 // theatre's setting, never the house's size.
 import { all, nowMs, useSetting } from '#kit'
 import type { BookingAction, BookingAnswer, PriceSummary } from '#modules/core'
-import { pricesFor } from '../../prices'
+import { pricesFor, WHEELCHAIR_TYPE } from '../../prices'
 import { sellableTypes, soldOn } from '../../ticket-types'
+
+/** Choose tickets and Check and pay, in a drawer over the show's page (BoxOfficeBookingDrawer.global.vue). */
+const DRAWER = 'BoxOfficeBookingDrawer'
 
 interface Sale { performance_id: string, state: string, on_sale_at: number | null, off_sale_at: number | null }
 
@@ -50,7 +53,7 @@ async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promi
     const left = freeOf.get(subject.id) ?? 0
     out[subject.id] = left <= 0
       ? { state: 'sold-out' }
-      : left <= under ? { state: 'limited', link, seatsLeft: left } : { state: 'available', link }
+      : left <= under ? { state: 'limited', link, seatsLeft: left, drawer: DRAWER } : { state: 'available', link, drawer: DRAWER }
   }
   return out
 }
@@ -83,7 +86,8 @@ async function prices(productionIds: string[]): Promise<Record<string, PriceSumm
   for (const { productionId, prices: rows } of priced) {
     for (const price of rows) {
       const type = types.get(price.ticketTypeId)
-      if (!type || type.kind === 'complimentary' || type.needsPaidTicket || !soldOn(type.channel, 'online')) continue
+      // A wheelchair space is priced as the seats beside it and is booked as access, not a price of its own.
+      if (!type || type.kind === 'complimentary' || type.kind === 'companion' || type.managedBy === WHEELCHAIR_TYPE || type.needsPaidTicket || !soldOn(type.channel, 'online')) continue
       const entry = lowest.get(productionId) ?? { currency: price.currency, byType: new Map<string, number>() }
       if (entry.currency !== price.currency) continue
       const was = entry.byType.get(type.id)
