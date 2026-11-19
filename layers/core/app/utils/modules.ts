@@ -15,7 +15,8 @@ export interface ModuleView {
   /** What switching this one on would also switch on, those required first. */
   alsoOn: string[]
   secrets: { name: string, needed: 'always' | 'when-used' | 'optional', set: boolean }[]
-  credentials: { name: string, needed: 'always' | 'when-used' | 'optional', set: boolean }[]
+  /** `step` is the "Set up" card's line: null when it asks nothing, else whether it is done. */
+  credentials: { name: string, needed: 'always' | 'when-used' | 'optional', set: boolean, step: boolean | null }[]
   /** The `always` secrets not set: they block switching it on. */
   missingSecrets: string[]
   screens: { id: string, menu: string }[]

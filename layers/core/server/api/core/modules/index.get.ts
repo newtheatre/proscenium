@@ -2,7 +2,8 @@
 // what it needs and what needs it, which of its secrets and credentials are set, and the screens it
 // adds. Names and descriptions are the client's, from each module's catalogue. Secret values never
 // leave the server; only whether each is set.
-import { can, defineRoute } from '#kit'
+import { can, defineRoute, usePoint } from '#kit'
+import type { CredentialUse } from '../../../points/credential-use'
 import { declaredGroups, holds, moduleTabs } from '../../../interface/navigation'
 import { enabledModules, missingSecrets, requiredOff } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
@@ -20,6 +21,7 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
     .then(r => new Map(r.results.map(m => [m.module_id, m])))
     .catch(() => new Map<string, { enabled_at: number | null, disabled_at: number | null }>())
   const groups = await declaredGroups()
+  const lacking = await lackingCredentials()
   const modules = []
   for (const [id, entry] of registry.modules) {
     const m = entry.manifest
@@ -43,7 +45,13 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
       requiredBy: [...registry.modules.values()].filter(o => o.manifest.requires?.includes(id)).map(o => o.manifest.id),
       alsoOn: on.has(id) ? [] : await requiredOff(id),
       secrets: Object.entries(m.secrets ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: isSet(env, name) })),
-      credentials: Object.entries(m.credentials ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: stored.has(`${id} ${name}`) || isSet(env, name) })),
+      credentials: Object.entries(m.credentials ?? {}).map(([name, decl]) => {
+        const set = stored.has(`${id} ${name}`) || isSet(env, name)
+        // One saved per record is asked for only while a record in use lacks it.
+        const perRecord = decl.needed === 'when-used' && !decl.manage
+        const step = decl.needed === 'optional' ? null : perRecord ? (lacking.get(id)?.has(name) ? false : null) : set
+        return { name, needed: decl.needed, set, step }
+      }),
       missingSecrets: missingSecrets(id),
       screens,
       // The module's own console group's icon, else its first screen's.
@@ -59,6 +67,16 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
   const manage = holds(await can(actor, 'core.modules.manage'))
   return { modules, manage }
 })
+
+/** Per module, the per-record credentials a record in use lacks. A source that fails asks for nothing. */
+async function lackingCredentials(): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>()
+  for (const { module, value } of await usePoint<CredentialUse>('core.credential-use')) {
+    const names = await value.missing().catch(() => [] as string[])
+    out.set(module, new Set([...(out.get(module) ?? []), ...names]))
+  }
+  return out
+}
 
 const onPage = (to: string | undefined, home: string) => to === home || !!to?.startsWith(`${home}/`)
 
