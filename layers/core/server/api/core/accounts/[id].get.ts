@@ -54,7 +54,6 @@ export default defineRoute({
   return {
     id,
     name: account.name,
-    preferredName: account.preferred_name,
     pronouns: account.pronouns,
     origin: account.origin,
     createdAt: account.created_at,

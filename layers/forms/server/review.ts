@@ -186,7 +186,7 @@ export async function roundView(def: Definition, responseId: string, reader: 'ch
   const review = stage?.review
   if (!round || !stage || !review) return null
   const rows = await all<AssignmentRow & { name: string | null }>(
-    `SELECT a.id, a.status, a.vote, a.scores, a.comment, a.submitted_at AS submittedAt, COALESCE(c.preferred_name, c.name) AS name
+    `SELECT a.id, a.status, a.vote, a.scores, a.comment, a.submitted_at AS submittedAt, c.name AS name
      FROM forms_review_assignments a LEFT JOIN core_accounts c ON c.id = a.reviewer_id WHERE a.round_id = ? ORDER BY name, a.id`, round.id)
   const done = rows.filter(r => r.status === 'submitted')
   const shown = reader !== 'reader' && (round.releasedAt !== null || !!review.open)

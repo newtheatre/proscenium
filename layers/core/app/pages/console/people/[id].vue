@@ -15,7 +15,6 @@ definePageMeta({ layout: 'console' })
 interface Person {
   id: string
   name: string | null
-  preferredName: string | null
   pronouns: string | null
   origin: string
   createdAt: number
@@ -91,17 +90,16 @@ async function act(run: () => Promise<unknown>, done: string) {
 // Details (ID-46): the same limits as the person's own form. Undo puts back what was there.
 const detailsSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  preferredName: z.string().trim().max(60),
   pronouns: z.string().trim().max(40),
 })
 const editing = ref(false)
-const details = reactive({ name: '', preferredName: '', pronouns: '' })
+const details = reactive({ name: '', pronouns: '' })
 const saving = ref(false)
 const detailsRefusal = ref<RefusalView | null>(null)
 function openDetails() {
   const p = person.value
   if (!p) return
-  Object.assign(details, { name: p.name ?? '', preferredName: p.preferredName ?? '', pronouns: p.pronouns ?? '' })
+  Object.assign(details, { name: p.name ?? '', pronouns: p.pronouns ?? '' })
   detailsRefusal.value = null
   editing.value = true
 }
@@ -109,11 +107,11 @@ const patch = (body: Record<string, string | null>) => $api<unknown>(`/api/core/
 async function saveDetails() {
   const p = person.value
   if (!p) return
-  const before = { preferredName: p.preferredName, pronouns: p.pronouns, ...(p.name ? { name: p.name } : {}) }
+  const before = { pronouns: p.pronouns, ...(p.name ? { name: p.name } : {}) }
   saving.value = true
   detailsRefusal.value = null
   try {
-    await patch({ name: details.name.trim(), preferredName: details.preferredName.trim() || null, pronouns: details.pronouns.trim() || null })
+    await patch({ name: details.name.trim(), pronouns: details.pronouns.trim() || null })
     editing.value = false
     // A nameless account cannot be made nameless again, so Undo there keeps the name.
     offer(t('core.person.details.saved'), async () => {
@@ -348,18 +346,6 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
               />
             </template>
             <dl class="space-y-2 text-sm">
-              <div>
-                <dt class="text-muted">
-                  {{ t('core.person.details.name') }}
-                </dt>
-                <dd>{{ p.name ?? t('core.person.details.none') }}</dd>
-              </div>
-              <div>
-                <dt class="text-muted">
-                  {{ t('core.person.details.preferred') }}
-                </dt>
-                <dd>{{ p.preferredName ?? t('core.person.details.none') }}</dd>
-              </div>
               <div>
                 <dt class="text-muted">
                   {{ t('core.person.details.pronouns') }}
@@ -644,17 +630,6 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
                 v-model="details.name"
                 autocomplete="off"
                 maxlength="120"
-              />
-            </UFormField>
-            <UFormField
-              name="preferredName"
-              :label="t('core.person.details.preferred')"
-              :help="t('core.person.details.preferred-help')"
-            >
-              <UInput
-                v-model="details.preferredName"
-                autocomplete="off"
-                maxlength="60"
               />
             </UFormField>
             <UFormField

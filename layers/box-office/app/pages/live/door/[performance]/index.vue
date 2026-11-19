@@ -6,7 +6,11 @@
      its type (such as a lapsed member), who goes to the box office to change it, unless a holder of the
      override admits them anyway with a reason (R-30). How many are in stays in view. Typing a code, finding
      someone by name and pausing the camera are the large buttons at the foot. Under the count, when
-     latecomers are let in.
+     latecomers are let in. Every result arrives fresh: the banner springs in, the phone buzzes where it
+     can (one short buzz for in, two for a look, one long for no), and an admission clears itself after
+     a few seconds, so the next ticket is never mistaken for the last. A paid booking's own code, such
+     as the QR code from its reservation, admits a single ticket at once; for several, the screen offers
+     Admit one (as each person reaches the door) and Admit all, until everyone on it is in.
      Offline (D2), the door keeps working from its copy of the door list on the device
      (useOfflineDoor): a ticket's signed code is checked here, admitted here and sent when the
      connection returns; the strip says how many admissions are waiting. The door list can be
@@ -42,6 +46,9 @@ const BANNER: Record<Tone, string> = { success: 'bg-success text-inverted', warn
 const TEXT: Record<Tone, string> = { success: 'text-success', warning: 'text-warning', info: 'text-info', error: 'text-error' }
 const FRAME: Record<Tone, string> = { success: 'border-success', warning: 'border-warning', info: 'border-info', error: 'border-error' }
 const RECENT = 6 // not-policy: how many past scans the screen lists
+const CLEAR_MS = 4000 // not-policy: how long an admission stays up before the screen is ready again
+// Ignored where the browser cannot vibrate, such as Safari on an iPhone.
+const BUZZ: Record<Tone, number[]> = { success: [90], warning: [90, 70, 90], info: [90, 70, 90], error: [400] } // not-policy: vibration patterns
 // What a ticket code, a booking reference or a desk code looks like; anything else typed is a name (D4).
 const CODE = /^(?:[^.\s]+\.){3}[^.\s]+$|^[A-HJKMNP-Z2-9]{8}$|^[A-HJKMNP-Z2-9]{10}$/i // not-policy: the shapes codes.ts and tickets.ts make
 
@@ -131,9 +138,57 @@ function describe(out: Scan): Shown {
   return { tone, icon: ICONS[tone], headline, line, at: Date.now(), ...who ? { who } : {}, ...collect ? { collect } : {}, ...override ? { override } : {} }
 }
 
+let clearing: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(clearing))
 function show(result: Shown) {
   shown.value = result
   recent.value = [result, ...recent.value].slice(0, RECENT)
+  try {
+    navigator.vibrate?.(BUZZ[result.tone])
+  }
+  catch {
+    // A browser that refuses to vibrate still shows the result.
+  }
+  clearTimeout(clearing)
+  if (result.tone === 'success' && !result.override) clearing = setTimeout(() => {
+    if (shown.value?.at === result.at) shown.value = group.value ? groupShown(group.value) : null
+  }, CLEAR_MS)
+}
+
+// A booking of several waiting to come in, after its own code was scanned: admitted one by one or all at once.
+const group = ref<Row | null>(null)
+const groupShown = (row: Row): Shown => ({ tone: 'info', icon: 'i-lucide-users', headline: t('box-office.live-door.result.reference'), line: `${nameOf(row)} · ${row.reference}. ${t('box-office.live-door.line.booking-waiting', { waiting: row.tickets - row.admitted, tickets: row.tickets })}`, at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
+async function admitFromGroup(count: number) {
+  const row = group.value
+  if (!row) return
+  const admitted = await admit(row, count)
+  if (group.value !== row) return
+  const left = { ...row, admitted: row.admitted + admitted }
+  group.value = left.admitted < left.tickets && admitted ? left : null
+}
+
+// A paid booking's own code for tonight, such as its reservation's QR code: everyone on it not yet in goes in.
+async function admitBooking(reference: string) {
+  const rows = online.value
+    ? await $api<{ rows: Row[] }>(`${base.value}/door`, { query: { q: reference } }).then(r => r.rows).catch(() => [] as Row[])
+    : door.find(reference)
+  const row = rows.find(r => r.reference.toUpperCase() === reference.toUpperCase() && !r.unpaid)
+  if (!row) {
+    query.value = reference
+    finding.value = true
+    return
+  }
+  group.value = null
+  if (row.admitted >= row.tickets) {
+    show({ tone: 'warning', icon: ICONS.warning, headline: t('box-office.live-door.result.already_admitted'), line: t('box-office.live-door.line.booking-in', { reference: row.reference }), at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
+    return
+  }
+  if (row.tickets - row.admitted === 1) {
+    await admit(row, 1)
+    return
+  }
+  group.value = row
+  show(groupShown(row))
 }
 
 /** Offline: checked against the device's copy of the door list, and admitted here. */
@@ -143,26 +198,18 @@ async function scanOffline(code: string) {
     return
   }
   const out = await door.check(code)
-  if (out.result === 'reference' && out.reference) {
-    query.value = out.reference
-    finding.value = true
-    return
-  }
+  if (out.result === 'reference' && out.reference) return admitBooking(out.reference)
   const said = describe(out)
   show({ ...said, line: `${said.line} ${t('box-office.live-door.checked-here')}` })
 }
 
 async function scan(code: string) {
   if (!code.trim()) return
+  group.value = null
   if (!online.value) return scanOffline(code)
   try {
     const out = await $api<Scan>(`${base.value}/scan`, { method: 'POST', body: { code: code.trim() } })
-    // A paid booking's reference for tonight: the list finds it, and its tickets are admitted there.
-    if (out.result === 'reference' && out.reference) {
-      query.value = out.reference
-      finding.value = true
-      return
-    }
+    if (out.result === 'reference' && out.reference) return admitBooking(out.reference)
     show(describe(out))
     if (out.result === 'admitted' || out.result === 'already_admitted') await door.noteIn(code)
     if (out.result === 'admitted') await refresh()
@@ -244,12 +291,12 @@ async function submitQuery() {
   await scan(code)
 }
 
-async function admit(row: Row, count: number) {
+async function admit(row: Row, count: number): Promise<number> {
   if (!online.value) {
     const admitted = door.admit(row.id, count)
     show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: `${t('box-office.door.admitted-now', { count: admitted })} ${t('box-office.live-door.checked-here')}`, at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     await search()
-    return
+    return admitted
   }
   admitting.value = row.id
   try {
@@ -258,10 +305,12 @@ async function admit(row: Row, count: number) {
     show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: t('box-office.door.admitted-now', { count: admitted }), at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     await refresh()
     await search()
+    return admitted
   }
   catch (e) {
     const refusal = toRefusal(e)
     show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: refusal.reason, at: Date.now() })
+    return 0
   }
   finally {
     admitting.value = null
@@ -343,7 +392,7 @@ async function admit(row: Row, count: number) {
                   <div
                     v-if="shown"
                     :key="shown.at"
-                    class="flex items-center gap-3 rounded-xl p-4 shadow-lg"
+                    class="door-result-in flex items-center gap-3 rounded-xl p-4 shadow-lg"
                     :class="BANNER[shown.tone]"
                   >
                     <UIcon
@@ -363,6 +412,33 @@ async function admit(row: Row, count: number) {
                   </p>
                 </div>
               </section>
+              <div
+                v-if="group"
+                class="grid gap-3"
+                :class="group.tickets - group.admitted > 1 ? 'grid-cols-2' : 'grid-cols-1'"
+              >
+                <UButton
+                  icon="i-lucide-user-check"
+                  color="neutral"
+                  variant="outline"
+                  size="xl"
+                  block
+                  :loading="admitting === group.id"
+                  :label="t('box-office.door.admit-one')"
+                  :aria-label="t('box-office.door.admit-one-of', { reference: group.reference })"
+                  @click="admitFromGroup(1)"
+                />
+                <UButton
+                  v-if="group.tickets - group.admitted > 1"
+                  icon="i-lucide-users"
+                  size="xl"
+                  block
+                  :loading="admitting === group.id"
+                  :label="t('box-office.door.admit-all', { count: group.tickets - group.admitted })"
+                  :aria-label="t('box-office.door.admit-all-of', { count: group.tickets - group.admitted, reference: group.reference })"
+                  @click="admitFromGroup(group.tickets - group.admitted)"
+                />
+              </div>
               <UButton
                 v-if="shown?.collect && tillTo(shown.collect)"
                 icon="i-lucide-hand-coins"
@@ -615,3 +691,15 @@ async function admit(row: Row, count: number) {
     </USlideover>
   </div>
 </template>
+
+<style>
+/* Each result springs in, so a second ticket like the first still looks new. */
+@keyframes door-result-in {
+  0% { transform: scale(0.9); opacity: 0.3; }
+  60% { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .door-result-in { animation: door-result-in 350ms ease-out; }
+}
+</style>

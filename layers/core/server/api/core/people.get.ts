@@ -25,7 +25,7 @@ export default defineRoute({ ability: 'core.account.read', rateLimit: 'default' 
 
   const db = useDb()
   const found = await db.select({
-    id: accounts.id, name: accounts.name, preferredName: accounts.preferredName, since: accounts.createdAt,
+    id: accounts.id, name: accounts.name, since: accounts.createdAt,
     firstSignedInAt: accounts.firstSignedInAt, disabledAt: accounts.disabledAt, anonymisedAt: accounts.anonymisedAt,
   }).from(accounts).where(where).orderBy(...read.orderBy()).limit(read.limit).offset(read.offset)
   const [{ n: total }] = await db.select({ n: count() }).from(accounts).where(where) as [{ n: number }]
@@ -42,7 +42,7 @@ export default defineRoute({ ability: 'core.account.read', rateLimit: 'default' 
 
   unit.audit({ action: 'read', ability: 'core.account.read', detail: { list: accountsList.id } })
   return {
-    rows: found.map(r => ({ id: r.id, name: r.name, preferredName: r.preferredName, since: r.since, state: accountState(r) })),
+    rows: found.map(r => ({ id: r.id, name: r.name, since: r.since, state: accountState(r) })),
     total,
     dropped: read.dropped,
     ignoredWords,

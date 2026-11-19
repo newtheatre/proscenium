@@ -11,7 +11,7 @@ export async function lastChanges(keys: string[]): Promise<Map<string, { at: num
   const asked = [...new Set(keys.flatMap(key => [key, ...[...useRegistry().settingAliases].filter(([, now]) => now === key).map(([old]) => old)]))]
   const rows = await all<{ key: string, at: number, name: string | null }>(
     `SELECT key, at, name FROM (
-       SELECT c.key, c.at, coalesce(a.preferred_name, a.name) AS name,
+       SELECT c.key, c.at, a.name AS name,
               row_number() OVER (PARTITION BY c.key ORDER BY c.at DESC, c.id DESC) AS n
          FROM core_setting_changes c LEFT JOIN core_accounts a ON a.id = c.actor
         WHERE c.key IN (SELECT value FROM json_each(?))

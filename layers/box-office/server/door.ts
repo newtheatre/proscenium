@@ -114,6 +114,22 @@ async function elsewhere(performanceId: string): Promise<Pick<ScanOutcome, 'tick
   return { ticketPerformanceId: performanceId, ...ticketPerformance ? { ticketPerformance } : {} }
 }
 
+interface Booked { id: string, reference: string, state: string, total_minor: number, currency: string, account_id: string | null }
+
+/** A reservation not yet paid for: the door sends it to the box office or the bar with what is owed. */
+async function notPaid(order: Booked, performanceId: string): Promise<ScanOutcome> {
+  const tickets = await first<{ n: number }>("SELECT count(*) AS n FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live' AND performance_id = ?", order.id, performanceId)
+  return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, buyer: order.account_id ? await accountLabel(order.account_id) : null, tickets: Number(tickets?.n ?? 0), amountDueMinor: order.total_minor, currency: order.currency } }
+}
+
+/** The booking a pass has for this performance, and the ticket of its entry once it is paid for. */
+async function passEntryTonight(passId: string, performanceId: string): Promise<(Booked & { ticket_id: string | null }) | null> {
+  return first<Booked & { ticket_id: string | null }>(
+    `SELECT o.id, o.reference, o.state, o.total_minor, o.currency, o.account_id, (SELECT k.id FROM box_office_tickets k WHERE k.order_line_id = l.id AND k.state = 'valid' LIMIT 1) AS ticket_id
+      FROM box_office_pass_redemptions r JOIN box_office_order_lines l ON l.pass_redemption_id = r.id AND l.state = 'live' JOIN box_office_orders o ON o.id = l.order_id
+      WHERE r.pass_id = ? AND r.performance_id = ? AND r.state = 'live' AND o.state IN ('reserved', 'awaiting_payment', 'confirmed') LIMIT 1`, passId, performanceId)
+}
+
 /**
  * A scan made on a device that was offline (D2, box office review) carries the id the device gave it
  * and the device's time; it was admitted there already, after the device checked the code's
@@ -162,6 +178,7 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
     const said = await other.resolve(random)
     return said ? { result: 'card', scanId: null, card: { kind, ...said } } : { result: 'unknown', scanId: null }
   }
+  let ticket: TicketRow | undefined
   if (parts.length !== PARTS || parts[0] !== TICKET_KIND) {
     // What a reservation's message carries is not a ticket: the desk takes the payment first. A paid
     // booking's reference is ours too: for another night it says which, and for tonight the door
@@ -172,16 +189,22 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
       // A booking for another night is that, whether paid or not.
       if (lines.length && !lines.some(l => l.performance_id === input.performanceId)) return { result: 'wrong_performance', scanId: null, ...await elsewhere(lines[0]!.performance_id) }
       if (order.state === 'confirmed') return lines.length ? { result: 'reference', scanId: null, reference: order.reference } : recorded({ result: 'unknown' })
-      return { result: 'not_paid', scanId: null, reservation: { reference: order.reference, buyer: order.account_id ? await accountLabel(order.account_id) : null, tickets: lines.filter(l => l.performance_id === input.performanceId).length, amountDueMinor: order.total_minor, currency: order.currency } }
+      return notPaid(order, input.performanceId)
     }
-    // A pass makes reservations and admits nobody: its holder needs a ticket for tonight from the box office.
-    if (await passByCode(code)) return { result: 'pass', scanId: null }
-    return recorded({ result: 'unknown' })
+    // A pass stands for the entry it booked tonight (Matt, 19 November); with none it admits nobody.
+    const pass = await passByCode(code)
+    if (!pass) return recorded({ result: 'unknown' })
+    const entry = await passEntryTonight(pass.id, input.performanceId)
+    if (!entry) return { result: 'pass', scanId: null }
+    if (entry.state !== 'confirmed') return notPaid(entry, input.performanceId)
+    ticket = entry.ticket_id ? await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE id = ?', entry.ticket_id) ?? undefined : undefined
+    if (!ticket) return { result: 'reference', scanId: null, reference: entry.reference }
   }
-  const [kind, keyId, random, signature] = parts as [string, string, string, string]
-  if (!await signing.verify(DOOR_CODE_PURPOSE, keyId, signedPart(kind, keyId, random), signature)) return recorded({ result: 'bad_signature' })
-
-  const ticket = await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE code_hash = ?', await hashOf(random))
+  else {
+    const [kind, keyId, random, signature] = parts as [string, string, string, string]
+    if (!await signing.verify(DOOR_CODE_PURPOSE, keyId, signedPart(kind, keyId, random), signature)) return recorded({ result: 'bad_signature' })
+    ticket = await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE code_hash = ?', await hashOf(random)) ?? undefined
+  }
   if (!ticket) return recorded({ result: 'unknown' })
   if (ticket.state === 'void') return recorded({ result: 'void', ticketId: ticket.id, voidReason: ticket.void_reason ?? undefined }, ticket.id)
   if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ...await elsewhere(ticket.performance_id) }, ticket.id)

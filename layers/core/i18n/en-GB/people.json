@@ -1,7 +1,6 @@
 {
   "core.navigation.people.label": "Accounts",
   "core.people.column.name": "Name",
-  "core.people.column.preferredName": "Known as",
   "core.people.column.state": "State",
   "core.people.column.since": "Since",
   "core.people.state.active": "Active",
@@ -33,8 +32,6 @@
   "core.person.details.edit": "Edit",
   "core.person.details.edit-title": "Edit details for {name}",
   "core.person.details.name": "Name",
-  "core.person.details.preferred": "Known as",
-  "core.person.details.preferred-help": "Shown in place of their name where we greet them. Leave empty to use their name.",
   "core.person.details.pronouns": "Pronouns",
   "core.person.details.none": "Not given",
   "core.person.details.save": "Save details",

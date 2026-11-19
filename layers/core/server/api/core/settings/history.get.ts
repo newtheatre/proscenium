@@ -38,7 +38,7 @@ export default defineRoute({
   const [beforeAt, beforeId] = input.before ? [Number(input.before.split(':')[0]), input.before.split(':')[1]!] : [undefined, undefined]
   // A person's changes include those made under an account since merged into theirs.
   const rows = await useDb().all<ChangeRow>(sql`
-    SELECT c.id, c.key, c.old_value, c.new_value, c.reason, c.at, c.actor, coalesce(a.preferred_name, a.name) AS actor_name
+    SELECT c.id, c.key, c.old_value, c.new_value, c.reason, c.at, c.actor, a.name AS actor_name
       FROM core_setting_changes c LEFT JOIN core_accounts a ON a.id = c.actor
      WHERE c.key IN (SELECT value FROM json_each(${JSON.stringify(keys)}))
        AND ${input.actor ? inAccountScope('c.actor', input.actor) : sql`1`}

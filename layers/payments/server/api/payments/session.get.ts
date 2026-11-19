@@ -5,7 +5,7 @@
 import { z } from 'zod'
 import { can, defineRoute } from '#kit'
 import { takesCash } from '../../providers'
-import { awaitingCountOf, closesAt, defaultSpace, lastSaleIn, salesIn, sessionOf, summarise, takingsIn, unfinishedIn, waitingIn } from '../../sessions'
+import { awaitingCountOf, closesAt, defaultSpace, lastSaleIn, openSalesIn, salesIn, sessionOf, summarise, takingsIn, unfinishedIn, waitingIn } from '../../sessions'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -24,6 +24,7 @@ export default defineRoute({
     session: session ? { ...await summarise(session, undefined, cashTaken), lastSaleAt: await lastSaleIn(session), closesAt: await closesAt(session) } : null,
     waiting: session ? await waitingIn(session.id) : [],
     unfinished: session?.state === 'open' ? await unfinishedIn(session.id) : null,
+    openSales: session?.state === 'open' ? await openSalesIn(session.id) : [],
     takings: session ? await takingsIn(session.id) : [],
     // Where a session opens when the device has no place of its own, for the till to show.
     defaultSpaceId: mayOpen && !session ? await defaultSpace() : null,
