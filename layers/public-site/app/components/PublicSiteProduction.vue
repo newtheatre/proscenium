@@ -405,7 +405,7 @@ useHead(() => {
                 <li
                   v-for="p in dates"
                   :key="p.id"
-                  class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
+                  class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-3"
                 >
                   <div class="min-w-0 space-y-1">
                     <p :class="p.state === 'cancelled' ? 'text-muted line-through' : 'font-medium'">
@@ -451,7 +451,7 @@ useHead(() => {
                   >{{ t('public-site.production.date-cancelled') }}</span>
                   <div
                     v-else-if="p.state === 'scheduled'"
-                    class="flex items-center gap-3"
+                    class="flex flex-col items-end gap-1 text-end"
                   >
                     <PublicSiteBookingButton
                       :booking="p.booking"
