@@ -203,6 +203,8 @@ export default defineModule({
     // Sizes on sale whose labels are not all read, as a card on the console home for whoever records allergens.
     // A refusals register not signed within bar.age-check.review-every, as an overdue card for whoever may sign it.
     'core.count': [{ id: 'bar.allergens-unchecked', file: 'allergens-unchecked' }, { id: 'bar.register-overdue', file: 'register-overdue' }],
+    // Tonight's bar takings, on the console home's grid.
+    'core.home-figure': [{ id: 'bar.takings', file: 'takings' }],
     'core.home-card': [
       { id: 'bar.allergens', home: 'console', ability: 'bar.allergens.manage', component: 'BarAllergensCard', urgency: 'info', count: 'bar.allergens-unchecked' },
       { id: 'bar.register', home: 'console', ability: 'bar.age-check.review', component: 'BarRegisterCard', urgency: 'overdue', count: 'bar.register-overdue' },

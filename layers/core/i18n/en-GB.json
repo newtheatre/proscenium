@@ -679,5 +679,13 @@
   "core.latecomers.short.suitable-point": "At a suitable point",
   "core.latecomers.short.interval": "At the interval",
   "core.latecomers.short.not-admitted": "Not let in",
-  "core.latecomers.rules": "Our house rules"
+  "core.latecomers.rules": "Our house rules",
+  "core.console.home.actions": "Quick actions",
+  "core.console.home.figures": "At a glance",
+  "core.console.home.look-closer": "Open {what}",
+  "core.home-figures.performances.label": "Performances this week",
+  "core.home-figures.performances.detail.one": "Across {count} production",
+  "core.home-figures.performances.detail.other": "Across {count} productions",
+  "core.home-figures.no-value": "None",
+  "core.home-figures.meter": "{value} of {max}"
 }

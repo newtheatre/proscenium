@@ -236,6 +236,8 @@ export default defineModule({
     ],
     // Applications waiting on staff: beside the Applications entry, and as a card on the console home.
     'core.count': [{ id: 'membership.applications-waiting', file: 'applications-waiting' }, { id: 'membership.cards-held', file: 'cards-held' }],
+    // Current members and joins by month, on the console home's grid.
+    'core.home-figure': [{ id: 'membership.members', file: 'members' }],
     'core.home-card': [
       { id: 'membership.applications', home: 'console', ability: 'membership.membership.view', component: 'MembershipApplicationsCard', urgency: 'today', count: 'membership.applications-waiting' },
       // The holder's own card, on the members' area home, while they hold a membership.
