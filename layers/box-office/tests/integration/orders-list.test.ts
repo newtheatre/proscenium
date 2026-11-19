@@ -19,6 +19,7 @@ async function set(key: string, value: unknown): Promise<void> {
 }
 
 let h: House
+let other: House
 let reservation: { orderId: string, reference: string }
 let basketId: string
 
@@ -37,6 +38,7 @@ beforeAll(async () => {
   const left = await buy(h, 1)
   if (!left.ok) throw new Error(left.code)
   basketId = left.basket.orderId
+  other = await house(20)
 })
 
 describe('the Orders list', () => {
@@ -63,6 +65,31 @@ describe('the Orders list', () => {
   it('filters by state', async () => {
     const paid = await req('GET', '/api/box-office/orders?state=confirmed', undefined, viewer)
     expect(paid.body.rows.map((r: { id: string }) => r.id)).not.toContain(reservation.orderId)
+  })
+
+  it('filters by show and by performance', async () => {
+    const ids = async (filter: string) => (await req('GET', `/api/box-office/orders?view=all&${filter}`, undefined, viewer)).body.rows.map((r: { id: string }) => r.id)
+    expect(await ids(`performance=${h.performanceId}`)).toEqual([reservation.orderId])
+    expect(await ids(`show=${h.productionId}`)).toEqual([reservation.orderId])
+    expect(await ids(`performance=${other.performanceId}`)).toEqual([])
+    expect(await ids(`show=${other.productionId}`)).toEqual([])
+  })
+
+  it('offers shows and performances to filter by, and names a chosen one', async () => {
+    const shows = await req('GET', '/api/box-office/productions/lookup?q=box office show', undefined, viewer)
+    expect(shows.status, JSON.stringify(shows.body)).toBe(200)
+    expect(shows.body.rows.map((r: { value: string }) => r.value)).toEqual(expect.arrayContaining([h.productionId, other.productionId]))
+    const named = await req('GET', `/api/box-office/productions/lookup?ids=${h.productionId}`, undefined, viewer)
+    const title = named.body.rows[0].label
+    expect(named.body.rows).toEqual([{ value: h.productionId, label: title }])
+
+    // Narrowed to the show that is on, and named with the show and when it starts.
+    const ofShow = await req('GET', `/api/box-office/performances/lookup?q=&show=${h.productionId}`, undefined, viewer)
+    expect(ofShow.body.rows.map((r: { value: string }) => r.value)).toEqual([h.performanceId])
+    expect(ofShow.body.rows[0].label).toContain(title)
+    const resolved = await req('GET', `/api/box-office/performances/lookup?ids=${other.performanceId}`, undefined, viewer)
+    expect(resolved.body.rows.map((r: { value: string }) => r.value)).toEqual([other.performanceId])
+    expect((await req('GET', '/api/box-office/performances/lookup', undefined, stranger)).status).toBe(403)
   })
 
   it('is refused to someone who may not see orders', async () => {

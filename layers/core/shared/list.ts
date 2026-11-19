@@ -261,7 +261,7 @@ export function resolveDates(value: string, today: string): { from?: string, to?
 }
 
 /** What a chip says for one filter that is on: "State: Draft, Published". Null when nothing is left to say. */
-export function filterChipText(def: FilterDef, value: string, labels: { yes: string, no: string, unknown?: string } = { yes: 'Yes', no: 'No' }): string | null {
+export function filterChipText(def: FilterDef, value: string, labels: { yes: string, no: string, unknown?: string, /** A lookup's id, as its resolve route named it. */ lookup?: string } = { yes: 'Yes', no: 'No' }): string | null {
   const labelOf = (options: ListOption[] | undefined, v: string) => options?.find(o => o.value === v)?.label ?? v
   let text: string
   switch (def.kind) {
@@ -275,7 +275,7 @@ export function filterChipText(def: FilterDef, value: string, labels: { yes: str
       text = g ? (item ? labelOf(g.items, item) : g.label) : value
       break
     }
-    default: text = value
+    default: text = labels.lookup ?? value
   }
   return text ? `${def.label}: ${text}` : null
 }

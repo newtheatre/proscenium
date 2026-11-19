@@ -448,7 +448,8 @@ a layout, not a shell, and it has no navigation of its own.
   that runs past midnight stays until `core.locale.day-start`), each with its start time and the
   figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
   `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
-  minor units): Box office gives sold and in, Payments what the tills have taken. The screens'
+  minor units): Box office gives sold, not yet paid, in, still to come and seats left, Payments
+  what the tills have taken. The hub reads them again every 30 seconds while open. The screens'
   tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48

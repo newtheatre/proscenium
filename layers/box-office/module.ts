@@ -241,7 +241,9 @@ export default defineModule({
       agreedOnApplying: true,
       onForExisting: 'box-office.on-the-night-switched-on',
     }],
-    'core.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.in', file: 'in' }],
+    // Front of house's headline numbers for a performance, on the Tonight hub and the front of house board.
+    'core.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.unpaid', file: 'unpaid' }, { id: 'box-office.in', file: 'in' }, { id: 'box-office.to-come', file: 'to-come' }, { id: 'box-office.left', file: 'left' }],
+    'front-of-house.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.unpaid', file: 'unpaid' }, { id: 'box-office.in', file: 'in' }, { id: 'box-office.to-come', file: 'to-come' }, { id: 'box-office.left', file: 'left' }],
     // Tonight's ticket sales and the next performances' seats, on the console home's grid.
     'core.home-figure': [{ id: 'box-office.sales', file: 'sales' }, { id: 'box-office.seats', file: 'seats' }],
     // The door, from the palette and the console home.
