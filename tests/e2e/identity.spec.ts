@@ -4,16 +4,28 @@ import AxeBuilder from '@axe-core/playwright'
 
 const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
-test('the sign-in page asks for an email address first, with a passkey as another way', async ({ page }) => {
+test('the sign-in page asks for an email address first, offers only ways in that work, with a passkey as another way', async ({ page }) => {
+  const owner = { 'x-test-actor': JSON.stringify({ kind: 'person', accountId: 'acc_keyholder', name: 'Key Holder', grants: [{ ability: 'core.identity-settings.manage', via: 'test' }], assurance: 'strong', reassertedAt: Date.now() }) }
+  const saveBotCheck = (value: string | null) => page.request.post('/api/core/credentials', { headers: owner, data: { keys: { CORE_TURNSTILE_SECRET_KEY: value } } })
+  // Without the bot check's secret no code can be sent, and no provider is set up: only the passkey.
   await page.goto('/sign-in')
-  await expect(page.getByText('Sign in', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'Email address' })).toBeVisible()
-  const link = page.getByRole('button', { name: 'Email me a link' })
   const passkey = page.getByRole('button', { name: 'Sign in with a passkey' })
-  await expect(link).toBeVisible()
   await expect(passkey).toBeVisible()
-  // The emailed link comes first.
-  expect((await link.boundingBox())!.y).toBeLessThan((await passkey.boundingBox())!.y)
+  await expect(page.getByRole('textbox', { name: 'Email address' })).toHaveCount(0)
+  expect((await saveBotCheck('0x4AAAAAAAe2e-identity-check')).ok()).toBe(true)
+  try {
+    await page.goto('/sign-in')
+    await expect(page.getByText('Sign in', { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Email address' })).toBeVisible()
+    const carryOn = page.getByRole('button', { name: 'Continue' })
+    await expect(carryOn).toBeVisible()
+    // The address comes first; the code and any provider are offered once it is given.
+    expect((await carryOn.boundingBox())!.y).toBeLessThan((await passkey.boundingBox())!.y)
+    await expect(page.getByRole('button', { name: 'Email me a code' })).toHaveCount(0)
+  }
+  finally {
+    await saveBotCheck(null)
+  }
 })
 
 test('a Google refusal is explained on the sign-in page', async ({ page }) => {

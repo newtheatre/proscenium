@@ -1,6 +1,8 @@
-<!-- The ways in (ID-01, ID-02, ID-04, ID-07): an emailed link and code first, as most people use it,
-     then a passkey, or an outside provider the theatre has switched on (Google so far), one button
-     each. The sign-in page draws it in its card; a page that asks for a sign-in in place (a scheme's
+<!-- The ways in (ID-01, ID-02, ID-04, ID-07). The address comes first (Matt, 19 November), then
+     only the ways in that fit it: an address in a managed domain goes straight to its provider; one
+     an outside provider accepts is offered that provider beside an emailed code; any other is sent
+     its code at once. A passkey needs no address, so it is offered beneath, and the address box
+     suggests saved passkeys as well. The sign-in page draws it in its card; a page that asks for a sign-in in place (a scheme's
      join page) draws it there, with `next` set to come back. `sent` is true once a link and code have
      been sent, for the page's title. -->
 <script setup lang="ts">
@@ -29,8 +31,15 @@ const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/, t('core.form.inv
 const addressForm = useTemplateRef('addressForm')
 const codeForm = useTemplateRef('codeForm')
 const turnstile = useTemplateRef('turnstile')
-const { data: me } = await useAPI<{ signedIn: boolean, signIn?: { email: boolean, providers: { id: string, label: string }[], openSignUp?: boolean } }>('/api/core/me', { key: 'core:me' })
+interface Methods { email: boolean, providers: { id: string, label: string, domains: string[] }[], managed: { domains: string[], provider: string } | null, openSignUp?: boolean }
+const { data: me } = await useAPI<{ signedIn: boolean, signIn?: Methods }>('/api/core/me', { key: 'core:me' })
 const providers = computed(() => me.value?.signIn?.providers ?? [])
+const email = computed(() => !!me.value?.signIn?.email)
+// With no emailed code and no provider, an address leads nowhere: only the passkey is offered.
+const asksAddress = computed(() => email.value || providers.value.length > 0)
+// Once an address is given and more than one way in fits it, the choice; `null` while it is being typed.
+const choosing = ref<{ address: string, providers: Methods['providers'] } | null>(null)
+const nowhere = ref(false)
 // Errors come back from a provider's callback; while one provider is offered it can be named.
 const providerName = computed(() => providers.value.length === 1 ? providers.value[0]!.label : t('core.sign-in.page.your-provider'))
 const errorCode = typeof route.query.error === 'string' ? route.query.error : null
@@ -42,7 +51,33 @@ const providerErrors: Record<string, string> = {
   'core.account.disabled': 'core.sign-in.page.error.disabled',
 }
 const providerError = computed(() => errorCode ? t(providerErrors[errorCode] ?? 'core.sign-in.page.error.provider-other', { provider: providerName.value }) : null)
-const providerHref = (id: string) => `/api/core/sign-in/${id}${props.next ? `?next=${encodeURIComponent(props.next)}` : ''}`
+const providerHref = (id: string, loginHint?: string) => {
+  const query = new URLSearchParams({ ...(props.next ? { next: props.next } : {}), ...(loginHint ? { login_hint: loginHint } : {}) }).toString()
+  return `/api/core/sign-in/${id}${query ? `?${query}` : ''}`
+}
+
+/** The address decides the ways in: its domain's provider if managed, else those that accept it, else the code. */
+async function carryOn() {
+  refusal.value = null
+  nowhere.value = false
+  const given = address.value.trim().toLowerCase()
+  const domain = given.split('@').pop() ?? ''
+  const managed = me.value?.signIn?.managed
+  if (managed?.domains.includes(domain)) return navigateTo(providerHref(managed.provider, given), { external: true })
+  const fitting = providers.value.filter(p => !p.domains.length || p.domains.includes(domain))
+  if (fitting.length) {
+    choosing.value = { address: given, providers: fitting }
+    return
+  }
+  if (email.value) return sendLink()
+  nowhere.value = true
+}
+function changeAddress() {
+  choosing.value = null
+  nowhere.value = false
+}
+// A provider that names this address's organisation is the likely way in, so it leads; otherwise the code does.
+const providerLeads = computed(() => !email.value || !!choosing.value?.providers.some(p => p.domains.length))
 
 async function withPasskey() {
   pending.value = 'passkey'
@@ -74,6 +109,7 @@ async function sendLink() {
     return
   }
   if (answer.data.to) return navigateTo(answer.data.to, { external: true })
+  choosing.value = null
   sent.value = true
 }
 
@@ -99,14 +135,15 @@ async function useCode() {
     <RefusalNotice :refusal="refusal" />
 
     <template v-if="!sent">
-      <template v-if="me?.signIn?.email">
+      <template v-if="asksAddress">
         <UForm
+          v-if="!choosing"
           ref="addressForm"
           :schema="addressSchema"
           :state="{ address }"
           class="flex flex-col gap-4"
           novalidate
-          @submit="sendLink"
+          @submit="carryOn"
         >
           <UFormField
             :label="t('core.sign-in.page.address')"
@@ -116,11 +153,15 @@ async function useCode() {
               v-model="address"
               type="email"
               autocomplete="email webauthn"
+              @update:model-value="nowhere = false"
             />
           </UFormField>
-          <TurnstileCheck
-            ref="turnstile"
-            quiet
+          <UAlert
+            v-if="nowhere"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-info"
+            :title="t('core.sign-in.page.no-way-in')"
           />
           <UButton
             type="submit"
@@ -128,32 +169,67 @@ async function useCode() {
             size="lg"
             :loading="pending === 'link'"
           >
-            {{ t('core.sign-in.page.send-link') }}
+            {{ t('core.sign-in.page.continue') }}
           </UButton>
         </UForm>
+        <div
+          v-else
+          class="flex flex-col gap-3"
+        >
+          <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+            <span>{{ t('core.sign-in.page.signing-in-as', { address: choosing.address }) }}</span>
+            <UButton
+              variant="link"
+              color="neutral"
+              size="sm"
+              class="p-0"
+              :label="t('core.sign-in.page.change-address')"
+              @click="changeAddress"
+            />
+          </p>
+          <UButton
+            v-for="(provider, i) in choosing.providers"
+            :key="provider.id"
+            block
+            size="lg"
+            :color="providerLeads && i === 0 ? undefined : 'neutral'"
+            :variant="providerLeads && i === 0 ? undefined : 'outline'"
+            :href="providerHref(provider.id, choosing.address)"
+            external
+          >
+            {{ t('core.sign-in.page.provider', { provider: provider.label }) }}
+          </UButton>
+          <UButton
+            v-if="email"
+            block
+            size="lg"
+            :color="providerLeads ? 'neutral' : undefined"
+            :variant="providerLeads ? 'outline' : undefined"
+            icon="i-lucide-mail"
+            :loading="pending === 'link'"
+            @click="sendLink"
+          >
+            {{ t('core.sign-in.page.send-link') }}
+          </UButton>
+        </div>
+        <!-- The bot check stays on the page through both steps, so a code can be sent from either. -->
+        <TurnstileCheck
+          v-if="email"
+          ref="turnstile"
+          quiet
+        />
         <USeparator :label="t('core.sign-in.page.or')" />
       </template>
       <UButton
         block
-        :size="me?.signIn?.email ? undefined : 'lg'"
-        :color="me?.signIn?.email ? 'neutral' : undefined"
-        :variant="me?.signIn?.email ? 'outline' : undefined"
+        :size="asksAddress ? undefined : 'lg'"
+        :color="asksAddress ? 'neutral' : undefined"
+        :variant="asksAddress ? 'outline' : undefined"
         icon="i-lucide-key-round"
         :loading="pending === 'passkey'"
         @click="withPasskey"
       >
         {{ t('core.sign-in.page.passkey') }}
-      </UButton>
-      <UButton
-        v-for="provider in providers"
-        :key="provider.id"
-        block
-        color="neutral"
-        variant="outline"
-        :href="providerHref(provider.id)"
-        external
-      >
-        {{ t('core.sign-in.page.provider', { provider: provider.label }) }}
       </UButton>
     </template>
 
