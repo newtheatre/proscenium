@@ -237,9 +237,8 @@ useResizeObserver(() => [sheetBody.value, sheetBody.value?.parentElement], () =>
   sheetScrolls.value = !!body && body.scrollHeight > body.clientHeight + 1
 })
 
-// "Add a code or discount": a code the customer gives, or a discount from the till's list. Each is
-// tried against the sale before it is added, so a code that cannot be used says why in the window.
-const discounting = ref(false)
+// One box on the receipt for a code the customer gives or a discount from the till's list. Each is
+// tried against the sale before it is added, so a code that cannot be used says why under the box.
 const codeTyped = ref('')
 const picked = ref<string | undefined>(undefined)
 const reason = ref('')
@@ -247,25 +246,19 @@ const choices = ref<Choice[] | null>(null)
 const discountRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const trying = ref(false)
 const pickedChoice = computed(() => choices.value?.find(c => c.promotionId === picked.value))
-// The sale sheet's backdrop would sit over the window, so the sheet steps aside and comes back after.
-let fromSheet = false
-watch(discounting, (open) => {
-  if (open || !fromSheet) return
-  fromSheet = false
-  sheet.value = true
-})
-async function openDiscounts() {
-  fromSheet = sheet.value
-  sheet.value = false
+const choiceItems = computed<{ type?: 'label', value?: string, label: string, icon?: string }[]>(() => choices.value?.length
+  ? [{ type: 'label', label: t('payments.screens.till.discount-list') }, ...choices.value.map(c => ({ value: c.promotionId, label: c.name, icon: 'i-lucide-badge-percent' }))]
+  : [])
+async function loadChoices() {
+  if (choices.value) return
+  try { choices.value = (await $api<{ choices: Choice[] }>('/api/payments/till/discounts')).choices }
+  catch { choices.value = [] }
+}
+function clearDiscountBox() {
   codeTyped.value = ''
   picked.value = undefined
   reason.value = ''
   discountRefusal.value = null
-  discounting.value = true
-  if (!choices.value) {
-    try { choices.value = (await $api<{ choices: Choice[] }>('/api/payments/till/discounts')).choices }
-    catch { choices.value = [] }
-  }
 }
 async function tryAdding(next: typeof pricing) {
   trying.value = true
@@ -275,7 +268,7 @@ async function tryAdding(next: typeof pricing) {
     pricing.codes = next.codes
     pricing.staff = next.staff
     summary.value = answer
-    discounting.value = false
+    clearDiscountBox()
   }
   catch (e) {
     discountRefusal.value = toRefusal(e)
@@ -284,19 +277,32 @@ async function tryAdding(next: typeof pricing) {
     trying.value = false
   }
 }
-function addCode() {
-  const code = codeTyped.value.trim()
+function addCode(typed?: string) {
+  const code = (typed ?? codeTyped.value).trim()
   if (!code) return
+  picked.value = undefined
   void tryAdding({ codes: [...pricing.codes.filter(c => c.toUpperCase() !== code.toUpperCase()), code], staff: pricing.staff })
 }
 function addPicked() {
   const choice = pickedChoice.value
-  if (!choice) return
+  if (!choice || (choice.needsReason && !reason.value.trim())) return
   void tryAdding({ codes: pricing.codes, staff: [...pricing.staff.filter(s => s.promotionId !== choice.promotionId), { promotionId: choice.promotionId, label: choice.label, ...(reason.value.trim() ? { reason: reason.value.trim() } : {}) }] })
 }
+// A discount that asks for a reason waits for one; any other is given as soon as it is picked.
+watch(picked, () => {
+  discountRefusal.value = null
+  reason.value = ''
+  if (pickedChoice.value && !pickedChoice.value.needsReason) addPicked()
+})
+function removeDiscount(label: string, next: typeof pricing) {
+  const before = { codes: [...pricing.codes], staff: [...pricing.staff] }
+  pricing.codes = next.codes
+  pricing.staff = next.staff
+  toast.add({ id: TOAST, title: t('payments.screens.till.discount-removed', { name: label }), color: 'neutral', actions: [{ label: t('payments.screens.till.undo'), color: 'neutral', variant: 'outline', onClick: () => Object.assign(pricing, before) }] })
+}
 const addedDiscounts = computed(() => [
-  ...pricing.codes.map(code => ({ key: `code:${code}`, label: code.toUpperCase(), remove: () => { pricing.codes = pricing.codes.filter(c => c !== code) } })),
-  ...pricing.staff.map(s => ({ key: `staff:${s.promotionId}`, label: s.label, remove: () => { pricing.staff = pricing.staff.filter(x => x.promotionId !== s.promotionId) } })),
+  ...pricing.codes.map(code => ({ key: `code:${code}`, label: code.toUpperCase(), remove: () => removeDiscount(code.toUpperCase(), { codes: pricing.codes.filter(c => c !== code), staff: pricing.staff }) })),
+  ...pricing.staff.map(s => ({ key: `staff:${s.promotionId}`, label: s.label, remove: () => removeDiscount(s.label, { codes: pricing.codes, staff: pricing.staff.filter(x => x.promotionId !== s.promotionId) }) })),
 ])
 
 // The receipt is drawn once and shown beside the panels, or in a sheet where there is no room.
@@ -1065,7 +1071,7 @@ function ended() {
               </template>
 
               <div
-                v-if="!sale && groups.length"
+                v-if="!sale && groups.length && addedDiscounts.length"
                 class="flex flex-wrap items-center gap-2"
               >
                 <UBadge
@@ -1084,14 +1090,97 @@ function ended() {
                     @click="d.remove()"
                   />
                 </UBadge>
-                <UButton
-                  icon="i-lucide-ticket-percent"
-                  color="neutral"
-                  variant="link"
-                  class="px-0"
+              </div>
+              <div
+                v-if="!sale && groups.length"
+                class="space-y-3"
+              >
+                <UFormField
+                  name="promoCode"
                   :label="t('payments.screens.till.discount-add')"
-                  @click="openDiscounts"
-                />
+                  :ui="{ label: 'sr-only' }"
+                  :error="pickedChoice?.needsReason ? undefined : discountRefusal?.reason"
+                >
+                  <div
+                    v-if="pickedChoice?.needsReason"
+                    class="flex items-center gap-2 rounded-md border border-default px-2.5 py-1.5 text-sm"
+                  >
+                    <UIcon
+                      name="i-lucide-badge-percent"
+                      class="size-5 shrink-0 text-dimmed"
+                    />
+                    <span class="flex-1">{{ pickedChoice.name }}</span>
+                    <IconButton
+                      icon="i-lucide-x"
+                      :label="t('payments.screens.till.discount-remove', { name: pickedChoice.name })"
+                      @click="clearDiscountBox"
+                    />
+                  </div>
+                  <div
+                    v-else
+                    class="flex gap-2"
+                  >
+                    <UInputMenu
+                      v-model="picked"
+                      v-model:search-term="codeTyped"
+                      :items="choiceItems"
+                      value-key="value"
+                      icon="i-lucide-ticket-percent"
+                      :placeholder="t('payments.screens.till.discount-placeholder')"
+                      :create-item="{ position: 'top', when: 'always' }"
+                      :ignore-filter="false"
+                      :ui="{ base: 'uppercase placeholder:normal-case' }"
+                      class="min-w-0 flex-1"
+                      autocomplete="off"
+                      open-on-focus
+                      :disabled="trying"
+                      @focus="loadChoices"
+                      @create="addCode"
+                    >
+                      <template #create-item-label="{ item }">
+                        {{ t('payments.screens.till.discount-use-code', { code: String(item).toUpperCase() }) }}
+                      </template>
+                    </UInputMenu>
+                    <UButton
+                      color="neutral"
+                      variant="outline"
+                      :label="t('payments.screens.till.discount-apply')"
+                      :loading="trying"
+                      :disabled="!codeTyped.trim()"
+                      @click="addCode()"
+                    />
+                  </div>
+                </UFormField>
+                <UForm
+                  v-if="pickedChoice?.needsReason"
+                  :state="{ reason }"
+                  novalidate
+                  @submit="addPicked"
+                >
+                  <UFormField
+                    :label="t('payments.screens.till.discount-reason')"
+                    name="reason"
+                    required
+                    :error="discountRefusal?.reason"
+                  >
+                    <div class="flex gap-2">
+                      <UInput
+                        v-model="reason"
+                        maxlength="200"
+                        class="min-w-0 flex-1"
+                        autofocus
+                      />
+                      <UButton
+                        type="submit"
+                        color="neutral"
+                        variant="outline"
+                        :label="t('payments.screens.till.discount-give')"
+                        :loading="trying"
+                        :disabled="!reason.trim()"
+                      />
+                    </div>
+                  </UFormField>
+                </UForm>
               </div>
 
               <p
@@ -1519,82 +1608,6 @@ function ended() {
               </div>
             </div>
           </DefineReceipt>
-          <UModal
-            v-model:open="discounting"
-            :title="t('payments.screens.till.discount-add')"
-          >
-            <template #body>
-              <div class="space-y-6">
-                <RefusalNotice :refusal="discountRefusal" />
-                <UForm
-                  :state="{ codeTyped }"
-                  novalidate
-                  @submit="addCode"
-                >
-                  <UFormField
-                    :label="t('payments.screens.till.discount-code')"
-                    name="promoCode"
-                  >
-                    <div class="flex gap-2">
-                      <UInput
-                        v-model="codeTyped"
-                        class="w-48 uppercase"
-                        maxlength="40"
-                        autocomplete="off"
-                      />
-                      <UButton
-                        type="submit"
-                        color="neutral"
-                        variant="outline"
-                        :label="t('payments.screens.till.discount-apply')"
-                        :loading="trying"
-                        :disabled="!codeTyped.trim()"
-                      />
-                    </div>
-                  </UFormField>
-                </UForm>
-                <UForm
-                  v-if="choices?.length"
-                  :state="{ picked, reason }"
-                  novalidate
-                  class="space-y-4"
-                  @submit="addPicked"
-                >
-                  <UFormField
-                    :label="t('payments.screens.till.discount-pick')"
-                    name="staff"
-                  >
-                    <USelectMenu
-                      v-model="picked"
-                      :items="choices.map(c => ({ value: c.promotionId, label: c.name }))"
-                      value-key="value"
-                      class="w-72"
-                    />
-                  </UFormField>
-                  <UFormField
-                    v-if="pickedChoice?.needsReason"
-                    :label="t('payments.screens.till.discount-reason')"
-                    name="reason"
-                    required
-                  >
-                    <UInput
-                      v-model="reason"
-                      maxlength="200"
-                      class="w-80"
-                    />
-                  </UFormField>
-                  <UButton
-                    type="submit"
-                    color="neutral"
-                    variant="outline"
-                    :label="t('payments.screens.till.discount-give')"
-                    :loading="trying"
-                    :disabled="!pickedChoice || (pickedChoice.needsReason && !reason.trim())"
-                  />
-                </UForm>
-              </div>
-            </template>
-          </UModal>
 
           <!-- While a payment is being taken nothing in the sale can change: the panels say so plainly. -->
           <UAlert
