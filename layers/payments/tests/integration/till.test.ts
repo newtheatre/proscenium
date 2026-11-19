@@ -112,7 +112,10 @@ describe('news of a session', () => {
     const joined = await connectRealtime(new Request(`https://theatre.test/api/realtime?ticket=${encodeURIComponent(ticket)}`, { headers: { upgrade: 'websocket' } }), env)
     const heard: string[] = []
     joined.webSocket!.accept()
-    joined.webSocket!.addEventListener('message', (event) => { heard.push(JSON.parse(event.data as string).channel) })
+    joined.webSocket!.addEventListener('message', (event) => {
+      const { channel } = JSON.parse(event.data as string)
+      if (channel !== 'core.presence') heard.push(channel)
+    })
     const told = async (times: number) => {
       await new Promise(resolve => setTimeout(resolve, 20))
       expect(heard).toEqual(Array.from({ length: times }, () => 'payments.session'))

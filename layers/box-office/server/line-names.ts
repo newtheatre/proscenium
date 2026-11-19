@@ -3,6 +3,8 @@
 // pages and the messages do too: "2 tickets" rather than "2 × Full price" for a free show.
 import { availability } from './availability'
 import { sellableTypes } from './ticket-types'
+import { pricesFor } from './prices'
+import { typesInSeveralSections } from '../shared/sections'
 
 /** The kinds of ticket that go unnamed at a performance, as `${bandId} ${ticketTypeId}`. */
 export async function unnamedKinds(performanceId: string): Promise<Set<string>> {
@@ -27,3 +29,11 @@ export async function unnamedLines(lines: readonly { performance_id: string, ban
 }
 
 export const lineKey = (l: { performance_id: string, band_id: string, ticket_type_id: string }) => `${l.performance_id} ${l.band_id} ${l.ticket_type_id}`
+
+/** The lines with `band_name` kept only where their type is sold in more than one section of the performance. */
+export async function withSections<T extends { performance_id: string, ticket_type_id: string, band_name: string | null }>(lines: readonly T[]): Promise<T[]> {
+  const several = new Map<string, Set<string>>()
+  for (const performanceId of new Set(lines.filter(l => l.band_name).map(l => l.performance_id)))
+    several.set(performanceId, typesInSeveralSections(await pricesFor(performanceId).catch(() => [])))
+  return lines.map(l => l.band_name && !several.get(l.performance_id)?.has(l.ticket_type_id) ? { ...l, band_name: null } : l)
+}

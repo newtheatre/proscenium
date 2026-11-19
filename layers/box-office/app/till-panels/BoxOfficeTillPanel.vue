@@ -6,6 +6,7 @@
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 import type { TillPass, TillPassBuy, TillUpgrade } from '../components/BoxOfficeTillPasses.vue'
+import { typesInSeveralSections } from '../../shared/sections'
 
 interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, noun?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
@@ -129,7 +130,9 @@ const oneSection = (id: string | undefined) => {
   const rows = performances.value.find(p => p.performanceId === id)?.rows ?? []
   return rows.length > 0 && rows.every(r => r.bandId === rows[0]!.bandId)
 }
-const rowLabel = (row: PerformanceRow) => (bands.value.length > 1 ? t('box-office.screens.panel.sold.line', { band: row.band, type: row.ticketType }) : row.ticketType)
+// A ticket is named by its type, with its section only where the type is sold in more than one.
+const severalSections = computed(() => typesInSeveralSections(performance.value?.rows ?? []))
+const rowLabel = (row: PerformanceRow) => (severalSections.value.has(row.ticketTypeId) ? t('box-office.screens.panel.sold.line', { band: row.band, type: row.ticketType }) : row.ticketType)
 
 function setQuantity(row: PerformanceRow, value: number | null | undefined) {
   const n = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
@@ -293,7 +296,8 @@ const adding = ref<string | undefined>(undefined)
 const orderRows = computed(() => performances.value.find(p => p.performanceId === order.value?.lines[0]?.performanceId)?.rows ?? [])
 // The price shows under each choice in the list; the box shows the name, with the line's price beside it.
 const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: r.ticketType, description: money(r.amountMinor) }))
-const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: oneSection(order.value?.lines[0]?.performanceId)
+const orderSections = computed(() => typesInSeveralSections(orderRows.value))
+const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: !orderSections.value.has(r.ticketTypeId)
   ? t('box-office.screens.panel.row-whole', { type: r.ticketType, price: money(r.amountMinor) })
   : t('box-office.screens.panel.row', { band: r.band, type: r.ticketType, price: money(r.amountMinor) }) })))
 
@@ -1142,7 +1146,7 @@ function clear() {
             class="space-y-2 rounded-lg border border-default p-3"
           >
             <h4 class="text-sm font-medium">
-              {{ t(row.companion ? 'box-office.screens.panel.holder.companion-heading' : 'box-office.screens.panel.holder.heading', { type: bands.length > 1 ? `${row.band}, ${row.ticketType}` : row.ticketType }) }}
+              {{ t(row.companion ? 'box-office.screens.panel.holder.companion-heading' : 'box-office.screens.panel.holder.heading', { type: rowLabel(row) }) }}
             </h4>
             <div
               v-for="n in quantities[keyOf(row)]"
