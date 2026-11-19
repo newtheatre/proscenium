@@ -223,6 +223,16 @@ describe('email wording (C-27)', () => {
     expect(variablesIn('Hello {{ name }}, see {{link}} at {{ theatre }}').sort()).toEqual(['link', 'name', 'theatre'])
   })
 
+  it('draws a lone {{ qr name }} as a QR code of table cells in HTML, and leaves it out of the text', () => {
+    expect(variablesIn('Code **{{ code }}**\n\n{{ qr code }}')).toEqual(['code'])
+    const out = render({ subject: 'Hi', body: 'Your code is **{{ code }}**\n\n{{ qr code }}\n\nSee you soon.' }, { values: { code: 'PASS-7KD2-M4QX' }, kinds: { code: 'sealed' }, accent: '#000000', theatre: 'T' })
+    expect(out.html).toContain('aria-label="QR code"')
+    expect(out.html.match(/<tr /g)).toHaveLength(29)
+    expect(out.html).toContain('bgcolor="#000000"')
+    expect(out.text).toBe('Your code is PASS-7KD2-M4QX\n\nSee you soon.\n')
+    expect(out.text).not.toContain('qr')
+  })
+
   it('takes only https addresses, except on this machine', () => {
     expect(isSafeUrl('https://example.org/x')).toBe(true)
     expect(isSafeUrl('http://localhost:3000/x')).toBe(true)

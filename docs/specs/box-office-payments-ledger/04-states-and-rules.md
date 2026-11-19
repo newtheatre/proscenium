@@ -318,6 +318,16 @@ Ruled by Matt on 19 November (plan "Applying a pass to earlier bookings"), rever
 
 A paid ticket switched to a pass is no longer refunded on its own: cancelling it gives nothing back, since its money is the pass's.
 
+## A pass code at the door and the till
+
+Ruled by Matt on 19 November: at the door, the till and the bar a holder may show their pass code (typed, or scanned from the QR code in the pass's email) in place of their booking's reference.
+
+| Where | Rule |
+| --- | --- |
+| The door | The pass's live entry for this performance stands for it. A paid booking admits the entry's own ticket, as scanning that ticket would; a reservation answers "Not paid" with what is owed; no entry tonight answers `pass` ("No booking on this pass") and admits nobody. Nothing else on the booking is admitted |
+| The till's find box | A pass code finds the bookings it made for performances on tonight's show night, as a reference would. With none, the pass is offered as a new entry, as before |
+| The email | `box-office.pass-issued` shows the code as a QR code under the written code, drawn as a table so it shows with images blocked. The plain-text part has the written code only |
+
 ## The waiting list
 
 | Transition | Guard |
