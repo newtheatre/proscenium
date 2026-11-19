@@ -39,6 +39,12 @@ async function visit(page: Page, url: string) {
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
 }
 
+// Other tests leave the outlet opening on its favourites, so the juice's own category is picked first.
+async function addJuice(page: Page) {
+  await page.getByRole('group', { name: 'Categories' }).getByRole('button', { name: `Juices ${run}` }).click()
+  await page.getByRole('button', { name: new RegExp(`^${juice}`) }).click()
+}
+
 // A finger dragging down from a point, as a phone sends it (touch, not a mouse).
 async function swipeDown(page: Page, x: number, y: number, distance: number) {
   const cdp = await page.context().newCDPSession(page)
@@ -54,7 +60,7 @@ async function swipeDown(page: Page, x: number, y: number, distance: number) {
 
 test('a code is added from the sale sheet and takes its saving off', async ({ page }) => {
   await visit(page, '/live/till')
-  await page.getByRole('button', { name: new RegExp(`^${juice}`) }).click()
+  await addJuice(page)
   await page.getByRole('button', { name: /^Sale/ }).click()
   const sheet = page.getByRole('dialog', { name: /^Sale/ })
   await sheet.getByRole('button', { name: 'Add a code or discount' }).click()
@@ -69,7 +75,7 @@ test('a code is added from the sale sheet and takes its saving off', async ({ pa
 
 test('the sale sheet closes when swiped down', async ({ page }) => {
   await visit(page, '/live/till')
-  await page.getByRole('button', { name: new RegExp(`^${juice}`) }).click()
+  await addJuice(page)
   await page.getByRole('button', { name: /^Sale/ }).click()
   const sheet = page.getByRole('dialog', { name: /^Sale/ })
   await expect(sheet).toBeVisible()
@@ -82,7 +88,7 @@ test('the sale sheet closes when swiped down', async ({ page }) => {
 test('a sale too long for the sheet scrolls, and the sheet still swipes closed from its header', async ({ page }) => {
   await page.setViewportSize({ width: 412, height: 480 }) // a phone on its side
   await visit(page, '/live/till')
-  await page.getByRole('button', { name: new RegExp(`^${juice}`) }).click()
+  await addJuice(page)
   await page.getByRole('button', { name: /^Sale/ }).click()
   const sheet = page.getByRole('dialog', { name: /^Sale/ })
   await expect(sheet).toBeVisible()
