@@ -224,7 +224,6 @@
   "core.public.navigation": "Main",
   "core.public.footer-navigation": "Footer",
   "core.public.setup-needed.title": "This site has not been set up yet",
-  "core.public.setup-needed.description": "Whoever is installing it makes the first Owner account and describes the theatre. Until then there is nothing to sign in to.",
   "core.public.setup-needed.action": "Set up the site",
   "core.console.navigation": "Console",
   "core.console.menu": "Open or close the menu",

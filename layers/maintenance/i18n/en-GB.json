@@ -1,6 +1,6 @@
 {
   "maintenance.module.name": "Maintenance mode",
-  "maintenance.module.description": "Closes the public site and online booking for a while, behind a page that says what is happening and how to reach the box office. Staff still sign in and work as usual: the console, Admin, the till, the door and the scanner all keep going. Switch it on for a few hours when you need to (moving to a new system, a big import) and off again when you are done.",
+  "maintenance.module.description": "Closes the public site and online booking for a while, behind a page that says what is happening and how to reach the box office. Staff still sign in and work as usual: the console, Admin, the till, the door and the scanner all keep going. Switch it on for a few hours when you need to (moving to a new system, a big import) and off again when you are done. A new site starts with it on, so nothing is public until you switch it off.",
   "maintenance.navigation.groups.maintenance.label": "Maintenance mode",
   "maintenance.settings-sections.notice": "Holding page",
   "maintenance.settings-sections.search": "Maintenance mode",
@@ -28,5 +28,7 @@
   "maintenance.notice.thanks": "Thank you for bearing with us.",
   "maintenance.card.line": "Maintenance mode is on",
   "maintenance.card.description": "The public site and online booking are closed. Staff can carry on as usual. Switch it off when you are done.",
-  "maintenance.card.action": "Open Maintenance mode"
+  "maintenance.card.action": "Open Maintenance mode",
+  "maintenance.notice.setup": "Installing this site?",
+  "maintenance.notice.setup-action": "Set up the site"
 }
