@@ -27,7 +27,7 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
   return out
 }
 
-async function deflate(raw: Uint8Array): Promise<Uint8Array> {
+async function deflate(raw: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
   const stream = new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }

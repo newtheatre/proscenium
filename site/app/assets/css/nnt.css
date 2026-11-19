@@ -1,0 +1,265 @@
+/* The New Theatre's look: house lights down, stage lights up. Purple is the brand, gold the
+   limelight, ash the stage-black neutrals. Plain CSS (no Tailwind directives), loaded by
+   plugins/nnt-theme.ts; Nuxt UI takes the colours through app.config.ts, and the classes below are
+   the public pages' expressive kit. Fonts are self-hosted (OFL, licences beside them). */
+
+/* bricolage-grotesque-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Bricolage Grotesque Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url(/fonts/bricolage-grotesque-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+/* bricolage-grotesque-latin-wght-normal */
+@font-face {
+  font-family: 'Bricolage Grotesque Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url(/fonts/bricolage-grotesque-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+/* figtree-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Figtree Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(/fonts/figtree-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+/* figtree-latin-wght-normal */
+@font-face {
+  font-family: 'Figtree Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(/fonts/figtree-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+/* jetbrains-mono-latin-ext-wght-normal */
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url(/fonts/jetbrains-mono-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+/* jetbrains-mono-latin-wght-normal */
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url(/fonts/jetbrains-mono-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+:root {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Figtree Variable', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --color-purple-50: oklch(0.959 0.02 330.76);
+  --color-purple-100: oklch(0.927 0.038 332.66);
+  --color-purple-200: oklch(0.855 0.079 331.79);
+  --color-purple-300: oklch(0.775 0.129 332.26);
+  --color-purple-400: oklch(0.704 0.181 332.6);
+  --color-purple-500: oklch(0.628 0.188 332.55);
+  --color-purple-600: oklch(0.546 0.164 332.65);
+  --color-purple-700: oklch(0.448 0.135 332.43);
+  --color-purple-800: oklch(0.341 0.102 332.15);
+  --color-purple-900: oklch(0.243 0.072 333.45);
+  --color-purple-950: oklch(0.197 0.058 333.69);
+
+  --color-gold-50: oklch(0.982 0.013 71.33);
+  --color-gold-100: oklch(0.967 0.027 74.76);
+  --color-gold-200: oklch(0.924 0.066 77.23);
+  --color-gold-300: oklch(0.891 0.106 80.96);
+  --color-gold-400: oklch(0.851 0.167 85.4);
+  --color-gold-500: oklch(0.735 0.151 86.16);
+  --color-gold-600: oklch(0.615 0.126 86.16);
+  --color-gold-700: oklch(0.493 0.101 85.63);
+  --color-gold-800: oklch(0.373 0.076 86.63);
+  --color-gold-900: oklch(0.26 0.053 87.37);
+  --color-gold-950: oklch(0.199 0.041 85.51);
+
+  --color-ash-50: oklch(0.977 0.003 332.5);
+  --color-ash-100: oklch(0.953 0.004 332.5);
+  --color-ash-200: oklch(0.906 0.006 332.5);
+  --color-ash-300: oklch(0.848 0.008 332.5);
+  --color-ash-400: oklch(0.708 0.01 332.5);
+  --color-ash-500: oklch(0.556 0.011 332.5);
+  --color-ash-600: oklch(0.446 0.011 332.5);
+  --color-ash-700: oklch(0.373 0.011 332.5);
+  --color-ash-800: oklch(0.278 0.011 332.5);
+  --color-ash-900: oklch(0.208 0.011 332.5);
+  --color-ash-950: oklch(0.152 0.012 332.5);
+}
+
+/* The brand settings write html:root and html.dark; these outrank them, so the house's own scales
+   hold whatever the Branding screen says. Interactive purple is 600 (4.5:1 on white), gold
+   carrying text is 700, and the ground is paper (ash-50) under white raised surfaces. */
+html:root:root {
+  --ui-radius: 0.375rem;
+  --ui-primary: var(--ui-color-primary-600);
+  --ui-secondary: var(--ui-color-secondary-700);
+  --ui-color-neutral-50: var(--color-ash-50);
+  --ui-color-neutral-100: var(--color-ash-100);
+  --ui-color-neutral-200: var(--color-ash-200);
+  --ui-color-neutral-300: var(--color-ash-300);
+  --ui-color-neutral-400: var(--color-ash-400);
+  --ui-color-neutral-500: var(--color-ash-500);
+  --ui-color-neutral-600: var(--color-ash-600);
+  --ui-color-neutral-700: var(--color-ash-700);
+  --ui-color-neutral-800: var(--color-ash-800);
+  --ui-color-neutral-900: var(--color-ash-900);
+  --ui-color-neutral-950: var(--color-ash-950);
+  --ui-bg: var(--ui-color-neutral-50);
+  --ui-bg-muted: var(--ui-color-neutral-100);
+  --ui-bg-elevated: white;
+  --ui-bg-accented: var(--ui-color-neutral-200);
+}
+
+/* Stage black, in the dark colour mode and in any subtree marked .dark (the public chrome). */
+html.dark.dark,
+html:root:root .dark {
+  --ui-bg: var(--ui-color-neutral-950);
+  --ui-bg-muted: var(--ui-color-neutral-900);
+  --ui-bg-elevated: var(--ui-color-neutral-900);
+  --ui-bg-accented: var(--ui-color-neutral-800);
+  --ui-border: var(--ui-color-neutral-800);
+  --ui-border-muted: var(--ui-color-neutral-800);
+  --ui-border-accented: var(--ui-color-neutral-700);
+  --ui-primary: var(--ui-color-primary-400);
+  --ui-secondary: var(--ui-color-secondary-400);
+  --ui-text-dimmed: var(--ui-color-neutral-500);
+  --ui-text-muted: var(--ui-color-neutral-400);
+  --ui-text-toned: var(--ui-color-neutral-300);
+  --ui-text: var(--ui-color-neutral-200);
+  --ui-text-highlighted: white;
+  --ui-text-inverted: var(--ui-color-neutral-900);
+  --ui-bg-inverted: white;
+  --ui-border-inverted: white;
+  color-scheme: dark;
+}
+
+/* The poster headline: display face, tight, balanced. */
+.nnt-headline {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+/* A limelight beam on stage black: heroes, show pages, the centenary. */
+.nnt-spotlight {
+  background-color: var(--color-ash-950);
+  background-image:
+    radial-gradient(ellipse 45% 48% at 66% 40%, color-mix(in oklab, var(--color-gold-400) 26%, transparent), transparent 72%),
+    radial-gradient(ellipse 48% 48% at 34% 60%, color-mix(in oklab, var(--color-purple-500) 22%, transparent), transparent 72%);
+}
+
+/* The floor under words on a photograph, heaviest on the left. */
+.nnt-scrim {
+  background-color: color-mix(in oklab, var(--color-ash-950) 58%, transparent);
+  background-image: linear-gradient(to right,
+    color-mix(in oklab, var(--color-ash-950) 82%, transparent),
+    color-mix(in oklab, var(--color-ash-950) 34%, transparent) 70%,
+    transparent);
+}
+
+/* A show with no artwork yet: its own two hues under stage black. */
+.nnt-poster-none {
+  --poster-from: 0;
+  --poster-to: 140;
+  background-color: var(--color-ash-950);
+  background-image:
+    linear-gradient(to top, var(--color-ash-950) 4%, color-mix(in oklab, var(--color-ash-950) 30%, transparent) 30%, transparent 55%),
+    radial-gradient(ellipse 105% 85% at 12% 2%, oklch(0.54 0.19 var(--poster-from)), transparent 75%),
+    radial-gradient(ellipse 115% 95% at 92% 88%, oklch(0.46 0.18 var(--poster-to)), transparent 78%);
+}
+
+/* Hand-printed poster: square, an ink ring and a hard gold shadow. */
+.nnt-poster-card {
+  border-radius: 0;
+  background: var(--ui-bg-elevated);
+  box-shadow: 0 0 0 2px var(--color-ash-950), 0.375rem 0.375rem 0 2px var(--color-gold-400);
+}
+.dark .nnt-poster-card,
+html.dark .nnt-poster-card {
+  box-shadow: 0 0 0 2px var(--color-gold-400), 0.375rem 0.375rem 0 2px var(--color-gold-400);
+}
+
+/* The poster button: flat white, ink ring, hard offset shadow it presses into. */
+.nnt-button-poster {
+  border-radius: 0 !important;
+  background: white !important;
+  color: var(--color-ash-950) !important;
+  box-shadow: inset 0 0 0 2px var(--color-ash-950), 0.375rem 0.375rem 0 0 var(--color-ash-950);
+  transition: transform 120ms, box-shadow 120ms;
+}
+.dark .nnt-button-poster,
+html.dark .nnt-button-poster {
+  box-shadow: inset 0 0 0 2px var(--color-ash-950), 0.375rem 0.375rem 0 0 var(--color-gold-400);
+}
+.nnt-button-poster:hover {
+  transform: translate(2px, 2px);
+  box-shadow: inset 0 0 0 2px var(--color-ash-950), 0.25rem 0.25rem 0 0 var(--color-ash-950);
+}
+.dark .nnt-button-poster:hover,
+html.dark .nnt-button-poster:hover {
+  box-shadow: inset 0 0 0 2px var(--color-ash-950), 0.25rem 0.25rem 0 0 var(--color-gold-400);
+}
+.nnt-button-poster:active {
+  transform: translate(6px, 6px);
+  box-shadow: inset 0 0 0 2px var(--color-ash-950);
+}
+
+/* The marquee: the one call to action that matters on a view, with running-light bulbs. */
+.nnt-button-marquee,
+.nnt-marquee-actions a.inline-flex {
+  background: var(--color-gold-400) !important;
+  color: var(--color-ash-950) !important;
+  outline: 2px dotted var(--color-gold-400);
+  outline-offset: 3px;
+  transition: transform 120ms;
+}
+.nnt-button-marquee:hover, .nnt-marquee-actions a.inline-flex:hover { transform: scale(1.03); }
+.nnt-button-marquee:active, .nnt-marquee-actions a.inline-flex:active { transform: scale(0.98); }
+
+/* The sticker: tilted, gold, one per view. */
+.nnt-sticker {
+  rotate: -2deg;
+  border-radius: 9999px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  background: var(--color-gold-400) !important;
+  color: var(--color-ash-950) !important;
+  box-shadow: 0 0 0 2px var(--color-ash-950);
+}
+
+/* A ticket stub, perforated at both edges. */
+.nnt-ticket {
+  --ticket-notch: 0.75rem;
+  mask-image:
+    radial-gradient(circle var(--ticket-notch) at left center, transparent 98%, black),
+    radial-gradient(circle var(--ticket-notch) at right center, transparent 98%, black);
+  mask-composite: intersect;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nnt-button-poster, .nnt-button-marquee, .nnt-marquee-actions a.inline-flex { transition: none; }
+  .nnt-button-poster:hover, .nnt-button-poster:active, .nnt-button-marquee:hover, .nnt-button-marquee:active, .nnt-marquee-actions a.inline-flex:hover, .nnt-marquee-actions a.inline-flex:active { transform: none; }
+}
+
+/* What's on: the layout draws the band with the page's heading, so upstream's plain header goes,
+   and the filters become pills. */
+.nnt-whats-on [data-slot="root"]:has(> [data-slot="container"] > [data-slot="wrapper"] > h1) { display: none; }
+.nnt-whats-on nav ul a { border-radius: 9999px; }

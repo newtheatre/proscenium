@@ -1,6 +1,7 @@
 ---
 title: About us
 description: Who the Nottingham New Theatre is, who runs it, and how to get in touch.
+banner: /images/banners/about.webp
 ---
 
 The Nottingham New Theatre is the student theatre of the University of Nottingham, and a society

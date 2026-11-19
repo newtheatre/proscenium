@@ -1,6 +1,7 @@
 ---
 title: Get involved
 description: How to join the Nottingham New Theatre, and what there is to do once you have.
+banner: /images/banners/get-involved.webp
 ---
 
 No experience needed: every show is made by students, and most of them had never done it before

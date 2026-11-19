@@ -1,6 +1,7 @@
 ---
 title: Our history
 description: How theatre at the University of Nottingham became the New Theatre, and where to find the full record.
+banner: /images/banners/alumni.webp
 ---
 
 Students at the University of Nottingham have been making theatre for a hundred years. This is the
