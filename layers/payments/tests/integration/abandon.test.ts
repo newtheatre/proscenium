@@ -47,7 +47,7 @@ beforeAll(async () => {
   for (const id of ['finance', 'payments', 'tickets', 'cardco']) await setModule(id, true)
   await commit(unit => changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true }))
   // These take cash at the desk, which a theatre turns on.
-  await commit(unit => changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }))
+  await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
   card = newId('ppa')
   cash = newId('ppa')
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'cardco', 'CardCo', '[\"online\",\"desk\"]', 'live', 1, ?, ?)").bind(card, NOV_16, NOV_16).run()

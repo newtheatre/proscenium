@@ -48,7 +48,6 @@ test.beforeAll(async ({ playwright }) => {
   await set([{ key: 'core.locale.time-zone', value: 'Europe/London' }])
   for (const id of ['finance', 'payments', 'box-office', 'promotions']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
   await set([{ key: 'box-office.reservations.confirm-email', value: false }, { key: 'box-office.checkout.payment-timing', value: 'buyer-chooses' }])
-  await set([{ key: 'payments.cash.enabled', value: true }]) // these sell for cash, which a theatre turns on
   await settings.dispose()
 
   const api = await playwright.request.newContext({ ...base, ...as(manager) })

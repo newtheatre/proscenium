@@ -57,7 +57,7 @@ beforeAll(async () => {
     stock.nuts = (await addProduct(v, { categoryId, name: 'Refunds nuts' }, { amountMinor: 200 }, seller.accountId!)).variantId
     stock.outlet = addOutlet(v, { name: 'Refunds bar', kind: 'bar' })
   })
-  await setSetting('payments.cash.enabled', true)
+  await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
   await setSetting('core.locale.time-zone', 'Europe/London')
   await setSetting('payments.refunds.self-approve-up-to', 600)
   for (const who of [seller, manager]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Bar', floatMinor: 0 }))

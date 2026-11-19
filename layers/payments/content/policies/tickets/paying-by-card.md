@@ -11,6 +11,6 @@ Card payments are taken securely by :fact{name="payments.card-providers"}. We ne
 Card payments are taken by a payment company. We never see your card number.
 ::
 
-::when{setting="payments.cash.enabled" is="true"}
+::when{fact="payments.cash" is="true"}
 You can also pay in cash at the box office.
 ::

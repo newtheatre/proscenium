@@ -32,7 +32,6 @@ test.beforeAll(async ({ playwright }) => {
   await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }, { key: 'core.rate-limits.write', value: 10000 }] } })
   expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'core.locale.time-zone', value: 'Europe/London' }], confirm: true } })).ok()).toBe(true)
   for (const id of ['finance', 'payments', 'bar']) expect((await api.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
-  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: true }], confirm: true } })).ok()).toBe(true)
   await post(api, '/api/payments/providers', { provider: 'cash', label: 'Bar cash', channels: ['desk'], mode: 'live' })
   const draught = await post(api, '/api/bar/categories', { name: `Draught ${run}`, colour: 'warning' })
   const soft = await post(api, '/api/bar/categories', { name: `Soft ${run}`, colour: 'info' })
