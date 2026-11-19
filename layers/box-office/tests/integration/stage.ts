@@ -64,6 +64,7 @@ import tillSessionPost from '../../../payments/server/api/payments/till/session.
 import sessionGet from '../../../payments/server/api/payments/session.get'
 import intentCancelPost from '../../../payments/server/api/payments/intents/[id]/cancel.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
+import tillDiscountsGet from '../../../payments/server/api/payments/till/discounts.get'
 import homeGet from '../../../core/server/api/core/home.get'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
 import orderAccountPost from '../../server/api/box-office/orders/link/account.post'
@@ -176,6 +177,7 @@ export const handle = server({
   'GET /api/payments/session': sessionGet,
   'POST /api/payments/intents/:id/cancel': intentCancelPost,
   'POST /api/payments/till/summary': tillSummaryPost,
+  'GET /api/payments/till/discounts': tillDiscountsGet,
   'GET /api/core/home': homeGet,
 })
 

@@ -178,7 +178,7 @@ export interface OrderPlan {
  * the others are lines of their own at no charge, last. A pass bought here gives its first entry here
  * too, after those of the passes typed, unless it is bought on its own. Reads only.
  */
-export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { performanceId: string }, buyer: Buyer, at: number, known?: { productionId: string }): Promise<OrderPlan> {
+export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { performanceId: string }, buyer: Buyer, at: number, known?: { productionId: string }, price?: (lines: PricedLine[]) => PricedTickets): Promise<OrderPlan> {
   const performance = known ?? await getPerformance(input.performanceId)
   const typed = input.passes ?? []
   const used = await judgePasses(typed, input.performanceId, buyer, at)
@@ -190,7 +190,9 @@ export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { pe
   const priced = asked.length || asks.length ? await pricedLines(input.performanceId, asked, at, buyer, asks.length) : { pool: new Map<string, { id: string }>(), lines: [], currency: planned[0]?.currency ?? await useSetting('core.locale.currency') as string, guard: () => {} }
   const { pool, currency, guard } = priced
   const bought = priced.lines.length - passes.asks.length
-  const tickets = bought ? await priceTickets(input.performanceId, priced.lines.slice(0, bought), buyer.channel === 'online' ? 'online' : 'till', input.promoCode) : unpriced(0)
+  // Priced through Payments' pricing: online, the code the buyer typed and any offer on its own; at
+  // the desk, as the till priced the whole sale.
+  const tickets = !bought ? unpriced(0) : price ? price(priced.lines.slice(0, bought)) : await priceTickets(input.performanceId, priced.lines.slice(0, bought), 'online', input.promoCode)
   const discounts = [...tickets.discounts, ...passes.asks.map(() => 0)]
   const ordinary = passes.entries.filter(e => !e.wheelchair)
   const entryTypeId = ordinary.length ? await passEntryTypeId() : ''
