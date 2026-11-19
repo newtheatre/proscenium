@@ -40,5 +40,11 @@
   "gallery.forms.fields-template.name": "Show details",
   "gallery.forms.fields-template.description": "Running time and whether there is an interval.",
   "gallery.forms.note.label": "Note it against the show",
-  "gallery.forms.note.title": "What to note"
+  "gallery.forms.note.title": "What to note",
+  "gallery.home-figures.drafts.label": "Drafts written",
+  "gallery.home-figures.drafts.detail.one": "{count} sent",
+  "gallery.home-figures.drafts.detail.other": "{count} sent",
+  "gallery.home-figures.drafts.series": "Written",
+  "gallery.home-figures.drafts.summary": "Four drafts on the first day and nine on the second.",
+  "gallery.home-figures.broken.label": "Never shown"
 }

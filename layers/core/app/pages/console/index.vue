@@ -1,11 +1,8 @@
-<!-- Console home (UI-16): a queue of what is waiting, from modules' home cards. -->
+<!-- Console home (UI-16): what needs the person, their quick actions, and the modules' headline figures. -->
 <script setup lang="ts">
 const { t } = useT()
 </script>
 
 <template>
-  <PageHome
-    :title="t('core.console.home.title')"
-    home="console"
-  />
+  <ConsoleHome :title="t('core.console.home.title')" />
 </template>

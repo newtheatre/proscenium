@@ -394,11 +394,11 @@ export const contributes = {
   ],
   // The palette's Do group (M30): where each common act starts. The pages open their form from ?new=1.
   'core.quick-action': [
-    { id: 'core.new-production', to: '/console/programme/productions?new=1', icon: 'i-lucide-plus', ability: 'core.production.create', keywords: 'core.quick-actions.new-production.keywords' },
-    { id: 'core.add-run', to: '/console/programme/productions?run=1', icon: 'i-lucide-calendar-plus', ability: 'core.performance.schedule', keywords: 'core.quick-actions.add-run.keywords' },
-    { id: 'core.new-venue', to: '/admin/modules/core/venues?new=1', icon: 'i-lucide-building', ability: 'core.venue.manage', keywords: 'core.quick-actions.new-venue.keywords' },
-    { id: 'core.give-role', to: '/console/people/grants?give=1', icon: 'i-lucide-key-round', ability: 'core.grant.manage', keywords: 'core.quick-actions.give-role.keywords' },
-    { id: 'core.invite', to: '/console/people?invite=1', icon: 'i-lucide-user-plus', ability: 'core.account.create', keywords: 'core.quick-actions.invite.keywords' },
+    { id: 'core.new-production', to: '/console/programme/productions?new=1', icon: 'i-lucide-plus', ability: 'core.production.create', keywords: 'core.quick-actions.new-production.keywords', order: 30 },
+    { id: 'core.add-run', to: '/console/programme/productions?run=1', icon: 'i-lucide-calendar-plus', ability: 'core.performance.schedule', keywords: 'core.quick-actions.add-run.keywords', order: 40 },
+    { id: 'core.new-venue', to: '/admin/modules/core/venues?new=1', icon: 'i-lucide-building', ability: 'core.venue.manage', keywords: 'core.quick-actions.new-venue.keywords', order: 60 },
+    { id: 'core.give-role', to: '/console/people/grants?give=1', icon: 'i-lucide-key-round', ability: 'core.grant.manage', keywords: 'core.quick-actions.give-role.keywords', order: 70 },
+    { id: 'core.invite', to: '/console/people?invite=1', icon: 'i-lucide-user-plus', ability: 'core.account.create', keywords: 'core.quick-actions.invite.keywords', order: 80 },
   ],
   // The production page's "Ready to publish?" checklist (R-35).
   'core.record-check': ['summary', 'category', 'effects', 'advisories', 'booking', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),

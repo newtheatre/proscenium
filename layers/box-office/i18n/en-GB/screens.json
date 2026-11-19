@@ -1223,5 +1223,19 @@
   "box-office.my-passes.booked": "Booked: {when}",
   "box-office.my-passes.reserved": "Reserved: {when}",
   "box-office.my-passes.not-booked": "Not booked yet",
-  "box-office.my-passes.book": "Book with pass"
+  "box-office.my-passes.book": "Book with pass",
+  "box-office.quick-actions.door.label": "Door",
+  "box-office.quick-actions.door.keywords": "Scan tickets, admit, check in",
+  "box-office.home-figures.sales.label": "Ticket sales tonight",
+  "box-office.home-figures.sales.detail.one": "{count} ticket sold",
+  "box-office.home-figures.sales.detail.other": "{count} tickets sold",
+  "box-office.home-figures.sales.series": "Ticket sales",
+  "box-office.home-figures.sales.summary.one": "Ticket sales on each of the last {days} days: {count} ticket in all.",
+  "box-office.home-figures.sales.summary.other": "Ticket sales on each of the last {days} days: {count} tickets in all.",
+  "box-office.home-figures.seats.label": "Seats taken",
+  "box-office.home-figures.seats.detail.one": "{taken} of {capacity} seats at the next performance",
+  "box-office.home-figures.seats.detail.other": "{taken} of {capacity} seats at the next {count} performances",
+  "box-office.home-figures.seats.none": "No performances coming up",
+  "box-office.home-figures.seats.summary.one": "Seats taken at the next performance.",
+  "box-office.home-figures.seats.summary.other": "Seats taken at each of the next {count} performances."
 }

@@ -471,5 +471,11 @@
   "membership.screens.home-card.applications.other": "{count} membership applications are waiting for a check",
   "membership.screens.home-card.applications-action": "Check applications",
   "membership.screens.home-card.card-action": "My membership",
-  "membership.screens.mine.actions": "Actions for {scheme}"
+  "membership.screens.mine.actions": "Actions for {scheme}",
+  "membership.home-figures.members.label": "Members",
+  "membership.home-figures.members.detail.one": "{count} joined this month",
+  "membership.home-figures.members.detail.other": "{count} joined this month",
+  "membership.home-figures.members.series": "Joined",
+  "membership.home-figures.members.summary.one": "People who joined in each of the last {months} months: {count} in all.",
+  "membership.home-figures.members.summary.other": "People who joined in each of the last {months} months: {count} in all."
 }

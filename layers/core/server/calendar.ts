@@ -39,6 +39,14 @@ export async function dayBounds(day: string): Promise<{ start: number, end: numb
   return operatingDayBounds(day, await requireRule())
 }
 
+/** The last `count` operating days, oldest first and ending today, with their span and a way to place an instant in one. */
+export async function recentDays(count: number, at: number): Promise<{ days: string[], start: number, end: number, dayOf: (ms: number) => string }> {
+  const rule = await requireRule()
+  const today = operatingDayAt(at, rule)
+  const days = Array.from({ length: count }, (_, i) => previousDate(today, count - 1 - i))
+  return { days, start: operatingDayBounds(days[0]!, rule).start, end: operatingDayBounds(today, rule).end, dayOf: ms => operatingDayAt(ms, rule) }
+}
+
 interface OperatingDayTable { id: string, table: string, key: string, instant: string, day: string, done?: string }
 
 /** Every row whose stored operating day differs from the one this rule gives. */
