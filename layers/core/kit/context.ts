@@ -14,6 +14,9 @@ export interface KitEnv {
   EMAIL?: SendEmail
   /** The shared rate-limit counts (RateLimitCounter). Absent under nuxt dev, where they count in memory. */
   RATE_LIMITS?: DurableObjectNamespace
+  /** The realtime rooms (RealtimeHub). Absent under nuxt dev, where pages keep asking instead. */
+  REALTIME?: DurableObjectNamespace
+  CORE_SESSION_KEY?: string
   CORE_ENCRYPTION_KEY?: string
   CORE_TURNSTILE_SECRET_KEY?: string
   /** The site's origin when the recorded one is lost: prevails over core.site.origin. A plain variable. */

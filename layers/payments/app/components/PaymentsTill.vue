@@ -74,10 +74,12 @@ const open = computed(() => session.value?.session?.state === 'open')
 // The till is usable by someone with a session open or who may open one: the session itself waits
 // for the first sale, so coming to the till by mistake leaves nothing behind.
 const usable = computed(() => open.value || !!session.value?.mayOpen)
-// The seller's other devices open, move and sell in the same session, so the strip asks again.
-const SESSION_REFRESH = 15_000 // not-policy: how often the till asks after the shared session
+// The seller's other devices open, move and sell in the same session: the server says when it
+// changes (useRealtime), and where it cannot, the strip asks again by itself.
+const SESSION_REFRESH = 15_000 // not-policy: how often the till asks after the shared session without news
 const visibility = useDocumentVisibility()
-useIntervalFn(() => { if (visibility.value === 'visible') void refreshSession() }, SESSION_REFRESH)
+const { connected: told } = useRealtime('payments.session', () => { void refreshSession() })
+useIntervalFn(() => { if (visibility.value === 'visible' && !told.value) void refreshSession() }, SESSION_REFRESH)
 watch(visibility, (now) => { if (now === 'visible') void refreshSession() })
 const { time } = useDates()
 
