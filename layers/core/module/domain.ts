@@ -492,7 +492,7 @@ function terms(...list: [slug: string, label: string, icon?: string][]) {
 }
 
 /** The public fields of a production, as core.production.updated names them. */
-export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageMin', 'ageRestricted', 'effectsConfirmedNone', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories', 'effects', 'credits'] as const
+export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageMin', 'ageRestricted', 'effectsConfirmedNone', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'intervalMinutes', 'doorsBeforeMinutes', 'externalBookingUrl', 'latecomers', 'creditsPublic', 'listed', 'slug', 'advisories', 'effects', 'credits'] as const
 
 export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
