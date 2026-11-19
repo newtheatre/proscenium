@@ -65,7 +65,7 @@ describe('the year end (ID-24)', () => {
     const admin = await staff()
     await grantDirectly(admin.accountId, ['core.identity-settings.manage'])
     const choose = () => admin.browser.put('/api/core/settings/core.grants.default-expiry', { value: 'year-end' })
-    expect((await choose()).body.fields).toEqual({ value: 'core.settings.rules.default-expiry-needs-year-end' })
+    expect((await choose()).body.fields).toMatchObject({ value: 'core.settings.rules.default-expiry-needs-year-end' })
     await setSetting('core.organisation.year-end', '07-31')
     expect((await choose()).status).toBe(200)
     await clearSetting('core.grants.default-expiry')

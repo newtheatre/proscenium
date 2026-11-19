@@ -3,7 +3,7 @@
 // which settings switch it on and name its client, and which credential holds its secret. The flow
 // itself (`oidc.ts`) knows nothing about any one provider. Google is the only one so far; another is
 // a new entry here, its settings and its credential, and nothing else.
-import { refuse, useSetting } from '#kit'
+import { credential, credentialStatus, refuse, siteUrl, useSetting } from '#kit'
 import type { SettingKey } from '#kit/registry-types'
 
 export interface SignInProvider {
@@ -56,16 +56,16 @@ export function providerById(id: string): SignInProvider {
   return provider
 }
 
-/** Whether a provider is switched on and has its client named. Its secret is checked when it is used. */
+/** Whether a provider is switched on with its client id and secret saved, so its button would work. */
 export async function isOffered(provider: SignInProvider): Promise<boolean> {
-  return !!(await useSetting(provider.settings.on)) && !!(await useSetting(provider.settings.clientId))
+  return !!(await useSetting(provider.settings.on)) && !!(await useSetting(provider.settings.clientId)) && !!(await credential(provider.secret))
 }
 
-/** The providers a signed-out browser is offered, in the order declared. */
-export async function offeredProviders(): Promise<{ id: string, label: string }[]> {
-  const offered: { id: string, label: string }[] = []
+/** The providers a signed-out browser is offered, in the order declared, with the organisations each accepts (none: any). */
+export async function offeredProviders(): Promise<{ id: string, label: string, domains: string[] }[]> {
+  const offered: { id: string, label: string, domains: string[] }[] = []
   for (const provider of Object.values(PROVIDERS) as SignInProvider[]) {
-    if (await isOffered(provider)) offered.push({ id: provider.id, label: provider.label })
+    if (await isOffered(provider)) offered.push({ id: provider.id, label: provider.label, domains: await useSetting(provider.settings.domains) as string[] })
   }
   return offered
 }
@@ -73,4 +73,58 @@ export async function offeredProviders(): Promise<{ id: string, label: string }[
 /** The provider managed-domain addresses are sent to. */
 export function managedDomainProvider(): SignInProvider {
   return (Object.values(PROVIDERS) as SignInProvider[]).find(p => p.managedDomains)!
+}
+
+/** What Admin > Sign-in shows on a provider's card and in its set-up: never the secret itself. */
+export interface ProviderView {
+  id: string
+  label: string
+  on: boolean
+  clientId: string | null
+  domains: string[]
+  secret: { saved: boolean, hint: string | null, start: string | null }
+  /** The address to register at the provider as its redirect URI. */
+  callbackUrl: string
+  /** What still has to be saved before it can be put in use. */
+  missing: ('client-id' | 'secret')[]
+}
+
+export async function providerView(provider: SignInProvider): Promise<ProviderView> {
+  const clientId = await useSetting(provider.settings.clientId) as string | null
+  const [status] = await credentialStatus([provider.secret])
+  const saved = !!status?.source
+  return {
+    id: provider.id,
+    label: provider.label,
+    on: !!(await useSetting(provider.settings.on)),
+    clientId,
+    domains: await useSetting(provider.settings.domains) as string[],
+    secret: { saved, hint: status?.hint ?? null, start: status?.start ?? null },
+    callbackUrl: await siteUrl(`/api/core/sign-in/${provider.id}/callback`),
+    missing: [...(clientId ? [] : ['client-id' as const]), ...(saved ? [] : ['secret' as const])],
+  }
+}
+
+/**
+ * Asks the provider's token endpoint to swap a code that cannot exist, with the saved client. A
+ * provider checks the client before the code (RFC 6749, 5.2), so `invalid_grant` means it accepted
+ * the client id and secret and `invalid_client` means it did not. The redirect URI is not checked.
+ */
+export async function checkProvider(provider: SignInProvider, clientId: string, secret: string): Promise<'accepted' | 'rejected' | 'unreachable'> {
+  const timeout = await useSetting('core.external.timeout') as number
+  try {
+    const response = await fetch(provider.tokenUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'authorization_code', code: 'proscenium-set-up-check', client_id: clientId, client_secret: secret, redirect_uri: await siteUrl(`/api/core/sign-in/${provider.id}/callback`) }),
+      signal: AbortSignal.timeout(timeout * 1000), // not-policy: seconds to milliseconds
+    })
+    const body = await response.json().catch(() => ({})) as { error?: string }
+    if (body.error === 'invalid_client' || body.error === 'unauthorized_client') return 'rejected'
+    if (body.error === 'invalid_grant') return 'accepted'
+    return 'unreachable'
+  }
+  catch {
+    return 'unreachable'
+  }
 }

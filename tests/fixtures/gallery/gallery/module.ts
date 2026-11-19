@@ -16,6 +16,8 @@ export default defineModule({
     'sample.view': ability(),
     'sample.manage': ability(),
     'sample.admin': ability(),
+    // Held only by the browser test whose Admin overview has a count that never answers.
+    'sample.slow': ability(),
   }),
   settings: defineSettings('gallery', {
     'demo.title': setting.text({ default: 'Hamlet', maxLength: 40, change: 'gallery.sample.manage', audience: 'public', quotable: true }),
@@ -35,7 +37,7 @@ export default defineModule({
     'payments.desk-basket': [{ id: 'gallery' }],
     'payments.settlement': [{ id: 'gallery' }],
     'finance.system-account': [{ id: 'income', name: 'Gallery income', kind: 'income' }],
-    'core.count': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.none', file: 'none' }],
+    'core.count': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.none', file: 'none' }, { id: 'gallery.stalled', file: 'stalled' }],
     'core.record-fact': [{ id: 'gallery.seats-held', record: 'gallery.production', ability: 'gallery.sample.view', component: 'GalleryFactSeats', order: 10 }],
     'core.record-check': [{ id: 'gallery.poster', file: 'has-poster' }],
     'core.list-column': [{ id: 'gallery.sales', list: 'gallery.shows', ability: 'gallery.sample.view', component: 'GalleryShowSales', order: 10 }],
@@ -44,6 +46,7 @@ export default defineModule({
       { id: 'gallery.drafts-waiting', home: 'console', ability: 'gallery.sample.view', component: 'GalleryDraftsCard', urgency: 'overdue', count: 'gallery.drafts' },
       { id: 'gallery.nothing', home: 'console', ability: 'gallery.sample.view', component: 'GalleryNothingCard', urgency: 'today', count: 'gallery.none' },
       { id: 'gallery.tip', home: 'console', ability: 'gallery.sample.view', component: 'GalleryTipCard', urgency: 'info' },
+      { id: 'gallery.stalled', home: 'admin', ability: 'gallery.sample.slow', component: 'GalleryNothingCard', urgency: 'info', count: 'gallery.stalled' },
     ],
     'core.account-section': [
       { id: 'gallery.tickets', target: 'account', side: 'audience', ability: 'signed-in', component: 'GalleryTickets', order: 10 },
@@ -52,6 +55,7 @@ export default defineModule({
     'core.navigation-group': [{ id: 'gallery', icon: 'i-lucide-layout-grid', after: 'box-office' }],
     'core.search-source': [{ id: 'gallery.production-search', record: 'gallery.production', ability: 'gallery.sample.view', route: '/api/gallery/search', shells: ['console'] }],
     'core.record-resolver': [{ id: 'gallery.production', file: 'gallery.production' }],
+    'core.home-figure': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.broken', file: 'broken' }],
     'core.quick-action': [{ id: 'gallery.new-booking', to: '/console/gallery/form', icon: 'i-lucide-plus', ability: 'gallery.sample.view', keywords: 'gallery.quick-actions.new-booking.keywords' }],
     'core.navigation': [
       { id: 'gallery.list', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/list', icon: 'i-lucide-list', ability: 'gallery.sample.view', order: 10 },

@@ -47,6 +47,8 @@ export default defineModule({
       { id: 'core.getting-ready', home: 'admin', ability: 'core.settings.manage', component: 'CoreGettingReadyCard', urgency: 'today', count: 'core.getting-ready' },
       { id: 'core.access-scheme-waiting', home: 'console', ability: 'core.access-scheme.read', component: 'CoreAccessSchemeWaitingCard', urgency: 'today', count: 'core.access-scheme-waiting' },
     ],
+    // The coming week's performances, on the console home's grid.
+    'core.home-figure': [{ id: 'core.performances', file: 'performances' }],
     'core.account-notice': [...identity.identityContributions['core.account-notice']],
     'core.account-section': [...identity.identityContributions['core.account-section'], ...domain.contributes['core.account-section']],
     // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in

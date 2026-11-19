@@ -57,3 +57,16 @@ test.describe('a site owner who runs the console', () => {
     await expect(page).toHaveURL(/\/console$/)
   })
 })
+
+test.describe('a site owner whose Admin overview has a count that never answers', () => {
+  test.use(as({ ...person('Sid Slow', [grant('gallery.sample.view'), grant('gallery.sample.slow'), grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }))
+
+  test('the console\'s Admin link still opens the overview, without the card that cannot count', async ({ page }) => {
+    await visit(page, '/console')
+    await page.getByRole('navigation', { name: 'Help and administration' }).getByRole('link', { name: 'Admin', exact: true }).click()
+    await expect(page).toHaveURL(/\/admin$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Get your theatre ready')).toBeVisible()
+    await expect(page.getByText('This card never shows')).toHaveCount(0)
+  })
+})

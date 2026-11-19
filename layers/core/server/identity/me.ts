@@ -1,11 +1,11 @@
 // What a signed-in person's own screens read: their account, how they sign in, and what to offer.
-import { all, first, nowMs, useSetting } from '#kit'
+import { all, credential, first, nowMs, useSetting } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { accountById, verifiedAddressesOf } from './accounts'
 import { kitGrantsOf } from './grants'
 import type { CurrentSession } from './sessions'
 import { authenticatorOf } from './authenticator'
-import { offeredProviders } from './providers'
+import { managedDomainProvider, offeredProviders } from './providers'
 
 // Does the account still have a way in other than its passkeys (ID-14, "the only way in")?
 export async function hasOtherWayIn(accountId: string): Promise<boolean> {
@@ -21,11 +21,29 @@ export async function holdsPrivileged(accountId: string): Promise<boolean> {
   return (await kitGrantsOf(accountId)).some(g => g.ability && registry.abilities.get(g.ability)?.decl.risk === 'privileged')
 }
 
-// The ways in a signed-out browser is offered. Passkeys are always on.
-// `providers` are the outside providers offered, in order, each with its id (the path segment) and label.
-// `openSignUp` says whether signing in with a new address makes an account, so the page can say so.
-export async function signInMethods(): Promise<{ email: boolean, providers: { id: string, label: string }[], openSignUp: boolean }> {
-  return { email: !!(await useSetting('core.sign-in.email-link')), providers: await offeredProviders(), openSignUp: !!(await useSetting('core.sign-in.open-sign-up')) }
+// The ways in a signed-out browser is offered, so the page asks for an address first and then shows
+// only the buttons that fit it. Passkeys are always on. `email` is true only while an emailed code
+// would actually be sent: switched on and the bot check's secret saved. `providers` are the outside
+// providers offered, in order, with the organisations each accepts (none: any account). `managed`
+// names the domains whose people sign in only through a provider, and that provider. `openSignUp`
+// says whether signing in with a new address makes an account, so the page can say so.
+export interface SignInMethods {
+  email: boolean
+  providers: { id: string, label: string, domains: string[] }[]
+  managed: { domains: string[], provider: string } | null
+  openSignUp: boolean
+}
+
+export async function signInMethods(): Promise<SignInMethods> {
+  const providers = await offeredProviders()
+  const managedDomains = await useSetting('core.sign-in.managed-domains') as string[]
+  const managedBy = managedDomainProvider()
+  return {
+    email: !!(await useSetting('core.sign-in.email-link')) && !!(await credential('CORE_TURNSTILE_SECRET_KEY')),
+    providers,
+    managed: managedDomains.length && providers.some(p => p.id === managedBy.id) ? { domains: managedDomains, provider: managedBy.id } : null,
+    openSignUp: !!(await useSetting('core.sign-in.open-sign-up')),
+  }
 }
 
 export async function describeMe(session: CurrentSession) {

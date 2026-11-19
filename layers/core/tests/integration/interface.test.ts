@@ -425,7 +425,17 @@ describe('home cards, record tabs and history (UI-12, UI-16)', () => {
   })
 
   it('hides the members\' home from someone who is not a member', async () => {
-    expect(await get('/api/core/home?home=members', audience())).toEqual({ cards: [], starters: [] })
+    expect(await get('/api/core/home?home=members', audience())).toEqual({ cards: [], starters: [], actions: [], figures: [] })
+  })
+
+  it('gives the console home the quick actions and figures the person may use, leaving out a figure that fails', async () => {
+    const body = await get('/api/core/home?home=console', reader())
+    expect(body.actions.map((a: { id: string }) => a.id)).toContain('gallery.new-booking')
+    expect(body.figures.map((f: { id: string }) => f.id)).toEqual(['gallery.drafts'])
+    expect(body.figures[0]).toMatchObject({ value: 13, size: 'wide', to: '/console/gallery/drafts', chart: { type: 'bar' } })
+    const none = await get('/api/core/home?home=console', audience())
+    expect(none.actions).toEqual([])
+    expect(none.figures).toEqual([])
   })
 
   it('lists the tabs other modules add, and none once that module is off', async () => {

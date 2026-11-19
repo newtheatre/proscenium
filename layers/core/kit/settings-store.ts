@@ -2,7 +2,7 @@
 // stored, so a better default upstream reaches every theatre that never changed it.
 import { useContext } from './context'
 import { useRegistry } from './registry'
-import { defaultValue, validateSettingValue, type SettingEntry } from './settings'
+import { defaultValue, validateSettingValue, type SettingEntry, type SettingRule } from './settings'
 import { Refusal } from './refusal'
 import { newId } from './ids'
 import { nowMs } from './clock'
@@ -52,17 +52,82 @@ export async function isOverridden(key: string): Promise<boolean> {
   return (await overrides()).has(currentKey(key))
 }
 
-/** Every value of one module, by short key, with a proposed change applied: what the rules see. */
-async function moduleValues(module: string, change?: { key: string, value: unknown }) {
+/** Every value of one module, by short key, with the proposed changes applied: what the rules see. */
+async function moduleValues(module: string, changes: ReadonlyMap<string, unknown> = new Map()) {
   const registry = useRegistry()
   const map = await overrides()
   const values: Record<string, unknown> = {}
   for (const [key, { module: owner, entry }] of registry.settings) {
     if (owner !== module) continue
-    const value = change?.key === key ? change.value : map.has(key) ? map.get(key) : defaultValue(entry)
+    const value = changes.has(key) ? changes.get(key) : map.has(key) ? map.get(key) : defaultValue(entry)
     values[key.slice(module.length + 1)] = value
   }
   return values
+}
+
+async function holds(rule: SettingRule, values: Record<string, unknown>): Promise<boolean> {
+  try {
+    return await rule.check(values)
+  }
+  catch {
+    return false
+  }
+}
+
+export interface SettingChange { key: string, value?: unknown, reset?: boolean }
+type ChangeOptions = { reason?: string, confirm?: boolean }
+
+/**
+ * Changes several settings at once in the caller's unit of work. Every value is checked against its
+ * entry first; then each module's rules see all the changes together, so settings that depend on each
+ * other (Google on, and addresses that must use Google) are saved in one go, in any order. A rule
+ * that already failed before is not this change's to fix, so it does not block it. A rule the changes
+ * break names, in `fields`, the change it blames: the first one whose removal lets the rule hold.
+ */
+export async function changeSettings(unit: UnitView, asked: readonly SettingChange[], options: ChangeOptions = {}): Promise<Record<string, unknown>> {
+  const registry = useRegistry()
+  const prepared: { key: string, entry: SettingEntry, module: string, reset: boolean, after: unknown }[] = []
+  for (const change of asked) {
+    const key = currentKey(change.key)
+    const found = registry.settings.get(key)
+    if (!found) throw new Refusal('core.setting.unknown', `There is no setting called ${key}.`, { status: 404 })
+    const { entry, module } = found
+    if (entry.onChange === 'reason' && !options.reason?.trim()) throw new Refusal('core.setting.reason-needed', 'Say why you are changing this setting.', { status: 422, fields: { reason: 'required', [key]: 'required' } })
+    if (entry.onChange === 'confirm' && options.confirm !== true) throw new Refusal('core.setting.confirm-needed', 'This setting asks for the change to be confirmed before it is saved.', { status: 422, fields: { confirm: 'required' } })
+    const reset = change.reset === true
+    let after: unknown = defaultValue(entry)
+    if (!reset) {
+      const result = validateSettingValue(entry, change.value ?? null)
+      if (!result.ok) throw new Refusal('core.setting.invalid', `This value cannot be saved: it ${result.reason}.`, { status: 422, fields: { value: result.reason, [key]: result.reason } })
+      after = result.value
+    }
+    prepared.push({ key, entry, module, reset, after })
+  }
+
+  const pending = new Map(prepared.map(c => [c.key, c.after]))
+  for (const module of new Set(prepared.map(c => c.module))) {
+    const mine = prepared.filter(c => c.module === module)
+    const after = await moduleValues(module, pending)
+    const before = await moduleValues(module)
+    for (const rule of registry.settingRules.get(module) ?? []) {
+      if (await holds(rule, after) || !(await holds(rule, before))) continue
+      let blamed = mine[0]!.key
+      for (const c of mine) {
+        const without = new Map(pending)
+        without.delete(c.key)
+        if (await holds(rule, await moduleValues(module, without))) {
+          blamed = c.key
+          break
+        }
+      }
+      const message = `${module}.settings.rules.${rule.id}`
+      throw new Refusal('core.setting.rule-failed', message, { status: 422, fields: { value: message, [blamed]: message } })
+    }
+  }
+
+  const saved: Record<string, unknown> = {}
+  for (const c of prepared) saved[c.key] = await writeSetting(unit, c.key, c.entry, c.after, { reason: options.reason, reset: c.reset })
+  return saved
 }
 
 /**
@@ -71,33 +136,13 @@ async function moduleValues(module: string, change?: { key: string, value: unkno
  * Passing `null` for a setting that has a default resets it (the override is deleted).
  */
 export async function changeSetting(unit: UnitView, asked: string, raw: unknown, options: { reason?: string, reset?: boolean, confirm?: boolean } = {}): Promise<unknown> {
-  const registry = useRegistry()
-  const key = currentKey(asked)
-  const found = registry.settings.get(key)
-  if (!found) throw new Refusal('core.setting.unknown', `There is no setting called ${key}.`, { status: 404 })
-  const { entry, module } = found
-  if (entry.onChange === 'reason' && !options.reason?.trim()) throw new Refusal('core.setting.reason-needed', 'Say why you are changing this setting.', { status: 422, fields: { reason: 'required' } })
-  if (entry.onChange === 'confirm' && options.confirm !== true) throw new Refusal('core.setting.confirm-needed', 'This setting asks for the change to be confirmed before it is saved.', { status: 422, fields: { confirm: 'required' } })
-  const reset = options.reset === true
-  let value: unknown = null
-  if (!reset) {
-    const result = validateSettingValue(entry, raw)
-    if (!result.ok) throw new Refusal('core.setting.invalid', `This value cannot be saved: it ${result.reason}.`, { status: 422, fields: { value: result.reason } })
-    value = result.value
-  }
-  const after = reset ? defaultValue(entry) : value
-  for (const rule of registry.settingRules.get(module) ?? []) {
-    const values = await moduleValues(module, { key, value: after })
-    let passes: boolean
-    try {
-      passes = await rule.check(values)
-    }
-    catch {
-      passes = false
-    }
-    if (!passes) throw new Refusal('core.setting.rule-failed', `${module}.settings.rules.${rule.id}`, { status: 422, fields: { value: `${module}.settings.rules.${rule.id}` } })
-  }
+  const saved = await changeSettings(unit, [{ key: asked, value: raw, reset: options.reset }], options)
+  return saved[currentKey(asked)]
+}
 
+async function writeSetting(unit: UnitView, key: string, entry: SettingEntry, after: unknown, options: { reason?: string, reset: boolean }): Promise<unknown> {
+  const { reset } = options
+  const value = after
   const map = await overrides()
   const before = map.has(key) ? map.get(key) : defaultValue(entry)
   const context = useContext()

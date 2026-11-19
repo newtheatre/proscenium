@@ -284,7 +284,19 @@ the server for actions and sources when it is first opened, not on every page.
 - **`PageHome`** (UI-16): a queue. Cards come from `core.home-card` (`{ id, home, ability, component,
   urgency, count? }`), components in the module's `app/home-cards/` folder that receive `count`. They
   sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
-  says so and offers up to three of the viewer's quick actions.
+  says so and offers up to three of the viewer's quick actions. The members', Tonight and Admin homes
+  use it.
+- **`ConsoleHome`** (UI-16): the console's home. Top to bottom: the queue (`HomeCards`, only when
+  something is waiting, with no empty panel otherwise); up to six of the viewer's quick actions
+  (`core.quick-action`, by `order`); then a grid of headline figures from `core.home-figure`. A figure
+  is code (`server/points/home-figure.ts`): a `label`, an `ability` held anywhere on the site, an
+  `order`, a `size` (`small` one cell, `wide` two side by side, `tall` two stacked) and a `read(actor)`
+  that answers `{ value, unit?, detail?, chart? }`. A `unit` that is a currency code makes the value
+  money in minor units; `percent` a whole percentage. A chart is `bar`, `line` or `area` over rows
+  named by `date`, `month`, `at` or `label`, drawn by `ChartFigure` (quiet: the tile's words name it),
+  or `meters`, a list of rows each a share of its own `max`. A figure that takes longer than two
+  seconds or throws is left out, and a module that is off adds none, so an install without the bar
+  shows no bar tile. The empty state shows only when there is nothing at all to put on the page.
 
 ## Dates, times and money
 

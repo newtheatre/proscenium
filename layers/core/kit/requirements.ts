@@ -11,6 +11,7 @@ import { createUnit } from './unit'
 import { countAgainstRate } from './ratelimit'
 import { nowMs } from './clock'
 import { log } from './log'
+import { refuse } from './refusal'
 import type { RecordRef } from './unit'
 
 /** What a source says about one pair of account and reference. */
@@ -30,6 +31,8 @@ export interface SourceAnswer {
   help?: string
   /** On a not-met verdict: where the person can put it right (join, renew), as a translated label and a page of the source's. */
   remedy?: { label: string, to: string }
+  /** On a not-met verdict for a presented value: the source can take a request for staff to check that value by hand (`ask`). */
+  ask?: boolean
   /** On a met verdict: how many of the thing the host may grant on it, nought or more. */
   quantity?: number
   /**
@@ -62,6 +65,11 @@ export interface RequirementSource {
   check: (accountIds: (string | null)[], refs: string[], at: number, record?: RecordRef, presented?: Presented[]) => Promise<SourceAnswer[]>
   /** A display name for a piece of evidence, for staff only, guarded by holderAbility. */
   holder?: (evidence: string) => Promise<string | null>
+  /**
+   * Takes a request from the signed-in actor for staff to check a presented value the source did not
+   * find, such as a student ID the list has not caught up with. Writes in a unit of its own; refuses when it cannot.
+   */
+  ask?: (accountId: string, ref: string, value: string) => Promise<AskResult>
   /** The ability, declared audit: 'read', that guards holder(). Required when holder is given. */
   holderAbility?: string
   /**
@@ -70,6 +78,9 @@ export interface RequirementSource {
    */
   checkAbility?: string
 }
+
+/** What asking came to: a request now waiting for staff, or the value met after all. */
+export interface AskResult { state: 'requested' | 'met' }
 
 export const defineRequirementSource = (source: RequirementSource): RequirementSource => source
 
@@ -92,6 +103,7 @@ export interface Answer {
   evidence?: string
   help?: string
   remedy?: { label: string, to: string }
+  ask?: boolean
   quantity?: number
   /**
    * On a met verdict, the account a presented value belongs to, if the source knows. Server only:
@@ -320,4 +332,18 @@ async function holder(ref: string, evidence: string): Promise<string | null> {
   return found.source.holder(evidence)
 }
 
-export const requirements = { options, describe, check, holder }
+/**
+ * Asks the source behind a reference to have staff check a value it did not find, for the signed-in
+ * actor's own account. Counts against presented-value, as a check does; the value is never logged.
+ */
+async function ask(ref: string, value: string): Promise<AskResult> {
+  const parsed = parseReference(ref)
+  const found = parsed && parsed.source !== FACT ? (await sources()).get(parsed.source) : undefined
+  if (!found?.source.ask || !(await isEnabled(found.module))) refuse('core.requirement.ask-unavailable', 'This cannot be checked by hand at the moment.', { status: 409, remedy: 'Contact the theatre.' })
+  const { actor } = useContext()
+  if (!actor.accountId) refuse('core.requirement.ask-sign-in', 'Sign in first, so the theatre can tell you when it has checked.', { status: 401 })
+  for (const k of presentedKeys()) if (!(await countAgainstRate('presented-value', k)).allowed) refuse('core.requirement.slow-down', SLOW_DOWN, { status: 429 })
+  return found!.source.ask!(actor.accountId!, ref, value)
+}
+
+export const requirements = { options, describe, check, holder, ask }
