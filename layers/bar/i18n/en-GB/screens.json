@@ -801,5 +801,10 @@
   "bar.screens.stock.retired-items": "Retired stock items",
   "bar.screens.stock.retired-locations": "Retired locations",
   "bar.screens.stock.retired": "{name} retired.",
-  "bar.screens.stock.restored": "{name} brought back."
+  "bar.screens.stock.restored": "{name} brought back.",
+  "bar.promotions.items": "Bar products",
+  "bar.promotions.category": "Category",
+  "bar.promotions.product": "Product",
+  "bar.promotions.size": "Size",
+  "bar.promotions.outlet": "Outlet"
 }

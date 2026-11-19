@@ -7,10 +7,10 @@
 // money is pass income when it is paid, never split between performances.
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, openColumn, refuse, requirements, useSetting, type UnitView } from '#kit'
-import { getPerformance, getProduction, notify } from '#modules/core'
+import { findOrCreateAccount, getPerformance, getProduction, notify } from '#modules/core'
 import { orderLines } from './db/schema'
 import type { JudgedPass } from './pass-entries'
-import { issuePass, shownPassCode } from './pass-holding'
+import { issuePass, passCodeHashes, shownPassCode } from './pass-holding'
 import { getPassType, listPassTypes, type PassType } from './passes'
 import { soldOn } from './ticket-types'
 
@@ -21,6 +21,12 @@ export interface PassBuy {
   bandId?: string
   /** Its first entry is in a wheelchair space: still one entry. */
   wheelchair?: boolean
+  /** At the till: false sells the pass on its own, with no entry at this performance. */
+  entry?: boolean
+  /** At the till: who holds it, picked by the seller. Otherwise the buyer. */
+  accountId?: string
+  /** At the till: an address typed for who holds it, the account for which is found or made as the sale is made. */
+  email?: string
 }
 
 type Buyer = { channel: 'online' | 'desk', account: string | null }
@@ -70,6 +76,26 @@ export async function passesOnSale(performanceId: string, buyer: Buyer, at = now
   return out
 }
 
+/** A pass on sale at the till, with whether it covers the performance being sold, so it can give its first entry there. */
+export interface DeskPassOnSale extends Omit<PassOnSale, 'prices'> {
+  covers: boolean
+  holder: 'named' | 'open' | 'auto'
+  prices: { id: string, name: string, amountMinor: number, proofNote: string | null, /** Only some people may have it: the seller checks. */ restricted: boolean }[]
+}
+
+/** Every pass on sale at the till: at the desk the seller checks who may have a price. */
+export async function deskPassesOnSale(performanceId: string, at = nowMs()): Promise<DeskPassOnSale[]> {
+  const types = (await listPassTypes()).filter(t => selling(t, 'desk', at))
+  if (!types.length) return []
+  const performance = await getPerformance(performanceId)
+  const production = await getProduction(performance.productionId)
+  return types.flatMap((type) => {
+    const prices = type.prices.filter(p => p.active).map(p => ({ id: p.id, name: p.name, amountMinor: p.amountMinor, proofNote: p.proofNote, restricted: p.requirementRefs.length > 0 }))
+    if (!prices.length) return []
+    return [{ id: type.id, name: type.name, description: type.description, shows: type.covers === 'productions' ? type.productionIds.length : null, once: type.perShow === 'once', uses: type.uses, reserveUnpaid: type.reserveUnpaid, covers: covers(type, performance, production), holder: type.holder, prices }]
+  })
+}
+
 export interface PlannedPass {
   buy: PassBuy
   /** The pass as it will be, so its first entry can be taken in the same batch. */
@@ -89,7 +115,7 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
     const price = type.prices.find(p => p.id === buy.passPriceId && p.active)
     if (!selling(type, buyer.channel, at) || !price)
       refuse('box-office.pass.not-on-sale', `${type.name} is not on sale here.`, { status: 422, remedy: 'Reload to see what is on sale.', fields: { pass: 'not-on-sale' } })
-    if (!covers(type, performance, production))
+    if (buy.entry !== false && !covers(type, performance, production))
       refuse('box-office.pass.not-covered', `${type.name} does not cover this show.`, { status: 422, remedy: 'Buy it with a booking for a show it covers.', fields: { pass: 'not-covered' } })
     const may = await mayBuy(price.requirementRefs, performanceId, buyer)
     if (!may.allowed) {
@@ -101,7 +127,7 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
       buy,
       amountMinor: price.amountMinor,
       currency: type.currency,
-      judged: { passId: newId('pass'), passTypeId: type.id, name: type.name, priceName: price.name, accountId: buyer.channel === 'online' ? buyer.account : null, named, once: type.perShow === 'once', owedMinor: price.amountMinor, left: type.uses },
+      judged: { passId: newId('pass'), passTypeId: type.id, name: type.name, priceName: price.name, accountId: buyer.channel === 'online' ? buyer.account : buy.accountId ?? null, named, once: type.perShow === 'once', owedMinor: price.amountMinor, left: type.uses },
     })
   }
   return out
@@ -122,35 +148,42 @@ export async function addPassSales(unit: UnitView, orderId: string, planned: rea
 const LIVE_ORDER = (at: number) => `(o.state IN ('awaiting_payment', 'reserved') OR (o.state = 'basket' AND o.expires_at > ${Math.trunc(at)}))`
 const MOVED = { code: 'box-office.pass.just-used', reason: 'That pass has just been used somewhere else.', remedy: 'Try again.' }
 
+/** A pass used here whose money is collected with this order, and the sale line it was waiting on. */
+export interface Owed { pass: JudgedPass, fromLine: string | null }
+
 /**
- * A pass used here that is still to be paid for, and whose sale is not waiting on a live booking,
- * is collected with this one: a sale line is written on this order and the pass points at it.
- * Returns what that adds to the total.
+ * Which passes used here are still to be paid for and are not waiting on a live booking: their
+ * money is collected with this one. Reads only.
  */
-export async function carryOwed(unit: UnitView, orderId: string, passes: readonly JudgedPass[], at = nowMs()): Promise<number> {
-  let added = 0
+export async function owedHere(passes: readonly JudgedPass[], at = nowMs()): Promise<Owed[]> {
+  const out: Owed[] = []
   for (const pass of passes.filter(p => p.owedMinor > 0)) {
     const row = await first<{ order_line_id: string | null, waiting: number }>(
       `SELECT p.order_line_id, EXISTS (SELECT 1 FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id WHERE l.id = p.order_line_id AND l.state = 'live' AND ${LIVE_ORDER(at)}) AS waiting
         FROM box_office_passes p WHERE p.id = ? AND p.paid_at IS NULL`, pass.passId)
-    if (!row || row.waiting) continue
-    const [lineId] = unit.insertSet(orderLines, [{ orderId, kind: 'pass_sale', listMinor: pass.owedMinor, discountMinor: 0, amountMinor: pass.owedMinor, state: 'live' }])
-    unit.add(sql`UPDATE box_office_passes SET order_line_id = ${lineId!}, updated_at = ${at} WHERE id = ${pass.passId} AND paid_at IS NULL AND order_line_id IS ${row.order_line_id}`).expect(1, MOVED)
-    added += pass.owedMinor
+    if (row && !row.waiting) out.push({ pass, fromLine: row.order_line_id })
   }
-  return added
+  return out
 }
 
-export interface PassSale { lineId: string, passId: string, name: string, priceName: string, amountMinor: number, /** As shown, PASS-XXXX-XXXX. */ code: string | null, /** Bought on this order, rather than an earlier pass's money collected here. */ fresh: boolean, reserveUnpaid: boolean }
+/** Writes a sale line on this order for each pass `owedHere` found, and points the pass at it. */
+export function carryOwed(unit: UnitView, orderId: string, owed: readonly Owed[], at = nowMs()): void {
+  for (const { pass, fromLine } of owed) {
+    const [lineId] = unit.insertSet(orderLines, [{ orderId, kind: 'pass_sale', listMinor: pass.owedMinor, discountMinor: 0, amountMinor: pass.owedMinor, state: 'live' }])
+    unit.add(sql`UPDATE box_office_passes SET order_line_id = ${lineId!}, updated_at = ${at} WHERE id = ${pass.passId} AND paid_at IS NULL AND order_line_id IS ${fromLine}`).expect(1, MOVED)
+  }
+}
+
+export interface PassSale { lineId: string, passId: string, /** Who holds it already, if anyone. */ accountId: string | null, name: string, priceName: string, amountMinor: number, /** As shown, PASS-XXXX-XXXX. */ code: string | null, /** Bought on this order, rather than an earlier pass's money collected here. */ fresh: boolean, reserveUnpaid: boolean }
 
 /** The passes an order sells or collects for: its live sale lines. */
 export async function passSalesOn(orderId: string): Promise<PassSale[]> {
-  const rows = await all<{ line_id: string, pass_id: string, name: string, price_name: string, amount_minor: number, code: string | null, issued_at: number | null, reserve_unpaid: number }>(
-    `SELECT l.id AS line_id, p.id AS pass_id, t.name, r.name AS price_name, l.amount_minor, p.code, p.issued_at, t.reserve_unpaid FROM box_office_order_lines l
+  const rows = await all<{ line_id: string, pass_id: string, account_id: string | null, name: string, price_name: string, amount_minor: number, code: string | null, issued_at: number | null, reserve_unpaid: number }>(
+    `SELECT l.id AS line_id, p.id AS pass_id, p.account_id, t.name, r.name AS price_name, l.amount_minor, p.code, p.issued_at, t.reserve_unpaid FROM box_office_order_lines l
       JOIN box_office_passes p ON p.order_line_id = l.id JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id
-      WHERE l.order_id = ? AND l.kind = 'pass_sale' AND l.state = 'live' ORDER BY l.id`, orderId)
+      WHERE l.order_id = ? AND l.kind = 'pass_sale' AND l.state = 'live' ORDER BY l.rowid`, orderId)
   return Promise.all(rows.map(async r => ({
-    lineId: r.line_id, passId: r.pass_id, name: r.name, priceName: r.price_name, amountMinor: r.amount_minor, code: r.code ? shownPassCode(await openColumn(r.code) as string) : null, fresh: r.issued_at === null, reserveUnpaid: !!r.reserve_unpaid,
+    lineId: r.line_id, passId: r.pass_id, accountId: r.account_id, name: r.name, priceName: r.price_name, amountMinor: r.amount_minor, code: r.code ? shownPassCode(await openColumn(r.code) as string) : null, fresh: r.issued_at === null, reserveUnpaid: !!r.reserve_unpaid,
   })))
 }
 
@@ -165,13 +198,18 @@ export async function assertMayReserve(orderId: string): Promise<void> {
   if (sale) refuse('box-office.pass.pay-first', `${sale.name} is paid for when it is booked with.`, { status: 409, remedy: 'Pay now, or bring it to the box office.', fields: { pass: 'pay-first' } })
 }
 
-/** Sends the buyer the code of each pass bought on the order. Called before the passes are settled, while they are still new. */
-export async function sendNewPasses(unit: UnitView, order: { id: string, currency: string }, accountId: string | null, paid: boolean): Promise<void> {
-  if (!accountId) return
+/**
+ * Sends each pass bought on the order its code: to its holder, picked at the till or decided by who
+ * paid for it in a split sale (`holders`), or else to the buyer. Called before the passes are
+ * settled, while they are still new.
+ */
+export async function sendNewPasses(unit: UnitView, order: { id: string, currency: string }, accountId: string | null, paid: boolean, holders: ReadonlyMap<string, string> = new Map()): Promise<void> {
   for (const sale of (await passSalesOn(order.id)).filter(s => s.fresh && s.code)) {
+    const to = holders.get(sale.passId) ?? sale.accountId ?? accountId
+    if (!to) continue
     const amount = new Intl.NumberFormat((await useSetting('core.locale.language') as string | null) ?? 'en-GB', { style: 'currency', currency: order.currency }).format(sale.amountMinor / 100) // not-policy: minor units to units
     await notify(unit, 'box-office.pass-issued', {
-      to: accountId,
+      to,
       variables: { pass: sale.name, price: sale.priceName, code: sale.code!, paid: paid || !sale.amountMinor ? 'It is paid for.' : `There is ${amount} to pay for it, which is taken at the box office when you come to your first show.` },
       subject: ['box-office.pass', sale.passId],
       dedupeKey: `pass-issued:${sale.passId}`,
@@ -180,10 +218,52 @@ export async function sendNewPasses(unit: UnitView, order: { id: string, currenc
 }
 
 /**
- * The order's passes become the buyer's as it is reserved or confirmed, and are paid when it is
- * confirmed. A pass with a holder already keeps them.
+ * In a till sale split between people, a pass nobody was named for goes to whoever paid for it
+ * (Matt, 18 November): `payers` says who paid for each keyed summary line, and `pass:<n>` is the
+ * nth pass sold on the order. A holder the seller picked keeps it, and anyone may move it later.
+ * Each address is looked up once, so two passes for one person make one account.
  */
-export function settlePassSales(unit: UnitView, orderId: string, accountId: string | null, paid: boolean, at = nowMs()): void {
+export async function passPayers(unit: UnitView, orderId: string, payers: readonly { key: string, to: { accountId?: string, email?: string } }[]): Promise<Map<string, string>> {
+  const holders = new Map<string, string>()
+  if (!payers.some(p => p.key.startsWith('pass:'))) return holders
+  const sold = (await passSalesOn(orderId)).filter(s => s.fresh)
+  const accounts = new Map<string, string>()
+  for (const { key, to } of payers) {
+    const sale = key.startsWith('pass:') ? sold[Number(key.slice(5))] : undefined // not-policy: the length of 'pass:'
+    if (!sale || sale.accountId || holders.has(sale.passId)) continue
+    let accountId = to.accountId
+    if (!accountId && to.email) {
+      const address = to.email.trim().toLowerCase()
+      accountId = accounts.get(address) ?? (await findOrCreateAccount(unit, { address, origin: 'guest' })).accountId
+      accounts.set(address, accountId)
+    }
+    if (accountId) holders.set(sale.passId, accountId)
+  }
+  return holders
+}
+
+/**
+ * The order's passes become the buyer's as it is reserved or confirmed, and are paid when it is
+ * confirmed. A pass with a holder already keeps them; one in `holders` goes to that person.
+ */
+export function settlePassSales(unit: UnitView, orderId: string, accountId: string | null, paid: boolean, at = nowMs(), holders: ReadonlyMap<string, string> = new Map()): void {
+  for (const [passId, holder] of holders)
+    unit.add(sql`UPDATE box_office_passes SET account_id = COALESCE(account_id, ${holder}), updated_at = ${at} WHERE id = ${passId} AND paid_at IS NULL`)
   unit.add(sql`UPDATE box_office_passes SET issued_at = COALESCE(issued_at, ${at}), account_id = COALESCE(account_id, ${accountId}), paid_at = ${paid ? at : null}, updated_at = ${at}
     WHERE paid_at IS NULL AND order_line_id IN (SELECT id FROM box_office_order_lines WHERE order_id = ${orderId} AND kind = 'pass_sale' AND state = 'live')`)
+}
+
+/**
+ * A pass whose money is still owed, found by its code, to be paid for at the till on its own. Its
+ * money is taken with this sale unless a live booking is already waiting to collect it.
+ */
+export async function passOwing(typed: string): Promise<JudgedPass> {
+  const row = await first<{ id: string, pass_type_id: string, name: string, price_name: string, account_id: string | null, named: number, once: number, amount_minor: number, paid_at: number | null, state: string, uses_total: number | null, uses_taken: number }>(
+    `SELECT p.id, p.pass_type_id, t.name, r.name AS price_name, p.account_id, p.named, p.once, p.amount_minor, p.paid_at, p.state, p.uses_total, p.uses_taken
+      FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id
+      WHERE (p.code_hash = ? OR p.alias_hash = ?) AND p.issued_at IS NOT NULL`, ...await passCodeHashes(typed))
+  if (!row) refuse('box-office.pass.unknown', 'We do not recognise that pass code.', { status: 422, remedy: 'Check how it is spelt. It is on the pass and in its email.', fields: { pass: 'unknown' } })
+  if (row.state !== 'active') refuse('box-office.pass.void', 'That pass has been cancelled.', { status: 422, fields: { pass: 'void' } })
+  if (row.paid_at || !row.amount_minor) refuse('box-office.pass.paid', `${row.name} is paid for already.`, { status: 409, fields: { pass: 'paid' } })
+  return { passId: row.id, passTypeId: row.pass_type_id, name: row.name, priceName: row.price_name, accountId: row.account_id, named: !!row.named, once: !!row.once, owedMinor: row.amount_minor, left: row.uses_total === null ? null : row.uses_total - row.uses_taken }
 }

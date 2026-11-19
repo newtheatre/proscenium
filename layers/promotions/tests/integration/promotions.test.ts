@@ -196,6 +196,34 @@ describe('a promotion on tickets', () => {
   })
 })
 
+describe('days and times', () => {
+  it('runs a code only in its windows of the week, in the theatre\'s time zone', async () => {
+    // 16 November 2026 is a Monday; noon in London.
+    const p = await promotion({ value: 5000, schedule: [{ days: [1], from: '17:00', until: '19:00' }] })
+    expect(await hold(h, p.code, 1)).toEqual({ ok: false, code: 'promotions.code.not-now' })
+    try {
+      setClock(NOV_16 + 5.5 * 3600_000) // 17:30
+      expect(total(await hold(h, p.code, 1))).toBe(600)
+      setClock(NOV_16 + 7 * 3600_000) // 19:00, when it has ended
+      expect(await hold(h, p.code, 1)).toEqual({ ok: false, code: 'promotions.code.not-now' })
+    }
+    finally {
+      setClock(NOV_16)
+    }
+    const listed = (await api('GET', '/api/promotions')).body.rows.find((r: any) => r.id === p.id)
+    expect(listed.schedule).toEqual([{ days: [1], from: '17:00', until: '19:00' }])
+  })
+
+  it('leaves an automatic promotion out of its hours, and refuses a window it cannot read', async () => {
+    const auto = await promotion({ value: 1000, schedule: [{ days: [2, 3], from: '12:00', until: '13:00' }] }, true)
+    expect(total(await hold(h, undefined, 1))).toBe(1200)
+    expect(await used(auto.id)).toBe(0)
+    await api('POST', `/api/promotions/${auto.id}/active`, { active: false })
+    const bad = await api('POST', '/api/promotions', body('BADTIME1', { schedule: [{ days: [1], from: '25:00', until: '19:00' }] }))
+    expect(bad.status).toBe(422)
+  })
+})
+
 describe('managing promotions', () => {
   it('keeps codes unique whatever the case, and will not lower the uses below those made', async () => {
     const p = await promotion({})

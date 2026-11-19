@@ -1,0 +1,1 @@
+ALTER TABLE `bar_sale_lines` ADD `promotion_redemption_id` text;
