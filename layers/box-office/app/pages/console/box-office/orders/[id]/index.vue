@@ -9,7 +9,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 definePageMeta({ layout: 'console' })
 
 type State = 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired'
-interface Line { id: string, kind: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, state: string, admittedAt: number | null, ticketState: string | null, requirementPending?: boolean, passEntry?: boolean }
+interface Line { id: string, kind: string, bandId: string | null, band: string | null, section?: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, state: string, admittedAt: number | null, ticketState: string | null, requirementPending?: boolean, passEntry?: boolean }
 interface Cancellation { id: string, kind: string, note: string | null, lineCount: number, refunded: boolean, feeMinor: number, reason: string | null, by: string | null, at: number }
 interface Payment { intentId: string, amountMinor: number, refundedMinor: number, methods: string[], takenBy: string | null, point: string | null, at: number }
 type RefundState = 'requested' | 'approved' | 'sent' | 'succeeded' | 'failed' | 'declined'
@@ -156,7 +156,7 @@ const tickets = computed(() => {
   return [...groups.values()]
 })
 const lineName = (l: Line, count: number) => {
-  const name = t('box-office.order.line.title', { band: l.band ?? '', type: l.ticketType ?? '' })
+  const name = l.section ? t('box-office.order.line.title', { band: l.section, type: l.ticketType ?? '' }) : l.ticketType ?? ''
   return count > 1 ? t('box-office.order.line.times', { count, name }) : name
 }
 const lineStatus = (l: Line) => l.state !== 'live'
