@@ -31,7 +31,6 @@ export default defineModule({
     // The common providers the receipt box offers a typed name at (Matt, 17 November, first for tickets).
     'desk.email-domains': setting.list({ default: ['gmail.com', 'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'icloud.com', 'yahoo.com', 'yahoo.co.uk', 'live.co.uk', 'btinternet.com'], of: 'text', maxLength: 253, change, audience: 'staff' }),
     'cash.enabled': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
-    'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     // For a test instance only: a provider account in test mode takes payment for real sales, which
     // then post to the ledger as live money would, so the whole journey can be tried with test cards.
