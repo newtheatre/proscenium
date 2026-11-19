@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { inContext, person } from '../../../../tests/integration/helpers'
+import { env, inContext, person } from '../../../../tests/integration/helpers'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const viewer = person(['box-office.order.view'])
@@ -63,6 +63,15 @@ describe('the Orders list', () => {
   it('filters by state', async () => {
     const paid = await req('GET', '/api/box-office/orders?state=confirmed', undefined, viewer)
     expect(paid.body.rows.map((r: { id: string }) => r.id)).not.toContain(reservation.orderId)
+  })
+
+  it('lists an order whose first line is a pass sale, with no performance', async () => {
+    const id = 'ord_passonly'
+    await env.DB.prepare("INSERT INTO box_office_orders (id, reference, channel, state, currency, total_minor, created_at, updated_at) VALUES (?, 'PASSONLY', 'phone', 'reserved', 'GBP', 3500, ?, ?)").bind(id, NOV_16, NOV_16).run()
+    await env.DB.prepare("INSERT INTO box_office_order_lines (id, order_id, kind, list_minor, amount_minor, created_at, updated_at) VALUES ('orl_passonly', ?, 'pass_sale', 3500, 3500, ?, ?)").bind(id, NOV_16, NOV_16).run()
+    const all = await req('GET', '/api/box-office/orders?view=all', undefined, viewer)
+    expect(all.status, JSON.stringify(all.body)).toBe(200)
+    expect(all.body.rows.find((r: { id: string }) => r.id === id)).toMatchObject({ show: null, startsAt: null })
   })
 
   it('is refused to someone who may not see orders', async () => {
