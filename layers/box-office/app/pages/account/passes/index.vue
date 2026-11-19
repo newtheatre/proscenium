@@ -83,6 +83,13 @@ const { data, status, error, refresh } = await useAPI<{ passes: MyPass[] }>('/ap
             :title="t('box-office.my-passes.pay-title')"
             :description="t('box-office.my-passes.pay-help', { amount: money(pass.owedMinor, pass.currency) })"
           />
+          <BoxOfficePassCoverPanel
+            v-if="pass.state === 'active'"
+            :pass-id="pass.id"
+            :currency="pass.currency"
+            mode="mine"
+            @covered="refresh()"
+          />
           <RecordList
             v-if="pass.entries.length || pass.open.length"
             :label="t('box-office.my-passes.shows', { name: pass.name })"

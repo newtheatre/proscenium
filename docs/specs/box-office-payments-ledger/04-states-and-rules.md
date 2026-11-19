@@ -298,6 +298,26 @@ It should not happen, because a hold with a pending or unknown attempt is never 
 
 In every case one batch releases the claims, voids the tickets, updates the lines and total, writes the cancellation row and requests any refund. The refund is asked for through Payments' requestRefund in the same unit, and its id is kept on the cancellation row. A refund made from Payments' screens with no cancellation behind it is set against the order's cancelled lines first, then its live lines. The entries Box office returns for a refund debit deferred ticket income, per performance, while that performance's income has not been recognised, and ticket income once it has.
 
+## Using a pass for tickets already held
+
+Ruled by Matt on 19 November (plan "Applying a pass to earlier bookings"), reversing the earlier "no upgrade after booking". When someone gets a pass, the tickets they already hold for other shows it covers can become its entries. The ticket's line stays on its own booking, in the same seat, with the same ticket and code: it takes a pass redemption on its claim, and its price is wholly discounted. A switch is a `box_office_pass_covers` row.
+
+| Case | Rule |
+| --- | --- |
+| Which tickets | A live ticket line on one of the holder's own bookings (their account scope) for a performance the pass covers: on a reservation, for a scheduled performance still to come; on a paid booking whose ticket is still valid, for any performance not cancelled, including one already seen. Not a complimentary or companion ticket, not one that is already a pass entry, and not one waiting on another pass being bought |
+| How many | One ticket a performance for each pass, one performance of a show where the pass says so, and no more than the entries it has left. Where several tickets qualify, the soonest is offered, then the ticket type the pass price is offered instead of, then the dearest. The rest stay ordinary tickets at their own price |
+| Asked while buying the pass | Online beside the swap (signed in only) and at the till for a holder the seller found. The switch is `held` with the booking that buys the pass and made in the batch that reserves or confirms that booking. A ticket that changed in between, or is no longer the holder's, is `lapsed` and stays as it is |
+| Asked later | From Your passes, by staff on the holders list, and at the till when a pass is scanned: made at once, all the tickets asked for or none |
+| The ticket's booking | Its total comes down by the ticket's price. A reservation left with nothing to pay is confirmed and its tickets issued, as any order with nothing to pay is. The booking's holder is sent `box-office.pass-covered` |
+| A paid ticket | What it cost is credit towards the pass: the pass's `credit_minor` goes up by it and the switch row records it as `credit_minor`. The pass then owes its price less its credit, wherever owed money is shown or collected. A pass bought with the switch is sold for its price less the credit (the sale line's discount). One already issued and still owed has the sale line waiting on a reservation, if any, brought down too; while that line is being paid for the switch is refused. A pass whose credit reaches its price is paid |
+| Only up to what the pass owes | A paid ticket goes towards a pass only when the pass still owes at least its price, counting the other paid tickets asked for with it. Otherwise the holder sees it with "ask the box office" and is refused as `box-office.pass.cover-ask` |
+| Staff, for more than the pass owes | Staff (on the holders list or at the till) may switch it anyway, the pass already paid included: soonest first, each paid ticket puts what the pass still owes towards it and the rest is refunded, one refund per booking under Payments' usual approval. The switch row records `refund_minor` and `refund_id`, and the refund's ledger entries come off that ticket's performance |
+| The ledger | A transfer posting (`box-office:pass-cover:<switch id>`) moves the ticket money from the performance's deferred ticket income, or its ticket income for whatever has been recognised, to Pass income. With the rest of the pass's price taken when it is paid, Pass income always comes to the pass's price |
+| A held paid switch that changed | The pass was priced with that ticket's money, so the batch that reserves or confirms the booking buying it is refused (`box-office.pass.cover-changed`) rather than the switch lapsing |
+| Guards | The pass's own entry guard, on the statement, as for any entry; the line must still be live with its price unchanged; the booking must still be reserved with its total unchanged; one `applied` switch per line (unique index) |
+
+A paid ticket switched to a pass is no longer refunded on its own: cancelling it gives nothing back, since its money is the pass's.
+
 ## The waiting list
 
 | Transition | Guard |

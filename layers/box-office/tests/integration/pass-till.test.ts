@@ -8,6 +8,7 @@ import { createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, openSession } from '../../../payments/server/services'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { createBasket } from '../../server/baskets'
 import { issuePass } from '../../server/pass-holding'
 import { listPassTypes } from '../../server/passes'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
@@ -141,6 +142,30 @@ describe('selling a pass at the till', () => {
     // Nobody was named for it: the after-sale panel shows its code to hand over.
     expect((await req('GET', `/api/box-office/desk/sold?intent=${made.body.intentId}`, undefined, seller)).body.orders).toMatchObject([{ performance: null, lines: [], passes: [{ name: type.name, priceName: 'Member', holder: null, code: expect.stringMatching(/^PASS-/) }] }])
     expect(await passIncome() - before).toBe(-2100)
+  })
+})
+
+describe('a pass sold at the till to someone with tickets already reserved', () => {
+  it('covers the tickets the seller left ticked once the sale is paid', async () => {
+    const type = await passType({ productionIds: [a.productionId, b.productionId] })
+    const holder = await commit(async unit => (await (await import('#modules/core')).findOrCreateAccount(unit.view(), { address: 'covered.holder@example.org', origin: 'guest' })).accountId)
+    const who = person([], { accountId: holder })
+    const basket = await inContext(async () => {
+      const unit = createUnit()
+      const made = await createBasket(unit.view(), { performanceId: b.performanceId, lines: [{ bandId: b.bandId, ticketTypeId: b.fullId, quantity: 1 }] })
+      await unit.commit()
+      return made
+    }, who)
+    expect((await req('POST', `/api/box-office/baskets/${basket.orderId}/reserve`, { expectedTotalMinor: basket.totalMinor, ageConfirmed: true }, who, { 'x-basket-token': basket.token })).status).toBe(200)
+    const offered = await req('GET', `/api/box-office/desk/covers?performanceId=${a.performanceId}&passTypeId=${type.id}&passPriceId=${type.prices[0]!.id}&accountId=${holder}`, undefined, seller)
+    expect(offered.body.choices.map((c: { lineId: string }) => c.lineId)).toEqual([basket.lines[0]!.id])
+
+    const made = await sale({ performanceId: a.performanceId, lines: [], buy: [{ passTypeId: type.id, passPriceId: type.prices[0]!.id, accountId: holder }], cover: [basket.lines[0]!.id] })
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    expect(made.body.amountMinor).toBe(2100)
+    await payCash(made.body.intentId)
+    expect(await linesOf(basket.orderId)).toEqual([{ kind: 'ticket', amount_minor: 0, entry: 1 }])
+    expect((await rows<{ state: string }>('SELECT state FROM box_office_orders WHERE id = ?', basket.orderId))[0]!.state).toBe('confirmed')
   })
 })
 

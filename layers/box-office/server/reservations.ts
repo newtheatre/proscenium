@@ -9,6 +9,7 @@
 // the reserving. That link holds a random token and nothing else: its hash is on the basket with
 // the address it was sent to, it works once, and it ends with the basket. The account is found or
 // made only when the link is pressed, so a mistyped address leaves nothing behind.
+import { applyHeldCovers } from './pass-covers'
 import { assertMayReserve, passSalesMinor, passSalesOn, sendNewPasses, settlePassSales } from './pass-sales'
 import { getPass, movePass, sendPass } from './pass-holding'
 import { stampTerms } from './terms'
@@ -171,6 +172,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   // A pass bought with the reservation is the buyer's now, and paid for when the reservation is.
   await sendNewPasses(unit, order, accountId, false)
   settlePassSales(unit, order.id, accountId, false, at)
+  await applyHeldCovers(unit, order.id, accountId, at)
 
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
   const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
