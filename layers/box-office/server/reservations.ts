@@ -14,7 +14,7 @@ import { getPass, movePass, sendPass } from './pass-holding'
 import { stampTerms } from './terms'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, isEnabled, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
-import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress, placeName } from '#modules/core'
+import { canSendClaimLink, claimLink, findOrCreateAccount, getPerformance, getProduction, getVenue, notify, notifyAddress, latecomersAt, placeName, type LatecomerRule } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancelLines } from './cancel'
 import { cancellations } from './db/schema'
@@ -219,7 +219,7 @@ export interface OrderView {
 }
 
 /** What the booking is for, so a page can lead with it. venueSlug is set when the venue has a public page. */
-export interface OrderShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
+export interface OrderShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean, /** When latecomers are let in. */ latecomers: LatecomerRule }
 
 /** The performance an order's tickets are for (the first, where it has more than one). */
 /** A booking's lines as its pages show them; `unnamed` where there is one kind to book, as Choose tickets shows it. */
@@ -244,6 +244,7 @@ export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<
     venueSlug: listed ? venue!.slug : null,
     address,
     cancelled: performance.state === 'cancelled',
+    latecomers: await latecomersAt(performance.id),
   }
 }
 

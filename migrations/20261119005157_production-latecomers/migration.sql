@@ -1,0 +1,1 @@
+ALTER TABLE `core_productions` ADD `latecomers` text;

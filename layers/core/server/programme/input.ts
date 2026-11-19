@@ -1,5 +1,6 @@
 // The shapes the programme routes accept, shared so a create and an edit agree on every bound.
 import { z } from 'zod'
+import { LATECOMER_RULES } from '../../shared/latecomers'
 
 // Nothing here imports server code, so a screen can check a form with the same schema its route uses.
 export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/ // not-policy: a slug's pattern
@@ -37,6 +38,8 @@ const productionFields = z.object({
   capacity: z.number().int().min(1).max(100_000).nullable(), // not-policy: a sane ceiling on a house
   usualSpaceId: z.string().min(1).nullable(),
   externalBookingUrl: z.string().trim().url().startsWith('https://').max(2000).nullable(), // not-policy: an address's bound
+  // Null takes the theatre's usual practice.
+  latecomers: z.enum(LATECOMER_RULES).nullable(),
   creditsPublic: z.boolean(),
   listed: z.boolean(),
 })

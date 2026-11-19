@@ -35,6 +35,7 @@ import spaceOptions from '../../server/api/core/productions/space-options.get'
 import createSeason from '../../server/api/core/seasons/index.post'
 import { guidanceFor } from '../../server/programme/guidance'
 import { completeEnded } from '../../server/programme/performances'
+import { latecomersFor } from '../../server/programme/latecomers'
 import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
@@ -116,6 +117,25 @@ afterEach(async () => {
     env.DB.prepare('DELETE FROM core_closures'),
     env.DB.prepare("DELETE FROM core_settings WHERE key = 'core.locale.time-zone'"),
   ])
+})
+
+describe('latecomers', () => {
+  it('follow the show\'s rule, else the theatre\'s usual practice, and are never let in at an interval that does not exist', async () => {
+    const s = await stage()
+    const one = await add(s, '2031-03-01T19:30', { intervalCount: 1 })
+    const none = await add(s, '2031-03-02T19:30', { intervalCount: 0 })
+    const rules = () => inContext(() => latecomersFor([one, none]))
+    expect(Object.fromEntries(await rules())).toEqual({ [one]: 'suitable-point', [none]: 'suitable-point' })
+    expect((await req('PATCH', `/api/core/productions/${s.productionId}`, { latecomers: 'whenever' })).status).toBe(422)
+    expect((await req('PATCH', `/api/core/productions/${s.productionId}`, { latecomers: 'interval' })).status).toBe(200)
+    expect((await req('GET', `/api/core/productions/${s.productionId}`)).body.production.latecomers).toBe('interval')
+    expect(Object.fromEntries(await rules())).toEqual({ [one]: 'interval', [none]: 'not-admitted' })
+    const copy = (await req('POST', `/api/core/productions/${s.productionId}/duplicate`)).body.id
+    expect((await req('GET', `/api/core/productions/${copy}`)).body.production.latecomers).toBe('interval')
+    // Cleared, the show takes the theatre's usual practice again.
+    expect((await req('PATCH', `/api/core/productions/${s.productionId}`, { latecomers: null })).status).toBe(200)
+    expect((await rules()).get(one)).toBe('suitable-point')
+  })
 })
 
 describe('a production\'s usual space', () => {

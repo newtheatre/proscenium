@@ -3,7 +3,7 @@
 // and prices. It never says how many seats the house holds or how many are sold: a band is either
 // available or sold out.
 import { refuse, requirements, useContext, useSetting } from '#kit'
-import { getPerformance, getProduction, placeName, placeOf } from '#modules/core'
+import { getPerformance, getProduction, latecomersAt, placeName, placeOf, type LatecomerRule } from '#modules/core'
 import { availability } from './availability'
 import { timingFor, type PaymentTiming } from './reservations'
 import { salesOf } from './setup'
@@ -13,7 +13,8 @@ import { passesOnSale, type PassOnSale } from './pass-sales'
 import { WHEELCHAIR_TYPE } from './prices'
 
 export interface BookingPage {
-  performance: { id: string, startsAt: number, venue: string, state: string }
+  /** `latecomers`: when latecomers are let in. */
+  performance: { id: string, startsAt: number, venue: string, state: string, latecomers: LatecomerRule }
   /** Age guidance: `ageRestricted` means only people of `ageMin` and over may come; otherwise `ageMin` is a recommendation. */
   production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
   state: 'none' | 'draft' | 'on_sale' | 'paused' | 'closed'
@@ -73,7 +74,7 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   }
   const timing = await timingFor(performanceId)
   return {
-    performance: { id: performance.id, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? placeOf(performance.spaceName, performance.venueName), state: performance.state },
+    performance: { id: performance.id, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? placeOf(performance.spaceName, performance.venueName), state: performance.state, latecomers: await latecomersAt(performance.id) },
     production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle, ageMin: production.ageMin, ageRestricted: production.ageRestricted && production.ageMin !== null },
     state: found.state,
     onSaleAt: found.onSaleAt,

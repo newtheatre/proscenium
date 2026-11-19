@@ -326,6 +326,9 @@ export const productions = defineTable('core_productions', {
   // The space it usually plays in: what adding a run or a performance offers first. Each date keeps its own.
   usualSpaceId: col.internal(text('usual_space_id').references(() => spaces.id, { onDelete: 'set null' })),
   externalBookingUrl: col.public(text('external_booking_url')),
+  // When latecomers are let in (any-time, suitable-point, interval, not-admitted); null takes the
+  // theatre's usual practice (core.visiting.latecomers). Bounded by the route's input.
+  latecomers: col.public(text('latecomers')),
   creditsPublic: col.internal(integer('credits_public', { mode: 'boolean' }).notNull()),
   state: col.internal(text('state').notNull().default('draft')),
   cancelReasonTermId: col.ref('core_terms', { nullable: true }),

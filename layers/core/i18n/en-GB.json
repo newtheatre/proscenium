@@ -619,6 +619,7 @@
   "core.live.performances": "Tonight's performances",
   "core.live.no-performances": "No performances today.",
   "core.live.figure-unavailable": "Not available",
+  "core.live.latecomers": "Latecomers",
   "core.live.screens": "Screens",
   "core.live.empty.title": "Nothing to open tonight",
   "core.live.empty.description": "Screens for working a performance appear here when you are on shift or hold a role that uses them.",
@@ -670,5 +671,14 @@
   "core.settings.webhooks.log-retention.label": "Keep the webhook delivery log for",
   "core.settings.webhooks.log-retention.help": "How long each webhook delivery stays in the log. Shortening it removes older entries at the next clean-up.",
   "core.settings.webhooks.timeout.label": "Wait for a webhook to answer",
-  "core.settings.webhooks.timeout.help": "How long to wait for the receiving address to answer before the try counts as failed."
+  "core.settings.webhooks.timeout.help": "How long to wait for the receiving address to answer before the try counts as failed.",
+  "core.latecomers.any-time": "Latecomers are let in at any time.",
+  "core.latecomers.suitable-point": "Latecomers are let in at a suitable point.",
+  "core.latecomers.interval": "Latecomers are let in at the interval.",
+  "core.latecomers.not-admitted": "Latecomers are not let in.",
+  "core.latecomers.short.any-time": "Any time",
+  "core.latecomers.short.suitable-point": "At a suitable point",
+  "core.latecomers.short.interval": "At the interval",
+  "core.latecomers.short.not-admitted": "Not let in",
+  "core.latecomers.rules": "Our house rules"
 }
