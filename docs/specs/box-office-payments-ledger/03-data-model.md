@@ -49,6 +49,7 @@ Since a person may now be several stored ids, everything that reads, counts or l
 | `box_office_scans` | operational | none | yes | kept |
 | `box_office_passes` | audience | `account_id` | no | keep-row |
 | `box_office_pass_redemptions` | audience | via `pass_id` | no | kept |
+| `box_office_pass_covers` | audience | via `order_id` | no | kept |
 | `box_office_comp_requests` | operational | `for_account_id` | no | keep-row |
 | `box_office_waitlist_entries` | audience | email: `contact_email` | no | delete-row; also deleted `box-office.retention.waiting-list` after the performance |
 | `box_office_seating_plans`, `_plan_seats`, `_performance_seats` | operational | none | no (guarded) | kept |
@@ -88,6 +89,7 @@ Foundations amended the id format on 16 November: every id is `<prefix>_<26 char
 | `box_office_passes` | `pass` | `finance_periods` | `fpe` |
 | `box_office_pass_redemptions` | `psr` | `finance_period_closes` | `pcl` |
 | `box_office_comp_requests` | `comp` | `finance_tax_codes` | `tax` |
+| `box_office_pass_covers` | `pcv` |  |  |
 | `box_office_waitlist_entries` | `wle` |  |  |
 
 `payments_intent_parts` has the prefix `pip`. With it, the list above is the final table list for the three modules.
@@ -386,6 +388,18 @@ A season ticket or a multi-show pass as a product.
 | `pass_id` | text | not null | Internal | keep |
 | `production_id` | text | unique with `pass_id` among live rows when the pass is one per production | Internal | keep |
 | `state` | text | `live`, `released` | Internal | keep |
+
+### `box_office_pass_covers` (guarded)
+
+A ticket someone already held that a pass now covers (part 4, "Using a pass for tickets already held"). The pass also gains `credit_minor`, what paid tickets took off its price, which stays 0 until paid tickets can be switched.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `pass_id`, `line_id` | ref | not null; one `applied` row per line | Internal | keep |
+| `order_id` | text | not null; the ticket's booking | Internal | keep |
+| `asked_on` | text | the booking buying the pass, while `held` | Internal | keep |
+| `was_minor`, `credit_minor`, `refund_minor` | integer | the ticket's price, and what of it paid towards the pass or went back; CHECK credit + refund within was | Internal | keep |
+| `state` | text | `held`, `applied`, `lapsed`, `undone` | Internal | keep |
 
 ### `box_office_comp_requests` (guarded)
 

@@ -40,7 +40,7 @@ export interface PassBuy {
 type Buyer = { channel: 'online' | 'desk', account: string | null }
 
 /** Whether a pass covers a performance: its dates, and its shows, season or everything. */
-function covers(type: PassType, performance: { startsAt: number }, production: { id: string, seasonId: string | null }): boolean {
+export function covers(type: PassType, performance: { startsAt: number }, production: { id: string, seasonId: string | null }): boolean {
   return (type.coversFrom === null || performance.startsAt >= type.coversFrom) && (type.coversUntil === null || performance.startsAt < type.coversUntil)
     && (type.covers === 'dates' || (type.covers === 'season' && type.seasonId === production.seasonId) || (type.covers === 'productions' && type.productionIds.includes(production.id)))
 }

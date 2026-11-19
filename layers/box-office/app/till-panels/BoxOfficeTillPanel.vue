@@ -191,6 +191,7 @@ const passBody = () => ({
   ...(passEntries.value.length ? { passes: passEntries.value.map(p => ({ code: p.code })) } : {}),
   ...(passBuys.value.length ? { buy: passBuys.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.entry ? {} : { entry: false }), ...(b.holder ? ('email' in b.holder ? { email: b.holder.email } : { accountId: b.holder.accountId }) : {}), ...(b.reference ? { reference: b.reference } : {}) })) } : {}),
   ...(passCollect.value.length ? { collect: passCollect.value.map(p => p.code) } : {}),
+  ...(passBuys.value.some(b => b.cover?.length) ? { cover: passBuys.value.flatMap(b => b.cover ?? []) } : {}),
 })
 const passReceipt = (detail: string): ReceiptLine[] => [
   ...passEntries.value.flatMap(p => [
@@ -325,7 +326,7 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
 }
 
 // The passes in a sale picked up after a reload, found again by their codes; a pass sold, by its kind.
-async function restorePasses(value: { passes?: unknown, buy?: unknown, collect?: unknown }) {
+async function restorePasses(value: { passes?: unknown, buy?: unknown, collect?: unknown, cover?: unknown }) {
   const codes = (list: unknown) => (Array.isArray(list) ? list.map(x => (typeof x === 'string' ? x : (x as { code?: unknown })?.code)).filter((c): c is string => typeof c === 'string') : [])
   const look = async (list: unknown) => (await Promise.all(codes(list).map(c => lookPass(c)))).filter((p): p is TillPass => !!p)
   passEntries.value = await look(value.passes)
@@ -339,6 +340,9 @@ async function restorePasses(value: { passes?: unknown, buy?: unknown, collect?:
     const holder = b.email ? { email: b.email } : b.accountId ? { accountId: b.accountId, label: t('box-office.screens.panel.holder.restored') } : undefined
     return [{ passTypeId: type.id, passPriceId: price.id, name: type.name, priceName: price.name, amountMinor: price.amountMinor, entry: b.entry !== false, ...(holder ? { holder } : {}), ...(b.reference ? { reference: b.reference } : {}) }]
   })
+  // The sale's tickets to cover ride with its first pass; the server matches them to the passes again.
+  const cover = Array.isArray(value.cover) ? value.cover.filter((c): c is string => typeof c === 'string') : []
+  if (cover.length && passBuys.value[0]) passBuys.value[0] = { ...passBuys.value[0], cover }
 }
 
 // The till empties every panel after a sale, and when the seller clears the sale.

@@ -333,7 +333,21 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'Your {{ pass }} for {{ theatre }}',
-          body: 'Here is your **{{ pass }}** ({{ price }}).\n\nYour pass code is **{{ code }}**\n\n{{ paid }}\n\nThe pass gives you one entry at each performance it covers. You still need to reserve: choose a performance on our website and add the pass with this code, or give the code at the box office. Bring your ticket on the night, not the pass.',
+          body: 'Here is your **{{ pass }}** ({{ price }}).\n\nYour pass code is **{{ code }}**\n\n{{ paid }}\n\nThe pass gives you one entry at each performance it covers. You still need to reserve: choose a performance on our website and add the pass with this code, or give the code at the box office. Bring your ticket on the night, not the pass.\n\nAlready have tickets for other shows this pass covers? Use your pass for them from Your passes, in your account.',
+        },
+      },
+    }, {
+      // Tickets someone already had are now covered by their pass (Matt, 19 November).
+      id: 'box-office.pass-covered',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      lane: 'prompt' as const,
+      variables: { pass: 'text' as const, tickets: 'text' as const, reference: 'text' as const, money: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your {{ pass }} now covers booking {{ reference }}',
+          body: 'Your **{{ pass }}** now covers {{ tickets }}, on booking {{ reference }}.\n\nYour seat and your ticket have not changed.\n\n{{ money }}',
         },
       },
     }, {

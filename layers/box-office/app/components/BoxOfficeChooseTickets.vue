@@ -57,6 +57,8 @@ const buying = ref<BoughtPass[]>([])
 // ticket's count, and its reference with it (Matt, 19 November), so the count of people stays.
 const swaps = ref<PassSwap[]>([])
 const swapped = computed(() => swaps.value.reduce((sum, s) => sum + s.count, 0))
+// Tickets the signed-in buyer already has for other shows, for the passes swapped for to cover (Matt, 19 November).
+const covered = ref<string[]>([])
 const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length + buying.value.length + swapped.value)
 // A pass type with a price offered instead of a ticket is offered as a swap; any other as a pass to add.
 const swappable = computed(() => (data.value?.passes.onSale ?? []).filter(p => p.prices.some(price => price.insteadOf.length)))
@@ -220,7 +222,7 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: asked.value.lines.filter(c => c.quantity > 0).map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length || asked.value.buys.length ? { buy: [...buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })), ...asked.value.buys] } : {}) },
+      body: { performanceId: performanceId.value, lines: asked.value.lines.filter(c => c.quantity > 0).map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length || asked.value.buys.length ? { buy: [...buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })), ...asked.value.buys] } : {}), ...(covered.value.length && asked.value.buys.length ? { cover: covered.value } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     // Changing tickets: the new ones are held, so the old basket is let go.
@@ -418,6 +420,13 @@ async function hold() {
         :chosen="kinds"
         :currency="currency"
         @count="setSwapCount"
+      />
+      <BoxOfficePassCovers
+        v-if="viewer.signedIn && swaps.length && !holdsOwn"
+        v-model="covered"
+        :performance-id="performanceId"
+        :swaps="swaps"
+        :currency="currency"
       />
       <p
         v-if="swapReferencesMissing"

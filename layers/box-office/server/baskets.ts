@@ -15,6 +15,7 @@ import { entitle, type Buyer, type Requirement } from './entitlement'
 import { describeSavings, priceTickets, redeemTickets, unpriced, type PricedTickets } from './promotions'
 import { sellableTypes, soldOn } from './ticket-types'
 import { addPassSales, carryOwed, owedHere, passSalesOn, planPassBuys, type Owed, type PassBuy, type PlannedPass } from './pass-sales'
+import { holdCovers, planCovers, type PlannedCover } from './pass-covers'
 import { judgePasses, letGoBaskets, passEntryTypeId, redeemPasses, type JudgedPass, type PassAsk } from './pass-entries'
 import { WHEELCHAIR_TYPE } from './prices'
 
@@ -25,7 +26,7 @@ import { WHEELCHAIR_TYPE } from './prices'
  */
 export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[], holders?: string[] }
 /** `promoCode`, as the buyer typed it (BO-17). `passes`: each gives one entry at no charge (BO-64). */
-export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string, passes?: PassAsk[], /** Passes bought with this booking, each giving its first entry here. */ buy?: PassBuy[] }
+export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string, passes?: PassAsk[], /** Passes bought with this booking, each giving its first entry here. */ buy?: PassBuy[], /** Tickets the holder already has for other shows, to be covered by the passes bought here. */ cover?: string[] }
 
 export interface Basket {
   orderId: string
@@ -167,6 +168,8 @@ export interface OrderPlan {
   planned: PlannedPass[]
   /** What the passes used here still owe, collected with this order. */
   owed: Owed[]
+  /** Tickets already held that the passes bought here will cover once this order is reserved or paid. */
+  covers: PlannedCover[]
   requests: { poolId: string, quantity: number }[]
   /** Tickets and passes together. */
   totalMinor: number
@@ -202,8 +205,9 @@ export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { pe
   const charged = lines.map((l, i) => entryOf[i] ? 0 : l.amountMinor - (discounts[i] ?? 0))
   const requests = [...asked.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), ...ordinary.map(e => ({ poolId: pool.get(e.bandId)!.id, quantity: 1 }))]
   const owed = await owedHere(used, at)
+  const covers = await planCovers(input.cover ?? [], planned, { id: input.performanceId, productionId: performance.productionId }, at)
   const totalMinor = charged.reduce((sum, amount) => sum + amount, 0) + planned.reduce((sum, p) => sum + p.amountMinor, 0) + owed.reduce((sum, o) => sum + o.pass.owedMinor, 0)
-  return { performanceId: input.performanceId, productionId: performance.productionId, currency, pool, guard, lines, entryOf, tickets, discounts, charged, bought, used, planned, owed, requests, totalMinor }
+  return { performanceId: input.performanceId, productionId: performance.productionId, currency, pool, guard, lines, entryOf, tickets, discounts, charged, bought, used, planned, owed, covers, requests, totalMinor }
 }
 
 /**
@@ -215,6 +219,7 @@ export async function writeOrder(unit: UnitView, plan: OrderPlan, order: { order
   // What is paid for the passes themselves: those bought here, and any used here that is still owed.
   await addPassSales(unit, orderId, plan.planned, order.issuedBy)
   carryOwed(unit, orderId, plan.owed, at)
+  holdCovers(unit, orderId, plan.covers, plan.planned, order.issuedBy)
   // A basket left holding an entry of one of these passes would stand in the way: it is let go.
   await letGoBaskets(unit, plan.entryOf.filter(p => p !== null), plan.performanceId, plan.productionId, at)
   const claimed = plan.requests.length ? (await claimSeats(unit, { holdId: order.holdId, requests: plan.requests, expiresAt: order.expiresAt })).flat() : []

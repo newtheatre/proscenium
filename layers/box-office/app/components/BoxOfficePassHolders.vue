@@ -194,6 +194,12 @@ const describe = (h: Holder) => [
               />
             </RecordList>
           </section>
+          <BoxOfficePassCoverPanel
+            v-if="picked.pass.state === 'active' && picked.pass.accountId"
+            :pass-id="picked.pass.id"
+            mode="staff"
+            @covered="show(picked.pass.id); load(); emit('changed')"
+          />
           <UFormField
             v-if="moving"
             :label="t('box-office.passes.holders.move-to')"
