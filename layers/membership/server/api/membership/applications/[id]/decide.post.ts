@@ -3,6 +3,7 @@
 // Declining is final; the person may apply again. Every decision is a verification row.
 // Passing an ID the list did not hold can add it to the list (addToList), as an entry staff added:
 // claimed by this membership, ending when it ends, and kept through file loads until a file holds it.
+// Staff may set the end date on passing (endsOn), such as when the union's membership ends.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, first, newId, nowMs, refuse, today, useSetting, type UnitView } from '#kit'
@@ -20,6 +21,8 @@ export default defineRoute({
     note: z.string().trim().max(500).nullish(), // not-policy: the bound of a staff note
     // For an ID the list did not hold: add it to the list as well.
     addToList: z.boolean().optional(),
+    // When the membership ends, in place of the one its length or the list entry gives.
+    endsOn: z.iso.date().optional(),
   }),
 }, async (_event, { input, actor, record, unit }) => {
   const row = await first<{ account_id: string, scheme_id: string, state: string, needs_approval: number, approved_at: number | null, needs_payment: number, paid_at: number | null, count: number | null, entry_ends: string | null, verifier: string | null, reason: string | null, reference: string | null, account_name: string | null }>(
@@ -44,6 +47,8 @@ export default defineRoute({
     return { state: 'declined' }
   }
   const scheme = await requireScheme(row!.scheme_id)
+  const startsOn = await today()
+  if (input.endsOn && input.endsOn <= startsOn) refuse('membership.application.ends-before-start', 'The end date must be after today.', { status: 422, fields: { endsOn: 'membership.application.ends-before-start' } })
   // The ID the list did not hold, added for this membership; its check then names the new entry.
   const added = input.addToList && row!.reason === 'not-on-list' && row!.reference ? await addEntry(unit, scheme, record!.id, row!.reference, row!.account_name) : null
   recordOutcome(unit, record!.id, { outcome: 'passed', verifier, entryId: added?.entryId, reference: row!.reference ?? undefined }, actor.accountId, note)
@@ -57,14 +62,15 @@ export default defineRoute({
   const unpaid = !!row!.needs_payment && row!.paid_at === null
   const unapproved = !!row!.needs_approval && row!.approved_at === null
   if (unapproved || unpaid) {
+    if (input.endsOn) refuse('membership.application.ends-on-later', 'This membership does not start yet, so its end date is set when it does.', { status: 409, fields: { endsOn: 'membership.application.ends-on-later' } })
     const at = nowMs()
     const expiresAt = unpaid && !unapproved ? at + (await useSetting('membership.applications.expire-after') as number) * 1000 : null // not-policy: seconds to milliseconds
     unit.add({ sql: 'UPDATE membership_memberships SET verified_at = ?, expires_at = ?, updated_at = ? WHERE id = ? AND state = \'pending\'', params: [at, expiresAt, at, record!.id] }).expect(1)
     return { state: 'pending', waiting: unapproved ? 'approval' : 'payment' }
   }
   const dates = await activatePending(unit, {
-    id: record!.id, scheme, accountId: row!.account_id, count: row!.count ?? 1, startsOn: await today(),
-    ...(row!.entry_ends ? { endsOn: row!.entry_ends } : {}),
+    id: record!.id, scheme, accountId: row!.account_id, count: row!.count ?? 1, startsOn,
+    ...(input.endsOn ? { endsOn: input.endsOn } : row!.entry_ends ? { endsOn: row!.entry_ends } : {}),
   })
   // The entry added for it ends when the membership does.
   if (added?.fresh) unit.add({ sql: 'UPDATE membership_verification_entries SET ends_on = ? WHERE id = ?', params: [dates.endsOn, added.entryId] })
