@@ -90,6 +90,16 @@ function takeOne(row: PerformanceRow) {
   for (const list of [holders.value[keyOf(row)], references.value[keyOf(row)]]) if (list && list.length > n) list.splice(Math.max(n, 0))
   if (n <= 0 && lastAdded.value === keyOf(row)) lastAdded.value = null
 }
+// One ticket waiting to be named comes off, and who the later ones are for moves up with them.
+// `removed` keys the pickers afresh, so a half-finished answer stays with the ticket it was for.
+const removed = ref(0)
+function removeAt(row: PerformanceRow, index: number) {
+  removed.value++
+  for (const list of [holders.value[keyOf(row)], references.value[keyOf(row)]]) if (list && list.length > index) list.splice(index, 1)
+  const n = (quantities.value[keyOf(row)] ?? 0) - 1
+  setQuantity(row, n)
+  if (n <= 0 && lastAdded.value === keyOf(row)) lastAdded.value = null
+}
 // The sale's tickets by kind, for the offer to swap one for a pass; and taking one out when it is.
 const saleTickets = computed(() => {
   const out: { ticketTypeId: string, name: string, amountMinor: number, quantity: number }[] = []
@@ -980,7 +990,7 @@ function clear() {
             </h4>
             <div
               v-for="n in quantities[keyOf(row)]"
-              :key="n"
+              :key="`${removed} ${n}`"
               class="space-y-1"
             >
               <BoxOfficeHolderPicker
@@ -991,19 +1001,33 @@ function clear() {
                 :label="t(row.companion ? 'box-office.screens.panel.holder.companion-ticket' : 'box-office.screens.panel.holder.ticket', { n })"
                 :companion="row.companion"
                 :disabled="locked"
+                :remove-label="t(row.companion ? 'box-office.screens.panel.holder.companion-remove' : 'box-office.screens.panel.holder.remove', { n })"
                 @update:model-value="(h: Holder | undefined) => setHolder(row, n - 1, h)"
+                @remove="removeAt(row, n - 1)"
               />
-              <UInput
+              <div
                 v-if="row.reference && !holders[keyOf(row)]?.[n - 1]"
-                :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                :aria-label="t('box-office.screens.panel.reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label, n })"
-                :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label })"
-                :disabled="locked"
-                autocomplete="off"
-                maxlength="64"
-                class="block w-64"
-                @update:model-value="setReference(row, n - 1, String($event))"
-              />
+                class="flex items-center gap-2"
+              >
+                <UInput
+                  :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
+                  :aria-label="t('box-office.screens.panel.reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label, n })"
+                  :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label })"
+                  :disabled="locked"
+                  autocomplete="off"
+                  maxlength="64"
+                  class="block w-64"
+                  @update:model-value="setReference(row, n - 1, String($event))"
+                />
+                <!-- With a reference typed the picker, and its bin, are hidden. -->
+                <IconButton
+                  v-if="references[keyOf(row)]?.[n - 1]?.trim()"
+                  icon="i-lucide-trash-2"
+                  :label="t('box-office.screens.panel.holder.remove', { n })"
+                  :disabled="locked"
+                  @click="removeAt(row, n - 1)"
+                />
+              </div>
             </div>
             <p
               v-if="unnamed(row)"
