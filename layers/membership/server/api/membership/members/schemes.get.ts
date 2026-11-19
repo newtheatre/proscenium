@@ -3,7 +3,7 @@
 // a reference against. Withdrawn lengths are never offered.
 import { can, defineRoute } from '#kit'
 import { charger } from '../../../charge'
-import { schemeList } from '../../../lists'
+import { nounOf, schemeList } from '../../../lists'
 import { lengthOptions, listSchemes } from '../../../schemes'
 
 export default defineRoute({ ability: 'membership.membership.view', rateLimit: 'default' }, async (_event, { actor }) => {
@@ -23,7 +23,7 @@ export default defineRoute({ ability: 'membership.membership.view', rateLimit: '
       lengthRule: scheme.lengthRule,
       options: (options.get(scheme.id) ?? []).map(o => ({ id: o.id, name: o.name })),
       feesOn: scheme.requiresPayment && fees,
-      reference: list?.keyKind === 'reference' ? { listName: list.name, label: list.referenceLabel } : null,
+      reference: list?.keyKind === 'reference' ? { listName: list.name, label: list.referenceLabel, noun: nounOf(list) } : null,
       canAdd,
       canImport,
     })

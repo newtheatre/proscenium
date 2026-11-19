@@ -92,7 +92,7 @@ describe('the member price', () => {
   it('describes a scheme that accepts a reference with a label that names it, and offers schemes to hosts', async () => {
     const id = await openScheme({ name: 'Friends', key: `friends-${Date.now()}`, side: 'audience', acceptsReference: true })
     const described = await inContext(() => requirements.describe([`membership:${id}`, 'membership:msch_gone']))
-    expect(described[`membership:${id}`]).toEqual({ label: 'Friends', presentable: { label: 'Friends: type your member number to get this price', field: 'Member number', shape: 'member-number' } })
+    expect(described[`membership:${id}`]).toEqual({ label: 'Friends', presentable: { label: 'Friends: type your member number to get this price', field: 'Member number', noun: 'member number', shape: 'member-number' } })
     expect(described['membership:msch_gone']!.label).toBe('A membership no longer offered')
     const options = await inContext(() => requirements.options('membership', 'friends'))
     expect(options.map(o => o.reference)).toContain(`membership:${id}`)

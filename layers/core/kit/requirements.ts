@@ -50,8 +50,9 @@ export interface RequirementDescription {
    * Tells the host to show a field for a value the person presents, and how to label and check it:
    * `label` is the hint beside the price ("Friends: type your member number to get this price"),
    * `field` the field's own name ("Member number"), a whole phrase never set inside a sentence.
+   * `noun` is the short name staff use for it inside a sentence ("student ID").
    */
-  presentable?: { label: string, field?: string, shape: string }
+  presentable?: { label: string, field?: string, noun?: string, shape: string }
 }
 
 /** The contract of a core.requirement contribution. The contribution's id is the source id. */

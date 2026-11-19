@@ -5,7 +5,7 @@ export interface MembershipSchemeChoice {
   lengthRule: 'fixed' | 'rolling' | 'indefinite'
   options: { id: string, name: string }[]
   feesOn: boolean
-  reference: { listName: string, label: string | null } | null
+  reference: { listName: string, label: string | null, noun: string } | null
   canAdd: boolean
   canImport: boolean
 }
