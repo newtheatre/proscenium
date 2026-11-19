@@ -6,7 +6,7 @@
      the booking drawer (`drawer`), where Change tickets and releasing go back a step in the drawer. -->
 <script setup lang="ts">
 import { z } from 'zod'
-import type { BookingDoneOutcome } from '../../utils/booking'
+import type { BookingDoneOutcome } from '../utils/booking'
 
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
 interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number, listMinor?: number, pass?: string }[], passSales?: { name: string, priceName: string, amountMinor: number, fresh: boolean, reserveUnpaid: boolean }[], promo?: { code: string, savingMinor: number } | null }
