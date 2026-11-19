@@ -33,16 +33,16 @@ async function editor() {
 const addressesOf = async (accountId: string) => rows<{ id: string, address: string, verified_at: number | null, added_by: string }>('SELECT id, address, verified_at, added_by FROM core_account_emails WHERE account_id = ? ORDER BY created_at', accountId)
 
 describe('staff change a person\'s details (ID-46)', () => {
-  it('changes the name, known-as name and pronouns, and audits which fields changed but never the words', async () => {
+  it('changes the name and pronouns, and audits which fields changed but never the words', async () => {
     const desk = await editor()
     const personId = await signInByEmail(new Browser())
-    const changed = await desk.browser.patch(`/api/core/accounts/${personId}`, { name: 'Harriet Vane', preferredName: 'Harry', pronouns: 'she/her' })
+    const changed = await desk.browser.patch(`/api/core/accounts/${personId}`, { name: 'Harriet Vane', pronouns: 'she/her' })
     expect(changed.status).toBe(200)
     const shown = (await desk.browser.get(`/api/core/accounts/${personId}`)).body
-    expect({ name: shown.name, preferredName: shown.preferredName, pronouns: shown.pronouns }).toEqual({ name: 'Harriet Vane', preferredName: 'Harry', pronouns: 'she/her' })
+    expect({ name: shown.name, pronouns: shown.pronouns }).toEqual({ name: 'Harriet Vane', pronouns: 'she/her' })
     const [audit] = await rows<{ detail: string, ability: string }>('SELECT detail, ability FROM core_audit WHERE action = \'update\' AND record_id = ? AND actor_account_id = ?', personId, desk.accountId)
     expect(audit!.ability).toBe('core.account.update')
-    expect(JSON.parse(audit!.detail).fields.sort()).toEqual(['name', 'preferredName', 'pronouns'])
+    expect(JSON.parse(audit!.detail).fields.sort()).toEqual(['name', 'pronouns'])
     expect(audit!.detail).not.toContain('Harriet')
   })
 

@@ -7,7 +7,7 @@ import type { RefusalView } from '../../../utils/refusal'
 
 definePageMeta({ layout: 'console' })
 
-interface Side { id: string, name: string | null, preferredName: string | null, createdAt: number, claimed: boolean, disabled: boolean }
+interface Side { id: string, name: string | null, createdAt: number, claimed: boolean, disabled: boolean }
 interface Preview { survivor: Side | null, mergedAccount: Side | null, moves: { table: string, column: string, action: string, rows: number }[] }
 
 const { t } = useT()
@@ -23,7 +23,7 @@ const preview = ref<Preview | null>(null)
 const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
 
-const labelOf = (s: Side | null) => s?.preferredName || s?.name || t('core.merges.unnamed')
+const labelOf = (s: Side | null) => s?.name || t('core.merges.unnamed')
 const { dayLong: day } = useDates()
 const moving = computed(() => (preview.value?.moves ?? []).reduce((n, m) => n + m.rows, 0))
 

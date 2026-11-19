@@ -395,7 +395,7 @@ export async function reviewQueue() {
   const replyWithin = await useSetting('core.access-scheme.reply-within') as number
   const at = nowMs()
   const rows = await all<{ account_id: string, status: string, submitted_at: number, submitted_via: string, name: string | null }>(
-    `SELECT p.account_id, p.status, p.submitted_at, p.submitted_via, coalesce(a.preferred_name, a.name) AS name
+    `SELECT p.account_id, p.status, p.submitted_at, p.submitted_via, a.name AS name
        FROM core_access_profiles p JOIN core_accounts a ON a.id = p.account_id
       WHERE p.status = 'submitted' OR (p.status = 'accepted' AND p.pending IS NOT NULL)
       ORDER BY p.submitted_at`,

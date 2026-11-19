@@ -10,7 +10,7 @@ export default {
       `SELECT a.id, a.name, a.preferred_name, a.anonymised_at FROM core_accounts a
         WHERE a.id = (SELECT coalesce(merged_into_id, id) FROM core_accounts WHERE id = ?)`, id)
     if (!row) return null
-    const title = row.anonymised_at ? 'Former member' : row.preferred_name || row.name || 'Unnamed person'
+    const title = row.anonymised_at ? 'Former member' : row.name || 'Unnamed person'
     return { title, to: `/console/people/${row.id}` }
   },
 } satisfies RecordResolver

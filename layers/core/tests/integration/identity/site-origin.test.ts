@@ -36,9 +36,9 @@ describe('the site\'s one origin', () => {
   it('refuses a change sent on another host once recorded, and allows it before', async () => {
     const browser = new Browser()
     await signInByEmail(browser)
-    expect((await browser.patch('/api/core/me', { preferredName: 'Pat' })).status).toBe(200)
+    expect((await browser.patch('/api/core/me', { pronouns: 'they/them' })).status).toBe(200)
     await setSetting('core.site.origin', 'https://tickets.example.org')
-    const refused = await browser.patch('/api/core/me', { preferredName: 'Sam' })
+    const refused = await browser.patch('/api/core/me', { pronouns: 'she/her' })
     expect(refused.status).toBe(403)
     expect(refused.body).toMatchObject({ code: 'core.access.wrong-origin', remedy: 'Use https://tickets.example.org.' })
   })

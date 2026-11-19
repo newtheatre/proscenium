@@ -52,7 +52,7 @@ export async function canonicalAccount(id: string): Promise<string> {
 export async function accountLabel(id: string): Promise<string> {
   const row = await accountById(await canonicalAccount(id))
   if (!row || row.anonymised_at) return 'Former member'
-  return row.preferred_name || row.name || 'Unnamed person'
+  return row.name || 'Unnamed person'
 }
 
 export interface AddressRow { id: string, account_id: string, address: string, verified_at: number | null }

@@ -71,7 +71,7 @@ One row per person. Kept for ever as a tombstone after erasure, so that history 
 | --- | --- | --- | --- | --- |
 | id | id | Primary key | Internal | Kept |
 | name | text | Not null while live; 1 to 120 characters | Personal | Set to null |
-| preferred\_name | text | Null; up to 60 characters | Personal | Set to null |
+| preferred\_name | text | Null; up to 60 characters. Kept but no longer asked for or shown (ID-11) | Personal | Set to null |
 | phone | text | Null; stored in international form | Personal | Set to null |
 | locale | text | Null; a language tag the platform ships | Internal | Set to null |
 | audience\_email\_id | id | Null; refers to a core\_account\_emails row of this account | Internal | Set to null |

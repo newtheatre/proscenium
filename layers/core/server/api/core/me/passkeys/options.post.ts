@@ -11,6 +11,6 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.
   if (!session.limited) await requireFresh(actor)
   const account = await accountById(session.accountId)
   const [address] = await verifiedAddressesOf(session.accountId)
-  const label = account?.preferred_name || account?.name || address || session.accountId
+  const label = account?.name || address || session.accountId
   return registrationOptions(unit, event, { purpose: 'register', accountId: session.accountId, userId: session.accountId, userName: address ?? label, displayName: label })
 })

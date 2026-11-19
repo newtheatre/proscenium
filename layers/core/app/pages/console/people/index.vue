@@ -8,7 +8,7 @@ import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
 definePageMeta({ layout: 'console' })
 
 type State = 'active' | 'unclaimed' | 'disabled' | 'anonymised'
-interface Row { id: string, name: string | null, preferredName: string | null, since: number, state: State }
+interface Row { id: string, name: string | null, since: number, state: State }
 
 const { t } = useT()
 const { day } = useDates()
@@ -94,13 +94,6 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     </template>
     <template #cell-name="{ row }">
       <span>{{ label(row) }}</span>
-      <span
-        v-if="row.preferredName && row.preferredName !== row.name"
-        class="text-sm text-muted"
-      > · {{ row.preferredName }}</span>
-    </template>
-    <template #cell-preferredName="{ row }">
-      {{ row.preferredName }}
     </template>
     <template #cell-state="{ row }">
       <StatusBadge

@@ -12,7 +12,7 @@ export default {
   allowed: async actor => (await can(actor, 'core.account.search')).allowed,
   search: async text => (await searchAccounts(text)).filter(p => !p.disabled).map(p => ({ id: p.id, label: p.label })),
   async labels(ids) {
-    const rows = await all<{ id: string, label: string | null }>('SELECT id, COALESCE(preferred_name, name) AS label FROM core_accounts WHERE id IN (SELECT value FROM json_each(?)) AND anonymised_at IS NULL', JSON.stringify(ids))
+    const rows = await all<{ id: string, label: string | null }>('SELECT id, name AS label FROM core_accounts WHERE id IN (SELECT value FROM json_each(?)) AND anonymised_at IS NULL', JSON.stringify(ids))
     return Object.fromEntries(rows.map(r => [r.id, r.label ?? 'Unnamed person']))
   },
 } satisfies FormsSource

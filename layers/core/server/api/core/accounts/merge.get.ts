@@ -12,6 +12,6 @@ export default defineRoute({
 }, async (_event, { input, actor }) => {
   await requireAbility(actor, 'core.account.merge', ['core.account', input.mergedAccountId])
   const preview = await mergePreview(input.survivorId, input.mergedAccountId)
-  const side = (a: typeof preview.survivor) => a && { id: a.id, name: a.name, preferredName: a.preferred_name, createdAt: a.created_at, claimed: !!a.first_signed_in_at, disabled: !!a.disabled_at }
+  const side = (a: typeof preview.survivor) => a && { id: a.id, name: a.name, createdAt: a.created_at, claimed: !!a.first_signed_in_at, disabled: !!a.disabled_at }
   return { survivor: side(preview.survivor), mergedAccount: side(preview.mergedAccount), moves: preview.moves }
 })

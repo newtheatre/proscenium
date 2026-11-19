@@ -91,7 +91,7 @@ As the person who runs the deployment, I can get an Owner back in when every Own
 
 ### ID-11 Edit my details (first release)
 
-- A person can change their name, the name they are known by, and pronouns.
+- A person can change their name and pronouns. There is no "known as" name (Matt, 19 November 2026): it is not asked for or shown, and one already held is kept but never used as a label; it may return later with crediting.
 - A change shows at once everywhere the account's label is used.
 
 ### ID-12 Manage my email addresses (first release)
@@ -316,7 +316,7 @@ This is the eight separation rules in part 3, as one story.
 
 Matt, 19 November 2026: staff could merge accounts but not correct them.
 
-- Staff with `core.account.update` change a person's name, the name they are known by and pronouns on the person's page, with the limits of ID-11. Undo puts the previous values back. The name can be corrected but never emptied.
+- Staff with `core.account.update` change a person's name and pronouns on the person's page, with the limits of ID-11. Undo puts the previous values back. The name can be corrected but never emptied.
 - Staff add an email address for a person. It is sent its link and does nothing until the link is used, as in ID-12; every verified address on the account is told that a new address was added by the theatre's staff.
 - An address held by another account is refused with that account's id, and the page offers to merge the two. Staff already see both accounts, so nothing is revealed.
 - Staff choose which verified address the theatre writes to (the old one is told, and Undo switches back) and remove an address, under ID-12's rules: never the one written to, never the last verified one.

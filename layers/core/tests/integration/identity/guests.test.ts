@@ -162,7 +162,7 @@ describe('adding and inviting people (ID-06)', () => {
     expect(used.status).toBe(200)
     // The landing says who invited them and to what (AC-9).
     const inviter = (await owner.browser.get('/api/core/me')).body.account
-    expect(used.body.invitation).toEqual({ by: inviter.preferredName || inviter.name, roles: ['Front of house lead'] })
+    expect(used.body.invitation).toEqual({ by: inviter.name, roles: ['Front of house lead'] })
     expect((await browser.get('/api/core/me')).body.account.id).toBe(given.body.accountId)
     expect((await browser.get('/api/core/roles')).status).toBe(200)
     // It works once.
