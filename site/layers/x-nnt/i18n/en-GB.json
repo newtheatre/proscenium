@@ -1,0 +1,4 @@
+{
+  "x-nnt.module.name": "New Theatre move",
+  "x-nnt.module.description": "Keeps the old system's emailed ticket and pass links working while the site moves. Removed after the last show of the autumn term."
+}
