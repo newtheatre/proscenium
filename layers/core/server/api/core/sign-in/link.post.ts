@@ -1,5 +1,5 @@
-// Use the link from a sign-in email. The landing page posts the token, so a mail scanner that
-// opens the link signs nobody in and spends nothing.
+// Use the link from a sign-in email. The landing page posts the token only on a press, because
+// mail scanners open links in a real browser.
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { useLink } from '../../../identity/email-sign-in'
