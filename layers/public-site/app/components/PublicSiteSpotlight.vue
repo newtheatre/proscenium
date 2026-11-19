@@ -119,6 +119,7 @@ const priceLine = computed(() => (props.show.price ? priceSummary(props.show.pri
             :to="`${to}#dates`"
             :label="t('public-site.whats-on.book')"
             size="lg"
+            class="public-spotlight-book"
           />
           <UButton
             :to="to"

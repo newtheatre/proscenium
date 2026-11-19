@@ -486,8 +486,8 @@ phone the poster sits small beside the title, so the title, the facts and Book a
 
 A theatre restyles the band with CSS rather than copying the component. The hooks are
 `public-show-top` (the band), `public-show-poster`, `public-show-title`, `public-show-actions` and
-`public-show-book` on the show's page, and `public-spotlight`, `public-spotlight-poster` and
-`public-spotlight-title` on what's on.
+`public-show-book` on the show's page, and `public-spotlight`, `public-spotlight-poster`,
+`public-spotlight-title` and `public-spotlight-book` on what's on.
 
 ## Seams for Identity
 
