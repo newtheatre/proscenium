@@ -7,7 +7,9 @@
      (Box office's Sell shows only its own); live mode draws the panels as tabs over the one basket,
      each with its larger live panel where its module has one. Coming to the till opens the seller's
      session if none is open, at the place this device used last; a strip above the panels says which
-     session sales go into and lets the seller move it.
+     session sales go into and lets the seller move it. The session is the seller's, not the device's:
+     every device they sell on shares it, asks after it every few seconds and when shown again, and
+     follows its place, while a sale stays with the device that started it.
 
      The sale is one receipt beside the panels (till proposal, 17 November 2026): grouped by panel,
      with the ways to pay on it, so paying is one press and not "take payment" and then a choice. A
@@ -15,7 +17,7 @@
      appear at once, before the server has answered with the total. On a narrow screen the receipt
      is a sheet, and a bar at the foot says what was last added, with an undo, and takes payment. -->
 <script setup lang="ts">
-import { createReusableTemplate, useMediaQuery, useResizeObserver } from '@vueuse/core'
+import { createReusableTemplate, useDocumentVisibility, useIntervalFn, useMediaQuery, useResizeObserver } from '@vueuse/core'
 import type { YourSession } from '../../shared/sessions'
 import type { ReceiptTo } from './PaymentsReceiptTo.vue'
 
@@ -72,6 +74,11 @@ const open = computed(() => session.value?.session?.state === 'open')
 // The till is usable by someone with a session open or who may open one: the session itself waits
 // for the first sale, so coming to the till by mistake leaves nothing behind.
 const usable = computed(() => open.value || !!session.value?.mayOpen)
+// The seller's other devices open, move and sell in the same session, so the strip asks again.
+const SESSION_REFRESH = 15_000 // not-policy: how often the till asks after the shared session
+const visibility = useDocumentVisibility()
+useIntervalFn(() => { if (visibility.value === 'visible') void refreshSession() }, SESSION_REFRESH)
+watch(visibility, (now) => { if (now === 'visible') void refreshSession() })
 const { time } = useDates()
 
 // The place this device last sold at, where its next session opens.
@@ -83,7 +90,19 @@ function deviceSpace(): string | null {
 const nextPlace = ref<string | null>(null)
 // With no place of its own, the device shows where the session would open: the default space, or
 // the theatre's only space.
-onMounted(() => { nextPlace.value = deviceSpace() ?? session.value?.defaultSpaceId ?? null })
+onMounted(() => {
+  if (open.value && session.value?.session) remember(session.value.session.spaceId)
+  else nextPlace.value = deviceSpace() ?? session.value?.defaultSpaceId ?? null
+})
+function remember(spaceId: string | null) {
+  try { localStorage.setItem(SPACE_KEY, spaceId ?? '') }
+  catch { /* storage refused: the next session opens at the default */ }
+  nextPlace.value = spaceId
+}
+// Moved on another of the seller's devices: this one follows, so a session reopened here opens there too.
+watch(() => (open.value ? session.value?.session?.spaceId : undefined), (spaceId) => {
+  if (spaceId !== undefined && spaceId !== deviceSpace()) remember(spaceId)
+})
 /** Opens the seller's session if none is open, at this device's place. True once one is. */
 async function ensureSession(): Promise<boolean> {
   if (open.value) return true
@@ -95,9 +114,7 @@ async function ensureSession(): Promise<boolean> {
 }
 
 async function move(spaceId: string | null) {
-  try { localStorage.setItem(SPACE_KEY, spaceId ?? '') }
-  catch { /* storage refused: the next session opens at the default */ }
-  nextPlace.value = spaceId
+  remember(spaceId)
   const current = session.value?.session
   if (!current || current.state !== 'open') return
   try {
@@ -358,6 +375,11 @@ function kept(intentId: string): Kept | null {
     return found?.intentId === intentId ? found : null
   }
   catch { return null }
+}
+/** The sale this device is taking: its id, null for none, or undefined where storage cannot say. */
+function keptSale(): string | null | undefined {
+  try { return (JSON.parse(localStorage.getItem(SALE_KEY) ?? 'null') as Kept | null)?.intentId ?? null }
+  catch { return undefined }
 }
 function forget() {
   try { localStorage.removeItem(SALE_KEY) }
@@ -689,10 +711,11 @@ onMounted(() => {
     if (session.value?.session) void resume(intent, said)
     return
   }
-  // A sale left open, such as by reloading the page while taking it, is picked up again so it can be
-  // taken or cancelled; otherwise what it holds, such as a reservation, stays waiting for it.
-  const left = session.value?.unfinished
+  // A sale this device left open, such as by a reload, is picked up again; another device's is left to it.
+  const mine = keptSale()
+  const left = mine === undefined ? session.value?.unfinished : session.value?.openSales?.find(s => s.intentId === mine)
   if (left) void resume(left.intentId, 'reload')
+  else if (mine) forget()
 })
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
