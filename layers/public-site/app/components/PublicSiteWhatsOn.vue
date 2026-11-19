@@ -29,7 +29,7 @@ const props = defineProps<{
   layout?: 'grid' | 'list'
 }>()
 const { t } = useT()
-const { range } = useDates()
+const { span } = useDates()
 const query = computed(() => Object.fromEntries(Object.entries({ limit: props.limit, category: props.category, season: props.season, venue: props.venue }).filter(([, v]) => v !== undefined && v !== '')))
 const key = computed(() => `public-site:whats-on-component:${JSON.stringify(query.value)}`)
 // The public site being off answers "not found"; the component then says only that nothing is on sale.
@@ -55,7 +55,7 @@ const list = computed(() => props.layout === 'list')
           :description="markdownText(p.summary) || p.subtitle"
           :poster="p.poster"
           :price="p.price"
-          :when="range(p.nextStartsAt, p.lastStartsAt)"
+          :when="span(p.nextStartsAt, p.lastStartsAt)"
           :age="p.age"
           :effects="p.hasEffects"
           :warnings="p.hasWarnings"

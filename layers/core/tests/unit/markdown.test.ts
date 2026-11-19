@@ -63,6 +63,16 @@ describe('safety', () => {
     ])
   })
 
+  it('links a bare https address, leaving the sentence\'s full stop outside it', () => {
+    expect(parseInline('Buy it at https://su.example/shop?activity_id=42&category_id=2. Then come back')).toEqual([
+      text('Buy it at '),
+      { type: 'link', href: 'https://su.example/shop?activity_id=42&category_id=2', children: [text('https://su.example/shop?activity_id=42&category_id=2')] },
+      text('. Then come back'),
+    ])
+    expect(parseInline('[https://a.example](https://a.example)')).toEqual([{ type: 'link', href: 'https://a.example', children: [text('https://a.example')] }])
+    expect(parseInline('http://a.example')).toEqual([text('http://a.example')])
+  })
+
   it('makes a link only of https, mailto, tel or a path on this site', () => {
     for (const href of ['https://example.org/a', 'mailto:box@example.org', 'tel:+441234567890', '/whats-on']) expect(isSafeHref(href), href).toBe(true)
     for (const href of ['javascript:alert(1)', 'JAVASCRIPT:alert(1)', 'data:text/html,x', 'http://example.org', '//evil.example', 'vbscript:x', 'relative']) expect(isSafeHref(href), href).toBe(false)

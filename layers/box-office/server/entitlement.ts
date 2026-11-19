@@ -89,7 +89,7 @@ export async function entitle(performanceId: string, lines: readonly { ticketTyp
 }
 
 /** What a holder named at the desk may have of a type: met by their account, or not, with the source's words. */
-export async function holderVerdict(performanceId: string, type: TicketType, accountId: string): Promise<{ met: { ref: string, evidence?: string, limit: number } | null, reason: string | null, unavailable: boolean }> {
+export async function holderVerdict(performanceId: string, type: Pick<TicketType, 'requirementRefs' | 'maxPerHolder'>, accountId: string): Promise<{ met: { ref: string, evidence?: string, limit: number } | null, reason: string | null, unavailable: boolean }> {
   const answers = await requirements.check({ accounts: [accountId], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
   const met = answers.find(a => a.verdict === 'met' && !a.unavailable)
   if (met) return { met: { ref: met.ref, ...(met.evidence ? { evidence: met.evidence } : {}), limit: met.quantity ?? type.maxPerHolder }, reason: null, unavailable: false }

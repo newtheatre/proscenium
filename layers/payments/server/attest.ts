@@ -38,7 +38,7 @@ export async function attest(input: AttestInput): Promise<{ attemptId: string, s
   if (!account?.active || !provider || !provider.capabilities.includes('attested') || !provider.methods.some(m => m.method === input.method && m.channels.includes('desk')))
     throw new Refusal('payments.attempt.method-unavailable', 'That way of paying is not set up here.', { status: 409 })
   if (input.method === 'cash' && !(await useSetting('payments.cash.enabled'))) throw new Refusal('payments.attempt.method-unavailable', 'Cash is not taken at the desk.', { status: 409 })
-  if (input.method !== 'cash' && !(await useSetting('payments.desk.attested-card'))) throw new Refusal('payments.attempt.method-unavailable', 'Card payments on a standalone machine are not recorded here.', { status: 409 })
+  if (input.method === 'card_attested' && !(await useSetting('payments.desk.attested-card'))) throw new Refusal('payments.attempt.method-unavailable', 'Card payments on a standalone machine are not recorded here.', { status: 409 })
 
   const attempts = await all<{ state: string, amount_minor: number }>('SELECT state, amount_minor FROM payments_attempts WHERE intent_id = ?', intent.id)
   if (attempts.some(a => ['started', 'pending', 'unknown'].includes(a.state))) throw new Refusal('payments.attempt.in-flight', 'Another payment for this is still waiting for its answer.', { status: 409 })

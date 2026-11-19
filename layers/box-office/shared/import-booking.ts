@@ -40,5 +40,7 @@ export const importPassSchema = z.object({
   email: z.string().trim().min(3).max(254),
   name: z.string().trim().max(120).nullish(),
   paid: z.boolean(),
+  /** Given free in the other system, whatever it says was paid: held here at no amount, and settled. */
+  gift: z.boolean().optional(),
 })
 export type ImportPass = z.infer<typeof importPassSchema>

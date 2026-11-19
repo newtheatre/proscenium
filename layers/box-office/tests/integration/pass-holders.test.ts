@@ -23,6 +23,7 @@ const handle = server({
 const staff = person(['box-office.pass.manage'])
 const holder = person([])
 const friend = person([])
+const recipient = person([])
 let keys = 0
 async function api(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> = staff) {
   const response = await call(handle, method, path, { actor, body, headers: { 'idempotency-key': `ph${++keys}` } })
@@ -59,6 +60,18 @@ describe('the people who hold a pass', () => {
     expect(mine.body.passes).toMatchObject([{ id: passId, name: 'Season Pass', priceName: 'Adult', code, owedMinor: 3500, entries: [], open: [{ productionId: a.productionId }] }])
     expect((await api('GET', '/api/box-office/passes/mine', undefined, friend)).body.passes).toEqual([])
     expect((await api('GET', `/api/box-office/pass-types/${typeId}/passes`, undefined, holder)).status).toBe(403)
+  })
+
+  it('given as a gift is held at no amount and owes nothing, unlike one paid some other way', async () => {
+    const other = await api('POST', '/api/box-office/pass-types', { name: 'Gift Pass', covers: 'productions', productionIds: [a.productionId], perShow: 'once', prices: [{ name: 'Adult', amountMinor: 3500 }] })
+    const otherPrice = (await rows<{ id: string }>('SELECT id FROM box_office_pass_prices WHERE pass_type_id = ?', other.body.id))[0]!.id
+    const gift = await api('POST', `/api/box-office/pass-types/${other.body.id}/passes`, { passPriceId: otherPrice, accountId: recipient.accountId, gift: true })
+    expect(gift.status, JSON.stringify(gift.body)).toBe(200)
+    const paid = await api('POST', `/api/box-office/pass-types/${other.body.id}/passes`, { passPriceId: otherPrice, accountId: recipient.accountId, settled: true })
+    const held = (await api('GET', `/api/box-office/pass-types/${other.body.id}/passes`)).body.rows
+    expect(held.find((r: any) => r.id === gift.body.id)).toMatchObject({ amountMinor: 0, paidAt: NOV_16 })
+    expect(held.find((r: any) => r.id === paid.body.id)).toMatchObject({ amountMinor: 3500, paidAt: NOV_16 })
+    expect((await api('GET', '/api/box-office/passes/mine', undefined, recipient)).body.passes.map((p: any) => p.owedMinor)).toEqual([0, 0])
   })
 
   it('is listed for staff with what it has booked, and marked paid by hand', async () => {

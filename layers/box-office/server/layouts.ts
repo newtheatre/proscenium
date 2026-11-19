@@ -119,28 +119,36 @@ export async function houseOf(performanceId: string): Promise<number | null> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Applying a layout to a performance
+// Applying a layout to performances
 
-/** The production's wheelchair band, as far as this unit knows: made here earlier, or already there. */
+/** A performance and the wheelchair spaces it is to have; `seats` also gives a layout's seats as its capacity. */
+export interface Placement { performanceId: string, arrangement: Arrangement, own?: boolean, seats?: boolean }
+
+/**
+ * Each production's wheelchair band, made in this unit where it has none: one statement for every
+ * production at once. The unit remembers what it made, since nothing is stored until it runs.
+ */
 type BandMemo = Map<string, string>
 const memos = new WeakMap<UnitView, BandMemo>()
 
-async function wheelchairBand(unit: UnitView, productionId: string): Promise<string> {
+async function wheelchairBands(unit: UnitView, productionIds: string[]): Promise<BandMemo> {
   const memo = memos.get(unit) ?? new Map<string, string>()
   memos.set(unit, memo)
-  const known = memo.get(productionId) ?? (await first<{ id: string }>("SELECT id FROM box_office_bands WHERE production_id = ? AND kind = 'wheelchair' ORDER BY sort, name LIMIT 1", productionId))?.id
-  if (known) {
-    memo.set(productionId, known)
-    return known
+  const fresh: { id: string, productionId: string }[] = []
+  for (const productionId of new Set(productionIds)) {
+    const known = memo.get(productionId) ?? (await first<{ id: string }>("SELECT id FROM box_office_bands WHERE production_id = ? AND kind = 'wheelchair' ORDER BY sort, name LIMIT 1", productionId))?.id
+    if (known) memo.set(productionId, known)
+    else fresh.push({ id: newId('band'), productionId })
   }
-  const id = newId('band')
-  const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_bands (id, production_id, name, kind, sort, created_at, updated_at)
-    SELECT ${id}, ${productionId}, ${WHEELCHAIR_BAND}, 'wheelchair', ${LAST}, ${at}, ${at}
-    WHERE NOT EXISTS (SELECT 1 FROM box_office_bands WHERE production_id = ${productionId} AND name = ${WHEELCHAIR_BAND})`)
-    .expect(1, { code: 'box-office.band.name-taken', reason: `This production already has a section called ${WHEELCHAIR_BAND}.`, remedy: 'Rename that section, then choose the layout again.' })
-  memo.set(productionId, id)
-  return id
+  if (fresh.length) {
+    const at = nowMs()
+    unit.add(sql`INSERT INTO box_office_bands (id, production_id, name, kind, sort, created_at, updated_at)
+      SELECT json_extract(j.value, '$.id'), json_extract(j.value, '$.productionId'), ${WHEELCHAIR_BAND}, 'wheelchair', ${LAST}, ${at}, ${at} FROM json_each(${JSON.stringify(fresh)}) j
+      WHERE NOT EXISTS (SELECT 1 FROM box_office_bands WHERE production_id = json_extract(j.value, '$.productionId') AND name = ${WHEELCHAIR_BAND})`)
+      .expect(fresh.length, { code: 'box-office.band.name-taken', reason: `This production already has a section called ${WHEELCHAIR_BAND}.`, remedy: 'Rename that section, then choose the layout again.' })
+    for (const f of fresh) memo.set(f.productionId, f.id)
+  }
+  return memo
 }
 
 /**
@@ -170,58 +178,104 @@ const bookedSpaces = async (performanceId: string) => (await first<{ claimed: nu
  * as one part of the house also takes the layout's seats as its capacity.
  */
 export async function applyArrangement(unit: UnitView, performanceId: string, arrangement: Arrangement, options: { own?: boolean, seats?: boolean } = {}): Promise<void> {
-  const performance = await getPerformance(performanceId)
-  const { layout } = arrangement
-  if (layout && performance.spaceId !== layout.spaceId) refuse('box-office.layout.other-space', 'That layout is for another space.', { status: 422, fields: { layoutId: 'Choose a layout of the space this performance is in.' } })
+  await applyArrangements(unit, [{ performanceId, arrangement, ...options }])
+}
+
+/**
+ * Gives many performances their wheelchair spaces in a fixed handful of statements, however many
+ * there are (U7): a busy space's performances to come all change with its layouts.
+ */
+export async function applyArrangements(unit: UnitView, placements: readonly Placement[]): Promise<void> {
+  if (!placements.length) return
+  const rowsLimit = await useSetting('core.units.set-rows-limit') as number
+  for (let i = 0; i < placements.length; i += rowsLimit) await applyChunk(unit, placements.slice(i, i + rowsLimit))
+}
+
+async function applyChunk(unit: UnitView, placements: readonly Placement[]): Promise<void> {
   const at = nowMs()
-  const spaces = layout ? null : arrangement.spaces
-  const each = layout ? null : arrangement.seatsEach
-  const own = !!options.own
-  const seatsBandId = await seatsBandOf(performance.productionId, arrangement)
+  const planned = []
+  for (const p of placements) {
+    const performance = await getPerformance(p.performanceId)
+    const { layout } = p.arrangement
+    if (layout && performance.spaceId !== layout.spaceId) refuse('box-office.layout.other-space', 'That layout is for another space.', { status: 422, fields: { layoutId: 'Choose a layout of the space this performance is in.' } })
+    const existing = await first<{ band_id: string, claimed: number }>(
+      'SELECT o.band_id, o.claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind = \'wheelchair\' ORDER BY b.sort, b.name LIMIT 1', p.performanceId)
+    if (existing && existing.claimed > p.arrangement.spaces) refuse(SPACES_BOOKED.code, spacesBooked(existing.claimed, p.arrangement), { status: 409, remedy: SPACES_BOOKED.remedy })
+    let seatPool: { id: string, claimed: number } | undefined
+    if (p.seats && layout && layout.seats !== null) {
+      const seating = await all<{ id: string, claimed: number }>(
+        'SELECT o.id, o.claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind <> \'wheelchair\'', p.performanceId)
+      if (seating.length === 1) seatPool = seating[0]!
+      if (seatPool && seatPool.claimed > layout.seats) refuse('box-office.layout.seats-sold', `${seatPool.claimed} seats are already taken at this performance, more than the ${layout.seats} ${layout.name} has.`, { status: 409 })
+    }
+    planned.push({ ...p, own: !!p.own, layout, performance, existing, seatPool, seatsBandId: await seatsBandOf(performance.productionId, p.arrangement) })
+  }
+
+  const sales = planned.map(p => ({ id: newId('sale'), performanceId: p.performanceId, layoutId: p.layout?.id ?? null, spaces: p.layout ? null : p.arrangement.spaces, each: p.layout ? null : p.arrangement.seatsEach, own: p.own ? 1 : 0, seatsBandId: p.seatsBandId }))
   unit.add(sql`INSERT INTO box_office_performance_sales (id, performance_id, seating, state, layout_id, wheelchair_spaces, seats_per_space, layout_own, seats_band_id, created_at, updated_at)
-    VALUES (${newId('sale')}, ${performanceId}, 'general', 'draft', ${layout?.id ?? null}, ${spaces}, ${each}, ${own}, ${seatsBandId}, ${at}, ${at})
+    SELECT json_extract(value, '$.id'), json_extract(value, '$.performanceId'), 'general', 'draft', json_extract(value, '$.layoutId'), json_extract(value, '$.spaces'), json_extract(value, '$.each'),
+      json_extract(value, '$.own'), json_extract(value, '$.seatsBandId'), ${at}, ${at} FROM json_each(${JSON.stringify(sales)}) WHERE true
     ON CONFLICT (performance_id) DO UPDATE SET layout_id = excluded.layout_id, wheelchair_spaces = excluded.wheelchair_spaces, seats_per_space = excluded.seats_per_space, layout_own = excluded.layout_own,
       seats_band_id = excluded.seats_band_id, updated_at = excluded.updated_at`)
 
-  const existing = await first<{ band_id: string, claimed: number }>(
-    'SELECT o.band_id, o.claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind = \'wheelchair\' ORDER BY b.sort, b.name LIMIT 1', performanceId)
-  if (arrangement.spaces > 0 || existing) {
-    const bandId = existing?.band_id ?? await wheelchairBand(unit, performance.productionId)
+  const spaced = planned.filter(p => p.arrangement.spaces > 0 || p.existing)
+  if (spaced.length) {
+    const bands = await wheelchairBands(unit, spaced.filter(p => !p.existing).map(p => p.performance.productionId))
+    const pools = spaced.map(p => ({ id: newId('pool'), performanceId: p.performanceId, bandId: p.existing?.band_id ?? bands.get(p.performance.productionId)!, capacity: p.arrangement.spaces }))
     // The seats each space takes come from the production's first seating section, unless it names another.
-    unit.add(sql`UPDATE box_office_bands SET displaces_band_id = (SELECT s.id FROM box_office_bands s WHERE s.production_id = ${performance.productionId} AND s.kind = 'standard' ORDER BY s.sort, s.name LIMIT 1), updated_at = ${at}
-      WHERE id = ${bandId} AND displaces_band_id IS NULL AND EXISTS (SELECT 1 FROM box_office_bands s WHERE s.production_id = ${performance.productionId} AND s.kind = 'standard')`)
-    unit.add(sql`INSERT INTO box_office_pools (id, performance_id, band_id, capacity, claimed, created_at, updated_at) VALUES (${newId('pool')}, ${performanceId}, ${bandId}, ${arrangement.spaces}, 0, ${at}, ${at})
+    unit.add(sql`UPDATE box_office_bands SET displaces_band_id = (SELECT s.id FROM box_office_bands s WHERE s.production_id = box_office_bands.production_id AND s.kind = 'standard' ORDER BY s.sort, s.name LIMIT 1), updated_at = ${at}
+      WHERE id IN (SELECT json_extract(value, '$.bandId') FROM json_each(${JSON.stringify(pools)})) AND displaces_band_id IS NULL
+        AND EXISTS (SELECT 1 FROM box_office_bands s WHERE s.production_id = box_office_bands.production_id AND s.kind = 'standard')`)
+    const one = spaced.length === 1 ? spaced[0]! : null
+    unit.add(sql`INSERT INTO box_office_pools (id, performance_id, band_id, capacity, claimed, created_at, updated_at)
+      SELECT json_extract(value, '$.id'), json_extract(value, '$.performanceId'), json_extract(value, '$.bandId'), json_extract(value, '$.capacity'), 0, ${at}, ${at} FROM json_each(${JSON.stringify(pools)}) WHERE true
       ON CONFLICT (performance_id, band_id) DO UPDATE SET capacity = excluded.capacity, updated_at = excluded.updated_at WHERE claimed <= excluded.capacity`)
-      .expect(1, { code: 'box-office.layout.spaces-booked', reason: `${existing?.claimed ?? 'Some'} wheelchair spaces are already booked at this performance, more than the ${arrangement.spaces} ${layout ? layout.name : 'asked for'} has.`, remedy: 'Choose more wheelchair spaces, or move those bookings first.' })
+      .expect(pools.length, { ...SPACES_BOOKED, reason: one ? spacesBooked(one.existing?.claimed ?? null, one.arrangement) : 'Some performances now have more wheelchair spaces booked than they would have.' })
   }
 
-  if (options.seats && layout && layout.seats !== null) {
-    const seating = await all<{ id: string, claimed: number }>(
-      'SELECT o.id, o.claimed FROM box_office_pools o JOIN box_office_bands b ON b.id = o.band_id WHERE o.performance_id = ? AND b.kind <> \'wheelchair\'', performanceId)
-    if (seating.length === 1) {
-      unit.add(sql`UPDATE box_office_pools SET capacity = ${layout.seats}, updated_at = ${at} WHERE id = ${seating[0]!.id} AND claimed <= ${layout.seats}`)
-        .expect(1, { code: 'box-office.layout.seats-sold', reason: `${seating[0]!.claimed} seats are already taken at this performance, more than the ${layout.seats} ${layout.name} has.` })
-    }
+  const seated = planned.filter(p => p.seatPool).map(p => ({ id: p.seatPool!.id, capacity: p.layout!.seats! }))
+  if (seated.length) {
+    unit.add(sql`UPDATE box_office_pools SET capacity = j.capacity, updated_at = ${at}
+      FROM (SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.capacity') AS capacity FROM json_each(${JSON.stringify(seated)})) j
+      WHERE box_office_pools.id = j.id AND box_office_pools.claimed <= j.capacity`)
+      .expect(seated.length, { code: 'box-office.layout.seats-sold', reason: 'More seats are already taken at this performance than the layout has.' })
   }
-  unit.audit({ action: 'update', record: ['core.performance', performanceId], detail: layout ? { layoutId: layout.id, own } : { wheelchairSpaces: arrangement.spaces, seatsPerSpace: arrangement.seatsEach, own } })
+  unit.audit(planned.map(p => ({ action: 'update', record: ['core.performance', p.performanceId] as const, detail: p.layout ? { layoutId: p.layout.id, own: p.own } : { wheelchairSpaces: p.arrangement.spaces, seatsPerSpace: p.arrangement.seatsEach, own: p.own } })))
 }
+
+const SPACES_BOOKED = { code: 'box-office.layout.spaces-booked', remedy: 'Choose more wheelchair spaces, or move those bookings first.' }
+const spacesBooked = (claimed: number | null, arrangement: Arrangement) =>
+  `${claimed ?? 'Some'} wheelchair spaces are already booked at this performance, more than the ${arrangement.spaces} ${arrangement.layout ? arrangement.layout.name : 'asked for'} has.`
+
+type ReapplyOptions = { strict?: boolean, create?: boolean, run?: Choice | null, ignoreOwn?: boolean, seats?: boolean }
 
 /**
  * Works out a performance's wheelchair spaces again and gives them to it. Only a performance set up
  * for sale, unless `create`. Strict, a change below the spaces booked is refused; otherwise such a
  * performance keeps what it has.
  */
-export async function reapply(unit: UnitView, performanceId: string, options: { strict?: boolean, create?: boolean, run?: Choice | null, ignoreOwn?: boolean, seats?: boolean } = {}): Promise<void> {
-  const sales = await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space, seats_band_id FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
-  if (!sales && !options.create) return
-  const { arrangement, from } = await arrangementFor(performanceId, options)
-  if (!arrangement) {
-    if (sales) unit.add(sql`UPDATE box_office_performance_sales SET layout_id = NULL, wheelchair_spaces = NULL, seats_per_space = NULL, seats_band_id = NULL, layout_own = 0, updated_at = ${nowMs()}
-      WHERE performance_id = ${performanceId} AND (layout_id IS NOT NULL OR wheelchair_spaces IS NOT NULL OR layout_own = 1)`)
-    return
+export async function reapply(unit: UnitView, performanceId: string, options: ReapplyOptions = {}): Promise<void> {
+  await reapplyAll(unit, [performanceId], options)
+}
+
+/** reapply() for many performances, written set-wise. */
+async function reapplyAll(unit: UnitView, performanceIds: readonly string[], options: ReapplyOptions = {}): Promise<void> {
+  const placements: Placement[] = []
+  const cleared: string[] = []
+  for (const performanceId of performanceIds) {
+    const sales = await first<ChoiceRow>('SELECT layout_id, wheelchair_spaces, seats_per_space, seats_band_id FROM box_office_performance_sales WHERE performance_id = ?', performanceId)
+    if (!sales && !options.create) continue
+    const { arrangement, from } = await arrangementFor(performanceId, options)
+    if (!arrangement) {
+      if (sales) cleared.push(performanceId)
+      continue
+    }
+    if (!options.strict && await bookedSpaces(performanceId) > arrangement.spaces) continue
+    placements.push({ performanceId, arrangement, own: from === 'performance', seats: options.seats })
   }
-  if (!options.strict && await bookedSpaces(performanceId) > arrangement.spaces) return
-  await applyArrangement(unit, performanceId, arrangement, { own: from === 'performance', seats: options.seats })
+  if (cleared.length) unit.add(sql`UPDATE box_office_performance_sales SET layout_id = NULL, wheelchair_spaces = NULL, seats_per_space = NULL, seats_band_id = NULL, layout_own = 0, updated_at = ${nowMs()}
+    WHERE performance_id IN (SELECT value FROM json_each(${JSON.stringify(cleared)})) AND (layout_id IS NOT NULL OR wheelchair_spaces IS NOT NULL OR layout_own = 1)`)
+  await applyArrangements(unit, placements)
 }
 
 /** Performances still to come, set up for sale: in a space, of a production, or using a layout. */
@@ -238,10 +292,12 @@ async function coming(where: { spaceId?: string, productionId?: string, layoutId
  * stored until the unit runs, so it is given directly. One with more spaces booked keeps what it has.
  */
 async function applyUsual(unit: UnitView, layout: SeatingLayout): Promise<void> {
+  const placements: Placement[] = []
   for (const performanceId of await coming({ spaceId: layout.spaceId })) {
     const { from } = await arrangementFor(performanceId)
-    if ((from === null || from === 'usual') && await bookedSpaces(performanceId) <= layout.wheelchairSpaces) await applyArrangement(unit, performanceId, fromLayout(layout))
+    if ((from === null || from === 'usual') && await bookedSpaces(performanceId) <= layout.wheelchairSpaces) placements.push({ performanceId, arrangement: fromLayout(layout) })
   }
+  await applyArrangements(unit, placements)
 }
 
 export type ChoiceInput = z.output<typeof wheelchairChoice>
@@ -269,7 +325,7 @@ export async function setRunChoice(unit: UnitView, productionId: string, input: 
       ON CONFLICT (production_id) DO UPDATE SET layout_id = excluded.layout_id, wheelchair_spaces = excluded.wheelchair_spaces, seats_per_space = excluded.seats_per_space, seats_band_id = excluded.seats_band_id, updated_at = excluded.updated_at`)
   }
   else unit.add(sql`DELETE FROM box_office_run_layouts WHERE production_id = ${productionId}`)
-  for (const performanceId of await coming({ productionId })) await reapply(unit, performanceId, { strict: true, run: choice })
+  await reapplyAll(unit, await coming({ productionId }), { strict: true, run: choice })
   unit.audit({ action: 'update', record: ['core.production', productionId], detail: choice ? { ...choice } : { wheelchair: 'usual' } })
 }
 
@@ -326,10 +382,9 @@ export async function updateLayout(unit: UnitView, id: string, input: LayoutInpu
   unit.add(sql`UPDATE box_office_seating_layouts SET name = ${input.name}, seats = ${input.seats}, wheelchair_spaces = ${input.wheelchairSpaces}, seats_per_space = ${input.seatsPerSpace}, seats_section = ${input.seatsSection ?? null}, updated_at = ${nowMs()}
     WHERE id = ${id} AND NOT EXISTS (SELECT 1 FROM box_office_seating_layouts WHERE space_id = ${before.spaceId} AND lower(name) = lower(${input.name}) AND id <> ${id})`).expect(1, NAME_TAKEN)
   const after: SeatingLayout = { ...before, ...input, seatsSection: input.seatsSection ?? null }
-  for (const performanceId of await coming({ layoutId: id })) {
-    const { from } = await arrangementFor(performanceId)
-    await applyArrangement(unit, performanceId, fromLayout(after), { own: from === 'performance' })
-  }
+  const placements: Placement[] = []
+  for (const performanceId of await coming({ layoutId: id })) placements.push({ performanceId, arrangement: fromLayout(after), own: (await arrangementFor(performanceId)).from === 'performance' })
+  await applyArrangements(unit, placements)
   unit.audit({ action: 'update', record: ['core.space', before.spaceId], detail: { layoutId: id } })
 }
 
