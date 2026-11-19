@@ -7,6 +7,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import { z } from 'zod'
 import { productionPatch } from '../../../../../server/programme/input'
 import { blankAsNull } from '../../../../../shared/validation'
+import { LATECOMER_RULES } from '../../../../../shared/latecomers'
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -33,6 +34,7 @@ interface Production {
   doorsBeforeMinutes: number | null
   capacity: number | null
   externalBookingUrl: string | null
+  latecomers: string | null
   creditsPublic: boolean
   listed: boolean
   state: State
@@ -41,7 +43,7 @@ interface Production {
   effects: { termId: string, detail: string | null }[]
 }
 interface Need { key: string, sentence: string, link: string }
-interface Answer { production: Production, needs: Need[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[], spaces: { id: string, label: string }[] } }
+interface Answer { production: Production, needs: Need[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number, latecomers: string }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[], spaces: { id: string, label: string }[] } }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -88,8 +90,14 @@ const spaces = computed(() => [{ value: NONE, label: 'Not set' }, ...(data.value
 const details = reactive({
   title: '', slug: '', subtitle: '', summary: '', description: '', kind: 'own' as Production['kind'], categoryTermId: '', seasonId: NONE, usualSpaceId: NONE, companyName: '',
   contentNote: '', runningMinutes: null as number | null, intervalCount: 0, intervalMinutes: null as number | null, doorsBeforeMinutes: null as number | null,
-  capacity: null as number | null, bookedElsewhere: false, externalBookingUrl: '', creditsPublic: true, listed: true,
+  capacity: null as number | null, bookedElsewhere: false, externalBookingUrl: '', latecomers: NONE as string, creditsPublic: true, listed: true,
 })
+// When latecomers are let in: the theatre's usual practice unless the show says otherwise. Each date may differ too.
+const latecomerItems = computed(() => [
+  { value: NONE, label: `Usual: ${t(`core.latecomers.short.${data.value?.theatre.latecomers ?? 'suitable-point'}`).toLowerCase()}` },
+  ...LATECOMER_RULES.map(value => ({ value, label: t(`core.latecomers.short.${value}`) })),
+])
+const withLatecomers = (schema: z.ZodType) => z.preprocess(v => ({ ...(v as object), latecomers: (v as { latecomers?: string }).latecomers === NONE ? null : (v as { latecomers?: string }).latecomers }), schema)
 // With nothing here selling tickets, every production is booked elsewhere (Matt, 2026-11-17).
 const sellsHere = computed(() => data.value?.sellsHere ?? true)
 const elsewhere = computed(() => !sellsHere.value || details.bookedElsewhere)
@@ -98,16 +106,16 @@ const elsewhere = computed(() => !sellsHere.value || details.bookedElsewhere)
 // (and a published production) needs it.
 const linkNeeded = computed(() => elsewhere.value && (sellsHere.value || production.value?.state === 'published'))
 const detailsForm = useTemplateRef('detailsForm')
-const detailsSchema = computed(() => linkNeeded.value
+const detailsSchema = computed(() => withLatecomers(linkNeeded.value
   ? blankAsNull(productionPatch.extend({ externalBookingUrl: productionPatch.shape.externalBookingUrl.unwrap().unwrap() }))
   : elsewhere.value
     ? blankAsNull(productionPatch)
-    : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch)))
+    : z.preprocess(v => ({ ...(v as object), externalBookingUrl: null }), blankAsNull(productionPatch))))
 const detailsFrom = (p: Production) => ({
   title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
   seasonId: p.seasonId ?? NONE, usualSpaceId: p.usualSpaceId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
   intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
-  bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
+  bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', latecomers: p.latecomers ?? NONE, creditsPublic: p.creditsPublic, listed: p.listed,
 })
 const resetDetails = () => production.value && Object.assign(details, detailsFrom(production.value))
 watch(production, resetDetails, { immediate: true })
@@ -119,6 +127,7 @@ const saveDetails = () => run(() => api('', 'PATCH', {
   categoryTermId: details.categoryTermId || null,
   seasonId: details.seasonId === NONE ? null : details.seasonId,
   usualSpaceId: details.usualSpaceId === NONE ? null : details.usualSpaceId,
+  latecomers: details.latecomers === NONE ? null : details.latecomers,
   externalBookingUrl: elsewhere.value ? details.externalBookingUrl.trim() || null : null,
   runningMinutes: details.runningMinutes || null,
 }), 'Production saved', detailsForm.value)
@@ -520,6 +529,16 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                     v-model="details.capacity"
                     placeholder="Each space's own"
                     :min="1"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Latecomers"
+                  name="latecomers"
+                  help="When people who arrive after the start are let in. A date can differ."
+                >
+                  <USelect
+                    v-model="details.latecomers"
+                    :items="latecomerItems"
                   />
                 </UFormField>
                 <UCheckbox

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, setting, task, credentialDecl } from '#kit'
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
+import { LATECOMER_RULES } from '../shared/latecomers'
 
 const organisation = 'core.organisation.edit'
 const branding = 'core.branding.edit'
@@ -33,8 +34,8 @@ export const settings = defineSettings('core', {
   // (privacy, terms). Site readiness lists each policy that is not here.
   'policies.reviewed': setting.list({ default: [], of: 'text', maxLength: 60, change: organisation, onChange: 'confirm' }),
   'complaints.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change: organisation, audience: 'public', quotable: true }),
-  // Usual practice only: each show may differ, and the house rules explain all four.
-  'visiting.latecomers': setting.choice({ default: 'suitable-point', options: ['any-time', 'suitable-point', 'interval', 'not-admitted'], change: organisation, audience: 'public' }),
+  // Usual practice only: a production or a performance may say otherwise, and the house rules explain all four.
+  'visiting.latecomers': setting.choice({ default: 'suitable-point', options: [...LATECOMER_RULES], change: organisation, audience: 'public' }),
   // Children under this age come with an adult. 0 says nothing about it.
   'visiting.accompanied-under': setting.integer({ default: 14, min: 0, max: 18, change: organisation, audience: 'public', quotable: true }),
   'visiting.recording-allowed': setting.boolean({ default: false, change: organisation, audience: 'public' }),

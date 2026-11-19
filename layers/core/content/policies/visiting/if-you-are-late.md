@@ -11,6 +11,8 @@ Whether latecomers can be let in depends on the show, and we decide that show by
 - **Let in at the interval.** You can come in when the interval begins, and not before. This only applies to shows that have one.
 - **Not let in.** Once the performance has started nobody can come in. This is usually for the safety of the performers or because the show cannot be interrupted.
 
+Each show's page, the booking pages and your tickets say which of these applies to that show.
+
 ::when{setting="core.visiting.latecomers" is="any-time"}
 Unless we tell you otherwise, our usual practice is to let latecomers in at any time.
 ::

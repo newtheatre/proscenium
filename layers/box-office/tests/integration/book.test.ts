@@ -42,6 +42,8 @@ describe('the public booking page', () => {
     expect(page.body.bands[0].types.map((t: { amountMinor: number }) => t.amountMinor).sort((a: number, b: number) => a - b)).toEqual([800, 1200])
     expect(JSON.stringify(page.body)).not.toMatch(/capacity|"free"|claimed/)
     expect(page.body.production).toMatchObject({ ageMin: null, ageRestricted: false })
+    // When latecomers are let in: the show says nothing, so the theatre's usual practice.
+    expect(page.body.performance.latecomers).toBe('suitable-point')
   })
 
   it('carries the production\'s age guidance', async () => {

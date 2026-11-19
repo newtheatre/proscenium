@@ -12,6 +12,7 @@ import { instantOfLocal } from '#kit/clock'
 import { dayRule, operatingDayOf } from '../calendar'
 import type { ChangeImpact, ProposedChange } from '../points/change-impact'
 import type { ChangeGuard, GuardAnswer } from '../points/change-guard'
+import { latecomerRule, type LatecomerRule } from '../../shared/latecomers'
 
 export type PerformanceState = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 
@@ -179,13 +180,14 @@ export interface PerformanceDefaults {
 const minutesOf = async (key: SettingKey) => Math.round((await useSetting(key) as number) / 60) // not-policy: seconds to minutes
 
 /** The theatre's own defaults, from its settings. */
-export async function theatreDefaults(): Promise<{ runningMinutes: number, doorsBeforeMinutes: number, intervalCount: number, intervalMinutes: number, turnaroundMinutes: number }> {
+export async function theatreDefaults(): Promise<{ runningMinutes: number, doorsBeforeMinutes: number, intervalCount: number, intervalMinutes: number, turnaroundMinutes: number, latecomers: LatecomerRule }> {
   return {
     runningMinutes: await minutesOf('core.programme.default-running-time'),
     doorsBeforeMinutes: await minutesOf('core.programme.doors-before'),
     intervalCount: await useSetting('core.programme.intervals') as number,
     intervalMinutes: await minutesOf('core.programme.interval-length'),
     turnaroundMinutes: await minutesOf('core.programme.turnaround'),
+    latecomers: latecomerRule(null, await useSetting('core.visiting.latecomers') as string, 1),
   }
 }
 

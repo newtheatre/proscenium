@@ -3,7 +3,8 @@
      costs; pressing it holds the seats, which is when the countdown starts, and goes on to Check and
      pay. A companion ticket needs a paid ticket with it. No count of seats is ever shown. A member
      price the visitor is not signed in for can take a reference instead, such as a student ID: one
-     box for each ticket, worded by Membership, shown only on that ticket type. -->
+     box for each ticket, worded by Membership, shown only on that ticket type. Above, when latecomers
+     are let in, so nobody finds out on the night. -->
 <script setup lang="ts">
 import type { ButtonProps } from '@nuxt/ui'
 import type { ChosenPass } from '~~/layers/box-office/app/components/BoxOfficePassBox.vue'
@@ -11,7 +12,7 @@ import type { BoughtPass, PassOnSale } from '~~/layers/box-office/app/components
 
 interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
 interface Page {
-  performance: { id: string, startsAt: number, venue: string, state: string }
+  performance: { id: string, startsAt: number, venue: string, state: string, latecomers?: string }
   production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
   state: 'none' | 'draft' | 'on_sale' | 'paused' | 'closed'
   onSaleAt: number | null
@@ -218,6 +219,11 @@ async function hold() {
             />
             {{ data.production.ageRestricted ? t('box-office.book.age.restricted', { age: data.production.ageMin }) : t('box-office.book.age.recommended', { age: data.production.ageMin }) }}
           </p>
+          <LatecomersNote
+            v-if="data.performance.latecomers"
+            :rule="data.performance.latecomers"
+            rules
+          />
           <UAlert
             v-if="heldLeft > 0"
             color="info"

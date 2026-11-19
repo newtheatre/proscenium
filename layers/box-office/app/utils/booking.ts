@@ -4,7 +4,7 @@
 /** `unnamed` where there is one kind of ticket to book, so its name is left out as Choose tickets leaves it out. */
 export interface BookingLine { id: string, performanceId: string, ticketType: string, band: string | null, amountMinor: number, unnamed?: true }
 export interface BookingTicket { lineId: string, number: string, doorCode: string | null, admitted: boolean }
-export interface BookingShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
+export interface BookingShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean, /** Absent from an answer cached before it was added. */ latecomers?: string }
 export interface BookingView {
   accountUnclaimed?: boolean
   orderId: string
