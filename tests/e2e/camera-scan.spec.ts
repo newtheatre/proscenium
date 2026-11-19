@@ -223,13 +223,17 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
   }
 })
 
-test('the door admits a whole paid booking from its own code in one step, and clears for the next', async ({ playwright }) => {
+test('a paid booking\'s own code offers Admit one or Admit all, and the door clears for the next', async ({ playwright }) => {
   const { browser, page } = await withCamera(playwright.chromium, cameraShowing(pairReference, `pair-${stamp}`))
   try {
     await visit(page, `/live/door/${performanceId}`)
-    const banner = page.getByRole('status').filter({ hasText: 'Admitted' })
-    await expect(banner).toContainText('2 admitted', { timeout: 15_000 })
+    await expect(page.getByRole('status').filter({ hasText: 'Booking found' })).toContainText('2 of 2 still to come in', { timeout: 15_000 })
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: `Admit one ticket for ${pairReference}` }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Admitted' })).toContainText('1 admitted')
+    await expect(page.getByRole('button', { name: /^Admit all/ })).toHaveCount(0)
+    await page.getByRole('button', { name: `Admit one ticket for ${pairReference}` }).click()
+    await expect(page.getByRole('button', { name: `Admit one ticket for ${pairReference}` })).toHaveCount(0)
     await expect(page.getByRole('status').filter({ hasText: 'Hold a ticket or a booking code up to the camera.' })).toBeVisible({ timeout: 10_000 })
   }
   finally {

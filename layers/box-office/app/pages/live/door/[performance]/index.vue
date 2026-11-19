@@ -9,7 +9,8 @@
      latecomers are let in. Every result arrives fresh: the banner springs in, the phone buzzes where it
      can (one short buzz for in, two for a look, one long for no), and an admission clears itself after
      a few seconds, so the next ticket is never mistaken for the last. A paid booking's own code, such
-     as the QR code from its reservation, admits everyone on it not yet in, in one go.
+     as the QR code from its reservation, admits a single ticket at once; for several, the screen offers
+     Admit one (as each person reaches the door) and Admit all, until everyone on it is in.
      Offline (D2), the door keeps working from its copy of the door list on the device
      (useOfflineDoor): a ticket's signed code is checked here, admitted here and sent when the
      connection returns; the strip says how many admissions are waiting. The door list can be
@@ -150,8 +151,20 @@ function show(result: Shown) {
   }
   clearTimeout(clearing)
   if (result.tone === 'success' && !result.override) clearing = setTimeout(() => {
-    if (shown.value === result) shown.value = null
+    if (shown.value === result) shown.value = group.value ? groupShown(group.value) : null
   }, CLEAR_MS)
+}
+
+// A booking of several waiting to come in, after its own code was scanned: admitted one by one or all at once.
+const group = ref<Row | null>(null)
+const groupShown = (row: Row): Shown => ({ tone: 'info', icon: 'i-lucide-users', headline: t('box-office.live-door.result.reference'), line: `${nameOf(row)} · ${row.reference}. ${t('box-office.live-door.line.booking-waiting', { waiting: row.tickets - row.admitted, tickets: row.tickets })}`, at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
+async function admitFromGroup(count: number) {
+  const row = group.value
+  if (!row) return
+  const admitted = await admit(row, count)
+  if (group.value !== row) return
+  const left = { ...row, admitted: row.admitted + admitted }
+  group.value = left.admitted < left.tickets && admitted ? left : null
 }
 
 // A paid booking's own code for tonight, such as its reservation's QR code: everyone on it not yet in goes in.
@@ -165,11 +178,17 @@ async function admitBooking(reference: string) {
     finding.value = true
     return
   }
+  group.value = null
   if (row.admitted >= row.tickets) {
     show({ tone: 'warning', icon: ICONS.warning, headline: t('box-office.live-door.result.already_admitted'), line: t('box-office.live-door.line.booking-in', { reference: row.reference }), at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     return
   }
-  await admit(row, row.tickets - row.admitted)
+  if (row.tickets - row.admitted === 1) {
+    await admit(row, 1)
+    return
+  }
+  group.value = row
+  show(groupShown(row))
 }
 
 /** Offline: checked against the device's copy of the door list, and admitted here. */
@@ -186,6 +205,7 @@ async function scanOffline(code: string) {
 
 async function scan(code: string) {
   if (!code.trim()) return
+  group.value = null
   if (!online.value) return scanOffline(code)
   try {
     const out = await $api<Scan>(`${base.value}/scan`, { method: 'POST', body: { code: code.trim() } })
@@ -271,12 +291,12 @@ async function submitQuery() {
   await scan(code)
 }
 
-async function admit(row: Row, count: number) {
+async function admit(row: Row, count: number): Promise<number> {
   if (!online.value) {
     const admitted = door.admit(row.id, count)
     show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: `${t('box-office.door.admitted-now', { count: admitted })} ${t('box-office.live-door.checked-here')}`, at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     await search()
-    return
+    return admitted
   }
   admitting.value = row.id
   try {
@@ -285,10 +305,12 @@ async function admit(row: Row, count: number) {
     show({ tone: admitted ? 'success' : 'warning', icon: ICONS[admitted ? 'success' : 'warning'], headline: t(admitted ? 'box-office.live-door.result.admitted' : 'box-office.live-door.result.already_admitted'), line: t('box-office.door.admitted-now', { count: admitted }), at: Date.now(), who: `${nameOf(row)} · ${row.reference}` })
     await refresh()
     await search()
+    return admitted
   }
   catch (e) {
     const refusal = toRefusal(e)
     show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: refusal.reason, at: Date.now() })
+    return 0
   }
   finally {
     admitting.value = null
@@ -390,6 +412,33 @@ async function admit(row: Row, count: number) {
                   </p>
                 </div>
               </section>
+              <div
+                v-if="group"
+                class="grid gap-3"
+                :class="group.tickets - group.admitted > 1 ? 'grid-cols-2' : 'grid-cols-1'"
+              >
+                <UButton
+                  icon="i-lucide-user-check"
+                  color="neutral"
+                  variant="outline"
+                  size="xl"
+                  block
+                  :loading="admitting === group.id"
+                  :label="t('box-office.door.admit-one')"
+                  :aria-label="t('box-office.door.admit-one-of', { reference: group.reference })"
+                  @click="admitFromGroup(1)"
+                />
+                <UButton
+                  v-if="group.tickets - group.admitted > 1"
+                  icon="i-lucide-users"
+                  size="xl"
+                  block
+                  :loading="admitting === group.id"
+                  :label="t('box-office.door.admit-all', { count: group.tickets - group.admitted })"
+                  :aria-label="t('box-office.door.admit-all-of', { count: group.tickets - group.admitted, reference: group.reference })"
+                  @click="admitFromGroup(group.tickets - group.admitted)"
+                />
+              </div>
               <UButton
                 v-if="shown?.collect && tillTo(shown.collect)"
                 icon="i-lucide-hand-coins"
