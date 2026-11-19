@@ -521,14 +521,15 @@ async function admit(row: Row, count: number): Promise<number> {
       <template #footer>
         <div
           class="mx-auto grid max-w-4xl gap-3"
-          :class="problem ? 'grid-cols-1' : 'grid-cols-2'"
+          :class="problem ? 'grid-cols-1' : 'grid-cols-[repeat(2,minmax(0,1fr))]'"
         >
           <UButton
             icon="i-lucide-search"
             color="neutral"
             variant="outline"
             size="xl"
-            class="flex-col justify-center gap-1 text-sm sm:flex-row sm:gap-2 sm:text-base"
+            class="min-w-0 flex-col justify-center gap-1 text-sm sm:flex-row sm:gap-2 sm:text-base"
+            :ui="{ label: 'whitespace-normal! text-center' }"
             :label="t('box-office.live-door.find')"
             @click="finding = true"
           />
@@ -539,7 +540,8 @@ async function admit(row: Row, count: number): Promise<number> {
             color="neutral"
             variant="outline"
             size="xl"
-            class="flex-col justify-center gap-1 text-sm sm:flex-row sm:gap-2 sm:text-base"
+            class="min-w-0 flex-col justify-center gap-1 text-sm sm:flex-row sm:gap-2 sm:text-base"
+            :ui="{ label: 'whitespace-normal! text-center' }"
             :label="running ? t('box-office.live-door.pause') : t('box-office.live-door.resume')"
             @click="running = !running"
           />
