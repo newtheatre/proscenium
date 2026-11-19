@@ -17,9 +17,6 @@ hero:
 whatsOn:
   title: On stage this term
   limit: 3
-  link:
-    label: Full season
-    to: /whats-on
 
 feature:
   headline: The centenary
