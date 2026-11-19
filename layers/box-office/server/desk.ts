@@ -26,7 +26,7 @@ import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
-import { normaliseCode } from './promo-codes'
+import { moveTicketSavings } from './promotions'
 import { availability } from './availability'
 import { salesOf } from './setup'
 
@@ -123,11 +123,14 @@ async function deskSale(input: SaleInput, at: number): Promise<OrderPlan> {
 }
 
 /** The till's lines for a planned sale: each ticket, each pass's entry, then each pass sold or paid for. */
-function saleLines(plan: OrderPlan, names: Map<string, string>, code: string): SummaryLine[] {
+function saleLines(plan: OrderPlan, names: Map<string, string>): SummaryLine[] {
+  // A discounted ticket is named with the code it was given for, or the offer's own label.
+  const nameOf = new Map(plan.tickets.priced.applied.map(a => [a.promotionId, a.code ?? a.label]))
+  const said = (i: number) => [...new Set(plan.tickets.priced.savings.filter(s => s.key === String(i)).map(s => nameOf.get(s.promotionId)))].join(', ')
   const tickets: SummaryLine[] = plan.lines.map((l, i) => {
     const pass = plan.entryOf[i]
     if (pass) return { label: `${names.get(l.ticketTypeId) && l.priceId ? `${names.get(l.ticketTypeId)}, ` : ''}${pass.name} entry`, amountMinor: 0 }
-    return { label: plan.discounted[i] ? `${names.get(l.ticketTypeId) ?? ''} (${code})` : names.get(l.ticketTypeId) ?? '', amountMinor: plan.charged[i]! }
+    return { label: plan.discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${said(i)})` : names.get(l.ticketTypeId) ?? '', amountMinor: plan.charged[i]! }
   })
   // Each pass sold is a line of its own with a key, so a split sale says who paid for it: it is theirs.
   const sold = plan.planned.map((p, i) => ({ label: `${p.judged.name}, ${p.judged.priceName}`, amountMinor: p.amountMinor, key: `pass:${i}` }))
@@ -165,7 +168,7 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
   }
   else {
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
-    lines = saleLines(await deskSale(input.sale, nowMs()), names, normaliseCode(input.sale.promoCode ?? ''))
+    lines = saleLines(await deskSale(input.sale, nowMs()), names)
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
@@ -477,18 +480,23 @@ export async function splitReservation(unit: UnitView, orderId: string, lineIds:
   // A line keeps its order and its claim, so the tickets moving are new lines on the new order, at
   // the same prices, and the old ones are marked moved on as an exchange's are. Their seats are let go
   // and taken again in the same batch, so nobody else can take them in between.
-  const pools = new Map((await all<{ line_id: string, pool_id: string }>(
-    `SELECT l.id AS line_id, c.pool_id FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
-      WHERE l.order_id = ? AND l.id IN (SELECT value FROM json_each(?))`, order.id, ids)).map(r => [r.line_id, r.pool_id]))
+  const found = await all<{ line_id: string, pool_id: string, promo_redemption_id: string | null }>(
+    `SELECT l.id AS line_id, c.pool_id, l.promo_redemption_id FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
+      WHERE l.order_id = ? AND l.id IN (SELECT value FROM json_each(?))`, order.id, ids)
+  const pools = new Map(found.map(r => [r.line_id, r.pool_id]))
+  const savingOf = new Map(found.map(r => [r.line_id, r.promo_redemption_id]))
   if (pools.size !== lineIds.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
   unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = 'exchanged'
     WHERE state = 'confirmed' AND id IN (SELECT claim_id FROM box_office_order_lines WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids})))`).expect(lineIds.length, CHANGED)
   unit.add(sql`UPDATE box_office_order_lines SET state = 'exchanged', updated_at = ${at}
     WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(lineIds.length, CHANGED)
   const claimed = (await claimSeats(unit, { holdId, requests: lineIds.map(id => ({ poolId: pools.get(id)!, quantity: 1 })), state: 'confirmed', expiresAt: null })).flat()
+  // A promotion's use goes with the seat it was given for, counted once.
+  const savings = await moveTicketSavings(unit, newOrderId, lineIds.map((id, i) => ({ redemptionId: savingOf.get(id) ?? null, claimId: claimed[i]! })))
   lineIds.forEach((id, i) => {
+    const saving = savingOf.get(id) ?? null
     unit.add(sql`INSERT INTO box_office_order_lines (id, order_id, kind, performance_id, band_id, ticket_type_id, claim_id, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, state, created_at, updated_at)
-      SELECT ${newId('orl')}, ${newOrderId}, kind, performance_id, band_id, ticket_type_id, ${claimed[i]}, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, 'live', ${at}, ${at}
+      SELECT ${newId('orl')}, ${newOrderId}, kind, performance_id, band_id, ticket_type_id, ${claimed[i]}, price_id, list_minor, discount_minor, amount_minor, ${saving ? savings.get(saving) ?? saving : null}, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, 'live', ${at}, ${at}
         FROM box_office_order_lines WHERE id = ${id}`).expect(1, CHANGED)
   })
   await carryPassEntries(unit, newOrderId, lineIds.map((lineId, i) => ({ lineId, claimId: claimed[i]! })))
@@ -678,9 +686,8 @@ const MOVED = { code: 'box-office.order.lines-changed', reason: 'These tickets h
 async function splitPaid(unit: UnitView, order: OrderRow, lineIds: string[], accountId: string): Promise<{ orderId: string, token: string }> {
   const at = nowMs()
   const ids = JSON.stringify(lineIds)
-  const lines = await all<{ id: string, performance_id: string, amount_minor: number, pool_id: string, promo_code_id: string | null }>(
-    `SELECT l.id, l.performance_id, l.amount_minor, c.pool_id, r.promo_code_id FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
-      LEFT JOIN box_office_promo_redemptions r ON r.id = l.promo_redemption_id AND r.state = 'live'
+  const lines = await all<{ id: string, performance_id: string, amount_minor: number, pool_id: string, promo_redemption_id: string | null }>(
+    `SELECT l.id, l.performance_id, l.amount_minor, c.pool_id, l.promo_redemption_id FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
       WHERE l.order_id = ? AND l.state = 'live' AND l.id IN (SELECT value FROM json_each(?)) ORDER BY l.rowid`, order.id, ids)
   if (lines.length !== lineIds.length) refuse(MOVED.code, MOVED.reason, { status: 409 })
   const orderId = newId('ord')
@@ -699,13 +706,9 @@ async function splitPaid(unit: UnitView, order: OrderRow, lineIds: string[], acc
   unit.add(sql`UPDATE box_office_order_lines SET state = 'exchanged', updated_at = ${at}
     WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(lines.length, MOVED)
   const claimed = (await claimSeats(unit, { holdId, requests: lines.map(l => ({ poolId: l.pool_id, quantity: 1 })), state: 'confirmed', expiresAt: null })).flat()
-  // A promo code's use goes with the seat it was given for: the old one was let go with its claim.
-  const moved = lines.map((l, i) => ({ old: l.id, id: newId('orl'), claim: claimed[i]!, redemption: l.promo_code_id ? newId('prr') : null, code: l.promo_code_id }))
-  const redeemed = moved.filter(m => m.redemption)
-  if (redeemed.length) {
-    unit.add(sql`INSERT INTO box_office_promo_redemptions (id, promo_code_id, order_id, claim_id, state, created_at, updated_at)
-      SELECT json_extract(value, '$.redemption'), json_extract(value, '$.code'), ${orderId}, json_extract(value, '$.claim'), 'live', ${at}, ${at} FROM json_each(${JSON.stringify(redeemed)})`).expect(redeemed.length, MOVED)
-  }
+  // A promotion's use goes with the seat it was given for, counted once.
+  const savings = await moveTicketSavings(unit, orderId, lines.map((l, i) => ({ redemptionId: l.promo_redemption_id, claimId: claimed[i]! })))
+  const moved = lines.map((l, i) => ({ old: l.id, id: newId('orl'), claim: claimed[i]!, redemption: l.promo_redemption_id ? savings.get(l.promo_redemption_id) ?? l.promo_redemption_id : null }))
   unit.add(sql`INSERT INTO box_office_order_lines (id, order_id, kind, performance_id, band_id, ticket_type_id, claim_id, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, replaces_line_id, state, created_at, updated_at)
     SELECT json_extract(m.value, '$.id'), ${orderId}, l.kind, l.performance_id, l.band_id, l.ticket_type_id, json_extract(m.value, '$.claim'), l.price_id, l.list_minor, l.discount_minor, l.amount_minor, json_extract(m.value, '$.redemption'), l.pass_redemption_id, l.comp_request_id, l.requirement_ref, l.requirement_account_id, l.requirement_evidence_id, l.id, 'live', ${at}, ${at}
       FROM json_each(${JSON.stringify(moved)}) m JOIN box_office_order_lines l ON l.id = json_extract(m.value, '$.old')`).expect(lines.length, MOVED)
