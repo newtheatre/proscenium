@@ -176,6 +176,10 @@ test('the production page shows its dates, the booking link, the cancelled date 
   await visit(page, `/whats-on/${slug}`)
   await expect(page.getByText(`Spring ${stamp} · Play`, { exact: true })).toBeVisible()
   await expect(page.getByText(/2 hours 15 minutes, with an interval/)).toBeVisible()
+  // The top states the facts somebody decides on, each under its own label.
+  const top = page.getByRole('region', { name: title })
+  await expect(top.getByRole('heading', { level: 1, name: title })).toBeVisible()
+  await expect(top.getByText('Running time', { exact: true })).toBeVisible()
   await expect(page.getByRole('img', { name: 'A red stage curtain' })).toBeVisible()
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/files\//)
   await expect(page.getByText('This production has no staging effects or content warnings.')).toBeVisible()
