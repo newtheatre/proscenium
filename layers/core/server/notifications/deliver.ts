@@ -85,7 +85,8 @@ async function settle(id: string, change: { state: 'sent' | 'retrying' | 'failed
  */
 export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitView): Promise<{ sent: number, retrying: number, failed: number, skipped: number }> {
   const counts = { sent: 0, retrying: 0, failed: 0, skipped: 0 }
-  const due = await all<DueRow>(`SELECT d.id, d.notification_id, d.sender_key, d.attempts, n.type_key, n.side, n.account_id, n.address, n.locale, n.payload, n.sealed_variables
+  const due = await all<DueRow>(`SELECT d.id, d.notification_id, d.sender_key, d.attempts, n.type_key, n.side,
+      coalesce((SELECT a.merged_into_id FROM core_accounts a WHERE a.id = n.account_id), n.account_id) AS account_id, n.address, n.locale, n.payload, n.sealed_variables
       FROM core_notification_deliveries d JOIN core_notifications n ON n.id = d.notification_id
      WHERE d.id IN (SELECT value FROM json_each(?)) AND d.channel = 'email' AND d.state IN ('queued', 'retrying')`, JSON.stringify(deliveryIds))
   if (!due.length) return counts
@@ -98,7 +99,8 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
   const brand = await brandTokens()
   const theatre = await theatreName(domain)
   const footer = await useSetting('core.notifications.email-footer') as string | null
-  // The address is read again at send time, so a person who changed theirs meanwhile is reached at the new one.
+  // The address is read again at send time, so a person who changed theirs, or whose account was
+  // merged into another, meanwhile is reached at the new one.
   const idsOn = (side: 'audience' | 'members') => due.filter(d => !d.address && d.account_id && d.side === side).map(d => d.account_id!)
   const sides = { audience: await addressesFor(idsOn('audience'), 'audience'), members: await addressesFor(idsOn('members'), 'members') }
   const addressOf = (row: DueRow) => row.address ?? (row.account_id ? sides[row.side].get(row.account_id) ?? null : null)
