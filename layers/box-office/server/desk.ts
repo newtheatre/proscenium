@@ -54,6 +54,8 @@ const saleInput = z.object({
   passes: z.array(passAsk).max(50).optional(), // not-policy: more passes than one group brings
   buy: z.array(passBuy).max(20).optional(), // not-policy: more passes than one sale sells
   collect: z.array(passCode).max(20).optional(), // not-policy: as many as `buy`
+  // Tickets the pass holder already has for other shows, for the passes sold here to cover.
+  cover: z.array(id).max(50).optional(), // not-policy: more tickets than one person holds
   admit: z.boolean().optional(),
   email: z.email().max(254).optional(), // not-policy: the longest address
   accountId: id.optional(),
@@ -107,7 +109,7 @@ async function deskSale(input: SaleInput, at: number, priced?: PricedSale): Prom
     const cap = await useSetting('box-office.orders.desk-seat-cap') as number
     if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one desk order.`, { status: 422 })
   }
-  const plan = await planOrder({ performanceId: input.performanceId, lines: input.lines, passes: input.passes, buy: input.buy }, { channel: 'desk', account: null }, at, undefined, lines => deskDiscounts(lines, priced))
+  const plan = await planOrder({ performanceId: input.performanceId, lines: input.lines, passes: input.passes, buy: input.buy, cover: input.cover }, { channel: 'desk', account: null }, at, undefined, lines => deskDiscounts(lines, priced))
   // A pass paid for on its own: what it owes is collected here, unless a live booking already waits to.
   const collecting = await owedHere(await Promise.all((input.collect ?? []).map(code => passOwing(code))), at)
   const owed = [...plan.owed]
@@ -132,7 +134,7 @@ function saleLines(plan: OrderPlan, names: Map<string, string>): SummaryLine[] {
     return { label: plan.discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${said(i)})` : names.get(l.ticketTypeId) ?? '', amountMinor: plan.charged[i]! }
   })
   // Each pass sold is a line of its own with a key, so a split sale says who paid for it: it is theirs.
-  const sold = plan.planned.map((p, i) => ({ label: `${p.judged.name}, ${p.judged.priceName}`, amountMinor: p.amountMinor, key: `pass:${i}` }))
+  const sold = plan.planned.map((p, i) => ({ label: `${p.judged.name}, ${p.judged.priceName}`, amountMinor: p.amountMinor - p.creditMinor, key: `pass:${i}` }))
   const owed = plan.owed.map(o => ({ label: `${o.pass.name}, ${o.pass.priceName} (owed)`, amountMinor: o.pass.owedMinor, key: `owed:${o.pass.passId}` }))
   return [...tickets, ...sold, ...owed]
 }

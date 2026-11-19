@@ -1,0 +1,1 @@
+ALTER TABLE `box_office_pass_covers` ADD `refund_id` text REFERENCES payments_refunds(id);

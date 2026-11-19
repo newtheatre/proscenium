@@ -102,22 +102,24 @@ export interface HeldPass {
   usesTaken: number
   once: boolean
   amountMinor: number
+  /** What tickets already paid for have put towards it. */
+  creditMinor: number
   currency: string
   issuedAt: number | null
   paidAt: number | null
   state: 'active' | 'void'
 }
 
-interface PassRow { id: string, pass_type_id: string, name: string, price_name: string, account_id: string | null, named: number, code: string | null, uses_total: number | null, uses_taken: number, once: number, amount_minor: number, currency: string, issued_at: number | null, paid_at: number | null, state: 'active' | 'void' }
+interface PassRow { id: string, pass_type_id: string, name: string, price_name: string, account_id: string | null, named: number, code: string | null, uses_total: number | null, uses_taken: number, once: number, amount_minor: number, credit_minor: number, currency: string, issued_at: number | null, paid_at: number | null, state: 'active' | 'void' }
 
-const PASSES = `SELECT p.id, p.pass_type_id, t.name, r.name AS price_name, p.account_id, p.named, p.code, p.uses_total, p.uses_taken, p.once, p.amount_minor, p.currency, p.issued_at, p.paid_at, p.state
+const PASSES = `SELECT p.id, p.pass_type_id, t.name, r.name AS price_name, p.account_id, p.named, p.code, p.uses_total, p.uses_taken, p.once, p.amount_minor, p.credit_minor, p.currency, p.issued_at, p.paid_at, p.state
   FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id`
 
 async function toPass(r: PassRow): Promise<HeldPass> {
   return {
     id: r.id, passTypeId: r.pass_type_id, name: r.name, priceName: r.price_name, accountId: r.account_id, named: !!r.named,
     code: r.code ? shownPassCode(await openColumn(r.code) as string) : null,
-    usesTotal: r.uses_total, usesTaken: r.uses_taken, once: !!r.once, amountMinor: r.amount_minor, currency: r.currency, issuedAt: r.issued_at, paidAt: r.paid_at, state: r.state,
+    usesTotal: r.uses_total, usesTaken: r.uses_taken, once: !!r.once, amountMinor: r.amount_minor, creditMinor: r.credit_minor, currency: r.currency, issuedAt: r.issued_at, paidAt: r.paid_at, state: r.state,
   }
 }
 
@@ -174,10 +176,10 @@ export async function entriesOf(passId: string): Promise<PassEntry[]> {
 const GONE = { code: 'box-office.pass.changed', reason: 'This pass has just changed.', remedy: 'Reload to see it as it is now.' }
 
 /** Tells a pass's holder its code: when it is given by hand, moved to them, or asked for again. */
-export async function sendPass(unit: UnitView, passId: string, reason: string, made?: Pick<HeldPass, 'id' | 'accountId' | 'code' | 'state' | 'currency' | 'amountMinor' | 'name' | 'priceName' | 'paidAt'>): Promise<boolean> {
+export async function sendPass(unit: UnitView, passId: string, reason: string, made?: Pick<HeldPass, 'id' | 'accountId' | 'code' | 'state' | 'currency' | 'amountMinor' | 'name' | 'priceName' | 'paidAt'> & { creditMinor?: number }): Promise<boolean> {
   const pass = made ?? await getPass(passId)
   if (!pass.accountId || !pass.code || pass.state !== 'active') return false
-  const amount = new Intl.NumberFormat((await useSetting('core.locale.language') as string | null) ?? 'en-GB', { style: 'currency', currency: pass.currency }).format(pass.amountMinor / 100) // not-policy: minor units to units
+  const amount = new Intl.NumberFormat((await useSetting('core.locale.language') as string | null) ?? 'en-GB', { style: 'currency', currency: pass.currency }).format((pass.amountMinor - (pass.creditMinor ?? 0)) / 100) // not-policy: minor units to units
   await notify(unit, 'box-office.pass-issued', {
     to: pass.accountId,
     variables: { pass: pass.name, price: pass.priceName, code: pass.code, paid: pass.paidAt ? 'It is paid for.' : `There is ${amount} to pay for it, which is taken at the box office when you come to your first show.` },
@@ -239,7 +241,7 @@ export async function myPasses(accountId: string): Promise<MyPass[]> {
         if (production && !booked.has(id)) open.push({ productionId: id, title: production.title, slug: production.slug })
       }
     }
-    out.push({ id: pass.id, name: pass.name, priceName: pass.priceName, code: pass.code, owedMinor: pass.paidAt ? 0 : pass.amountMinor, currency: pass.currency, left: pass.usesTotal === null ? null : pass.usesTotal - pass.usesTaken, state: pass.state, entries, open })
+    out.push({ id: pass.id, name: pass.name, priceName: pass.priceName, code: pass.code, owedMinor: pass.paidAt ? 0 : pass.amountMinor - pass.creditMinor, currency: pass.currency, left: pass.usesTotal === null ? null : pass.usesTotal - pass.usesTaken, state: pass.state, entries, open })
   }
   return out
 }

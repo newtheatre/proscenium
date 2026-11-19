@@ -96,6 +96,9 @@ export async function takenBack(totals: Map<string, number>): Promise<OwnerEntry
 
 /** What a refund of an order's part takes back off deferred income, by performance. */
 export async function refundEntries(orderId: string, refund: { id: string, amountMinor: number }): Promise<OwnerEntry[]> {
+  // A refund of what a paid ticket cost beyond what a pass took of it is for that ticket's performance.
+  const covered = await all<{ performance_id: string, amount_minor: number }>('SELECT l.performance_id, c.refund_minor AS amount_minor FROM box_office_pass_covers c JOIN box_office_order_lines l ON l.id = c.line_id WHERE c.refund_id = ? ORDER BY c.id', refund.id)
+  if (covered.length) return takenBack(spread(covered, refund.amountMinor))
   const cancellation = await first<{ line_ids: string }>('SELECT line_ids FROM box_office_cancellations WHERE refund_id = ?', refund.id)
   // A refund asked for with a cancellation is for that cancellation's lines. One asked for on its
   // own, from Payments' screens, is set against the order's cancelled lines first.

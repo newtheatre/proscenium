@@ -54,6 +54,7 @@ import deskSoldGet from '../../server/api/box-office/desk/sold.get'
 import deskIssuePost from '../../server/api/box-office/desk/issue.post'
 import deskPassGet from '../../server/api/box-office/desk/pass.get'
 import deskPassesGet from '../../server/api/box-office/desk/passes.get'
+import deskCoversGet from '../../server/api/box-office/desk/covers.get'
 import passTypesPost from '../../server/api/box-office/pass-types/index.post'
 import deskSendPost from '../../server/api/box-office/desk/orders/[id]/send.post'
 import deskTicketsGet from '../../server/api/box-office/desk/orders/[id]/tickets.get'
@@ -150,6 +151,7 @@ export const handle = server({
   'POST /api/box-office/desk/issue': deskIssuePost,
   'GET /api/box-office/desk/pass': deskPassGet,
   'GET /api/box-office/desk/passes': deskPassesGet,
+  'GET /api/box-office/desk/covers': deskCoversGet,
   'POST /api/box-office/pass-types': passTypesPost,
   'POST /api/box-office/desk/orders/:id/send': deskSendPost,
   'GET /api/box-office/desk/orders/:id/tickets': deskTicketsGet,
