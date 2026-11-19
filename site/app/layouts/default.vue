@@ -11,9 +11,8 @@ const { data: navigation } = await useAsyncData('core:navigation', () => queryCo
 const route = useRoute()
 const { data: settings } = await usePublicSettings()
 
-useHead(() => ({
-  style: brand.value?.css ? [{ key: 'core-brand', innerHTML: brand.value.css }] : [],
-}))
+// The brand's tokens are set by app.vue for every shell; the heading font is the public shell's alone.
+useHead({ bodyAttrs: { class: 'public-shell' } })
 
 const BOOKING_TO = '/whats-on'
 const name = computed(() => brand.value?.name ?? t('core.public.default-name'))
