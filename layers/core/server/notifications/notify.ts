@@ -19,7 +19,15 @@ export interface NotifyRecipient {
   /** Variables for this recipient only, over the shared ones. */
   variables?: Record<string, string>
   dedupeKey?: string
+  /**
+   * The account's own address to write to this time, over the one it uses for this side: the one a
+   * person typed when booking signed out. Kept sealed, and gone once the email is sent.
+   */
+  address?: string
 }
+
+/** The sealed key that carries a recipient's address for this one message. */
+export const SEND_TO = '@to'
 
 export interface NotifyOptions {
   /** An account id, or a set of them. */
@@ -83,6 +91,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     accountId: live.get(r.accountId) ?? r.accountId,
     values: checkVariables(type.variables, { ...options.variables, ...r.variables }),
     dedupeKey: r.dedupeKey ?? options.dedupeKey,
+    address: r.address,
   }))
   if (!recipients.length) return []
 
@@ -103,13 +112,13 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
         AND ${inAccountScope('n.account_id', sql`json_extract(r.value, '$.a')`)}`)
     for (const row of found) earlier.set(Number(row.i), row.id)
   }
-  const fresh: { index: number, accountId: string, values: Record<string, string>, hash: string | null }[] = []
+  const fresh: { index: number, accountId: string, values: Record<string, string>, hash: string | null, address?: string }[] = []
   const inCall = new Set<string>()
   recipients.forEach((r, index) => {
     const hash = hashes[index] ?? null
     if (hash && (earlier.has(index) || inCall.has(`${r.accountId}\u0000${hash}`))) return
     if (hash) inCall.add(`${r.accountId}\u0000${hash}`)
-    fresh.push({ index, accountId: r.accountId, values: r.values, hash })
+    fresh.push({ index, accountId: r.accountId, values: r.values, hash, address: r.address })
   })
 
   const moduleOn = await isEnabled(module)
@@ -127,7 +136,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     for (const row of rows) muted.add(`${row.account_id}\u0000${row.channel}`)
   }
   const addresses = wantsEmail && moduleOn ? await addressesFor(accountIds, type.side) : new Map<string, string | null>()
-  const suppressed = await suppressedAddresses([...addresses.values()].filter((a): a is string => !!a))
+  const suppressed = await suppressedAddresses([...addresses.values(), ...fresh.map(r => r.address)].filter((a): a is string => !!a))
   const locales = new Map<string, string | null>()
   if (accountIds.length) {
     for (const row of await all<{ id: string, locale: string | null }>('SELECT id, locale FROM core_accounts WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(accountIds)))
@@ -147,8 +156,8 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
   const sealedNames = Object.keys(type.variables).filter(name => type.variables[name] === 'sealed')
   const split = await Promise.all(fresh.map(async (r) => {
     const open = Object.fromEntries(Object.entries(r.values).filter(([k]) => !sealedNames.includes(k)))
-    const hidden = Object.fromEntries(Object.entries(r.values).filter(([k]) => sealedNames.includes(k)))
-    return { open, sealed: sealedNames.length ? await sealSpecial(JSON.stringify(hidden)) : null }
+    const hidden = { ...Object.fromEntries(Object.entries(r.values).filter(([k]) => sealedNames.includes(k))), ...r.address ? { [SEND_TO]: r.address } : {} }
+    return { open, sealed: sealedNames.length || r.address ? await sealSpecial(JSON.stringify(hidden)) : null }
   }))
   const ids = unit.insertSet(notifications, fresh.map((r, i) => ({
     typeKey,
@@ -163,11 +172,11 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     actorId: actor.accountId ?? null,
   })))
 
-  const stateFor = (accountId: string, channel: 'email' | 'inbox'): { state: DeliveryState, reason: string | null } => {
+  const stateFor = (accountId: string, channel: 'email' | 'inbox', sendTo?: string): { state: DeliveryState, reason: string | null } => {
     if (!moduleOn) return { state: 'skipped', reason: 'module_off' }
     if (muted.has(`${accountId}\u0000${channel}`)) return { state: 'suppressed', reason: 'preference' }
     if (channel === 'inbox') return { state: 'sent', reason: null }
-    const address = addresses.get(accountId)
+    const address = sendTo ?? addresses.get(accountId)
     // No committed address yet, perhaps because the account is made in this same unit (an
     // invitation): queue it, and the send job, which reads the address again, decides.
     if (!address) return { state: 'queued', reason: null }
@@ -177,7 +186,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
 
   const queued: string[] = []
   if (wantsEmail && fresh.length) {
-    const rows = fresh.map((r, i) => ({ notificationId: ids[i]!, side: type.side, channel: 'email', ...stateFor(r.accountId, 'email'), senderKey: options.senderKey ?? null }))
+    const rows = fresh.map((r, i) => ({ notificationId: ids[i]!, side: type.side, channel: 'email', ...stateFor(r.accountId, 'email', r.address), senderKey: options.senderKey ?? null }))
     const made = unit.insertSet(deliveries, rows)
     rows.forEach((row, i) => { if (row.state === 'queued') queued.push(made[i]!) })
   }

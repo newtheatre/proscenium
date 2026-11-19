@@ -244,7 +244,7 @@ async function writeDeskOrder(unit: UnitView, sale: SaleInput, plan: OrderPlan, 
   const holdId = newId('hold')
   const order: OrderRow = {
     id: newId('ord'), reference: newReference(), state: 'basket', account_id: taken.accountId ?? await deskBuyer(unit, sale), currency: plan.currency, total_minor: plan.totalMinor, expires_at: expiresAt,
-    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
+    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, booked_with: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
   }
   unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, sold_by, expires_at, keep, created_at, updated_at)
     VALUES (${order.id}, ${order.reference}, ${taken.channel}, 'basket', ${order.account_id}, 0, ${order.currency}, ${order.total_minor}, ${order.sold_by}, ${expiresAt}, 0, ${at}, ${at})`)
@@ -324,7 +324,7 @@ async function freeLines(plan: OrderPlan, lineIds: string[]): Promise<LineRow[]>
 
 const RESERVE_HOLD = 2 * 60_000 // not-policy: the basket is reserved by the request that writes it; this only has to outlast it
 
-export interface DeskReservation { orderId: string, accountId: string, madeWith: { address: string } | null }
+export interface DeskReservation { orderId: string, accountId: string, madeWith: { address: string } | null, address?: string | null }
 
 /**
  * A booking taken for somebody at the desk or by phone and reserved to pay later (BO-34, as cut to
@@ -363,14 +363,14 @@ export async function prepareDeskReservation(unit: UnitView, input: { sale: unkn
     accountId = holder
   }
   const { order } = await writeDeskOrder(unit, sale, plan, at, at + RESERVE_HOLD, { channel: 'phone', accountId })
-  return { orderId: order.id, accountId, madeWith }
+  return { orderId: order.id, accountId, madeWith, address: input.accountId ? null : input.email ?? null }
 }
 
 /** Reserves the basket `prepareDeskReservation` wrote, for the buyer it names, and sends them the reservation. */
 export async function reserveForBuyer(unit: UnitView, prepared: DeskReservation): Promise<{ orderId: string, reference: string, state: string, amountDueMinor: number, releaseAt: number | null }> {
   const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, prepared.orderId)
   if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
-  const done = await reserveBasket(unit, order, await liveLines(order.id), prepared.accountId, prepared.madeWith)
+  const done = await reserveBasket(unit, order, await liveLines(order.id), prepared.accountId, prepared.madeWith, prepared.address)
   return done.state === 'reserved'
     ? { orderId: done.orderId, reference: done.reference, state: done.state, amountDueMinor: done.amountDueMinor, releaseAt: done.releaseAt }
     : { orderId: order.id, reference: order.reference, state: 'confirmed', amountDueMinor: 0, releaseAt: null }

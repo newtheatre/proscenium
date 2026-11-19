@@ -97,7 +97,10 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     expect((await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': done.body.token })).body.accountUnclaimed).toBe(false)
     expect(o.link_token_hash).toBe(await hashOf(done.body.token))
     expect(o.desk_code_hash).toBe(await hashOf(done.body.deskCode))
-    const stored = JSON.stringify(await rows('SELECT * FROM box_office_orders WHERE id = ?', b.orderId)) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))
+    // The address it was booked with is kept on the order only, so its messages go there.
+    expect(o.booked_with).toBe(email)
+    const { booked_with: _, ...kept } = o
+    const stored = JSON.stringify(kept) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))
     for (const secret of [done.body.token, done.body.deskCode, b.token, tokenOf(confirm.link!)]) expect(stored).not.toContain(secret)
     expect(stored).not.toContain(email)
 
