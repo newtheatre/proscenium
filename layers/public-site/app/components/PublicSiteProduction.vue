@@ -64,7 +64,7 @@ interface Production {
 
 const props = defineProps<{ slug: string, prefix: 'whats-on' | 'shows' }>()
 const { t } = useT()
-const { dateTime, time } = useDates()
+const { dateTime, dayNamed, time } = useDates()
 
 const { data } = await useAPI<Production | { moved: string }>(() => `/api/public-site/productions/${encodeURIComponent(props.slug)}`, { key: `public-site:production:${props.slug}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.production.not-found'), fatal: true })
@@ -406,18 +406,15 @@ useHead(() => {
                 <li
                   v-for="p in dates"
                   :key="p.id"
-                  class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
+                  class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-3"
                 >
                   <div class="min-w-0 space-y-1">
                     <p :class="p.state === 'cancelled' ? 'text-muted line-through' : 'font-medium'">
-                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dateTime(p.startsAt) }}</time>
+                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dayNamed(p.startsAt) }}</time>
                       <span v-if="p.label"> · {{ p.label }}</span>
                     </p>
-                    <p
-                      v-if="where(p) || (p.doorsAt && p.state === 'scheduled')"
-                      class="text-sm text-muted"
-                    >
-                      {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
+                    <p class="text-sm text-muted">
+                      <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ time(p.startsAt) }}</span>{{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
                     </p>
                     <p
                       v-if="p.effectsOff.length && p.state === 'scheduled'"
@@ -452,7 +449,7 @@ useHead(() => {
                   >{{ t('public-site.production.date-cancelled') }}</span>
                   <div
                     v-else-if="p.state === 'scheduled'"
-                    class="flex items-center gap-3"
+                    class="flex flex-col items-end gap-1 text-end"
                   >
                     <PublicSiteBookingButton
                       :booking="p.booking"

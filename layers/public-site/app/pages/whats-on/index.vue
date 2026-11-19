@@ -30,7 +30,7 @@ interface Filters {
 type Key = 'category' | 'season' | 'venue' | 'month'
 
 const { t } = useT()
-const { range, monthYear, toLocal } = useDates()
+const { span, monthYear, toLocal } = useDates()
 const route = useRoute()
 const chosen = computed(() => Object.fromEntries((['category', 'season', 'venue', 'month'] as Key[])
   .map(k => [k, typeof route.query[k] === 'string' ? route.query[k] : undefined])
@@ -154,7 +154,7 @@ const groups = computed(() => {
                   :description="markdownText(p.summary) || p.subtitle"
                   :poster="p.poster"
                   :price="p.price"
-                  :when="range(p.nextStartsAt, p.lastStartsAt)"
+                  :when="span(p.nextStartsAt, p.lastStartsAt)"
                   :age="p.age"
                   :effects="p.hasEffects"
                   :warnings="p.hasWarnings"
