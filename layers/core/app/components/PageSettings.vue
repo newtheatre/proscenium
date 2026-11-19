@@ -12,8 +12,6 @@ const props = defineProps<{
   highlight?: string
 }>()
 defineSlots<{
-  /** Under the title, above everything else: the page's tabs, such as Sign-in's. */
-  toolbar?: () => unknown
   /** Beneath the settings: what the page manages besides them, such as its KeysCard. */
   default?: () => unknown
 }>()
@@ -29,12 +27,6 @@ const onlyChanged = ref(false)
     :trail="trail"
     width="reading"
   >
-    <template
-      v-if="$slots.toolbar"
-      #toolbar
-    >
-      <slot name="toolbar" />
-    </template>
     <SettingsSearch />
     <UAlert
       v-if="advanced"

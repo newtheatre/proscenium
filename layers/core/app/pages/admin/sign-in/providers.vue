@@ -1,5 +1,5 @@
-<!-- Sign-in providers, a tab of Admin > Sign-in: one card per outside provider, each set up in its
-     own slide-over (SignInProviders). Settings search lands here for a provider's settings. -->
+<!-- Sign-in providers, the second tab of Sign-in (SignInFrame): one card per outside provider, each
+     set up in its own slide-over (SignInProviders). Settings search lands here for their settings. -->
 <script setup lang="ts">
 const { t } = useT()
 const route = useRoute()
@@ -7,12 +7,9 @@ const route = useRoute()
 
 <template>
   <PageFrame
-    :title="t('core.sign-in-settings.title')"
-    width="reading"
+    :title="t('core.sign-in-providers.title')"
+    :description="t('core.sign-in-providers.description')"
   >
-    <template #toolbar>
-      <SignInTabs />
-    </template>
     <SignInProviders :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined" />
   </PageFrame>
 </template>

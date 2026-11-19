@@ -262,6 +262,7 @@ test.describe('sign-in providers', () => {
     await page.getByRole('tab', { name: 'Providers' }).click()
     await expect(page).toHaveURL(/\/admin\/sign-in\/providers$/)
     await expect(page.getByRole('heading', { level: 2, name: 'Sign-in providers' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Providers' })).toHaveAttribute('aria-selected', 'true')
     await page.getByRole('button', { name: 'Manage Google' }).click()
     const panel = page.getByRole('dialog')
     await expect(panel.getByLabel('Redirect URI')).toHaveValue(/\/api\/core\/sign-in\/google\/callback$/)

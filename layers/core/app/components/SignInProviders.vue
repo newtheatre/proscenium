@@ -135,10 +135,7 @@ async function copy(text: string) {
 </script>
 
 <template>
-  <PageSection
-    :title="t('core.sign-in-providers.title')"
-    :description="t('core.sign-in-providers.description')"
-  >
+  <div>
     <DataBoundary
       :data="data"
       :status="status"
@@ -347,5 +344,5 @@ async function copy(text: string) {
         </div>
       </template>
     </USlideover>
-  </PageSection>
+  </div>
 </template>
