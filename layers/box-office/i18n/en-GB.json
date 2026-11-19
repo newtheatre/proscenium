@@ -50,6 +50,8 @@
   "box-office.settings.orders.desk-seat-cap.help": "The most tickets a seller can put in one order at the desk, for group bookings.",
   "box-office.settings.sales.desk-until-after.label": "Desk sells until this long after the start",
   "box-office.settings.sales.desk-until-after.help": "How long after the performance starts the desk may still sell, for latecomers.",
+  "box-office.settings.sales.desk-admit.label": "Offer to admit at the till",
+  "box-office.settings.sales.desk-admit.help": "Shows the till's \"Admit now\" box, so a seller can let the buyer in as the sale is made. Turn it off where everyone is let in at the door.",
   "box-office.settings.retention.holds.label": "Keep the label of a staff hold for",
   "box-office.settings.retention.holds.help": "How long after the performance a hold placed by staff keeps its label, such as the name of the guests it was for.",
   "box-office.abilities.performance.manage.label": "Set up sales for a performance",
