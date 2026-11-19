@@ -240,6 +240,12 @@ export async function unfinishedIn(sessionId: string): Promise<{ intentId: strin
   return row ? { intentId: row.id, amountMinor: row.amount_minor } : null
 }
 
+/** Every sale still open in the session, newest first: a seller's devices share it, and each picks up only its own. */
+export async function openSalesIn(sessionId: string): Promise<{ intentId: string, amountMinor: number }[]> {
+  const rows = await all<{ id: string, amount_minor: number }>("SELECT id, amount_minor FROM payments_intents WHERE session_id = ? AND state = 'open' ORDER BY created_at DESC, id DESC", sessionId)
+  return rows.map(r => ({ intentId: r.id, amountMinor: r.amount_minor }))
+}
+
 /** What the session has taken, by way of paying: payments that succeeded, less what went back. */
 export async function takingsIn(sessionId: string): Promise<{ method: string, amountMinor: number }[]> {
   const rows = await all<{ method: string, amount: number }>(

@@ -9,6 +9,7 @@
      columns are left out, and Your session shows only to someone with a session to look after. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { sessionsList } from '../../../../shared/lists'
 import type { YourSession } from '../../../../shared/sessions'
 
@@ -22,6 +23,9 @@ const { t } = useT()
 const { money, signed } = await useMoney()
 const { dateTime: when, brief } = useDates()
 const { data: yours, refresh: refreshYours } = await useAPI<YourSession>('/api/payments/session', { key: 'payments:session' })
+// The seller's other devices sell into the same session, so Your session asks again while shown.
+const visibility = useDocumentVisibility()
+useIntervalFn(() => { if (visibility.value === 'visible') void refreshYours() }, 15_000) // not-policy: how often Your session asks again
 const mayViewAll = computed(() => !!yours.value?.mayViewAll)
 const { data: recent, refresh: refreshRecent } = await useAPI<{ sessions: Row[] }>('/api/payments/sessions/recent', { key: 'payments:sessions-recent', default: () => ({ sessions: [] }), immediate: mayViewAll.value })
 const tillName = (r: Row) => [r.place ?? t('payments.screens.session.unknown-place'), r.pointLabel].filter(Boolean).join(' · ')
