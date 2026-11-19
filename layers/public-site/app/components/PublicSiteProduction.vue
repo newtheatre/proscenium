@@ -64,7 +64,7 @@ interface Production {
 
 const props = defineProps<{ slug: string, prefix: 'whats-on' | 'shows' }>()
 const { t } = useT()
-const { dateTime, time } = useDates()
+const { dateTime, dayNamed, time } = useDates()
 
 const { data } = await useAPI<Production | { moved: string }>(() => `/api/public-site/productions/${encodeURIComponent(props.slug)}`, { key: `public-site:production:${props.slug}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.production.not-found'), fatal: true })
@@ -409,14 +409,11 @@ useHead(() => {
                 >
                   <div class="min-w-0 space-y-1">
                     <p :class="p.state === 'cancelled' ? 'text-muted line-through' : 'font-medium'">
-                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dateTime(p.startsAt) }}</time>
+                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dayNamed(p.startsAt) }}</time>
                       <span v-if="p.label"> · {{ p.label }}</span>
                     </p>
-                    <p
-                      v-if="where(p) || (p.doorsAt && p.state === 'scheduled')"
-                      class="text-sm text-muted"
-                    >
-                      {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
+                    <p class="text-sm text-muted">
+                      <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ time(p.startsAt) }}</span>{{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
                     </p>
                     <p
                       v-if="p.effectsOff.length && p.state === 'scheduled'"
