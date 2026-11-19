@@ -13,7 +13,7 @@ useSeoMeta({ title: () => t('core.policies.title'), description: () => t('core.p
         :description="t('core.policies.description')"
       />
       <UPageBody>
-        <UPageList divide>
+        <UPageList class="gap-2">
           <UPageCard
             v-for="policy in data.policies"
             :key="policy.id"

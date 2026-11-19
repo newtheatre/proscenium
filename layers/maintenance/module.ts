@@ -4,7 +4,8 @@
 // so search engines keep the pages they know. Staff (anyone the console, Admin or live mode is open
 // to) carry on as usual: they sign in, sell, scan and change settings. Links already sent by email,
 // such as a booking's tickets, keep working where their module says so (maintenance.open-address).
-// Being on is the whole switch: there is no separate "closed" setting to forget.
+// Being on is the whole switch: there is no separate "closed" setting to forget. A new site starts
+// with it on (onAtSetup): closed from the first deploy, with setup open, until the Owner switches it off.
 import { z } from 'zod'
 import { ability, defineAbilities, defineModule, defineSettings, point, setting } from '#kit'
 
@@ -15,6 +16,7 @@ export default defineModule({
   manifest: 1,
   since: '0.1.0',
   stability: 'experimental',
+  onAtSetup: true,
 
   settings: defineSettings('maintenance', {
     // The holding page's words. Unset uses the wording in the module's catalogue.

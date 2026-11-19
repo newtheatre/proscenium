@@ -1,11 +1,12 @@
 // The gate: with maintenance mode on, a visitor gets the holding page (503, Retry-After) and the API
 // a refusal, while staff, signing in and links modules keep open go on as usual. Off, nothing changes.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { switchOnAtSetup } from '#kit/modules-store'
 import { createApp, createRouter, defineEventHandler, toWebHandler } from 'h3'
 import { changeSetting, createUnit } from '#kit'
 import gate from '../../server/middleware/10.maintenance'
 import state from '../../server/api/maintenance/state.get'
-import { env, inContext, person, setModule } from '../../../../tests/integration/helpers'
+import { env, inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 
 const app = createApp({ onRequest(event) { event.context.cloudflare = { env } } })
 app.use(gate)
@@ -32,7 +33,38 @@ const set = (key: string, value: unknown) => inContext(async () => {
 describe('maintenance mode', () => {
   afterEach(() => setModule('maintenance', false))
 
+  // The test site has no Owner, like a site just deployed.
+  describe('on a new site', () => {
+    it('is closed before anybody has switched it, with a way to setup', async () => {
+      await env.DB.prepare('DELETE FROM core_modules WHERE module_id = ?').bind('maintenance').run()
+      const r = await get('/whats-on')
+      expect(r.status).toBe(503)
+      const html = await r.text()
+      expect(html).toContain('href="/setup"')
+      expect((await get('/setup')).status).toBe(200)
+      expect((await get('/api/core/setup')).status).toBe(200)
+    })
+
+    it('is switched on by first-run setup, unless somebody already switched it', async () => {
+      await env.DB.prepare('DELETE FROM core_modules WHERE module_id = ?').bind('maintenance').run()
+      await inContext(async () => {
+        const unit = createUnit()
+        expect(await switchOnAtSetup(unit)).toEqual(['maintenance'])
+        await unit.commit()
+      })
+      expect(await rows('SELECT enabled FROM core_modules WHERE module_id = ?', 'maintenance')).toEqual([{ enabled: 1 }])
+      await setModule('maintenance', false)
+      await inContext(async () => {
+        const unit = createUnit()
+        expect(await switchOnAtSetup(unit)).toEqual([])
+        await unit.commit()
+      })
+      expect(await rows('SELECT enabled FROM core_modules WHERE module_id = ?', 'maintenance')).toEqual([{ enabled: 0 }])
+    })
+  })
+
   it('changes nothing while it is off', async () => {
+    await setModule('maintenance', false)
     const r = await get('/whats-on')
     expect(r.status).toBe(200)
     expect(await r.text()).toBe('the page')
@@ -54,6 +86,7 @@ describe('maintenance mode', () => {
       expect(html).toContain('We will be back soon')
       expect(html).toContain('We expect to be back by 6pm.')
       expect(html).toContain('mailto:boxoffice@example.org')
+      expect(html).not.toContain('href="/setup"')
     })
 
     it('says what the theatre wrote, escaped', async () => {

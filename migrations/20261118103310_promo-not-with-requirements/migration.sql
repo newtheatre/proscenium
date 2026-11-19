@@ -1,1 +1,0 @@
-ALTER TABLE `box_office_promo_codes` ADD `not_with_requirements` integer DEFAULT false NOT NULL;
