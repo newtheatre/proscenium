@@ -6,7 +6,7 @@
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 import type { TillPass, TillPassBuy } from '../components/BoxOfficeTillPasses.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, noun?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -996,8 +996,8 @@ function clear() {
               <UInput
                 v-if="row.reference && !holders[keyOf(row)]?.[n - 1]"
                 :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
-                :aria-label="t('box-office.screens.panel.reference', { label: row.reference.field ?? row.reference.label, n })"
-                :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.field ?? row.reference.label })"
+                :aria-label="t('box-office.screens.panel.reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label, n })"
+                :placeholder="t('box-office.screens.panel.holder.or-reference', { label: row.reference.noun ?? row.reference.field ?? row.reference.label })"
                 :disabled="locked"
                 autocomplete="off"
                 maxlength="64"

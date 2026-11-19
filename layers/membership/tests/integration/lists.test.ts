@@ -201,7 +201,7 @@ describe('the member price by student ID', () => {
     expect((await inContext(() => requirements.check({ accounts: [null], refs: [ref], presented: [{ ref, evidence: entry!.id }], whenUnavailable: 'not-met' }), buyer))[0]!.verdict).toBe('met')
 
     const described = await inContext(() => requirements.describe([ref]), buyer)
-    expect(described[ref]!.presentable).toMatchObject({ label: `${described[ref]!.label}: type your student ID or member number to get this price`, field: 'NNT member? Enter your University of Nottingham student ID' })
+    expect(described[ref]!.presentable).toMatchObject({ label: `${described[ref]!.label}: type your student ID or member number to get this price`, field: 'NNT member? Enter your University of Nottingham student ID', noun: 'student ID' })
 
     const door = person(['membership.verification-list.check'])
     expect(await inContext(() => requirements.holder(ref, entry!.id), door)).toBe('Ada Lovelace')

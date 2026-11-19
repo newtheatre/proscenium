@@ -785,7 +785,7 @@
   "box-office.book.reference": "{label} (ticket {n})",
   "box-office.book.reference-placeholder": "For ticket {n}",
   "box-office.book.references-missing": "Type a reference for each of these tickets.",
-  "box-office.screens.panel.reference": "{label} (ticket {n})",
+  "box-office.screens.panel.reference": "Their {label} (ticket {n})",
   "box-office.screens.panel.pass.title": "{name} · {holder}",
   "box-office.screens.panel.pass.no-holder": "No holder named",
   "box-office.screens.panel.pass.added": "One entry for tonight is in the sale.",
