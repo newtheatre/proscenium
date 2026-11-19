@@ -2,11 +2,12 @@
 // Cancelling an order's tickets (BO-50): the seats go back on sale and tickets not yet used stop
 // working at the door. A paid order may be refunded in full, less the cancellation fee, or not at
 // all, for whoever may refund; a reason is needed when the tickets were paid for. Each ticket can
-// be ticked or left out; one already used at the door is shown but cannot be ticked, and the
-// refund shown is for what is ticked.
+// be ticked or left out. One already used at the door starts unticked and, if ticked, stays admitted
+// (a duplicate booking scanned by mistake). The buyer can be left unemailed. The refund shown is for
+// what is ticked.
 interface Line { id: string, band: string | null, ticketType: string | null, amountMinor: number, admittedAt: number | null }
 
-const props = defineProps<{ orderId: string, reference: string, paid: boolean, canRefund: boolean, currency: string, feeMinor: number, lines: Line[] }>()
+const props = defineProps<{ orderId: string, reference: string, paid: boolean, canRefund: boolean, currency: string, feeMinor: number, lines: Line[], hasBuyer: boolean }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ cancelled: [result: { refund: { state: string, amountMinor: number } | null }] }>()
 
@@ -16,20 +17,20 @@ const { toRefusal } = useRefusal()
 const { money } = await useMoney()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const form = ref({ lineIds: [] as string[], refund: 'none' as 'full' | 'less-fee' | 'none', reasonTermId: '', note: '' })
+const form = ref({ lineIds: [] as string[], refund: 'none' as 'full' | 'less-fee' | 'none', reasonTermId: '', note: '', quiet: false })
 
 const { data: reasons } = await useAPI<{ terms: { id: string, label: string }[] }>('/api/core/vocabularies/box-office.cancellation-reason/terms', { key: 'box-office:cancellation-reasons', default: () => ({ terms: [] }) })
 const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ value: r.id, label: r.label })))
 const refunds = computed(() => (['full', 'less-fee', 'none'] as const).map(value => ({ value, label: t(`box-office.order.cancel.refund.${value}`) })))
 
-// A ticket used at the door stays on the order; only a paid one is checked at the door.
+// A ticket used at the door is left out unless ticked; only a paid one is checked at the door.
 const used = (l: Line) => props.paid && !!l.admittedAt
 const lineItems = computed(() => props.lines.map((l, i) => ({
   value: l.id,
   label: t('box-office.order.cancel.line', { number: i + 1, band: l.band ?? '', type: l.ticketType ?? '', price: money(l.amountMinor, props.currency) }),
   description: used(l) ? t('box-office.order.cancel.line-used') : undefined,
-  disabled: used(l),
 })))
+const usedChosen = computed(() => props.lines.some(l => used(l) && form.value.lineIds.includes(l.id)))
 const chosen = computed(() => props.lines.filter(l => form.value.lineIds.includes(l.id)))
 const refundMinor = computed(() => {
   if (!props.paid || form.value.refund === 'none') return 0
@@ -43,7 +44,7 @@ const refundWords = computed(() => props.paid && props.canRefund && chosen.value
 watch(open, (v) => {
   if (!v) return
   refusal.value = null
-  form.value = { lineIds: props.lines.filter(l => !used(l)).map(l => l.id), refund: props.paid && props.canRefund ? 'full' : 'none', reasonTermId: '', note: '' }
+  form.value = { lineIds: props.lines.filter(l => !used(l)).map(l => l.id), refund: props.paid && props.canRefund ? 'full' : 'none', reasonTermId: '', note: '', quiet: false }
 })
 
 async function cancel() {
@@ -51,7 +52,7 @@ async function cancel() {
   try {
     const result = await $api<{ refund: { state: string, amountMinor: number } | null }>(`/api/box-office/orders/${encodeURIComponent(props.orderId)}/cancel`, {
       method: 'POST',
-      body: { lineIds: form.value.lineIds, refund: form.value.refund, reasonTermId: form.value.reasonTermId || undefined, note: form.value.note.trim() || undefined },
+      body: { lineIds: form.value.lineIds, refund: form.value.refund, reasonTermId: form.value.reasonTermId || undefined, note: form.value.note.trim() || undefined, quiet: form.value.quiet || undefined, admitted: usedChosen.value || undefined },
     })
     open.value = false
     emit('cancelled', { refund: result?.refund ?? null })
@@ -87,7 +88,7 @@ async function cancel() {
       >
         <RefusalNotice :refusal="refusal" />
         <UFormField
-          v-if="lines.length > 1"
+          v-if="lines.length > 1 || lines.some(used)"
           name="lineIds"
           required
         >
@@ -97,6 +98,13 @@ async function cancel() {
             :items="lineItems"
           />
         </UFormField>
+        <p
+          v-if="usedChosen"
+          class="text-sm text-muted"
+          aria-live="polite"
+        >
+          {{ t('box-office.order.cancel.used-chosen') }}
+        </p>
         <UFormField
           v-if="paid && canRefund"
           :label="t('box-office.order.cancel.refund.label')"
@@ -134,6 +142,12 @@ async function cancel() {
             maxlength="200"
           />
         </UFormField>
+        <UCheckbox
+          v-if="hasBuyer"
+          v-model="form.quiet"
+          :label="t('box-office.order.cancel.quiet')"
+          :description="t('box-office.order.cancel.quiet-help')"
+        />
       </UForm>
     </template>
     <template #footer>

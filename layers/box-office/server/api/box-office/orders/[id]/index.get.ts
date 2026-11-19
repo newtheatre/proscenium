@@ -5,6 +5,7 @@ import { all, can, defineRoute, first, refuse, useSetting } from '#kit'
 import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from '#modules/core'
 import { paymentsOf } from '#modules/payments'
 import { passOf } from '../../../../orders'
+import { mayReadPassCodes, passesOnOrder } from '../../../../pass-holding'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
 interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null, pass_entry: number }
@@ -53,6 +54,11 @@ export default defineRoute({
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
     complimentary: (await first<{ one: number }>('SELECT 1 AS one FROM box_office_order_lines WHERE order_id = ? AND comp_request_id IS NOT NULL LIMIT 1', id)) !== null,
     pass: await passOf(id),
+    // Each pass bought on the order or used for its tickets, with its code for staff who hand codes over.
+    passes: await passesOnOrder(id).then(async (list) => {
+      const codes = await mayReadPassCodes(actor)
+      return list.map(p => ({ ...p, code: codes ? p.code : null }))
+    }),
     // A request to make this reservation complimentary that is still waiting for a decision.
     compNeedsApproval: await useSetting('box-office.comps.needs-approval') as boolean,
     compPending: order.state === 'reserved' && (await first<{ one: number }>("SELECT 1 AS one FROM box_office_comp_requests WHERE order_id = ? AND state IN ('requested', 'approved') LIMIT 1", id)) !== null,
@@ -70,6 +76,7 @@ export default defineRoute({
       cancel: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.cancel'),
       refund: order.state === 'confirmed' && await allowed('box-office.order.refund'),
       exchange: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.exchange'),
+      assign: !order.account_id && ['reserved', 'awaiting_payment', 'confirmed'].includes(order.state) && await allowed('box-office.order.exchange'),
       comp: order.state === 'reserved' && !!performanceId && (await can(actor, 'box-office.comp.request', ['core.performance', performanceId])).allowed,
     },
   }

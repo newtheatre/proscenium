@@ -34,6 +34,8 @@ import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
 import cancelPost from '../../server/api/box-office/orders/[id]/cancel.post'
+import assignPost from '../../server/api/box-office/orders/[id]/assign.post'
+import accountGet from '../../server/api/box-office/accounts/[id]/index.get'
 import amendPost from '../../server/api/box-office/orders/[id]/amend.post'
 import compPost from '../../server/api/box-office/orders/[id]/comp.post'
 import splitPost from '../../server/api/box-office/orders/[id]/split.post'
@@ -146,6 +148,8 @@ export const handle = server({
   'POST /api/box-office/orders/link/cancel': orderCancelPost,
   'POST /api/box-office/orders/link/account': orderAccountPost,
   'POST /api/box-office/orders/:id/cancel': cancelPost,
+  'POST /api/box-office/orders/:id/assign': assignPost,
+  'GET /api/box-office/accounts/:id': accountGet,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'POST /api/box-office/orders/:id/comp': compPost,
   'POST /api/box-office/orders/:id/split': splitPost,
