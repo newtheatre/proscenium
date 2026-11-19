@@ -94,6 +94,7 @@ export default defineRoute({
       catalogue: entry.catalogue ?? null,
       of: entry.of,
       record: entry.record,
+      choices: entry.choices,
     })
   }
   const declared = input.page ? registry.settingPages.get(input.page) : undefined

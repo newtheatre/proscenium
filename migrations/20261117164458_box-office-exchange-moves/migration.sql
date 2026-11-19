@@ -1,1 +1,0 @@
-ALTER TABLE `box_office_exchanges` ADD `moves` text;

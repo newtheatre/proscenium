@@ -1,1 +1,0 @@
-ALTER TABLE `payments_attempts` ADD `note` text;

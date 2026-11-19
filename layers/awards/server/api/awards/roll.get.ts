@@ -12,5 +12,7 @@ export default defineRoute({ public: true, rateLimit: 'default' }, async (event,
   const typeKey = typeof type === 'string' && KEY.test(type) ? type : undefined
   const members = actor.kind === 'person' && !!actor.accountId && await fact('core.member', actor)
   // With the form builder on, the page offers whichever nomination forms the viewer could answer now.
-  return { types: await roll({ members, typeKey }), nominations: await isEnabled('forms') }
+  // A production links to its page only where that page answers (public site on, past shows public).
+  const pages = !await isEnabled('public-site') ? 'none' : await useSetting('public-site.archive.public') ? 'all' : 'current'
+  return { types: await roll({ members, typeKey, pages }), nominations: await isEnabled('forms') }
 })
