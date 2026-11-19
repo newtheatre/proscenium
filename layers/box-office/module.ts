@@ -339,7 +339,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'Your {{ pass }} for {{ theatre }}',
-          body: 'Here is your **{{ pass }}** ({{ price }}).\n\nYour pass code is **{{ code }}**\n\n{{ paid }}\n\nThe pass gives you one entry at each performance it covers. You still need to reserve: choose a performance on our website and add the pass with this code, or give the code at the box office. Bring your ticket on the night, not the pass.\n\nAlready have tickets for other shows this pass covers? Use your pass for them from Your passes, in your account.',
+          body: 'Here is your **{{ pass }}** ({{ price }}).\n\nYour pass code is **{{ code }}**\n\n{{ qr code }}\n\n{{ paid }}\n\nThe pass gives you one entry at each performance it covers. You still need to reserve: choose a performance on our website and add the pass with this code, or give the code at the box office. On the night, show your ticket or this pass code at the door.\n\nAlready have tickets for other shows this pass covers? Use your pass for them from Your passes, in your account.',
         },
       },
     }, {
