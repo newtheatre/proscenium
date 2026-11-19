@@ -9,7 +9,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 definePageMeta({ layout: 'console' })
 
 type State = 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired'
-interface Line { id: string, kind: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, state: string, admittedAt: number | null, ticketState: string | null, requirementPending?: boolean }
+interface Line { id: string, kind: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, state: string, admittedAt: number | null, ticketState: string | null, requirementPending?: boolean, passEntry?: boolean }
 interface Cancellation { id: string, kind: string, note: string | null, lineCount: number, refunded: boolean, feeMinor: number, reason: string | null, by: string | null, at: number }
 interface Payment { intentId: string, amountMinor: number, refundedMinor: number, methods: string[], takenBy: string | null, point: string | null, at: number }
 type RefundState = 'requested' | 'approved' | 'sent' | 'succeeded' | 'failed' | 'declined'

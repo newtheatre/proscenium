@@ -3,11 +3,12 @@
 // items to priceSale and writes the savings that come back on its own lines.
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { all, can, first, newId, nowMs, refuse, useContext, usePoint, type UnitView } from '#kit'
+import { all, can, first, newId, nowMs, refuse, theatreTimeZone, useContext, usePoint, type UnitView } from '#kit'
 import type { PricedSale, PricedSaving, PricingInput, StaffChoice } from '#modules/payments'
 import { codes as codesTable, redemptions as redemptionsTable, targets as targetsTable, CHANNELS, COUNT_BY, EFFECTS, TRIGGERS } from './db/schema'
 import { priceItems, type EngineItem, type EngineRule } from './engine'
 import type { PromotionTarget, Scope, TargetField } from './points/target'
+import { inSchedule, parseSchedule, scheduleInput, type Schedule } from './schedule'
 
 export type Trigger = typeof TRIGGERS[number]
 export type Effect = typeof EFFECTS[number]
@@ -26,6 +27,8 @@ export interface Promotion {
   channel: typeof CHANNELS[number]
   validFrom: number | null
   validUntil: number | null
+  /** The days and times it runs, in the theatre's time zone; null for any time its dates allow. */
+  schedule: Schedule | null
   minSpendMinor: number | null
   maxUses: number | null
   used: number
@@ -53,6 +56,7 @@ interface Row {
   channel: Promotion['channel']
   valid_from: number | null
   valid_until: number | null
+  schedule: string | null
   min_spend_minor: number | null
   max_uses: number | null
   used: number
@@ -69,7 +73,7 @@ interface CodeRow { id: string, promotion_id: string, code: string, max_uses: nu
 
 const toPromotion = (r: Row, codes: CodeRow[], targets: PromotionTargetRow[]): Promotion => ({
   id: r.id, name: r.name, label: r.label, trigger: r.trigger, effect: r.effect, value: r.value, buyQuantity: r.buy_quantity, freeQuantity: r.free_quantity, channel: r.channel,
-  validFrom: r.valid_from, validUntil: r.valid_until, minSpendMinor: r.min_spend_minor, maxUses: r.max_uses, used: r.used, countBy: r.count_by, maxPerSale: r.max_per_sale,
+  validFrom: r.valid_from, validUntil: r.valid_until, schedule: parseSchedule(r.schedule), minSpendMinor: r.min_spend_minor, maxUses: r.max_uses, used: r.used, countBy: r.count_by, maxPerSale: r.max_per_sale,
   combines: !!r.combines, notWithRequirements: !!r.not_with_requirements, needsReason: !!r.needs_reason, active: !!r.active, note: r.note,
   codes: codes.map(c => ({ id: c.id, code: c.code, maxUses: c.max_uses, used: c.used, active: !!c.active, note: c.note })),
   targets,
@@ -95,6 +99,7 @@ export const promotionInput = z.object({
   channel: z.enum(CHANNELS).optional(),
   validFrom: z.number().int().positive().nullable().optional(),
   validUntil: z.number().int().positive().nullable().optional(),
+  schedule: scheduleInput.nullable().optional(),
   minSpendMinor: z.number().int().min(1).max(10_000_000).nullable().optional(), // not-policy: a sanity bound
   maxUses: z.number().int().min(1).max(1_000_000).nullable().optional(), // not-policy: a sanity bound
   countBy: z.enum(COUNT_BY).optional(),
@@ -186,7 +191,7 @@ function writeChildren(unit: UnitView, promotionId: string, input: PromotionInpu
 
 const columns = (c: PromotionInput) => ({
   name: c.name, label: c.label, trigger: c.trigger, effect: c.effect, value: c.value, buyQuantity: c.effect === 'multi_buy' ? c.buyQuantity ?? null : null, freeQuantity: c.effect === 'multi_buy' ? c.freeQuantity ?? null : null,
-  channel: c.channel ?? 'all', validFrom: c.validFrom ?? null, validUntil: c.validUntil ?? null, minSpendMinor: c.minSpendMinor ?? null, maxUses: c.maxUses ?? null, countBy: c.countBy ?? 'item',
+  channel: c.channel ?? 'all', validFrom: c.validFrom ?? null, validUntil: c.validUntil ?? null, schedule: c.schedule?.length ? JSON.stringify(c.schedule) : null, minSpendMinor: c.minSpendMinor ?? null, maxUses: c.maxUses ?? null, countBy: c.countBy ?? 'item',
   maxPerSale: c.maxPerSale ?? null, combines: c.combines ? 1 : 0, notWithRequirements: c.notWithRequirements ? 1 : 0, note: c.note ?? null,
   needsReason: c.trigger === 'staff' && c.needsReason ? 1 : 0,
 })
@@ -197,8 +202,8 @@ export async function createPromotion(unit: UnitView, input: PromotionInput, act
   const at = nowMs()
   const v = columns(c)
   const id = newId('prom')
-  unit.add(sql`INSERT INTO promotions_promotions (id, name, label, trigger, effect, value, buy_quantity, free_quantity, channel, valid_from, valid_until, min_spend_minor, max_uses, count_by, max_per_sale, combines, not_with_requirements, needs_reason, note, active, created_by, created_at, updated_at)
-    VALUES (${id}, ${v.name}, ${v.label}, ${v.trigger}, ${v.effect}, ${v.value}, ${v.buyQuantity}, ${v.freeQuantity}, ${v.channel}, ${v.validFrom}, ${v.validUntil}, ${v.minSpendMinor}, ${v.maxUses}, ${v.countBy}, ${v.maxPerSale}, ${v.combines}, ${v.notWithRequirements}, ${v.needsReason}, ${v.note}, 1, ${actorId}, ${at}, ${at})`)
+  unit.add(sql`INSERT INTO promotions_promotions (id, name, label, trigger, effect, value, buy_quantity, free_quantity, channel, valid_from, valid_until, schedule, min_spend_minor, max_uses, count_by, max_per_sale, combines, not_with_requirements, needs_reason, note, active, created_by, created_at, updated_at)
+    VALUES (${id}, ${v.name}, ${v.label}, ${v.trigger}, ${v.effect}, ${v.value}, ${v.buyQuantity}, ${v.freeQuantity}, ${v.channel}, ${v.validFrom}, ${v.validUntil}, ${v.schedule}, ${v.minSpendMinor}, ${v.maxUses}, ${v.countBy}, ${v.maxPerSale}, ${v.combines}, ${v.notWithRequirements}, ${v.needsReason}, ${v.note}, 1, ${actorId}, ${at}, ${at})`)
   writeChildren(unit, id, c, at)
   unit.audit({ action: 'create', record: ['promotions.promotion', id] })
   return id
@@ -219,7 +224,7 @@ export async function updatePromotion(unit: UnitView, id: string, input: Promoti
   const at = nowMs()
   const v = columns(c)
   unit.add(sql`UPDATE promotions_promotions SET name = ${v.name}, label = ${v.label}, trigger = ${v.trigger}, effect = ${v.effect}, value = ${v.value}, buy_quantity = ${v.buyQuantity}, free_quantity = ${v.freeQuantity},
-    channel = ${v.channel}, valid_from = ${v.validFrom}, valid_until = ${v.validUntil}, min_spend_minor = ${v.minSpendMinor}, max_uses = ${v.maxUses}, count_by = ${v.countBy}, max_per_sale = ${v.maxPerSale},
+    channel = ${v.channel}, valid_from = ${v.validFrom}, valid_until = ${v.validUntil}, schedule = ${v.schedule}, min_spend_minor = ${v.minSpendMinor}, max_uses = ${v.maxUses}, count_by = ${v.countBy}, max_per_sale = ${v.maxPerSale},
     combines = ${v.combines}, not_with_requirements = ${v.notWithRequirements}, needs_reason = ${v.needsReason}, note = ${v.note}, updated_at = ${at}
     WHERE id = ${id} AND (${v.maxUses} IS NULL OR used <= ${v.maxUses})`).expect(1, { code: 'promotions.promotion.below-used', reason: 'This promotion has just been used more often than that limit.' })
   writeChildren(unit, id, c, at)
@@ -245,12 +250,26 @@ export async function anyAutomatic(channel: PricingInput['channel']): Promise<bo
   return !!await first("SELECT 1 FROM promotions_promotions WHERE active = 1 AND trigger = 'automatic' AND channel IN ('all', ?) LIMIT 1", channel)
 }
 
+/**
+ * Whether a promotion's days and times allow it at a moment, in the theatre's time zone. Before
+ * setup has set the zone, a promotion with a schedule does not run; one without runs as its dates allow.
+ */
+async function runsNow(at: number): Promise<(row: Pick<Row, 'schedule'>) => boolean> {
+  const zone = await theatreTimeZone().catch(() => null)
+  return (row) => {
+    const schedule = parseSchedule(row.schedule)
+    if (!schedule) return true
+    return zone !== null && inSchedule(schedule, at, zone)
+  }
+}
+
 /** The promotions in play: those that start on their own, and those of the codes typed, judged now. */
 async function candidates(input: PricingInput, at: number): Promise<Candidate[]> {
   const channel = input.channel
   const auto = await all<Row>(`SELECT * FROM promotions_promotions WHERE active = 1 AND trigger = 'automatic' AND channel IN ('all', ?)
     AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)`, channel, at, at)
-  const out: Candidate[] = auto.map(row => ({ row, code: null }))
+  const now = await runsNow(at)
+  const out: Candidate[] = auto.filter(now).map(row => ({ row, code: null }))
   for (const typed of input.codes ?? []) {
     const code = normaliseCode(typed)
     if (!code) continue
@@ -259,13 +278,14 @@ async function candidates(input: PricingInput, at: number): Promise<Candidate[]>
     const row = (await first<Row>('SELECT * FROM promotions_promotions WHERE id = ?', found.promotion_id))!
     if (!found.active || !row.active || row.trigger !== 'code' || (row.valid_until !== null && at >= row.valid_until)) refuse('promotions.code.expired', 'That code has expired.', { status: 422, fields: CODE_FIELDS })
     if (row.valid_from !== null && at < row.valid_from) refuse('promotions.code.not-yet', 'That code cannot be used yet.', { status: 422, fields: CODE_FIELDS })
+    if (!now(row)) refuse('promotions.code.not-now', 'That code cannot be used at this time of day.', { status: 422, fields: CODE_FIELDS })
     if (row.channel !== 'all' && row.channel !== channel) refuse('promotions.code.not-here', channel === 'online' ? 'That code can only be used in person.' : 'That code can only be used online.', { status: 422, fields: CODE_FIELDS })
     if (!out.some(c => c.row.id === row.id)) out.push({ row, code: found })
   }
   const STAFF_FIELDS = { staff: 'invalid' }
   for (const pick of input.staff ?? []) {
     const row = await first<Row>('SELECT * FROM promotions_promotions WHERE id = ?', pick.promotionId)
-    if (!row || row.trigger !== 'staff' || !row.active || (row.valid_until !== null && at >= row.valid_until) || (row.valid_from !== null && at < row.valid_from) || (row.channel !== 'all' && row.channel !== channel))
+    if (!row || row.trigger !== 'staff' || !row.active || (row.valid_until !== null && at >= row.valid_until) || (row.valid_from !== null && at < row.valid_from) || (row.channel !== 'all' && row.channel !== channel) || !now(row))
       refuse('promotions.staff.unavailable', 'That discount cannot be given now.', { status: 422, fields: STAFF_FIELDS })
     if (!await mayApply(row)) refuse('promotions.staff.not-yours', 'You cannot give that discount.', { status: 403, fields: STAFF_FIELDS })
     const reason = pick.reason?.trim() || null
@@ -288,7 +308,8 @@ export async function staffChoices(): Promise<StaffChoice[]> {
   const rows = await all<Row & { staff_ability: string | null }>(`SELECT * FROM promotions_promotions WHERE active = 1 AND trigger = 'staff' AND channel IN ('all', 'till')
     AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?) ORDER BY name`, at, at)
   const out: StaffChoice[] = []
-  for (const r of rows) if (await mayApply(r)) out.push({ promotionId: r.id, label: r.label, name: r.name, needsReason: !!r.needs_reason })
+  const now = await runsNow(at)
+  for (const r of rows) if (now(r) && await mayApply(r)) out.push({ promotionId: r.id, label: r.label, name: r.name, needsReason: !!r.needs_reason })
   return out
 }
 

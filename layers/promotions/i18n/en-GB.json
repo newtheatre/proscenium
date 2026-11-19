@@ -107,5 +107,21 @@
   "promotions.field.until": "Valid until",
   "promotions.field.until-after": "After the start.",
   "promotions.field.note": "Note",
-  "promotions.field.note-help": "For staff only, such as who the codes were given to."
+  "promotions.field.note-help": "For staff only, such as who the codes were given to.",
+  "promotions.field.schedule": "Days and times",
+  "promotions.field.schedule-help": "Leave empty to run whenever its dates allow. A time that ends before it starts runs past midnight. Times are the theatre's.",
+  "promotions.field.schedule-days": "Days, window {n}",
+  "promotions.field.schedule-from": "From",
+  "promotions.field.schedule-until": "Until",
+  "promotions.field.schedule-add": "Add days and times",
+  "promotions.field.schedule-remove": "Remove window {n}",
+  "promotions.field.schedule-days-needed": "Choose at least one day.",
+  "promotions.field.schedule-times-needed": "Give a start and an end time.",
+  "promotions.day.1": "Mon",
+  "promotions.day.2": "Tue",
+  "promotions.day.3": "Wed",
+  "promotions.day.4": "Thu",
+  "promotions.day.5": "Fri",
+  "promotions.day.6": "Sat",
+  "promotions.day.7": "Sun"
 }

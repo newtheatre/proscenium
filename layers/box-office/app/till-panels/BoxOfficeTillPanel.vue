@@ -4,6 +4,7 @@
      only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
+import type { TillPass, TillPassBuy } from '../components/BoxOfficeTillPasses.vue'
 
 interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
@@ -14,7 +15,7 @@ interface Order { orderId: string, reference: string, state: 'reserved' | 'await
 /** `settled`: the till payment just taken that this panel sold something in, until the next customer. */
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
 /** One line on the till's receipt; `more` and `fewer` draw its stepper there. */
-interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more: () => void, fewer: () => void }
+interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more?: () => void, fewer?: () => void }
 const emit = defineEmits<{
   'update:modelValue': [unknown]
   /** The tickets for the till's receipt, with their steppers, and what was last added (till proposal, 17 November 2026). */
@@ -89,6 +90,25 @@ function takeOne(row: PerformanceRow) {
   for (const list of [holders.value[keyOf(row)], references.value[keyOf(row)]]) if (list && list.length > n) list.splice(Math.max(n, 0))
   if (n <= 0 && lastAdded.value === keyOf(row)) lastAdded.value = null
 }
+// The sale's tickets by kind, for the offer to swap one for a pass; and taking one out when it is.
+const saleTickets = computed(() => {
+  const out: { ticketTypeId: string, name: string, amountMinor: number, quantity: number }[] = []
+  for (const row of performance.value?.rows ?? []) {
+    const n = quantities.value[keyOf(row)] ?? 0
+    if (!n) continue
+    const kind = out.find(k => k.ticketTypeId === row.ticketTypeId)
+    if (kind) {
+      kind.quantity += n
+      kind.amountMinor = Math.max(kind.amountMinor, row.amountMinor)
+    }
+    else out.push({ ticketTypeId: row.ticketTypeId, name: row.ticketType, amountMinor: row.amountMinor, quantity: n })
+  }
+  return out
+})
+function swapTicket(ticketTypeId: string) {
+  const row = [...(performance.value?.rows ?? [])].reverse().find(r => r.ticketTypeId === ticketTypeId && (quantities.value[keyOf(r)] ?? 0) > 0)
+  if (row) takeOne(row)
+}
 // A performance whose production has one price throughout sells in one section, which is not named.
 const oneSection = (id: string | undefined) => {
   const rows = performances.value.find(p => p.performanceId === id)?.rows ?? []
@@ -125,7 +145,77 @@ watch(performanceId, () => {
   quantities.value = {}
   references.value = {}
   holders.value = {}
+  dropPasses()
 })
+
+// Passes (BO-64): a pass found by the find box gives one entry tonight; one sold here gives its first
+// entry tonight unless sold on its own; one whose money is owed may be paid for on its own.
+const passEntries = ref<TillPass[]>([])
+const passBuys = ref<TillPassBuy[]>([])
+const passCollect = ref<TillPass[]>([])
+const passFound = ref<TillPass | null>(null)
+const hasPasses = computed(() => passEntries.value.length + passBuys.value.length + passCollect.value.length > 0)
+function dropPasses() {
+  passEntries.value = []
+  passBuys.value = []
+  passCollect.value = []
+  passFound.value = null
+}
+/** The pass for what was typed or scanned, or null when no pass has that code. */
+async function lookPass(text: string): Promise<TillPass | null> {
+  if (!performanceId.value) return null
+  try {
+    return await $api<TillPass>('/api/box-office/desk/pass', { query: { performanceId: performanceId.value, code: text.trim() } })
+  }
+  catch (e) {
+    const said = toRefusal(e)
+    if (said?.code !== 'box-office.pass.unknown') refusal.value = said
+    return null
+  }
+}
+function foundPass(pass: TillPass) {
+  passFound.value = pass
+  if (!pass.unusable && !passEntries.value.some(p => p.code === pass.code)) passEntries.value = [...passEntries.value, pass]
+}
+const passBody = () => ({
+  ...(passEntries.value.length ? { passes: passEntries.value.map(p => ({ code: p.code })) } : {}),
+  ...(passBuys.value.length ? { buy: passBuys.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.entry ? {} : { entry: false }), ...(b.holder ? ('email' in b.holder ? { email: b.holder.email } : { accountId: b.holder.accountId }) : {}) })) } : {}),
+  ...(passCollect.value.length ? { collect: passCollect.value.map(p => p.code) } : {}),
+})
+const passReceipt = (detail: string): ReceiptLine[] => [
+  ...passEntries.value.flatMap(p => [
+    { key: `pass-entry ${p.code}`, label: t('box-office.screens.panel.pass.receipt-entry', { name: p.name }), detail: p.holder ?? detail, quantity: 1, amountMinor: 0 },
+    ...(p.owedMinor > 0 ? [{ key: `pass-owed ${p.code}`, label: t('box-office.screens.panel.pass.receipt-owed', { name: p.name, price: p.priceName }), quantity: 1, amountMinor: p.owedMinor }] : []),
+  ]),
+  ...passBuys.value.flatMap((b, i) => [
+    ...(b.entry ? [{ key: `pass-buy-entry ${i}`, label: t('box-office.screens.panel.pass.receipt-entry', { name: b.name }), detail, quantity: 1, amountMinor: 0 }] : []),
+    { key: `pass-buy ${i}`, label: t('box-office.screens.panel.pass.receipt-buy', { name: b.name, price: b.priceName }), quantity: 1, amountMinor: b.amountMinor },
+  ]),
+  ...passCollect.value.map(p => ({ key: `pass-collect ${p.code}`, label: t('box-office.screens.panel.pass.receipt-owed', { name: p.name, price: p.priceName }), quantity: 1, amountMinor: p.owedMinor })),
+].map(l => ({ ...l, more: undefined, fewer: undefined }))
+
+// Nothing to pay, such as a pass's entry alone: booked here, without the till's payment.
+const issuing = ref(false)
+const issued = ref<{ orderId: string, reference: string } | null>(null)
+const canIssue = computed(() => mode.value === 'sell' && passEntries.value.length > 0 && props.summary?.amountMinor === 0 && props.modelValue !== null && props.modelValue !== undefined)
+async function issueFree() {
+  issuing.value = true
+  refusal.value = null
+  try {
+    issued.value = await $api<{ orderId: string, reference: string }>('/api/box-office/desk/issue', { method: 'POST', body: { sale: props.modelValue } })
+    quantities.value = {}
+    references.value = {}
+    holders.value = {}
+    dropPasses()
+    tell(null)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    issuing.value = false
+  }
+}
 
 // Collecting: one order, found by what the buyer shows.
 const query = ref('')
@@ -155,10 +245,10 @@ function sendReceipt(rows: PerformanceRow[]) {
   const detail = t('box-office.screens.panel.receipt-detail', { title: show.title, when: dateTime(show.startsAt) })
   const added = rows.find(r => keyOf(r) === lastAdded.value)
   emit('receipt', {
-    lines: rows.map((r) => {
+    lines: [...rows.map((r) => {
       const quantity = quantities.value[keyOf(r)]!
       return { key: keyOf(r), label: rowLabel(r), detail, quantity, amountMinor: r.amountMinor * quantity, more: () => addOne(r), fewer: () => takeOne(r) }
-    }),
+    }), ...passReceipt(detail)],
     added: added ? { label: rowLabel(added), undo: () => takeOne(added) } : null,
   })
 }
@@ -178,7 +268,7 @@ function say() {
       const named = Array.from({ length: quantity }, (_, n) => (typed[n] ? '' : holders.value[keyOf(r)]?.[n]?.accountId ?? ''))
       return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(typed.some(Boolean) ? { references: typed } : {}), ...(named.some(Boolean) ? { holders: named } : {}) }
     })
-    tell(lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value } : null)
+    tell((lines.length || hasPasses.value) && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...passBody() } : null)
     sendReceipt((performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r)))
   }
   else {
@@ -186,7 +276,7 @@ function say() {
     tell(order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, references, holders, order, exchange, lastAdded], say, { deep: true })
+watch([mode, admit, quantities, references, holders, order, exchange, lastAdded, passEntries, passBuys, passCollect], say, { deep: true })
 // A booking found, or several to pick from, is what the panel shows; with none, it sells walk-up tickets.
 watch([order, matches], () => {
   mode.value = order.value || matches.value.length ? 'collect' : 'sell'
@@ -208,7 +298,7 @@ onMounted(() => {
 let lastSaid = 'null'
 // The till hands back what a sale was for when it picks a payment up after a reload: the
 // performance and how many of each ticket are shown again, as they were.
-async function restore(value: { performanceId?: unknown, lines?: unknown, admit?: unknown, email?: unknown }) {
+async function restore(value: { performanceId?: unknown, lines?: unknown, admit?: unknown, email?: unknown, passes?: unknown, buy?: unknown, collect?: unknown }) {
   if (typeof value.performanceId !== 'string' || !Array.isArray(value.lines)) return
   order.value = null
   matches.value = []
@@ -221,6 +311,24 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
   // Who each ticket was for is kept by account; their names were on the screen before the reload.
   holders.value = Object.fromEntries(lines.filter(l => l.holders).map(l => [keyOf(l), l.holders!.map(id => (id ? { accountId: id, label: t('box-office.screens.panel.holder.restored'), byHand: false } : undefined))]))
   admit.value = value.admit === true
+  await restorePasses(value)
+}
+
+// The passes in a sale picked up after a reload, found again by their codes; a pass sold, by its kind.
+async function restorePasses(value: { passes?: unknown, buy?: unknown, collect?: unknown }) {
+  const codes = (list: unknown) => (Array.isArray(list) ? list.map(x => (typeof x === 'string' ? x : (x as { code?: unknown })?.code)).filter((c): c is string => typeof c === 'string') : [])
+  const look = async (list: unknown) => (await Promise.all(codes(list).map(c => lookPass(c)))).filter((p): p is TillPass => !!p)
+  passEntries.value = await look(value.passes)
+  passCollect.value = await look(value.collect)
+  if (!Array.isArray(value.buy) || !value.buy.length || !performanceId.value) return
+  const onSale = (await $api<{ passes: { id: string, name: string, prices: { id: string, name: string, amountMinor: number }[] }[] }>('/api/box-office/desk/passes', { query: { performanceId: performanceId.value } })).passes
+  passBuys.value = (value.buy as { passTypeId: string, passPriceId: string, entry?: boolean, accountId?: string, email?: string }[]).flatMap((b) => {
+    const type = onSale.find(x => x.id === b.passTypeId)
+    const price = type?.prices.find(p => p.id === b.passPriceId)
+    if (!type || !price) return []
+    const holder = b.email ? { email: b.email } : b.accountId ? { accountId: b.accountId, label: t('box-office.screens.panel.holder.restored') } : undefined
+    return [{ passTypeId: type.id, passPriceId: price.id, name: type.name, priceName: price.name, amountMinor: price.amountMinor, entry: b.entry !== false, ...(holder ? { holder } : {}) }]
+  })
 }
 
 // The till empties every panel after a sale, and when the seller clears the sale.
@@ -239,7 +347,8 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (Object.keys(references.value).length) references.value = {}
   if (Object.keys(holders.value).length) holders.value = {}
-  // The next buyer never sees who the last one was.
+  // The next buyer never sees who the last one was, nor uses their passes.
+  if (hasPasses.value || passFound.value) dropPasses()
   if (!order.value || mode.value !== 'collect') return
   // After a sale the booking is found again, to show it paid; the receipt's Clear puts it away.
   if (fromTill && !wasLocked) clear()
@@ -248,7 +357,7 @@ watch(() => [props.modelValue, props.locked] as const, ([now], [, wasLocked]) =>
 
 // After the sale (till proposal): what was made, with its reference and tickets, so the seller can
 // email them, admit the buyer, or open the booking, until the till moves on to the next customer.
-interface Sold { orderId: string, reference: string, buyer: string | null, performance: { id: string, title: string, startsAt: number } | null, lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[] }
+interface Sold { orderId: string, reference: string, buyer: string | null, performance: { id: string, title: string, startsAt: number } | null, lines: { id: string, band: string | null, ticketType: string, amountMinor: number, admitted: boolean }[], passes: { name: string, priceName: string, code: string | null, holder: string | null }[] }
 const sold = ref<Sold[]>([])
 const soldRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const soldBusy = ref<string | null>(null)
@@ -291,6 +400,17 @@ async function find(text = query.value) {
   refusal.value = null
   try {
     const found = await $api<{ orders: Order[] }>('/api/box-office/desk/orders', { query: { q: text } })
+    issued.value = null
+    // No booking by that: it may be a pass, whose entry joins the walk-up sale.
+    const pass = found.orders.length ? null : await lookPass(text)
+    if (pass) {
+      order.value = null
+      matches.value = []
+      searched.value = false
+      query.value = ''
+      foundPass(pass)
+      return
+    }
     matches.value = found.orders.length > 1 ? found.orders : []
     order.value = found.orders.length === 1 ? found.orders[0]! : null
     searched.value = true
@@ -444,6 +564,27 @@ function clear() {
           </span>
         </li>
       </ul>
+      <ul
+        v-if="o.passes.length"
+        class="space-y-1 text-sm"
+        :aria-label="t('box-office.screens.panel.pass.sold')"
+      >
+        <li
+          v-for="p in o.passes"
+          :key="p.code ?? p.name"
+          class="flex flex-wrap items-center gap-x-2"
+        >
+          <UIcon
+            name="i-lucide-id-card"
+            class="size-4 text-muted"
+          />
+          <span>{{ t('box-office.screens.panel.pass.sold-line', { name: p.name, price: p.priceName, holder: p.holder ?? t('box-office.screens.panel.pass.no-holder') }) }}</span>
+          <span
+            v-if="p.code"
+            class="font-mono"
+          >{{ p.code }}</span>
+        </li>
+      </ul>
       <p
         v-if="o.buyer"
         class="flex items-center gap-2 text-sm"
@@ -507,6 +648,14 @@ function clear() {
     class="space-y-4"
   >
     <RefusalNotice :refusal="refusal" />
+    <UAlert
+      v-if="issued"
+      color="success"
+      variant="subtle"
+      icon="i-lucide-check"
+      :title="t('box-office.screens.panel.pass.booked', { reference: issued.reference })"
+      :actions="[{ label: t('box-office.screens.panel.sold.open'), color: 'neutral', variant: 'outline', to: `/console/box-office/orders/${issued.orderId}` }, { label: t('box-office.screens.panel.pass.dismiss'), color: 'neutral', variant: 'link', onClick: () => { issued = null } }]"
+    />
 
     <UForm
       :state="{ query }"
@@ -864,6 +1013,26 @@ function clear() {
               {{ t(row.companion ? 'box-office.screens.panel.holder.companion-needed' : 'box-office.screens.panel.holder.needed', { count: unnamed(row) }) }}
             </p>
           </div>
+          <BoxOfficeTillPasses
+            v-model:entries="passEntries"
+            v-model:buys="passBuys"
+            v-model:collect="passCollect"
+            v-model:found="passFound"
+            :performance-id="performance.performanceId"
+            :locked="locked"
+            :tickets="saleTickets"
+            @swap="swapTicket"
+          />
+          <!-- The till takes no payment of nothing: a pass's entry alone is booked from here. -->
+          <UButton
+            v-if="canIssue"
+            icon="i-lucide-check"
+            size="lg"
+            :label="t(admit ? 'box-office.screens.panel.pass.book-admit' : 'box-office.screens.panel.pass.book', { count: passEntries.length })"
+            :loading="issuing"
+            :disabled="locked"
+            @click="issueFree"
+          />
         </template>
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
           <USelect

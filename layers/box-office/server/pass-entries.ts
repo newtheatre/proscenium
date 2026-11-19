@@ -7,9 +7,9 @@
 // performance and, for a pass of that kind, one performance of a show. A seat given back gives the
 // entry back.
 import { sql } from 'drizzle-orm'
-import { all, first, newId, nowMs, openColumn, refuse, requirements, theatreTimeZone, useSetting, type UnitView } from '#kit'
+import { all, first, isRefusal, newId, nowMs, openColumn, refuse, requirements, theatreTimeZone, useSetting, type UnitView } from '#kit'
 import { accountScopeIds, accountScopeSql } from '#kit/accounts'
-import { getPerformance, getProduction } from '#modules/core'
+import { accountLabel, getPerformance, getProduction } from '#modules/core'
 import { hashOf } from './codes'
 import { passCodeHashes, shownPassCode } from './pass-holding'
 import { HIDDEN_TYPE, managedType } from './ticket-types'
@@ -172,6 +172,29 @@ export function carryPassEntry(unit: UnitView, from: { redemptionId: string }, t
 }
 
 /**
+ * Moves pass entries to other seats at another performance of the same show, in an exchange, in the
+ * same batch as their old seats' release (which gives the entries back): each takes its entry again
+ * for its new seat, with the same guard as a first entry. Answers the new entry for each old line.
+ */
+export async function movePassEntries(unit: UnitView, orderId: string, moving: readonly { lineId: string, claimId: string }[], performanceId: string, productionId: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (!moving.length) return out
+  const rows = await all<{ line_id: string, pass_id: string, once: number }>(`SELECT l.id AS line_id, d.pass_id, d.once FROM box_office_order_lines l JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id
+    WHERE l.order_id = ? AND l.id IN (SELECT value FROM json_each(?))`, orderId, JSON.stringify(moving.map(m => m.lineId)))
+  const at = nowMs()
+  for (const row of rows) {
+    const claimId = moving.find(m => m.lineId === row.line_id)!.claimId
+    unit.add(sql`UPDATE box_office_passes SET updated_at = ${at} WHERE id = ${row.pass_id} AND state = 'active' AND (uses_total IS NULL OR uses_taken < uses_total)
+      AND NOT EXISTS (SELECT 1 FROM box_office_pass_redemptions d WHERE d.pass_id = ${row.pass_id} AND d.state = 'live' AND (d.performance_id = ${performanceId} OR (d.once = 1 AND d.production_id = ${productionId})))`).expect(1, TAKEN)
+    const id = newId('pred')
+    unit.add(sql`INSERT INTO box_office_pass_redemptions (id, pass_id, production_id, performance_id, order_id, claim_id, once, state, created_at, updated_at)
+      VALUES (${id}, ${row.pass_id}, ${productionId}, ${performanceId}, ${orderId}, ${claimId}, ${row.once}, 'live', ${at}, ${at})`)
+    out.set(row.line_id, id)
+  }
+  return out
+}
+
+/**
  * For lines written again on new seats, in the same batch as their old seats' release: each line
  * that was a pass entry takes its entry again for its new seat, and its new line points at it.
  */
@@ -223,4 +246,38 @@ export async function passesFor(performanceId: string, account: string | null, a
     }
   }
   return { accepted: true, mine }
+}
+
+/** A pass as the till sees it once found (BO-64). `unusable` says why it gives no entry tonight; what it owes can still be paid. */
+export interface DeskPass {
+  code: string
+  name: string
+  priceName: string
+  holder: string | null
+  owedMinor: number
+  left: number | null
+  unusable: { code: string, reason: string, remedy: string | null } | null
+}
+
+/**
+ * A pass scanned or typed at the till, judged for the performance being sold. One that is unknown or
+ * cancelled is refused; one that cannot give an entry tonight is still shown, saying why, so what it
+ * owes can be paid. Reads only.
+ */
+export async function deskPass(typed: string, performanceId: string, at = nowMs()): Promise<DeskPass> {
+  const row = await first<{ id: string, code: string | null, name: string, price_name: string, account_id: string | null, amount_minor: number, paid_at: number | null, uses_total: number | null, uses_taken: number, state: string, issued_at: number | null }>(
+    `SELECT p.id, p.code, t.name, r.name AS price_name, p.account_id, p.amount_minor, p.paid_at, p.uses_total, p.uses_taken, p.state, p.issued_at
+      FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id WHERE p.code_hash = ? OR p.alias_hash = ?`, ...await passCodeHashes(typed))
+  if (!row || !row.issued_at) refuse('box-office.pass.unknown', 'We do not recognise that pass code.', { status: 422, remedy: 'Check how it is spelt. It is on the pass and in its email.', fields: field('unknown') })
+  if (row.state !== 'active') refuse('box-office.pass.void', 'That pass has been cancelled.', { status: 422, remedy: 'Open it from Passes to see who cancelled it.', fields: field('void') })
+  const code = row.code ? shownPassCode(await openColumn(row.code) as string) : typed.trim()
+  const base = { code, name: row.name, priceName: row.price_name, holder: row.account_id ? await accountLabel(row.account_id) : null, owedMinor: row.paid_at ? 0 : row.amount_minor }
+  try {
+    const judged = await judgePass(code, performanceId, { channel: 'desk', account: null }, at)
+    return { ...base, left: judged.left, unusable: null }
+  }
+  catch (error) {
+    if (!isRefusal(error)) throw error
+    return { ...base, left: row.uses_total === null ? null : row.uses_total - row.uses_taken, unusable: { code: error.code, reason: error.reason, remedy: error.remedy ?? null } }
+  }
 }

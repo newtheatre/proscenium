@@ -5,7 +5,7 @@
 // a full house changes nothing. The
 // dialogue shows what it costs or gives back before anything happens. A dearer exchange of paid
 // tickets goes to the till, which holds the new seats while the difference is paid.
-interface Line { id: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number }
+interface Line { id: string, bandId: string | null, band: string | null, ticketTypeId: string | null, ticketType: string | null, amountMinor: number, /** A pass's entry: it keeps the pass, and only its seats change. */ passEntry?: boolean }
 interface Offer { performanceId: string, title: string, startsAt: number, currency: string | null, rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }[] }
 interface Quote { oldMinor: number, newMinor: number, differenceMinor: number, paid: boolean }
 
@@ -35,6 +35,10 @@ const performanceItems = computed(() => {
 const rows = computed(() => offers.value?.performances.find(p => p.performanceId === form.value.performanceId)?.rows ?? [])
 const optionItems = computed(() => rows.value
   .map(r => ({ value: `${r.bandId}|${r.ticketTypeId}`, label: t('box-office.order.exchange.option', { band: r.band, type: r.ticketType, price: money(r.amountMinor, props.currency), free: r.free }), disabled: r.free < 1 })))
+// A pass's entry moves to any seats with room, still the pass's, at no charge.
+const passItemsFor = (l: Line) => [...new Map(rows.value.map(r => [r.bandId, r])).values()]
+  .map(r => ({ value: `${r.bandId}|${l.ticketTypeId}`, label: t('box-office.order.exchange.pass-option', { band: r.band, free: r.free }), disabled: r.free < 1 }))
+const itemsFor = (l: Line) => (l.passEntry ? passItemsFor(l) : optionItems.value)
 // Each ticket is named by its place on the order as well, so three alike tickets read apart.
 const describe = (l: Line) => t('box-office.order.exchange.line', { number: props.lines.indexOf(l) + 1, band: l.band ?? '', type: l.ticketType ?? '', price: money(l.amountMinor, props.currency) })
 const lineItems = computed(() => props.lines.map(l => ({ value: l.id, label: describe(l) })))
@@ -52,6 +56,10 @@ const ready = computed(() => chosen.value.length > 0 && !!form.value.performance
 // sells them, else the same ticket type in any seats, else nothing until the seller picks.
 function startingOption(l: Line): string {
   const free = rows.value.filter(r => r.free > 0)
+  if (l.passEntry) {
+    const band = free.find(r => r.bandId === l.bandId) ?? free[0]
+    return band ? `${band.bandId}|${l.ticketTypeId}` : ''
+  }
   const same = free.find(r => r.bandId === l.bandId && r.ticketTypeId === l.ticketTypeId) ?? free.find(r => r.ticketTypeId === l.ticketTypeId)
   return same ? `${same.bandId}|${same.ticketTypeId}` : ''
 }
@@ -152,7 +160,7 @@ async function exchange() {
           >
             <USelect
               v-model="form.options[l.id]"
-              :items="optionItems"
+              :items="itemsFor(l)"
               :placeholder="t('box-office.order.exchange.choose')"
             />
           </UFormField>
