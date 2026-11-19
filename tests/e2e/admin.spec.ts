@@ -233,7 +233,8 @@ test.describe('keys typed into the app', () => {
     await visit(page, '/admin/sign-in')
     const card = page.locator('form').filter({ has: page.getByRole('heading', { level: 2, name: 'Keys' }) })
     await expect(card.getByLabel('Turnstile secret key')).toBeVisible()
-    await expect(card.getByLabel('Google client secret')).toBeVisible()
+    // Google's secret is in Google's own set-up, on the Providers tab.
+    await expect(card.getByLabel('Google client secret')).toHaveCount(0)
     await card.getByLabel('Turnstile secret key').fill('0x4AAAAAAAe2eabcdefghij4321')
     await card.getByRole('button', { name: 'Save keys' }).click()
     await expect(page.getByText('Keys saved', { exact: true }).first()).toBeVisible()
@@ -248,6 +249,40 @@ test.describe('keys typed into the app', () => {
     await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
     await expect(card.getByLabel('Turnstile secret key')).toHaveValue('')
     await expect(card.getByText('Not set').first()).toBeVisible()
+  })
+})
+
+test.describe('sign-in providers', () => {
+  test.use(as(siteOwner('Sam Signin', ['core.identity-settings.manage'])))
+
+  test('Google is a card whose set-up runs in order: redirect URI, client ID and secret together, then in use with Undo', async ({ page }) => {
+    await visit(page, '/admin/sign-in')
+    // Google's switch and fields are no longer among the settings; the providers are the next tab.
+    await expect(page.getByRole('switch', { name: 'Sign in with Google' })).toHaveCount(0)
+    await page.getByRole('tab', { name: 'Providers' }).click()
+    await expect(page).toHaveURL(/\/admin\/sign-in\/providers$/)
+    await expect(page.getByRole('heading', { level: 2, name: 'Sign-in providers' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Providers' })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('button', { name: 'Manage Google' }).click()
+    const panel = page.getByRole('dialog')
+    await expect(panel.getByLabel('Redirect URI')).toHaveValue(/\/api\/core\/sign-in\/google\/callback$/)
+    await expect(panel.getByText('Save the client ID and secret before putting it in use.')).toBeVisible()
+    // Both are needed, said beside each field.
+    await panel.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(panel.getByText('This is needed.').first()).toBeVisible()
+    await panel.getByLabel('Client ID').fill('123-abc.apps.googleusercontent.com')
+    await panel.getByLabel('Client secret').fill('GOCSPX-secretvalue9876')
+    // The messages go as each field is typed in, before Save is pressed.
+    await expect(panel.getByText('This is needed.')).toHaveCount(0)
+    await panel.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText("Saved Google's set-up").first()).toBeVisible()
+    await expect(panel.getByText('Saved, ending 9876')).toBeVisible()
+    await noViolations(page)
+    await panel.getByRole('button', { name: 'Put in use' }).click()
+    await expect(page.getByText('Google sign-in is in use').first()).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Take out of use' })).toBeVisible()
+    await page.locator('button', { hasText: 'Undo' }).first().click()
+    await expect(panel.getByRole('button', { name: 'Put in use' })).toBeVisible()
   })
 })
 

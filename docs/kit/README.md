@@ -297,6 +297,20 @@ after 5 seconds; a throw waits 30. After five tries the message is set aside in
 `<worker>-email-events-dead`. The body names the recipient and the subject, so only the queue
 message's id and the event's type are ever logged.
 
+### The content store
+
+Nuxt Content keeps each collection (the theatre's pages, the menu, redirects, policies) in D1 and
+loads a collection, after a deploy changes it, in whichever request first reads it. Its row in
+`_content_info` says "not ready" while the load runs, and every other reader waits up to 90 seconds
+for it. A load cut short (the visitor left, the request was cancelled) used to leave that row "not
+ready" for good: every read of the collection then waited 90 seconds and gave up, so the Admin
+overview, whose site-readiness count reads the pages, never finished loading. The minute's cron
+tick now mends the store (`layers/core/server/content-store.ts`): a row still "not ready" two
+minutes after the tick first saw it is deleted, so the collection is loaded again from scratch, and
+the tick then asks for one row of every collection, so the load after a deploy runs in the tick
+rather than in a visitor's request. Separately, a count (`core.count`) that has not answered in three
+seconds reads as zero, so no count can hold up a home page or a menu.
+
 ## Public components
 
 A module offers a component to the fork's Markdown pages through `core.public-component`:
@@ -574,7 +588,11 @@ in the specification's "As built" list; this guide is the reference from here on
 - The content token is `:setting{name="..."}` rather than `:setting{key}`, because `key` is
   reserved in Vue and never reaches the component.
 - Points are read with `usePoint(name)`; `point()` is the manifest helper that declares one.
-- Cross-setting rules are declared in the manifest field `settingRules`.
+- Cross-setting rules are declared in the manifest field `settingRules`. A save of several settings
+  (`changeSettings`, and `PUT /api/core/settings`) checks each module's rules once, against all its
+  changes together, so dependent settings save in one go in any order. A rule that already failed
+  before the save does not block it; one the save breaks is refused, naming in `fields` the change it
+  blames (the first whose removal lets the rule hold) as well as `value`.
 - The jobs of a switched-off module wait (M4) rather than run.
 - External calls are declared in the manifest's `calls` section, each with a handler file.
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning

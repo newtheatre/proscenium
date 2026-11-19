@@ -238,6 +238,10 @@ export default defineModule({
       onForExisting: 'box-office.on-the-night-switched-on',
     }],
     'core.tonight-figure': [{ id: 'box-office.sold', file: 'sold' }, { id: 'box-office.in', file: 'in' }],
+    // Tonight's ticket sales and the next performances' seats, on the console home's grid.
+    'core.home-figure': [{ id: 'box-office.sales', file: 'sales' }, { id: 'box-office.seats', file: 'seats' }],
+    // The door, from the palette and the console home.
+    'core.quick-action': [{ id: 'box-office.door', to: '/live/door', icon: 'i-lucide-scan-line', ability: 'box-office.ticket.admit', keywords: 'box-office.quick-actions.door.keywords', order: 20 }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.

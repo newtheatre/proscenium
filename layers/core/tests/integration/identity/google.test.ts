@@ -56,9 +56,9 @@ describe('sign in with Google (ID-04)', () => {
     // Turning Google on is declared onChange: 'confirm' (part 6): it asks again first.
     expect((await admin.browser.put('/api/core/settings/core.sign-in.google', { value: true })).body.fields).toEqual({ confirm: 'required' })
     const turnOn = () => admin.browser.put('/api/core/settings/core.sign-in.google', { value: true, confirm: true })
-    expect((await turnOn()).body.fields).toEqual({ value: 'core.settings.rules.google-needs-client-id' })
+    expect((await turnOn()).body.fields).toMatchObject({ value: 'core.settings.rules.google-needs-client-id' })
     expect((await admin.browser.put('/api/core/settings/core.sign-in.google-client-id', { value: CLIENT })).status).toBe(200)
-    expect((await turnOn()).body.fields).toEqual({ value: 'core.settings.rules.google-needs-client-secret' })
+    expect((await turnOn()).body.fields).toMatchObject({ value: 'core.settings.rules.google-needs-client-secret' })
     await saveKey('CORE_GOOGLE_CLIENT_SECRET', 'test-google-secret')
     expect((await turnOn()).status).toBe(200)
   })
@@ -186,5 +186,115 @@ describe('the hourly sweep', () => {
     expect(await rows('SELECT count(*) AS n FROM core_account_tokens WHERE expires_at <= ?', Date.now())).toEqual([{ n: 0 }])
     expect(await rows('SELECT count(*) AS n FROM core_passkey_challenges WHERE used_at IS NOT NULL')).toEqual([{ n: 0 }])
     expect((await browser.get('/api/core/me')).body.account.id).toBe(accountId)
+  })
+})
+
+describe('setting a sign-in provider up on Admin > Sign-in', () => {
+  afterEach(async () => {
+    for (const key of ['core.sign-in.google', 'core.sign-in.google-client-id', 'core.sign-in.google-domains', 'core.sign-in.managed-domains']) await clearSetting(key)
+    await saveKey('CORE_GOOGLE_CLIENT_SECRET', null)
+  })
+
+  async function admin() {
+    const person = await staff()
+    await grantDirectly(person.accountId, ['core.identity-settings.manage'])
+    return person
+  }
+
+  it('lists each provider with what it still needs and the redirect URI, never the secret', async () => {
+    const { browser } = await admin()
+    const [google] = (await browser.get('/api/core/sign-in-providers')).body.providers
+    expect(google).toMatchObject({ id: 'google', label: 'Google', on: false, clientId: null, domains: [], missing: ['client-id', 'secret'] })
+    expect(google.callbackUrl).toMatch(/\/api\/core\/sign-in\/google\/callback$/)
+    expect((await new Browser().get('/api/core/sign-in-providers')).status).not.toBe(200)
+  })
+
+  it('saves the client id, secret and organisations together, then puts it in use and out again', async () => {
+    const { browser } = await admin()
+    const saved = await browser.put('/api/core/sign-in-providers/google', { clientId: CLIENT, domains: ['Example.org'], secret: 'shh-its-a-secret-1234', confirm: true })
+    expect(saved.status).toBe(200)
+    expect(saved.body.provider).toMatchObject({ clientId: CLIENT, domains: ['example.org'], missing: [], on: false, secret: { saved: true, hint: '1234' } })
+    expect(JSON.stringify(saved.body)).not.toContain('shh-its-a-secret')
+    expect((await browser.put('/api/core/settings/core.sign-in.google', { value: true, confirm: true })).status).toBe(200)
+    // A secret in use is not removed from under it.
+    expect((await browser.put('/api/core/sign-in-providers/google', { clientId: CLIENT, domains: ['example.org'], secret: null })).status).toBe(409)
+    // Leaving the secret out keeps it.
+    const kept = await browser.put('/api/core/sign-in-providers/google', { clientId: CLIENT, domains: [], confirm: true })
+    expect(kept.body.provider).toMatchObject({ on: true, domains: [], secret: { saved: true } })
+    expect((await browser.put('/api/core/settings/core.sign-in.google', { value: false, confirm: true })).status).toBe(200)
+  })
+
+  it('checks the saved pair with the provider, without saving anything', async () => {
+    const { browser } = await admin()
+    expect((await browser.post('/api/core/sign-in-providers/google/check', {})).body.code).toBe('core.sign-in.provider-incomplete')
+    await browser.put('/api/core/sign-in-providers/google', { clientId: CLIENT, domains: [], secret: 'right-secret' })
+    stubGoogle(async (url, init) => {
+      const body = new URLSearchParams(String(init?.body))
+      expect(url).toBe('https://oauth2.googleapis.com/token')
+      return body.get('client_secret') === 'right-secret'
+        ? Response.json({ error: 'invalid_grant' }, { status: 400 })
+        : Response.json({ error: 'invalid_client' }, { status: 401 })
+    })
+    expect((await browser.post('/api/core/sign-in-providers/google/check', {})).body).toEqual({ accepted: true })
+    await browser.put('/api/core/sign-in-providers/google', { clientId: CLIENT, domains: [], secret: 'wrong-secret' })
+    expect((await browser.post('/api/core/sign-in-providers/google/check', {})).body.code).toBe('core.sign-in.provider-rejected')
+    stubGoogle(async () => { throw new Error('offline') })
+    expect((await browser.post('/api/core/sign-in-providers/google/check', {})).body.code).toBe('core.sign-in.provider-unreachable')
+  })
+})
+
+describe('related settings saved together', () => {
+  afterEach(async () => {
+    for (const key of ['core.sign-in.google', 'core.sign-in.google-client-id', 'core.sign-in.managed-domains']) await clearSetting(key)
+    await saveKey('CORE_GOOGLE_CLIENT_SECRET', null)
+  })
+
+  it('checks the rules against every change in the save, in any order', async () => {
+    const person = await staff()
+    await grantDirectly(person.accountId, ['core.identity-settings.manage'])
+    await saveKey('CORE_GOOGLE_CLIENT_SECRET', 'test-google-secret')
+    const save = (changes: { key: string, value: unknown }[]) => person.browser.put('/api/core/settings', { changes, confirm: true })
+    // Managed domains need Google on, and Google needs its client id: all three in one save, the dependent one first.
+    const together = await save([
+      { key: 'core.sign-in.managed-domains', value: ['example.org'] },
+      { key: 'core.sign-in.google', value: true },
+      { key: 'core.sign-in.google-client-id', value: CLIENT },
+    ])
+    expect(together.status).toBe(200)
+    // A save that breaks a rule names the change it blames.
+    const broken = await save([{ key: 'core.sign-in.google', value: false }])
+    expect(broken.body.fields).toMatchObject({ 'core.sign-in.google': 'core.settings.rules.managed-domains-need-provider' })
+  })
+
+  it('does not let a rule that already failed block an unrelated change', async () => {
+    const person = await staff()
+    await grantDirectly(person.accountId, ['core.identity-settings.manage'])
+    await setSetting('core.sign-in.google', true)
+    await setSetting('core.sign-in.google-client-id', CLIENT)
+    // The secret was removed after Google went into use, so google-needs-client-secret fails already.
+    expect((await person.browser.put('/api/core/settings', { changes: [{ key: 'core.sessions.idle-limit', value: 7 * 24 * 3600 }] })).status).toBe(200)
+    await clearSetting('core.sessions.idle-limit')
+  })
+})
+
+describe('the ways in a signed-out browser is offered', () => {
+  afterEach(async () => {
+    for (const key of ['core.sign-in.google', 'core.sign-in.google-client-id', 'core.sign-in.google-domains', 'core.sign-in.managed-domains']) await clearSetting(key)
+    await saveKey('CORE_GOOGLE_CLIENT_SECRET', null)
+    await saveKey('CORE_TURNSTILE_SECRET_KEY', 'test-turnstile-secret')
+  })
+
+  it('offers only what would work: the code once the bot check has its secret, a provider once its secret is saved', async () => {
+    const methods = async () => (await new Browser().get('/api/core/me')).body.signIn
+    await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
+    expect(await methods()).toMatchObject({ email: false, providers: [], managed: null })
+    await saveKey('CORE_TURNSTILE_SECRET_KEY', 'turnstile-secret')
+    await setSetting('core.sign-in.google', true)
+    await setSetting('core.sign-in.google-client-id', CLIENT)
+    await setSetting('core.sign-in.google-domains', ['example.org'])
+    await setSetting('core.sign-in.managed-domains', ['staff.example.org'])
+    expect(await methods()).toMatchObject({ email: true, providers: [], managed: null })
+    await saveKey('CORE_GOOGLE_CLIENT_SECRET', 'test-google-secret')
+    expect(await methods()).toMatchObject({ email: true, providers: [{ id: 'google', label: 'Google', domains: ['example.org'] }], managed: { domains: ['staff.example.org'], provider: 'google' } })
   })
 })

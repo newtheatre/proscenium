@@ -7,7 +7,11 @@ import { installRegistry } from '#kit/registry'
 import { installMigrations } from '#kit/migrations'
 import { handleQueue, handleScheduled } from '#kit/worker'
 import { setEmailEventsConsumer, setEmailEventsSetAside } from '#kit/email-events'
+import { setContentUpkeep } from '#kit/content-upkeep'
+import { useNitroApp } from 'nitropack/runtime'
+import { useContext } from '#kit'
 import { emailEventsConsumer, emailEventsSetAside } from './email-events'
+import { mendContentStore } from './content-store'
 import type { KitEnv } from '#kit/context'
 
 // The Durable Object behind the shared rate-limit counts (binding RATE_LIMITS).
@@ -17,6 +21,15 @@ installRegistry(registry)
 installMigrations(migrations, release)
 setEmailEventsConsumer(emailEventsConsumer)
 setEmailEventsSetAside(emailEventsSetAside)
+// Nuxt Content's own route loads a collection on first ask, so the tick asks it through Nitro.
+setContentUpkeep(async (at) => {
+  const { env } = useContext()
+  const query = async (collection: string, sql: string) => {
+    const response = await useNitroApp().localFetch(`/__nuxt_content/${collection}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql }) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  }
+  await mendContentStore(env.DB, env.CACHE, at, query)
+})
 
 export default {
   ...nitro,

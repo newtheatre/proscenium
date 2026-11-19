@@ -34,7 +34,7 @@ const props = defineProps<{ performanceId: string, drawer?: boolean, changing?: 
 const emit = defineEmits<{ held: [] }>()
 const performanceId = computed(() => props.performanceId)
 
-const { data } = await useAPI<Page>(() => `/api/box-office/book/performances/${encodeURIComponent(performanceId.value)}`, { key: `box-office:book:${performanceId.value}` })
+const { data, refresh } = await useAPI<Page>(() => `/api/box-office/book/performances/${encodeURIComponent(performanceId.value)}`, { key: `box-office:book:${performanceId.value}` })
 // This performance's own booking page: where signing in comes back to, and where Change tickets returns.
 const here = computed(() => (data.value ? `/book/${data.value.production.slug}/${data.value.performance.id}` : route.path))
 
@@ -184,6 +184,42 @@ const ready = computed(() => quantity.value > 0 && !companionAlone.value && !too
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // A refused reference is said beside the references typed; the notice at the top is for the rest.
 const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
+// A reference not found that the theatre can check by hand (Matt, 19 November): a small button sends
+// it to staff as a membership request, and while that waits the buyer's account has the price.
+const mayAsk = computed(() => referenceRefusal.value?.fields?.reference === 'ask')
+const asking = ref(false)
+const sentForCheck = ref(false)
+const ASK_KEY = 'box-office:ask-check'
+async function askCheck(typeId: string) {
+  const typed = Object.entries(references.value).filter(([key]) => key.endsWith(` ${typeId}`)).flatMap(([, list]) => list.map(r => r?.trim()).filter(Boolean))
+  if (!viewer.value.signedIn) {
+    // Signing in comes back here; what was chosen and typed waits in this tab until then.
+    try {
+      sessionStorage.setItem(ASK_KEY, JSON.stringify({ performanceId: performanceId.value, typeId, counts: counts.value, references: references.value }))
+    }
+    catch { /* storage refused: the choices are typed again after signing in */ }
+    await navigateTo(`/sign-in?next=${encodeURIComponent(here.value)}`)
+    return
+  }
+  asking.value = true
+  try {
+    let requested = false
+    for (const reference of typed) {
+      const answer = await $api<{ state: 'requested' | 'met' }>('/api/box-office/book/ask-check', { method: 'POST', body: { performanceId: performanceId.value, ticketTypeId: typeId, reference } })
+      requested = answer.state === 'requested'
+      if (requested) break
+    }
+    refusal.value = null
+    sentForCheck.value = requested
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    asking.value = false
+  }
+}
 // So is a refused pass, beside the passes.
 const passRefusal = computed(() => refusal.value?.code.startsWith('box-office.pass.') ? refusal.value : null)
 const busy = ref(false)
@@ -194,6 +230,18 @@ const held = ref<{ expiresAt: number } | null>(null)
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(async () => {
+  let waiting: { performanceId: string, typeId: string, counts: Record<string, number>, references: Record<string, string[]> } | null = null
+  try {
+    waiting = JSON.parse(sessionStorage.getItem(ASK_KEY) ?? 'null')
+    sessionStorage.removeItem(ASK_KEY)
+  }
+  catch { /* nothing waiting */ }
+  if (waiting?.performanceId === performanceId.value && viewer.value.signedIn) {
+    counts.value = waiting.counts
+    references.value = waiting.references
+    await askCheck(waiting.typeId)
+    return
+  }
   const remembered = recallBasket()
   if (!remembered || remembered.back.split('?')[0] !== here.value) return
   const basket = await $api<{ state: string, expiresAt: number | null }>(`/api/box-office/baskets/${encodeURIComponent(remembered.orderId)}`, { headers: { 'x-basket-token': remembered.token } }).catch(() => null)
@@ -298,6 +346,21 @@ async function hold() {
     </template>
     <template v-else>
       <RefusalNotice :refusal="referenceRefusal || passRefusal ? null : refusal" />
+      <UButton
+        v-if="refusal?.detail?.to"
+        :to="refusal.detail.to"
+        color="neutral"
+        variant="outline"
+        :label="t('box-office.book.ask.join-page')"
+      />
+      <UAlert
+        v-if="sentForCheck"
+        color="success"
+        variant="subtle"
+        icon="i-lucide-mail-check"
+        :title="t('box-office.book.ask.sent')"
+        :description="t('box-office.book.ask.sent-help')"
+      />
       <BoxOfficePassBox
         v-if="data.passes.accepted"
         v-model="passes"
@@ -407,6 +470,16 @@ async function hold() {
                     maxlength="64"
                     class="block w-64"
                     @update:model-value="setReference(band.bandId, type.ticketTypeId, n - 1, String($event))"
+                  />
+                  <UButton
+                    v-if="mayAsk && counts[keyOf(band.bandId, type.ticketTypeId)]"
+                    size="xs"
+                    color="neutral"
+                    variant="link"
+                    class="px-0"
+                    :loading="asking"
+                    :label="t('box-office.book.ask.button')"
+                    @click="askCheck(type.ticketTypeId)"
                   />
                 </template>
               </div>

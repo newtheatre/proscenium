@@ -796,5 +796,11 @@
   "bar.promotions.category": "Category",
   "bar.promotions.product": "Product",
   "bar.promotions.size": "Size",
-  "bar.promotions.outlet": "Outlet"
+  "bar.promotions.outlet": "Outlet",
+  "bar.home-figures.takings.label": "Bar takings tonight",
+  "bar.home-figures.takings.detail.one": "{count} sale",
+  "bar.home-figures.takings.detail.other": "{count} sales",
+  "bar.home-figures.takings.series": "Takings",
+  "bar.home-figures.takings.summary.one": "Bar takings on each of the last {days} days: {count} sale in all.",
+  "bar.home-figures.takings.summary.other": "Bar takings on each of the last {days} days: {count} sales in all."
 }
