@@ -4,6 +4,7 @@
 // payments.settlement release.
 import type { UnitView } from '#kit'
 import type { PricedSale, PricingItem } from './pricing'
+import type { Destination } from './settlement'
 
 /** One line of a panel's summary. */
 export interface SummaryLine {
@@ -25,6 +26,10 @@ export interface DeskContext {
    * it in `prepare`; it must not price its items again.
    */
   priced?: PricedSale
+  /** Where the whole sale's receipt goes, if anywhere; a split sale's are given person by person as they pay. */
+  receipt?: Destination
+  /** The sale is split between people, so its receipts are not known yet. */
+  split?: boolean
 }
 
 export interface DeskBasket {

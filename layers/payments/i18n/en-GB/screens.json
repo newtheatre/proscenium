@@ -228,6 +228,7 @@
   "payments.screens.till.add-person": "Add a person",
   "payments.screens.till.remove-person": "Remove person {n}",
   "payments.screens.till.receipt-to": "Email a receipt to",
+  "payments.screens.till.receipt-needed": "Tickets are sent with the receipt, so add the buyer's email before taking payment.",
   "payments.screens.till.receipt-after": "Email a receipt",
   "payments.screens.till.receipt-send": "Send",
   "payments.screens.till.receipt-sent": "Receipt sent, with any tickets.",
