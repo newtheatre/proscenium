@@ -1,6 +1,6 @@
 // What the order services share: the order and its live ticket lines as they are read, and the
 // words a message uses for them.
-import { all, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
+import { all, first, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
 import { getPerformance, getProduction, getVenue, latecomersAt, placeOf } from '#modules/core'
 import { lineKey, unnamedLines } from './line-names'
 import catalogue from '../i18n/en-GB.json'
@@ -86,4 +86,21 @@ export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors
     access: notes.length ? say('box-office.visit.access', { notes: notes.join(' ') }) : say('box-office.visit.ask'),
     latecomers: say(`box-office.visit.latecomers.${await latecomersAt(performance.id)}`),
   }
+}
+
+/**
+ * The pass an order's tickets were booked on, when any were: its type's name, whether the pass itself
+ * is paid for, and whether every ticket on the order is a pass entry. Staff see it on the orders list
+ * and the order, so an order of pass entries at £0 does not read as paid in full. Where an order holds
+ * entries from more than one pass, an unpaid one is named first.
+ */
+export interface OrderPass { name: string, paid: boolean, only: boolean }
+
+export async function passOf(orderId: string): Promise<OrderPass | null> {
+  const row = await first<{ name: string, paid_at: number | null, others: number }>(`SELECT y.name, p.paid_at,
+      (SELECT count(*) FROM box_office_order_lines x WHERE x.order_id = l.order_id AND x.kind = 'ticket' AND x.pass_redemption_id IS NULL) AS others
+    FROM box_office_order_lines l JOIN box_office_pass_redemptions d ON d.id = l.pass_redemption_id
+      JOIN box_office_passes p ON p.id = d.pass_id JOIN box_office_pass_types y ON y.id = p.pass_type_id
+    WHERE l.order_id = ? ORDER BY p.paid_at IS NULL DESC LIMIT 1`, orderId)
+  return row ? { name: row.name, paid: row.paid_at !== null, only: row.others === 0 } : null
 }

@@ -12,6 +12,7 @@ import { basketByToken, createBasket, type Basket } from '../../server/baskets'
 import { issuePass } from '../../server/pass-holding'
 import { listPassTypes } from '../../server/passes'
 import { passesFor } from '../../server/pass-entries'
+import { passOf } from '../../server/orders'
 import { expireBasket } from '../../server/release'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
 import { house, NOV_16, ready, type House } from './stage'
@@ -145,5 +146,28 @@ describe('a pass on a basket', () => {
     const bad = await call(handle, 'GET', `/api/box-office/book/performances/${a.performanceId}/pass?code=PASS-AAAA-BBBB`, {})
     expect([bad.status, (await bad.json() as { code: string }).code]).toEqual([422, 'box-office.pass.unknown'])
     expect(nowMs()).toBe(NOV_16)
+  })
+})
+
+describe('an order booked on a pass', () => {
+  it('names the pass for staff, says whether the pass is paid, and whether every ticket came from it', async () => {
+    const type = await passType()
+    const pass = await issue(type)
+    const only = await hold(b, [pass.code])
+    if (!only.ok) throw new Error(only.code)
+    await keep(only.orderId)
+    expect(await inContext(() => passOf(only.orderId))).toEqual({ name: type.name, paid: true, only: true })
+
+    await env.DB.prepare('UPDATE box_office_passes SET paid_at = NULL WHERE id = ?').bind(pass.id).run()
+    expect(await inContext(() => passOf(only.orderId))).toEqual({ name: type.name, paid: false, only: true })
+
+    const other = await issue(type)
+    const mixed = await hold(a, [other.code], 1)
+    if (!mixed.ok) throw new Error(mixed.code)
+    expect((await inContext(() => passOf(mixed.orderId)))?.only).toBe(false)
+
+    const none = await hold(a, [], 1)
+    if (!none.ok) throw new Error(none.code)
+    expect(await inContext(() => passOf(none.orderId))).toBeNull()
   })
 })

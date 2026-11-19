@@ -6,14 +6,11 @@ import { ordersList } from '../../../../../shared/lists'
 
 definePageMeta({ layout: 'console' })
 
-type State = 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired'
-interface Row { id: string, reference: string, state: State, channel: string, buyer: string | null, show: string | null, startsAt: number | null, currency: string, totalMinor: number, createdAt: number, complimentary?: boolean }
+interface Row { id: string, reference: string, state: OrderState, channel: string, buyer: string | null, show: string | null, startsAt: number | null, currency: string, totalMinor: number, createdAt: number, complimentary?: boolean, pass?: OrderPass | null }
 
 const { t } = useT()
 const { dateTime, day } = useDates()
 const { money } = await useMoney()
-
-const TONES = { reserved: 'warning', awaiting_payment: 'info', confirmed: 'success', cancelled: 'neutral', expired: 'neutral' } as const
 
 const list = computed(() => ({
   ...ordersList,
@@ -46,13 +43,19 @@ const list = computed(() => ({
       <span v-if="row.show && row.startsAt">{{ row.show }}, {{ dateTime(row.startsAt) }}</span>
     </template>
     <template #cell-state="{ row }">
-      <StatusBadge
-        :tone="TONES[row.state as State]"
-        :label="t(`box-office.orders.state.${row.state === 'confirmed' && row.complimentary ? 'complimentary' : row.state}`)"
-      />
+      <StatusBadge v-bind="orderStateBadge(row, t)" />
     </template>
     <template #cell-total="{ row }">
-      {{ money(row.totalMinor, row.currency) }}
+      <span class="inline-flex items-center gap-2">
+        <span v-if="!row.pass?.only">{{ money(row.totalMinor, row.currency) }}</span>
+        <UBadge
+          v-if="row.pass"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-ticket"
+          :label="row.pass.name"
+        />
+      </span>
     </template>
     <template #cell-created="{ row }">
       {{ day(row.createdAt) }}
