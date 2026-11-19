@@ -198,7 +198,7 @@ export async function importPasses(unit: UnitView, incoming: readonly ImportPass
     else {
       if (!dryRun) {
         const { accountId } = await findOrCreateAccount(unit, { address: pass.email, name: pass.name ?? null, origin: 'guest' })
-        await issuePass(unit, { passTypeId: type.id, passPriceId: price.id, accountId, paid: pass.paid, issuedBy: null, alias: pass.code })
+        await issuePass(unit, { passTypeId: type.id, passPriceId: price.id, accountId, paid: pass.paid, gift: pass.gift, issuedBy: null, alias: pass.code })
       }
       out.push({ code: pass.code, result: 'issue' })
     }

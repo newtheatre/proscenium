@@ -50,9 +50,9 @@ describe('importing passes with the bookings', () => {
   })
 
   it('issues each pass to its holder and brings its ticket in as the pass\'s entry', async () => {
-    const made = await post({ passes: [pass('p1', true), pass('p2', false)], bookings: [await booking('PASS01', a, 'p1', [{ pass: OLD_PASS('p1'), amountMinor: 0 }, { type: 'Full price', amountMinor: 1000 }]), await booking('PASS02', a, 'p2', [{ pass: OLD_PASS('p2'), amountMinor: 0 }])] })
+    const made = await post({ passes: [pass('p1', true), pass('p2', false), { ...pass('p5', true), gift: true }], bookings: [await booking('PASS01', a, 'p1', [{ pass: OLD_PASS('p1'), amountMinor: 0 }, { type: 'Full price', amountMinor: 1000 }]), await booking('PASS02', a, 'p2', [{ pass: OLD_PASS('p2'), amountMinor: 0 }])] })
     expect(made.status, JSON.stringify(made.body)).toBe(200)
-    expect(made.body).toMatchObject({ queued: 2, passes: { issue: 2 } })
+    expect(made.body).toMatchObject({ queued: 2, passes: { issue: 3 } })
     expect((await deliver()).every(outcome => outcome === 'done')).toBe(true)
 
     // Found by the code its holder already has, in its holder's name, paid or owed.
@@ -61,6 +61,8 @@ describe('importing passes with the bookings', () => {
     expect(first).toMatchObject({ name: 'Autumn Season Pass', priceName: 'Member', usesTaken: 1, paidAt: NOV_16 })
     expect(second).toMatchObject({ usesTaken: 1, paidAt: null, amountMinor: 2100 })
     expect(first.accountId).toBeTruthy()
+    // Given free in the other system: held at no amount, and owes nothing.
+    expect((await inContext(() => passByCode(OLD_PASS('p5'))))!).toMatchObject({ amountMinor: 0, paidAt: NOV_16 })
 
     // Beside a ticket to pay for, the entry is on a reservation; alone, it is confirmed with its ticket.
     expect(await one('SELECT state, total_minor FROM box_office_orders WHERE reference = ?', 'PASS01')).toEqual({ state: 'reserved', total_minor: 1000 })

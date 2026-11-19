@@ -50,6 +50,8 @@ export interface IssueInput {
   accountId: string | null
   /** Whether it is paid for already. */
   paid: boolean
+  /** Given free (Matt, 19 November): nothing was paid and nothing is owed, so it is held at no amount and settled. */
+  gift?: boolean
   /** False for a pass made in a basket, which becomes somebody's when its order is reserved or confirmed. */
   issued?: boolean
   orderLineId?: string | null
@@ -80,10 +82,10 @@ export async function issuePass(unit: UnitView, input: IssueInput): Promise<{ id
   const hash = await hashOf(code)
   const alias = input.alias ? await aliasHashOf(input.alias) : null
   unit.add(sql`INSERT INTO box_office_passes (id, pass_type_id, pass_price_id, order_line_id, account_id, named, code_hash, alias_hash, code, uses_total, once, amount_minor, currency, issued_at, paid_at, state, issued_by, created_at, updated_at)
-    SELECT ${id}, ${type.id}, ${price.id}, ${input.orderLineId ?? null}, ${input.accountId}, ${named ? 1 : 0}, ${hash}, ${alias}, ${await sealColumn(code)}, ${type.uses}, ${type.perShow === 'once' ? 1 : 0}, ${price.amountMinor}, ${type.currency},
-      ${(input.issued ?? true) ? at : null}, ${input.paid ? at : null}, 'active', ${input.issuedBy}, ${at}, ${at}
+    SELECT ${id}, ${type.id}, ${price.id}, ${input.orderLineId ?? null}, ${input.accountId}, ${named ? 1 : 0}, ${hash}, ${alias}, ${await sealColumn(code)}, ${type.uses}, ${type.perShow === 'once' ? 1 : 0}, ${input.gift ? 0 : price.amountMinor}, ${type.currency},
+      ${(input.issued ?? true) ? at : null}, ${input.paid || input.gift ? at : null}, 'active', ${input.issuedBy}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_passes WHERE code_hash = ${hash} OR (${alias} IS NOT NULL AND alias_hash = ${alias}))`).expect(1, { code: 'box-office.pass.code-taken', reason: 'Another pass already has that code.', remedy: 'Choose another code.' })
-  unit.audit({ action: 'create', record: ['box-office.pass', id], detail: { passTypeId: type.id, paid: input.paid } })
+  unit.audit({ action: 'create', record: ['box-office.pass', id], detail: { passTypeId: type.id, paid: input.paid, ...(input.gift ? { gift: true } : {}) } })
   return { id, code: shownPassCode(code), named }
 }
 
@@ -187,15 +189,16 @@ export async function sendPass(unit: UnitView, passId: string, reason: string, m
 
 /**
  * A pass given by hand, from the console: to a person, or to nobody in particular where the pass
- * allows that. `settled` says nothing is owed for it (a gift, or paid for some other way); otherwise
- * its price is collected with the first booking it is used on. Its holder is sent the code.
+ * allows that. `settled` says it was paid for some other way, and `gift` that it was given free, held
+ * at no amount (Matt, 19 November); otherwise its price is collected with the first booking it is
+ * used on. Its holder is sent the code.
  */
-export async function givePass(unit: UnitView, input: { passTypeId: string, passPriceId: string, accountId: string | null, settled: boolean }, by: string | null): Promise<{ id: string, code: string }> {
+export async function givePass(unit: UnitView, input: { passTypeId: string, passPriceId: string, accountId: string | null, settled: boolean, gift?: boolean }, by: string | null): Promise<{ id: string, code: string }> {
   const type = await getPassType(input.passTypeId)
   if (!type.active) refuse('box-office.pass.retired', `${type.name} has been retired.`, { status: 409, remedy: 'Bring it back first.' })
-  const pass = await issuePass(unit, { passTypeId: type.id, passPriceId: input.passPriceId, accountId: input.accountId, paid: input.settled, issuedBy: by })
+  const pass = await issuePass(unit, { passTypeId: type.id, passPriceId: input.passPriceId, accountId: input.accountId, paid: input.settled, gift: input.gift, issuedBy: by })
   const price = type.prices.find(p => p.id === input.passPriceId)!
-  await sendPass(unit, pass.id, 'given', { id: pass.id, accountId: input.accountId, code: pass.code, state: 'active', currency: type.currency, amountMinor: price.amountMinor, name: type.name, priceName: price.name, paidAt: input.settled ? nowMs() : null })
+  await sendPass(unit, pass.id, 'given', { id: pass.id, accountId: input.accountId, code: pass.code, state: 'active', currency: type.currency, amountMinor: input.gift ? 0 : price.amountMinor, name: type.name, priceName: price.name, paidAt: input.settled || input.gift ? nowMs() : null })
   return { id: pass.id, code: pass.code }
 }
 
