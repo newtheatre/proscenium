@@ -22,7 +22,10 @@ const rows = ref<Holder[] | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const picked = ref<{ pass: Holder, entries: Entry[] } | null>(null)
 const giving = ref(false)
-const give = ref<{ passPriceId: string | undefined, accountId: string | undefined, settled: boolean }>({ passPriceId: undefined, accountId: undefined, settled: false })
+// How it is paid for: collected with its first booking, paid some other way, or given free (Matt, 19 November).
+type Paying = 'collect' | 'settled' | 'gift'
+const give = ref<{ passPriceId: string | undefined, accountId: string | undefined, paying: Paying }>({ passPriceId: undefined, accountId: undefined, paying: 'collect' })
+const payingItems = computed(() => (['collect', 'settled', 'gift'] as const).map(value => ({ value, label: t(`box-office.passes.holders.give-paying.${value}`) })))
 const moving = ref(false)
 const moveTo = ref<string | undefined>()
 const busy = ref(false)
@@ -93,7 +96,7 @@ async function move() {
 
 const prices = computed(() => (props.pass?.prices ?? []).filter(p => p.active).map(p => ({ value: p.id, label: `${p.name} · ${money(p.amountMinor)}` })))
 function startGiving() {
-  give.value = { passPriceId: prices.value[0]?.value, accountId: undefined, settled: false }
+  give.value = { passPriceId: prices.value[0]?.value, accountId: undefined, paying: 'collect' }
   giving.value = true
   refusal.value = null
 }
@@ -102,7 +105,7 @@ async function submitGive() {
   refusal.value = null
   busy.value = true
   try {
-    const made = await $api<{ id: string, code: string }>(`/api/box-office/pass-types/${props.pass.id}/passes`, { method: 'POST', body: { passPriceId: give.value.passPriceId, accountId: give.value.accountId ?? null, settled: give.value.settled }, headers: key() })
+    const made = await $api<{ id: string, code: string }>(`/api/box-office/pass-types/${props.pass.id}/passes`, { method: 'POST', body: { passPriceId: give.value.passPriceId, accountId: give.value.accountId ?? null, settled: give.value.paying === 'settled', gift: give.value.paying === 'gift' }, headers: key() })
     toast.add({ title: t('box-office.passes.holders.given', { code: made.code }), color: 'success' })
     giving.value = false
     await load()
@@ -278,11 +281,17 @@ const describe = (h: Holder) => [
           >
             <PersonPicker v-model="give.accountId" />
           </UFormField>
-          <UCheckbox
-            v-model="give.settled"
-            :label="t('box-office.passes.holders.give-settled')"
-            :description="t('box-office.passes.holders.give-settled-help')"
-          />
+          <UFormField
+            :label="t('box-office.passes.holders.give-paying.label')"
+            :help="t(`box-office.passes.holders.give-paying.${give.paying}-help`)"
+            name="paying"
+          >
+            <USelect
+              v-model="give.paying"
+              :items="payingItems"
+              class="min-w-64"
+            />
+          </UFormField>
           <div class="flex gap-2">
             <UButton
               :label="t('box-office.passes.holders.give')"
@@ -340,9 +349,9 @@ const describe = (h: Holder) => [
                 />
                 <UBadge
                   v-else
-                  :color="h.paidAt ? 'success' : 'warning'"
+                  :color="h.paidAt ? (h.amountMinor ? 'success' : 'info') : 'warning'"
                   variant="subtle"
-                  :label="t(h.paidAt ? 'box-office.passes.holders.badge.paid' : 'box-office.passes.holders.badge.not-paid')"
+                  :label="t(h.paidAt ? (h.amountMinor ? 'box-office.passes.holders.badge.paid' : 'box-office.passes.holders.badge.given') : 'box-office.passes.holders.badge.not-paid')"
                 />
                 <UIcon
                   name="i-lucide-chevron-right"

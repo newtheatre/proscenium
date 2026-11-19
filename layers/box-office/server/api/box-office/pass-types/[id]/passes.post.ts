@@ -10,5 +10,5 @@ export default defineRoute({
   record: event => ['box-office.pass-type', getRouterParam(event, 'id')],
   rateLimit: 'write',
   idempotent: true,
-  input: z.object({ passPriceId: idSchema('ppr'), accountId: idSchema('acc').nullish(), settled: z.boolean().default(false) }).strict(),
-}, (_event, { input, unit, record, actor }) => givePass(unit.view(), { passTypeId: record!.id!, passPriceId: input.passPriceId, accountId: input.accountId ?? null, settled: input.settled }, actor.accountId ?? null))
+  input: z.object({ passPriceId: idSchema('ppr'), accountId: idSchema('acc').nullish(), settled: z.boolean().default(false), gift: z.boolean().default(false) }).strict(),
+}, (_event, { input, unit, record, actor }) => givePass(unit.view(), { passTypeId: record!.id!, passPriceId: input.passPriceId, accountId: input.accountId ?? null, settled: input.settled, gift: input.gift }, actor.accountId ?? null))
