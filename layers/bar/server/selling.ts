@@ -9,7 +9,6 @@ import { redeemSale, type DeskContext, type PricedSale, type PricingItem } from 
 import { ageCheckSettings, recordSaleCheck } from './age-checks'
 import { priceLists, pricesFor } from './catalogue'
 import { choiceGroups, groupsByProduct, pickInput, priceGroups, resolvePicks, type Picked } from './choices'
-import { lessPercent } from './pricing'
 import { ensureOpening } from './openings'
 import { ID_TYPES, saleLineChoices, saleLines } from './db/schema'
 
@@ -78,18 +77,14 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
   const byId = new Map(named.map(n => [n.id, n]))
   const attached = await groupsByProduct([...new Set(named.map(n => n.product_id))])
   const anyChoices = [...merged.values()].some(m => m.choices?.length) || [...attached.values()].some(g => g.length)
-  // A percentage list rounds once, on the whole unit price: the size and its picks at Standard, less the percentage.
-  const list = (await priceLists()).find(l => l.id === priceListId)
-  const percent = list && !list.standard && list.percentOff !== null ? list.percentOff : null
-  const baseListId = percent !== null ? (await priceLists()).find(l => l.standard)!.id : priceListId
   const groups = new Map<string, Awaited<ReturnType<typeof choiceGroups>>[number]>()
   if (anyChoices) {
     const all = await choiceGroups({ activeOnly: true })
     const mixerIds = all.filter(g => g.source === 'mixers').flatMap(g => g.options.map(o => o.key))
-    const mixerPrices = mixerIds.length ? await pricesFor(mixerIds, baseListId) : new Map()
+    const mixerPrices = mixerIds.length ? await pricesFor(mixerIds, priceListId) : new Map()
     for (const g of priceGroups(all, v => mixerPrices.get(v)?.amountMinor ?? null)) groups.set(g.id, g)
   }
-  const prices = await pricesFor(ids, baseListId)
+  const prices = await pricesFor(ids, priceListId)
   const lines = [...merged.values()].map((m): Priced => {
     const n = byId.get(m.variantId)
     if (!n) refuse('bar.variant.not-on-sale', 'Something in the basket is no longer on sale.', { status: 409, remedy: 'Take it out and add it again.' })
@@ -97,8 +92,7 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
     const price = prices.get(m.variantId)
     if (!price) refuse('bar.variant.no-price', `${sized} has no price on this list.`, { status: 409, remedy: 'Take it out, or ask for a price to be set.' })
     const choices = resolvePicks(sized, attached.get(n!.product_id) ?? [], groups, m.choices ?? [])
-    const before = price!.amountMinor + choices.reduce((s, c) => s + c.deltaMinor, 0)
-    const unitMinor = percent !== null ? lessPercent(before, percent) : before
+    const unitMinor = price!.amountMinor + choices.reduce((s, c) => s + c.deltaMinor, 0)
     const label = choices.length ? `${sized} · ${choices.map(c => c.label).join(', ')}` : sized
     return {
       variantId: m.variantId, quantity: m.quantity, label, unitMinor, amountMinor: unitMinor * m.quantity, priceId: price!.priceId, categoryId: n!.category_id, parentCategoryId: n!.parent_category_id, productId: n!.product_id,

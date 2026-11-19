@@ -1,7 +1,7 @@
 <!-- Add a product (Bar specification, tab 10, approved 17 November): two steps in one window, as Add a
      run. First the kind of product, as large tiles of presets; opened from a category with a usual
      preset (its own or its parent's), it starts straight on the second step. Then one form: name,
-     category, a row per size with its Standard price and what percentage lists will charge, the
+     category, a row per size with its Standard price, the
      choices it asks, and its age check. The footer saves the product (and starts another, or closes,
      leaving the list in view), or the rows and choices as a preset for next time. The theatre's own presets can be renamed or deleted from their tiles. -->
 <script setup lang="ts">
@@ -10,7 +10,7 @@ import { presetInput, presetPatch, setupInput } from '../../server/input'
 interface PresetSize { name: string, measure: string | null }
 interface Preset { id: string, builtIn: boolean, name: string | null, sizes: PresetSize[], groupIds: string[], groupNames: string[], ageRestricted: boolean | null, mixer: boolean }
 interface Category { id: string, name: string, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean }
-interface List { id: string, name: string, standard: boolean, percentOff: number | null, active: boolean }
+interface List { id: string, name: string, standard: boolean, active: boolean }
 interface Group { id: string, name: string, active: boolean }
 type Age = 'category' | 'yes' | 'no'
 type FormRef = { setErrors: (errors: FieldError[]) => void }
@@ -23,7 +23,6 @@ const emit = defineEmits<{ added: [productId: string], presets: [] }>()
 
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { money } = await useMoney()
 const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { offer } = useUndo()
@@ -45,7 +44,6 @@ const own = computed(() => presets.value.filter(p => !p.builtIn))
 const categoryItems = computed(() => props.categories.filter(c => c.active).map(c => ({ value: c.id, label: c.name })))
 const groupItems = computed(() => groups.value.filter(g => g.active).map(g => ({ value: g.id, label: g.name })))
 const category = computed(() => props.categories.find(c => c.id === form.value.categoryId))
-const percentLists = computed(() => props.lists.filter(l => l.active && !l.standard && l.percentOff !== null))
 const standardName = computed(() => props.lists.find(l => l.standard)?.name ?? '')
 const answer = (needed: boolean) => needed ? t('bar.screens.product.age-yes') : t('bar.screens.product.age-no')
 const ageItems = computed(() => [
@@ -53,8 +51,6 @@ const ageItems = computed(() => [
   { value: 'yes', label: answer(true) },
   { value: 'no', label: answer(false) },
 ])
-// A percentage list rounds once, as the till does: half a penny and over goes up.
-const lessPercent = (amount: number, percent: number) => Math.floor((amount * (100 - percent) + 50) / 100)
 
 /** A category's usual preset, or its parent's when it has none of its own. */
 function usualOf(c: Category | undefined): string | null {
@@ -352,13 +348,6 @@ async function deletePreset(p: Preset) {
                   class="mt-1 text-xs text-warning"
                 >
                   {{ t('bar.screens.add-product.unpriced', { size: s.name, list: standardName }) }}
-                </p>
-                <p
-                  v-for="l in percentLists"
-                  :key="l.id"
-                  class="mt-1 text-xs text-muted"
-                >
-                  {{ s.amountMinor === null ? t('bar.screens.add-product.list-follows', { list: l.name, percent: l.percentOff! }) : t('bar.screens.add-product.list-price', { list: l.name, amount: money(lessPercent(s.amountMinor, l.percentOff!)), percent: l.percentOff! }) }}
                 </p>
               </UFormField>
               <IconButton

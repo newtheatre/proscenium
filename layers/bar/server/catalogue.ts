@@ -16,8 +16,8 @@ const GONE = (what: string) => ({ code: 'core.not-found', reason: `There is no s
 export function ensureStandard(unit: UnitView): void {
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO bar_price_lists (id, name, system_key, restricted, falls_back, percent_off, active, created_at, updated_at)
-          SELECT ?, 'Standard', 'standard', 0, 1, NULL, 1, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_price_lists WHERE system_key = 'standard')`,
+    sql: `INSERT INTO bar_price_lists (id, name, system_key, restricted, falls_back, active, created_at, updated_at)
+          SELECT ?, 'Standard', 'standard', 0, 1, 1, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_price_lists WHERE system_key = 'standard')`,
     params: [newId('bpls'), at, at],
   })
 }
@@ -31,19 +31,19 @@ const currency = async () => await useSetting('core.locale.currency') as string
 
 // ---- Reading -------------------------------------------------------------------------------------
 
-export interface PriceList { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
-export interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
+export interface PriceList { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, active: boolean }
+export interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | null, next: { amountMinor: number | null, from: number } | null }
 export interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, position: number, active: boolean, prices: VariantPrice[] }
 export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, position: number, active: boolean, groupIds: string[], variants: Variant[] }
 export interface Category { id: string, name: string, position: number, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
 
-interface ListRow { id: string, name: string, system_key: string | null, restricted: number, falls_back: number, percent_off: number | null, active: number }
+interface ListRow { id: string, name: string, system_key: string | null, restricted: number, falls_back: number, active: number }
 
-const shapeList = (r: ListRow): PriceList => ({ id: r.id, name: r.name, standard: r.system_key === STANDARD, restricted: !!r.restricted, fallsBack: !!r.falls_back, percentOff: r.percent_off, active: !!r.active })
+const shapeList = (r: ListRow): PriceList => ({ id: r.id, name: r.name, standard: r.system_key === STANDARD, restricted: !!r.restricted, fallsBack: !!r.falls_back, active: !!r.active })
 
 /** Every price list, Standard first. */
 export async function priceLists(): Promise<PriceList[]> {
-  const rows = await all<ListRow>("SELECT id, name, system_key, restricted, falls_back, percent_off, active FROM bar_price_lists ORDER BY system_key = 'standard' DESC, active DESC, lower(name), id")
+  const rows = await all<ListRow>("SELECT id, name, system_key, restricted, falls_back, active FROM bar_price_lists ORDER BY system_key = 'standard' DESC, active DESC, lower(name), id")
   return rows.map(shapeList)
 }
 
@@ -52,7 +52,7 @@ async function priceRows(variantIds?: string[]): Promise<PriceRow[]> {
   return await all<PriceRow>(`SELECT id, variant_id AS variantId, price_list_id AS priceListId, amount_minor AS amountMinor, effective_from AS effectiveFrom FROM bar_prices ${where}`, ...(variantIds ? [JSON.stringify(variantIds)] : []))
 }
 
-const rule = (l: PriceList): ListRule => ({ id: l.id, percentOff: l.percentOff, fallsBack: l.fallsBack })
+const rule = (l: PriceList): ListRule => ({ id: l.id, fallsBack: l.fallsBack })
 
 /** The whole catalogue, with each variant's price in force on every list and any change planned. */
 export async function catalogue(options: { activeOnly?: boolean } = {}): Promise<{ categories: Category[], lists: PriceList[], currency: string }> {
@@ -69,7 +69,7 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
   for (const v of vars) {
     const prices = lists.map((l): VariantPrice => {
       const priced = priceOn(rows, v.id, rule(l), std, at)
-      const next = l.percentOff === null ? nextChange(rows, v.id, l.id, at) : null
+      const next = nextChange(rows, v.id, l.id, at)
       return { listId: l.id, amountMinor: priced?.amountMinor ?? null, from: priced?.from ?? null, next: next ? { amountMinor: next.amountMinor, from: next.effectiveFrom } : null }
     })
     const list = variantsOf.get(v.product_id) ?? []
@@ -98,7 +98,6 @@ export interface Menu {
   favourites: string[]
   priceListId: string
   priceList: string
-  percentOff: number | null
   currency: string
   categories: { id: string, name: string, colour: string | null, parentId: string | null, items: MenuItem[] }[]
   // Each option carries allergens too while they are switched on.
@@ -118,15 +117,12 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
   const list = lists.find(l => l.id === (priceListId ?? outlet!.price_list_id) && l.active)
   if (!list) refuse('bar.price-list.unknown', 'That price list is not in use.', { status: 404 })
   const std = lists.find(l => l.standard)?.id ?? ''
-  const standardList = lists.find(l => l.standard)
-  const percent = !list!.standard && list!.percentOff !== null
   const { categories } = await catalogue({ activeOnly: true })
   const rows = await priceRows()
   const at = nowMs()
-  // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
-  // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
+  // Each option with what it adds. A line's unit price is its baseMinor (its amountMinor) plus its picks: the server's sum.
   const priced = priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
-    const found = priceOn(rows, variantId, rule(percent ? standardList! : list!), std, at)
+    const found = priceOn(rows, variantId, rule(list!), std, at)
     return found ? found.amountMinor : null
   })
   // Allergens ride on the menu, so the till's sheet works from what it loaded. Left off when switched off.
@@ -140,7 +136,6 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
     favourites: (await all<{ variant_id: string }>('SELECT variant_id FROM bar_outlet_favourites WHERE outlet_id = ? ORDER BY position', outlet!.id)).map(f => f.variant_id),
     priceListId: list!.id,
     priceList: list!.name,
-    percentOff: list!.standard ? null : list!.percentOff,
     currency: await currency(),
     categories: kept(categories.map(c => ({
       id: c.id,
@@ -151,8 +146,7 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
       items: c.products.flatMap(p => p.variants.filter(v => !v.mixerMeasure).flatMap((v) => {
         const priced = priceOn(rows, v.id, rule(list!), std, at)
         if (!priced) return []
-        // The price the picks are added to: Standard's on a percentage list, which then takes its percentage off the whole.
-        const base = percent ? priceOn(rows, v.id, rule(standardList!), std, at)?.amountMinor ?? priced.amountMinor : priced.amountMinor
+        const base = priced.amountMinor
         return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base, ...(al ? { allergens: al.size(p.id, v.id, p.groupIds) } : {}) }]
       })),
     }))),
@@ -330,7 +324,7 @@ export interface PriceInput { variantId: string, priceListId: string | null, amo
 
 /**
  * A new price for a variant on a list (Standard when none is named), from now or a later moment. A
- * null amount withdraws it. A percentage list has no prices of its own, and the statement says so.
+ * null amount withdraws it.
  */
 export async function setPrice(unit: UnitView, input: PriceInput, by: string): Promise<string> {
   ensureStandard(unit)
@@ -341,51 +335,43 @@ export async function setPrice(unit: UnitView, input: PriceInput, by: string): P
   unit.add({
     sql: `INSERT INTO bar_prices (id, variant_id, price_list_id, amount_minor, currency, effective_from, set_by, created_at)
           SELECT ?, v.id, l.id, ?, ?, ?, ?, ? FROM bar_variants v, bar_price_lists l
-          WHERE v.id = ? AND l.id = ${list} AND l.percent_off IS NULL AND l.active = 1`,
+          WHERE v.id = ? AND l.id = ${list} AND l.active = 1`,
     params: [id, input.amountMinor, await currency(), from, by, at, input.variantId, ...(input.priceListId === null ? [] : [input.priceListId])],
-  }).expect(1, { code: 'bar.price.not-settable', reason: 'That list does not take prices of its own, or the size is not there.', remedy: 'A percentage list follows Standard.' })
+  }).expect(1, { code: 'bar.price.not-settable', reason: 'That list is not in use, or the size is not there.', remedy: 'Choose a list in use.' })
   unit.audit({ action: 'create', record: ['bar.price-list', input.priceListId ?? 'standard'], detail: { variantId: input.variantId, amountMinor: input.amountMinor, effectiveFrom: from } })
   return id
 }
 
-export interface PriceListInput { name: string, restricted?: boolean, fallsBack?: boolean, percentOff?: number | null, active?: boolean }
+export interface PriceListInput { name: string, restricted?: boolean, fallsBack?: boolean, active?: boolean }
 
 export function addPriceList(unit: UnitView, input: PriceListInput): string {
   ensureStandard(unit)
   const id = newId('bpls')
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO bar_price_lists (id, name, system_key, restricted, falls_back, percent_off, active, created_at, updated_at)
-          SELECT ?, ?, NULL, ?, ?, ?, 1, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_price_lists WHERE lower(name) = lower(?))`,
-    params: [id, input.name, input.restricted ? 1 : 0, input.fallsBack === false ? 0 : 1, input.percentOff ?? null, at, at, input.name],
+    sql: `INSERT INTO bar_price_lists (id, name, system_key, restricted, falls_back, active, created_at, updated_at)
+          SELECT ?, ?, NULL, ?, ?, 1, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_price_lists WHERE lower(name) = lower(?))`,
+    params: [id, input.name, input.restricted ? 1 : 0, input.fallsBack === false ? 0 : 1, at, at, input.name],
   }).expect(1, NAME_TAKEN('a price list'))
   unit.audit({ action: 'create', record: ['bar.price-list', id] })
   return id
 }
 
-/**
- * Changes a list. Standard keeps its name's place and can be neither retired nor made a percentage.
- * A list becomes a percentage list only while it holds no prices of its own; the database trigger
- * refuses the rest.
- */
+/** Changes a list. Standard keeps its name's place and cannot be retired. */
 export async function updatePriceList(unit: UnitView, id: string, input: Partial<PriceListInput>): Promise<void> {
-  const row = await first<ListRow>('SELECT id, name, system_key, restricted, falls_back, percent_off, active FROM bar_price_lists WHERE id = ?', id)
+  const row = await first<ListRow>('SELECT id, name, system_key, restricted, falls_back, active FROM bar_price_lists WHERE id = ?', id)
   if (!row) refuse(GONE('price list').code, GONE('price list').reason, { status: 404 })
   const standard = row!.system_key === STANDARD
-  if (standard && ((input.percentOff ?? null) !== null || input.active === false)) refuse('bar.price-list.standard', 'Standard is always in use and has prices of its own.', { status: 409 })
+  if (standard && input.active === false) refuse('bar.price-list.standard', 'Standard is always in use.', { status: 409 })
   const name = input.name ?? row!.name
-  const percentOff = input.percentOff === undefined ? row!.percent_off : input.percentOff
   const active = input.active === undefined ? !!row!.active : input.active
-  const ownPrices = percentOff !== null ? 'AND NOT EXISTS (SELECT 1 FROM bar_prices WHERE price_list_id = ?)' : ''
   // A list an outlet sells from stays in use.
   const inUse = active ? '' : 'AND NOT EXISTS (SELECT 1 FROM bar_outlets WHERE price_list_id = ? AND active = 1)'
   unit.add({
-    sql: `UPDATE bar_price_lists SET name = ?, restricted = ?, falls_back = ?, percent_off = ?, active = ?, updated_at = ?
-          WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bar_price_lists WHERE lower(name) = lower(?) AND id <> ?) ${ownPrices} ${inUse}`,
-    params: [name, input.restricted === undefined ? row!.restricted : input.restricted ? 1 : 0, input.fallsBack === undefined ? row!.falls_back : input.fallsBack ? 1 : 0, percentOff, active ? 1 : 0, nowMs(), id, name, id, ...(percentOff !== null ? [id] : []), ...(active ? [] : [id])],
-  }).expect(1, percentOff !== null && row!.percent_off === null
-    ? { code: 'bar.price-list.has-prices', reason: 'This list has prices of its own, so it cannot become a percentage off Standard.', remedy: 'Make a new list for the percentage.' }
-    : !active ? { code: 'bar.price-list.in-use', reason: 'An outlet sells from this list.', remedy: 'Give the outlet another list first.' } : NAME_TAKEN('a price list'))
+    sql: `UPDATE bar_price_lists SET name = ?, restricted = ?, falls_back = ?, active = ?, updated_at = ?
+          WHERE id = ? AND NOT EXISTS (SELECT 1 FROM bar_price_lists WHERE lower(name) = lower(?) AND id <> ?) ${inUse}`,
+    params: [name, input.restricted === undefined ? row!.restricted : input.restricted ? 1 : 0, input.fallsBack === undefined ? row!.falls_back : input.fallsBack ? 1 : 0, active ? 1 : 0, nowMs(), id, name, id, ...(active ? [] : [id])],
+  }).expect(1, !active ? { code: 'bar.price-list.in-use', reason: 'An outlet sells from this list.', remedy: 'Give the outlet another list first.' } : NAME_TAKEN('a price list'))
   unit.audit({ action: 'update', record: ['bar.price-list', id] })
 }
 
@@ -468,7 +454,6 @@ export interface RaiseRow { variantId: string, oldMinor: number, newMinor: numbe
 export async function raisePrices(unit: UnitView | null, listId: string, input: RaiseInput, by: string): Promise<RaiseRow[]> {
   const list = (await priceLists()).find(l => l.id === listId && l.active)
   if (!list) refuse(GONE('price list').code, GONE('price list').reason, { status: 404 })
-  if (list!.percentOff !== null) refuse('bar.price.not-settable', 'A percentage list follows Standard and has no prices of its own.', { status: 409 })
   if ((input.percent === undefined) === (input.amountMinor === undefined)) refuse('bar.price.raise-how', 'Raise by a percentage or by an amount.', { status: 422 })
   const variants = await all<{ id: string }>(
     `SELECT v.id FROM bar_variants v JOIN bar_products p ON p.id = v.product_id

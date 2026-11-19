@@ -1,12 +1,12 @@
 <!-- A price list (S12): every size on sale with its price on this list beside Standard's, and where
-     it follows Standard. A percentage list is read only and shows each worked price; prices on a list
-     priced by hand are set from each product's page, or raised together, with a preview of old and new. -->
+     it follows Standard. Prices are set from each product's page, or raised together, with a preview
+     of old and new. -->
 <script setup lang="ts">
-interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null }
+interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | null }
 interface Variant { id: string, name: string, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, name: string, active: boolean, variants: Variant[] }
 interface Category { id: string, name: string, active: boolean, products: Product[] }
-interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
+interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, active: boolean }
 
 const { t } = useT()
 const route = useRoute()
@@ -87,7 +87,7 @@ function onStandard(v: Variant): string {
   >
     <template #primary>
       <UButton
-        v-if="list && list.active && list.percentOff === null"
+        v-if="list && list.active"
         icon="i-lucide-trending-up"
         :label="t('bar.screens.lists.raise.title')"
         @click="startRaise()"
@@ -104,7 +104,7 @@ function onStandard(v: Variant): string {
         class="space-y-6"
       >
         <p class="text-sm text-muted">
-          {{ list.standard ? t('bar.screens.lists.standard-help') : list.percentOff !== null ? t('bar.screens.lists.percent-help', { percent: list.percentOff }) : t('bar.screens.lists.hand-help') }}
+          {{ list.standard ? t('bar.screens.lists.standard-help') : t('bar.screens.lists.hand-help') }}
         </p>
         <PageSection
           v-for="c in data.categories.filter(c => c.active)"
