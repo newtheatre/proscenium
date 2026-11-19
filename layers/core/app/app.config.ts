@@ -9,6 +9,13 @@ export default defineAppConfig({
     textarea: { slots: { root: 'w-full' } },
     inputNumber: { slots: { root: 'w-full' } },
     inputTags: { slots: { root: 'w-full' } },
+    // A code's boxes share the field's width (up to a comfortable maximum) and are large enough to
+    // read and tap, rather than sitting small at the left of the card.
+    pinInput: {
+      slots: { root: 'flex w-full max-w-md gap-2' },
+      variants: { size: { xl: { base: 'h-12 sm:h-14 w-0 flex-1 text-xl' } } },
+      defaultVariants: { size: 'xl' },
+    },
     // A select's placeholder is readable text (a filter shows its name there), so it meets 4.5:1.
     select: { slots: { base: 'w-full', placeholder: 'text-muted' } },
     selectMenu: { slots: { base: 'w-full', placeholder: 'text-muted' } },
