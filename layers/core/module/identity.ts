@@ -107,6 +107,8 @@ export const identityAbilities = defineAbilities('core', {
   // rows by a person's name or email"). Every use is audited as a read, naming the list.
   'account.find': ability({ risk: 'normal', fresh: false, audit: 'read', impliable: true, grantAt: ['site'] }),
   'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'], grantAt: ['site'] }),
+  // Staff change a person's details and addresses for them (ID-46).
+  'account.update': ability({ on: 'core.account', risk: 'privileged', owner: 'grants', implies: ['account.read'], grantAt: ['site'] }),
   'account.create': ability({ risk: 'privileged', implies: ['account.search'], grantAt: ['site'] }),
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'account.recover': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),

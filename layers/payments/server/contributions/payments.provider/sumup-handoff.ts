@@ -46,7 +46,9 @@ export default {
     const params = new URLSearchParams({
       'affiliate-key': key,
       'app-id': appId,
+      // Android reads total; iOS reads amount, and without it the iPhone app opens with no sale.
       'total': (attempt.amountMinor / 10 ** digits).toFixed(digits), // not-policy: decimal places
+      'amount': (attempt.amountMinor / 10 ** digits).toFixed(digits), // not-policy: decimal places
       'currency': attempt.currency,
       'title': 'Till sale', // shown in SumUp's own history beside the transaction
       'foreign-tx-id': attempt.id,

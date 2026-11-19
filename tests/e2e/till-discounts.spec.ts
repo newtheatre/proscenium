@@ -1,5 +1,5 @@
 // Codes and discounts at the till, on a phone: the sale sits in a sheet at the foot of the screen,
-// a code is added from it and takes its saving off, and the sheet is swiped down to close.
+// a code is typed into its box and takes its saving off, and the sheet is swiped down to close.
 import { test, expect, devices, type APIRequestContext, type Page } from '@playwright/test'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -63,12 +63,10 @@ test('a code is added from the sale sheet and takes its saving off', async ({ pa
   await addJuice(page)
   await page.getByRole('button', { name: /^Sale/ }).click()
   const sheet = page.getByRole('dialog', { name: /^Sale/ })
-  await sheet.getByRole('button', { name: 'Add a code or discount' }).click()
-
-  const window = page.getByRole('dialog', { name: 'Add a code or discount' })
-  await window.getByRole('textbox').fill(code.toLowerCase())
-  await window.getByRole('button', { name: 'Apply' }).click()
-  await expect(window).toHaveCount(0)
+  await sheet.getByPlaceholder('Code or discount').fill(code.toLowerCase())
+  await sheet.getByRole('button', { name: 'Apply' }).click()
+  await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole('button', { name: `Remove ${code}` })).toBeVisible()
   await expect(page.getByText(/Pound off/).first()).toBeVisible()
   await expect(page.getByText('£2.00', { exact: true }).first()).toBeVisible()
 })
