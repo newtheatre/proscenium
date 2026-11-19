@@ -117,6 +117,14 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   await expect(page.getByText('Stock item saved.').first()).toBeVisible()
   await expect(page.getByText(`Cocoa ${stamp}`)).toBeVisible()
 
+  // Retiring a location puts it under the divider and offers Undo, which brings it straight back.
+  await page.getByRole('button', { name: `Actions for Cellar ${stamp}` }).click()
+  await page.getByRole('menuitem', { name: 'Retire' }).click()
+  await expect(page.getByText(`Cellar ${stamp} retired.`)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Retired locations/ })).toBeVisible()
+  await page.getByRole('region', { name: /Notifications/ }).getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByRole('list', { name: 'Locations' }).getByText(`Cellar ${stamp}`)).toBeVisible()
+
   await visit(page, `/admin/modules/bar/products/${s.product}`)
   await expect(page.getByText('No recipe: moves no stock')).toBeVisible()
   await page.getByRole('button', { name: 'Edit recipe of Each' }).click()

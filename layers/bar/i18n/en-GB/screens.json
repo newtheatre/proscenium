@@ -795,5 +795,11 @@
   "bar.screens.deliveries.check-label-of": "Check the label of {name}",
   "bar.screens.register-card.overdue.one": "The refusals register has not been signed as checked for {count} day",
   "bar.screens.register-card.overdue.other": "The refusals register has not been signed as checked for {count} days",
-  "bar.screens.register-card.action": "Sign the register"
+  "bar.screens.register-card.action": "Sign the register",
+  "bar.screens.stock.search": "Search stock items",
+  "bar.screens.stock.no-match": "No stock item has that name.",
+  "bar.screens.stock.retired-items": "Retired stock items",
+  "bar.screens.stock.retired-locations": "Retired locations",
+  "bar.screens.stock.retired": "{name} retired.",
+  "bar.screens.stock.restored": "{name} brought back."
 }
