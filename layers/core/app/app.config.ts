@@ -30,6 +30,9 @@ export default defineAppConfig({
     // Dialogue actions sit on the right, so a footer takes its buttons directly.
     modal: { slots: { footer: 'justify-end gap-2' } },
     slideover: { slots: { footer: 'justify-end gap-2' } },
+    // A drawer swipes closed only outside a scrolling box (a touch there is the browser's to scroll),
+    // so only its body scrolls: the handle, header and footer always take the swipe.
+    drawer: { slots: { container: 'min-h-0 overflow-y-visible', body: 'min-h-0 overflow-y-auto' } },
     // Alerts and badges are subtle unless one asks otherwise.
     alert: { defaultVariants: { variant: 'subtle' } },
     badge: { defaultVariants: { variant: 'subtle' } },

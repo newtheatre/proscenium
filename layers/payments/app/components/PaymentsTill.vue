@@ -15,7 +15,7 @@
      appear at once, before the server has answered with the total. On a narrow screen the receipt
      is a sheet, and a bar at the foot says what was last added, with an undo, and takes payment. -->
 <script setup lang="ts">
-import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
+import { createReusableTemplate, useMediaQuery, useResizeObserver } from '@vueuse/core'
 import type { YourSession } from '../../shared/sessions'
 import type { ReceiptTo } from './PaymentsReceiptTo.vue'
 
@@ -222,6 +222,16 @@ function clearAll() {
   added.value = null
 }
 
+// The sale opens as a sheet where there is no room beside the panels. A scrolling box takes a swipe
+// as a scroll, so the sheet's body only scrolls when the sale is too long to fit.
+const sheet = ref(false)
+const sheetBody = ref<HTMLElement | null>(null)
+const sheetScrolls = ref(false)
+useResizeObserver(() => [sheetBody.value, sheetBody.value?.parentElement], () => {
+  const body = sheetBody.value?.parentElement
+  sheetScrolls.value = !!body && body.scrollHeight > body.clientHeight + 1
+})
+
 // "Add a code or discount": a code the customer gives, or a discount from the till's list. Each is
 // tried against the sale before it is added, so a code that cannot be used says why in the window.
 const discounting = ref(false)
@@ -232,7 +242,16 @@ const choices = ref<Choice[] | null>(null)
 const discountRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const trying = ref(false)
 const pickedChoice = computed(() => choices.value?.find(c => c.promotionId === picked.value))
+// The sale sheet's backdrop would sit over the window, so the sheet steps aside and comes back after.
+let fromSheet = false
+watch(discounting, (open) => {
+  if (open || !fromSheet) return
+  fromSheet = false
+  sheet.value = true
+})
 async function openDiscounts() {
+  fromSheet = sheet.value
+  sheet.value = false
   codeTyped.value = ''
   picked.value = undefined
   reason.value = ''
@@ -283,7 +302,6 @@ const wide = useMediaQuery(() => (props.live ? '(min-width: 900px)' : '(min-widt
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const beside = computed(() => !mounted.value || wide.value)
-const sheet = ref(false)
 // Payment can start once the server has agreed the total.
 const payable = computed(() => groups.value.some(g => g.id !== SAVINGS) && !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
 
@@ -1714,9 +1732,12 @@ function ended() {
               v-model:open="sheet"
               :title="t('payments.screens.till.sale', { count })"
               :description="t('payments.screens.till.sale-help')"
+              :ui="{ body: sheetScrolls ? undefined : 'overflow-y-visible' }"
             >
               <template #body>
-                <Receipt />
+                <div ref="sheetBody">
+                  <Receipt />
+                </div>
               </template>
             </UDrawer>
           </template>
