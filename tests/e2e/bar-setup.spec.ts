@@ -120,7 +120,7 @@ test('Stock takes a location and an item, and a size takes a recipe', async ({ p
   // Retiring a location puts it under the divider and offers Undo, which brings it straight back.
   await page.getByRole('button', { name: `Actions for Cellar ${stamp}` }).click()
   await page.getByRole('menuitem', { name: 'Retire' }).click()
-  await expect(page.getByText(`Cellar ${stamp} retired.`)).toBeVisible()
+  await expect(page.getByText(`Cellar ${stamp} retired.`).first()).toBeVisible()
   await expect(page.getByRole('button', { name: /Retired locations/ })).toBeVisible()
   await page.getByRole('region', { name: /Notifications/ }).getByRole('button', { name: 'Undo' }).click()
   await expect(page.getByRole('list', { name: 'Locations' }).getByText(`Cellar ${stamp}`)).toBeVisible()
