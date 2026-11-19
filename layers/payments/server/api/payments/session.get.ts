@@ -3,7 +3,8 @@
 // what it has taken by each way of paying and its latest sales; and my sessions that stopped and await their count. cashTaken says whether to ask for a float.
 // mayOpen and mayViewAll say what the page shows: the card, the list of every session, or both.
 import { z } from 'zod'
-import { can, defineRoute, useSetting } from '#kit'
+import { can, defineRoute } from '#kit'
+import { takesCash } from '../../providers'
 import { awaitingCountOf, closesAt, defaultSpace, lastSaleIn, salesIn, sessionOf, summarise, takingsIn, unfinishedIn, waitingIn } from '../../sessions'
 
 export default defineRoute({
@@ -13,7 +14,7 @@ export default defineRoute({
 }, async (_event, { actor }) => {
   const mayOpen = (await can(actor, 'payments.session.open')).allowed
   const mayViewAll = (await can(actor, 'payments.session.view')).allowed
-  const cashTaken = !!(await useSetting('payments.cash.enabled'))
+  const cashTaken = await takesCash()
   const session = mayOpen ? await sessionOf(actor.accountId!) : null
   const awaiting = mayOpen ? await awaitingCountOf(actor.accountId!) : []
   return {

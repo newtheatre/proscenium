@@ -9,6 +9,11 @@ export async function providers(): Promise<Map<string, PaymentProvider>> {
   return new Map((await usePoint<PaymentProvider>('payments.provider')).map(c => [c.id, c.value]))
 }
 
+/** Whether the theatre takes cash: it has a cash account in use (Matt, 19 November: no separate setting). */
+export async function takesCash(): Promise<boolean> {
+  return !!(await first<{ one: number }>("SELECT 1 AS one FROM payments_provider_accounts WHERE provider = 'cash' AND active = 1 LIMIT 1"))
+}
+
 export async function providerAccount(id: string): Promise<ProviderAccountRow | null> {
   return first<ProviderAccountRow>('SELECT * FROM payments_provider_accounts WHERE id = ?', id)
 }

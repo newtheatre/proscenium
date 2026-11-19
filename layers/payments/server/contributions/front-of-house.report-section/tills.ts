@@ -3,7 +3,7 @@
 // are minor units with the currency code as their unit. Compiled at sign-off, so the report keeps the
 // figures of that moment. The shape is front-of-house.report-section's contract. A theatre that takes
 // no cash gets only the count of sessions, unless one of them held cash anyway.
-import { useSetting } from '#kit'
+import { takesCash } from '../../providers'
 import { sessionsOnNightOf } from '../../night'
 
 export default {
@@ -15,7 +15,7 @@ export default {
     const lines: { label: string, value: string | number, unit?: string }[] = [{ label: 'payments.report.sessions-closed', value: closed.length }]
     const left = sessions.length - closed.length
     if (left) lines.push({ label: 'payments.report.sessions-not-closed', value: left })
-    const cash = !!(await useSetting('payments.cash.enabled')) || closed.some(s => (s.expectedCashMinor ?? 0) !== 0 || (s.countedCashMinor ?? 0) !== 0)
+    const cash = await takesCash() || closed.some(s => (s.expectedCashMinor ?? 0) !== 0 || (s.countedCashMinor ?? 0) !== 0)
     if (!cash) return lines
     // Totals per currency: a theatre takes one, but nothing here adds two together.
     for (const currency of [...new Set(closed.map(s => s.currency))]) {
