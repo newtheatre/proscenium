@@ -11,5 +11,6 @@ export default defineRoute({
   input: z.object({ address: z.email().max(254) }).strict(), // not-policy: the longest address SMTP allows
 }, async (event, { input, unit, actor }) => {
   await requireFresh(actor)
-  return addAddress(unit, event, actor.accountId!, input.address)
+  const { id } = await addAddress(unit, event, actor.accountId!, input.address)
+  return { id }
 })

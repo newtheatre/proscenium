@@ -163,6 +163,7 @@
   "core.abilities.retention.arm.label": "Arm or disarm the account sweeps",
   "core.abilities.account.find.label": "Search other lists by a person's name or address",
   "core.abilities.account.read.label": "See a person's details and how they sign in",
+  "core.abilities.account.update.label": "Change a person's details and email addresses for them",
   "core.abilities.account.create.label": "Add people by name and address",
   "core.abilities.account.disable.label": "Disable and enable accounts",
   "core.abilities.access-scheme.read.label": "See the access scheme's queue and open applications",
