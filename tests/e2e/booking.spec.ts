@@ -14,6 +14,7 @@ const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.string
 const stamp = Date.now() % 1_000_000
 const title = `The Booking Show ${stamp}`
 let performanceId = ''
+let productionSlug = ''
 const promoCode = `FRIENDS${stamp}`
 
 async function post(api: APIRequestContext, path: string, data: unknown, method: 'post' | 'patch' = 'post') {
@@ -31,7 +32,7 @@ test.beforeAll(async ({ playwright }) => {
   }
   await set([{ key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }, { key: 'core.rate-limits.write', value: { count: 10000, per: '1m' } }])
   await set([{ key: 'core.locale.time-zone', value: 'Europe/London' }])
-  for (const id of ['finance', 'payments', 'box-office', 'promotions']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
+  for (const id of ['finance', 'payments', 'box-office', 'promotions', 'public-site']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
   await set([{ key: 'box-office.reservations.confirm-email', value: false }, { key: 'box-office.checkout.payment-timing', value: 'buyer-chooses' }])
   const categories = await (await settings.get('/api/core/vocabularies/core.production-category')).json()
   await settings.dispose()
@@ -50,6 +51,7 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, '/api/payments/providers', { provider: 'cash', label: `Box office cash ${stamp}`, channels: ['desk'], mode: 'live' })
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await post(api, `/api/core/productions/${production.id}/publish`, {})
+  productionSlug = (await (await api.get(`/api/core/productions/${production.id}`)).json()).production.slug
   await post(api, '/api/promotions', { name: promoCode, label: promoCode, trigger: 'code', effect: 'percent_off', value: 2000, maxPerSale: 1, codes: [{ code: promoCode }], targets: [{ role: 'applies', kind: 'box-office.ticket', scope: { productionId: production.id } }] })
   await api.dispose()
 })
@@ -111,6 +113,33 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   // The basket is spent: coming back shows nothing held.
   await visit(page, '/book/basket')
   await expect(page.getByRole('heading', { name: 'Your basket is empty' })).toBeVisible()
+})
+
+test('a buyer books from the show\'s page in a drawer, without leaving it', async ({ page }) => {
+  await visit(page, `/whats-on/${productionSlug}`)
+  const dates = page.getByRole('region', { name: 'Dates and tickets' })
+  // The button is still a link to the booking page, for a new tab or with scripts off.
+  await expect(dates.getByRole('link', { name: /^Book/ })).toHaveAttribute('href', `/book/${productionSlug}/${performanceId}`)
+  await dates.getByRole('link', { name: /^Book/ }).click()
+  const drawer = page.getByRole('dialog', { name: title })
+  await expect(drawer).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/whats-on/${productionSlug}$`))
+  await expect(drawer.getByRole('button', { name: 'Choose your tickets' })).toBeDisabled()
+  await noViolations(page)
+
+  await drawer.getByRole('button', { name: 'Add a ticket' }).click()
+  await drawer.getByRole('button', { name: 'Hold 1 ticket, £10.00' }).click()
+  await expect(drawer.getByText(/Held for \d+:\d\d/)).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/whats-on/${productionSlug}$`))
+  // Change tickets goes back a step in the drawer, with the choice kept.
+  await drawer.getByRole('button', { name: 'Change tickets' }).click()
+  await expect(drawer.getByRole('button', { name: 'Hold 1 ticket, £10.00' })).toBeVisible()
+  await drawer.getByRole('button', { name: 'Hold 1 ticket, £10.00' }).click()
+  await drawer.getByLabel('Your name').fill('Drawer Buyer')
+  await drawer.getByLabel('Email address').fill(`drawer.buyer.${stamp}@example.org`)
+  await noViolations(page)
+  await drawer.getByRole('button', { name: 'Reserve and pay £10.00 at the box office' }).click()
+  await expect(drawer.getByText(/Booking reference: \S+/)).toBeVisible()
 })
 
 test('a link that opens no booking says so, and a used confirmation link explains itself', async ({ page }) => {
