@@ -44,8 +44,8 @@ export interface PriceSummary {
   fromMinor: number | null
   /** The highest price anyone may book at, so a show whose every open price is nothing reads "Free". */
   toMinor?: number | null
-  /** Lower prices for people who qualify (a concession, a membership), each by its ticket type's own name, lowest first. */
-  others: { label: string, amountMinor: number }[]
+  /** Lower prices for people who qualify (a concession, a membership), each by its ticket type's own name, lowest first. `gated` marks one held by an account (a membership, an award), never quoted as "From". */
+  others: { label: string, amountMinor: number, gated?: true }[]
 }
 
 export interface BookingAction {

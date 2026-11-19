@@ -2,17 +2,21 @@
      after the ticket counts settle, a row appears for each kind of ticket chosen that a pass price is
      offered instead of: how many of those tickets become passes, each pass's first entry being
      tonight, at the difference in price. Only while the pass works out cheaper a show than the
-     ticket and covers more shows still to come. A price for members can be had by typing a
-     membership number for each pass, as for a Member ticket, rather than signing in. -->
+     ticket and covers more shows still to come. Each one swapped comes off its ticket's count, and a
+     membership number typed for that ticket comes across with it (Matt, 19 November). A price for
+     members can be had by typing a membership number for each pass, as for a Member ticket, rather
+     than signing in. -->
 <script setup lang="ts">
 import type { PassOnSale } from './BoxOfficePassOffer.vue'
 
-export interface PassSwap { passTypeId: string, passPriceId: string, ticketTypeId: string, name: string, priceName: string, amountMinor: number, count: number, references: string[] }
+export interface PassSwap { passTypeId: string, passPriceId: string, ticketTypeId: string, name: string, priceName: string, amountMinor: number, count: number, references: string[], /** The part of the house each swapped ticket came from, so it goes back there. */ bands?: string[] }
 interface Chosen { ticketTypeId: string, name: string, amountMinor: number, quantity: number }
 interface Row { key: string, pass: PassOnSale, price: PassOnSale['prices'][number], ticket: Chosen, entries: number }
 
 const props = defineProps<{ passes: PassOnSale[], chosen: Chosen[], currency?: string }>()
 const swaps = defineModel<PassSwap[]>({ default: () => [] })
+/** How many of a kind of ticket to swap: the page takes them off the ticket's count, or gives them back. */
+const emit = defineEmits<{ count: [row: Omit<PassSwap, 'count' | 'references' | 'bands'>, count: number] }>()
 
 const { t } = useT()
 const { money } = await useMoney()
@@ -44,10 +48,7 @@ const countOf = (row: Row) => swapOf(row)?.count ?? 0
 // The most of one kind of ticket that can become passes, less those swapped in another row.
 const mostOf = (row: Row) => row.ticket.quantity - swaps.value.filter(s => s.ticketTypeId === row.ticket.ticketTypeId && keyOf(s.passTypeId, s.passPriceId, s.ticketTypeId) !== row.key).reduce((sum, s) => sum + s.count, 0)
 function setCount(row: Row, count: number | null) {
-  const n = Math.max(0, Math.min(count ?? 0, mostOf(row)))
-  const others = swaps.value.filter(s => keyOf(s.passTypeId, s.passPriceId, s.ticketTypeId) !== row.key)
-  const references = swapOf(row)?.references ?? []
-  swaps.value = n ? [...others, { passTypeId: row.pass.id, passPriceId: row.price.id, ticketTypeId: row.ticket.ticketTypeId, name: row.pass.name, priceName: row.price.name, amountMinor: row.price.amountMinor, count: n, references: references.slice(0, n) }] : others
+  emit('count', { passTypeId: row.pass.id, passPriceId: row.price.id, ticketTypeId: row.ticket.ticketTypeId, name: row.pass.name, priceName: row.price.name, amountMinor: row.price.amountMinor }, Math.max(0, Math.min(count ?? 0, mostOf(row))))
 }
 function setReference(row: Row, n: number, value: string) {
   const swap = swapOf(row)
@@ -56,11 +57,9 @@ function setReference(row: Row, n: number, value: string) {
   references[n] = value
   swaps.value = swaps.value.map(s => (s === swap ? { ...s, references } : s))
 }
-// Fewer tickets chosen, or an offer that no longer stands, takes its swaps with it.
-watch([rows, () => props.chosen], () => {
-  const kept = swaps.value.filter(s => rows.value.some(r => r.key === keyOf(s.passTypeId, s.passPriceId, s.ticketTypeId)))
-    .map(s => ({ ...s, count: Math.min(s.count, props.chosen.find(c => c.ticketTypeId === s.ticketTypeId)?.quantity ?? 0) })).filter(s => s.count > 0)
-  if (kept.length !== swaps.value.length || kept.some((s, i) => s.count !== swaps.value[i]!.count)) swaps.value = kept
+// An offer that no longer stands gives its tickets back.
+watch(rows, () => {
+  for (const s of swaps.value) if (!rows.value.some(r => r.key === keyOf(s.passTypeId, s.passPriceId, s.ticketTypeId))) emit('count', s, 0)
 })
 const typing = (row: Row) => !row.price.allowed && !!row.price.reference
 const passNames = computed(() => [...new Set(rows.value.map(r => r.pass.name))])

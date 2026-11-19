@@ -109,7 +109,8 @@ async function prices(productionIds: string[]): Promise<Record<string, PriceSumm
     const toMinor = open.length ? Math.max(...open) : null
     const others = [...byType]
       .filter(([id, amount]) => qualifies(id) && (fromMinor === null || amount < fromMinor))
-      .map(([id, amountMinor]) => ({ label: types.get(id)!.name, amountMinor }))
+      // A price held by an account (a membership, an award) is gated: it is never quoted to everyone.
+      .map(([id, amountMinor]) => ({ label: types.get(id)!.name, amountMinor, ...(types.get(id)!.requirementRefs.length ? { gated: true as const } : {}) }))
       .sort((a, b) => a.amountMinor - b.amountMinor || a.label.localeCompare(b.label))
     out[productionId] = { currency, fromMinor, toMinor, others }
   }
