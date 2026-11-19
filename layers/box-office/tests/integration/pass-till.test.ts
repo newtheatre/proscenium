@@ -142,6 +142,10 @@ describe('selling a pass at the till', () => {
     // Nobody was named for it: the after-sale panel shows its code to hand over.
     expect((await req('GET', `/api/box-office/desk/sold?intent=${made.body.intentId}`, undefined, seller)).body.orders).toMatchObject([{ performance: null, lines: [], passes: [{ name: type.name, priceName: 'Member', holder: null, code: expect.stringMatching(/^PASS-/) }] }])
     expect(await passIncome() - before).toBe(-2100)
+    // The staff Orders list carries it, with no show, rather than refusing the whole page.
+    const listed = await req('GET', '/api/box-office/orders?view=all', undefined, seller)
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200)
+    expect(listed.body.rows.find((r: { id: string }) => r.id === order.id)).toMatchObject({ show: null, startsAt: null })
   })
 })
 
