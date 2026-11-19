@@ -47,6 +47,12 @@ watch(() => props.outcome.token, async (token) => {
         />
       </template>
     </template>
+    <BoxOfficeSendPasses
+      v-if="booking?.passes && outcome.token"
+      :passes="booking.passes"
+      :headers="{ 'x-order-token': outcome.token }"
+      @sent="booking = { ...booking!, passes: $event }"
+    />
     <BoxOfficeAccountCard
       v-if="outcome.accountLinkSent && !viewer.signedIn"
       :order-token="outcome.token"

@@ -18,7 +18,11 @@ export interface BookingView {
   buyerCancel: { feeMinor: number, until: number } | null
   tickets?: BookingTicket[]
   show?: BookingShow | null
+  /** Passes bought with the booking; `buyers` while the buyer still holds it. */
+  passes?: BookingPass[]
 }
+
+export interface BookingPass { id: string, name: string, priceName: string, code: string | null, buyers: boolean }
 
 /** What the server answers when a booking is made, free or reserved, as the screen after it shows it. */
 export interface BookingDoneOutcome {

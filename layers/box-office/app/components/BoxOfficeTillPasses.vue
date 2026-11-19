@@ -8,9 +8,12 @@ import type { Buyer } from './BoxOfficeBuyerPicker.vue'
 
 export interface TillPass { code: string, name: string, priceName: string, holder: string | null, owedMinor: number, left: number | null, unusable: { code: string, reason: string, remedy: string | null } | null }
 export interface TillPassBuy { passTypeId: string, passPriceId: string, name: string, priceName: string, amountMinor: number, entry: boolean, holder?: Buyer }
-interface OnSale { id: string, name: string, covers: boolean, holder: 'auto' | 'named' | 'open', prices: { id: string, name: string, amountMinor: number, proofNote: string | null, restricted: boolean }[] }
+interface OnSale { id: string, name: string, covers: boolean, holder: 'auto' | 'named' | 'open', uses: number | null, ahead: number, prices: { id: string, name: string, amountMinor: number, proofNote: string | null, restricted: boolean, insteadOf: string[] }[] }
+interface SaleTicket { ticketTypeId: string, name: string, amountMinor: number, quantity: number }
 
-const props = defineProps<{ performanceId: string, locked: boolean }>()
+const props = defineProps<{ performanceId: string, locked: boolean, /** The sale's tickets by kind, for the offer to swap one for a pass. */ tickets?: SaleTicket[] }>()
+/** A ticket of this kind is to come out of the sale: it became a pass's first entry. */
+const emit = defineEmits<{ swap: [ticketTypeId: string] }>()
 const entries = defineModel<TillPass[]>('entries', { required: true })
 const buys = defineModel<TillPassBuy[]>('buys', { required: true })
 const collect = defineModel<TillPass[]>('collect', { required: true })
@@ -78,25 +81,64 @@ const needsHolder = computed(() => !!choice.value && (choice.value.type.holder =
 watch(choice, (c) => {
   entry.value = !!c?.type.covers
 })
-async function openSelling() {
+let loadedFor = ''
+async function loadOnSale() {
+  if (loadedFor === props.performanceId) return
+  onSale.value = (await $api<{ passes: OnSale[] }>('/api/box-office/desk/passes', { query: { performanceId: props.performanceId } })).passes
+  loadedFor = props.performanceId
+}
+async function openSelling(prefill?: { value: string, swapping: string }) {
   selling.value = true
   saleRefusal.value = null
+  swapping.value = prefill?.swapping ?? null
   try {
-    onSale.value = (await $api<{ passes: OnSale[] }>('/api/box-office/desk/passes', { query: { performanceId: props.performanceId } })).passes
-    if (options.value.length === 1) chosen.value = options.value[0]!.value
+    await loadOnSale()
+    if (prefill) chosen.value = prefill.value
+    else if (options.value.length === 1) chosen.value = options.value[0]!.value
   }
   catch (e) {
     saleRefusal.value = toRefusal(e)
   }
 }
+
+// The offer to swap a ticket in the sale for a pass (mock-up approved by Matt, 18 November): one
+// button for each kind of ticket a price is offered instead of, while the pass is cheaper a show and
+// covers more shows still to come. Not now hides it for the rest of this sale.
+const swapping = ref<string | null>(null)
+const notNow = ref(false)
+watch(() => props.performanceId, () => {
+  notNow.value = false
+})
+watch(() => (props.tickets ?? []).length, (n) => {
+  if (!n) notNow.value = false
+  else loadOnSale().catch(() => {})
+}, { immediate: true })
+const swaps = computed(() => (props.tickets ?? []).flatMap(ticket => onSale.value.filter(type => type.covers && type.ahead >= 3).flatMap(type => type.prices.flatMap((price) => {
+  const entries = Math.min(type.ahead, type.uses ?? type.ahead)
+  if (!price.insteadOf.includes(ticket.ticketTypeId) || price.amountMinor >= ticket.amountMinor * entries) return []
+  return [{ ticket, type, price, more: price.amountMinor - ticket.amountMinor }]
+}))))
+const swapNames = computed(() => [...new Set(swaps.value.map(s => s.type.name))])
+const swapActions = computed(() => [
+  ...swaps.value.map(s => ({
+    label: t('box-office.screens.panel.pass.swap', { ticket: s.ticket.name, pass: s.type.name, price: s.price.name, amount: money(s.more) }),
+    color: 'neutral' as const,
+    variant: 'outline' as const,
+    onClick: () => openSelling({ value: `${s.type.id} ${s.price.id}`, swapping: s.ticket.ticketTypeId }),
+  })),
+  { label: t('box-office.screens.panel.pass.not-now'), color: 'neutral' as const, variant: 'link' as const, onClick: () => { notNow.value = true } },
+])
 function addSale() {
   const c = choice.value
   if (!c || (needsHolder.value && !holder.value)) return
   buys.value = [...buys.value, { passTypeId: c.type.id, passPriceId: c.price.id, name: c.type.name, priceName: c.price.name, amountMinor: c.price.amountMinor, entry: entry.value && c.type.covers, ...(holder.value ? { holder: holder.value } : {}) }]
+  // A swap: the ticket it replaces comes out of the sale, as its entry is the pass's.
+  if (swapping.value && entry.value && c.type.covers) emit('swap', swapping.value)
   closeSelling()
 }
 function closeSelling() {
   selling.value = false
+  swapping.value = null
   chosen.value = undefined
   holder.value = undefined
 }
@@ -113,6 +155,16 @@ const buyerLabel = (b: Buyer | undefined) => (!b ? t('box-office.screens.panel.p
       :title="t('box-office.screens.panel.pass.title', { name: found.name, holder: holderOf(found) })"
       :description="foundWords"
       :actions="foundActions"
+    />
+
+    <UAlert
+      v-if="swaps.length && !notNow && !selling && !locked"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-id-card"
+      :title="swapNames.length === 1 ? t('box-office.screens.panel.pass.swap-title', { name: swapNames[0]! }) : t('box-office.screens.panel.pass.swap-title-several')"
+      :description="t('box-office.screens.panel.pass.swap-help')"
+      :actions="swapActions"
     />
 
     <ul
@@ -171,7 +223,7 @@ const buyerLabel = (b: Buyer | undefined) => (!b ? t('box-office.screens.panel.p
       variant="link"
       :label="t('box-office.screens.panel.pass.sell')"
       :disabled="locked"
-      @click="openSelling"
+      @click="openSelling()"
     />
     <div
       v-else
