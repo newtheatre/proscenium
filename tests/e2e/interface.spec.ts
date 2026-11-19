@@ -333,6 +333,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await noViolations(page)
     })
 
+    test('the console wears the brand\'s primary, shaded for this scheme', async ({ page }) => {
+      await visit(page, '/console')
+      const tokens = await page.evaluate(() => ['--brand-solid', '--ui-primary'].map(p => getComputedStyle(document.documentElement).getPropertyValue(p).trim()))
+      expect(tokens[0]).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(tokens[1]).toMatch(/^#[0-9a-f]{6}$/i)
+    })
+
     test('the account menu marks the current shell and offers the console', async ({ page }) => {
       await visit(page, '/console/gallery/list')
       await page.getByRole('button', { name: /Open the menu for Sam Staff/ }).first().click()
