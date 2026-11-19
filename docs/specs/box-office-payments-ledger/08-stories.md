@@ -69,7 +69,7 @@ This is how the first theatre sells, so all seven are Gate stories. The rules ar
 
 | Id | Story | Acceptance criteria | Release |
 | --- | --- | --- | --- |
-| BO-40 | As a steward I scan a ticket and know at once | A valid ticket shows Admitted. A second scan shows Already in, with the time and door. A ticket for another performance, a cancelled ticket and a code that is not ours each say so. A desk code or a reservation reference says Not paid, send to the desk | First. Gate |
+| BO-40 | As a steward I scan a ticket and know at once | A valid ticket shows Admitted. A second scan shows Already in, with the time and door. A ticket for another performance, a cancelled ticket and a code that is not ours each say so. A desk code or a reservation reference says Not paid, send to the desk; once paid, it admits everyone on the booking not yet in. Each result is shown afresh (it springs in, the device vibrates where it can, and an admission clears after a few seconds), so consecutive tickets are never mistaken for one | First. Gate |
 | BO-41 | As a steward I keep working when the wifi drops | With the offline data loaded, scanning works offline and shows that it is offline. Queued scans are sent on reconnection, exactly once each | First |
 | BO-42 | As a steward I admit someone by name | The door list finds a buyer by name, through Identity's findAccounts (part 4), and admits one or all of their tickets | First |
 | BO-43 | As a front-of-house manager I see how many are in | Sold, admitted and still to come, updated within a few seconds while online | First |

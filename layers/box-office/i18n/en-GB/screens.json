@@ -747,6 +747,7 @@
   "box-office.live-door.result.wrong_performance": "Wrong performance",
   "box-office.live-door.result.reference": "Booking found",
   "box-office.live-door.line.reference": "Booking {reference}: admit them from the list.",
+  "box-office.live-door.line.booking-in": "Everyone on {reference} is already in",
   "box-office.live-door.result.requirement_not_met": "Does not qualify",
   "box-office.live-door.result.unknown": "Not one of ours",
   "box-office.live-door.result.bad_signature": "Altered code",
