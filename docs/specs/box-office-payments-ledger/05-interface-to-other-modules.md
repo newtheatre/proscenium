@@ -91,7 +91,7 @@ Two families fall out of the capabilities. An **integrated** provider answers fo
 **Two SumUp providers.** A SumUp account that cannot use the Cloud API (the Nottingham New Theatre's is the students' union's, which works only with SumUp's older app hand-off, Payment Switch) is served by a second provider. Each provider account is one or the other, and a till offers the reader method of every account it has, so it may offer either or both.
 
 - `sumup` is the Cloud API, an integrated provider as described above.
-- `sumup-handoff` opens the SumUp app on the till's device with the total, the currency and the attempt's id as the app's reference. The contract's next step for it is `{ kind: 'handoff', url }`. The app returns to an address for that one attempt, signed with the kit's signing keys under the purpose `payments.handoff`.
+- `sumup-handoff` opens the SumUp app on the till's device with the total, the currency and the attempt's id as the app's reference. It asks the app to skip its own success screen, so a paid sale returns to the till at once and the till shows the result. The contract's next step for it is `{ kind: 'handoff', url }`. The app returns to an address for that one attempt, signed with the kit's signing keys under the purpose `payments.handoff`.
 - The app's answer is unsigned by SumUp, so it is recorded as a claim by the person at the till, exactly as an attested card payment is: success makes the attempt succeed, anything else fails it, and SumUp's transaction code is kept for reconciliation against the SumUp statement.
 - An attempt with no answer becomes unknown through the reconcile task and is resolved by a person. Refunds are made in the SumUp app and confirmed by a person, as for attested.
 
