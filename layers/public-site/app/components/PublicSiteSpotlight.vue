@@ -18,7 +18,7 @@ interface Listing {
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
   price: PriceSummaryView | null
 }
-interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, external?: true }
+interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, external?: true, drawer?: string }
 interface Production {
   companyName: string | null
   runningMinutes: number | null
@@ -43,6 +43,15 @@ const eyebrow = computed(() => [tonight.value ? t('public-site.whats-on.tonight'
 const facts = computed(() => [range(props.show.nextStartsAt, props.show.lastStartsAt), props.show.venues.join(', ')].filter(Boolean).join(' · '))
 const priceLine = computed(() => (props.show.price ? priceSummary(props.show.price, t) : ''))
 const bookable = (b: Booking | null) => !!b?.link && (b.state === 'available' || b.state === 'limited')
+// A date whose booking names a drawer opens it over this page, as the show page's Book buttons do.
+const drawn = ref<{ booking: Booking, startsAt: number } | null>(null)
+const drawerOpen = ref(false)
+function book(event: MouseEvent, p: { booking: Booking | null, startsAt: number }) {
+  if (!p.booking?.drawer || p.booking.external || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+  event.preventDefault()
+  drawn.value = { booking: p.booking, startsAt: p.startsAt }
+  drawerOpen.value = true
+}
 const note = (b: Booking | null) => b?.state === 'limited' ? t('public-site.booking.last-few') : b?.state === 'sold-out' ? t('public-site.booking.sold-out') : b?.state === 'not-yet' ? t('public-site.booking.not-yet') : b?.state === 'closed' ? t('public-site.booking.closed') : ''
 </script>
 
@@ -129,6 +138,7 @@ const note = (b: Booking | null) => b?.state === 'limited' ? t('public-site.book
               color="neutral"
               variant="outline"
               class="flex-col items-start gap-0 text-start"
+              @click="book($event, p)"
             >
               <span class="font-semibold">{{ dayBrief(p.startsAt) }}</span>
               <span class="text-xs text-muted">{{ [time(p.startsAt), note(p.booking)].filter(Boolean).join(' · ') }}</span>
@@ -171,5 +181,13 @@ const note = (b: Booking | null) => b?.state === 'limited' ? t('public-site.book
         </div>
       </div>
     </div>
+    <PublicSiteBookingDrawer
+      v-if="drawn"
+      v-model:open="drawerOpen"
+      :name="drawn.booking.drawer!"
+      :link="drawn.booking.link!"
+      :title="show.title"
+      :when="dateTime(drawn.startsAt)"
+    />
   </section>
 </template>

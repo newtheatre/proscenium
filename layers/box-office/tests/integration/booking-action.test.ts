@@ -31,8 +31,8 @@ describe('the booking button from Box office', () => {
     const small = await house(5)
     const found = await answers(big, small)
     const slug = (await rows<{ slug: string }>('SELECT slug FROM core_productions WHERE id = ?', big.productionId))[0]!.slug
-    expect(found[big.performanceId]).toEqual({ state: 'available', link: `/book/${slug}/${big.performanceId}` })
-    expect(found[small.performanceId]).toMatchObject({ state: 'limited', seatsLeft: 5 })
+    expect(found[big.performanceId]).toEqual({ state: 'available', link: `/book/${slug}/${big.performanceId}`, drawer: 'BoxOfficeBookingDrawer' })
+    expect(found[small.performanceId]).toMatchObject({ state: 'limited', seatsLeft: 5, drawer: 'BoxOfficeBookingDrawer' })
     await setting('box-office.availability.show-remaining-under', 0)
     expect((await answers(small))[small.performanceId]!.state).toBe('available')
     await setting('box-office.availability.show-remaining-under', 20)
