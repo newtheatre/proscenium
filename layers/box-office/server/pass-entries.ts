@@ -12,6 +12,7 @@ import { accountScopeIds, accountScopeSql } from '#kit/accounts'
 import { accountLabel, getPerformance, getProduction } from '#modules/core'
 import { hashOf } from './codes'
 import { passCodeHashes, shownPassCode } from './pass-holding'
+import { owedNow } from './pass-sales'
 import { HIDDEN_TYPE, managedType } from './ticket-types'
 
 /** The ticket type Box office keeps for a pass entry's line. It is never listed, priced or sold. */
@@ -235,7 +236,7 @@ export async function passesFor(performanceId: string, account: string | null, a
     const code = await openColumn(row.code) as string
     try {
       const judged = await judgePass(code, performanceId, { channel: 'online', account }, at)
-      mine.push({ code: shownPassCode(code), name: judged.name, priceName: judged.priceName, owedMinor: judged.owedMinor, left: judged.left, unusable: null })
+      mine.push({ code: shownPassCode(code), name: judged.name, priceName: judged.priceName, owedMinor: await owedNow(judged, at), left: judged.left, unusable: null })
     }
     catch (error) {
       const refusal = error as { name?: string, reason?: string, remedy?: string }
@@ -273,7 +274,7 @@ export async function deskPass(typed: string, performanceId: string, at = nowMs(
   if (!row || !row.issued_at) refuse('box-office.pass.unknown', 'We do not recognise that pass code.', { status: 422, remedy: 'Check how it is spelt. It is on the pass and in its email.', fields: field('unknown') })
   if (row.state !== 'active') refuse('box-office.pass.void', 'That pass has been cancelled.', { status: 422, remedy: 'Open it from Passes to see who cancelled it.', fields: field('void') })
   const code = row.code ? shownPassCode(await openColumn(row.code) as string) : typed.trim()
-  const base = { passId: row.id, code, name: row.name, priceName: row.price_name, holder: row.account_id ? await accountLabel(row.account_id) : null, owedMinor: row.paid_at ? 0 : row.amount_minor - row.credit_minor }
+  const base = { passId: row.id, code, name: row.name, priceName: row.price_name, holder: row.account_id ? await accountLabel(row.account_id) : null, owedMinor: row.paid_at ? 0 : await owedNow({ passId: row.id, owedMinor: row.amount_minor - row.credit_minor }, at) }
   try {
     const judged = await judgePass(code, performanceId, { channel: 'desk', account: null }, at)
     return { ...base, left: judged.left, unusable: null }
