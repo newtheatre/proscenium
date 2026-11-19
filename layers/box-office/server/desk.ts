@@ -498,9 +498,12 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   if (touched.some(id => !byId.has(id)) || new Set(touched).size !== touched.length) refuse(CHANGED.code, 'Those tickets are not on this reservation any more.', { status: 409, remedy: CHANGED.remedy })
   if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
   const performanceId = lines[0]!.performance_id
-  // A change of type is priced as of when the order was reserved, so a later price rise is not charged for a swap.
+  // A change of type is priced as of when the order was reserved, so a later price rise is not charged
+  // for a swap; a booking reserved before its prices existed, such as an imported one, takes today's.
   const reservedAt = (await first<{ reserved_at: number | null }>('SELECT reserved_at FROM box_office_orders WHERE id = ?', order.id))?.reserved_at ?? at
-  const prices = new Map((await pricesFor(performanceId, reservedAt)).map(p => [`${p.bandId} ${p.ticketTypeId}`, p.amountMinor]))
+  const priceKey = (p: { bandId: string, ticketTypeId: string }) => `${p.bandId} ${p.ticketTypeId}`
+  const prices = new Map((retype.length ? await pricesFor(performanceId, at) : []).map(p => [priceKey(p), p]))
+  if (retype.length && reservedAt < at) for (const p of await pricesFor(performanceId, reservedAt)) prices.set(priceKey(p), p)
 
   const kept: { typeId: string, amountMinor: number }[] = []
   for (const l of lines) {
@@ -510,10 +513,11 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
       kept.push({ typeId: l.ticket_type_id, amountMinor: l.amount_minor })
       continue
     }
-    const amountMinor = prices.get(`${l.band_id} ${change.ticketTypeId}`)
-    if (amountMinor === undefined) refuse('box-office.price.none', 'That kind of ticket is not sold for this part of the house.', { status: 422 })
+    const price = prices.get(priceKey({ bandId: l.band_id, ticketTypeId: change.ticketTypeId }))
+    if (!price) refuse('box-office.price.none', 'That kind of ticket is not sold for this part of the house.', { status: 422 })
+    const amountMinor = price.amountMinor
     kept.push({ typeId: change.ticketTypeId, amountMinor })
-    unit.add(sql`UPDATE box_office_order_lines SET ticket_type_id = ${change.ticketTypeId}, list_minor = ${amountMinor}, discount_minor = 0, amount_minor = ${amountMinor}, updated_at = ${at}
+    unit.add(sql`UPDATE box_office_order_lines SET ticket_type_id = ${change.ticketTypeId}, price_id = ${price.id}, list_minor = ${amountMinor}, discount_minor = 0, amount_minor = ${amountMinor}, updated_at = ${at}
       WHERE id = ${l.id} AND order_id = ${order.id} AND state = 'live'`).expect(1, CHANGED)
   }
   // A change to a type with requirements is a desk sale of it: the seller must be able to check by hand.
