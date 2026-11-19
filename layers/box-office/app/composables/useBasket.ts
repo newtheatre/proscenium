@@ -12,6 +12,8 @@ export interface RememberedBasket {
   /** The passes being bought with the booking. */
   buying?: { passTypeId: string, passPriceId: string, name: string, priceName: string, amountMinor: number, wheelchair: boolean }[]
   passes?: { code: string, name: string, priceName: string, owedMinor: number, wheelchair: boolean, own: boolean }[]
+  /** Tickets swapped for passes, with any membership numbers typed for them. */
+  swaps?: { passTypeId: string, passPriceId: string, ticketTypeId: string, name: string, priceName: string, amountMinor: number, count: number, references: string[] }[]
 }
 
 const KEY = 'box-office:basket'

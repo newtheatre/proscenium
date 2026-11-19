@@ -3,6 +3,7 @@
 import { all, defineRoute, requirements, usePoint } from '#kit'
 import { getProduction, listSeasons } from '#modules/core'
 import { listPassTypes } from '../../../passes'
+import { HIDDEN_TYPE, sellableTypes } from '../../../ticket-types'
 
 export default defineRoute({
   ability: 'box-office.pass.manage',
@@ -21,5 +22,8 @@ export default defineRoute({
   const labels: Record<string, string> = Object.fromEntries(offered.map(o => [o.reference, o.label]))
   const inUse = [...new Set(rows.flatMap(r => r.prices.flatMap(p => p.requirementRefs)))]
   for (const [ref, d] of Object.entries(await requirements.describe(inUse))) labels[ref] = d.label
-  return { rows, productions, seasons, requirementOptions: offered.map(o => ({ value: o.reference, label: o.label })), requirementLabels: labels }
+  // The ticket types a price can be offered instead of: those people buy, in the order lists show them.
+  const ticketTypes = [...(await sellableTypes()).values()].filter(t => t.kind !== 'complimentary' && t.kind !== 'companion' && t.managedBy !== HIDDEN_TYPE)
+    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(t => ({ value: t.id, label: t.name }))
+  return { rows, productions, seasons, requirementOptions: offered.map(o => ({ value: o.reference, label: o.label })), requirementLabels: labels, ticketTypes }
 })

@@ -21,8 +21,6 @@ export const priceLists = defineTable('bar_price_lists', {
   restricted: col.internal(integer('restricted', { mode: 'boolean' }).notNull().default(false)),
   // A variant with no price on this list uses Standard's.
   fallsBack: col.internal(integer('falls_back', { mode: 'boolean' }).notNull().default(true)),
-  // Set: the list has no prices of its own, and each is Standard's less this percentage.
-  percentOff: col.internal(integer('percent_off')),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
@@ -33,8 +31,7 @@ export const priceLists = defineTable('bar_price_lists', {
   extra: t => [
     uniqueIndex('bar_price_lists_name').on(sql`lower(${t.name})`),
     uniqueIndex('bar_price_lists_system_key').on(t.systemKey).where(sql`system_key IS NOT NULL`),
-    check('bar_price_lists_percent', sql`${t.percentOff} IS NULL OR (${t.percentOff} BETWEEN 1 AND 100)`),
-    check('bar_price_lists_standard', sql`${t.systemKey} IS NULL OR (${t.percentOff} IS NULL AND ${t.active} = 1)`),
+    check('bar_price_lists_standard', sql`${t.systemKey} IS NULL OR ${t.active} = 1`),
   ],
 })
 

@@ -1,5 +1,5 @@
 <!-- A booking, leading with what it is for: the production, when, where (with the venue's page and
-     "Add to calendar"), the tickets and the total, then what to show. A confirmed booking shows each
+     "Add to calendar"), when latecomers are let in, the tickets and the total, then what to show. A confirmed booking shows each
      ticket's code to be scanned at the door; a reservation shows the box office code, which finds it
      at the desk to be paid for. Used on Your booking, the confirmation screen and after booking. -->
 <script setup lang="ts">
@@ -53,6 +53,12 @@ function addToCalendar() {
           <br>{{ show.address }}
         </template>
       </p>
+      <LatecomersNote
+        v-if="show.latecomers && !show.cancelled"
+        :rule="show.latecomers"
+        rules
+        class="pt-1"
+      />
       <UAlert
         v-if="show.cancelled"
         color="warning"

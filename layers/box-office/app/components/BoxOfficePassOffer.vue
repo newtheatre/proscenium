@@ -2,7 +2,7 @@
      Matt 2026-11-18). Buying it here makes this booking's ticket its first entry, so nobody is sent
      to a separate page to buy a pass before they can book. One of each pass to a booking. -->
 <script setup lang="ts">
-export interface PassOnSale { id: string, name: string, description: string | null, shows: number | null, once: boolean, uses: number | null, reserveUnpaid: boolean, prices: { id: string, name: string, amountMinor: number, proofNote: string | null, allowed: boolean, why: string | null }[] }
+export interface PassOnSale { id: string, name: string, description: string | null, shows: number | null, once: boolean, uses: number | null, reserveUnpaid: boolean, /** Covered shows still to come, this one included. */ ahead: number, prices: { id: string, name: string, amountMinor: number, proofNote: string | null, allowed: boolean, why: string | null, insteadOf: string[], reference?: { label: string, field?: string, shape: string } }[] }
 export interface BoughtPass { passTypeId: string, passPriceId: string, name: string, priceName: string, amountMinor: number, wheelchair: boolean }
 
 const props = defineProps<{ pass: PassOnSale, currency?: string, /** Whether the visitor may book a wheelchair space here. */ wheelchair: boolean }>()

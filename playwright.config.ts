@@ -9,7 +9,11 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? 'github' : 'list',
   use: { baseURL: 'http://localhost:8788' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // A new site starts in maintenance mode; the tests' site is switched out of it first.
+    { name: 'setup', testMatch: /\.setup\.ts$/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'] },
+  ],
   webServer: {
     command: 'rm -rf .wrangler/e2e && bunx wrangler dev --cwd .output --port 8788 --persist-to ../.wrangler/e2e --var PROSCENIUM_AUTO_MIGRATE:1 --var CORE_ENCRYPTION_KEY:browser-tests-only-not-a-secret --var CORE_SESSION_KEY:browser-tests-only-not-a-secret',
     url: 'http://localhost:8788/api/core/health',

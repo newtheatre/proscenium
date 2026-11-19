@@ -21,6 +21,8 @@ export interface PassPrice {
   amountMinor: number
   requirementRefs: string[]
   proofNote: string | null
+  /** Ticket types this price is offered instead of, as a swap, when someone books them. */
+  insteadOf: string[]
   active: boolean
   /** Passes sold at this price, so it can be retired but not removed. */
   sold: number
@@ -53,7 +55,7 @@ export interface PassType {
 }
 
 interface TypeRow { id: string, name: string, description: string | null, covers: Covers, season_id: string | null, covers_from: number | null, covers_until: number | null, per_show: 'once' | 'any', uses: number | null, holder: 'auto' | 'named' | 'open', reserve_unpaid: number, recheck: number, channel: Channel, on_sale: number, sale_from: number | null, sale_until: number | null, active: number, currency: string, held: number, unpaid: number }
-interface PriceRow { id: string, pass_type_id: string, name: string, amount_minor: number, requirement_refs: string | null, proof_note: string | null, active: number, sold: number }
+interface PriceRow { id: string, pass_type_id: string, name: string, amount_minor: number, requirement_refs: string | null, proof_note: string | null, instead_of: string | null, active: number, sold: number }
 
 const refsOf = (text: string | null): string[] => {
   if (!text) return []
@@ -67,7 +69,7 @@ const refsOf = (text: string | null): string[] => {
 }
 const refsText = (refs: readonly string[] | undefined): string | null => (refs?.length ? JSON.stringify([...refs]) : null)
 
-const toPrice = (r: PriceRow): PassPrice => ({ id: r.id, name: r.name, amountMinor: r.amount_minor, requirementRefs: refsOf(r.requirement_refs), proofNote: r.proof_note, active: !!r.active, sold: r.sold })
+const toPrice = (r: PriceRow): PassPrice => ({ id: r.id, name: r.name, amountMinor: r.amount_minor, requirementRefs: refsOf(r.requirement_refs), proofNote: r.proof_note, insteadOf: refsOf(r.instead_of), active: !!r.active, sold: r.sold })
 
 const TYPES = `SELECT t.*,
   (SELECT count(*) FROM box_office_passes p WHERE p.pass_type_id = t.id AND p.state = 'active') AS held,
@@ -112,6 +114,7 @@ const priceInput = z.object({
   amountMinor: z.number().int().min(0).max(100_000_000), // not-policy: a sanity bound
   requirementRefs: z.array(z.string().min(3).max(200)).max(10).optional(), // not-policy: bounds on a list of references
   proofNote: z.string().trim().max(200).nullable().optional(), // not-policy: one line about proof to bring
+  insteadOf: z.array(idSchema('tty')).max(20).optional(), // not-policy: bounds on a list of ticket types
   active: z.boolean().optional(),
 }).strict()
 
@@ -160,6 +163,12 @@ async function checked(input: PassTypeInput): Promise<PassTypeInput & { producti
     const bad = input.prices.findIndex(p => (p.requirementRefs ?? []).some(r => !known[r]))
     if (bad >= 0) refuse('box-office.pass.unknown-requirement', 'One of those is not provided by anything switched on.', { status: 422, fields: { [`prices.${bad}.requirementRefs`]: 'Choose from the list.' } })
   }
+  const wanted = [...new Set(input.prices.flatMap(p => p.insteadOf ?? []))]
+  if (wanted.length) {
+    const known = new Set((await all<{ id: string }>('SELECT id FROM box_office_ticket_types WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(wanted))).map(r => r.id))
+    const bad = input.prices.findIndex(p => (p.insteadOf ?? []).some(id => !known.has(id)))
+    if (bad >= 0) refuse('box-office.pass.unknown-ticket-type', 'One of those ticket types is no longer there.', { status: 422, fields: { [`prices.${bad}.insteadOf`]: 'Choose from the list.' } })
+  }
   // A pass only its holder may use cannot be sold to nobody in particular, so it is refused where it would be: when sold.
   return {
     ...input, productionIds,
@@ -179,12 +188,12 @@ function writePrices(unit: UnitView, passTypeId: string, prices: PassTypeInput['
   }
   prices.forEach((p, sort) => {
     if (p.id) {
-      unit.add(sql`UPDATE box_office_pass_prices SET name = ${p.name}, amount_minor = ${p.amountMinor}, requirement_refs = ${refsText(p.requirementRefs)}, proof_note = ${p.proofNote ?? null}, sort = ${sort}, active = ${(p.active ?? true) ? 1 : 0}, updated_at = ${at}
+      unit.add(sql`UPDATE box_office_pass_prices SET name = ${p.name}, amount_minor = ${p.amountMinor}, requirement_refs = ${refsText(p.requirementRefs)}, proof_note = ${p.proofNote ?? null}, instead_of = ${refsText(p.insteadOf)}, sort = ${sort}, active = ${(p.active ?? true) ? 1 : 0}, updated_at = ${at}
         WHERE id = ${p.id} AND pass_type_id = ${passTypeId}`).expect(1, { code: 'box-office.pass.price-not-found', reason: 'One of these prices is no longer there.', remedy: 'Reload and try again.' })
     }
     else {
-      unit.add(sql`INSERT INTO box_office_pass_prices (id, pass_type_id, name, amount_minor, requirement_refs, proof_note, sort, active, created_at, updated_at)
-        VALUES (${newId('ppr')}, ${passTypeId}, ${p.name}, ${p.amountMinor}, ${refsText(p.requirementRefs)}, ${p.proofNote ?? null}, ${sort}, ${(p.active ?? true) ? 1 : 0}, ${at}, ${at})`)
+      unit.add(sql`INSERT INTO box_office_pass_prices (id, pass_type_id, name, amount_minor, requirement_refs, proof_note, instead_of, sort, active, created_at, updated_at)
+        VALUES (${newId('ppr')}, ${passTypeId}, ${p.name}, ${p.amountMinor}, ${refsText(p.requirementRefs)}, ${p.proofNote ?? null}, ${refsText(p.insteadOf)}, ${sort}, ${(p.active ?? true) ? 1 : 0}, ${at}, ${at})`)
     }
   })
 }

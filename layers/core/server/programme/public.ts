@@ -12,6 +12,8 @@ import { bookingActions, priceSummaries, type ShownBooking } from './booking'
 import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
 import { publicVenues, type PublicVenueSummary } from './public-places'
+import { latecomersFor } from './latecomers'
+import { latecomerRule, type LatecomerRule } from '../../shared/latecomers'
 
 export interface PublicTerm { id: string, slug: string, label: string }
 export interface PublicNote { termId: string, label: string, detail: string | null }
@@ -31,6 +33,8 @@ export interface PublicPerformance {
   access: PublicNote[]
   /** Labels of the staging effects this performance does not use (C-55). */
   effectsOff: string[]
+  /** When latecomers are let in at this performance: the show's rule, or not at all where "at the interval" meets a performance without one. */
+  latecomers: LatecomerRule
   /** The booking button, or null where there is none (C-39: "where one exists"). */
   booking: ShownBooking | null
 }
@@ -58,6 +62,8 @@ export interface PublicProduction {
   contentNote: string | null
   runningMinutes: number | null
   intervalCount: number
+  /** When latecomers are usually let in to this show: its own rule or the theatre's. A performance with no interval may differ. */
+  latecomers: LatecomerRule
   state: 'published' | 'cancelled'
   /** Worked out, not stored (part 3): cancelled, or its last performance not cancelled has ended. */
   past: boolean
@@ -101,6 +107,7 @@ interface ProductionRow {
   running_minutes: number | null
   interval_count: number
   external_booking_url: string | null
+  latecomers: string | null
   state: 'published' | 'cancelled'
 }
 
@@ -125,7 +132,7 @@ const PRODUCTION = `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.descr
     c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
     s.id AS season_id, s.slug AS season_slug, s.name AS season_name,
     p.company_name, p.age_min, p.age_restricted, p.effects_confirmed_none, p.advisories_confirmed_none, p.content_note, p.running_minutes, p.interval_count,
-    p.external_booking_url, p.state
+    p.external_booking_url, p.latecomers, p.state
   FROM core_productions p
   LEFT JOIN core_terms c ON c.id = p.category_term_id
   LEFT JOIN core_seasons s ON s.id = p.season_id AND s.state IN ('published', 'archived')
@@ -164,6 +171,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     contentNote: row.content_note,
     runningMinutes: row.running_minutes,
     intervalCount: row.interval_count,
+    latecomers: latecomerRule(row.latecomers, await useSetting('core.visiting.latecomers') as string, row.interval_count),
     state: row.state,
     past: isPast(row.state, performances, now),
     credits: await shownCredits(row.id, options.members ?? false),
@@ -337,6 +345,7 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
       JSON.stringify(rows.map(r => r.id)),
     )) effectsOff.set(e.performance_id, [...(effectsOff.get(e.performance_id) ?? []), e.label])
   }
+  const latecomers = await latecomersFor(rows.map(r => r.id))
   // A cancelled production books nothing; otherwise only a scheduled performance not yet over.
   const bookable = rows.filter(r => r.state === 'scheduled' && r.ends_at > now && byId.get(r.production_id)!.state === 'published')
   const booking = await bookingActions(bookable.map(r => ({
@@ -359,6 +368,7 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
     space: { id: r.space_id, name: r.space_name },
     access: access.get(r.id) ?? [],
     effectsOff: effectsOff.get(r.id) ?? [],
+    latecomers: latecomers.get(r.id)!,
     booking: booking[r.id] ?? null,
   }))
 }

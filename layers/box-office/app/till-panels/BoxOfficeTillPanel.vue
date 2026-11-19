@@ -90,6 +90,25 @@ function takeOne(row: PerformanceRow) {
   for (const list of [holders.value[keyOf(row)], references.value[keyOf(row)]]) if (list && list.length > n) list.splice(Math.max(n, 0))
   if (n <= 0 && lastAdded.value === keyOf(row)) lastAdded.value = null
 }
+// The sale's tickets by kind, for the offer to swap one for a pass; and taking one out when it is.
+const saleTickets = computed(() => {
+  const out: { ticketTypeId: string, name: string, amountMinor: number, quantity: number }[] = []
+  for (const row of performance.value?.rows ?? []) {
+    const n = quantities.value[keyOf(row)] ?? 0
+    if (!n) continue
+    const kind = out.find(k => k.ticketTypeId === row.ticketTypeId)
+    if (kind) {
+      kind.quantity += n
+      kind.amountMinor = Math.max(kind.amountMinor, row.amountMinor)
+    }
+    else out.push({ ticketTypeId: row.ticketTypeId, name: row.ticketType, amountMinor: row.amountMinor, quantity: n })
+  }
+  return out
+})
+function swapTicket(ticketTypeId: string) {
+  const row = [...(performance.value?.rows ?? [])].reverse().find(r => r.ticketTypeId === ticketTypeId && (quantities.value[keyOf(r)] ?? 0) > 0)
+  if (row) takeOne(row)
+}
 // A performance whose production has one price throughout sells in one section, which is not named.
 const oneSection = (id: string | undefined) => {
   const rows = performances.value.find(p => p.performanceId === id)?.rows ?? []
@@ -1001,6 +1020,8 @@ function clear() {
             v-model:found="passFound"
             :performance-id="performance.performanceId"
             :locked="locked"
+            :tickets="saleTickets"
+            @swap="swapTicket"
           />
           <!-- The till takes no payment of nothing: a pass's entry alone is booked from here. -->
           <UButton

@@ -3,6 +3,8 @@
      applies to, and is limited by uses, dates and where it is sold. What it can apply to comes from
      the selling modules switched on, each with its own pickers. Retired promotions fold away. -->
 <script setup lang="ts">
+import { parseTime } from '@internationalized/date'
+
 type Effect = 'percent_off' | 'amount_off' | 'set_price' | 'multi_buy' | 'basket_amount_off'
 type Trigger = 'automatic' | 'code' | 'staff'
 type Channel = 'all' | 'online' | 'till'
@@ -23,6 +25,7 @@ interface Promotion {
   channel: Channel
   validFrom: number | null
   validUntil: number | null
+  schedule: Window[] | null
   minSpendMinor: number | null
   maxUses: number | null
   used: number
@@ -47,6 +50,11 @@ const { dateTime } = useDates()
 const { data, status, error, refresh } = await useAPI<Listing>('/api/promotions', { key: 'promotions:list' })
 
 const ANY = '__any'
+/** A window of the week a promotion runs in: ISO weekdays (1 is Monday) and times as HH:MM. */
+interface Window { days: number[], from: string, until: string }
+/** A window as the form holds it: the checkbox group's days are strings. */
+interface FormWindow { days: string[], from: string, until: string }
+const WEEK = ['1', '2', '3', '4', '5', '6', '7'] // not-policy: the days of the week
 const EFFECTS: Effect[] = ['percent_off', 'amount_off', 'set_price', 'multi_buy', 'basket_amount_off']
 const effectItems = computed(() => EFFECTS.map(value => ({ value, label: t(`promotions.effect.${value}`) })))
 const triggerItems = computed(() => (['code', 'automatic', 'staff'] as const).map(value => ({ value, label: t(`promotions.trigger.${value}`) })))
@@ -129,13 +137,14 @@ interface Form {
   needsReason: boolean
   validFrom: number | null
   validUntil: number | null
+  schedule: FormWindow[]
   note: string
 }
 const firstKind = () => data.value?.kinds[0]?.kind ?? ''
 const blank = (): Form => ({
   name: '', label: '', trigger: 'code', codes: [{ code: '', maxUses: null }], effect: 'percent_off', percent: 10, amount: null, // not-policy: a new promotion's first guess, ten per cent off
   multiBuy: 'free', buyQuantity: 2, freeQuantity: 1, minSpend: null, targets: [{ kind: firstKind(), scope: {} }], channel: 'all', // not-policy: a new multi-buy's first guess, two for one
-  maxUses: null, maxPerSale: null, countBy: 'item', combines: false, notWithRequirements: true, needsReason: false, validFrom: null, validUntil: null, note: '',
+  maxUses: null, maxPerSale: null, countBy: 'item', combines: false, notWithRequirements: true, needsReason: false, validFrom: null, validUntil: null, schedule: [], note: '',
 })
 const form = ref<Form>(blank())
 const editing = ref(false)
@@ -149,7 +158,7 @@ const asForm = (p: Promotion): Form => ({
   effect: p.effect, percent: p.effect === 'percent_off' ? p.value / 100 : null, amount: p.effect === 'percent_off' || (p.effect === 'multi_buy' && p.freeQuantity) ? null : p.value,
   multiBuy: p.freeQuantity ? 'free' : 'price', buyQuantity: p.buyQuantity, freeQuantity: p.freeQuantity, minSpend: p.minSpendMinor,
   targets: p.targets.filter(x => x.role === 'applies').map(x => ({ kind: x.kind, scope: { ...x.scope } })), channel: p.channel,
-  maxUses: p.maxUses, maxPerSale: p.maxPerSale, countBy: p.countBy, combines: p.combines, notWithRequirements: p.notWithRequirements, needsReason: p.needsReason, validFrom: p.validFrom, validUntil: p.validUntil, note: p.note ?? '',
+  maxUses: p.maxUses, maxPerSale: p.maxPerSale, countBy: p.countBy, combines: p.combines, notWithRequirements: p.notWithRequirements, needsReason: p.needsReason, validFrom: p.validFrom, validUntil: p.validUntil, schedule: (p.schedule ?? []).map(w => ({ from: w.from, until: w.until, days: w.days.map(String) })), note: p.note ?? '',
 })
 function valueOf(f: Form) {
   if (f.effect === 'percent_off') return Math.round((f.percent ?? 0) * 100)
@@ -164,12 +173,12 @@ const asBody = (f: Form) => ({
   codes: f.trigger === 'code' ? f.codes.filter(c => c.code.trim()).map(c => ({ ...(c.id ? { id: c.id } : {}), code: c.code.trim(), maxUses: c.maxUses })) : [],
   targets: f.targets.map(x => ({ role: 'applies' as const, kind: x.kind, scope: Object.fromEntries(Object.entries(x.scope).filter(([, v]) => v && v !== ANY)) })),
   channel: f.trigger === 'staff' ? 'till' : f.channel, maxUses: f.maxUses, maxPerSale: f.effect === 'basket_amount_off' ? null : f.maxPerSale, countBy: f.countBy,
-  combines: f.combines, notWithRequirements: f.notWithRequirements, needsReason: f.trigger === 'staff' && f.needsReason, validFrom: f.validFrom, validUntil: f.validUntil, note: f.note.trim() || null,
+  combines: f.combines, notWithRequirements: f.notWithRequirements, needsReason: f.trigger === 'staff' && f.needsReason, validFrom: f.validFrom, validUntil: f.validUntil, schedule: f.schedule.length ? f.schedule.map(w => ({ days: w.days.map(Number).sort((a, b) => a - b), from: w.from, until: w.until })) : null, note: f.note.trim() || null,
 })
 function open(p?: Promotion) {
   editId.value = p?.id ?? null
   form.value = p ? asForm(p) : blank()
-  more.value = !!p && (p.maxUses !== null || p.maxPerSale !== null || p.validFrom !== null || p.validUntil !== null || p.channel !== 'all' || p.combines || !!p.note)
+  more.value = !!p && (p.maxUses !== null || p.maxPerSale !== null || p.validFrom !== null || p.validUntil !== null || !!p.schedule || p.channel !== 'all' || p.combines || !!p.note)
   formRefusal.value = null
   editing.value = true
 }
@@ -196,6 +205,18 @@ function setKind(x: FormTarget, kind: string) {
 }
 const addTarget = () => form.value.targets.push({ kind: firstKind(), scope: {} })
 const addCode = () => form.value.codes.push({ code: '', maxUses: null })
+// A new window starts as the evenings of the working week, the usual happy hour.
+const addWindow = () => form.value.schedule.push({ days: ['1', '2', '3', '4', '5'], from: '17:00', until: '19:00' }) // not-policy: a first guess the form shows
+const dayItems = computed(() => WEEK.map(d => ({ value: d, label: t(`promotions.day.${d}`) })))
+function timeOf(value: string) {
+  try {
+    return value ? parseTime(value) : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+const asTime = (value: unknown) => value ? String(value).slice(0, 5) : '' // not-policy: HH:mm
 
 const url = (id: string) => `/api/promotions/${encodeURIComponent(id)}`
 const stored = (typed: string) => typed.replace(/\s+/g, '').toUpperCase()
@@ -218,6 +239,10 @@ function validate(f: Form) {
   }
   if (!f.targets.length) errors.push({ name: 'targets', message: t('promotions.field.targets-needed') })
   if (f.validFrom && f.validUntil && f.validUntil <= f.validFrom) errors.push({ name: 'validUntil', message: t('promotions.field.until-after') })
+  f.schedule.forEach((w, i) => {
+    if (!w.days.length) errors.push({ name: `schedule.${i}.days`, message: t('promotions.field.schedule-days-needed') })
+    if (!w.from || !w.until) errors.push({ name: `schedule.${i}.times`, message: t('promotions.field.schedule-times-needed') })
+  })
   return errors
 }
 
@@ -664,6 +689,63 @@ const perItem = computed(() => !['basket_amount_off'].includes(form.value.effect
               name="validUntil"
             >
               <FieldDateTime v-model="form.validUntil" />
+            </UFormField>
+            <UFormField
+              :label="t('promotions.field.schedule')"
+              :help="t('promotions.field.schedule-help')"
+              name="schedule"
+            >
+              <div class="space-y-3">
+                <div
+                  v-for="(w, i) in form.schedule"
+                  :key="i"
+                  class="space-y-2 rounded-md border border-default p-3"
+                >
+                  <UFormField
+                    :name="`schedule.${i}.days`"
+                    :label="t('promotions.field.schedule-days', { n: i + 1 })"
+                  >
+                    <UCheckboxGroup
+                      v-model="w.days"
+                      :items="dayItems"
+                      orientation="horizontal"
+                    />
+                  </UFormField>
+                  <div class="flex flex-wrap items-end gap-3">
+                    <UFormField
+                      :name="`schedule.${i}.times`"
+                      :label="t('promotions.field.schedule-from')"
+                    >
+                      <UInputTime
+                        :model-value="timeOf(w.from)"
+                        :hour-cycle="24"
+                        class="w-24"
+                        @update:model-value="w.from = asTime($event)"
+                      />
+                    </UFormField>
+                    <UFormField :label="t('promotions.field.schedule-until')">
+                      <UInputTime
+                        :model-value="timeOf(w.until)"
+                        :hour-cycle="24"
+                        class="w-24"
+                        @update:model-value="w.until = asTime($event)"
+                      />
+                    </UFormField>
+                    <IconButton
+                      icon="i-lucide-x"
+                      :label="t('promotions.field.schedule-remove', { n: i + 1 })"
+                      @click="form.schedule.splice(i, 1)"
+                    />
+                  </div>
+                </div>
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-clock"
+                  :label="t('promotions.field.schedule-add')"
+                  @click="addWindow()"
+                />
+              </div>
             </UFormField>
             <UFormField
               :label="t('promotions.field.note')"

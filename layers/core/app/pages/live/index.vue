@@ -1,11 +1,11 @@
 <!-- The Tonight hub: tonight's performances, each with its start time and the figures other modules
      give for it (core.tonight-figure: sold, in, taken at the tills), then the live screens this
-     person may open, one large tile each. The tiles are the live menu's entries (core.navigation with
+     person may open, one large tile each. Each performance says when latecomers are let in. The tiles are the live menu's entries (core.navigation with
      menu 'live'), so a module that brings live screens adds its own tile and nothing here names a
      module. Performances are those of the operating day, so a late show stays past midnight. -->
 <script setup lang="ts">
 interface Figure { id: string, label: string, value: string | number | null, state: 'ok' | 'attention' | 'unavailable', unit?: string, to?: string }
-interface Performance { id: string, title: string, label: string | null, startsAt: number, venue: string, figures: Figure[] }
+interface Performance { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers?: string, figures: Figure[] }
 
 const CURRENCY = /^[A-Z]{3}$/ // not-policy: the shape of an ISO 4217 code
 
@@ -58,6 +58,11 @@ function valueOf(f: Figure): string {
               </span>
               <span class="shrink-0 text-2xl font-semibold tabular-nums">{{ time(p.startsAt) }}</span>
             </div>
+            <LatecomersNote
+              v-if="p.latecomers"
+              :rule="p.latecomers"
+              staff
+            />
             <dl
               v-if="p.figures.length"
               class="grid grid-cols-3 gap-2"

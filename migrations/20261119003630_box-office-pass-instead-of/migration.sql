@@ -1,0 +1,1 @@
+ALTER TABLE `box_office_pass_prices` ADD `instead_of` text;

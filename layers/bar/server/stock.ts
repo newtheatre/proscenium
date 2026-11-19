@@ -300,19 +300,27 @@ export async function moveForSale(unit: UnitView, saleId: string): Promise<void>
 }
 
 /**
- * A refund's reversals with the goods returned put back what their lines took, in proportion to the
- * quantity refunded, to the location it came from. Wasted or not returned: nothing moves back.
+ * A refund's reversals put back what their lines took, in proportion to the quantity refunded, to the
+ * location it came from. Goods returned: that is all. Goods wasted: the same batch writes them off
+ * again, with the refund's reason, so the level is unchanged and the waste is counted. Nothing to
+ * return (or a goodwill amount): nothing moves.
  */
 export async function returnForRefund(unit: UnitView, refundId: string): Promise<void> {
-  const rows = await all<{ reversal_id: string, by: string, reversed: number, sold: number, movement_id: string, item_id: string, location_id: string, quantity: number }>(
-    `SELECT r.id AS reversal_id, r.requested_by AS by, r.quantity AS reversed, l.quantity AS sold, m.id AS movement_id, m.stock_item_id AS item_id, m.location_id, m.quantity
+  const rows = await all<{ reversal_id: string, by: string, outcome: 'returned' | 'wasted', reason: string, reversed: number, sold: number, movement_id: string, item_id: string, location_id: string, quantity: number }>(
+    `SELECT r.id AS reversal_id, r.requested_by AS by, r.stock_outcome AS outcome, r.reason_term AS reason, r.quantity AS reversed, l.quantity AS sold,
+            m.id AS movement_id, m.stock_item_id AS item_id, m.location_id, m.quantity
        FROM bar_sale_reversals r JOIN bar_sale_lines l ON l.id = r.sale_line_id
        JOIN bar_stock_movements m ON m.source_type = 'bar.sale-line' AND m.source_id = l.id AND m.kind = 'sale'
-      WHERE r.refund_id = ? AND r.state = 'requested' AND r.stock_outcome = 'returned' AND r.quantity > 0 ORDER BY r.id, m.id`,
+      WHERE r.refund_id = ? AND r.state = 'requested' AND r.stock_outcome IN ('returned', 'wasted') AND r.quantity > 0 ORDER BY r.id, m.id`,
     refundId,
   )
-  writeMovements(unit, rows.map(r => ({
-    itemId: r.item_id, locationId: r.location_id, kind: 'sale_reversal' as const, quantity: Math.round(-r.quantity * r.reversed / r.sold),
-    sourceType: 'bar.sale-reversal', sourceId: r.reversal_id, key: `bar:reversal:${r.reversal_id}:${r.movement_id}`, by: r.by,
-  })).filter(m => m.quantity > 0), nowMs())
+  writeMovements(unit, rows.flatMap((r) => {
+    const quantity = Math.round(-r.quantity * r.reversed / r.sold)
+    if (quantity <= 0) return []
+    const back = { itemId: r.item_id, locationId: r.location_id, sourceType: 'bar.sale-reversal', sourceId: r.reversal_id, by: r.by }
+    return [
+      { ...back, kind: 'sale_reversal' as const, quantity, key: `bar:reversal:${r.reversal_id}:${r.movement_id}` },
+      ...r.outcome === 'wasted' ? [{ ...back, kind: 'wastage' as const, quantity: -quantity, reasonTerm: r.reason, key: `bar:reversal-waste:${r.reversal_id}:${r.movement_id}` }] : [],
+    ]
+  }), nowMs())
 }

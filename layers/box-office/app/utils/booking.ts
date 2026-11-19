@@ -4,7 +4,7 @@
 /** `unnamed` where there is one kind of ticket to book, so its name is left out as Choose tickets leaves it out. */
 export interface BookingLine { id: string, performanceId: string, ticketType: string, band: string | null, amountMinor: number, unnamed?: true }
 export interface BookingTicket { lineId: string, number: string, doorCode: string | null, admitted: boolean }
-export interface BookingShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean }
+export interface BookingShow { title: string, productionSlug: string, startsAt: number, endsAt: number, venue: string, venueSlug: string | null, address: string | null, cancelled: boolean, /** Absent from an answer cached before it was added. */ latecomers?: string }
 export interface BookingView {
   accountUnclaimed?: boolean
   orderId: string
@@ -18,7 +18,11 @@ export interface BookingView {
   buyerCancel: { feeMinor: number, until: number } | null
   tickets?: BookingTicket[]
   show?: BookingShow | null
+  /** Passes bought with the booking; `buyers` while the buyer still holds it. */
+  passes?: BookingPass[]
 }
+
+export interface BookingPass { id: string, name: string, priceName: string, code: string | null, buyers: boolean }
 
 /** What the server answers when a booking is made, free or reserved, as the screen after it shows it. */
 export interface BookingDoneOutcome {

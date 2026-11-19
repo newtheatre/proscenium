@@ -6,7 +6,7 @@ import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from
 import { paymentsOf } from '#modules/payments'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
-interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null }
+interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null, pass_entry: number }
 interface Cancellation { id: string, kind: string, reason_term_id: string | null, note: string | null, line_ids: string, refund_id: string | null, fee_minor: number, by: string | null, created_at: number }
 
 export default defineRoute({
@@ -18,7 +18,7 @@ export default defineRoute({
   const order = await first<Order>(`SELECT id, reference, state, channel, account_id, sold_by, currency, total_minor, keep, release_at, reserved_at, confirmed_at, cancelled_at, created_at
     FROM box_office_orders WHERE id = ? AND state <> 'basket'`, id)
   if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
-  const lines = await all<Line>(`SELECT l.id, l.kind, l.performance_id, l.band_id, l.ticket_type_id, b.name AS band, t.name AS ticket_type, l.amount_minor, l.state, k.admitted_at, k.state AS ticket_state, l.requirement_evidence_id
+  const lines = await all<Line>(`SELECT l.id, l.kind, l.performance_id, l.band_id, l.ticket_type_id, b.name AS band, t.name AS ticket_type, l.amount_minor, l.state, k.admitted_at, k.state AS ticket_state, l.requirement_evidence_id, (l.pass_redemption_id IS NOT NULL) AS pass_entry
     FROM box_office_order_lines l
     LEFT JOIN box_office_bands b ON b.id = l.band_id
     LEFT JOIN box_office_ticket_types t ON t.id = l.ticket_type_id
@@ -51,7 +51,7 @@ export default defineRoute({
     refunds: money.refunds.map(r => ({ id: r.id, amountMinor: r.amountMinor, method: r.method, state: r.state, handBack: r.handBack, requestedBy: r.requestedByName, approvedBy: r.approvedByName, at: r.createdAt })),
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
     complimentary: (await first<{ one: number }>('SELECT 1 AS one FROM box_office_order_lines WHERE order_id = ? AND comp_request_id IS NOT NULL LIMIT 1', id)) !== null,
-    lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: l.requirement_evidence_id === 'pending' })),
+    lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: l.requirement_evidence_id === 'pending', passEntry: !!l.pass_entry })),
     // The fee kept on each ticket when a cancellation is refunded less the fee, so the dialogue can show the refund.
     cancellationFeeMinor: await useSetting('box-office.cancellations.fee') as number,
     cancellations: await Promise.all(cancellations.map(async c => ({

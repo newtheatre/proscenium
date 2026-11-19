@@ -1,11 +1,11 @@
 <!-- Price lists (S12): Standard, which always exists, and any others such as Committee or Staff. A
-     list is priced by hand, falling back to Standard where it has no price, or is a percentage off
-     Standard with no prices of its own. A restricted list needs its own ability to choose at the till.
+     list is priced by hand, falling back to Standard where it has no price; a percentage off is a
+     promotion, not a list. A restricted list needs its own ability to choose at the till.
      Retired lists sit below a divider. -->
 <script setup lang="ts">
 import { priceListInput, priceListPatch } from '../../../../../../server/input'
 
-interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
+interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, active: boolean }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -17,7 +17,7 @@ const { data, status, error, refresh } = await useAPI<{ lists: List[] }>('/api/b
 function describe(l: List): string {
   const how = l.standard
     ? t('bar.screens.lists.standard')
-    : l.percentOff !== null ? t('bar.screens.lists.percent', { percent: l.percentOff }) : l.fallsBack ? t('bar.screens.lists.by-hand-falls-back') : t('bar.screens.lists.by-hand')
+    : l.fallsBack ? t('bar.screens.lists.by-hand-falls-back') : t('bar.screens.lists.by-hand')
   return [how, l.restricted ? t('bar.screens.lists.restricted') : null].filter(Boolean).join(' · ')
 }
 
@@ -28,28 +28,23 @@ const shown = computed(() => (data.value?.lists ?? []).filter(l => l.name.toLowe
 const current = computed(() => shown.value.filter(l => l.active))
 const retired = computed(() => shown.value.filter(l => !l.active))
 
-const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean, pricing: 'hand' | 'percent', percentOff: number | null } | null>(null)
+const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 type FormRef = { setErrors: (errors: FieldError[]) => void }
 const formEl = useTemplateRef<FormRef>('formEl')
-const pricingItems = computed(() => [{ value: 'hand', label: t('bar.screens.lists.pricing-hand') }, { value: 'percent', label: t('bar.screens.lists.pricing-percent') }])
 function edit(l?: List) {
   refusal.value = null
   form.value = l
-    ? { id: l.id, standard: l.standard, name: l.name, restricted: l.restricted, fallsBack: l.fallsBack, pricing: l.percentOff === null ? 'hand' : 'percent', percentOff: l.percentOff }
-    : { id: null, standard: false, name: '', restricted: false, fallsBack: true, pricing: 'hand', percentOff: null }
+    ? { id: l.id, standard: l.standard, name: l.name, restricted: l.restricted, fallsBack: l.fallsBack }
+    : { id: null, standard: false, name: '', restricted: false, fallsBack: true }
 }
 const listBody = () => {
   const f = form.value!
   return f.standard
     ? { name: f.name, restricted: f.restricted }
-    : { name: f.name, restricted: f.restricted, fallsBack: f.fallsBack, percentOff: f.pricing === 'percent' ? f.percentOff : null }
+    : { name: f.name, restricted: f.restricted, fallsBack: f.fallsBack }
 }
-// A percentage list needs its percentage, which the schema cannot say on its own (null is "by hand").
-const validate = () => [
-  ...bodyErrors(form.value?.id ? priceListPatch : priceListInput, listBody()),
-  ...needs({ percentOff: !form.value?.standard && form.value?.pricing === 'percent' ? form.value.percentOff : true }),
-]
+const validate = () => bodyErrors(form.value?.id ? priceListPatch : priceListInput, listBody())
 async function save() {
   const f = form.value!
   refusal.value = null
@@ -61,7 +56,7 @@ async function save() {
       const id = f.id
       await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body })
       offer(t('bar.screens.lists.saved'), was && (async () => {
-        await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body: was.standard ? { name: was.name, restricted: was.restricted } : { name: was.name, restricted: was.restricted, fallsBack: was.fallsBack, percentOff: was.percentOff } })
+        await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body: was.standard ? { name: was.name, restricted: was.restricted } : { name: was.name, restricted: was.restricted, fallsBack: was.fallsBack } })
         await refresh()
       }))
     }
@@ -225,30 +220,7 @@ async function setActive(l: List, active: boolean) {
             <UInput v-model="form.name" />
           </UFormField>
           <template v-if="!form.standard">
-            <UFormField
-              :label="t('bar.screens.lists.pricing')"
-              name="pricing"
-            >
-              <USelect
-                v-model="form.pricing"
-                :items="pricingItems"
-              />
-            </UFormField>
-            <UFormField
-              v-if="form.pricing === 'percent'"
-              :label="t('bar.screens.lists.percent-off')"
-              :help="t('bar.screens.lists.percent-off-help')"
-              name="percentOff"
-              required
-            >
-              <UInputNumber
-                v-model="form.percentOff"
-                :min="1"
-                :max="100"
-              />
-            </UFormField>
             <UCheckbox
-              v-else
               v-model="form.fallsBack"
               :label="t('bar.screens.lists.falls-back')"
               :description="t('bar.screens.lists.falls-back-help')"

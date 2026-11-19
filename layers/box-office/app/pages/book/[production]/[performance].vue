@@ -3,15 +3,17 @@
      costs; pressing it holds the seats, which is when the countdown starts, and goes on to Check and
      pay. A companion ticket needs a paid ticket with it. No count of seats is ever shown. A member
      price the visitor is not signed in for can take a reference instead, such as a student ID: one
-     box for each ticket, worded by Membership, shown only on that ticket type. -->
+     box for each ticket, worded by Membership, shown only on that ticket type. Above, when latecomers
+     are let in, so nobody finds out on the night. -->
 <script setup lang="ts">
 import type { ButtonProps } from '@nuxt/ui'
 import type { ChosenPass } from '~~/layers/box-office/app/components/BoxOfficePassBox.vue'
 import type { BoughtPass, PassOnSale } from '~~/layers/box-office/app/components/BoxOfficePassOffer.vue'
+import type { PassSwap } from '~~/layers/box-office/app/components/BoxOfficePassSwap.vue'
 
 interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
 interface Page {
-  performance: { id: string, startsAt: number, venue: string, state: string }
+  performance: { id: string, startsAt: number, venue: string, state: string, latecomers?: string }
   production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
   state: 'none' | 'draft' | 'on_sale' | 'paused' | 'closed'
   onSaleAt: number | null
@@ -51,7 +53,38 @@ const passes = ref<ChosenPass[]>((data.value?.passes.mine ?? []).filter(m => !m.
 // Passes bought with this booking: each gives its first entry here.
 const buying = ref<BoughtPass[]>([])
 const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length + buying.value.length)
-const passMinor = computed(() => buying.value.reduce((sum, b) => sum + b.amountMinor, 0))
+// Tickets swapped for a pass (mock-up approved by Matt, 18 November): each becomes a pass bought
+// here, whose first entry is tonight in the same part of the house. The count of people stays.
+const swaps = ref<PassSwap[]>([])
+// A pass type with a price offered instead of a ticket is offered as a swap; any other as a pass to add.
+const swappable = computed(() => (data.value?.passes.onSale ?? []).filter(p => p.prices.some(price => price.insteadOf.length)))
+const holdsOwn = computed(() => (data.value?.passes.mine ?? []).some(m => !m.unusable))
+const kinds = computed(() => [...chosen.value.reduce((map, c) => {
+  const was = map.get(c.type.ticketTypeId)
+  map.set(c.type.ticketTypeId, { ticketTypeId: c.type.ticketTypeId, name: c.type.name, amountMinor: Math.min(was?.amountMinor ?? Infinity, c.type.amountMinor), quantity: (was?.quantity ?? 0) + c.quantity })
+  return map
+}, new Map<string, { ticketTypeId: string, name: string, amountMinor: number, quantity: number }>()).values()])
+// What is asked for once the swaps are taken out: fewer tickets, and a pass bought for each swapped.
+const asked = computed(() => {
+  const left = new Map<string, PassSwap[]>()
+  for (const swap of swaps.value) left.set(swap.ticketTypeId, [...(left.get(swap.ticketTypeId) ?? []), ...Array.from({ length: swap.count }, () => swap)])
+  const buys: { passTypeId: string, passPriceId: string, bandId: string, reference?: string }[] = []
+  const used = new Map<PassSwap, number>()
+  const lines = chosen.value.map((c) => {
+    const queue = left.get(c.type.ticketTypeId) ?? []
+    const taken = queue.splice(0, c.quantity)
+    for (const swap of taken) {
+      const n = used.get(swap) ?? 0
+      used.set(swap, n + 1)
+      const reference = swap.references[n]?.trim()
+      buys.push({ passTypeId: swap.passTypeId, passPriceId: swap.passPriceId, bandId: c.band.bandId, ...(reference ? { reference } : {}) })
+    }
+    return { ...c, quantity: c.quantity - taken.length }
+  })
+  return { lines, buys }
+})
+const swapMinor = computed(() => swaps.value.reduce((sum, s) => sum + s.amountMinor * s.count, 0))
+const passMinor = computed(() => buying.value.reduce((sum, b) => sum + b.amountMinor, 0) + swapMinor.value)
 // A promo code (BO-17), tried before holding so the saving shows; sent with the hold, which applies it again.
 const promoInput = ref('')
 const promo = ref<{ code: string, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] } | null>(null)
@@ -79,14 +112,14 @@ function dropCode() {
 }
 // The saving, as the server will work it out: the dearest eligible tickets first, up to the code's limit for one order.
 const totalMinor = computed(() => {
-  const each = chosen.value.flatMap(c => Array.from({ length: c.quantity }, () => ({ full: c.type.amountMinor, with: promoPrice(c.band.bandId, c.type.ticketTypeId) })))
+  const each = asked.value.lines.flatMap(c => Array.from({ length: c.quantity }, () => ({ full: c.type.amountMinor, with: promoPrice(c.band.bandId, c.type.ticketTypeId) })))
   const eligible = each.filter(e => e.with !== undefined).sort((a, b) => b.full - a.full).slice(0, promo.value?.maxPerOrder ?? Infinity)
   const saving = eligible.reduce((sum, e) => sum + e.full - e.with!, 0)
   return each.reduce((sum, e) => sum + e.full, 0) - saving
 })
 const currency = computed(() => data.value?.currency ?? undefined)
 // A pass entry is a ticket a companion may come with, as a paid one is.
-const companionAlone = computed(() => chosen.value.length > 0 && !passes.value.length && !buying.value.length && chosen.value.every(c => c.type.needsPaidTicket))
+const companionAlone = computed(() => chosen.value.length > 0 && !passes.value.length && !buying.value.length && !swaps.value.length && chosen.value.every(c => c.type.needsPaidTicket))
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
 const atLimit = computed(() => !!data.value && quantity.value >= data.value.maxPerOrder)
 // The most of one type the steppers allow: what the visitor may have, and what is left of the order's limit.
@@ -135,7 +168,9 @@ function setReference(bandId: string, typeId: string, n: number, value: string) 
   if (referenceRefusal.value) refusal.value = null
 }
 const referencesMissing = computed(() => chosen.value.some(c => typing(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).filter(Boolean).length < c.quantity))
-const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && (!siteKey || !!challenge.value))
+// A member price swapped for without signing in needs what proves it, one for each pass.
+const swapReferencesMissing = computed(() => swaps.value.some(s => (data.value?.passes.onSale.find(p => p.id === s.passTypeId)?.prices.find(p => p.id === s.passPriceId)?.allowed === false) && s.references.slice(0, s.count).filter(r => r?.trim()).length < s.count))
+const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && !swapReferencesMissing.value && (!siteKey || !!challenge.value))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // A refused reference is said beside the references typed; the notice at the top is for the rest.
 const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
@@ -161,6 +196,7 @@ onMounted(async () => {
     counts.value = Object.fromEntries(remembered.choices.map(c => [keyOf(c.bandId, c.ticketTypeId), c.quantity]))
     if (remembered.passes) passes.value = remembered.passes
     if (remembered.buying) buying.value = remembered.buying
+    if (remembered.swaps) swaps.value = remembered.swaps
     if (remembered.promoCode) {
       promoInput.value = remembered.promoCode
       await tryCode()
@@ -177,14 +213,14 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length ? { buy: buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })) } : {}) },
+      body: { performanceId: performanceId.value, lines: asked.value.lines.filter(c => c.quantity > 0).map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length || asked.value.buys.length ? { buy: [...buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })), ...asked.value.buys] } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     // Changing tickets: the new ones are held, so the old basket is let go.
     const before = recallBasket()
     if (before && before.orderId !== basket.orderId)
       void $api(`/api/box-office/baskets/${encodeURIComponent(before.orderId)}/release`, { method: 'POST', body: {}, headers: { 'x-basket-token': before.token } }).catch(() => undefined)
-    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code, passes: passes.value, buying: buying.value })
+    rememberBasket({ orderId: basket.orderId, token: basket.token, back: route.path, choices: chosen.value.map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity })), promoCode: promo.value?.code, passes: passes.value, buying: buying.value, swaps: swaps.value })
     await navigateTo('/book/basket')
   }
   catch (e) {
@@ -218,6 +254,11 @@ async function hold() {
             />
             {{ data.production.ageRestricted ? t('box-office.book.age.restricted', { age: data.production.ageMin }) : t('box-office.book.age.recommended', { age: data.production.ageMin }) }}
           </p>
+          <LatecomersNote
+            v-if="data.performance.latecomers"
+            :rule="data.performance.latecomers"
+            rules
+          />
           <UAlert
             v-if="heldLeft > 0"
             color="info"
@@ -259,7 +300,7 @@ async function hold() {
               :refusal="passRefusal"
             />
             <BoxOfficePassOffer
-              v-for="pass in data.passes.onSale"
+              v-for="pass in data.passes.onSale.filter(p => !swappable.includes(p))"
               :key="pass.id"
               v-model="buying"
               :pass="pass"
@@ -366,6 +407,19 @@ async function hold() {
                 </template>
               </template>
             </section>
+            <BoxOfficePassSwap
+              v-if="swappable.length && !holdsOwn"
+              v-model="swaps"
+              :passes="swappable"
+              :chosen="kinds"
+              :currency="currency"
+            />
+            <p
+              v-if="swapReferencesMissing"
+              class="text-sm text-muted"
+            >
+              {{ t('box-office.book.swap.references-missing') }}
+            </p>
             <UFormField
               :label="t('box-office.book.promo.label')"
               name="promoCode"
@@ -428,7 +482,7 @@ async function hold() {
               size="lg"
               :loading="busy"
               :disabled="!ready"
-              :label="quantity ? (buying.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
+              :label="quantity ? (buying.length || swaps.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
               @click="hold"
             />
           </template>

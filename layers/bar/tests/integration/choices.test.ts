@@ -10,7 +10,6 @@ import menuGet from '../../server/api/bar/till/menu.get'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addPriceList, addProduct, addVariant } from '../../server/catalogue'
 import { addGroup, addOption, orderOptions, setMixer, setProductGroups, updateGroup } from '../../server/choices'
-import { lessPercent } from '../../server/pricing'
 
 const NOW = Date.UTC(2026, 10, 17, 22) // not-policy: a test's moment
 const handle = server({ 'POST /api/payments/till/sale': tillSalePost, 'GET /api/bar/till/menu': menuGet })
@@ -79,7 +78,7 @@ beforeAll(async () => {
     setProductGroups(v, s.smProduct, [s.spirit, s.mixer])
     setProductGroups(v, s.chocProduct, [s.shot])
     s.outlet = addOutlet(v, { name: 'Choices bar', kind: 'bar' })
-    s.committee = addPriceList(v, { name: 'Choices committee', percentOff: 25, restricted: true })
+    s.committee = addPriceList(v, { name: 'Choices committee', restricted: true })
   })
   const mixers = await rows<{ id: string, product: string }>("SELECT v.id, p.name AS product FROM bar_variants v JOIN bar_products p ON p.id = v.product_id WHERE v.mixer_measure = 1 AND p.name LIKE 'Choices %'")
   s.colaMix = mixers.find(m => m.product === 'Choices cola')!.id
@@ -143,14 +142,14 @@ describe('selling with choices', () => {
     expect((await sell('choice-7-xxxxxxx', shot, 450, { ageCheck: 'not_needed' })).status).toBe(200)
   })
 
-  it('rounds once on a percentage list, on the size and its picks together', async () => {
+  it('adds the picks to the price on the outlet\'s list, falling back to Standard', async () => {
     await commit(unit => unit.add({ sql: 'UPDATE bar_outlets SET price_list_id = ? WHERE id = ?', params: [s.committee, s.outlet] }))
-    const unitMinor = lessPercent(450 + 100, 25)
+    const unitMinor = 450 + 100
     const sold = await sell('choice-8-xxxxxxx', [{ variantId: s.single, quantity: 1, choices: [{ groupId: s.spirit, key: s.hendricks }] }], unitMinor, { ageCheck: 'not_needed' })
     expect(sold.status, JSON.stringify(sold.body)).toBe(200)
     expect((await linesOf('choice-8-xxxxxxx'))[0]!.unit_minor).toBe(unitMinor)
     const menu = (await send('GET', `/api/bar/till/menu?outlet=${s.outlet}`)).body
-    expect(menu.percentOff).toBe(25)
+    expect(menu.percentOff).toBeUndefined()
     expect(menu.categories.flatMap((c: any) => c.items).find((i: any) => i.variantId === s.single).baseMinor).toBe(450)
   })
 })

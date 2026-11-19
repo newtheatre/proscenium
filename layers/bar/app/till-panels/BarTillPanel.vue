@@ -16,7 +16,7 @@
 import { createReusableTemplate } from '@vueuse/core'
 import { answerVerdict, itemVerdict, type AllergenFacts, type Verdict } from '../../shared/allergen-verdict'
 
-// The choice fields (`groupIds`, `baseMinor`, the menu's `groups` and `percentOff`) are absent from a
+// The choice fields (`groupIds`, `baseMinor` and the menu's `groups`) are absent from a
 // server without choices, and then every product is as it was: sizes only.
 interface Item { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, groupIds?: string[], baseMinor?: number, allergens?: Allergens }
 /** What is recorded of the 14 allergens; absent while the theatre has allergens switched off. */
@@ -31,7 +31,7 @@ interface Category { id: string, name: string, colour: string | null, parentId?:
 // asks only whether ID was checked, and a refusal says nothing of its scope.
 // `priceListStandard`, `priceListRestricted` and `priceListAllowed` say which list the till sells from
 // and whether this seller may; `ageCheck.minimumAge` is the legal age, where the server sends it.
-interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, priceListStandard?: boolean, priceListRestricted?: boolean, priceListAllowed?: boolean, percentOff?: number | null, tillLayout?: 'chips' | 'folders' | 'rail', favourites?: string[], allergenStatement?: string | null, categories: Category[], groups?: Group[], ageCheck: { enabled: boolean, challengeAge: number, minimumAge?: number, description: boolean, idTypes?: string[], refusalScope?: boolean } }
+interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, priceListStandard?: boolean, priceListRestricted?: boolean, priceListAllowed?: boolean, tillLayout?: 'chips' | 'folders' | 'rail', favourites?: string[], allergenStatement?: string | null, categories: Category[], groups?: Group[], ageCheck: { enabled: boolean, challengeAge: number, minimumAge?: number, description: boolean, idTypes?: string[], refusalScope?: boolean } }
 /** A product as one tile: its sizes, cheapest first as the server lists them. */
 interface Tile { key: string, productId: string, name: string, items: Item[], ageRestricted: boolean, fromMinor: number, choices: boolean, colour: string | null }
 interface Outlet { id: string, name: string, kind: string }
@@ -95,13 +95,10 @@ const groups = computed(() => new Map((menu.value?.groups ?? []).map(g => [g.id,
 const groupsOf = (i: Item) => (i.groupIds ?? []).flatMap(id => groups.value.get(id) ?? [])
 const picked = (picks: Choice[]) => picks.flatMap(p => groups.value.get(p.groupId)?.options.find(o => o.key === p.key) ?? [])
 const keyOf = (i: Item, picks: Choice[]) => [i.variantId, ...picks.map(p => `${p.groupId}:${p.key}`).sort()].join('|')
-// The price of one, worked out as the server does: choices are added before a percentage list's
-// discount, which is rounded once on the whole.
+// The price of one, worked out as the server does: the size's price and what is picked on it.
+// Promotions are the till's, shown at the foot of its receipt.
 function unitOf(i: Item, picks: Choice[]) {
-  const extra = picked(picks).reduce((sum, o) => sum + o.deltaMinor, 0)
-  const percent = menu.value?.percentOff
-  if (percent === null || percent === undefined || i.baseMinor === undefined) return i.amountMinor + extra
-  return Math.floor(((i.baseMinor + extra) * (100 - percent) + 50) / 100)
+  return i.amountMinor + picked(picks).reduce((sum, o) => sum + o.deltaMinor, 0)
 }
 const needsAge = (i: Item, picks: Choice[]) => i.ageRestricted || picked(picks).some(o => o.ageRestricted)
 const label = (i: Item) => i.variant === 'Each' ? i.product : `${i.product}, ${i.variant}`

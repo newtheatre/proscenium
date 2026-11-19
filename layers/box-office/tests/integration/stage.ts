@@ -208,12 +208,15 @@ export interface House { productionId: string, performanceId: string, bandId: st
 let n = 0
 let types: { fullId: string, concessionId: string } | undefined
 
-/** A scheduled performance with one band of `capacity` seats, priced, and (unless told not to) on sale. */
-export async function house(capacity: number, options: { open?: boolean, houseCapacity?: number, startsAt?: number } = {}): Promise<House> {
+/**
+ * A scheduled performance with one band of `capacity` seats, priced, and (unless told not to) on
+ * sale. With `of`, another performance of that house's show, in the same band at the same prices.
+ */
+export async function house(capacity: number, options: { open?: boolean, houseCapacity?: number, startsAt?: number, of?: House } = {}): Promise<House> {
   n++
   resetRateLimits()
-  const production = await req('POST', '/api/core/productions', { title: `Box office show ${n}`, kind: 'own' })
-  expect(production.status, JSON.stringify(production.body)).toBe(200)
+  const production = options.of ? { body: { id: options.of.productionId } } : await req('POST', '/api/core/productions', { title: `Box office show ${n}`, kind: 'own' })
+  if (!options.of) expect((production as { status: number }).status, JSON.stringify(production.body)).toBe(200)
   const venue = await req('POST', '/api/core/venues', { name: `Box office venue ${n}` })
   const performance = await req('POST', `/api/core/productions/${production.body.id}/performances`, {
     venueId: venue.body.venueId, spaceId: venue.body.spaceId, startsAt: options.startsAt ?? Date.UTC(2027, 2, n % 28 + 1, 19, 30), capacity: options.houseCapacity ?? 500,
@@ -227,12 +230,17 @@ export async function house(capacity: number, options: { open?: boolean, houseCa
     const named = async (name: string) => (await env.DB.prepare('SELECT id FROM box_office_ticket_types WHERE name = ?').bind(name).first<{ id: string }>())!.id
     types = { fullId: full.body.ticketTypeId ?? await named('Full price'), concessionId: concession.body.ticketTypeId ?? await named('Concession') }
   }
-  const band = await req('POST', `/api/box-office/productions/${production.body.id}/bands`, { name: 'Stalls' })
+  const band = options.of ? { status: 200, body: { bandId: options.of.bandId } } : await req('POST', `/api/box-office/productions/${production.body.id}/bands`, { name: 'Stalls' })
   expect(band.status, JSON.stringify(band.body)).toBe(200)
   const made: House = { productionId: production.body.id, performanceId: performance.body.id, bandId: band.body.bandId, ...types }
   const sales = await req('PUT', `/api/box-office/performances/${made.performanceId}/sales`, { pools: [{ bandId: made.bandId, capacity }] })
   expect(sales.status, JSON.stringify(sales.body)).toBe(200)
   if (options.open === false) return made
+  if (options.of) {
+    const opened = await req('POST', `/api/box-office/performances/${made.performanceId}/sales/open`, {})
+    expect(opened.status, JSON.stringify(opened.body)).toBe(200)
+    return made
+  }
   const prices = await req('POST', `/api/box-office/productions/${made.productionId}/prices`, { prices: [
     { bandId: made.bandId, ticketTypeId: made.fullId, amountMinor: 1200 },
     { bandId: made.bandId, ticketTypeId: made.concessionId, amountMinor: 800 },

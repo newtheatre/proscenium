@@ -5,9 +5,9 @@
 type Covers = 'productions' | 'season' | 'dates'
 type Channel = 'all' | 'desk' | 'online'
 type Holder = 'auto' | 'named' | 'open'
-interface PassPrice { id: string, name: string, amountMinor: number, requirementRefs: string[], proofNote: string | null, active: boolean, sold: number }
+interface PassPrice { id: string, name: string, amountMinor: number, requirementRefs: string[], proofNote: string | null, insteadOf: string[], active: boolean, sold: number }
 interface PassType { id: string, name: string, description: string | null, covers: Covers, seasonId: string | null, coversFrom: number | null, coversUntil: number | null, productionIds: string[], perShow: 'once' | 'any', uses: number | null, holder: Holder, reserveUnpaid: boolean, recheck: boolean, channel: Channel, onSale: boolean, saleFrom: number | null, saleUntil: number | null, active: boolean, prices: PassPrice[], held: number, unpaid: number }
-interface Listing { rows: PassType[], productions: { id: string, title: string }[], seasons: { id: string, name: string }[], requirementOptions: { value: string, label: string }[], requirementLabels: Record<string, string> }
+interface Listing { rows: PassType[], productions: { id: string, title: string }[], seasons: { id: string, name: string }[], requirementOptions: { value: string, label: string }[], requirementLabels: Record<string, string>, ticketTypes: { value: string, label: string }[] }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -23,6 +23,7 @@ const retiredOpen = ref(false)
 const productionItems = computed(() => (data.value?.productions ?? []).map(p => ({ value: p.id, label: p.title })))
 const seasonItems = computed(() => (data.value?.seasons ?? []).map(s => ({ value: s.id, label: s.name })))
 const whoItems = computed(() => data.value?.requirementOptions ?? [])
+const insteadItems = computed(() => data.value?.ticketTypes ?? [])
 const coversItems = computed(() => (['productions', 'season', 'dates'] as const).map(value => ({ value, label: t(`box-office.passes.covers.${value}`) })))
 const perShowItems = computed(() => (['once', 'any'] as const).map(value => ({ value, label: t(`box-office.passes.per-show.${value}`), description: t(`box-office.passes.per-show.${value}-help`) })))
 const holderItems = computed(() => (['auto', 'named', 'open'] as const).map(value => ({ value, label: t(`box-office.passes.holder.${value}`) })))
@@ -62,9 +63,9 @@ async function run<T>(fn: () => Promise<T>, done: string, undo?: (result: T) => 
   }
 }
 
-interface PriceForm { id?: string, name: string, amountMinor: number | null, requirementRefs: string[], proofNote: string | null, active: boolean }
+interface PriceForm { id?: string, name: string, amountMinor: number | null, requirementRefs: string[], proofNote: string | null, insteadOf: string[], active: boolean }
 interface Form { name: string, description: string, covers: Covers, productionIds: string[], seasonId: string | undefined, coversFrom: number | null, coversUntil: number | null, perShow: 'once' | 'any', uses: number | null, holder: Holder, reserveUnpaid: boolean, recheck: boolean, channel: Channel, onSale: boolean, saleFrom: number | null, saleUntil: number | null, prices: PriceForm[] }
-const blankPrice = (): PriceForm => ({ name: '', amountMinor: null, requirementRefs: [], proofNote: null, active: true })
+const blankPrice = (): PriceForm => ({ name: '', amountMinor: null, requirementRefs: [], proofNote: null, insteadOf: [], active: true })
 const blank = (): Form => ({
   name: '', description: '', covers: 'productions', productionIds: [], seasonId: undefined, coversFrom: null, coversUntil: null,
   perShow: 'once', uses: null, holder: 'auto', reserveUnpaid: true, recheck: false, channel: 'all', onSale: false, saleFrom: null, saleUntil: null,
@@ -78,14 +79,14 @@ const formRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const asForm = (p: PassType): Form => ({
   name: p.name, description: p.description ?? '', covers: p.covers, productionIds: [...p.productionIds], seasonId: p.seasonId ?? undefined, coversFrom: p.coversFrom, coversUntil: p.coversUntil,
   perShow: p.perShow, uses: p.uses, holder: p.holder, reserveUnpaid: p.reserveUnpaid, recheck: p.recheck, channel: p.channel, onSale: p.onSale, saleFrom: p.saleFrom, saleUntil: p.saleUntil,
-  prices: p.prices.filter(price => price.active).map(price => ({ id: price.id, name: price.name, amountMinor: price.amountMinor, requirementRefs: [...price.requirementRefs], proofNote: price.proofNote, active: true })),
+  prices: p.prices.filter(price => price.active).map(price => ({ id: price.id, name: price.name, amountMinor: price.amountMinor, requirementRefs: [...price.requirementRefs], proofNote: price.proofNote, insteadOf: [...price.insteadOf], active: true })),
 })
 const asBody = (f: Form) => ({
   name: f.name.trim(), description: f.description.trim() || null, covers: f.covers,
   productionIds: f.covers === 'productions' ? f.productionIds : [], seasonId: f.covers === 'season' ? f.seasonId ?? null : null,
   coversFrom: f.coversFrom, coversUntil: f.coversUntil, perShow: f.perShow, uses: f.uses ?? null,
   holder: f.holder, reserveUnpaid: f.reserveUnpaid, recheck: f.recheck, channel: f.channel, onSale: f.onSale, saleFrom: f.saleFrom, saleUntil: f.saleUntil,
-  prices: f.prices.map(p => ({ ...(p.id ? { id: p.id } : {}), name: p.name.trim(), amountMinor: p.amountMinor ?? 0, requirementRefs: p.requirementRefs, proofNote: p.proofNote, active: p.active })),
+  prices: f.prices.map(p => ({ ...(p.id ? { id: p.id } : {}), name: p.name.trim(), amountMinor: p.amountMinor ?? 0, requirementRefs: p.requirementRefs, proofNote: p.proofNote, insteadOf: p.insteadOf, active: p.active })),
 })
 // More options opens by itself when a pass being edited has one of them changed from the usual.
 const unusual = (f: Form) => f.holder !== 'auto' || !f.reserveUnpaid || f.recheck || f.channel !== 'all' || f.uses !== null || f.saleFrom !== null || f.saleUntil !== null || (f.covers !== 'dates' && (f.coversFrom !== null || f.coversUntil !== null))
@@ -357,6 +358,22 @@ const actions = (p: PassType) => [[
                     v-model="price.requirementRefs"
                     :items="whoItems"
                     :placeholder="t('box-office.passes.field.price-anyone')"
+                    :search-input="false"
+                    value-key="value"
+                    multiple
+                  />
+                </UFormField>
+                <UFormField
+                  v-if="insteadItems.length"
+                  :label="t('box-office.passes.field.price-instead')"
+                  :name="`prices.${i}.insteadOf`"
+                  :ui="{ label: i ? 'sr-only' : '' }"
+                  class="min-w-0 flex-1 basis-40"
+                >
+                  <USelectMenu
+                    v-model="price.insteadOf"
+                    :items="insteadItems"
+                    :placeholder="t('box-office.passes.field.price-instead-none')"
                     :search-input="false"
                     value-key="value"
                     multiple

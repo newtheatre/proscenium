@@ -323,6 +323,10 @@ export const passPrices = defineTable('box_office_pass_prices', {
   // A JSON list of requirement references. Box office never reads inside one.
   requirementRefs: col.internal(text('requirement_refs')),
   proofNote: col.public(text('proof_note')),
+  // A JSON list of ticket type ids this price is offered instead of, when someone books one of them
+  // for a show the pass covers (the up-sell; Matt, 18 November). Only for the offer: a pass still
+  // gives one entry to anything it covers.
+  insteadOf: col.internal(text('instead_of')),
   sort: col.internal(integer('sort').notNull().default(0)),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),

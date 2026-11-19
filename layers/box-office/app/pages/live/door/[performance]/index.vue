@@ -5,7 +5,8 @@
      till), red anything that does not get in, including a ticket whose holder no longer qualifies for
      its type (such as a lapsed member), who goes to the box office to change it, unless a holder of the
      override admits them anyway with a reason (R-30). How many are in stays in view. Typing a code, finding
-     someone by name and pausing the camera are the large buttons at the foot.
+     someone by name and pausing the camera are the large buttons at the foot. Under the count, when
+     latecomers are let in.
      Offline (D2), the door keeps working from its copy of the door list on the device
      (useOfflineDoor): a ticket's signed code is checked here, admitted here and sent when the
      connection returns; the strip says how many admissions are waiting. The door list can be
@@ -13,7 +14,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
 
-interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string }, tickets: number, admitted: number, unpaid: number }
+interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers: string }, tickets: number, admitted: number, unpaid: number }
 interface Scan {
   result: string
   admittedAt?: number
@@ -288,6 +289,11 @@ async function admit(row: Row, count: number) {
                 <span class="whitespace-nowrap text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: (counts ?? d).admitted, tickets: (counts ?? d).tickets + (counts ?? d).unpaid }) }}</span>
                 <span class="text-muted">{{ t('box-office.live-door.to-come', { count: (counts ?? d).tickets + (counts ?? d).unpaid - (counts ?? d).admitted }) }}<template v-if="(counts ?? d).unpaid"> · {{ t('box-office.live-door.unpaid', { count: (counts ?? d).unpaid }) }}</template></span>
               </p>
+              <LatecomersNote
+                v-if="d.performance.latecomers"
+                :rule="d.performance.latecomers"
+                staff
+              />
               <!-- With no camera there is nothing to frame: the area collapses to the result and the warning. -->
               <section
                 class="flex"
