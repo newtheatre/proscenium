@@ -33,6 +33,8 @@ export interface DoorPack {
   /** Each valid ticket for the performance: its code's hash, its booking and whether it is in. */
   tickets: { hash: string, orderId: string, ticketType: string, in: boolean }[]
   bookings: DoorPackBooking[]
+  /** Each pass with a paid entry tonight: its code's hashes, as typed and as another system's, and its entry ticket's hash. */
+  passes?: { hashes: string[], ticketHash: string }[]
 }
 
 /** The copy of a performance's door the live door keeps on the device. */
@@ -57,9 +59,14 @@ export async function doorPack(performanceId: string, madeAt: number): Promise<D
       ...unpaid ? { unpaid: { amountDueMinor: o.total_minor, currency: o.currency }, ...o.desk_code_hash ? { deskHash: o.desk_code_hash } : {} } : {},
     })
   }
+  const passes = await all<{ code_hash: string, alias_hash: string | null, ticket_hash: string }>(
+    `SELECT p.code_hash, p.alias_hash, k.code_hash AS ticket_hash FROM box_office_pass_redemptions r JOIN box_office_passes p ON p.id = r.pass_id
+      JOIN box_office_order_lines l ON l.pass_redemption_id = r.id AND l.state = 'live' JOIN box_office_tickets k ON k.order_line_id = l.id AND k.state = 'valid'
+      WHERE r.performance_id = ? AND r.state = 'live' AND p.state = 'active'`, performanceId)
   return {
     performanceId,
     madeAt,
+    passes: passes.map(p => ({ hashes: [p.code_hash, ...p.alias_hash ? [p.alias_hash] : []], ticketHash: p.ticket_hash })),
     keys: await signing.publicKeys(DOOR_CODE_PURPOSE),
     tickets: tickets.map(t => ({ hash: t.hash, orderId: t.order_id, ticketType: t.type_name, in: t.admitted_at !== null })),
     bookings,

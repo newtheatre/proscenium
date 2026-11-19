@@ -926,7 +926,7 @@ watch([avoid, refused], keep, { deep: true })
       :ui="{ header: 'pe-14' }"
     >
       <template #body>
-        <div class="grid gap-4">
+        <div class="grid grid-cols-[minmax(0,1fr)] gap-4">
           <div
             role="group"
             :aria-label="t('bar.desk.allergens.avoids')"
@@ -948,11 +948,12 @@ watch([avoid, refused], keep, { deep: true })
               :key="row.key"
               class="flex items-start justify-between gap-3 py-2"
             >
-              <span class="font-medium">{{ row.name }}</span>
+              <span class="min-w-0 font-medium">{{ row.name }}</span>
               <UBadge
                 :color="row.tone"
                 variant="subtle"
-                class="max-w-[60%] text-end whitespace-normal"
+                class="max-w-[60%] shrink-0 text-start whitespace-normal"
+                :ui="{ label: 'whitespace-normal! overflow-visible! break-words' }"
                 :icon="row.tone === 'error' ? 'i-lucide-octagon-alert' : row.tone === 'warning' ? 'i-lucide-triangle-alert' : row.tone === 'success' ? 'i-lucide-check' : 'i-lucide-circle-help'"
                 :label="row.text"
               />

@@ -13,6 +13,7 @@ interface Pack {
   keys: Key[]
   tickets: { hash: string, orderId: string, ticketType: string, in: boolean }[]
   bookings: PackBooking[]
+  passes?: { hashes: string[], ticketHash: string }[]
 }
 type Item = { kind: 'code', id: string, code: string, at: number } | { kind: 'name', ids: string[], orderId: string, at: number }
 interface Result { id: string, result: string, admitted?: number }
@@ -137,6 +138,17 @@ export function useOfflineDoor(performanceId: MaybeRefOrGetter<string>, options:
     // A booking reference or a reservation's desk code.
     const typed = code.trim().toUpperCase()
     const deskHash = await hashOf(typed)
+    // A pass with a paid entry tonight stands for that entry's ticket (pass-holding.ts normalisePassCode).
+    const plain = typed.replace(/[^A-Z0-9]/g, '')
+    const ours = await hashOf(plain.startsWith('PASS') && plain.length === 12 ? plain.slice(4) : plain) // not-policy: PASS and its eight characters
+    const pass = pack.passes?.find(p => p.hashes.includes(ours) || p.hashes.includes(deskHash))
+    const entry = pass && pack.tickets.find(t => t.hash === pass.ticketHash)
+    if (entry) {
+      if (entry.in) return { result: 'already_admitted', booking: bookingOf(entry.orderId, entry.ticketType) }
+      queue.add({ kind: 'code', id: newScanId(), code: code.trim(), at: Date.now() })
+      markIn(entry.orderId, [entry.hash])
+      return { result: 'admitted', booking: bookingOf(entry.orderId, entry.ticketType) }
+    }
     const booking = pack.bookings.find(b => b.reference === typed || (b.deskHash && b.deskHash === deskHash))
     if (!booking) return { result: 'not_on_list' }
     if (booking.unpaid) return { result: 'not_paid', reservation: { reference: booking.reference, buyer: booking.buyer, tickets: booking.tickets, amountDueMinor: booking.unpaid.amountDueMinor, currency: booking.unpaid.currency } }

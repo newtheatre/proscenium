@@ -690,6 +690,19 @@ function clear() {
           >{{ p.code }}</span>
         </li>
       </ul>
+      <!-- Tickets not yet in: the booking's code for the door, to photograph, for a buyer with no email. -->
+      <div
+        v-if="waitingIn(o) && o.performance"
+        class="flex flex-col items-center gap-1 text-center"
+      >
+        <QrCode
+          :value="o.reference"
+          :label="t('box-office.screens.panel.sold.qr', { reference: o.reference })"
+        />
+        <p class="text-sm text-muted">
+          {{ t('box-office.screens.panel.sold.qr-help') }}
+        </p>
+      </div>
       <p
         v-if="o.buyer"
         class="flex items-center gap-2 text-sm"
