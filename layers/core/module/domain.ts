@@ -32,7 +32,7 @@ export const settings = defineSettings('core', {
   // the page and the practice cannot drift apart; changing one changes what the policy says.
   // The policies whose default text a competent person has read for this theatre, by their ids
   // (privacy, terms). Site readiness lists each policy that is not here.
-  'policies.reviewed': setting.list({ default: [], of: 'text', maxLength: 60, change: organisation, onChange: 'confirm' }),
+  'policies.reviewed': setting.list({ default: [], of: 'text', maxLength: 60, choices: '/api/core/policies/choices', change: organisation, onChange: 'confirm' }),
   'complaints.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change: organisation, audience: 'public', quotable: true }),
   // Usual practice only: a production or a performance may say otherwise, and the house rules explain all four.
   'visiting.latecomers': setting.choice({ default: 'suitable-point', options: [...LATECOMER_RULES], change: organisation, audience: 'public' }),

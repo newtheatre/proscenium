@@ -338,6 +338,7 @@
   "core.settings-page.save": "Save {section} settings",
   "core.settings-page.choose": "Choose…",
   "core.settings-page.search-options": "Search…",
+  "core.settings-page.add-value": "Type a value and press Enter",
   "core.settings-page.saved": "Saved {count} changes",
   "core.settings-page.saved.one": "Saved 1 change",
   "core.settings-page.changes": "{count} changes",

@@ -112,6 +112,11 @@ describe('settings', () => {
     expect(() => defineSettings('core', { 'a.b': setting.choice({ default: 'x', catalogue: 'planets', change: 'c' } as never) })).toThrow(DeclarationError)
     expect(() => defineSettings('core', { 'a.b': setting.text({ default: 'x', maxLength: 3, catalogue: 'currency', change: 'c' } as never) })).toThrow(DeclarationError)
   })
+  it('let only a list of text name a route of values to pick from', () => {
+    expect(() => defineSettings('core', { 'a.b': setting.list({ default: [], of: 'text', choices: '/api/core/policies/choices', change: 'c' }) })).not.toThrow()
+    expect(() => defineSettings('core', { 'a.b': setting.text({ default: '', maxLength: 3, choices: '/api/x', change: 'c' } as never) })).toThrow(DeclarationError)
+    expect(() => defineSettings('core', { 'a.b': setting.list({ default: [], of: 'text', choices: 'policies', change: 'c' }) })).toThrow(DeclarationError)
+  })
   it('draw a long choice with a search box and label catalogue values by name', () => {
     expect(searchable(['system', 'light', 'dark'])).toBe(false)
     expect(searchable(optionsOf(setting.choice({ default: 'GBP', catalogue: 'currency', change: 'c' })))).toBe(true)
