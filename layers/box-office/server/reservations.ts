@@ -22,7 +22,7 @@ import { cancellations } from './db/schema'
 import { hashOf, newDeskCode, randomToken } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { siteUrl } from './links'
-import { lineKey, unnamedLines } from './line-names'
+import { lineKey, unnamedLines, withSections } from './line-names'
 import { assertAgeConfirmed, liveLines, ORDER, RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { releaseTime, salesOf } from './setup'
 import { doorCodesForOrder, ticketNumbers } from './tickets'
@@ -233,7 +233,7 @@ export interface OrderShow { title: string, productionSlug: string, startsAt: nu
 /** A booking's lines as its pages show them; `unnamed` where there is one kind to book, as Choose tickets shows it. */
 async function lineViews(lines: LineRow[]): Promise<OrderView['lines']> {
   const unnamed = await unnamedLines(lines)
-  return lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor, ...(unnamed.has(lineKey(l)) ? { unnamed: true } : {}) }))
+  return (await withSections(lines)).map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, band: l.band_name, amountMinor: l.amount_minor, ...(unnamed.has(lineKey(l)) ? { unnamed: true } : {}) }))
 }
 
 export async function showOf(lines: Pick<LineRow, 'performance_id'>[]): Promise<OrderShow | null> {

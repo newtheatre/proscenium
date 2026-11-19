@@ -488,18 +488,19 @@ test.describe('cancelling from the order page', () => {
     await page.getByRole('link', { name: cancelling, exact: true }).first().click()
     await expect(page.getByRole('heading', { level: 1, name: `Order ${cancelling}` })).toBeVisible()
     // Alike tickets are one row, and the payments say nothing has been paid yet.
-    await expect(page.getByText(`2 × Stalls, ${typeName}`)).toBeVisible()
+    // The section is named only where the type is sold in more than one, as a preset may have made.
+    await expect(page.getByText(new RegExp(`^2 × (Stalls, )?${typeName}$`))).toBeVisible()
     await expect(page.getByText('Nothing paid yet. £24.00 to pay when it is collected.')).toBeVisible()
     await page.getByRole('button', { name: /More actions/ }).click()
     await expect(page.getByRole('menuitem', { name: 'Release reservation' })).toHaveCount(0)
     await page.getByRole('menuitem', { name: 'Cancel reservation' }).click()
     const dialog = page.getByRole('dialog', { name: 'Cancel reservation' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole('checkbox', { name: /^Ticket 1, Stalls/ })).toBeChecked()
-    await expect(dialog.getByRole('checkbox', { name: /^Ticket 2, Stalls/ })).toBeChecked()
+    await expect(dialog.getByRole('checkbox', { name: /^Ticket 1, / })).toBeChecked()
+    await expect(dialog.getByRole('checkbox', { name: /^Ticket 2, / })).toBeChecked()
     await noViolations(page)
     // Leaving one out cancels the other alone.
-    await dialog.getByRole('checkbox', { name: /^Ticket 2, Stalls/ }).click()
+    await dialog.getByRole('checkbox', { name: /^Ticket 2, / }).click()
     await dialog.getByRole('button', { name: 'Cancel reservation' }).click()
     await expect(dialog).toBeHidden()
     await expect(page.getByText('Reservation cancelled').first()).toBeVisible()

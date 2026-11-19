@@ -6,6 +6,7 @@ import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from
 import { paymentsOf } from '#modules/payments'
 import { passOf } from '../../../../orders'
 import { mayReadPassCodes, passesOnOrder } from '../../../../pass-holding'
+import { withSections } from '../../../../line-names'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
 interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null, pass_entry: number }
@@ -26,6 +27,9 @@ export default defineRoute({
     LEFT JOIN box_office_ticket_types t ON t.id = l.ticket_type_id
     LEFT JOIN box_office_tickets k ON k.order_line_id = l.id
     WHERE l.order_id = ? ORDER BY l.id`, id)
+  // The section a ticket's name needs, only where its type is sold in more than one.
+  const sections = new Map((await withSections(lines.filter(l => l.performance_id && l.ticket_type_id).map(l => ({ id: l.id, performance_id: l.performance_id!, ticket_type_id: l.ticket_type_id!, band_name: l.band }))))
+    .map(l => [l.id, l.band_name]))
   const cancellations = await all<Cancellation>('SELECT id, kind, reason_term_id, note, line_ids, refund_id, fee_minor, by, created_at FROM box_office_cancellations WHERE order_id = ? ORDER BY created_at', id)
   const performanceId = lines.find(l => l.performance_id)?.performance_id
   const performance = performanceId ? await getPerformance(performanceId) : null
@@ -62,7 +66,7 @@ export default defineRoute({
     // A request to make this reservation complimentary that is still waiting for a decision.
     compNeedsApproval: await useSetting('box-office.comps.needs-approval') as boolean,
     compPending: order.state === 'reserved' && (await first<{ one: number }>("SELECT 1 AS one FROM box_office_comp_requests WHERE order_id = ? AND state IN ('requested', 'approved') LIMIT 1", id)) !== null,
-    lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: !!l.requirement_evidence_id?.startsWith('pending'), passEntry: !!l.pass_entry })),
+    lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, section: sections.get(l.id) ?? null, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: !!l.requirement_evidence_id?.startsWith('pending'), passEntry: !!l.pass_entry })),
     // The fee kept on each ticket when a cancellation is refunded less the fee, so the dialogue can show the refund.
     cancellationFeeMinor: await useSetting('box-office.cancellations.fee') as number,
     cancellations: await Promise.all(cancellations.map(async c => ({
