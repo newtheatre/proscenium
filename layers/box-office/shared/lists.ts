@@ -25,6 +25,8 @@ export const ordersList = defineList('box-office.orders', {
         { value: 'phone', label: 'By phone' },
       ],
     },
+    show: { kind: 'lookup', label: 'Show', lookup: { search: '/api/box-office/productions/lookup', resolve: '/api/box-office/productions/lookup' } },
+    performance: { kind: 'lookup', label: 'Performance', lookup: { search: '/api/box-office/performances/lookup', resolve: '/api/box-office/performances/lookup' } },
   },
   sorts: {
     created: { label: 'Made', type: 'date', natural: 'desc' },

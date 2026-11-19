@@ -11,6 +11,7 @@ import { holdAndRefund, type AttemptRow } from './answers'
 import { getIntent, ownersOf, partsOf, releaseParts } from './intents'
 import { providerAccount, providers } from './providers'
 import { confirmRefund } from './refunds'
+import { sessionChanged } from './sessions'
 
 export interface GivenBack {
   /** Handed back by the seller and confirmed: cash, a standalone machine, the SumUp app. */
@@ -59,6 +60,7 @@ export async function giveBack(unit: UnitView, intentId: string, actor: Actor): 
       AND NOT EXISTS (SELECT 1 FROM payments_attempts WHERE intent_id = ? AND state IN ('started', 'pending', 'unknown'))`,
     params: [nowMs(), intent.id, intent.id],
   }).expect(1, { code: 'payments.intent.not-open', reason: 'This payment is no longer open.' })
+  sessionChanged(unit, intent.session_id)
   await releaseParts(unit, intent, parts)
   const refundIds = await holdAndRefund(unit, { ...intent, state: 'unfulfilled' }, parts, paid)
   unit.announce('payments.intent.unfulfilled', { intentId: intent.id, owners: ownersOf(parts) }, { record: ['payments.intent', intent.id] })

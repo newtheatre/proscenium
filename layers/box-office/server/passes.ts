@@ -41,6 +41,7 @@ export interface PassType {
   uses: number | null
   holder: 'auto' | 'named' | 'open'
   reserveUnpaid: boolean
+  bookAhead: boolean
   recheck: boolean
   channel: Channel
   onSale: boolean
@@ -54,7 +55,7 @@ export interface PassType {
   unpaid: number
 }
 
-interface TypeRow { id: string, name: string, description: string | null, covers: Covers, season_id: string | null, covers_from: number | null, covers_until: number | null, per_show: 'once' | 'any', uses: number | null, holder: 'auto' | 'named' | 'open', reserve_unpaid: number, recheck: number, channel: Channel, on_sale: number, sale_from: number | null, sale_until: number | null, active: number, currency: string, held: number, unpaid: number }
+interface TypeRow { id: string, name: string, description: string | null, covers: Covers, season_id: string | null, covers_from: number | null, covers_until: number | null, per_show: 'once' | 'any', uses: number | null, holder: 'auto' | 'named' | 'open', reserve_unpaid: number, book_ahead: number, recheck: number, channel: Channel, on_sale: number, sale_from: number | null, sale_until: number | null, active: number, currency: string, held: number, unpaid: number }
 interface PriceRow { id: string, pass_type_id: string, name: string, amount_minor: number, requirement_refs: string | null, proof_note: string | null, instead_of: string | null, active: number, sold: number }
 
 const refsOf = (text: string | null): string[] => {
@@ -81,7 +82,7 @@ function toType(r: TypeRow, prices: PriceRow[], shows: { pass_type_id: string, p
   return {
     id: r.id, name: r.name, description: r.description, covers: r.covers, seasonId: r.season_id, coversFrom: r.covers_from, coversUntil: r.covers_until,
     productionIds: shows.filter(s => s.pass_type_id === r.id).map(s => s.production_id),
-    perShow: r.per_show, uses: r.uses, holder: r.holder, reserveUnpaid: !!r.reserve_unpaid, recheck: !!r.recheck, channel: r.channel,
+    perShow: r.per_show, uses: r.uses, holder: r.holder, reserveUnpaid: !!r.reserve_unpaid, bookAhead: !!r.book_ahead, recheck: !!r.recheck, channel: r.channel,
     onSale: !!r.on_sale, saleFrom: r.sale_from, saleUntil: r.sale_until, active: !!r.active, currency: r.currency,
     prices: prices.filter(p => p.pass_type_id === r.id).map(toPrice), held: r.held, unpaid: r.unpaid,
   }
@@ -130,6 +131,7 @@ export const passTypeInput = z.object({
   uses: z.number().int().min(1).max(10_000).nullable().optional(), // not-policy: a sanity bound
   holder: z.enum(HOLDERS).optional(),
   reserveUnpaid: z.boolean().optional(),
+  bookAhead: z.boolean().optional(),
   recheck: z.boolean().optional(),
   channel: z.enum(CHANNELS).optional(),
   onSale: z.boolean().optional(),
@@ -208,8 +210,8 @@ export async function createPassType(unit: UnitView, input: PassTypeInput, curre
   const c = await checked(input)
   const id = newId('pty')
   const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_pass_types (id, name, description, covers, season_id, covers_from, covers_until, per_show, uses, holder, reserve_unpaid, recheck, channel, on_sale, sale_from, sale_until, active, currency, created_by, created_at, updated_at)
-    SELECT ${id}, ${c.name}, ${c.description ?? null}, ${c.covers}, ${c.seasonId ?? null}, ${c.coversFrom ?? null}, ${c.coversUntil ?? null}, ${c.perShow}, ${c.uses ?? null}, ${c.holder ?? 'auto'}, ${(c.reserveUnpaid ?? true) ? 1 : 0}, ${c.recheck ? 1 : 0}, ${c.channel ?? 'all'}, ${c.onSale ? 1 : 0}, ${c.saleFrom ?? null}, ${c.saleUntil ?? null}, 1, ${currency}, ${actorId}, ${at}, ${at}
+  unit.add(sql`INSERT INTO box_office_pass_types (id, name, description, covers, season_id, covers_from, covers_until, per_show, uses, holder, reserve_unpaid, book_ahead, recheck, channel, on_sale, sale_from, sale_until, active, currency, created_by, created_at, updated_at)
+    SELECT ${id}, ${c.name}, ${c.description ?? null}, ${c.covers}, ${c.seasonId ?? null}, ${c.coversFrom ?? null}, ${c.coversUntil ?? null}, ${c.perShow}, ${c.uses ?? null}, ${c.holder ?? 'auto'}, ${(c.reserveUnpaid ?? true) ? 1 : 0}, ${(c.bookAhead ?? true) ? 1 : 0}, ${c.recheck ? 1 : 0}, ${c.channel ?? 'all'}, ${c.onSale ? 1 : 0}, ${c.saleFrom ?? null}, ${c.saleUntil ?? null}, 1, ${currency}, ${actorId}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_pass_types WHERE lower(name) = lower(${c.name}))`).expect(1, TAKEN)
   writePrices(unit, id, c.prices.map(p => ({ ...p, id: undefined })), [], at)
   writeShows(unit, id, c.productionIds, at)
@@ -226,7 +228,7 @@ export async function updatePassType(unit: UnitView, id: string, input: PassType
   const now = await getPassType(id)
   const at = nowMs()
   unit.add(sql`UPDATE box_office_pass_types SET name = ${c.name}, description = ${c.description ?? null}, covers = ${c.covers}, season_id = ${c.seasonId ?? null}, covers_from = ${c.coversFrom ?? null}, covers_until = ${c.coversUntil ?? null},
-    per_show = ${c.perShow}, uses = ${c.uses ?? null}, holder = ${c.holder ?? now.holder}, reserve_unpaid = ${(c.reserveUnpaid ?? now.reserveUnpaid) ? 1 : 0}, recheck = ${(c.recheck ?? now.recheck) ? 1 : 0}, channel = ${c.channel ?? now.channel},
+    per_show = ${c.perShow}, uses = ${c.uses ?? null}, holder = ${c.holder ?? now.holder}, reserve_unpaid = ${(c.reserveUnpaid ?? now.reserveUnpaid) ? 1 : 0}, book_ahead = ${(c.bookAhead ?? now.bookAhead) ? 1 : 0}, recheck = ${(c.recheck ?? now.recheck) ? 1 : 0}, channel = ${c.channel ?? now.channel},
     on_sale = ${(c.onSale ?? now.onSale) ? 1 : 0}, sale_from = ${c.saleFrom ?? null}, sale_until = ${c.saleUntil ?? null}, updated_at = ${at}
     WHERE id = ${id} AND NOT EXISTS (SELECT 1 FROM box_office_pass_types WHERE lower(name) = lower(${c.name}) AND id <> ${id})`).expect(1, TAKEN)
   writePrices(unit, id, c.prices, now.prices, at)

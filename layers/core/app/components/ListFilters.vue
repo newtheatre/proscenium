@@ -12,6 +12,8 @@ const props = defineProps<{
   values: Record<string, string>
   /** How many filters are on, for the button. */
   count: number
+  /** What each lookup's chosen id is called, by filter. */
+  lookupLabels?: Record<string, Record<string, string>>
 }>()
 const emit = defineEmits<{ change: [name: string, value: string], clear: [] }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -42,23 +44,36 @@ const lookupTerm = reactive<Record<string, string>>({})
 const lookupItems = reactive<Record<string, ListOption[]>>({})
 const lookupBusy = reactive<Record<string, boolean>>({})
 const { $api } = useNuxtApp()
-let lookupTimer: ReturnType<typeof setTimeout> | undefined
+const lookupTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 function searchLookup(name: string, term: string) {
   lookupTerm[name] = term
-  clearTimeout(lookupTimer)
-  lookupTimer = setTimeout(async () => {
+  clearTimeout(lookupTimers[name])
+  lookupTimers[name] = setTimeout(async () => {
     const route = props.filters[name]?.lookup?.search
     if (!route) return
     lookupBusy[name] = true
     try {
-      const found = await $api<{ rows: ListOption[] }>(route, { query: { q: term, size: 25 } })
+      // The other filters that are on go too, so a lookup can narrow to them (a show's performances).
+      const others = Object.fromEntries(Object.entries(props.values).filter(([key]) => key !== name))
+      const found = await $api<{ rows: ListOption[] }>(route, { query: { ...others, q: term, size: 25 } })
       lookupItems[name] = found.rows
     }
     catch { lookupItems[name] = [] }
     finally { lookupBusy[name] = false }
   }, 250) // not-policy: a typing pause
 }
-onBeforeUnmount(() => clearTimeout(lookupTimer))
+onBeforeUnmount(() => Object.values(lookupTimers).forEach(clearTimeout))
+// The chosen option stays in the field's items, so the field names it before anything is searched.
+function lookupOptions(name: string): ListOption[] {
+  const items = lookupItems[name] ?? []
+  const id = props.values[name]
+  const label = id ? props.lookupLabels?.[name]?.[id] : undefined
+  return id && label && !items.some(i => i.value === id) ? [{ value: id, label }, ...items] : items
+}
+// Opening the panel offers each lookup's nearest choices before anything is typed, again as other filters change.
+watch([open, () => props.values], ([isOpen]) => {
+  if (isOpen) for (const name of names.value) if (props.filters[name]?.kind === 'lookup') searchLookup(name, lookupTerm[name] ?? '')
+})
 
 // Dates: relative presets or a range of two days. The address keeps a preset relative.
 const range = reactive<Record<string, { from: string, to: string }>>({})
@@ -127,7 +142,7 @@ const label = computed(() => props.count ? t('core.list.filters-on', { count: pr
           <USelectMenu
             v-else-if="filters[name]!.kind === 'lookup'"
             :model-value="values[name]"
-            :items="lookupItems[name] ?? []"
+            :items="lookupOptions(name)"
             :search-term="lookupTerm[name] ?? ''"
             :loading="lookupBusy[name]"
             value-key="value"

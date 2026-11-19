@@ -11,6 +11,8 @@ import { inContext, person, rows, setModule } from '../../../../tests/integratio
 import { members } from '../../../../tests/fixtures/modules/seats/server/contributions/core.requirement/seats'
 import attendance from '../../server/contributions/front-of-house.report-section/attendance'
 import { doorCodesForOrder } from '../../server/tickets'
+import { tonightNumbers } from '../../server/tonight'
+import boardLeft from '../../server/contributions/front-of-house.tonight-figure/left'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const steward = person(['box-office.ticket.admit'])
@@ -128,6 +130,8 @@ describe('scanning at the door', () => {
     await scan(h, codes[0]!)
     const summary = await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, steward)
     expect(summary.body).toMatchObject({ performance: { id: h.performanceId }, tickets: 2, admitted: 1, unpaid: 0 })
+    // Front of house's headline numbers: sold, not yet paid, in, still to come and seats left.
+    expect(await inContext(() => tonightNumbers(h.performanceId))).toEqual({ sold: 2, unpaid: 0, admitted: 1, toCome: 1, left: 2 })
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, person([]))).status).toBe(403)
 
     // Tonight: performances today in the theatre's time zone. The house's performances are in March.
@@ -144,8 +148,13 @@ describe('scanning at the door', () => {
     const listed = hub.body.performances.find((p: { id: string }) => p.id === today.performanceId)
     expect(listed.figures).toEqual([
       expect.objectContaining({ id: 'box-office.sold', value: 0, state: 'ok' }),
+      expect.objectContaining({ id: 'box-office.unpaid', value: 0, to: `/live/door/${today.performanceId}` }),
       expect.objectContaining({ id: 'box-office.in', value: 0, to: `/live/door/${today.performanceId}` }),
+      expect.objectContaining({ id: 'box-office.to-come', value: 0 }),
+      expect.objectContaining({ id: 'box-office.left', value: 4 }),
     ])
+    // The same numbers on the front of house board, through its own point.
+    expect(await inContext(() => boardLeft.read(today.performanceId))).toEqual({ value: 4, state: 'ok' })
     expect((await req('GET', '/api/core/live/tonight', undefined, person([]))).status).toBe(403)
   })
 

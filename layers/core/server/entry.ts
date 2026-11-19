@@ -13,9 +13,12 @@ import { useContext } from '#kit'
 import { emailEventsConsumer, emailEventsSetAside } from './email-events'
 import { mendContentStore } from './content-store'
 import type { KitEnv } from '#kit/context'
+import { connectRealtime } from './realtime-hub'
 
 // The Durable Object behind the shared rate-limit counts (binding RATE_LIMITS).
 export { RateLimitCounter } from './rate-counter'
+// The Durable Object behind realtime rooms (binding REALTIME).
+export { RealtimeHub } from './realtime-hub'
 
 installRegistry(registry)
 installMigrations(migrations, release)
@@ -39,6 +42,8 @@ export default {
   // rule's year-long immutable cache header, and the browser would keep that failure: the page
   // never starts, so no button works, even after a reload. A missing build file is never cached.
   async fetch(request: Request, env: KitEnv, ctx: ExecutionContext) {
+    // A socket for news (#kit/realtime) goes to its room; Nitro cannot hand a socket back.
+    if (new URL(request.url).pathname === '/api/realtime') return connectRealtime(request, env)
     const response = await nitro.fetch!(request as Parameters<NonNullable<typeof nitro.fetch>>[0], env, ctx)
     if (response.status !== 404 || !new URL(request.url).pathname.startsWith('/_nuxt/')) return response // not-policy: HTTP's "not found"
     const headers = new Headers(response.headers)

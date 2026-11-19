@@ -31,6 +31,8 @@ interface Scan {
   overridable?: boolean
   ticketPerformance?: DoorElsewhere
   reference?: string
+  pass?: { reason: string, remedy: string | null }
+  viaPass?: { booked: boolean }
 }
 interface Row { id: string, reference: string, buyer: string | null, channel?: string, at?: number, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string } }
 type Tone = 'success' | 'warning' | 'info' | 'error'
@@ -39,7 +41,7 @@ interface Shown { tone: Tone, icon: string, headline: string, line: string, at: 
 interface Term { id: string, label: string }
 
 // Another performance's ticket is ours, so it is amber, with the show and time to tell them (D1).
-const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info', pass: 'info', not_on_list: 'warning', card_offline: 'warning' }
+const TONES: Record<string, Tone> = { admitted: 'success', card: 'success', already_admitted: 'warning', wrong_performance: 'warning', not_paid: 'info', released: 'warning', pass: 'info', not_on_list: 'warning', card_offline: 'warning' }
 const ICONS: Record<Tone, string> = { success: 'i-lucide-circle-check', warning: 'i-lucide-circle-alert', info: 'i-lucide-hand-coins', error: 'i-lucide-circle-x' }
 // The banner's colours: strong enough to read across a foyer, with text that passes contrast on each.
 const BANNER: Record<Tone, string> = { success: 'bg-success text-inverted', warning: 'bg-warning text-inverted', info: 'bg-info text-inverted', error: 'bg-error text-inverted' }
@@ -107,6 +109,7 @@ function describe(out: Scan): Shown {
   }
   else if (out.result === 'admitted' && out.booking) {
     line = t('box-office.live-door.line.admitted', { type: out.booking.ticketType, admitted: out.booking.admitted, tickets: out.booking.tickets, reference: out.booking.reference })
+    if (out.viaPass?.booked) line = `${t('box-office.live-door.line.pass-booked')} ${line}`
     if (out.unchecked) line = `${line}. ${t('box-office.door.scan.unchecked')}`
   }
   else if (out.result === 'requirement_not_met' && out.requirement?.reason) {
@@ -122,6 +125,12 @@ function describe(out: Scan): Shown {
     // Checked on the device, which knows the ticket is in but not when.
     line = t('box-office.live-door.line.already_admitted-here', { reference: out.booking.reference })
   }
+  else if (out.result === 'pass' && out.pass) {
+    line = [out.pass.reason, out.pass.remedy].filter(Boolean).join(' ')
+  }
+  else if (out.result === 'released' && out.reservation) {
+    line = t('box-office.live-door.line.released', { reference: out.reservation.reference, amount: money(out.reservation.amountDueMinor, out.reservation.currency) })
+  }
   else if (out.result === 'not_paid' && out.reservation) {
     const owed = { count: out.reservation.tickets, amount: money(out.reservation.amountDueMinor, out.reservation.currency), reference: out.reservation.reference }
     line = out.reservation.buyer
@@ -134,7 +143,7 @@ function describe(out: Scan): Shown {
     : undefined
   const about = out.booking ?? out.reservation
   const who = about ? [about.buyer, about.reference].filter(Boolean).join(' · ') : undefined
-  const collect = out.result === 'not_paid' ? out.reservation?.reference : undefined
+  const collect = out.result === 'not_paid' || out.result === 'released' ? out.reservation?.reference : undefined
   return { tone, icon: ICONS[tone], headline, line, at: Date.now(), ...who ? { who } : {}, ...collect ? { collect } : {}, ...override ? { override } : {} }
 }
 
@@ -191,6 +200,13 @@ async function admitBooking(reference: string) {
   show(groupShown(row))
 }
 
+/** The rest of a booking still to come in, after one of its tickets went in: Admit one or Admit all. */
+async function offerRest(reference: string) {
+  const rows = await $api<{ rows: Row[] }>(`${base.value}/door`, { query: { q: reference } }).then(r => r.rows).catch(() => [] as Row[])
+  const row = rows.find(r => r.reference.toUpperCase() === reference.toUpperCase() && !r.unpaid)
+  if (row && row.admitted < row.tickets) group.value = row
+}
+
 /** Offline: checked against the device's copy of the door list, and admitted here. */
 async function scanOffline(code: string) {
   if (!door.ready.value) {
@@ -210,9 +226,12 @@ async function scan(code: string) {
   try {
     const out = await $api<Scan>(`${base.value}/scan`, { method: 'POST', body: { code: code.trim() } })
     if (out.result === 'reference' && out.reference) return admitBooking(out.reference)
-    show(describe(out))
+    // A pass with no booking that could not be booked here goes to the till with its code, where its entry is ready to book.
+    show(out.result === 'pass' ? { ...describe(out), collect: code.trim() } : describe(out))
     if (out.result === 'admitted' || out.result === 'already_admitted') await door.noteIn(code)
     if (out.result === 'admitted') await refresh()
+    // Admitted on a pass, with others on its booking still to come in: offered as for a booking's own code.
+    if (out.result === 'admitted' && out.viaPass && out.booking && out.booking.tickets > out.booking.admitted) await offerRest(out.booking.reference)
   }
   catch (e) {
     // The connection dropped between the check and the answer: the device checks it instead.
