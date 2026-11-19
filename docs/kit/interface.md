@@ -476,6 +476,19 @@ a layout, not a shell, and it has no navigation of its own.
   offline and should disable its writes rather than lose them. Pages are not cached for offline
   loading, so a screen must be open before the connection goes.
 
+## The public show page and what's on
+
+A show's page opens with the same dark band as the spotlight at the top of what's on (concept A,
+"Spotlight", chosen by Matt on 19 November 2026): the poster, the title, four facts (dates, running
+time, tickets, guidance) shown only when known, the venue, and the next few dates as buttons
+(`PublicSiteDateButtons`), each opening the booking drawer when the booking answer names one. On a
+phone the poster sits small beside the title, so the title, the facts and Book are on the first screen.
+
+A theatre restyles the band with CSS rather than copying the component. The hooks are
+`public-show-top` (the band), `public-show-poster`, `public-show-title`, `public-show-actions` and
+`public-show-book` on the show's page, and `public-spotlight`, `public-spotlight-poster` and
+`public-spotlight-title` on what's on.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the
