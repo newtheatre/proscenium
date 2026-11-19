@@ -3,7 +3,7 @@
 // reads whatever their number. A date with no sales record, or a draft with no opening time, is left
 // out, so the core falls back to the external link. Seats left are given only at or under the
 // theatre's setting, never the house's size.
-import { all, nowMs, useSetting } from '#kit'
+import { all, nowMs, requirements, useSetting } from '#kit'
 import type { BookingAction, BookingAnswer, PriceSummary } from '#modules/core'
 import { pricesFor, WHEELCHAIR_TYPE } from '../../prices'
 import { sellableTypes, soldOn } from '../../ticket-types'
@@ -102,6 +102,14 @@ async function prices(productionIds: string[]): Promise<Record<string, PriceSumm
     const type = types.get(id)!
     return type.requirementRefs.length > 0 || type.kind === 'concession' || !!type.proofNote
   }
+  // A price held by an account (a membership, an award) is gated, never quoted to everyone, unless
+  // its source says anyone may take it up themselves, such as a membership the site lets people join.
+  const held = [...types.values()].filter(type => type.requirementRefs.length)
+  const described = held.length ? await requirements.describe([...new Set(held.flatMap(type => type.requirementRefs))]) : {}
+  const gated = (id: string) => {
+    const refs = types.get(id)!.requirementRefs
+    return refs.length > 0 && !refs.some(ref => described[ref]?.open)
+  }
   const out: Record<string, PriceSummary> = {}
   for (const [productionId, { currency, byType }] of lowest) {
     const open = [...byType].filter(([id]) => !qualifies(id)).map(([, amount]) => amount)
@@ -109,8 +117,7 @@ async function prices(productionIds: string[]): Promise<Record<string, PriceSumm
     const toMinor = open.length ? Math.max(...open) : null
     const others = [...byType]
       .filter(([id, amount]) => qualifies(id) && (fromMinor === null || amount < fromMinor))
-      // A price held by an account (a membership, an award) is gated: it is never quoted to everyone.
-      .map(([id, amountMinor]) => ({ label: types.get(id)!.name, amountMinor, ...(types.get(id)!.requirementRefs.length ? { gated: true as const } : {}) }))
+      .map(([id, amountMinor]) => ({ label: types.get(id)!.name, amountMinor, ...(gated(id) ? { gated: true as const } : {}) }))
       .sort((a, b) => a.amountMinor - b.amountMinor || a.label.localeCompare(b.label))
     out[productionId] = { currency, fromMinor, toMinor, others }
   }

@@ -3,6 +3,7 @@
 // current holder; met by a member number typed in place of signing in, only where the scheme accepts
 // a reference; judged again from the evidence; and nobody else's membership can be asked about
 // without membership.card.check.
+import { env } from 'cloudflare:test'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { requirements, setClock } from '#kit'
 import { inContext, person, setModule } from '../../../../tests/integration/helpers'
@@ -92,9 +93,26 @@ describe('the member price', () => {
   it('describes a scheme that accepts a reference with a label that names it, and offers schemes to hosts', async () => {
     const id = await openScheme({ name: 'Friends', key: `friends-${Date.now()}`, side: 'audience', acceptsReference: true })
     const described = await inContext(() => requirements.describe([`membership:${id}`, 'membership:msch_gone']))
-    expect(described[`membership:${id}`]).toEqual({ label: 'Friends', presentable: { label: 'Friends: type your member number to get this price', field: 'Member number', noun: 'member number', shape: 'member-number' } })
+    expect(described[`membership:${id}`]).toEqual({ label: 'Friends', presentable: { label: 'Friends: type your member number to get this price', field: 'Member number', noun: 'member number', shape: 'member-number' }, open: true })
     expect(described['membership:msch_gone']!.label).toBe('A membership no longer offered')
     const options = await inContext(() => requirements.options('membership', 'friends'))
     expect(options.map(o => o.reference)).toContain(`membership:${id}`)
+  })
+
+  it('says a price is open to everyone only while visitors can see the schemes and join this one themselves', async () => {
+    const open = await openScheme()
+    const staffOnly = await openScheme({ joinMode: 'staff-only' })
+    const closed = await openScheme()
+    await req('POST', `/api/membership/schemes/${closed}/state`, { to: 'closed' })
+    const refs = [open, staffOnly, closed].map(id => `membership:${id}`)
+    const described = await inContext(() => requirements.describe(refs))
+    expect(refs.map(ref => described[ref]!.open)).toEqual([true, undefined, undefined])
+    await env.DB.prepare("INSERT INTO core_settings (key, value, updated_at) VALUES ('membership.join.public-listing', 'false', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
+    try {
+      expect((await inContext(() => requirements.describe([refs[0]!])))[refs[0]!]!.open).toBeUndefined()
+    }
+    finally {
+      await env.DB.prepare("DELETE FROM core_settings WHERE key = 'membership.join.public-listing'").run()
+    }
   })
 })

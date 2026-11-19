@@ -56,6 +56,8 @@ export interface RequirementDescription {
    * `noun` is the short name staff use for it inside a sentence ("student ID").
    */
   presentable?: { label: string, field?: string, noun?: string, shape: string }
+  /** Anyone may take this up themselves (join a scheme the site lists), so a price it holds may be quoted to everyone. */
+  open?: true
 }
 
 /** The contract of a core.requirement contribution. The contribution's id is the source id. */
