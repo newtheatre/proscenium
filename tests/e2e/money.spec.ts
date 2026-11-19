@@ -20,7 +20,7 @@ const treasurer = {
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 
 test.beforeAll(async ({ playwright }) => {
-  const owner = { kind: 'person', accountId: 'acc_moneyowner', name: 'Money Owner', assurance: 'strong', reassertedAt: Date.now(), grants: [grant('core.settings.manage'), grant('core.modules.manage'), grant('payments.settings.manage')] }
+  const owner = { kind: 'person', accountId: 'acc_moneyowner', name: 'Money Owner', assurance: 'strong', reassertedAt: Date.now(), grants: [grant('core.settings.manage'), grant('core.modules.manage'), grant('payments.settings.manage'), grant('payments.provider.manage')] }
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
   await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
   // The till posts a sale to the ledger, which dates it in the theatre's time zone.
