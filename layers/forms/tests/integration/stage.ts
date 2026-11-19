@@ -2,7 +2,7 @@
 import { expect } from 'vitest'
 import { changeSetting, createUnit, newId, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
+import { call, inContext, person, rows, saveKey, server } from '../../../../tests/integration/helpers'
 import formsGet from '../../server/api/forms/forms/index.get'
 import formsPost from '../../server/api/forms/forms/index.post'
 import formGet from '../../server/api/forms/forms/[id].get'
@@ -123,7 +123,7 @@ export async function ready(): Promise<void> {
   setClock(NOV_17)
   resetRateLimits()
   // No challenge key, as on a theatre that has not set one: the check is then quietly off.
-  ;(env as unknown as Record<string, string>).CORE_TURNSTILE_SECRET_KEY = ''
+  await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
   await account(author)
   await inContext(async () => {
     const unit = createUnit()

@@ -8,7 +8,8 @@ import { applyMigrations, installMigrations } from '#kit/migrations'
 import { setAccessProvider } from '#kit/access'
 import { setDispatcher } from '#kit/dispatch'
 import { runInContext, SYSTEM, type KitEnv } from '#kit/context'
-import { sent, testAccess } from './helpers'
+import { saveKey, sent, testAccess } from './helpers'
+import { credentialEntry } from '#kit/secrets'
 
 installRegistry(registry)
 installMigrations(migrations, release)
@@ -18,3 +19,9 @@ setDispatcher(async (messages) => {
 })
 await runInContext({ env: env as unknown as KitEnv, actor: SYSTEM, cache: {} }, () => applyMigrations(env.DB))
 await env.DB.batch(['seats', 'notify'].map(id => env.DB.prepare('INSERT INTO core_modules (module_id, enabled) VALUES (?, 1) ON CONFLICT (module_id) DO UPDATE SET enabled = 1').bind(id)))
+// Keys a theatre saves in the app: the challenge is on, and lists can be hashed, unless a test removes them.
+await runInContext({ env: env as unknown as KitEnv, actor: SYSTEM, cache: {} }, async () => {
+  for (const [name, value] of [['CORE_TURNSTILE_SECRET_KEY', 'test-turnstile-secret'], ['MEMBERSHIP_LIST_KEY', 'test-list-key-not-secret']]) {
+    if (credentialEntry(name!)) await saveKey(name!, value!)
+  }
+})

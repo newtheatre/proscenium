@@ -19,8 +19,8 @@ export async function providerAccount(id: string): Promise<ProviderAccountRow | 
 }
 
 /**
- * The keys a provider needs that are not set for an account: saved for it, saved for every account,
- * or a Worker secret. An account missing one is not offered for payment.
+ * The keys a provider needs that are not set for an account, either saved for it or saved for every
+ * account. An account missing one is not offered for payment.
  */
 export async function missingSecrets(provider: PaymentProvider, accountId = ''): Promise<string[]> {
   const missing: string[] = []

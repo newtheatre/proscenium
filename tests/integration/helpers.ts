@@ -5,6 +5,7 @@ import type { AccessProvider } from '#kit/access'
 import type { JobMessage } from '#kit/dispatch'
 import { runJob } from '#kit/jobs'
 import { newId } from '#kit/ids'
+import { credentialEntry, seal } from '#kit/secrets'
 
 export const env = workerEnv as unknown as KitEnv & { DB: D1Database }
 
@@ -14,6 +15,20 @@ export const sent: JobMessage[] = []
 /** Runs `fn` as the kit runs a request: with the env, an actor and a fresh per-request cache. */
 export function inContext<T>(fn: () => Promise<T>, actor: Actor = SYSTEM): Promise<T> {
   return runInContext({ env, actor, cache: {}, requestId: newId('req') }, fn)
+}
+
+/** Saves a credential as an administrator would on its screen, or removes it with null. */
+export async function saveKey(name: string, value: string | null, scope = ''): Promise<void> {
+  await inContext(async () => {
+    const entry = credentialEntry(name)
+    if (!entry) throw new Error(`${name} is not a declared credential`)
+    if (value === null) {
+      await env.DB.prepare('DELETE FROM core_credentials WHERE module_id = ? AND name = ? AND scope = ?').bind(entry.module, name, scope).run()
+      return
+    }
+    await env.DB.prepare('INSERT INTO core_credentials (module_id, name, scope, ciphertext, key_version, set_at) VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT (module_id, name, scope) DO UPDATE SET ciphertext = excluded.ciphertext')
+      .bind(entry.module, name, scope, await seal(value), Date.now()).run()
+  })
 }
 
 export async function rows<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]> {

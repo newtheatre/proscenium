@@ -1,5 +1,5 @@
 // Provider keys typed into the app (Matt, 17 November): saved encrypted per provider account, never
-// sent back, read before the module-wide value and before a Worker secret of the same name.
+// sent back, read before the module-wide value, and never from a Worker secret of the same name.
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createUnit, credential, credentialStatus, newId, setCredential } from '#kit'
 import { methodsFor } from '../../server/services'
@@ -33,10 +33,10 @@ beforeEach(async () => {
 })
 
 describe('credential()', () => {
-  it('reads the account\'s saved key, then the module-wide one, then the Worker secret', async () => {
+  it('reads the account\'s saved key, then the module-wide one, and never the Worker', async () => {
     expect(await inContext(() => credential(SECRET, account))).toBeNull()
     secrets[SECRET] = 'sk_test_from_cloudflare'
-    expect(await inContext(() => credential(SECRET, account))).toBe('sk_test_from_cloudflare')
+    expect(await inContext(() => credential(SECRET, account))).toBeNull()
     await inContext(async () => {
       const unit = createUnit()
       await setCredential(unit.view(), SECRET, 'sk_test_for_everyone_0000', { by: null })

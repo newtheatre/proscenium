@@ -86,6 +86,10 @@ test('a seller applies to the access scheme with somebody at the till, then sell
   await space.click()
   // Not in the sale until somebody is named for it; it waits there rather than going.
   await expect(page.getByText('Not in the sale until you name who the ticket is for.')).toBeVisible()
+  // A ticket pressed by mistake comes off again before anyone is named for it.
+  await page.getByRole('button', { name: 'Remove ticket 1' }).click()
+  await expect(page.getByText('Not in the sale until you name who the ticket is for.')).toHaveCount(0)
+  await space.click()
 
   // Who the space is for is found in the till's own box.
   await page.getByRole('button', { name: 'Who ticket 1 is for' }).click()

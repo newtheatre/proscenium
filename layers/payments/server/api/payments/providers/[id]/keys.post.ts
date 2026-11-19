@@ -1,7 +1,6 @@
 // Saves or removes a provider account's keys (Matt, 17 November: keys are managed in the app). Each
 // is a Payments credential saved for this account, encrypted; a value is never sent back. A key not
-// named is left as it is; null removes the saved one, and a Worker secret of the same name, if any,
-// is used again. Managing providers is privileged, so this asks for a fresh sign-in.
+// named is left as it is; null removes the saved one. Managing providers is privileged, so this asks for a fresh sign-in.
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { clearCredential, credentialStatus, defineRoute, refuse, setCredential } from '#kit'
