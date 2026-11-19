@@ -5,4 +5,5 @@ import { deskPerformances } from '../../../desk'
 export default defineRoute({ ability: 'box-office.order.view', rateLimit: 'default' }, async () => ({
   performances: await deskPerformances(),
   admit: await useSetting('box-office.sales.desk-admit') as boolean,
+  email: await useSetting('box-office.sales.desk-email') as boolean,
 }))

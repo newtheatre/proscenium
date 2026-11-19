@@ -374,6 +374,26 @@ describe('selling at the desk', () => {
     expect(rowsOf.find(r => r.ticketTypeId === h.fullId)).not.toHaveProperty('companion')
   })
 
+  it('needs an email for new tickets or a pass at the till where the theatre says so, but not when split', async () => {
+    const h = await house(4)
+    const set = (on: boolean) => commit(unit => changeSetting(unit.view(), 'box-office.sales.desk-email', on, { reason: 'test', confirm: true }))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] }
+    await set(true)
+    try {
+      expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.email).toBe(true)
+      const refused = await till(input)
+      expect(refused.status).toBe(422)
+      expect(refused.body.code).toBe('box-office.desk.email-needed')
+      const sold = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], receipt: { email: 'walkup@example.org' } }, seller)
+      expect(sold.status, JSON.stringify(sold.body)).toBe(200)
+      await commit(unit => cancelIntent(unit.view(), sold.body.intentId))
+    }
+    finally {
+      await set(false)
+    }
+    expect((await till(input)).status).toBe(200)
+  })
+
   it('says whether the till offers to admit as it sells, as the theatre has set', async () => {
     expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.admit).toBe(true)
     const set = (on: boolean) => commit(unit => changeSetting(unit.view(), 'box-office.sales.desk-admit', on, { reason: 'test', confirm: true }))
