@@ -295,7 +295,60 @@ const busy = ref(false)
 const adding = ref<string | undefined>(undefined)
 const orderRows = computed(() => performances.value.find(p => p.performanceId === order.value?.lines[0]?.performanceId)?.rows ?? [])
 // The price shows under each choice in the list; the box shows the name, with the line's price beside it.
-const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: r.ticketType, description: money(r.amountMinor) }))
+const COMP = 'complimentary'
+const typesFor = (line: OrderLine) => [
+  ...orderRows.value.filter(r => r.bandId === line.bandId).map(r => ({ value: r.ticketTypeId, label: r.ticketType, description: money(r.amountMinor) })),
+  { value: COMP, label: t('box-office.screens.panel.comp.option'), description: money(0) },
+]
+// A swap to Complimentary asks why, as every comp does, then makes that ticket free on the same seat.
+const compLine = ref<OrderLine | null>(null)
+const compReason = ref<string | undefined>()
+const compReasons = ref<{ value: string, label: string }[]>([])
+const compRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+async function retype(line: OrderLine, value: string) {
+  if (value !== COMP) return amend({ retype: [{ lineId: line.id, ticketTypeId: value }] })
+  compLine.value = line
+  compReason.value = undefined
+  compRefusal.value = null
+  if (!compReasons.value.length) {
+    try { compReasons.value = (await $api<{ terms: { id: string, label: string }[] }>('/api/core/vocabularies/box-office.comp-reason/terms')).terms.map(r => ({ value: r.id, label: r.label })) }
+    catch (e) { compRefusal.value = toRefusal(e) }
+  }
+}
+async function compIt() {
+  const o = order.value
+  if (!o || !compLine.value || !compReason.value) return
+  busy.value = true
+  compRefusal.value = null
+  try {
+    await $api(`/api/box-office/orders/${o.orderId}/comp-lines` as string, { method: 'POST', body: { lineIds: [compLine.value.id], reasonTermId: compReason.value } })
+    compLine.value = null
+    await find(o.reference)
+  }
+  catch (e) {
+    compRefusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = false
+  }
+}
+// A reservation left with nothing to pay is confirmed here: the till's ways to pay need an amount.
+async function confirmFree() {
+  const o = order.value
+  if (!o) return
+  busy.value = true
+  refusal.value = null
+  try {
+    await $api(`/api/box-office/orders/${o.orderId}/confirm-free` as string, { method: 'POST', body: { admit: admit.value } })
+    await find(o.reference)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = false
+  }
+}
 const orderSections = computed(() => typesInSeveralSections(orderRows.value))
 const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: !orderSections.value.has(r.ticketTypeId)
   ? t('box-office.screens.panel.row-whole', { type: r.ticketType, price: money(r.amountMinor) })
@@ -893,13 +946,13 @@ function clear() {
             @update:model-value="(on: boolean | 'indeterminate') => togglePicked(line.id, on)"
           />
           <USelect
-            v-else-if="order.state === 'reserved' && typesFor(line).length > 1"
+            v-else-if="order.state === 'reserved' && !line.free && orderRows.length > 0"
             :model-value="line.ticketTypeId"
             :items="typesFor(line)"
             class="min-w-0 flex-1"
             :disabled="locked || busy"
             :aria-label="t('box-office.screens.panel.type', { n: i + 1 })"
-            @update:model-value="(value: string) => amend({ retype: [{ lineId: line.id, ticketTypeId: value }] })"
+            @update:model-value="(value: string) => retype(line, value)"
           />
           <span
             v-else
@@ -1023,6 +1076,58 @@ function clear() {
       >
         {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
       </p>
+      <UButton
+        v-if="order.state === 'reserved' && !order.released && order.totalMinor === 0"
+        icon="i-lucide-check"
+        size="xl"
+        block
+        :label="t(admit ? 'box-office.screens.panel.confirm-free-admit' : 'box-office.screens.panel.confirm-free')"
+        :loading="busy"
+        :disabled="locked"
+        @click="confirmFree"
+      />
+      <UModal
+        :open="!!compLine"
+        :title="t('box-office.screens.panel.comp.title')"
+        :description="t('box-office.screens.panel.comp.description')"
+        @update:open="(open: boolean) => { if (!open) compLine = null }"
+      >
+        <template #body>
+          <UForm
+            :state="{ compReason }"
+            novalidate
+            class="space-y-4"
+            @submit="compIt"
+          >
+            <RefusalNotice :refusal="compRefusal" />
+            <UFormField
+              :label="t('box-office.screens.panel.comp.reason')"
+              name="compReason"
+              required
+            >
+              <USelect
+                v-model="compReason"
+                :items="compReasons"
+                :placeholder="t('box-office.screens.panel.comp.reason-placeholder')"
+              />
+            </UFormField>
+            <div class="flex justify-end gap-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                :label="t('box-office.screens.panel.comp.cancel')"
+                @click="compLine = null"
+              />
+              <UButton
+                type="submit"
+                :label="t('box-office.screens.panel.comp.confirm')"
+                :loading="busy"
+                :disabled="!compReason"
+              />
+            </div>
+          </UForm>
+        </template>
+      </UModal>
       <UButton
         v-if="canUpgrade"
         icon="i-lucide-id-card"

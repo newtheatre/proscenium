@@ -5,7 +5,7 @@
 // person, scanned and counted like any other ticket. Nobody decides their own request: the ability
 // refuses the owner and a CHECK refuses the row.
 import { sql, type SQL } from 'drizzle-orm'
-import { first, inAccountScope, newId, nowMs, refuse, requireAbility, useContext, useDb, useSetting, type UnitView } from '#kit'
+import { all, first, inAccountScope, newId, nowMs, refuse, requireAbility, useContext, useDb, useSetting, type UnitView } from '#kit'
 import { findOrCreateAccount, getPerformance, getTerm } from '#modules/core'
 import { claimSeats } from './capacity'
 import { newReference } from './codes'
@@ -244,4 +244,43 @@ async function convertReservation(unit: UnitView, request: Pick<CompRow, 'id' | 
   unit.add(sql`UPDATE box_office_comp_requests SET state = 'issued', updated_at = ${at} WHERE id = ${request.id} AND state = 'approved'`).expect(1, CHANGED)
   unit.announce('box-office.comp-request.decided', { requestId: request.id, state: 'issued' }, { record: ['box-office.comp-request', request.id] })
   return confirmed
+}
+
+/**
+ * Makes some tickets on a reservation complimentary from the till's swap menu (Matt, 2026-11-19): a
+ * request for those tickets, issued at once where the theatre needs no approval, on the same seats.
+ */
+export async function compReservationLines(unit: UnitView, orderId: string, lineIds: string[], reasonTermId: string): Promise<{ requestId: string, totalMinor: number }> {
+  const actor = useContext().actor
+  if (!actor.accountId) refuse('box-office.comp.signed-out', 'Sign in to ask for complimentary tickets.', { status: 401 })
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (order.state !== 'reserved') refuse('box-office.desk.not-reserved', 'This order is not a reservation waiting to be paid for.', { status: 409 })
+  if (!order.account_id) refuse('box-office.comp.no-buyer', 'This reservation has nobody to send complimentary tickets to.', { status: 409 })
+  const ids = JSON.stringify([...new Set(lineIds)])
+  const lines = await all<{ id: string, performance_id: string, band_id: string, amount_minor: number }>(
+    `SELECT id, performance_id, band_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' AND state = 'live'
+      AND pass_redemption_id IS NULL AND comp_request_id IS NULL AND id IN (SELECT value FROM json_each(?))`, order.id, ids)
+  if (!lines.length || lines.length !== JSON.parse(ids).length) refuse(GONE.code, 'Those tickets are not on this reservation any more, or are free already.', { status: 409, remedy: 'Find the booking again.' })
+  const performanceId = lines[0]!.performance_id
+  await requireAbility(actor, 'box-office.comp.request', ['core.performance', performanceId])
+  if (await useSetting('box-office.comps.needs-approval'))
+    refuse('box-office.comp.needs-approval', 'Complimentary tickets need approval here, so they cannot be given at the till.', { status: 409, remedy: 'Ask for them from the booking\'s page.' })
+  const term = await getTerm(reasonTermId)
+  if (!term || term.vocabularyKey !== REASONS || term.retired)
+    refuse('box-office.comp.bad-reason', 'That reason is not on the list of reasons for complimentary tickets.', { status: 422, fields: { reasonTermId: 'invalid' }, remedy: 'Choose a reason from the list.' })
+  const type = await compType()
+  const at = nowMs()
+  const requestId = newId('comp')
+  unit.add(sql`INSERT INTO box_office_comp_requests (id, performance_id, band_id, quantity, for_account_id, reason_term_id, requested_by, state, order_id, created_at, updated_at)
+    VALUES (${requestId}, ${performanceId}, ${lines[0]!.band_id}, ${lines.length}, ${order.account_id}, ${reasonTermId}, ${actor.accountId}, 'requested', ${order.id}, ${at}, ${at})`)
+  unit.announce('box-office.comp-request.requested', { requestId }, { record: ['box-office.comp-request', requestId] })
+  await approveWithinCap(unit, { id: requestId, performance_id: performanceId }, null, at)
+  unit.add(sql`UPDATE box_office_order_lines SET ticket_type_id = ${type.id}, price_id = NULL, list_minor = 0, discount_minor = 0, amount_minor = 0, comp_request_id = ${requestId}, updated_at = ${at}
+    WHERE order_id = ${order.id} AND state = 'live' AND comp_request_id IS NULL AND id IN (SELECT value FROM json_each(${ids}))`).expect(lines.length, GONE)
+  const totalMinor = order.total_minor - lines.reduce((sum, l) => sum + l.amount_minor, 0)
+  unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, GONE)
+  unit.add(sql`UPDATE box_office_comp_requests SET state = 'issued', updated_at = ${at} WHERE id = ${requestId} AND state = 'approved'`).expect(1, CHANGED)
+  unit.announce('box-office.comp-request.decided', { requestId, state: 'issued' }, { record: ['box-office.comp-request', requestId] })
+  return { requestId, totalMinor }
 }
