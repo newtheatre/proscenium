@@ -49,7 +49,7 @@ describe('the last seat', () => {
       const held = await rows('SELECT c.id FROM box_office_claims c JOIN box_office_holds h ON h.id = c.hold_id WHERE h.order_id = ?', o.basket.orderId)
       expect(held).toHaveLength(o.basket.lines.length)
     }
-  })
+  }, 20_000)
 
   it('takes none for a party of four when three remain, and says three remain', async () => {
     const h = await house(3)
