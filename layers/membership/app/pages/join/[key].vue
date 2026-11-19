@@ -46,10 +46,12 @@ useSeoMeta({ title, description: () => scheme.value?.summary ?? undefined })
     >
       <div class="space-y-6">
         <template v-if="scheme">
-          <PageSection
-            :title="scheme.name"
-            :description="scheme.summary ?? undefined"
-          >
+          <PageSection :title="scheme.name">
+            <MarkdownText
+              v-if="scheme.summary"
+              :text="scheme.summary"
+              class="text-sm text-muted"
+            />
             <p
               v-if="fee"
               class="text-sm"

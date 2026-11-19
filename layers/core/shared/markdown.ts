@@ -1,6 +1,6 @@
 // The small part of Markdown that public text fields take (a production's description, summary and
 // content note; a venue's access and travel notes): paragraphs, line breaks, headings, bullet and
-// numbered lists, **bold**, *italic* and [links](https://...). It parses to a tree that the page
+// numbered lists, **bold**, *italic*, [links](https://...) and bare https addresses. It parses to a tree that the page
 // draws with Vue, never to HTML, so nothing typed can become markup: there is no raw HTML, no
 // component, no image and no script, whoever wrote the text. A link must be https, mailto or tel,
 // or a path on this site; anything else stays as plain text.
@@ -86,7 +86,7 @@ export function isSafeHref(href: string): boolean {
 const ESCAPABLE = /\\([\\`*_[\]()#+\-.!])/g
 
 /** Bold, italic, links, line breaks (two spaces or a backslash at a line's end, or any newline). */
-export function parseInline(source: string): Inline[] {
+export function parseInline(source: string, inLink = false): Inline[] {
   const out: Inline[] = []
   let text = ''
   const flush = () => {
@@ -110,6 +110,14 @@ export function parseInline(source: string): Inline[] {
       i += newline[0].length
       continue
     }
+    // A bare address is a link to itself; a full stop or bracket after it ends the sentence, not the address.
+    const bare = /^https:\/\/[^\s<>]*[^\s<>.,;:!?)'"]/.exec(rest)
+    if (bare && !inLink && !/\w/.test(source[i - 1] ?? '') && isSafeHref(bare[0])) {
+      flush()
+      out.push({ type: 'link', href: bare[0], children: [{ type: 'text', text: bare[0] }] })
+      i += bare[0].length
+      continue
+    }
     const strong = /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/.exec(rest)
     if (strong) {
       flush()
@@ -128,7 +136,7 @@ export function parseInline(source: string): Inline[] {
     if (link) {
       const href = link[2]!
       flush()
-      if (isSafeHref(href)) out.push({ type: 'link', href, children: parseInline(link[1]!) })
+      if (isSafeHref(href)) out.push({ type: 'link', href, children: parseInline(link[1]!, true) })
       else out.push(...parseInline(link[1]!))
       i += link[0].length
       continue
