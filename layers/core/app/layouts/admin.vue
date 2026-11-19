@@ -15,6 +15,8 @@ provide(DASHBOARD_SHELL, true)
 provide(ADMIN_SHELL, true)
 // A module's page (/admin/modules/<module>/...) frames whichever of its tabs is open.
 const module = computed(() => /^\/admin\/modules\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(route.path)?.[1])
+// Sign-in's pages are tabs of one frame, as a module's are.
+const signIn = computed(() => /^\/admin\/sign-in(?:\/|$)/.test(route.path))
 watch(() => route.fullPath, () => { open.value = false })
 
 // The browser title is the one pattern every page follows, the page, then the area, then the theatre
@@ -94,6 +96,9 @@ const groups = computed<NavigationMenuItem[]>(() => [
       >
         <slot />
       </ModuleFrame>
+      <SignInFrame v-else-if="signIn">
+        <slot />
+      </SignInFrame>
       <slot v-else />
     </main>
   </UDashboardGroup>
