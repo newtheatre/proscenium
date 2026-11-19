@@ -86,7 +86,7 @@ Every method ends in a session, and the method decides its assurance. A basic se
 1. The screen offers a passkey first, and an address field. A browser that holds a passkey for the site offers it in the field itself.
 2. An address on a managed domain is sent to that domain's provider and nowhere else.
 3. Any other address is emailed a link and a six-digit code. The answer on screen is identical whether or not the address is known.
-4. The link works in any browser. The code works only in the browser that asked, up to the attempt limit.
+4. The link works in any browser. The code works only in the browser that asked, up to the attempt limit. Opening the link uses nothing: the landing page waits for the person to press Sign in, because mail security scanners (Microsoft 365's among them) open every link in a real browser before the person sees the email, and a link used on load would be spent, with its code, by the scanner. The landings for verifying an address and confirming an erasure wait for a press for the same reason.
 5. A link or code used for an unknown address creates the account. Used for an unclaimed account, it claims it.
 6. The session opens at **basic** assurance for a link, a code or an ordinary provider, and at **strong** for a passkey.
 7. A person who signed in without a passkey is offered one, once, and can decline. A person who holds an ability that needs strong assurance cannot decline: they are taken to create one before the console opens.

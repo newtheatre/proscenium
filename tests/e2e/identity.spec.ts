@@ -71,3 +71,40 @@ test('the built Worker takes its own origin from the request, so a same-site cha
   const other = await request.post('/api/core/sign-in/passkey/options', { data: {}, headers: { origin: 'https://elsewhere.example' } })
   expect(other.status()).toBe(403)
 })
+
+test('opening an emailed link uses nothing until Sign in is pressed, so a mail scanner cannot spend it', async ({ page }) => {
+  const used: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/core/sign-in/link') used.push(request.url())
+  })
+  await page.goto('/sign-in/link#not-a-real-token')
+  await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+  const signIn = page.getByRole('button', { name: 'Sign in' })
+  await expect(signIn).toBeVisible()
+  expect(page.url()).not.toContain('not-a-real-token')
+  expect(used).toEqual([])
+  const results = await new AxeBuilder({ page }).withTags(tags).analyze()
+  expect(results.violations.map(v => v.id)).toEqual([])
+  await signIn.click()
+  await expect(page.getByRole('alert')).toContainText('This link is not valid.')
+  expect(used).toHaveLength(1)
+})
+
+for (const [path, endpoint, button] of [
+  ['/sign-in/verify-address', '/api/core/me/addresses/verify', 'Confirm address'],
+  ['/sign-in/confirm-erasure', '/api/core/me/data-requests/confirm', 'Confirm erasure'],
+]) {
+  test(`opening ${path} uses nothing until ${button} is pressed`, async ({ page }) => {
+    const used: string[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === endpoint) used.push(request.url())
+    })
+    await page.goto(`${path}#not-a-real-token`)
+    await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+    await expect(page.getByRole('button', { name: button })).toBeVisible()
+    expect(used).toEqual([])
+    await page.getByRole('button', { name: button }).click()
+    await expect(page.getByRole('alert')).toBeVisible()
+    expect(used).toHaveLength(1)
+  })
+}
