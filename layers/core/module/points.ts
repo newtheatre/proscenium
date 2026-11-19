@@ -150,6 +150,8 @@ export const points = {
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),
   }),
   'core.health-check': point({ kind: 'code', contract: 'health-check' }),
+  // The per-record credentials a record in use lacks, for its module's "Set up" card.
+  'core.credential-use': point({ kind: 'code', contract: 'credential-use' }),
   // A role made the first time its module is switched on, so a fresh install has the usual ones. The
   // key is the role's key: a theatre that has a role of that key already (archived too) keeps its own.
   // From then on the role is the theatre's to change or archive. Abilities a module that is absent

@@ -450,7 +450,10 @@ credentials: {
   first, with `<module>.credentials.<name>.replace-warning`.
 - A credential saved per record on its own screen leaves `manage` out and saves through its own
   route with `setCredential` and `clearCredential`, as Payments does for each provider account's
-  keys, drawing the fields with **CredentialFields**.
+  keys, drawing the fields with **CredentialFields**. The module's "Set up" card asks for one only
+  while a record in use lacks it: the module contributes to `core.credential-use` a file whose
+  `missing()` answers those names (Payments: the keys an active provider account lacks). With no
+  contribution, a per-record `when-used` credential is never asked for there.
 
 ## Settings
 

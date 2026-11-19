@@ -1,7 +1,8 @@
 <!-- "Set up <module>": what to do next after a module is switched on, drawn on its page. The steps come
      from what the module already declares: the Worker secrets and credentials it needs (ticked once
-     set) and its pages of settings and set-up screens, each a link to its tab. It shows for a week
-     after the module is switched on, or until the person hides it. -->
+     set; one saved per record, such as a payment provider's key, only while a record in use lacks it)
+     and its pages of settings and set-up screens, each a link to its tab. It shows for a week after
+     the module is switched on, or until the person hides it. -->
 <script setup lang="ts">
 import type { ModuleTabView, ModuleView } from '../utils/modules'
 
@@ -29,7 +30,7 @@ function hide() {
 interface Step { id: string, label: string, done: boolean, to?: string }
 const steps = computed<Step[]>(() => [
   ...props.view.secrets.filter(s => s.needed !== 'optional').map(s => ({ id: `secret:${s.name}`, label: t('core.modules.setup.secret', { name: s.name }), done: s.set })),
-  ...props.view.credentials.filter(c => c.needed !== 'optional').map(c => ({ id: `credential:${c.name}`, label: t('core.modules.setup.credential', { name: c.name }), done: c.set })),
+  ...props.view.credentials.filter(c => c.step !== null).map(c => ({ id: `credential:${c.name}`, label: t('core.modules.setup.credential', { name: c.name }), done: !!c.step })),
   ...props.tabs.filter(tab => !tab.id.startsWith('core.modules.about.')).map(tab => ({
     id: tab.id,
     label: t('core.modules.setup.open', { tab: te(tab.label) ? t(tab.label) : tab.label }),
