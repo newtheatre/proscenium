@@ -166,7 +166,10 @@ export default defineRequirementSource({
   },
 
   async describe(refs) {
-    const out: Record<string, { label: string, presentable?: { label: string, field?: string, noun?: string, shape: string } }> = {}
+    const out: Record<string, { label: string, presentable?: { label: string, field?: string, noun?: string, shape: string }, open?: true }> = {}
+    // A price is open to everyone when visitors can see the schemes and join one themselves.
+    const listed = !!(await useSetting('membership.join.public-listing'))
+    const openTo = async (ref: string, scheme: Scheme | null) => listed && await mayJoin(ref, scheme) ? { open: true as const } : {}
     const presentableOf = async (scheme: Scheme) => {
       const list = await schemeList(scheme)
       // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a
@@ -182,9 +185,12 @@ export default defineRequirementSource({
         // Any membership: a reference is taken where some scheme takes one. With one such scheme its
         // own words (V13); with several, words that fit them all.
         const taking = (await listSchemes(['open', 'closed'])).filter(s => s.acceptsReference)
-        out[ref] = taking.length === 1
-          ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
-          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', noun: 'membership reference', shape: 'reference' } } : { label: 'Members' }
+        out[ref] = {
+          ...(taking.length === 1
+            ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
+            : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', noun: 'membership reference', shape: 'reference' } } : { label: 'Members' }),
+          ...await openTo(ref, null),
+        }
         continue
       }
       const scheme = await getScheme(id)
@@ -193,7 +199,7 @@ export default defineRequirementSource({
         continue
       }
       // V13: the list's own question, never a bare noun; for member numbers, built from the scheme's name.
-      out[ref] = scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }
+      out[ref] = { ...(scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }), ...await openTo(ref, scheme) }
     }
     return out
   },

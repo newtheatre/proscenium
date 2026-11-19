@@ -13,7 +13,8 @@ export default defineRequirementSource({
   checkAbility: 'seats.members.look-up',
   holderAbility: 'seats.members.look-up',
   options: async query => [{ reference: 'seats:member', label: 'A current member' }].filter(o => o.label.toLowerCase().includes(query.toLowerCase())),
-  describe: async refs => Object.fromEntries(refs.map(ref => [ref, { label: 'A current member', presentable: { label: 'Membership number', shape: 'digits-8' } }])),
+  // `seats:joinable` is a membership anyone may take up themselves, so its price may be quoted to everyone.
+  describe: async refs => Object.fromEntries(refs.map(ref => [ref, { label: 'A current member', presentable: { label: 'Membership number', shape: 'digits-8' }, ...(ref === 'seats:joinable' ? { open: true as const } : {}) }])),
   async check(accounts, refs, _at, _record, presented) {
     calls.push({ accounts, refs, presented })
     const out: SourceAnswer[] = []

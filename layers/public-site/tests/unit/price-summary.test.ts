@@ -24,6 +24,8 @@ describe('the price line', () => {
       .toBe('From £8')
     expect(priceSummary({ currency: 'GBP', fromMinor: 1000, toMinor: 1000, others: [{ label: 'Fellow', amountMinor: 0, gated: true }] }, t)).toBe('£10')
     expect(priceSummary({ currency: 'GBP', fromMinor: null, toMinor: null, others: [{ label: 'Member', amountMinor: 600, gated: true }] }, t)).toBe('')
+    // A membership anyone may join is not gated, so its price is "From" like any other.
+    expect(priceSummary({ currency: 'GBP', fromMinor: 800, toMinor: 800, others: [{ label: 'Fellow', amountMinor: 0, gated: true }, { label: 'Member', amountMinor: 600 }] }, t)).toBe('From £6')
   })
 
   it('says "From" across a range of open prices and keeps pence that are not whole', () => {
