@@ -120,7 +120,7 @@ async function issueComps(unit: UnitView, request: Pick<CompRow, 'id' | 'perform
   const holdId = newId('hold')
   const order: OrderRow = {
     id: orderId, reference: newReference(), state: 'basket', account_id: request.for_account_id, currency, total_minor: 0, expires_at: at + HOLD,
-    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
+    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, booked_with: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
   }
   unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, sold_by, expires_at, keep, created_at, updated_at)
     VALUES (${orderId}, ${order.reference}, 'desk', 'basket', ${request.for_account_id}, 0, ${currency}, 0, ${order.sold_by}, ${order.expires_at}, 0, ${at}, ${at})`)

@@ -522,6 +522,8 @@ export const orders = defineTable('box_office_orders', {
   confirmExpiresAt: col.timestamp('confirm_expires_at'),
   confirmEmail: col.personal(text('confirm_email'), { erase: 'clear' }),
   confirmName: col.personal(text('confirm_name'), { erase: 'clear' }),
+  // The address typed by someone who booked signed out: their messages about it go there, not to their account's usual one.
+  bookedWith: col.personal(text('booked_with'), { erase: 'clear' }),
   linkTokenExpiresAt: col.timestamp('link_token_expires_at'),
   linkTokenHash: col.personal(text('link_token_hash'), { erase: 'clear' }),
   deskCodeHash: col.personal(text('desk_code_hash'), { erase: 'clear' }),

@@ -12,7 +12,7 @@ import { siteUrl } from './links'
 import { RAN_OUT, visitFor, wordsFor, type LineRow, type OrderRow } from './orders'
 import { applyHeldCovers } from './pass-covers'
 import { sendNewPasses, settlePassSales } from './pass-sales'
-import { issueTickets, ticketNumbers } from './tickets'
+import { doorCodesForOrder, issueTickets, ticketNumbers } from './tickets'
 
 export interface Confirmed {
   state: 'confirmed'
@@ -34,7 +34,7 @@ export interface ConfirmOptions {
   /** The payment that settled, which must be the one the order is waiting for. */
   intentId?: string
   /** Who the order is for, when confirming is also when that is first known (a free order). */
-  account?: { id: string, signedIn: boolean, madeWith?: { address: string } | null }
+  account?: { id: string, signedIn: boolean, madeWith?: { address: string } | null, /** The address typed when booking signed out, which the tickets go to. */ address?: string | null }
   /** Whether a message can link to the site: false where no request is at hand to take the address from. */
   link?: boolean
   /** Issued at the desk with nothing to pay and the buyer standing there: admitted by this seller. */
@@ -77,18 +77,36 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
   unit.announce('box-office.order.confirmed', { orderId: order.id, performanceIds }, { record: ['box-office.order', order.id] })
   // An anonymous desk sale has nobody to write to: the seller hands over the tickets, or sends them afterwards.
   // A pass sold on its own has no tickets: its own message has gone.
-  const accountLinkSent = accountId && lines.length ? await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}`, madeWith: options.account?.madeWith }) : false
+  // Booked signed out: the tickets go to the address typed, not the account's usual one (Matt, 19 November).
+  const address = options.account ? (options.account.signedIn ? null : options.account.address ?? null) : order.booked_with
+  const accountLinkSent = accountId && lines.length ? await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}`, madeWith: options.account?.madeWith, doorCodes, address }) : false
   return { state: 'confirmed', orderId: order.id, reference: order.reference, currency: order.currency, totalMinor: order.total_minor, doorCodes, accountLinkSent, token }
 }
 
-/** Sends the buyer their tickets: the ticket numbers and the link to the booking, whose token is `token`, which shows the codes. */
-export async function sendTickets(unit: UnitView, order: Pick<OrderRow, 'id' | 'reference' | 'currency' | 'total_minor'>, lines: LineRow[], send: { accountId: string, token: string, dedupeKey: string, madeWith?: Parameters<typeof claimLink>[2] }): Promise<boolean> {
+export interface SendTickets {
+  accountId: string
+  token: string
+  dedupeKey: string
+  madeWith?: Parameters<typeof claimLink>[2]
+  /** The codes of tickets issued in this unit, one for each line; read from the order when left out. */
+  doorCodes?: readonly string[]
+  /** The address to write to this time, over the account's usual one. */
+  address?: string | null
+}
+
+/** Sends the buyer their tickets: the ticket numbers, each ticket's code as a QR code, and the link to the booking, whose token is `token`. */
+export async function sendTickets(unit: UnitView, order: Pick<OrderRow, 'id' | 'reference' | 'currency' | 'total_minor'>, lines: LineRow[], send: SendTickets): Promise<boolean> {
   const words = await wordsFor(order, lines, order.total_minor)
-  const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, paid: order.total_minor === 0 ? 'Free' : words.amount, numbers: (await ticketNumbers(order, lines.map(l => l.id))).join(', '), link: await siteUrl(`/book/order/${send.token}`) }
+  const numbers = await ticketNumbers(order, lines.map(l => l.id))
+  const kept = send.doorCodes ? null : new Map((await doorCodesForOrder(order.id)).map(t => [t.lineId, t.doorCode]))
+  const codes = lines.map((l, i) => ({ number: numbers[i]!, code: send.doorCodes ? send.doorCodes[i] : kept!.get(l.id) })).filter(c => !!c.code)
+  // A caption and a code on each line, as core's QR drawing takes them; a space where no code is kept, which draws nothing.
+  const drawn = codes.map((c, i) => `Ticket ${i + 1} of ${codes.length}, number ${c.number}\t${c.code}`).join('\n') || ' '
+  const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, paid: order.total_minor === 0 ? 'Free' : words.amount, numbers: numbers.join(', '), codes: drawn, link: await siteUrl(`/book/order/${send.token}`) }
   // A buyer who has never signed in also gets the link that opens their account (core's claim link).
   const account = await claimLink(unit, send.accountId, send.madeWith)
   await notify(unit, account ? 'box-office.order-confirmed-guest' : 'box-office.order-confirmed', {
-    to: send.accountId,
+    to: [{ accountId: send.accountId, ...send.address ? { address: send.address } : {} }],
     variables: account ? { ...variables, account } : variables,
     subject: ['box-office.order', order.id],
     dedupeKey: send.dedupeKey,
