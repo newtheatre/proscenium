@@ -232,7 +232,7 @@ describe('email wording (C-27)', () => {
     expect(two.html.match(/aria-label="QR code"/g)).toHaveLength(2)
     expect(two.html).toContain('>Ticket 2 of 2</p>')
     expect(render({ subject: 'Hi', body: 'A.\n\n{{ qr codes }}' }, { values: { codes: ' ' }, kinds: { codes: 'sealed' }, accent: '#000000', theatre: 'T' }).html).not.toContain('QR code')
-    expect(out.html).toContain('bgcolor="#000000"')
+    expect(out.html).toContain('bgcolor=#000')
     expect(out.text).toBe('Your code is PASS-7KD2-M4QX\n\nSee you soon.\n')
     expect(out.text).not.toContain('qr')
   })

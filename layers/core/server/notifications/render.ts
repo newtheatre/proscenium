@@ -55,15 +55,15 @@ const QR_PX = 180 // not-policy: how wide a QR code is drawn, in pixels, whateve
 // Drawn as table cells, not an image, so it shows when a mail client blocks images; black on white
 // with a quiet border of four. The first row fixes each column's width; the rest join runs of a colour.
 function qrTable(value: string): string {
-  const { size, data } = encode(value, { border: 4, ecc: 'M' }) // not-policy: the quiet border a QR code needs
+  const { size, data } = encode(value, { border: 4, ecc: 'L' }) // not-policy: the quiet border a QR code needs; low correction keeps a ticket's long code small
   const px = Math.max(2, Math.floor(QR_PX / size)) // not-policy: no module narrower than two pixels
-  const widths = `<tr>${Array.from({ length: size }, () => `<td width="${px}" height="${px}"></td>`).join('')}</tr>`
+  const widths = `<tr>${Array.from({ length: size }, () => `<td width=${px} height=${px}></td>`).join('')}</tr>`
   const rows = data.slice(1).map((row) => {
     const runs: string[] = []
     for (let x = 0; x < row.length;) {
       let n = 1
       while (x + n < row.length && row[x + n] === row[x]) n++
-      runs.push(`<td${n > 1 ? ` colspan="${n}"` : ''}${row[x] ? ' bgcolor="#000000"' : ''} height="${px}"></td>`)
+      runs.push(`<td${n > 1 ? ` colspan=${n}` : ''}${row[x] ? ' bgcolor=#000' : ''}${x === 0 ? ` height=${px}` : ''}></td>`)
       x += n
     }
     return `<tr>${runs.join('')}</tr>`

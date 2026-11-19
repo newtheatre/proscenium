@@ -244,7 +244,7 @@ async function writeDeskOrder(unit: UnitView, sale: SaleInput, plan: OrderPlan, 
   const holdId = newId('hold')
   const order: OrderRow = {
     id: newId('ord'), reference: newReference(), state: 'basket', account_id: taken.accountId ?? await deskBuyer(unit, sale), currency: plan.currency, total_minor: plan.totalMinor, expires_at: expiresAt,
-    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
+    release_at: null, intent_id: null, confirm_email: null, confirm_name: null, booked_with: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
   }
   unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, sold_by, expires_at, keep, created_at, updated_at)
     VALUES (${order.id}, ${order.reference}, ${taken.channel}, 'basket', ${order.account_id}, 0, ${order.currency}, ${order.total_minor}, ${order.sold_by}, ${expiresAt}, 0, ${at}, ${at})`)

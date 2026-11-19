@@ -1,0 +1,1 @@
+ALTER TABLE `box_office_orders` ADD `booked_with` text;

@@ -170,7 +170,8 @@ describe('paying online', () => {
     expect(told.where).toBeTruthy()
     expect(told.doors).toMatch(/\d/)
     expect(told.access).toBeTruthy()
-    expect(JSON.stringify(told)).not.toContain('tkt.')
+    // Each ticket's code is drawn in the email, sealed and cleared once sent (Matt, 19 November).
+    expect(told.codes!.split('\n')).toHaveLength(3)
     const page = (await req('GET', '/api/box-office/orders/link', undefined, null, { 'x-order-token': told.link!.slice(told.link!.lastIndexOf('/') + 1) })).body
     expect(page.tickets.map((t: { number: string }) => t.number)).toEqual([`${b.reference}-1`, `${b.reference}-2`, `${b.reference}-3`])
     const codes = page.tickets.map((t: { doorCode: string }) => t.doorCode) as string[]
@@ -178,6 +179,7 @@ describe('paying online', () => {
     const everything = JSON.stringify(await rows('SELECT * FROM box_office_tickets')) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))
     for (const doorCode of codes) {
       const [kind, keyId, code, signature] = doorCode.split('.')
+      expect(told.codes).toContain(`.${code}.`)
       expect(kind).toBe('tkt')
       expect(code).toMatch(/^[A-Z2-7]{26}$/)
       expect(await inContext(() => signing.verify('box-office.door-code', keyId!, `${kind}.${keyId}.${code}`, signature!))).toBe(true)

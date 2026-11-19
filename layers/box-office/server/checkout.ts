@@ -74,7 +74,7 @@ export async function startCheckout(unit: UnitView, input: CheckoutInput): Promi
   const { intentId } = await collect(unit, { parts: [{ owner: { module: 'box-office', record: order.id }, amountMinor: order.total_minor }], currency: order.currency, expiresAt })
   // Booked signed out, the address typed is kept until payment, so the tickets go to it.
   unit.add(sql`UPDATE box_office_orders SET state = 'awaiting_payment', account_id = ${accountId}, signed_in = ${signedIn}, intent_id = ${intentId}, expires_at = ${expiresAt}, updated_at = ${at},
-      confirm_token_hash = NULL, confirm_expires_at = NULL, confirm_email = ${found ? input.email ?? null : null}, confirm_name = NULL
+      confirm_token_hash = NULL, confirm_expires_at = NULL, confirm_email = NULL, confirm_name = NULL, booked_with = ${found ? input.email ?? null : null}
     WHERE id = ${order.id} AND state = 'basket' AND expires_at > ${at} AND total_minor = ${order.total_minor}`).expect(1, RAN_OUT)
   // The seats move into the payment window, all of them still held.
   unit.add(sql`UPDATE box_office_claims SET expires_at = ${expiresAt}

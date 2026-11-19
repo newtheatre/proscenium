@@ -78,7 +78,7 @@ export async function confirmOrder(unit: UnitView, order: OrderRow, lines: LineR
   // An anonymous desk sale has nobody to write to: the seller hands over the tickets, or sends them afterwards.
   // A pass sold on its own has no tickets: its own message has gone.
   // Booked signed out: the tickets go to the address typed, not the account's usual one (Matt, 19 November).
-  const address = options.account ? (options.account.signedIn ? null : options.account.address ?? null) : order.confirm_email
+  const address = options.account ? (options.account.signedIn ? null : options.account.address ?? null) : order.booked_with
   const accountLinkSent = accountId && lines.length ? await sendTickets(unit, order, lines, { accountId, token, dedupeKey: `confirmed:${order.id}`, madeWith: options.account?.madeWith, doorCodes, address }) : false
   return { state: 'confirmed', orderId: order.id, reference: order.reference, currency: order.currency, totalMinor: order.total_minor, doorCodes, accountLinkSent, token }
 }
