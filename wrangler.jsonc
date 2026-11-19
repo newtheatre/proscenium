@@ -1,3 +1,4 @@
 // The theatre's Worker. The deploy screen writes your Worker's name here; queue names follow from
 // it. Bindings and the cron trigger come from the build (nuxt.config.ts), with no ids to fill in.
-{ "name": "nnt-preview" }
+// NNT: the live site on the New Theatre account. The preview builds from branch nnt-preview.
+{ "name": "proscenium" }
