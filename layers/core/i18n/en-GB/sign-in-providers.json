@@ -40,5 +40,8 @@
   "core.sign-in-providers.put-in-use": "Put in use",
   "core.sign-in-providers.take-out-of-use": "Take out of use",
   "core.sign-in-providers.now-in-use": "{provider} sign-in is in use",
-  "core.sign-in-providers.now-out-of-use": "{provider} sign-in is out of use"
+  "core.sign-in-providers.now-out-of-use": "{provider} sign-in is out of use",
+  "core.sign-in-tabs.label": "Sign-in pages",
+  "core.sign-in-tabs.settings": "Settings",
+  "core.sign-in-tabs.providers": "Providers"
 }

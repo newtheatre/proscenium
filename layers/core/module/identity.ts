@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, credentialDecl, credential, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
-const providerScreen = '/admin/sign-in'
+const providerScreen = '/admin/sign-in/providers'
 // How people sign in, how long sessions last and recovery are set once for the installation, so they
 // sit in Admin (Sign-in at /admin/sign-in), not on the console's settings page.
 
@@ -17,7 +17,7 @@ export const identitySettings = defineSettings('core', {
   'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
   'sign-in.address-resend-after': setting.duration({ default: '1m', min: '30s', max: '1h', change }),
   'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
-  // Google's settings are drawn on its card on Admin > Sign-in, not among the page's sections: its
+  // Google's settings are drawn on its card on Sign-in's Providers tab, not among the page's sections: its
   // set-up there saves the client id, the secret and the organisations together, then switches it on.
   'sign-in.google': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm', screen: providerScreen }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is

@@ -12,8 +12,8 @@ const props = defineProps<{
   highlight?: string
 }>()
 defineSlots<{
-  /** Above the settings: what the page manages first, such as Sign-in's providers. */
-  before?: () => unknown
+  /** Under the title, above everything else: the page's tabs, such as Sign-in's. */
+  toolbar?: () => unknown
   /** Beneath the settings: what the page manages besides them, such as its KeysCard. */
   default?: () => unknown
 }>()
@@ -29,6 +29,12 @@ const onlyChanged = ref(false)
     :trail="trail"
     width="reading"
   >
+    <template
+      v-if="$slots.toolbar"
+      #toolbar
+    >
+      <slot name="toolbar" />
+    </template>
     <SettingsSearch />
     <UAlert
       v-if="advanced"
@@ -44,12 +50,6 @@ const onlyChanged = ref(false)
       class="my-4"
       :label="t('core.settings-page.changed-only')"
     />
-    <div
-      v-if="$slots.before"
-      class="mb-6 space-y-6"
-    >
-      <slot name="before" />
-    </div>
     <SettingsSections
       :page="page"
       :highlight="highlight"

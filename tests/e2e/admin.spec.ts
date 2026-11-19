@@ -233,7 +233,7 @@ test.describe('keys typed into the app', () => {
     await visit(page, '/admin/sign-in')
     const card = page.locator('form').filter({ has: page.getByRole('heading', { level: 2, name: 'Keys' }) })
     await expect(card.getByLabel('Turnstile secret key')).toBeVisible()
-    // Google's secret is in Google's own set-up, above.
+    // Google's secret is in Google's own set-up, on the Providers tab.
     await expect(card.getByLabel('Google client secret')).toHaveCount(0)
     await card.getByLabel('Turnstile secret key').fill('0x4AAAAAAAe2eabcdefghij4321')
     await card.getByRole('button', { name: 'Save keys' }).click()
@@ -257,9 +257,11 @@ test.describe('sign-in providers', () => {
 
   test('Google is a card whose set-up runs in order: redirect URI, client ID and secret together, then in use with Undo', async ({ page }) => {
     await visit(page, '/admin/sign-in')
-    await expect(page.getByRole('heading', { level: 2, name: 'Sign-in providers' })).toBeVisible()
-    // Google's switch and fields are no longer among the page's sections.
+    // Google's switch and fields are no longer among the settings; the providers are the next tab.
     await expect(page.getByRole('switch', { name: 'Sign in with Google' })).toHaveCount(0)
+    await page.getByRole('tab', { name: 'Providers' }).click()
+    await expect(page).toHaveURL(/\/admin\/sign-in\/providers$/)
+    await expect(page.getByRole('heading', { level: 2, name: 'Sign-in providers' })).toBeVisible()
     await page.getByRole('button', { name: 'Manage Google' }).click()
     const panel = page.getByRole('dialog')
     await expect(panel.getByLabel('Redirect URI')).toHaveValue(/\/api\/core\/sign-in\/google\/callback$/)
