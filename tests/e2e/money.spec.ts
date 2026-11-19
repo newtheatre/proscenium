@@ -298,7 +298,7 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   await expect(card.getByText('Missing Secret key, Webhook signing secret, Publishable key')).toBeVisible()
   // Keys are managed in the app, on the same Keys card as every other page: nothing sends people to Worker secrets.
   await expect(page.getByText(/on the site's Worker/)).toHaveCount(0)
-  await expect(card.getByRole('heading', { level: 2, name: 'Keys' })).toBeVisible()
+  await expect(card.getByRole('heading', { level: 2, name: 'Keys', exact: true })).toBeVisible()
   await card.getByLabel('Secret key').fill('sk_test_e2eabcdefghijklm1234')
   await card.getByLabel('Webhook signing secret').fill('whsec_e2eabcdefghijklm5678')
   await card.getByLabel('Publishable key').fill('pk_test_e2eabcdefghijklm9012')
