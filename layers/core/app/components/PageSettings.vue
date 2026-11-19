@@ -12,6 +12,8 @@ const props = defineProps<{
   highlight?: string
 }>()
 defineSlots<{
+  /** Above the settings: what the page manages first, such as Sign-in's providers. */
+  before?: () => unknown
   /** Beneath the settings: what the page manages besides them, such as its KeysCard. */
   default?: () => unknown
 }>()
@@ -42,6 +44,12 @@ const onlyChanged = ref(false)
       class="my-4"
       :label="t('core.settings-page.changed-only')"
     />
+    <div
+      v-if="$slots.before"
+      class="mb-6 space-y-6"
+    >
+      <slot name="before" />
+    </div>
     <SettingsSections
       :page="page"
       :highlight="highlight"

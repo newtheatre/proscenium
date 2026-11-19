@@ -574,7 +574,11 @@ in the specification's "As built" list; this guide is the reference from here on
 - The content token is `:setting{name="..."}` rather than `:setting{key}`, because `key` is
   reserved in Vue and never reaches the component.
 - Points are read with `usePoint(name)`; `point()` is the manifest helper that declares one.
-- Cross-setting rules are declared in the manifest field `settingRules`.
+- Cross-setting rules are declared in the manifest field `settingRules`. A save of several settings
+  (`changeSettings`, and `PUT /api/core/settings`) checks each module's rules once, against all its
+  changes together, so dependent settings save in one go in any order. A rule that already failed
+  before the save does not block it; one the save breaks is refused, naming in `fields` the change it
+  blames (the first whose removal lets the rule hold) as well as `value`.
 - The jobs of a switched-off module wait (M4) rather than run.
 - External calls are declared in the manifest's `calls` section, each with a handler file.
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, credentialDecl, credential, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
+const providerScreen = '/admin/sign-in'
 // How people sign in, how long sessions last and recovery are set once for the installation, so they
 // sit in Admin (Sign-in at /admin/sign-in), not on the console's settings page.
 
@@ -16,11 +17,13 @@ export const identitySettings = defineSettings('core', {
   'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
   'sign-in.address-resend-after': setting.duration({ default: '1m', min: '30s', max: '1h', change }),
   'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
-  'sign-in.google': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm' }),
+  // Google's settings are drawn on its card on Admin > Sign-in, not among the page's sections: its
+  // set-up there saves the client id, the secret and the organisations together, then switches it on.
+  'sign-in.google': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm', screen: providerScreen }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is
-  // not a secret, so it is a setting the theatre types in beside the switch.
-  'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change }),
-  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm' }),
+  // not a secret, so it is a setting the theatre types in beside the secret.
+  'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change, screen: providerScreen }),
+  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm', screen: providerScreen }),
   'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm' }),
   'sign-in.provider-is-strong': setting.boolean({ default: false, change, onChange: 'confirm' }),
   // An authenticator app (TOTP), offered to people whose roles reach the console. Never a way to sign
