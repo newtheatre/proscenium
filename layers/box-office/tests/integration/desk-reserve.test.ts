@@ -102,5 +102,12 @@ describe('a reservation on an unpaid pass', () => {
     expect(next.status, JSON.stringify(next.body)).toBe(200)
     expect(next.body.state).toBe('confirmed')
     expect((await rows<{ paid_at: number | null }>('SELECT paid_at FROM box_office_passes WHERE id = ?', pass.id))[0]!.paid_at).toBeNull()
+
+    // Booked from the panel with nothing to pay, the entry is the holder's too, and emailed to them.
+    const third = await house(30, { of: h })
+    const booked = await req('POST', '/api/box-office/desk/issue', { sale: { performanceId: third.performanceId, lines: [], passes: [{ code: pass.code }] } }, seller)
+    expect(booked.status, JSON.stringify(booked.body)).toBe(200)
+    expect(await order(booked.body.orderId)).toMatchObject({ state: 'confirmed', account_id: holder })
+    expect(await told('box-office.order-confirmed', booked.body.orderId)).toHaveLength(1)
   })
 })
