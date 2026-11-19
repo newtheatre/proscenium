@@ -48,6 +48,8 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   record?: string
   schema?: z.ZodType
   of?: 'text' | 'choice'
+  /** list of text only: a GET route answering `{ items: { value, label }[] }`, the values to pick from. */
+  choices?: string
   /** What a colour sits on, for the contrast check: another colour setting's key. */
   on?: string
   /** Phantom: the type a read returns. */
@@ -88,7 +90,7 @@ export const setting = {
   time: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
   text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number, multiline?: boolean }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
   choice,
-  list: <const O extends Common & WithDefault<readonly string[]> & { of: 'text' | 'choice', options?: readonly string[], catalogue?: Catalogue, maxLength?: number }>(o: O) => ({ kind: 'list', ...o }) as SettingEntry<Value<string[], O>, 'list'> & O,
+  list: <const O extends Common & WithDefault<readonly string[]> & { of: 'text' | 'choice', options?: readonly string[], catalogue?: Catalogue, maxLength?: number, choices?: string }>(o: O) => ({ kind: 'list', ...o }) as SettingEntry<Value<string[], O>, 'list'> & O,
   /** A record of the named type. Always starts unset. */
   reference: <const O extends Common & { record: string }>(o: O) => ({ kind: 'reference', unset: true, ...o }) as SettingEntry<string | null, 'reference'> & O,
   /** The escape hatch: anything a Zod schema accepts. Needs its own editor; never quotable. */
@@ -156,6 +158,7 @@ function checkEntry(key: string, entry: SettingEntry) {
       throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case or a number, or names a catalogue')
   }
   else if (entry.catalogue !== undefined) throw new DeclarationError(f('catalogue'), 'only a choice, or a list of choices, names a catalogue')
+  if (entry.choices !== undefined && !(entry.kind === 'list' && entry.of === 'text' && typeof entry.choices === 'string' && entry.choices.startsWith('/api/'))) throw new DeclarationError(f('choices'), 'only a list of text names a route to pick its values from, such as /api/core/policies/choices')
   if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
   if ('scope' in entry) throw new DeclarationError(f('scope'), 'is gone: say where a group of settings is shown in the manifest\'s settingGroups')
   if (entry.screen !== undefined && !(typeof entry.screen === 'string' && SCREEN.test(entry.screen))) throw new DeclarationError(f('screen'), 'is the address of a page, such as /admin/email')

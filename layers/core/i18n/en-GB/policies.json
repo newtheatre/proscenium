@@ -41,5 +41,5 @@
   "core.policies.versions.old": "This is how the policy read at the time. It may have changed since.",
   "core.settings-sections.policies": "Policies",
   "core.settings.policies.reviewed.label": "Policies that have been reviewed",
-  "core.settings.policies.reviewed.help": "The policies whose text a competent person has read for your theatre, by the last part of each address: privacy, terms, accessibility, visiting, tickets. Site readiness lists the rest."
+  "core.settings.policies.reviewed.help": "The policies whose text a competent person has read for your theatre. Site readiness lists the rest."
 }

@@ -366,6 +366,10 @@ for any other screen:
 - `colour`: `FieldColour`, a swatch that opens a picker beside the hex value.
 - `reference`: `FieldRecord`, which searches the record type's `core.search-source` and keeps the
   record's id. A record type nothing searches falls back to the id as text.
+- `list` of text: tags (`UInputTags`), a value kept when it is typed and left or pasted. A list that
+  names a `choices` route (a GET answering `{ items: { value, label }[] }`) is `FieldListChoices`
+  instead, a multiple `UInputMenu` of those values, such as the policies a site has.
+- `list` of choices: square ticks, or a searchable multiple `USelectMenu` once the list is long.
 - `custom`: a component in the module's `app/setting-editors` folder named for the key, so
   `finance.year.starts` is `SettingFinanceYearStarts.vue`. It takes `modelValue` and `disabled` and
   emits `update:modelValue` with a value the setting's schema accepts. Without one the value is typed
