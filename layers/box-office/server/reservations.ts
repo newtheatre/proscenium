@@ -132,6 +132,12 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
   return lines
 }
 
+/** Staff reserving a basket for somebody (BO-34): no address to confirm, since the seller named them. */
+export function reserveBasket(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, madeWith: { address: string } | null): Promise<Reserved | Confirmed> {
+  if (!lines.length) refuse(RAN_OUT.code, RAN_OUT.reason, { status: 409, remedy: RAN_OUT.remedy })
+  return reserve(unit, order, lines, accountId, false, madeWith)
+}
+
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
 async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean, madeWith?: { address: string } | null): Promise<Reserved | Confirmed> {

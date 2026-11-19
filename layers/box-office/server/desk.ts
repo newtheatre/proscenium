@@ -19,6 +19,7 @@ import { claimSeats } from './capacity'
 import { carryPassEntries } from './pass-entries'
 import { hashOf, newReference, randomToken } from './codes'
 import { confirmOrder, sendTickets } from './confirm'
+import { reserveBasket } from './reservations'
 import { siteUrl } from './links'
 import { DOOR_CODE_PURPOSE, doorCodesForOrder, issueTickets, signedPart, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
@@ -233,15 +234,15 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
  * does, and the confirmation goes there. The till is told nothing about them. An order starts as a
  * basket and moves on in the same batch, as one bought online does.
  */
-async function writeDeskOrder(unit: UnitView, sale: SaleInput, plan: OrderPlan, at: number, expiresAt: number): Promise<{ order: OrderRow, lineIds: string[] }> {
+async function writeDeskOrder(unit: UnitView, sale: SaleInput, plan: OrderPlan, at: number, expiresAt: number, taken: { channel: 'desk' | 'phone', accountId?: string } = { channel: 'desk' }): Promise<{ order: OrderRow, lineIds: string[] }> {
   const actor = useContext().actor
   const holdId = newId('hold')
   const order: OrderRow = {
-    id: newId('ord'), reference: newReference(), state: 'basket', account_id: await deskBuyer(unit, sale), currency: plan.currency, total_minor: plan.totalMinor, expires_at: expiresAt,
+    id: newId('ord'), reference: newReference(), state: 'basket', account_id: taken.accountId ?? await deskBuyer(unit, sale), currency: plan.currency, total_minor: plan.totalMinor, expires_at: expiresAt,
     release_at: null, intent_id: null, confirm_email: null, confirm_name: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
   }
   unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, sold_by, expires_at, keep, created_at, updated_at)
-    VALUES (${order.id}, ${order.reference}, 'desk', 'basket', ${order.account_id}, 0, ${order.currency}, ${order.total_minor}, ${order.sold_by}, ${expiresAt}, 0, ${at}, ${at})`)
+    VALUES (${order.id}, ${order.reference}, ${taken.channel}, 'basket', ${order.account_id}, 0, ${order.currency}, ${order.total_minor}, ${order.sold_by}, ${expiresAt}, 0, ${at}, ${at})`)
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${order.id}, ${actor.accountId ?? null}, ${at}, ${at})`)
   // A pass's holder given by address is the account for it, made unclaimed if there is none.
   // Each address once, and the buyer's own address is the buyer.
@@ -284,6 +285,60 @@ export async function issueDeskSale(unit: UnitView, input: unknown): Promise<{ o
   }))
   await confirmOrder(unit, order, lines, { from: 'basket', ...(sale.admit && actor.accountId ? { admitBy: actor.accountId } : {}) })
   return { orderId: order.id, reference: order.reference }
+}
+
+const RESERVE_HOLD = 2 * 60_000 // not-policy: the basket is reserved by the request that writes it; this only has to outlast it
+
+export interface DeskReservation { orderId: string, accountId: string, madeWith: { address: string } | null }
+
+/**
+ * A booking taken for somebody at the desk or by phone and reserved to pay later (BO-34, as cut to
+ * the reservation path; part 4, "basket to reserved"), under the rules a buyer's own reservation
+ * keeps: the per-person limit, the release before the start, and what a pass still owes riding on
+ * it. Written as a basket in a unit of its own; `reserveForBuyer` reserves it in the next.
+ */
+export async function prepareDeskReservation(unit: UnitView, input: { sale: unknown, expectedTotalMinor: number, accountId?: string, email?: string }): Promise<DeskReservation> {
+  const actor = useContext().actor
+  const parsed = panelInput(input.sale)
+  if (!('sale' in parsed)) refuse('box-office.desk.bad-input', 'The box office panel was not filled in properly.', { status: 422 })
+  const sale = parsed.sale
+  await requireAbility(actor, 'box-office.order.sell', ['core.performance', sale.performanceId])
+  if (!forPerformance(sale) || sale.collect?.length)
+    refuse('box-office.desk.reserve-nothing', 'Only tickets for a performance can be reserved.', { status: 422, remedy: 'Take payment for a pass on its own at the till.' })
+  const at = nowMs()
+  const plan = await deskSale(sale, at)
+  if (plan.totalMinor !== input.expectedTotalMinor) {
+    const say = (minor: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: plan.currency }).format(minor / 100) // not-policy: minor units to units
+    refuse('box-office.order.total-changed', `The reservation comes to ${say(plan.totalMinor)}, not the ${say(input.expectedTotalMinor)} shown.`, { status: 409, remedy: 'Check what is in the sale and reserve again.' })
+  }
+  let accountId: string
+  let madeWith: { address: string } | null = null
+  if (input.accountId) {
+    accountId = await pickedBuyer(input.accountId)
+  }
+  else if (input.email) {
+    const found = await findOrCreateAccount(unit, { address: input.email, origin: 'guest' })
+    accountId = found.accountId
+    madeWith = found.madeWith ?? null
+  }
+  else {
+    // With nobody named, a reservation on passes goes to their one holder.
+    const holders = [...new Set(plan.entryOf.map(p => p?.accountId).filter((a): a is string => !!a))]
+    if (holders.length !== 1) refuse('box-office.desk.reserve-for', 'Say who the reservation is for, so it can be sent to them.', { status: 422, fields: { buyer: 'required' } })
+    accountId = await pickedBuyer(holders[0]!)
+  }
+  const { order } = await writeDeskOrder(unit, sale, plan, at, at + RESERVE_HOLD, { channel: 'phone', accountId })
+  return { orderId: order.id, accountId, madeWith }
+}
+
+/** Reserves the basket `prepareDeskReservation` wrote, for the buyer it names, and sends them the reservation. */
+export async function reserveForBuyer(unit: UnitView, prepared: DeskReservation): Promise<{ orderId: string, reference: string, state: string, amountDueMinor: number, releaseAt: number | null }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, prepared.orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  const done = await reserveBasket(unit, order, await liveLines(order.id), prepared.accountId, prepared.madeWith)
+  return done.state === 'reserved'
+    ? { orderId: done.orderId, reference: done.reference, state: done.state, amountDueMinor: done.amountDueMinor, releaseAt: done.releaseAt }
+    : { orderId: order.id, reference: order.reference, state: 'confirmed', amountDueMinor: 0, releaseAt: null }
 }
 
 /** Puts the till's payment on the order or exchange just prepared, so settling and releasing know it from any other. */
