@@ -28,8 +28,6 @@
   "payments.settings.cash.enabled.help": "Whether cash is offered as a way to pay at the desk. When it is off, till sessions have no float and close without a count.",
   "payments.settings.desk.email-domains.label": "Email providers suggested at the till",
   "payments.settings.desk.email-domains.help": "When a seller types a name into the box for a receipt, the till offers it at each of these, such as \"Use sam@gmail.com\". Write each as the part after the @.",
-  "payments.settings.desk.attested-card.label": "Record card payments taken on a standalone machine",
-  "payments.settings.desk.attested-card.help": "Whether a seller may record a card payment taken on a card machine that is not connected to this system.",
   "payments.settings.retention.webhooks.label": "Keep provider notifications for",
   "payments.settings.retention.webhooks.help": "How long a record of each notification from a payment provider is kept. Only its id and type are kept, never its contents.",
   "payments.settings.test-mode.takes-sales.label": "Test accounts take real sales",

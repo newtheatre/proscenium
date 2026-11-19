@@ -3,6 +3,7 @@
 // answer, a difference needs a reason and is posted, and above the limit someone else closes.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, setClock } from '#kit'
+import { useRegistry } from '#kit/registry'
 import { addAttempt, recordAnswer } from '../../server/answers'
 import sessionGet from '../../server/api/payments/session.get'
 import sessionsPost from '../../server/api/payments/sessions.post'
@@ -124,6 +125,14 @@ describe('the till', () => {
       { id: 'snacks', module: 'snacks', label: 'snacks.desk.label', tab: 'snacks.desk.tab', icon: 'i-lucide-cookie', panel: 'SnacksTillPanel', livePanel: 'SnacksLiveTillPanel' },
     ])
     expect((await get('/api/payments/till/panels', seller([]))).body.panels.map((p: { id: string }) => p.id)).toEqual(['snacks'])
+  })
+
+  it('offers a card machine not connected to the site from its account alone, with no setting (Matt, 19 November)', async () => {
+    const machine = newId('ppa')
+    await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'attested-card', 'Card machine', '[\"desk\"]', 'live', 1, 1, 1)").bind(machine).run()
+    expect((await get('/api/payments/till/methods', seller())).body.methods).toContainEqual(expect.objectContaining({ providerAccountId: machine, method: 'card_attested' }))
+    await env.DB.prepare('UPDATE payments_provider_accounts SET active = 0 WHERE id = ?').bind(machine).run()
+    expect(await inContext(async () => useRegistry().settings.has('payments.desk.attested-card'))).toBe(false)
   })
 
   it('offers the desk methods the settings allow', async () => {
