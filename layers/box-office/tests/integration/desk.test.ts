@@ -175,6 +175,19 @@ describe('a reservation at the desk', () => {
     expect(await claimed(h)).toBe(2)
   })
 
+  it('changes the type of a ticket reserved before its prices were set, such as an imported booking, at today\'s price', async () => {
+    const h = await house(2)
+    const r = await reserved(h, 1)
+    // An imported reservation keeps the old system's reservation time, from before any price here.
+    await env.DB.prepare('UPDATE box_office_orders SET reserved_at = ? WHERE id = ?').bind(NOV_16 - 30 * 86_400_000, r.orderId).run()
+    const [line] = (await rows<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live'", r.orderId)).map(l => l.id)
+    const changed = await req('POST', `/api/box-office/orders/${r.orderId}/amend`, { retype: [{ lineId: line, ticketTypeId: h.concessionId }] }, seller)
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200)
+    expect(changed.body).toMatchObject({ totalMinor: 800, amountDueMinor: 800 })
+    const [after] = await rows<{ ticket_type_id: string, amount_minor: number, price_id: string }>('SELECT l.ticket_type_id, l.amount_minor, p.ticket_type_id AS price_id FROM box_office_order_lines l JOIN box_office_prices p ON p.id = l.price_id WHERE l.id = ?', line)
+    expect(after).toEqual({ ticket_type_id: h.concessionId, amount_minor: 800, price_id: h.concessionId })
+  })
+
   it('is changed to who actually came: tickets off, on and of another type, with the amount due and the seats together', async () => {
     const h = await house(5)
     const r = await reserved(h, 3)
