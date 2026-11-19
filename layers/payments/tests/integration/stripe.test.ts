@@ -6,7 +6,7 @@ import { collect, methodsFor, refreshIntent, requestRefund, startAttempt } from 
 import { STRIPE_VERSION, transport } from '../../server/calls/stripe/client'
 import stripeProvider from '../../server/contributions/payments.provider/stripe'
 import webhookRoute from '../../server/api/payments/webhooks/[account].post'
-import { call, deliver, env, inContext, rows, sent, server, setModule } from '../../../../tests/integration/helpers'
+import { call, deliver, env, inContext, rows, saveKey, sent, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 12)
 const MINUTE = 60_000
@@ -70,8 +70,6 @@ async function order(amount: number): Promise<{ intentId: string, orderId: strin
   return { intentId, orderId, partId: partIds[0]! }
 }
 
-const secrets = env as unknown as Record<string, string | undefined>
-
 beforeAll(async () => {
   setClock(NOV_16)
   transport.fetch = fakeStripe
@@ -81,18 +79,18 @@ beforeAll(async () => {
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'stripe', 'Stripe', '[\"online\"]', 'live', 1, ?, ?)").bind(account, NOV_16, NOV_16).run()
 })
 
-afterAll(() => {
+afterAll(async () => {
   transport.fetch = real
-  delete secrets.PAYMENTS_STRIPE_SECRET_KEY
-  delete secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET
-  delete secrets.PAYMENTS_STRIPE_PUBLISHABLE_KEY
+  await saveKey('PAYMENTS_STRIPE_SECRET_KEY', null)
+  await saveKey('PAYMENTS_STRIPE_WEBHOOK_SECRET', null)
+  await saveKey('PAYMENTS_STRIPE_PUBLISHABLE_KEY', null)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   setClock(NOV_16)
-  secrets.PAYMENTS_STRIPE_SECRET_KEY = 'sk_live_test'
-  secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET
-  secrets.PAYMENTS_STRIPE_PUBLISHABLE_KEY = 'pk_live_test'
+  await saveKey('PAYMENTS_STRIPE_SECRET_KEY', 'sk_live_test')
+  await saveKey('PAYMENTS_STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET)
+  await saveKey('PAYMENTS_STRIPE_PUBLISHABLE_KEY', 'pk_live_test')
   seen.length = 0
   sent.length = 0
   intents = new Map()
@@ -101,14 +99,14 @@ beforeEach(() => {
 
 describe('connecting', () => {
   it('is not offered while a secret is missing', async () => {
-    delete secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET
+    await saveKey('PAYMENTS_STRIPE_WEBHOOK_SECRET', null)
     expect((await inContext(() => methodsFor('online'))).some(m => m.providerAccountId === account)).toBe(false)
-    secrets.PAYMENTS_STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET
+    await saveKey('PAYMENTS_STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET)
     expect((await inContext(() => methodsFor('online'))).some(m => m.providerAccountId === account)).toBe(true)
   })
 
   it('is not offered without the publishable key the card form loads with', async () => {
-    delete secrets.PAYMENTS_STRIPE_PUBLISHABLE_KEY
+    await saveKey('PAYMENTS_STRIPE_PUBLISHABLE_KEY', null)
     expect((await inContext(() => methodsFor('online'))).some(m => m.providerAccountId === account)).toBe(false)
   })
 })

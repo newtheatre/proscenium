@@ -8,7 +8,7 @@ import { transport } from '../../server/calls/sumup/client'
 import { webhookToken } from '../../server/contributions/payments.provider/sumup'
 import pairRoute from '../../server/api/payments/providers/[id]/readers.post'
 import webhookRoute from '../../server/api/payments/webhooks/[account].post'
-import { call, deliver, env, inContext, person, rows, sent, server, setModule } from '../../../../tests/integration/helpers'
+import { call, deliver, env, inContext, person, rows, saveKey, sent, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 19)
 const MINUTE = 60_000
@@ -67,7 +67,6 @@ async function sale(amount: number): Promise<{ intentId: string, orderId: string
 }
 
 const handle = server({ 'POST /api/payments/providers/:id/readers': pairRoute, 'POST /api/payments/webhooks/:account': webhookRoute })
-const secrets = env as unknown as Record<string, string | undefined>
 const attemptRow = async (id: string) => (await rows<{ state: string, provider_ref: string | null, failure_code: string | null }>('SELECT state, provider_ref, failure_code FROM payments_attempts WHERE id = ?', id))[0]!
 
 beforeAll(async () => {
@@ -79,18 +78,18 @@ beforeAll(async () => {
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, external_ref, active, created_at, updated_at) VALUES (?, 'sumup', 'SumUp', '[\"desk\"]', 'live', 'MC123', 1, ?, ?)").bind(account, NOV_16, NOV_16).run()
 })
 
-afterAll(() => {
+afterAll(async () => {
   transport.fetch = real
-  delete secrets.PAYMENTS_SUMUP_API_KEY
-  delete secrets.PAYMENTS_SUMUP_AFFILIATE_KEY
-  delete secrets.PAYMENTS_SUMUP_APP_ID
+  await saveKey('PAYMENTS_SUMUP_API_KEY', null)
+  await saveKey('PAYMENTS_SUMUP_AFFILIATE_KEY', null)
+  await saveKey('PAYMENTS_SUMUP_APP_ID', null)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   setClock(NOV_16)
-  secrets.PAYMENTS_SUMUP_API_KEY = 'sup_sk_test'
-  secrets.PAYMENTS_SUMUP_AFFILIATE_KEY = 'sup_afk_test'
-  secrets.PAYMENTS_SUMUP_APP_ID = 'com.example.theatre'
+  await saveKey('PAYMENTS_SUMUP_API_KEY', 'sup_sk_test')
+  await saveKey('PAYMENTS_SUMUP_AFFILIATE_KEY', 'sup_afk_test')
+  await saveKey('PAYMENTS_SUMUP_APP_ID', 'com.example.theatre')
   seen.length = 0
   sent.length = 0
   transactions.clear()

@@ -427,7 +427,9 @@ const keys = await signing.publicKeys('box-office.door-code') // for the device'
 
 A module declares what it reads under `secrets` (Worker secrets, set in the Cloudflare dashboard) or
 `credentials` (keys typed into the app). Only `CORE_ENCRYPTION_KEY`, `CORE_SESSION_KEY` and the
-break-glass `CORE_OWNER_RECOVERY` are secrets; every other key is a credential (Matt, 17 November).
+break-glass `CORE_OWNER_RECOVERY` are secrets; every other key is a credential (Matt, 17 November),
+and nothing the site can hold is set on the Worker (Matt, 19 November). A new module declares no
+secret unless the app cannot run, or cannot be recovered, without it.
 
 ```ts
 credentials: {
@@ -436,8 +438,11 @@ credentials: {
 ```
 
 - `credential(name, scope?)` reads it: the value saved for `scope` (a record, such as a payment
-  provider account), then the one saved for the whole site, then a Worker secret of the same name, so
-  a key already set in Cloudflare keeps working. Values are sealed with `CORE_ENCRYPTION_KEY` in
+  provider account), then the one saved for the whole site. It never reads the Worker. A site set up
+  before 19 November may still hold a credential as a Worker secret of the same name: the minute's
+  cron tick saves each such value into the app once, where nothing is saved yet (audited by name),
+  and copies a `NUXT_PUBLIC_TURNSTILE_SITE_KEY` variable into `core.sign-in.turnstile-site-key`.
+  After that the Worker copies are unused and can be deleted. Values are sealed with `CORE_ENCRYPTION_KEY` in
   `core_credentials`; only the last four characters of a long one are kept in the clear, as a hint.
 - `manage` names the ability that may save or remove it on the shared keys form. A page shows that
   form with **KeysCard** and the names it manages (`<KeysCard :names="['MEMBERSHIP_LIST_KEY']" />`);

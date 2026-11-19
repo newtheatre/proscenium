@@ -14,14 +14,13 @@ const generatedTypes = fileURLToPath(new URL('../../.generated/types/registry.d.
 
 export default defineNuxtConfig({
   // Loads Cloudflare Turnstile for TurnstileCheck. The site key is public: the setting
-  // core.sign-in.turnstile-site-key on Admin > Sign-in, or NUXT_PUBLIC_TURNSTILE_SITE_KEY where that
-  // is unset. Its secret key is a credential saved on the same page; the kit verifies the token itself.
+  // core.sign-in.turnstile-site-key on Admin > Sign-in. Its secret key is a credential saved on the
+  // same page; the kit verifies the token itself. Neither is read from the Worker.
   modules: ['@nuxtjs/turnstile'],
   app: { head: { htmlAttrs: { lang: 'en-GB' } } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   // The colour mode is kept in a cookie, so the server knows it before it renders (shared/appearance.ts).
   colorMode: { storage: 'cookie', storageKey: MODE_KEY, cookieAttrs: { path: '/', maxAge: MODE_COOKIE_AGE, sameSite: 'lax' } },
-  runtimeConfig: { public: { turnstile: { siteKey: '' } } },
   alias: kitAliases(root),
   // Screens that moved to Admin (R-33): old bookmarks still arrive.
   routeRules: {

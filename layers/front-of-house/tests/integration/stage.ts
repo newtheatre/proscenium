@@ -87,7 +87,7 @@ import rotaGet from '../../server/api/front-of-house/rota.get'
 import performanceRotaGet from '../../server/api/front-of-house/performances/[id]/rota.get'
 import peopleSearch from '../../server/api/front-of-house/incident-people/index.get'
 import personRedact from '../../server/api/front-of-house/incident-people/[id]/redact.post'
-import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
+import { call, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
   'POST /api/core/productions': createProduction,
@@ -202,7 +202,7 @@ export async function setting(key: string, value: unknown): Promise<void> {
 
 /** Switches the module on and sets the time zone. */
 export async function ready(): Promise<void> {
-  ;(env as any).CORE_TURNSTILE_SECRET_KEY = ''
+  await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
   await setModule('front-of-house', true)
   await setting('core.locale.time-zone', 'Europe/London')
   await setting('core.site.origin', 'https://theatre.example')

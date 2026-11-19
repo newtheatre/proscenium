@@ -115,8 +115,7 @@ export default defineModule({
   },
 
   // Provider keys are credentials (Matt, 17 November: keys are managed in the app, not in Cloudflare),
-  // typed into each provider account on the Providers screen. A Worker secret of the same name is
-  // used where none is saved. Stripe's are needed only once a Stripe account is added, SumUp's once a
+  // typed into each provider account on the Providers screen. Stripe's are needed only once a Stripe account is added, SumUp's once a
   // SumUp account is.
   credentials: {
     PAYMENTS_STRIPE_SECRET_KEY: credentialDecl({ needed: 'when-used' }),

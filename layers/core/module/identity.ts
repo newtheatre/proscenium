@@ -29,7 +29,7 @@ export const identitySettings = defineSettings('core', {
   'sign-in.authenticator': setting.boolean({ default: true, change, onChange: 'confirm' }),
   'sign-in.authenticator-is-strong': setting.boolean({ default: true, change, onChange: 'confirm' }),
   // The public half of the Turnstile bot check, which the browser draws the check with. Its secret
-  // half is a credential on the same page. Unset, NUXT_PUBLIC_TURNSTILE_SITE_KEY is used, if set.
+  // half is a credential on the same page.
   'sign-in.turnstile-site-key': setting.text({ unset: true, maxLength: 100, change, audience: 'public' }),
 
   'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
@@ -85,8 +85,8 @@ export const identitySettingRules: SettingRule[] = [
   // Ruling R-09: year-end expiry reads core.organisation.year-end, and cannot be chosen while it is unset.
   { id: 'default-expiry-needs-year-end', check: s => s['grants.default-expiry'] !== 'year-end' || !!s['organisation.year-end'] },
   { id: 'google-needs-client-id', check: s => !s['sign-in.google'] || !!s['sign-in.google-client-id'] },
-  // Rules run while a setting is saved, inside the request, so the key can be read here: saved on
-  // Admin > Sign-in, or a Worker secret of the same name.
+  // Rules run while a setting is saved, inside the request, so the key saved on Admin > Sign-in can
+  // be read here.
   { id: 'google-needs-client-secret', check: async s => !s['sign-in.google'] || !!(await credential('CORE_GOOGLE_CLIENT_SECRET')) },
   { id: 'domains-are-domains', check: s => [...s['sign-in.google-domains'], ...s['sign-in.managed-domains']].every((d: string) => DOMAIN.test(d)) },
 ]
@@ -196,8 +196,8 @@ export const identitySecrets = {
   CORE_OWNER_RECOVERY: secret({ needed: 'optional' }),
 }
 
-// Keys typed on Admin > Sign-in (Matt, 17 November), each falling back to a Worker secret of the
-// same name: Google's client secret, and the secret half of the Turnstile bot check.
+// Keys typed on Admin > Sign-in (Matt, 17 November), never read from the Worker: Google's client
+// secret, and the secret half of the Turnstile bot check.
 export const identityCredentials = {
   CORE_GOOGLE_CLIENT_SECRET: credentialDecl({ needed: 'when-used', manage: 'core.identity-settings.manage' }),
   CORE_TURNSTILE_SECRET_KEY: credentialDecl({ needed: 'optional', manage: 'core.identity-settings.manage' }),

@@ -5,7 +5,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { env, person, rows } from '../../../../tests/integration/helpers'
+import { person, rows, saveKey } from '../../../../tests/integration/helpers'
 import { buy, house, manager, NOV_16, ready, req } from './stage'
 
 beforeAll(async () => {
@@ -164,9 +164,9 @@ describe('a basket', () => {
   it('is held through the public route with no account, and opened again only with its token', async () => {
     const h = await house(10)
     // With a challenge secret set, a basket needs the challenge passed.
-    ;(env as any).CORE_TURNSTILE_SECRET_KEY = 'set'
+    await saveKey('CORE_TURNSTILE_SECRET_KEY', 'set')
     expect((await req('POST', '/api/box-office/baskets', { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] }, null)).body.code).toBe('core.challenge.failed')
-    ;(env as any).CORE_TURNSTILE_SECRET_KEY = ''
+    await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
     const made = await req('POST', '/api/box-office/baskets', { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }] }, null)
     expect(made.status, JSON.stringify(made.body)).toBe(200)
     expect(made.body).toMatchObject({ totalMinor: 3200, currency: 'GBP', expiresAt: NOV_16 + 10 * 60_000 })

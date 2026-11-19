@@ -5,12 +5,11 @@ import { changeSetting, createUnit, newId, nowMs, setClock } from '#kit'
 import { confirmRefund, createIntent, requestRefund, startAttempt } from '../../server/services'
 import returnRoute from '../../server/api/payments/handoff/[attempt]/[proof].get'
 import providersRoute from '../../server/api/payments/providers.get'
-import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
+import { call, env, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 19)
 const MINUTE = 60_000
 let account: string
-const secrets = env as unknown as Record<string, string | undefined>
 const handle = server({ 'GET /api/payments/handoff/:attempt/:proof': returnRoute, 'GET /api/payments/providers': providersRoute })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
@@ -46,15 +45,15 @@ beforeAll(async () => {
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'sumup-handoff', 'SumUp app', '[\"desk\"]', 'live', 1, ?, ?)").bind(account, NOV_16, NOV_16).run()
 })
 
-afterAll(() => {
-  delete secrets.PAYMENTS_SUMUP_AFFILIATE_KEY
-  delete secrets.PAYMENTS_SUMUP_APP_ID
+afterAll(async () => {
+  await saveKey('PAYMENTS_SUMUP_AFFILIATE_KEY', null)
+  await saveKey('PAYMENTS_SUMUP_APP_ID', null)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   setClock(NOV_16)
-  secrets.PAYMENTS_SUMUP_AFFILIATE_KEY = 'sup_afk_test'
-  secrets.PAYMENTS_SUMUP_APP_ID = 'com.example.theatre'
+  await saveKey('PAYMENTS_SUMUP_AFFILIATE_KEY', 'sup_afk_test')
+  await saveKey('PAYMENTS_SUMUP_APP_ID', 'com.example.theatre')
 })
 
 describe('the hand-off', () => {
