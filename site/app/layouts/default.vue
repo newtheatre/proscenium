@@ -1,7 +1,8 @@
 <!-- The New Theatre's public shell: upstream's (layers/core/app/layouts/default.vue) with the house's
      chrome. Header and footer are stage black in both colour modes, done by marking them .dark; the
      header's one call to action is Book tickets, which goes to what's on. The links and their rules
-     are upstream's: What's on and Past shows, then site/content/navigation.yml, then every policy.
+     are upstream's (What's on and Past shows, then site/content/navigation.yml, then every policy),
+     except that the roll of honour is in the footer only.
      What's on gets the house's photo band above upstream's page. -->
 <script setup lang="ts">
 const { t } = useT()
@@ -21,10 +22,10 @@ const logo = computed(() => brand.value?.logoDark ?? brand.value?.logo ?? null)
 const external = (to: string) => (/^https:/.test(to) ? '_blank' : undefined)
 const pastShows = computed(() => settings.value?.['public-site.archive.public']?.value === true)
 const roll = computed(() => settings.value?.['awards.roll.public']?.value === true)
-// The header leaves out what's on, since Book tickets beside it goes there.
+// The header leaves out what's on, since Book tickets beside it goes there, and the roll of honour,
+// which the house keeps to the footer (Matt, 2026-11-19).
 const links = computed(() => [
   ...(pastShows.value ? [{ label: t('core.public.past-shows'), to: '/shows' }] : []),
-  ...(roll.value ? [{ label: t('core.public.roll-of-honour'), to: '/awards' }] : []),
   ...(navigation.value?.header ?? []),
 ].map(l => ({ label: l.label, to: l.to, target: external(l.to), active: route.path === l.to || route.path.startsWith(`${l.to}/`) })))
 
