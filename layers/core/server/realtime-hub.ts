@@ -98,6 +98,24 @@ export class RealtimeHub extends DurableObject {
     await this.left(socket)
   }
 
+  /** A value held under this object's name until a time (#kit/realtime, holdUnder). False while another is held. */
+  async hold(value: string, until: number, at: number): Promise<boolean> {
+    const now = await this.ctx.storage.get<{ value: string, until: number }>('held')
+    if (now && now.until > at) return false
+    await this.ctx.storage.put('held', { value, until })
+    await this.ctx.storage.setAlarm(until)
+    return true
+  }
+
+  async held(at: number): Promise<string | null> {
+    const now = await this.ctx.storage.get<{ value: string, until: number }>('held')
+    return now && now.until > at ? now.value : null
+  }
+
+  override async alarm(): Promise<void> {
+    await this.ctx.storage.delete('held')
+  }
+
   /** The others are told; the last device out takes what the room kept with it, so nothing stale waits for the next. */
   private async left(socket: WebSocket): Promise<void> {
     if (this.ctx.getWebSockets().some(s => s !== socket)) this.tellPresence(socket)

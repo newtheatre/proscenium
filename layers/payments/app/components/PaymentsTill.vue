@@ -750,7 +750,24 @@ const clash = ref<SharedSale | null>(null)
 let rev = 0
 let applying = false
 let lastShared = ''
-const link = useRealtime('device.payments.till', (data, meta) => { void heard(data as SharedSale | null, meta) })
+// Someone else's till, joined with the code their device showed (server/till-link): this device
+// shares their sale in place of its own account's, until it leaves or the pass runs out.
+const LINK_KEY = 'payments.till.link'
+interface TillLink { grant: string, name: string, expiresAt: number }
+const joined = ref<TillLink | null>(null)
+const grant = computed(() => joined.value?.grant ?? null)
+// Before the socket is opened, so a joined device goes straight to the till it joined.
+onMounted(() => {
+  try {
+    const kept = JSON.parse(localStorage.getItem(LINK_KEY) ?? 'null') as TillLink | null
+    if (kept && kept.expiresAt > Date.now()) joined.value = kept
+    else if (kept) localStorage.removeItem(LINK_KEY)
+  }
+  catch { /* nothing kept */ }
+})
+const link = useRealtime('device.payments.till', (data, meta) => { void heard(data as SharedSale | null, meta) }, { grant })
+// The till it joined is another person's session, whose news comes in their room.
+useRealtime('payments.session', () => { if (joined.value && sale.value && !taking.value) void check().catch(() => {}) }, { grant })
 const others = computed(() => link.devices.value.filter(d => d.id !== link.deviceId()))
 const linked = computed(() => !solo.value && link.connected.value && others.value.length > 0)
 const nameOf = (id: string | null) => link.devices.value.find(d => d.id === id)?.name ?? t('payments.screens.till.linked.another-device')
@@ -759,8 +776,6 @@ const syncLabel = computed(() => {
   if (!others.value.length) return t('payments.screens.till.linked.button-alone')
   return others.value.length === 1 ? t('payments.screens.till.linked.button-linked', { name: others.value[0]!.name }) : t('payments.screens.till.linked.button-linked-many', { count: others.value.length })
 })
-const deviceLabel = ref('')
-watch(link.deviceName, (now) => { deviceLabel.value = now }, { immediate: true })
 
 function snapshot(): SharedSale {
   return JSON.parse(JSON.stringify({
@@ -886,6 +901,86 @@ onMounted(() => {
   try { solo.value = localStorage.getItem(SOLO_KEY) === '1' }
   catch { /* storage refused: linked, as a new device is */ }
 })
+
+/** The sale is now another room's: what this device holds waits for what that room keeps. */
+function changedRoom() {
+  clearTimeout(sharing)
+  clash.value = null
+  rev = 0
+  lastShared = contentOf(snapshot())
+}
+async function joinTill(code: string): Promise<string | null> {
+  try {
+    const now = await $api<TillLink>('/api/payments/till/link', { method: 'POST', body: { code } })
+    changedRoom()
+    joined.value = now
+    solo.value = false
+    try {
+      localStorage.setItem(LINK_KEY, JSON.stringify(now))
+      localStorage.removeItem(SOLO_KEY)
+    }
+    catch { /* storage refused: the link lasts until the page is closed */ }
+    toast.add({ id: TOAST, title: t('payments.screens.till.linked.joined', { name: now.name }), color: 'success' })
+    return null
+  }
+  catch (e) {
+    return toRefusal(e).reason
+  }
+}
+/** Back to this account's own till. The sale stays with the till it left, unless this device is taking the payment. */
+function leaveTill() {
+  if (!joined.value) return
+  const shared = linked.value && !(sale.value && !saleBy.value)
+  if (shared) {
+    if (sale.value) reset()
+    emptyPanels()
+  }
+  changedRoom()
+  joined.value = null
+  try { localStorage.removeItem(LINK_KEY) }
+  catch { /* nothing kept */ }
+}
+// The pass ran out, or was refused: the device is its own account's till again.
+watch(link.refused, (no) => {
+  if (!no || !joined.value) return
+  const name = joined.value.name
+  leaveTill()
+  toast.add({ id: TOAST, title: t('payments.screens.till.linked.ended', { name }), color: 'warning' })
+})
+// Scanned from another till's code: the address carries it once.
+onMounted(() => {
+  const { link: code, ...rest } = route.query
+  if (typeof code !== 'string') return
+  void router.replace({ query: rest })
+  if (!/^\d{6}$/.test(code)) return
+  void joinTill(code).then((wrong) => { if (wrong) toast.add({ id: TOAST, title: wrong, color: 'error' }) })
+})
+
+// Not in sync: a device that was sharing a sale and has lost the others holds what it has, so two
+// baskets do not grow apart unseen, until it is back or the seller carries on separately.
+const NOT_IN_SYNC_AFTER = 4000 // not-policy: a dropped socket is usually back sooner than this
+const wasLinked = ref(false)
+const adrift = ref(false)
+let drifting: ReturnType<typeof setTimeout> | undefined
+watch([link.connected, others, solo], () => {
+  if (link.connected.value) wasLinked.value = !solo.value && others.value.length > 0
+  const lost = wasLinked.value && !solo.value && !link.connected.value
+  if (!lost) {
+    clearTimeout(drifting)
+    drifting = undefined
+    adrift.value = false
+  }
+  else if (!drifting) {
+    drifting = setTimeout(() => { adrift.value = true }, NOT_IN_SYNC_AFTER)
+  }
+})
+onBeforeUnmount(() => clearTimeout(drifting))
+function carryOn() {
+  solo.value = true
+  wasLinked.value = false
+  try { localStorage.setItem(SOLO_KEY, '1') }
+  catch { /* storage refused: the device links again when the page is loaded */ }
+}
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
 
@@ -1056,72 +1151,22 @@ function ended() {
             class="size-4 shrink-0"
           />
           <span class="min-w-0 flex-1 truncate">{{ open && session?.session ? t('payments.screens.till.session-since-short', { time: time(session.session.openedAt) }) : t('payments.screens.till.session-opens-short') }}</span>
-          <UPopover v-if="link.connected.value">
-            <UButton
-              color="neutral"
-              variant="outline"
-              :size="live ? 'lg' : 'sm'"
-              :icon="linked ? 'i-lucide-link' : 'i-lucide-unlink'"
-              :label="syncLabel"
-              data-testid="till-sync"
-            />
-            <template #content>
-              <div class="w-80 max-w-[90vw] space-y-3 p-3 text-sm">
-                <p class="font-medium text-highlighted">
-                  {{ t('payments.screens.till.linked.title') }}
-                </p>
-                <UFormField :label="t('payments.screens.till.linked.this-device')">
-                  <UInput
-                    v-model="deviceLabel"
-                    maxlength="60"
-                    @change="link.rename(deviceLabel)"
-                  />
-                </UFormField>
-                <p
-                  v-if="!others.length"
-                  class="text-muted"
-                >
-                  {{ t('payments.screens.till.linked.none') }}
-                </p>
-                <ul
-                  v-else
-                  class="space-y-1"
-                >
-                  <li
-                    v-for="d in others"
-                    :key="d.id"
-                    class="flex items-center justify-between gap-2"
-                  >
-                    <span class="min-w-0 truncate">{{ d.name }}</span>
-                    <UBadge
-                      :color="solo ? 'neutral' : 'success'"
-                      variant="subtle"
-                      :label="solo ? t('payments.screens.till.linked.not-linked') : t('payments.screens.till.linked.in-sync')"
-                    />
-                  </li>
-                </ul>
-                <p class="text-muted">
-                  {{ solo ? t('payments.screens.till.linked.help-solo') : t('payments.screens.till.linked.help-linked') }}
-                </p>
-                <UButton
-                  v-if="solo"
-                  block
-                  icon="i-lucide-link"
-                  :label="t('payments.screens.till.linked.link')"
-                  @click="linkAgain"
-                />
-                <UButton
-                  v-else
-                  block
-                  color="neutral"
-                  variant="outline"
-                  icon="i-lucide-unlink"
-                  :label="t('payments.screens.till.linked.disconnect')"
-                  @click="disconnect"
-                />
-              </div>
-            </template>
-          </UPopover>
+          <PaymentsTillLinkMenu
+            v-if="link.connected.value"
+            :live="live"
+            testid="till-sync"
+            :label="syncLabel"
+            :linked="linked"
+            :solo="solo"
+            :others="others"
+            :device-name="link.deviceName.value"
+            :host="joined?.name ?? null"
+            :join="joinTill"
+            @rename="link.rename"
+            @disconnect="disconnect"
+            @link="linkAgain"
+            @leave="leaveTill"
+          />
           <UPopover>
             <IconButton
               icon="i-lucide-map-pin"
@@ -1160,72 +1205,22 @@ function ended() {
               @update:model-value="move"
             />
           </div>
-          <UPopover v-if="link.connected.value">
-            <UButton
-              color="neutral"
-              variant="outline"
-              :size="live ? 'lg' : 'sm'"
-              :icon="linked ? 'i-lucide-link' : 'i-lucide-unlink'"
-              :label="syncLabel"
-              data-testid="till-sync-wide"
-            />
-            <template #content>
-              <div class="w-80 max-w-[90vw] space-y-3 p-3 text-sm">
-                <p class="font-medium text-highlighted">
-                  {{ t('payments.screens.till.linked.title') }}
-                </p>
-                <UFormField :label="t('payments.screens.till.linked.this-device')">
-                  <UInput
-                    v-model="deviceLabel"
-                    maxlength="60"
-                    @change="link.rename(deviceLabel)"
-                  />
-                </UFormField>
-                <p
-                  v-if="!others.length"
-                  class="text-muted"
-                >
-                  {{ t('payments.screens.till.linked.none') }}
-                </p>
-                <ul
-                  v-else
-                  class="space-y-1"
-                >
-                  <li
-                    v-for="d in others"
-                    :key="d.id"
-                    class="flex items-center justify-between gap-2"
-                  >
-                    <span class="min-w-0 truncate">{{ d.name }}</span>
-                    <UBadge
-                      :color="solo ? 'neutral' : 'success'"
-                      variant="subtle"
-                      :label="solo ? t('payments.screens.till.linked.not-linked') : t('payments.screens.till.linked.in-sync')"
-                    />
-                  </li>
-                </ul>
-                <p class="text-muted">
-                  {{ solo ? t('payments.screens.till.linked.help-solo') : t('payments.screens.till.linked.help-linked') }}
-                </p>
-                <UButton
-                  v-if="solo"
-                  block
-                  icon="i-lucide-link"
-                  :label="t('payments.screens.till.linked.link')"
-                  @click="linkAgain"
-                />
-                <UButton
-                  v-else
-                  block
-                  color="neutral"
-                  variant="outline"
-                  icon="i-lucide-unlink"
-                  :label="t('payments.screens.till.linked.disconnect')"
-                  @click="disconnect"
-                />
-              </div>
-            </template>
-          </UPopover>
+          <PaymentsTillLinkMenu
+            v-if="link.connected.value"
+            :live="live"
+            testid="till-sync-wide"
+            :label="syncLabel"
+            :linked="linked"
+            :solo="solo"
+            :others="others"
+            :device-name="link.deviceName.value"
+            :host="joined?.name ?? null"
+            :join="joinTill"
+            @rename="link.rename"
+            @disconnect="disconnect"
+            @link="linkAgain"
+            @leave="leaveTill"
+          />
           <UButton
             to="/console/payments/sessions"
             color="neutral"
@@ -1252,6 +1247,17 @@ function ended() {
             { label: t('payments.screens.till.linked.keep-mine'), color: 'neutral', variant: 'outline', onClick: keepMine },
             { label: t('payments.screens.till.linked.keep-theirs', { name: nameOf(clash.by) }), onClick: () => { if (clash) void adopt(clash) } },
           ]"
+        />
+        <UAlert
+          v-if="adrift"
+          class="mb-6"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-unlink"
+          data-testid="till-not-in-sync"
+          :title="t('payments.screens.till.linked.adrift')"
+          :description="t('payments.screens.till.linked.adrift-help')"
+          :actions="[{ label: t('payments.screens.till.linked.carry-on'), color: 'neutral', variant: 'outline', onClick: carryOn }]"
         />
         <UAlert
           v-if="sale && saleBy"
@@ -1976,7 +1982,7 @@ function ended() {
             <UTabs
               v-if="tabbed"
               v-model="tab"
-              :inert="!!sale"
+              :inert="!!sale || adrift"
               :class="sale ? 'opacity-40' : undefined"
               :items="tabs"
               :unmount-on-hide="false"
@@ -1989,7 +1995,7 @@ function ended() {
                   :is="panels.find(p => p.id === item.value)!.component"
                   v-model="inputs[item.value]"
                   class="pt-4"
-                  :locked="!!sale"
+                  :locked="!!sale || adrift"
                   :summary="summaryOf(item.value)"
                   :settled="settledFor(item.value)"
                   @receipt="(r: PanelReceipt | null) => said(item.value, r)"
@@ -2000,7 +2006,7 @@ function ended() {
               v-else
               class="min-w-0 space-y-6"
               :class="sale ? 'opacity-40' : undefined"
-              :inert="!!sale"
+              :inert="!!sale || adrift"
             >
               <PageSection
                 v-for="p in panels"
@@ -2010,7 +2016,7 @@ function ended() {
                 <component
                   :is="p.component"
                   v-model="inputs[p.id]"
-                  :locked="!!sale"
+                  :locked="!!sale || adrift"
                   :summary="summaryOf(p.id)"
                   :settled="settledFor(p.id)"
                   @receipt="(r: PanelReceipt | null) => said(p.id, r)"

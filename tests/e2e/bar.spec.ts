@@ -169,6 +169,51 @@ test('two devices signed in as the same seller share one sale until one disconne
   await context.close()
 })
 
+test('another seller links their device with a code, shares the sale, and leaves', async ({ page, browser }) => {
+  await visit(page, '/live/till')
+  const context = await browser.newContext(as(person('acc_barseller2', 'Sam Second', ['bar.sale.sell', 'payments.session.open', 'payments.attempt.attest'])))
+  const theirs = await context.newPage()
+  await visit(theirs, '/live/till')
+  const receipt = (p: Page) => p.getByRole('complementary', { name: 'Total to pay' })
+  const sync = (p: Page) => p.getByTestId('till-sync-wide')
+  await expect(sync(theirs)).toContainText('No other devices')
+
+  // The code shown on one till is typed on the other, which then shares its sale.
+  await tile(page, cola).click()
+  await sync(page).click()
+  await page.getByTestId('till-link-show').click()
+  const code = ((await page.getByTestId('till-link-code').textContent()) ?? '').replace(/\D/g, '')
+  expect(code).toHaveLength(6)
+  await page.keyboard.press('Escape')
+  await sync(theirs).click()
+  await theirs.getByTestId('till-link-enter').fill(code)
+  await theirs.getByRole('button', { name: 'Link to that till' }).click()
+  await expect(sync(theirs)).toContainText('In sync with')
+  await expect(receipt(theirs).getByText(cola)).toBeVisible()
+
+  // The payment one seller starts is taken by the other.
+  await cash(page).click()
+  await expect(theirs.getByText('Still to pay: £2.00')).toBeVisible()
+  await cash(theirs).click()
+  await theirs.getByRole('button', { name: 'Cash taken' }).click()
+  await expect(page.getByText('Paid £2.00', { exact: true })).toBeVisible()
+  await expect(theirs.getByText('Paid £2.00', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Next customer' }).click()
+
+  // The link outlives a reload, and leaving makes the device its own till again.
+  await visit(theirs, '/live/till')
+  await expect(sync(theirs)).toContainText('In sync with')
+  await tile(page, cola).click()
+  await expect(receipt(theirs).getByText(cola)).toBeVisible()
+  await sync(theirs).click()
+  await theirs.getByTestId('till-link-leave').click()
+  await expect(theirs.getByText('Nothing added yet.')).toBeVisible()
+  await expect(sync(theirs)).toContainText('No other devices')
+  await expect(receipt(page).getByText(cola)).toBeVisible()
+  await receipt(page).getByRole('button', { name: `Remove ${cola}` }).click()
+  await context.close()
+})
+
 test('refusing the age-restricted lines leaves the rest of the sale to carry on', async ({ page }) => {
   await visit(page, '/live/till')
   const receipt = page.getByRole('complementary', { name: 'Total to pay' })
