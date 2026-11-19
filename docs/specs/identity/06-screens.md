@@ -22,7 +22,7 @@ Public shell. Every screen works on a phone and with a screen reader, and none a
 | --- | --- | --- | --- |
 | Sign in | Offer a passkey; take an address; send a managed-domain address to its provider | Anyone signed out | First |
 | Check your email | Say a link and a code were sent; take the code; offer to send again after a pause | Anyone who asked for a link | First |
-| Link landing | Finish a sign-in from the email; explain plainly when a link is spent, expired or opened for a different purpose, and offer a new one | Anyone opening a link | First |
+| Link landing | Finish a sign-in from the email when the person presses Sign in, never on opening; explain plainly when a link is spent, expired or opened for a different purpose, and offer a new one | Anyone opening a link | First |
 | Your name | Ask a new person for their name, once, after their first link | A person whose account was just created | First |
 | Add a passkey | Offer a passkey after a link sign-in; skippable unless a sensitive ability is held | A signed-in person without one | First |
 | Welcome, you were invited | Say who invited them and to what, then sign them in | The holder of an invite link | First |

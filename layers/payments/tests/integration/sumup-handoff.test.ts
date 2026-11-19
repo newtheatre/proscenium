@@ -72,6 +72,11 @@ describe('the hand-off', () => {
     expect(await state('payments_attempts', out.attemptId)).toBe('pending')
   })
 
+  it('asks the app to come straight back on success, since the till shows the result', async () => {
+    const { url } = await handedOff(1250)
+    expect(url.searchParams.get('skip-screen-success')).toBe('true')
+  })
+
   it('settles on the app\'s success, keeping SumUp\'s transaction code, and sends the seller back', async () => {
     const { out, back, orderId, intentId } = await handedOff(2000)
     const res = await returnTo(back, { 'smp-status': 'success', 'smp-tx-code': 'TEENSK4W2K', 'foreign-tx-id': out.attemptId })

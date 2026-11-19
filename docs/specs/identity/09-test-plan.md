@@ -17,6 +17,7 @@ Identity is tested mostly at the integration tier, against a real local D1, beca
 | Name | Tier | Asserts |
 | --- | --- | --- |
 | `sign-in link works once` | Integration | A second use signs nobody in, even in a race of two requests |
+| `opening a link uses nothing` | E2E | The sign-in, address and erasure link landings send nothing until their button is pressed, so a mail scanner opening the link spends nothing |
 | `sign-in code is bound to its browser` | Integration | The right code from another browser is refused and counts as an attempt |
 | `sign-in reveals nothing` | Integration | Response body, status and timing class are the same for a known and an unknown address |
 | `no account before proof` | Integration | Asking for a link writes no account row |
