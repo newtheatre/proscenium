@@ -28,7 +28,7 @@ useSeoMeta({ title: () => t('core.policies.versions.title', { policy: data.value
         />
         <UPageList
           v-else
-          divide
+          class="gap-2"
         >
           <UPageCard
             v-for="version in data.versions"
