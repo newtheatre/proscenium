@@ -2,7 +2,8 @@
      what it is, its advisories one press away, every public date with its booking action, the cast
      and team, and the photos. It lives at /whats-on/<slug> while current and /shows/<slug> once past
      (C-46); an old slug or the other prefix redirects to the right address. A cancelled date stays,
-     struck through, until it has passed. It carries event data search engines read, and a social card. -->
+     struck through, until it has passed. The dates panel says when latecomers are let in, and a date
+     that differs says so. It carries event data search engines read, and a social card. -->
 <script setup lang="ts">
 interface Image { url: string, alt: string, width: number | null, height: number | null }
 interface Note { termId: string, label: string, detail: string | null }
@@ -18,6 +19,8 @@ interface Performance {
   space: { id: string, name: string }
   access: Note[]
   effectsOff: string[]
+  /** Absent from an answer cached before latecomers were added. */
+  latecomers?: string
   booking: Booking | null
 }
 interface VenueSummary {
@@ -46,6 +49,8 @@ interface Production {
   contentNote: string | null
   runningMinutes: number | null
   intervalCount: number
+  /** When latecomers are let in to this show; a date with no interval may differ. Absent from an older cached answer. */
+  latecomers?: string
   state: 'published' | 'cancelled'
   past: boolean
   credits: { id: string, creditedName: string, role: string, section: string }[]
@@ -100,6 +105,8 @@ const only = computed(() => (dates.value.length === 1 && dates.value[0]!.state =
 // The dates and tickets panel: beside the story from lg, sticky; on a phone, after the guidance, with
 // a button by the title that jumps to it.
 const hasPanel = computed(() => !!production.value && (dates.value.length > 0 || !production.value.past || (production.value.venues?.length ?? 0) > 0))
+// A date says when latecomers are let in only where it differs from the show (one with no interval).
+const differs = (p: Performance) => !!p.latecomers && p.state === 'scheduled' && p.latecomers !== production.value?.latecomers
 const where = (p: Performance) => venues.value.length > 1 || p.space.name !== p.venue.name ? `${p.space.name}, ${p.venue.name}` : ''
 const credits = computed(() => {
   const sections = new Map<string, { section: string, people: { id: string, creditedName: string, role: string }[] }>()
@@ -393,6 +400,12 @@ useHead(() => {
               >
                 {{ priceSummary(production.price, t) }}
               </p>
+              <LatecomersNote
+                v-if="production.latecomers && !production.past"
+                :rule="production.latecomers"
+                rules
+                class="mb-2"
+              />
               <ul class="divide-y divide-default border-y border-default">
                 <li
                   v-for="p in dates"
@@ -416,6 +429,10 @@ useHead(() => {
                     >
                       {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
                     </p>
+                    <LatecomersNote
+                      v-if="differs(p)"
+                      :rule="p.latecomers!"
+                    />
                     <ul
                       v-if="p.access.length"
                       class="flex flex-wrap gap-1"

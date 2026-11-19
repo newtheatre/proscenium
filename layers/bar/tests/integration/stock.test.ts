@@ -21,7 +21,7 @@ import recipeGet from '../../server/api/bar/variants/[id]/recipe.get'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addProduct, addVariant, updateOutlet } from '../../server/catalogue'
 import { addGroup, addOption, setMixer, setProductGroups } from '../../server/choices'
-import { moveForSale } from '../../server/stock'
+import { moveForSale, returnForRefund } from '../../server/stock'
 
 const NOW = Date.UTC(2026, 10, 17, 23) // not-policy: a test's moment
 const handle = server({
@@ -181,7 +181,7 @@ describe('selling moves stock', () => {
     expect(await rows('SELECT count(*) AS n FROM bar_stock_movements')).toEqual(before)
   })
 
-  it('puts back what a refund hands back, in proportion, and nothing for a refund wasted', async () => {
+  it('puts back what a refund hands back, in proportion, and writes off what a refund wasted', async () => {
     const lines = (await send('GET', `/api/bar/sales/${reference}`)).body.sale.lines as { id: string, label: string }[]
     const reason = (await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'bar.refund-reason' AND slug = 'faulty'"))[0]!.id
     const double = lines.find(l => l.label.startsWith('Stock G and T, Double'))!.id
@@ -192,6 +192,15 @@ describe('selling moves stock', () => {
     const wasted = await send('POST', `/api/bar/sales/${reference}/refund`, { reasonTermId: reason, stockOutcome: 'wasted', lines: [{ lineId: pint, quantity: 1 }], expectedTotalMinor: 500 })
     await commit(unit => confirmRefund(unit.view(), wasted.body.refundId, manager.accountId!))
     expect(await levels()).toMatchObject({ 'Stock premium gin @ Stock bar': -50, 'Stock tonic can @ Stock bar': -1, 'Stock cider keg @ Stock bar': -(2 * 568 + 284) })
+    // The wasted pint comes back as a reversal and goes out again as wastage, with the refund's reason.
+    const moves = await rows<{ kind: string, quantity: number, reason_term: string | null }>(
+      `SELECT m.kind, m.quantity, m.reason_term FROM bar_stock_movements m JOIN bar_sale_reversals r ON r.id = m.source_id
+        WHERE m.source_type = 'bar.sale-reversal' AND r.refund_id = ? ORDER BY m.kind`, wasted.body.refundId,
+    )
+    expect(moves).toEqual([{ kind: 'sale_reversal', quantity: 568, reason_term: null }, { kind: 'wastage', quantity: -568, reason_term: reason }])
+    // Confirming again moves nothing more.
+    await commit(unit => returnForRefund(unit.view(), wasted.body.refundId))
+    expect(await rows('SELECT 1 FROM bar_stock_movements WHERE source_type = ? AND source_id IN (SELECT id FROM bar_sale_reversals WHERE refund_id = ?)', 'bar.sale-reversal', wasted.body.refundId)).toHaveLength(2)
   })
 
   it('moves no stock from an outlet with no location', async () => {

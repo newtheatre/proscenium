@@ -57,8 +57,8 @@ export async function retryAfter(): Promise<number> {
   return await useSetting('maintenance.search.retry-after') as number
 }
 
-/** The holding page as a whole document. */
-export async function noticePage(): Promise<string> {
+/** The holding page as a whole document. `setup`: the site has no Owner yet, so point the installer to setup. */
+export async function noticePage(options: { setup?: boolean } = {}): Promise<string> {
   const notice = await currentNotice()
   const brand = await getBrand()
   const light = brand.tokens.light
@@ -96,6 +96,7 @@ export async function noticePage(): Promise<string> {
     <p>${escape(words(contact.length ? 'maintenance.notice.contact' : 'maintenance.notice.contact-no-details'))}</p>
     ${contact.length ? `<ul>${contact.join('')}</ul>` : ''}
   </section>
+  ${options.setup ? `<p class="soft thanks">${escape(words('maintenance.notice.setup'))} <a href="/setup">${escape(words('maintenance.notice.setup-action'))}</a></p>` : ''}
   <p class="soft thanks">${escape(words('maintenance.notice.thanks'))}</p>
 </main>
 </body>

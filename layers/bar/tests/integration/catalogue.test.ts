@@ -1,5 +1,5 @@
 // The bar's catalogue (BAR-01 to BAR-04; tests T-I1 to T-I3): categories, products and sizes, prices
-// that are never edited, price lists by hand or as a percentage off Standard, and outlets with one
+// that are never edited, price lists priced by hand, and outlets with one
 // desk at most. Standard is made when the bar is switched on.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, newId, setClock } from '#kit'
@@ -74,7 +74,8 @@ describe('the catalogue', () => {
     expect(await rows("SELECT name FROM bar_price_lists WHERE system_key = 'standard'")).toEqual([{ name: 'Standard' }])
     const id = await standard()
     expect((await bar('PATCH', `/api/bar/price-lists/${id}`, { active: false })).body.code).toBe('bar.price-list.standard')
-    expect((await bar('PATCH', `/api/bar/price-lists/${id}`, { percentOff: 10 })).body.code).toBe('bar.price-list.standard')
+    // A percentage off is a promotion: a list has no such field.
+    expect((await bar('PATCH', `/api/bar/price-lists/${id}`, { percentOff: 10 })).status).toBe(422)
   })
 
   it('adds categories, products with a first size, and more sizes; names are unique where they should be', async () => {
@@ -137,27 +138,27 @@ describe('prices and price lists', () => {
     setClock(NOW)
   })
 
-  it('prices a hand-priced list, falling back to Standard, and a percentage list from Standard', async () => {
+  it('prices a hand-priced list, falling back to Standard, and one that does not fall back', async () => {
     const { categoryId } = ok(await bar('POST', '/api/bar/categories', { name: 'Cider' }))
     const cider = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'Cider', variantName: 'Pint', amountMinor: 450 }))
     const staff = ok(await bar('POST', '/api/bar/price-lists', { name: 'Staff', restricted: true })).priceListId
-    const committee = ok(await bar('POST', '/api/bar/price-lists', { name: 'Committee', percentOff: 25 })).priceListId
+    const committee = ok(await bar('POST', '/api/bar/price-lists', { name: 'Committee', fallsBack: false })).priceListId
+    expect((await bar('POST', '/api/bar/price-lists', { name: 'Half', percentOff: 50 })).status).toBe(422)
     expect((await bar('POST', '/api/bar/price-lists', { name: 'staff' })).body.code).toBe('bar.name-taken')
 
     const prices = async () => {
       const lists = ok(await bar('GET', '/api/bar/price-lists')).categories.flatMap((c: any) => c.products).find((p: any) => p.id === cider.productId).variants[0].prices
       return Object.fromEntries(lists.filter((p: any) => [staff, committee].includes(p.listId)).map((p: any) => [p.listId === staff ? 'staff' : 'committee', [p.amountMinor, p.from]]))
     }
-    expect(await prices()).toEqual({ staff: [450, 'standard'], committee: [338, 'percent'] })
+    expect(await prices()).toEqual({ staff: [450, 'standard'], committee: [null, null] })
     ok(await bar('POST', '/api/bar/prices', { variantId: cider.variantId, priceListId: staff, amountMinor: 300 }))
     ok(await bar('POST', '/api/bar/prices', { variantId: cider.variantId, priceListId: null, amountMinor: 500 }))
-    expect(await prices()).toEqual({ staff: [300, 'list'], committee: [375, 'percent'] })
+    expect(await prices()).toEqual({ staff: [300, 'list'], committee: [null, null] })
 
-    expect((await bar('POST', '/api/bar/prices', { variantId: cider.variantId, priceListId: committee, amountMinor: 100 })).body.code).toBe('bar.price.not-settable')
-    expect((await bar('PATCH', `/api/bar/price-lists/${staff}`, { percentOff: 10 })).body.code).toBe('bar.price-list.has-prices')
+    ok(await bar('POST', '/api/bar/prices', { variantId: cider.variantId, priceListId: committee, amountMinor: 400 }))
     // Withdrawn on Staff: it sells at Standard's price again.
     ok(await bar('POST', '/api/bar/prices', { variantId: cider.variantId, priceListId: staff, amountMinor: null }))
-    expect(await prices()).toEqual({ staff: [500, 'standard'], committee: [375, 'percent'] })
+    expect(await prices()).toEqual({ staff: [500, 'standard'], committee: [400, 'list'] })
   })
 })
 

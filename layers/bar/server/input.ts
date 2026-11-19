@@ -40,8 +40,7 @@ export const priceInput = z.object({
   effectiveFrom: z.number().int().positive().optional(),
 }).strict()
 
-const percent = z.number().int().min(1).max(100) // not-policy: a percentage
-export const priceListInput = z.object({ name, restricted: z.boolean().optional(), fallsBack: z.boolean().optional(), percentOff: percent.nullable().optional() }).strict()
+export const priceListInput = z.object({ name, restricted: z.boolean().optional(), fallsBack: z.boolean().optional() }).strict()
 export const priceListPatch = priceListInput.partial().extend({ active: z.boolean().optional() }).strict()
 
 export const outletInput = z.object({ name, kind: z.enum(OUTLET_KINDS), priceListId: id.nullable().optional(), spaceId: id.nullable().optional(), stockLocationId: id.nullable().optional(), tillLayout: z.enum(TILL_LAYOUTS).optional() }).strict()

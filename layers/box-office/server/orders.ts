@@ -1,7 +1,7 @@
 // What the order services share: the order and its live ticket lines as they are read, and the
 // words a message uses for them.
 import { all, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
-import { getPerformance, getProduction, getVenue, placeOf } from '#modules/core'
+import { getPerformance, getProduction, getVenue, latecomersAt, placeOf } from '#modules/core'
 import { lineKey, unnamedLines } from './line-names'
 import catalogue from '../i18n/en-GB.json'
 import { HIDDEN_TYPE } from './ticket-types'
@@ -71,7 +71,7 @@ export async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow
  * What a booking confirmation says about coming to the performance: where it is, with the address,
  * when the doors open, and the venue's and space's access information (or where to ask about it).
  */
-export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors: string, access: string }> {
+export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors: string, access: string, latecomers: string }> {
   const performance = await getPerformance(lines[0]!.performance_id)
   const venue = await getVenue(performance.venueId)
   const space = venue.spaces.find(s => s.id === performance.spaceId)
@@ -84,5 +84,6 @@ export async function visitFor(lines: LineRow[]): Promise<{ where: string, doors
     where: address ? `${place}, ${address}` : place,
     doors: new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(performance.doorsAt ?? performance.startsAt),
     access: notes.length ? say('box-office.visit.access', { notes: notes.join(' ') }) : say('box-office.visit.ask'),
+    latecomers: say(`box-office.visit.latecomers.${await latecomersAt(performance.id)}`),
   }
 }

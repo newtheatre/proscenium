@@ -136,9 +136,9 @@ describe('a restricted price list', () => {
     await commit(unit => openSession(unit.view(), { accountId: committee.accountId!, pointLabel: 'Bar', floatMinor: 0 }))
     const outlet = await commit(async (unit) => {
       const v = unit.view()
-      return addOutlet(v, { name: 'Committee bar', kind: 'bar', priceListId: addPriceList(v, { name: 'Committee', restricted: true, percentOff: 25 }) })
+      return addOutlet(v, { name: 'Committee bar', kind: 'bar', priceListId: addPriceList(v, { name: 'Committee', restricted: true }) })
     })
-    const input = (key: string) => ({ outletId: outlet, clientKey: key, lines: [{ variantId: stock.crisps, quantity: 1 }], expectedTotalMinor: 90 })
+    const input = (key: string) => ({ outletId: outlet, clientKey: key, lines: [{ variantId: stock.crisps, quantity: 1 }], expectedTotalMinor: 120 })
     expect((await till(input('committee-1-xxxx'))).status).toBe(403)
     const allowed = await till(input('committee-2-xxxx'), committee)
     expect(allowed.status, JSON.stringify(allowed.body)).toBe(200)
