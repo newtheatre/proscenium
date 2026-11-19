@@ -371,5 +371,7 @@
   "payments.screens.home-card.refunds-action": "Review refunds",
   "payments.screens.home-card.attention.one": "{count} payment needs attention",
   "payments.screens.home-card.attention.other": "{count} payments need attention",
-  "payments.screens.home-card.attention-action": "Open Needs attention"
+  "payments.screens.home-card.attention-action": "Open Needs attention",
+  "payments.quick-actions.sell.label": "Sell",
+  "payments.quick-actions.sell.keywords": "Till, tickets, bar, take payment"
 }
