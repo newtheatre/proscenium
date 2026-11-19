@@ -5,7 +5,7 @@
 // it is released, and the sale is open again with its lines kept, to pay another way or change.
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSetting, type UnitView } from '#kit'
-import type { DeskContext } from '#modules/payments'
+import { redeemSale, type DeskContext, type PricedSale, type PricingItem } from '#modules/payments'
 import { ageCheckSettings, recordSaleCheck } from './age-checks'
 import { priceLists, pricesFor } from './catalogue'
 import { choiceGroups, groupsByProduct, pickInput, priceGroups, resolvePicks, type Picked } from './choices'
@@ -43,7 +43,7 @@ function parse(value: unknown): PanelInput {
 }
 
 interface Outlet { id: string, name: string, price_list_id: string }
-interface Priced { variantId: string, quantity: number, label: string, unitMinor: number, amountMinor: number, priceId: string, categoryId: string, ageRestricted: boolean, choices: Picked[] }
+interface Priced { variantId: string, quantity: number, label: string, unitMinor: number, amountMinor: number, priceId: string, categoryId: string, parentCategoryId: string | null, productId: string, ageRestricted: boolean, choices: Picked[] }
 
 async function outletFor(id: string): Promise<Outlet> {
   const outlet = await first<Outlet>('SELECT id, name, price_list_id FROM bar_outlets WHERE id = ? AND active = 1', id)
@@ -68,8 +68,8 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
     else merged.set(key, { variantId: l.variantId, quantity: l.quantity, choices: l.choices })
   }
   const ids = [...new Set([...merged.values()].map(m => m.variantId))]
-  const named = await all<{ id: string, variant: string, product: string, product_id: string, category_id: string, age_restricted: number, sizes: number }>(
-    `SELECT v.id, v.name AS variant, p.name AS product, p.id AS product_id, p.category_id, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted,
+  const named = await all<{ id: string, variant: string, product: string, product_id: string, category_id: string, parent_category_id: string | null, age_restricted: number, sizes: number }>(
+    `SELECT v.id, v.name AS variant, p.name AS product, p.id AS product_id, p.category_id, c.parent_id AS parent_category_id, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted,
             (SELECT count(*) FROM bar_variants w WHERE w.product_id = p.id AND w.active = 1 AND w.mixer_measure = 0) AS sizes
        FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
       WHERE v.id IN (SELECT value FROM json_each(?)) AND v.active = 1 AND v.mixer_measure = 0 AND p.active = 1 AND c.active = 1`,
@@ -101,7 +101,7 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
     const unitMinor = percent !== null ? lessPercent(before, percent) : before
     const label = choices.length ? `${sized} · ${choices.map(c => c.label).join(', ')}` : sized
     return {
-      variantId: m.variantId, quantity: m.quantity, label, unitMinor, amountMinor: unitMinor * m.quantity, priceId: price!.priceId, categoryId: n!.category_id,
+      variantId: m.variantId, quantity: m.quantity, label, unitMinor, amountMinor: unitMinor * m.quantity, priceId: price!.priceId, categoryId: n!.category_id, parentCategoryId: n!.parent_category_id, productId: n!.product_id,
       // The line needs the age check when the product does, or anything picked on it does.
       ageRestricted: !!n!.age_restricted || choices.some(c => c.ageRestricted),
       choices,
@@ -110,11 +110,37 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
   return { outlet, priceListId, lines, totalMinor: lines.reduce((s, l) => s + l.amountMinor, 0) }
 }
 
-/** The panel's lines, for the till to show. Reads only. */
-export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number, quantity: number, item: string }[], amountMinor: number }> {
-  const { lines, totalMinor } = await priced(parse(context.input))
-  return { lines: lines.map(l => ({ label: l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label, amountMinor: l.amountMinor, quantity: l.quantity, item: l.label })), amountMinor: totalMinor }
+/** What comes off each line of the sale as the till priced it with its other panels (payments.pricing), in the lines' order. */
+const discountsOf = (lines: readonly Priced[], sale: PricedSale | undefined): number[] => {
+  const byKey = new Map((sale?.items ?? []).map(i => [i.key, i.discountMinor]))
+  return lines.map((l, i) => Math.min(byKey.get(String(i)) ?? 0, l.amountMinor))
 }
+
+/**
+ * The basket's lines as items for the till to price with the rest of the sale, one per line at its
+ * unit price, with what a promotion may be narrowed by (contributions/promotions.target/item.ts).
+ * A list other than Standard is already a lower price for who the customer is. Reads only.
+ */
+export async function deskItems(context: Pick<DeskContext, 'input'>): Promise<PricingItem[]> {
+  const input = parse(context.input)
+  const { outlet, priceListId, lines } = await priced(input)
+  const reduced = !(await priceLists()).find(l => l.id === priceListId)?.standard
+  return lines.map((l, i) => ({
+    key: String(i), kind: ITEM_KIND, listMinor: l.unitMinor, quantity: l.quantity, reduced,
+    facts: { categoryId: l.categoryId, parentCategoryId: l.parentCategoryId, productId: l.productId, variantId: l.variantId, outletId: outlet.id },
+  }))
+}
+
+/** The panel's lines, for the till to show, less any saving the till priced on them. Reads only. */
+export async function deskSummary(context: Pick<DeskContext, 'input' | 'priced'>): Promise<{ lines: { label: string, amountMinor: number, quantity: number, item: string }[], amountMinor: number }> {
+  const { lines } = await priced(parse(context.input))
+  const discounts = discountsOf(lines, context.priced)
+  const shown = lines.map((l, i) => ({ label: l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label, amountMinor: l.amountMinor - discounts[i]!, quantity: l.quantity, item: l.label }))
+  return { lines: shown, amountMinor: shown.reduce((s, l) => s + l.amountMinor, 0) }
+}
+
+/** Promotions' name for the bar's products (contributions/promotions.target/item.ts). */
+const ITEM_KIND = 'bar.item'
 
 const SALE_GONE = { code: 'bar.sale.not-open', reason: 'This bar sale is already being paid for, or has finished.', remedy: 'Start a new sale.' }
 
@@ -127,12 +153,15 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   const input = parse(context.input)
   const { actor } = useContext()
   await requireAbility(actor, 'bar.sale.sell', ['bar.outlet', input.outletId])
-  const { outlet, priceListId, lines, totalMinor } = await priced(input)
+  const { outlet, priceListId, lines, totalMinor: listMinor } = await priced(input)
   // A restricted list (committee prices) is sold from only by someone allowed to.
   const list = (await priceLists()).find(l => l.id === priceListId)
   if (list?.restricted) await requireAbility(actor, 'bar.sale.use-restricted-price-list', ['bar.outlet', input.outletId])
-  if (totalMinor !== input.expectedTotalMinor)
-    refuse('bar.sale.total-changed', `The total is ${totalMinor} now, not ${input.expectedTotalMinor}.`, { status: 409, remedy: 'Check the basket and take payment again.' })
+  // The panel knows its lines at their prices; what the till took off them is the till's to show.
+  if (listMinor !== input.expectedTotalMinor)
+    refuse('bar.sale.total-changed', `The total is ${listMinor} now, not ${input.expectedTotalMinor}.`, { status: 409, remedy: 'Check the basket and take payment again.' })
+  const discounts = discountsOf(lines, context.priced)
+  const totalMinor = listMinor - discounts.reduce((s, d) => s + d, 0)
   if (totalMinor <= 0) refuse('bar.sale.zero', 'There is nothing to pay for in the bar basket.', { status: 422 })
   const restricted = lines.find(l => l.ageRestricted)
   const checks = await ageCheckSettings()
@@ -161,7 +190,14 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
       params: [saleId, await reference(), priceListId, await useSetting('core.locale.currency') as string, actor.accountId, input.clientKey, at, at, outlet.id],
     }).expect(1, SALE_GONE)
   }
-  const lineIds = unit.insertSet(saleLines, lines.map(l => ({ saleId, variantId: l.variantId, priceId: l.priceId, quantity: l.quantity, unitMinor: l.unitMinor, discountMinor: 0, amountMinor: l.amountMinor })))
+  // The line ids are made here so each saving can name its line before the lines are written.
+  const ids = lines.map(() => newId('bsln'))
+  const refs: Record<string, string> = {}
+  discounts.forEach((d, i) => {
+    if (d > 0) refs[String(i)] = ids[i]!
+  })
+  const kept = context.priced ? await redeemSale(unit, context.priced, { kind: ITEM_KIND, saleRef: saleId, refs }) : {}
+  const lineIds = unit.insertSet(saleLines, lines.map((l, i) => ({ id: ids[i]!, saleId, variantId: l.variantId, priceId: l.priceId, quantity: l.quantity, unitMinor: l.unitMinor, discountMinor: discounts[i]!, amountMinor: l.amountMinor - discounts[i]!, promotionRedemptionId: kept[String(i)] ?? null })))
   const picks = lines.flatMap((l, i) => l.choices.map(c => ({ saleLineId: lineIds[i]!, groupId: c.groupId, optionId: c.optionId, mixerVariantId: c.mixerVariantId, label: c.label, deltaMinor: c.deltaMinor })))
   if (picks.length) unit.insertSet(saleLineChoices, picks)
   unit.add({

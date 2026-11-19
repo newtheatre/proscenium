@@ -44,7 +44,7 @@ export { getProduction, productionBySlug, listSeasons } from './programme/servic
 export type { Production, ProductionState, Season } from './programme/service'
 export { addressFor, addressesFor } from './identity/addresses'
 export type { Side } from './identity/addresses'
-export { describeViewer } from './interface/viewer'
+export { describeViewer, holdsConsole, holdsAdmin, holdsLive } from './interface/viewer'
 export type { ViewerDescription } from './interface/viewer'
 export { standingOf, isMember } from './identity/standings'
 export type { Standing } from './identity/standings'
