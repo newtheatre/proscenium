@@ -53,6 +53,9 @@ export default defineRoute({
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
     complimentary: (await first<{ one: number }>('SELECT 1 AS one FROM box_office_order_lines WHERE order_id = ? AND comp_request_id IS NOT NULL LIMIT 1', id)) !== null,
     pass: await passOf(id),
+    // A request to make this reservation complimentary that is still waiting for a decision.
+    compNeedsApproval: await useSetting('box-office.comps.needs-approval') as boolean,
+    compPending: order.state === 'reserved' && (await first<{ one: number }>("SELECT 1 AS one FROM box_office_comp_requests WHERE order_id = ? AND state IN ('requested', 'approved') LIMIT 1", id)) !== null,
     lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: !!l.requirement_evidence_id?.startsWith('pending'), passEntry: !!l.pass_entry })),
     // The fee kept on each ticket when a cancellation is refunded less the fee, so the dialogue can show the refund.
     cancellationFeeMinor: await useSetting('box-office.cancellations.fee') as number,
@@ -67,6 +70,7 @@ export default defineRoute({
       cancel: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.cancel'),
       refund: order.state === 'confirmed' && await allowed('box-office.order.refund'),
       exchange: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.exchange'),
+      comp: order.state === 'reserved' && !!performanceId && (await can(actor, 'box-office.comp.request', ['core.performance', performanceId])).allowed,
     },
   }
 })

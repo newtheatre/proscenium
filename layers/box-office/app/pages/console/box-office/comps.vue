@@ -8,7 +8,7 @@ import { compsInput } from '../../../../server/input'
 definePageMeta({ layout: 'console' })
 
 type State = 'requested' | 'approved' | 'declined' | 'issued' | 'withdrawn'
-interface Request { id: string, state: State, quantity: number, show: string, startsAt: number, band: string, forName: string | null, reason: string, requestedBy: string | null, orderId: string | null }
+interface Request { id: string, state: State, quantity: number, show: string, startsAt: number, band: string, forName: string | null, reason: string, requestedBy: string | null, orderId: string | null, reservation: string | null }
 interface Offer { id: string, title: string, label: string | null, startsAt: number, bands: { id: string, name: string }[] }
 interface Comps { mine: Request[], waiting: Request[], decided: Request[], performances: Offer[], needsApproval: boolean }
 
@@ -53,7 +53,7 @@ watch(() => form.value.performanceId, () => {
   form.value.bandId = ANY
 })
 
-const describe = (r: Request) => [`${r.show}, ${dateTime(r.startsAt)}`, r.band, t('box-office.comps.for', { name: r.forName ?? t('box-office.orders.no-buyer') }), r.reason].join(', ')
+const describe = (r: Request) => [`${r.show}, ${dateTime(r.startsAt)}`, r.reservation ? t('box-office.comps.reservation', { reference: r.reservation }) : r.band, t('box-office.comps.for', { name: r.forName ?? t('box-office.orders.no-buyer') }), r.reason].join(', ')
 const nameOf = (r: Request) => t('box-office.comps.tickets', { count: r.quantity })
 // Requests withdrawn or declined fold away under a divider below the others.
 const closed = (r: Request) => r.state === 'withdrawn' || r.state === 'declined'
