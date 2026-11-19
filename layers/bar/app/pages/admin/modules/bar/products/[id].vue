@@ -4,10 +4,10 @@
 <script setup lang="ts">
 import { priceInput, productPatch, variantInput, variantPatch } from '../../../../../../server/input'
 
-interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
+interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | null, next: { amountMinor: number | null, from: number } | null }
 interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
 interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, active: boolean, groupIds: string[], variants: Variant[] }
-interface List { id: string, name: string, standard: boolean, percentOff: number | null }
+interface List { id: string, name: string, standard: boolean }
 
 const { t } = useT()
 const route = useRoute()
@@ -274,7 +274,6 @@ function shown(v: Variant, l: List): string {
   const p = priceOf(v, l)
   if (!p || p.amountMinor === null) return t('bar.screens.product.not-sold')
   if (p.from === 'standard') return t('bar.screens.product.follows-standard', { amount: money(p.amountMinor) })
-  if (p.from === 'percent') return t('bar.screens.product.percent', { amount: money(p.amountMinor), percent: l.percentOff! })
   return money(p.amountMinor)
 }
 function planned(v: Variant, l: List): string | null {
@@ -428,7 +427,7 @@ function planned(v: Variant, l: List): string | null {
               :description="[shown(v, l), planned(v, l)].filter(Boolean).join(' · ')"
             >
               <UButton
-                v-if="data.canPrice && l.percentOff === null"
+                v-if="data.canPrice"
                 color="neutral"
                 variant="outline"
                 size="sm"

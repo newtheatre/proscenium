@@ -1,12 +1,11 @@
 // The price rules (tab 3, "Price lists"; tests T-U1): the newest price in force wins, a list falls
-// back to Standard, a percentage list follows Standard with halves rounded up.
+// back to Standard. A percentage off is a promotion, not a list.
 import { describe, expect, it } from 'vitest'
-import { inForce, lessPercent, nextChange, priceOn, type PriceRow } from '../../server/pricing'
+import { inForce, nextChange, priceOn, type PriceRow } from '../../server/pricing'
 
-const std = { id: 'std', percentOff: null, fallsBack: true }
-const committee = { id: 'com', percentOff: 25, fallsBack: true }
-const staff = { id: 'stf', percentOff: null, fallsBack: true }
-const strict = { id: 'str', percentOff: null, fallsBack: false }
+const std = { id: 'std', fallsBack: true }
+const staff = { id: 'stf', fallsBack: true }
+const strict = { id: 'str', fallsBack: false }
 const row = (id: string, priceListId: string, amountMinor: number | null, effectiveFrom: number, variantId = 'pint'): PriceRow => ({ id, variantId, priceListId, amountMinor, effectiveFrom })
 
 describe('prices', () => {
@@ -17,13 +16,6 @@ describe('prices', () => {
     expect(inForce(rows, 'pint', 'std', 600)!.id).toBe('b')
     expect(inForce(rows, 'pint', 'std', 50)).toBeNull()
     expect(nextChange(rows, 'pint', 'std', 600)!.id).toBe('c')
-  })
-
-  it('works out a percentage list from Standard, rounding halves up', () => {
-    expect(lessPercent(450, 25)).toBe(338)
-    expect(lessPercent(230, 25)).toBe(173)
-    expect(lessPercent(100, 100)).toBe(0)
-    expect(priceOn(rows, 'pint', committee, 'std', 600)).toEqual({ amountMinor: 338, priceId: 'b', from: 'percent' })
   })
 
   it('falls back to Standard where a list has no price, or has withdrawn it', () => {

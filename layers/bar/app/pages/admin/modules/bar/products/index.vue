@@ -8,7 +8,7 @@ import { categoryInput } from '../../../../../../server/input'
 interface Variant { id: string, name: string, mixerMeasure: boolean, active: boolean, prices: { listId: string, amountMinor: number | null }[] }
 interface Product { id: string, name: string, ageRestricted: boolean, active: boolean, variants: Variant[] }
 interface Category { id: string, name: string, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
-interface List { id: string, name: string, standard: boolean, percentOff: number | null, active: boolean }
+interface List { id: string, name: string, standard: boolean, active: boolean }
 type Section = Category & { title: string }
 
 const { t } = useT()
