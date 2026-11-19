@@ -96,6 +96,8 @@ describe('a reservation on an unpaid pass', () => {
     expect(await told('box-office.order-reserved', first.body.orderId)).toHaveLength(1)
 
     // The next booking on the pass owes nothing more: the first carries the pass's money.
+    const found = await req('GET', `/api/box-office/desk/pass?performanceId=${second.performanceId}&code=${pass.code}`, undefined, seller)
+    expect(found.body).toMatchObject({ owedMinor: 0, unusable: null })
     const next = await reserve({ sale: { performanceId: second.performanceId, lines: [], passes: [{ code: pass.code }] }, expectedTotalMinor: 0 })
     expect(next.status, JSON.stringify(next.body)).toBe(200)
     expect(next.body.state).toBe('confirmed')
