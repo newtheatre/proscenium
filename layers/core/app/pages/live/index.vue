@@ -1,19 +1,24 @@
 <!-- The Tonight hub: tonight's performances, each with its start time and the figures other modules
-     give for it (core.tonight-figure: sold, in, taken at the tills), then the live screens this
+     give for it (core.tonight-figure), read again while the hub is open, then the live screens this
      person may open, one large tile each. Each performance says when latecomers are let in. The tiles are the live menu's entries (core.navigation with
      menu 'live'), so a module that brings live screens adds its own tile and nothing here names a
      module. Performances are those of the operating day, so a late show stays past midnight. -->
 <script setup lang="ts">
+import { useIntervalFn } from '@vueuse/core'
+
 interface Figure { id: string, label: string, value: string | number | null, state: 'ok' | 'attention' | 'unavailable', unit?: string, to?: string }
 interface Performance { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers?: string, figures: Figure[] }
 
 const CURRENCY = /^[A-Z]{3}$/ // not-policy: the shape of an ISO 4217 code
+const REFRESH = 30_000 // not-policy: how often the figures are read again
 
 const { t, te } = useT()
 const { time } = useDates()
 const { data: navigation } = await useNavigation('live')
 const tiles = computed(() => navigation.value?.items ?? [])
-const { data: tonight } = await useAPI<{ performances: Performance[] }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [] }) })
+const { data: tonight, refresh } = await useAPI<{ performances: Performance[] }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [] }) })
+// The figures move all night (sold, in, still to come), so the hub reads them again while open.
+useIntervalFn(() => { void refresh() }, REFRESH)
 const performances = computed(() => tonight.value?.performances ?? [])
 
 // A label is translated when the catalogue has it; a value whose unit is a currency is money in minor units.

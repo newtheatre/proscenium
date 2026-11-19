@@ -1,6 +1,6 @@
 <!-- Orders (Box office specification, part 6): every order past the basket, newest first. Reserved
-     and paid orders are the default view; search finds a booking reference or a buyer by name or
-     address. Each row opens the order. -->
+     and paid orders are the default view; filters narrow to a show or one performance, and search
+     finds a booking reference or a buyer by name or address. Each row opens the order. -->
 <script setup lang="ts">
 import { ordersList } from '../../../../../shared/lists'
 
@@ -17,6 +17,8 @@ const list = computed(() => ({
   filters: {
     state: { ...ordersList.filters.state, label: t('box-office.orders.column.state'), options: ordersList.filters.state.options.map(o => ({ value: o.value, label: t(`box-office.orders.state.${o.value}`) })) },
     channel: { ...ordersList.filters.channel, label: t('box-office.orders.filter.channel'), options: ordersList.filters.channel.options.map(o => ({ value: o.value, label: t(`box-office.orders.channel.${o.value}`) })) },
+    show: { ...ordersList.filters.show, label: t('box-office.orders.filter.show') },
+    performance: { ...ordersList.filters.performance, label: t('box-office.orders.filter.performance') },
   },
   sorts: { created: { ...ordersList.sorts.created, label: t('box-office.orders.column.created') } },
   columns: Object.fromEntries(Object.entries(ordersList.columns).map(([key, c]) => [key, { ...c, label: t(`box-office.orders.column.${key}`) }])),
