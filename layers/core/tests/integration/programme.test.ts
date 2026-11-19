@@ -154,6 +154,15 @@ describe('productions', () => {
     expect(JSON.parse(event!.payload)).toEqual({ productionId: id, fields: ['subtitle'] })
   })
 
+  it('announce a change to the latecomer rule, interval length or doors time of a published production', async () => {
+    const id = await production()
+    await ready(id)
+    await req('POST', `/api/core/productions/${id}/publish`)
+    expect((await req('PATCH', `/api/core/productions/${id}`, { latecomers: 'interval', intervalMinutes: 20, doorsBeforeMinutes: 45 })).status).toBe(200)
+    const [event] = await rows<{ payload: string }>('SELECT payload FROM core_events WHERE name = ? AND record_id = ?', 'core.production.updated', id)
+    expect(JSON.parse(event!.payload).fields).toEqual(expect.arrayContaining(['latecomers', 'intervalMinutes', 'doorsBeforeMinutes']))
+  })
+
   it('keep an old web address once public, and never give it to another production', async () => {
     const id = await production({ title: 'Hamlet' })
     // A draft's address was never public, so changing it leaves nothing behind.
