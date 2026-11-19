@@ -8,11 +8,13 @@ import { fileURLToPath } from 'node:url'
 const r = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
 /** The theatre's Worker name, from its wrangler.jsonc. Queue names follow from it. */
-function workerName(): string {
+function workerConfig(): { name: string, workers_dev?: boolean, preview_urls?: boolean } {
   const text = readFileSync(r('./wrangler.jsonc'), 'utf8').replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
-  return (JSON.parse(text) as { name: string }).name
+  return JSON.parse(text)
 }
-const name = workerName()
+// NNT branch only: wrangler.jsonc may also switch off the workers.dev address and preview URLs, which
+// every deploy otherwise turns back on (first-run setup would be open there).
+const { name, workers_dev, preview_urls } = workerConfig()
 // The two job lanes, and the queue Cloudflare Email Sending reports outcomes to (EMAIL_EVENTS).
 const queue = { prompt: `${name}-prompt`, bulk: `${name}-bulk`, emailEvents: `${name}-email-events` }
 const theatreLayers = existsSync(r('./site/layers'))
@@ -50,6 +52,8 @@ export default defineNuxtConfig({
       nodeCompat: true,
       wrangler: {
         compatibility_date: COMPATIBILITY_DATE,
+        ...(workers_dev === undefined ? {} : { workers_dev }),
+        ...(preview_urls === undefined ? {} : { preview_urls }),
         observability: { enabled: true },
         d1_databases: [{ binding: 'DB' }],
         r2_buckets: [{ binding: 'FILES' }],
