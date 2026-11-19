@@ -10,7 +10,7 @@ import { brandTokens } from '../brand/theme'
 import { DOMAIN_CODES, MailError, useMailer } from './mailer'
 import { hasLink, linkPath, render, type VariableKind } from './render'
 import { sendingDomain, senderFor, theatreName } from './send'
-import { declaredType } from './notify'
+import { declaredType, SEND_TO } from './notify'
 import { suppressedAddresses } from './suppression'
 
 interface DueRow {
@@ -121,10 +121,12 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
     }
     const attempt = row.attempts + 1
     const found = declaredType(row.type_key)
-    const address = addressOf(row)
+    const { [SEND_TO]: sendTo, ...opened } = row.sealed_variables ? JSON.parse((await openSpecial(row.sealed_variables))!) as Record<string, string> : {}
+    const address = sendTo ?? addressOf(row)
     // A cleared notification cannot be re-sent: the caller issues a new one.
     const cleared = row.payload === null || (!!found && Object.values(found.type.variables).includes('sealed') && row.sealed_variables === null)
-    if (!found || !address || suppressed.has(address.toLowerCase()) || cleared) {
+    const blocked = !!address && (suppressed.has(address.toLowerCase()) || (!!sendTo && (await suppressedAddresses([sendTo])).size > 0))
+    if (!found || !address || blocked || cleared) {
       const reason = !found ? 'unknown_type' : !address ? 'no_address' : cleared ? 'erased' : 'suppressed_address'
       await (await settle(row.id, { state: 'skipped', reason })).commit()
       counts.skipped++
@@ -132,7 +134,7 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
     }
     const { type } = found
     const wording = type.wording[row.locale] ?? type.wording['en-GB']!
-    const values = { ...JSON.parse(row.payload!), ...(row.sealed_variables ? JSON.parse((await openSpecial(row.sealed_variables))!) : {}) }
+    const values = { ...JSON.parse(row.payload!), ...opened }
     const locale = type.wording[row.locale] ? row.locale : 'en-GB'
     const action = await actionFor(type, wording, locale, values)
     const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, theatre, footer, action })

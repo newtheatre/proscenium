@@ -124,6 +124,18 @@ describe('notify', () => {
     }
   })
 
+  it('writes to the address given for one recipient, sealed, over the account\'s usual one', async () => {
+    const to = await account('usual@example.org')
+    const { ids } = await send('notify.receipt', { to: [{ accountId: to, address: 'booked-with@example.org' }], variables: { order: 'C3' } })
+    const [row] = await rows<{ payload: string, sealed_variables: string | null }>('SELECT payload, sealed_variables FROM core_notifications WHERE id = ?', ids[0])
+    expect(row!.payload).not.toContain('booked-with')
+    expect(row!.sealed_variables).toMatch(/^v1\./)
+    await deliver()
+    expect(mails.map(m => m.to)).toEqual(['booked-with@example.org'])
+    expect(mails[0]!.text).not.toContain('@to')
+    expect((await rows<{ sealed_variables: string | null }>('SELECT sealed_variables FROM core_notifications WHERE id = ?', ids[0]))[0]!.sealed_variables).toBeNull()
+  })
+
   it('keeps a sealed variable encrypted in its own column, sends it by email only and clears it once sent', async () => {
     const to = await account('invitee@example.org')
     const link = 'https://theatre.example.org/invite#k3y-that-signs-in'
