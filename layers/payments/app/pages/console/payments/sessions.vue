@@ -25,7 +25,8 @@ const { dateTime: when, brief } = useDates()
 const { data: yours, refresh: refreshYours } = await useAPI<YourSession>('/api/payments/session', { key: 'payments:session' })
 // The seller's other devices sell into the same session, so Your session asks again while shown.
 const visibility = useDocumentVisibility()
-useIntervalFn(() => { if (visibility.value === 'visible') void refreshYours() }, 15_000) // not-policy: how often Your session asks again
+const { connected: told } = useRealtime('payments.session', () => { void refreshYours() })
+useIntervalFn(() => { if (visibility.value === 'visible' && !told.value) void refreshYours() }, 15_000) // not-policy: how often Your session asks again without news
 const mayViewAll = computed(() => !!yours.value?.mayViewAll)
 const { data: recent, refresh: refreshRecent } = await useAPI<{ sessions: Row[] }>('/api/payments/sessions/recent', { key: 'payments:sessions-recent', default: () => ({ sessions: [] }), immediate: mayViewAll.value })
 const tillName = (r: Row) => [r.place ?? t('payments.screens.session.unknown-place'), r.pointLabel].filter(Boolean).join(' · ')

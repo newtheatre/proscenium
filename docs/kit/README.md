@@ -401,6 +401,29 @@ key, then records the outcome and applies it through the module's `outcome` hand
 throws or times out leaves the attempt with no outcome; the `reconcile` handler asks the provider
 later. Nothing is shown as done before its outcome commits.
 
+## Realtime
+
+News pushed to open pages over a WebSocket, so two devices stay in step without asking
+(`#kit/realtime`, modelled on Mailflare's RealtimeHub). It is a hint to read again, never the
+record: every page that listens must still be right, only slower, without it.
+
+- **Rooms.** A room is one `RealtimeHub` Durable Object (binding `REALTIME`, exported from
+  `layers/core/server/entry.ts`). Every account has its own, `accountRoom(accountId)`, which each
+  of its devices joins. Sockets hibernate, so a quiet room costs nothing.
+- **Tickets.** A page posts to `/api/core/realtime/ticket` for a ticket: a claim to one room,
+  signed with `CORE_SESSION_KEY` and good for a minute. It opens `/api/realtime?ticket=...`; the
+  Worker's entry checks the ticket and hands the socket to the room. Nitro is not involved, since
+  it cannot pass a socket back.
+- **Publishing.** `publish(room, channel, data?)` after the commit (`unit.afterCommit`). It never
+  throws. Payments' `sessionChanged(unit, sessionId)` is the pattern: it tells the seller's room
+  that `payments.session` changed, and the till reads its session again.
+- **Listening.** `useRealtime(channel, on)` in a component: one socket for the page, shared by
+  every listener, with a heartbeat and reconnection. `on` is called with the news, or with `null`
+  when the socket comes back after a gap. `connected` says whether news is arriving, so a page
+  that polls can stop while it is and carry on by itself when it is not.
+- **Without the binding** (`nuxt dev`) the ticket route answers `available: false` and pages keep
+  to their own reads.
+
 ## Signing
 
 A module that issues codes a device must check with no connection (door codes, membership cards)

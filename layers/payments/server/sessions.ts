@@ -12,6 +12,7 @@
 // stops instead and awaits its count, which no longer stops the seller opening the next.
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
+import { accountRoom, publish } from '#kit/realtime'
 import { getSpace, listSpaces, placeName } from '#modules/core'
 import { postEntries } from '#modules/finance'
 import { labelsOf } from './people'
@@ -22,6 +23,15 @@ export interface SessionRow { id: string, point_label: string, space_id: string 
 
 export async function getSession(id: string): Promise<SessionRow | null> {
   return first<SessionRow>('SELECT * FROM payments_sessions WHERE id = ?', id)
+}
+
+/** Once the unit commits, tells the seller's open tills that the session, or a sale in it, changed. */
+export function sessionChanged(unit: UnitView, sessionId: string | null | undefined, openedBy?: string): void {
+  if (!sessionId) return
+  unit.afterCommit(async () => {
+    const seller = openedBy ?? (await getSession(sessionId))?.opened_by
+    if (seller) await publish(accountRoom(seller), 'payments.session')
+  })
 }
 
 /** The person's open session, the one their sales go into, if they have one. */
@@ -90,6 +100,7 @@ export async function openSession(unit: UnitView, input: { accountId: string, sp
       )`,
     params: [id, input.pointLabel?.trim() ?? '', spaceId, input.accountId, at, float, currency, at, at, input.accountId],
   }).expect(1, { code: 'payments.session.already-open', reason: 'You already have a till session open.' })
+  sessionChanged(unit, id, input.accountId)
   return id
 }
 
@@ -111,6 +122,7 @@ export async function placeSession(unit: UnitView, session: SessionRow, input: {
     sql: 'UPDATE payments_sessions SET space_id = ?, point_label = ?, float_minor = ?, updated_at = ? WHERE id = ? AND state = ?',
     params: [spaceId, note, float, nowMs(), session.id, session.state],
   }).expect(1, { code: 'payments.session.changed', reason: 'This session changed while you were looking at it.' })
+  sessionChanged(unit, session.id, session.opened_by)
 }
 
 /** Stops new payments and works out the cash expected. Refused while a payment in it has no answer. */
@@ -122,6 +134,7 @@ export async function startCount(unit: UnitView, session: SessionRow): Promise<n
       AND NOT EXISTS (SELECT 1 FROM payments_attempts a JOIN payments_intents i ON i.id = a.intent_id WHERE i.session_id = ? AND a.state IN ('started', 'pending', 'unknown'))`,
     params: [expected, nowMs(), session.id, session.id],
   }).expect(1, { code: 'payments.session.payment-waiting', reason: 'A payment in this session is still waiting for its answer.' })
+  sessionChanged(unit, session.id, session.opened_by)
   return expected
 }
 
@@ -169,6 +182,7 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
     })
   }
   unit.announce('payments.session.closed', { sessionId: session.id }, { record: ['payments.session', session.id] })
+  sessionChanged(unit, session.id, session.opened_by)
   return { varianceMinor: variance }
 }
 
@@ -308,5 +322,6 @@ export async function closeIfQuiet(unit: UnitView, session: SessionRow): Promise
     params: [at, at, session.id, session.id],
   }).expect(1, { code: 'payments.session.not-quiet', reason: 'This session is no longer quiet.' })
   unit.announce('payments.session.closed', { sessionId: session.id }, { record: ['payments.session', session.id] })
+  sessionChanged(unit, session.id, session.opened_by)
   return 'closed'
 }

@@ -11,6 +11,7 @@ import { refundInFull } from './refunds'
 import { isTestMoney } from './test-money'
 import type { Method, ProviderAnswer } from './points/provider'
 import { rowsOf, splitsForPart } from './splits'
+import { sessionChanged } from './sessions'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
 export interface AttemptRow { id: string, intent_id: string, provider_account_id: string, method: Method, amount_minor: number, state: AttemptState, idempotency_key: string, provider_ref: string | null, reader_id: string | null, started_at: number, refunded_minor: number }
@@ -148,8 +149,9 @@ export async function applyAnswer(unit: UnitView, attempt: AttemptRow, answer: A
   if (attempt.state === answer.state || !FROM[answer.state].includes(attempt.state)) return { changed: false, settled: false }
   recordMove(unit, attempt, answer, source)
   if (answer.state === 'unknown') unit.announce('payments.attempt.unknown', { attemptId: attempt.id }, { record: ['payments.attempt', attempt.id] })
-  if (answer.state !== 'succeeded') return { changed: true, settled: false }
   const intent = (await getIntent(attempt.intent_id))!
+  sessionChanged(unit, intent.session_id)
+  if (answer.state !== 'succeeded') return { changed: true, settled: false }
   await postFee(unit, attempt, answer, intent.currency)
   if (intent.state === 'cancelled' || intent.state === 'expired') {
     // A seller gave up on this payment and the provider took it after all.

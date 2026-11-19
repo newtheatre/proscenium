@@ -7,7 +7,7 @@
 // that ends without the money puts a reservation back as it was and lets a new sale's seats go.
 import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
+import { all, can, createUnit, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { accountLabel, addressFor, applyAtDesk, canonicalAccount, dayBounds, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
 import type { DeskContext, PricedSale, PricingItem, SummaryLine } from '#modules/payments'
 import { owedHere, passOwing, passSalesMinor, passSalesOn } from './pass-sales'
@@ -284,13 +284,41 @@ export async function issueDeskSale(unit: UnitView, input: unknown): Promise<{ o
   // With nobody named, entries on one holder's passes are theirs, so the booking is in their account and emailed to them.
   const holder = sale.accountId || sale.email ? null : await passHolderOf(plan)
   const { order, lineIds } = await writeDeskOrder(unit, sale, plan, at, at + FREE_HOLD, holder ? { channel: 'desk', accountId: holder } : undefined)
+  await confirmOrder(unit, order, await freeLines(plan, lineIds), { from: 'basket', ...(sale.admit && actor.accountId ? { admitBy: actor.accountId } : {}) })
+  return { orderId: order.id, reference: order.reference }
+}
+
+/**
+ * A pass scanned at the door with no booking tonight, of a type its holders need not book ahead
+ * (Matt, 19 November): its entry is booked exactly as the till's "Book the entry" books it, in a unit
+ * of its own, and the ticket returned for the door to admit. Refuses as the till would: the pass
+ * cannot be used tonight, owes money, or there is no seat.
+ */
+export async function bookPassEntryAtDoor(performanceId: string, code: string): Promise<string> {
+  const sale: SaleInput = { performanceId, lines: [], passes: [{ code }] }
+  const at = nowMs()
+  const plan = await deskSale(sale, at)
+  if (plan.totalMinor > 0) {
+    const owed = new Intl.NumberFormat('en-GB', { style: 'currency', currency: plan.currency }).format(plan.totalMinor / 100) // not-policy: minor units to units
+    refuse('box-office.door.pass-owes', `This pass still owes ${owed}.`, { status: 409, remedy: 'Send them to the box office or the bar to pay and book their entry.' })
+  }
+  const holder = await passHolderOf(plan)
+  const unit = createUnit()
+  const { order, lineIds } = await writeDeskOrder(unit.view(), sale, plan, at, at + FREE_HOLD, holder ? { channel: 'desk', accountId: holder } : undefined)
+  await confirmOrder(unit.view(), order, await freeLines(plan, lineIds), { from: 'basket' })
+  await unit.commit()
+  const ticket = await first<{ id: string }>("SELECT id FROM box_office_tickets WHERE order_line_id = ? AND state = 'valid'", lineIds[0])
+  if (!ticket) refuse('box-office.ticket.not-issued', 'The entry could not be booked.', { status: 409, remedy: 'Send them to the box office.' })
+  return ticket.id
+}
+
+/** A free desk sale's lines as confirming them needs them, each named for its ticket type or pass. */
+async function freeLines(plan: OrderPlan, lineIds: string[]): Promise<LineRow[]> {
   const types = new Map((await all<{ id: string, name: string, kind: string }>('SELECT id, name, kind FROM box_office_ticket_types')).map(t => [t.id, t]))
-  const lines: LineRow[] = plan.lines.map((l, i) => ({
+  return plan.lines.map((l, i) => ({
     id: lineIds[i]!, performance_id: plan.performanceId, band_id: l.bandId, ticket_type_id: l.ticketTypeId, amount_minor: 0,
     type_name: plan.entryOf[i] && !l.priceId ? plan.entryOf[i]!.name : types.get(l.ticketTypeId)?.name ?? '', type_kind: types.get(l.ticketTypeId)?.kind ?? 'standard', band_name: null, pass_entry: plan.entryOf[i] ? 1 : 0,
   }))
-  await confirmOrder(unit, order, lines, { from: 'basket', ...(sale.admit && actor.accountId ? { admitBy: actor.accountId } : {}) })
-  return { orderId: order.id, reference: order.reference }
 }
 
 const RESERVE_HOLD = 2 * 60_000 // not-policy: the basket is reserved by the request that writes it; this only has to outlast it

@@ -10,15 +10,16 @@
 // reference. Not met turns the person away to the desk; a source that is off, failing or that this
 // steward may not ask admits them and marks the scan unchecked, so a source being down never holds
 // the queue.
-import { all, can, createUnit, first, newId, nowMs, refuse, requirements, useContext } from '#kit'
+import { all, can, createUnit, first, isRefusal, newId, nowMs, refuse, requirements, useContext } from '#kit'
 import { signing } from '#kit/signing'
 import { accountLabel, getTerm } from '#modules/core'
 import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
+import { bookPassEntryAtDoor } from './desk'
 import { passByCode } from './pass-holding'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
 
-export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed' | 'reference' | 'pass'
+export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed' | 'reference' | 'pass' | 'released'
 
 export interface ScanOutcome {
   result: ScanResult
@@ -42,6 +43,10 @@ export interface ScanOutcome {
   reference?: string
   /** Not paid: the reservation the door sends to the box office or the bar, and what is owed. */
   reservation?: { reference: string, buyer: string | null, tickets: number, amountDueMinor: number, currency: string }
+  /** A pass with no booking tonight that could not be booked here: why, in the refusal's words. */
+  pass?: { reason: string, remedy: string | null }
+  /** Admitted on a pass: its entry was booked here and then (`booked`), or found already booked. */
+  viaPass?: { booked: boolean }
   /** Requirement not met: the source's words, such as "Membership not current", and the ticket's type. */
   requirement?: { reason: string | null, ticketType: string }
   /** Admitted without its requirement being checked again: the source was off, failing or not open to this steward. */
@@ -179,6 +184,7 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
     return said ? { result: 'card', scanId: null, card: { kind, ...said } } : { result: 'unknown', scanId: null }
   }
   let ticket: TicketRow | undefined
+  let viaPass: ScanOutcome['viaPass']
   if (parts.length !== PARTS || parts[0] !== TICKET_KIND) {
     // What a reservation's message carries is not a ticket: the desk takes the payment first. A paid
     // booking's reference is ours too: for another night it says which, and for tonight the door
@@ -191,14 +197,36 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
       if (order.state === 'confirmed') return lines.length ? { result: 'reference', scanId: null, reference: order.reference } : recorded({ result: 'unknown' })
       return notPaid(order, input.performanceId)
     }
-    // A pass stands for the entry it booked tonight (Matt, 19 November); with none it admits nobody.
+    // A reservation released unpaid: the box office can seat them again if seats are free.
+    const released = await first<Booked>("SELECT id, reference, state, total_minor, currency, account_id FROM box_office_orders WHERE state = 'expired' AND reserved_at IS NOT NULL AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())
+    if (released) {
+      const said = await notPaid(released, input.performanceId)
+      return { ...said, result: 'released' }
+    }
+    // A pass stands for the entry it booked tonight (Matt, 19 November). With none, a pass whose
+    // holders need not book ahead has its entry booked here and is admitted; otherwise nobody is.
     const pass = await passByCode(code)
     if (!pass) return recorded({ result: 'unknown' })
     const entry = await passEntryTonight(pass.id, input.performanceId)
-    if (!entry) return { result: 'pass', scanId: null }
-    if (entry.state !== 'confirmed') return notPaid(entry, input.performanceId)
-    ticket = entry.ticket_id ? await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE id = ?', entry.ticket_id) ?? undefined : undefined
-    if (!ticket) return { result: 'reference', scanId: null, reference: entry.reference }
+    if (!entry) {
+      const ahead = await first<{ book_ahead: number }>('SELECT book_ahead FROM box_office_pass_types WHERE id = ?', pass.passTypeId)
+      if (ahead?.book_ahead !== 0 || input.offline) return { result: 'pass', scanId: null }
+      try {
+        const ticketId = await bookPassEntryAtDoor(input.performanceId, code)
+        ticket = await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE id = ?', ticketId) ?? undefined
+        viaPass = { booked: true }
+      }
+      catch (error) {
+        if (!isRefusal(error)) throw error
+        return { result: 'pass', scanId: null, pass: { reason: error.reason, remedy: error.remedy ?? null } }
+      }
+    }
+    else {
+      if (entry.state !== 'confirmed') return notPaid(entry, input.performanceId)
+      ticket = entry.ticket_id ? await first<TicketRow>('SELECT id, performance_id, state, void_reason, admitted_at FROM box_office_tickets WHERE id = ?', entry.ticket_id) ?? undefined : undefined
+      if (!ticket) return { result: 'reference', scanId: null, reference: entry.reference }
+      viaPass = { booked: false }
+    }
   }
   else {
     const [kind, keyId, random, signature] = parts as [string, string, string, string]
@@ -226,7 +254,7 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   await unit.commit()
   const written = await first<{ result: 'admitted' | 'already_admitted' }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
   const booking = await bookingOf(ticket.id, input.performanceId)
-  if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id, booking, ...unchecked ? { unchecked: true } : {} }
+  if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id, booking, ...unchecked ? { unchecked: true } : {}, ...viaPass ? { viaPass } : {} }
   const earlier = await first<{ scanned_at: number, device_label: string | null }>('SELECT s.scanned_at, s.device_label FROM box_office_tickets t JOIN box_office_scans s ON s.id = t.admitted_scan_id WHERE t.id = ?', ticket.id)
   return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null, booking }
 }

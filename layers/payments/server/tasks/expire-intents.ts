@@ -4,6 +4,7 @@
 import { all, createUnit, defineTask, isRefusal, log, nowMs } from '#kit'
 import { getIntent, ownersOf, partsOf, releaseParts } from '../intents'
 import { holdAndRefund, type AttemptRow } from '../answers'
+import { sessionChanged } from '../sessions'
 
 const BATCH = 50 // not-policy: intents expired per run
 
@@ -20,6 +21,7 @@ export async function expireIntent(id: string): Promise<void> {
     params: [at, id, at, id],
   }).expect(1, { code: 'payments.intent.not-expired', reason: 'This payment is not due to expire.' })
   await releaseParts(view, intent, parts)
+  sessionChanged(view, intent.session_id)
   // Part of a desk payment taken before the sale was left: it goes back.
   const paid = await all<AttemptRow>("SELECT * FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded' ORDER BY started_at", id)
   if (paid.length) await holdAndRefund(view, { ...intent, state: 'expired' }, parts, paid)

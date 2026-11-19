@@ -64,8 +64,9 @@ export default defineNuxtConfig({
         send_email: [emailBinding],
         triggers: { crons: ['* * * * *'] },
         // The shared rate-limit counts (F-36). The class is exported from layers/core/server/entry.ts.
-        durable_objects: { bindings: [{ name: 'RATE_LIMITS', class_name: 'RateLimitCounter' }] },
-        migrations: [{ tag: 'core-rate-limits', new_sqlite_classes: ['RateLimitCounter'] }],
+        // The realtime rooms (#kit/realtime); RealtimeHub is exported from the same entry.
+        durable_objects: { bindings: [{ name: 'RATE_LIMITS', class_name: 'RateLimitCounter' }, { name: 'REALTIME', class_name: 'RealtimeHub' }] },
+        migrations: [{ tag: 'core-rate-limits', new_sqlite_classes: ['RateLimitCounter'] }, { tag: 'core-realtime', new_sqlite_classes: ['RealtimeHub'] }],
         queues: {
           producers: [
             { binding: 'JOBS_PROMPT', queue: queue.prompt },

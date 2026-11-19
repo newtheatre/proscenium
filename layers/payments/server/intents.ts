@@ -5,6 +5,7 @@
 import { all, first, newId, nowMs, Refusal, runInContext, useContext, useSetting, usePoint, type UnitView } from '#kit'
 import { intentParts } from './db/schema'
 import type { Part, Settlement } from './points/settlement'
+import { sessionChanged } from './sessions'
 
 export interface PartInput { owner: { module: string, record: string }, amountMinor: number }
 
@@ -84,6 +85,7 @@ export async function createIntent(unit: UnitView, input: IntentInput): Promise<
   // The parts sum to the intent: the statement changes the intent's row only if they do.
   unit.add({ sql: 'UPDATE payments_intents SET updated_at = updated_at WHERE id = ? AND amount_minor = (SELECT sum(amount_minor) FROM payments_intent_parts WHERE intent_id = ?)', params: [intentId, intentId] })
     .expect(1, { code: 'payments.intent.parts-differ', reason: 'The parts of this payment do not add up to its total.' })
+  sessionChanged(unit, input.sessionId)
   return { intentId, partIds }
 }
 
@@ -111,6 +113,7 @@ export async function cancelIntent(unit: UnitView, intentId: string): Promise<{ 
     params: [nowMs(), intentId, intentId],
   }).expect(1, { code: 'payments.intent.paid-in-part', reason: 'Money has been taken for this payment, so it cannot be cancelled.', remedy: 'Take the rest, or refund what was taken.' })
   await releaseParts(unit, intent, await partsOf(intentId))
+  sessionChanged(unit, intent.session_id)
   const waiting = await all<{ id: string }>("SELECT id FROM payments_attempts WHERE intent_id = ? AND state IN ('started', 'pending', 'unknown')", intentId)
   return { waiting: waiting.map(w => w.id) }
 }
