@@ -50,6 +50,8 @@ export default {
       'currency': attempt.currency,
       'title': 'Till sale', // shown in SumUp's own history beside the transaction
       'foreign-tx-id': attempt.id,
+      // SumUp's own success screen waits for a tap before returning; the till says the sale is paid.
+      'skip-screen-success': 'true',
       // Android reads callback; iOS reads callbacksuccess and callbackfail.
       'callback': back,
       'callbacksuccess': back,
