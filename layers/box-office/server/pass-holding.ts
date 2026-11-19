@@ -1,5 +1,5 @@
 // The passes people hold (BO-64). A pass has a short code, `PASS-7KD2-M4QX`, which makes
-// reservations and admits nobody: the door scans the reservation's tickets. The code is stored as
+// reservations; at the door it admits only the entry it booked for that night. The code is stored as
 // its hash, and sealed beside it so the holder's pass page and staff can show it again. A person
 // may hold any number of passes. Issuing here is by staff, or for passes brought in from another
 // system; a pass bought in an order is issued by the sale (pass-sales.ts) through the same function.

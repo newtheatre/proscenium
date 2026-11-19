@@ -1,6 +1,7 @@
 // Turns a notification type's wording and the caller's variables into a subject, a plain-text body
-// and an HTML body. The wording is a small part of Markdown: paragraphs, line breaks, **bold** and
-// [links](...). Every value is escaped; a url variable is the only thing that can become a link.
+// and an HTML body. The wording is a small part of Markdown: paragraphs, line breaks, **bold**,
+// [links](...) and `{{ qr name }}`. Every value is escaped; a url variable is the only thing that can become a link.
+import { encode } from 'uqr'
 import { refuse } from '#kit'
 
 export type VariableKind = 'url' | 'sealed' | 'text'
@@ -13,9 +14,23 @@ export const RESERVED = ['theatre'] as const
 
 const VARIABLE = /\{\{\s*([a-z][a-zA-Z0-9]*)\s*\}\}/g // not-policy: the variable syntax
 
+// A paragraph of only `{{ qr name }}` draws that variable as a QR code in the HTML part, and is left out of the text.
+const QR_PARAGRAPH = /^\s*\{\{\s*qr\s+([a-z][a-zA-Z0-9]*)\s*\}\}\s*$/ // not-policy: the QR syntax
+
 /** The variable names a piece of wording uses. */
 export function variablesIn(wording: string): string[] {
-  return [...new Set([...wording.matchAll(VARIABLE)].map(m => m[1]!))]
+  const drawn = wording.split(/\n\s*\n/).map(p => p.match(QR_PARAGRAPH)?.[1]).filter((n): n is string => !!n)
+  return [...new Set([...[...wording.matchAll(VARIABLE)].map(m => m[1]!), ...drawn])]
+}
+
+const MODULE_PX = 6 // not-policy: one QR module, so a version 1 code with its border is 174 pixels across
+
+// Drawn as table cells, not an image, so it shows when a mail client blocks images; black on white
+// with a quiet border of four, as the app's QrCode component draws it.
+function qrTable(value: string): string {
+  const { data } = encode(value, { border: 4, ecc: 'M' }) // not-policy: the quiet border a QR code needs
+  const rows = data.map(row => `<tr style="height:${MODULE_PX}px">${row.map(dark => `<td width="${MODULE_PX}" height="${MODULE_PX}" bgcolor="${dark ? '#000000' : '#ffffff'}"></td>`).join('')}</tr>`)
+  return `<table role="img" aria-label="QR code" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse;table-layout:fixed;margin:0 0 16px;background:#ffffff;font-size:0;line-height:0">${rows.join('')}</table>`
 }
 
 /** A url variable must be https, except on this machine while developing. */
@@ -106,6 +121,11 @@ export function render(wording: { subject: string, body: string, action?: string
   const inboxParts: string[] = []
   const htmlParts: string[] = []
   for (const paragraph of paragraphs) {
+    const drawn = paragraph.match(QR_PARAGRAPH)
+    if (drawn) {
+      if (values[drawn[1]!]) htmlParts.push(qrTable(values[drawn[1]!]!))
+      continue
+    }
     textParts.push(inlineText(paragraph, values))
     inboxParts.push(inlineText(paragraph, values, false))
     const lone = paragraph.match(LONE_LINK)

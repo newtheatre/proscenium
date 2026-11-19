@@ -61,20 +61,13 @@ const { data, status, error, refresh } = await useAPI<{ passes: MyPass[] }>('/ap
               :label="t('box-office.my-passes.owed', { amount: money(pass.owedMinor, pass.currency) })"
             />
           </div>
-          <div
+          <BoxOfficeTicketCode
             v-if="pass.code && pass.state === 'active'"
-            class="rounded-md bg-elevated/50 p-3"
-          >
-            <p class="text-sm text-muted">
-              {{ t('box-office.my-passes.code') }}
-            </p>
-            <p class="font-mono text-lg font-medium tracking-wide">
-              {{ pass.code }}
-            </p>
-            <p class="text-sm text-muted">
-              {{ t('box-office.my-passes.code-help') }}
-            </p>
-          </div>
+            :value="pass.code"
+            :title="t('box-office.my-passes.code')"
+            :number="pass.code"
+            :note="t('box-office.my-passes.code-help')"
+          />
           <UAlert
             v-if="pass.owedMinor && pass.state === 'active'"
             color="warning"

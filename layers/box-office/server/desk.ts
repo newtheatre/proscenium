@@ -8,7 +8,7 @@
 import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
+import { accountLabel, addressFor, applyAtDesk, canonicalAccount, dayBounds, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
 import type { DeskContext, PricedSale, PricingItem, SummaryLine } from '#modules/payments'
 import { owedHere, passOwing, passSalesMinor, passSalesOn } from './pass-sales'
 import { planOrder, pricedLines, writeOrder, type BasketLineInput, type OrderPlan } from './baskets'
@@ -17,6 +17,7 @@ import { signing } from '#kit/signing'
 import { sellableTypes } from './ticket-types'
 import { claimSeats } from './capacity'
 import { carryPassEntries } from './pass-entries'
+import { passCodeHashes } from './pass-holding'
 import { hashOf, newReference, randomToken } from './codes'
 import { confirmOrder, sendTickets } from './confirm'
 import { reserveBasket } from './reservations'
@@ -428,7 +429,7 @@ const BY_NAME = 8 // not-policy: enough bookings under one name to pick from at 
 const SINCE = 6 * 3_600_000 // not-policy: a performance that began this evening still counts as tonight's
 
 /**
- * Finds an order by what the buyer shows: the booking reference or the desk code, typed or scanned.
+ * Finds an order by what the buyer shows: the booking reference, the desk code or a pass code, typed or scanned.
  * Failing that, someone who may look people up finds bookings by the buyer's name or address: those
  * for performances still to come or tonight, soonest first.
  */
@@ -455,7 +456,18 @@ async function findByCode(query: string): Promise<DeskOrder[]> {
   const found = await all<{ id: string }>(
     "SELECT id FROM box_office_orders WHERE (state IN ('reserved', 'awaiting_payment', 'confirmed', 'cancelled') OR (state = 'expired' AND reserved_at IS NOT NULL)) AND (reference = ?1 OR desk_code_hash = ?2) ORDER BY created_at DESC LIMIT 5", // not-policy: both are unique, so one is expected
     typed, await hashOf(typed))
-  return (await Promise.all(found.map(o => deskOrder(o.id)))).filter(o => o !== null)
+  const byPass = found.length ? [] : await bookedTonightWithPass(query)
+  return (await Promise.all([...found, ...byPass].map(o => deskOrder(o.id)))).filter(o => o !== null)
+}
+
+/** A pass code stands for the bookings it made for tonight's show night (Matt, 19 November); none, and the till offers it a new entry. */
+async function bookedTonightWithPass(typed: string): Promise<{ id: string }[]> {
+  const { start, end } = await dayBounds(await operatingDayOf(nowMs()))
+  return all<{ id: string }>(
+    `SELECT DISTINCT o.id FROM box_office_passes p JOIN box_office_pass_redemptions r ON r.pass_id = p.id AND r.state = 'live'
+      JOIN box_office_orders o ON o.id = r.order_id JOIN core_performances f ON f.id = r.performance_id
+      WHERE (p.code_hash = ? OR p.alias_hash = ?) AND p.state = 'active' AND o.state IN ('reserved', 'awaiting_payment', 'confirmed') AND f.starts_at >= ? AND f.starts_at < ?
+      ORDER BY f.starts_at LIMIT ?`, ...await passCodeHashes(typed), start, end, BY_NAME)
 }
 
 export interface AmendInput {
