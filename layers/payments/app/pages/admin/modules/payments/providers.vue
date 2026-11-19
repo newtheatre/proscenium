@@ -1,8 +1,8 @@
 <!-- Providers and readers (Box office specification, part 5; PAY-01, PAY-02): the payment providers
      this site can use; the accounts set up with them, each a small card of one size; and payouts
      entered by hand from the provider's statement. An account's keys (on the KeysCard every page
-     uses), notification address, card readers and test payment open in a slide-over from its card,
-     so an account with nothing to set up, such as cash, leaves no empty space. -->
+     uses), notification address, card readers, test payment and taking it out of use open in a
+     slide-over from its card. -->
 <script setup lang="ts">
 interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean }
 interface Key { name: string, source: 'saved' | 'saved-for-module' | 'worker-secret' | null, hint: string | null, start?: string | null }
@@ -34,6 +34,26 @@ const hasDetails = (a: Account) => {
 }
 const managing = ref<string | null>(null)
 const managed = computed(() => data.value?.accounts.find(a => a.id === managing.value))
+// Taking an account out of use, or putting it back: payments stop being offered through it, nothing else changes.
+const switching = ref(false)
+async function setActive(a: Account, active: boolean, undoable = true) {
+  switching.value = true
+  try {
+    await $api(`/api/payments/providers/${a.id}` as string, { method: 'PATCH', body: { active } })
+    await refresh()
+    toast.add({
+      title: t(active ? 'payments.screens.providers.switched-on' : 'payments.screens.providers.switched-off', { account: a.label }),
+      color: 'success',
+      actions: undoable ? [{ label: t('core.undo.button'), icon: 'i-lucide-undo-2', color: 'neutral', variant: 'outline', onClick: () => { void setActive(a, !active, false) } }] : undefined,
+    })
+  }
+  catch (e) {
+    toast.add({ title: toRefusal(e).reason, color: 'error' })
+  }
+  finally {
+    switching.value = false
+  }
+}
 const webhookAddress = (a: Account) => (import.meta.client ? `${window.location.origin}/api/payments/webhooks/${a.id}` : `/api/payments/webhooks/${a.id}`)
 
 // Adding an account.
@@ -239,7 +259,6 @@ async function recordPayout() {
                       />
                     </div>
                     <UButton
-                      v-if="hasDetails(a)"
                       class="shrink-0"
                       :label="t('payments.screens.providers.manage')"
                       :aria-label="t('payments.screens.providers.manage-account', { account: a.label })"
@@ -379,6 +398,19 @@ async function recordPayout() {
             </div>
           </div>
         </template>
+      </template>
+      <template
+        v-if="managed"
+        #footer
+      >
+        <UButton
+          :label="managed.active ? t('payments.screens.providers.switch-off') : t('payments.screens.providers.switch-on')"
+          :icon="managed.active ? 'i-lucide-circle-pause' : 'i-lucide-circle-play'"
+          color="neutral"
+          variant="outline"
+          :loading="switching"
+          @click="setActive(managed, !managed.active)"
+        />
       </template>
     </USlideover>
 
