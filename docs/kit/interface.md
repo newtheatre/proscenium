@@ -18,7 +18,12 @@ here is stable before 1.0.
 Every shell and live mode wear the brand (C-35): `app.vue` puts the brand's stylesheet (primary,
 greys, radius, already shaded to reach 4.5 to 1 in light and dark) in the head of every page, so a layout
 never loads it itself, and each header draws the theatre's logo, or its name when there is none, with
-`BrandMark`.
+`BrandMark`. The heading font (`core.brand.display-font`) is the public shell's alone: `layouts/default.vue`
+sets `public-shell` on `body` and `main.css` gives its `h1` to `h3` and the header's name
+`--brand-display-font`; the other shells keep the system font. The choices are font stacks the device
+already has, so nothing is downloaded. Fonts the site serves itself and remote fonts (such as Google
+Fonts) are not supported yet; adding one means a choice with a source as well as a stack, and a
+`@font-face` or stylesheet link from `themeCss`.
 
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks

@@ -10,6 +10,8 @@ const route = useRoute()
 const { data: settings } = await usePublicSettings()
 
 const name = computed(() => brand.value?.name ?? t('core.public.default-name'))
+// The heading font is the public shell's alone (main.css); the staff shells stay calm.
+useHead({ bodyAttrs: { class: 'public-shell' } })
 const links = computed(() => [
   { label: t('core.public.whats-on'), to: '/whats-on' },
   // The archive of past shows, unless the theatre keeps it private (public-site.archive.public).

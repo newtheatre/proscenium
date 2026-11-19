@@ -58,6 +58,10 @@ test.describe('a visitor who is not signed in', () => {
     await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
     await expect(page.getByRole('contentinfo')).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
+    // The theatre's name in the header is drawn in the brand's heading font.
+    const [font, token] = await page.evaluate(() => [getComputedStyle(document.querySelector('header [data-slot="title"]')!).fontFamily, getComputedStyle(document.documentElement).getPropertyValue('--brand-display-font').trim()])
+    expect(token).not.toBe('')
+    expect(font.replace(/\s/g, '')).toBe(token.replace(/\s/g, ''))
   })
 })
 
