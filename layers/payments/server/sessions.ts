@@ -2,7 +2,7 @@
 // with a float, takes payments in it, and cashes up: counting stops new payments, the cash counted is
 // compared with what is expected, and any difference is explained and posted to
 // payments.cash-variance. Above payments.sessions.variance-needs-second-person, a second person closes
-// a session with a difference. A theatre that takes no cash (payments.cash.enabled off, the default)
+// a session with a difference. A theatre that takes no cash (no cash account in use, the default)
 // still opens sessions, since desk sales are made in one, but they hold no float and close with
 // nothing to count.
 //
@@ -16,6 +16,7 @@ import { getSpace, listSpaces, placeName } from '#modules/core'
 import { postEntries } from '#modules/finance'
 import { labelsOf } from './people'
 import { describeOwners } from './owners'
+import { takesCash } from './providers'
 
 export interface SessionRow { id: string, point_label: string, space_id: string | null, closed_how: 'hand' | 'quiet' | null, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
 
@@ -73,8 +74,8 @@ export async function expectedCash(session: SessionRow): Promise<number> {
 export async function openSession(unit: UnitView, input: { accountId: string, spaceId?: string | null, pointLabel?: string, floatMinor?: number }): Promise<string> {
   if (await sessionOf(input.accountId)) throw new Refusal('payments.session.already-open', 'You already have a till session open.', { status: 409, remedy: 'Close that session first.' })
   const spaceId = await checkSpace(input.spaceId)
-  const cash = await useSetting('payments.cash.enabled')
-  if (!cash && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' }, remedy: 'Leave the float empty, or turn on taking cash in Payments settings.' })
+  const cash = await takesCash()
+  if (!cash && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' }, remedy: 'Leave the float empty, or add a cash account on Providers and readers.' })
   const float = input.floatMinor ?? (cash ? await useSetting('payments.sessions.default-float') as number : 0)
   if (!Number.isSafeInteger(float) || float < 0) throw new Refusal('payments.session.bad-float', 'The float is a whole amount, nothing or more.', { status: 422, fields: { floatMinor: 'payments.session.bad-float' } })
   const id = newId('till')
@@ -101,7 +102,7 @@ export async function placeSession(unit: UnitView, session: SessionRow, input: {
   const note = input.pointLabel === undefined ? session.point_label : input.pointLabel.trim()
   let float = session.float_minor
   if (input.floatMinor !== undefined && input.floatMinor !== session.float_minor) {
-    if (!(await useSetting('payments.cash.enabled')) && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' } })
+    if (!(await takesCash()) && input.floatMinor) throw new Refusal('payments.session.no-cash', 'Cash is not taken, so a session has no float.', { status: 422, fields: { floatMinor: 'payments.session.no-cash' } })
     if (session.state !== 'open' || await cashMoved(session.id)) throw new Refusal('payments.session.float-fixed', 'The float can only change before the first cash is taken.', { status: 409, fields: { floatMinor: 'payments.session.float-fixed' } })
     if (!Number.isSafeInteger(input.floatMinor) || input.floatMinor < 0) throw new Refusal('payments.session.bad-float', 'The float is a whole amount, nothing or more.', { status: 422, fields: { floatMinor: 'payments.session.bad-float' } })
     float = input.floatMinor
@@ -180,7 +181,7 @@ export interface SessionSummary { handlesCash: boolean, id: string, spaceId: str
 export async function summarise(session: SessionRow, names?: Map<string, string>, cashTaken?: boolean): Promise<SessionSummary> {
   const expected = session.expected_cash_minor ?? await expectedCash(session)
   const label = names ?? await labelsOf([session.opened_by, session.closed_by])
-  const cash = cashTaken ?? !!(await useSetting('payments.cash.enabled'))
+  const cash = cashTaken ?? await takesCash()
   return {
     handlesCash: cash || session.float_minor > 0 || expected !== 0 || (session.counted_cash_minor ?? 0) > 0,
     id: session.id,
@@ -211,7 +212,7 @@ export async function describeSessions(ids: string[]): Promise<SessionSummary[]>
   const byId = new Map(found.map(r => [r.id, r]))
   const rows = ids.flatMap(id => byId.get(id) ?? [])
   const names = await labelsOf(rows.flatMap(r => [r.opened_by, r.closed_by]))
-  const cash = !!(await useSetting('payments.cash.enabled'))
+  const cash = await takesCash()
   return Promise.all(rows.map(r => summarise(r, names, cash)))
 }
 

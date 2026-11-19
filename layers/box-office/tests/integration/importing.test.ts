@@ -3,9 +3,9 @@
 // the till; a free one is confirmed with tickets; nothing is sent; a second import changes nothing;
 // one cancelled since is released; and one that cannot be placed is refused alone.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, setClock } from '#kit'
+import { createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { deliver, inContext, person, rows, server, call } from '../../../../tests/integration/helpers'
+import { call, deliver, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 import importPost from '../../server/api/box-office/import/bookings.post'
 import importGet from '../../server/api/box-office/import/[id].get'
 import { openSession } from '../../../payments/server/services'
@@ -131,7 +131,6 @@ describe('importing bookings from another system', () => {
     const cash = (await one<{ id: string }>("SELECT id FROM payments_provider_accounts WHERE provider = 'cash'")).id
     await inContext(async () => {
       const unit = createUnit()
-      await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true })
       await openSession(unit.view(), { accountId: seller.accountId!, pointLabel: 'Desk', floatMinor: 0 })
       await unit.commit()
     })

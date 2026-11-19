@@ -60,7 +60,7 @@ beforeAll(async () => {
     bar.outlet = addOutlet(v, { name: 'Offer bar', kind: 'bar' })
     bar.other = addOutlet(v, { name: 'Offer kiosk', kind: 'bar' })
   })
-  await commit(unit => changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }))
+  await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
   await commit(unit => changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true }))
   await commit(unit => openSession(unit.view(), { accountId: seller.accountId!, pointLabel: 'Bar', floatMinor: 0 }))
   const { ensureSystemAccounts } = await import('../../../finance/server/ledger')

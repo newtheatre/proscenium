@@ -3,6 +3,7 @@
 // answer, a difference needs a reason and is posted, and above the limit someone else closes.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, setClock } from '#kit'
+import { useRegistry } from '#kit/registry'
 import { addAttempt, recordAnswer } from '../../server/answers'
 import sessionGet from '../../server/api/payments/session.get'
 import sessionsPost from '../../server/api/payments/sessions.post'
@@ -74,7 +75,7 @@ beforeAll(async () => {
   await inContext(async () => {
     const unit = createUnit()
     await changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true })
-    await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }) // these take cash
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run() // these take cash
     await unit.commit()
   })
   cash = newId('ppa')
@@ -126,18 +127,26 @@ describe('the till', () => {
     expect((await get('/api/payments/till/panels', seller([]))).body.panels.map((p: { id: string }) => p.id)).toEqual(['snacks'])
   })
 
+  it('offers a card machine not connected to the site from its account alone, with no setting (Matt, 19 November)', async () => {
+    const machine = newId('ppa')
+    await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'attested-card', 'Card machine', '[\"desk\"]', 'live', 1, 1, 1)").bind(machine).run()
+    expect((await get('/api/payments/till/methods', seller())).body.methods).toContainEqual(expect.objectContaining({ providerAccountId: machine, method: 'card_attested' }))
+    await env.DB.prepare('UPDATE payments_provider_accounts SET active = 0 WHERE id = ?').bind(machine).run()
+    expect(await inContext(async () => ['payments.desk.attested-card', 'payments.cash.enabled'].some(key => useRegistry().settings.has(key)))).toBe(false)
+  })
+
   it('offers the desk methods the settings allow', async () => {
     const me = seller()
     expect((await get('/api/payments/till/methods', me)).body.methods).toContainEqual(expect.objectContaining({ providerAccountId: cash, method: 'cash' }))
     await inContext(async () => {
       const unit = createUnit()
-      await changeSetting(unit.view(), 'payments.cash.enabled', false, { reason: 'test', confirm: true })
+      await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(0).run()
       await unit.commit()
     })
     expect((await get('/api/payments/till/methods', me)).body.methods.some((m: { method: string }) => m.method === 'cash')).toBe(false)
     await inContext(async () => {
       const unit = createUnit()
-      await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true })
+      await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
       await unit.commit()
     })
   })
@@ -164,7 +173,7 @@ describe('the till', () => {
 describe('a theatre that takes no cash', () => {
   const cashTaken = (on: boolean) => inContext(async () => {
     const unit = createUnit()
-    await changeSetting(unit.view(), 'payments.cash.enabled', on, { reason: 'test', confirm: true })
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(on ? 1 : 0).run()
     await unit.commit()
   })
 

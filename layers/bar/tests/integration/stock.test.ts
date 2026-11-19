@@ -71,7 +71,7 @@ beforeAll(async () => {
   for (const id of ['finance', 'payments', 'bar']) await setModule(id, true)
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'cash', 'Cash', '[\"desk\"]', 'live', 1, ?, ?)").bind(cash, NOW, NOW).run()
   await commit(async unit => standardListener({ payload: { moduleId: 'bar' } } as any, unit.view()))
-  await setSetting('payments.cash.enabled', true)
+  await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
   await setSetting('core.locale.time-zone', 'Europe/London')
   await setSetting('payments.refunds.self-approve-up-to', 5000)
   const { ensureSystemAccounts } = await import('../../../finance/server/ledger')

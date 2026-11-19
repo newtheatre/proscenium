@@ -4,7 +4,7 @@
 // first entry tonight, or on its own, to the holder the seller picks; and a pass's money still owed
 // is paid on its own.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, setClock } from '#kit'
+import { createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { attest, openSession } from '../../../payments/server/services'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
@@ -52,9 +52,6 @@ beforeAll(async () => {
   a = await house(30)
   b = await house(30)
   await inContext(() => ensureManagedTicketTypes())
-  await commit(async (unit) => {
-    await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }) // these take cash
-  })
   cash = (await rows<{ id: string }>("SELECT id FROM payments_provider_accounts WHERE provider = 'cash'"))[0]!.id
   await commit(unit => openSession(unit.view(), { accountId: seller.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
 })

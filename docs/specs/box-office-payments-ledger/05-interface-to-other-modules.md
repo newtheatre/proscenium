@@ -95,7 +95,7 @@ Two families fall out of the capabilities. An **integrated** provider answers fo
 - The app's answer is unsigned by SumUp, so it is recorded as a claim by the person at the till, exactly as an attested card payment is: success makes the attempt succeed, anything else fails it, and SumUp's transaction code is kept for reconciliation against the SumUp statement.
 - An attempt with no answer becomes unknown through the reconcile task and is resolved by a person. Refunds are made in the SumUp app and confirmed by a person, as for attested.
 
-Matt chose the first providers (part 9, question 2): cash and attested card, then Stripe online, then the SumUp reader. `cash` and `attested-card` need no account anywhere and make the desk usable on day one. Money taken some other way at the desk (a voucher, an invoice, a bank transfer) is its own provider, `other`, so a theatre can take it without adding a card machine it does not have (Matt, 19 November 2026).
+Matt chose the first providers (part 9, question 2): cash and attested card, then Stripe online, then the SumUp reader. `cash` and `attested-card` need no account anywhere and make the desk usable on day one. Money taken some other way at the desk (a voucher, an invoice, a bank transfer) is its own provider, `other`, so a theatre can take it without adding a card machine it does not have (Matt, 19 November 2026). A card machine not connected to the site is offered only by having an `attested-card` account in use; there is no separate setting for it. Cash is the same: the theatre takes cash while a `cash` account is in use, and the policy fact `payments.cash` says so.
 
 **Test mode.** A provider account is `live` or `test` (part 2), and test money never touches a live record or the ledger:
 
