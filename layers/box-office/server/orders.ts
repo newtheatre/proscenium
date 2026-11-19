@@ -2,14 +2,14 @@
 // words a message uses for them.
 import { all, first, refuse, theatreTimeZone, useSetting, wordsFrom } from '#kit'
 import { getPerformance, getProduction, getVenue, latecomersAt, placeOf } from '#modules/core'
-import { lineKey, unnamedLines } from './line-names'
+import { lineKey, unnamedLines, withSections } from './line-names'
 import catalogue from '../i18n/en-GB.json'
 import { HIDDEN_TYPE } from './ticket-types'
 
 const say = wordsFrom(catalogue)
 
 export interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, intent_id: string | null, confirm_email: string | null, confirm_name: string | null, admit_on_payment: number, sold_by: string | null }
-/** band_name is null when the production has one band, so there is no part of the house to name. */
+/** band_name is null when the production has one band; withSections also drops it where the type is sold in one section. */
 export interface LineRow { id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, type_name: string, type_kind: string, band_name: string | null, /** 1 for a pass's entry. */ pass_entry?: number }
 
 export const ORDER = 'SELECT id, reference, state, account_id, currency, total_minor, expires_at, release_at, intent_id, confirm_email, confirm_name, admit_on_payment, sold_by FROM box_office_orders'
@@ -47,9 +47,9 @@ export async function wordsFor(order: Pick<OrderRow, 'currency'>, lines: LineRow
   const timeZone = await theatreTimeZone()
   const counts = new Map<string, number>()
   const unnamed = await unnamedLines(lines)
-  for (const line of lines) {
-    // Named with its part of the house where the production has more than one, such as a wheelchair
-    // space; not named at all where there is one kind to book, as Choose tickets shows it.
+  for (const line of await withSections(lines)) {
+    // Named with its section only where its type is sold in more than one; not named at all where
+    // there is one kind to book, as Choose tickets shows it.
     const name = unnamed.has(lineKey(line)) ? '' : line.band_name ? `${line.band_name}, ${line.type_name}` : line.type_name
     counts.set(name, (counts.get(name) ?? 0) + 1)
   }

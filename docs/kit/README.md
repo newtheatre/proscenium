@@ -421,6 +421,15 @@ record: every page that listens must still be right, only slower, without it.
   every listener, with a heartbeat and reconnection. `on` is called with the news, or with `null`
   when the socket comes back after a gap. `connected` says whether news is arriving, so a page
   that polls can stop while it is and carry on by itself when it is not.
+- **Devices.** A device is a browser, with an id and a name kept in its own storage. The room
+  says who is in it (`devices`), and devices talk to each other on channels named `device.*`:
+  `send(data, { keep })` passes a message to the others, and with `keep` the room holds it for a
+  device that arrives later (`ask()`, or starting to listen, brings it marked `kept`). The room
+  forgets what it kept when the last device leaves. A device cannot publish on any other channel.
+  The till's linked sale (`device.payments.till`, in `PaymentsTill.vue`) is the pattern: each
+  message is the whole sale with a revision number, the newest wins, and money is never passed
+  this way. A till panel must take up a `modelValue` it did not emit (Bar's `adopt`, Box office's
+  `restore`).
 - **Without the binding** (`nuxt dev`) the ticket route answers `available: false` and pages keep
   to their own reads.
 

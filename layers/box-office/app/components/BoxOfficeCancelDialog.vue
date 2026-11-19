@@ -5,7 +5,7 @@
 // be ticked or left out. One already used at the door starts unticked and, if ticked, stays admitted
 // (a duplicate booking scanned by mistake). The buyer can be left unemailed. The refund shown is for
 // what is ticked.
-interface Line { id: string, band: string | null, ticketType: string | null, amountMinor: number, admittedAt: number | null }
+interface Line { id: string, band: string | null, section?: string | null, ticketType: string | null, amountMinor: number, admittedAt: number | null }
 
 const props = defineProps<{ orderId: string, reference: string, paid: boolean, canRefund: boolean, currency: string, feeMinor: number, lines: Line[], hasBuyer: boolean }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -27,7 +27,9 @@ const refunds = computed(() => (['full', 'less-fee', 'none'] as const).map(value
 const used = (l: Line) => props.paid && !!l.admittedAt
 const lineItems = computed(() => props.lines.map((l, i) => ({
   value: l.id,
-  label: t('box-office.order.cancel.line', { number: i + 1, band: l.band ?? '', type: l.ticketType ?? '', price: money(l.amountMinor, props.currency) }),
+  label: l.section
+    ? t('box-office.order.cancel.line', { number: i + 1, band: l.section, type: l.ticketType ?? '', price: money(l.amountMinor, props.currency) })
+    : t('box-office.order.cancel.line-whole', { number: i + 1, type: l.ticketType ?? '', price: money(l.amountMinor, props.currency) }),
   description: used(l) ? t('box-office.order.cancel.line-used') : undefined,
 })))
 const usedChosen = computed(() => props.lines.some(l => used(l) && form.value.lineIds.includes(l.id)))

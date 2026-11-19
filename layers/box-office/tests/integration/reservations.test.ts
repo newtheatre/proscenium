@@ -238,9 +238,13 @@ describe('the link in the reservation message', () => {
     // What it is for leads the page; a reservation has no tickets yet.
     expect(seen.body.show).toMatchObject({ title: expect.stringMatching(/^Box office show/), venue: expect.stringMatching(/^Box office venue/), cancelled: false })
     expect(seen.body.tickets).toEqual([])
-    // One band: no part of the house to name. With a second, each ticket says which part it is in.
+    // One band: no part of the house to name. A second names it only once the same type is sold in both.
     expect(seen.body.lines[0].band).toBeNull()
-    expect((await req('POST', `/api/box-office/productions/${h.productionId}/bands`, { name: 'Wheelchair spaces' })).status).toBe(200)
+    const second = await req('POST', `/api/box-office/productions/${h.productionId}/bands`, { name: 'Circle' })
+    expect(second.status).toBe(200)
+    await req('PUT', `/api/box-office/performances/${h.performanceId}/sales`, { pools: [{ bandId: second.body.bandId, capacity: 1 }] })
+    expect((await req('GET', '/api/box-office/orders/link', undefined, null, link)).body.lines[0].band).toBeNull()
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: second.body.bandId, ticketTypeId: h.fullId, amountMinor: 1200 }] })).status).toBe(200)
     expect((await req('GET', '/api/box-office/orders/link', undefined, null, link)).body.lines[0]).toMatchObject({ band: 'Stalls' })
     expect((await buy(h, 1)).ok).toBe(false)
 

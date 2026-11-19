@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { inAccountScope, nowMs, useDb } from '#kit'
 import { getPerformance, getProduction, placeName } from '#modules/core'
 import { liveLines } from './orders'
-import { lineKey, unnamedLines } from './line-names'
+import { lineKey, unnamedLines, withSections } from './line-names'
 import { doorCodesForOrders } from './tickets'
 
 export interface MyVisit {
@@ -31,7 +31,7 @@ export async function myBookings(accountId: string): Promise<{ upcoming: MyVisit
   const codes = new Map((await doorCodesForOrders(orders.filter(o => o.state === 'confirmed').map(o => o.id))).map(t => [t.lineId, t]))
   const visits: MyVisit[] = []
   for (const order of orders) {
-    const lines = await liveLines(order.id)
+    const lines = await withSections(await liveLines(order.id))
     const unnamed = await unnamedLines(lines)
     for (const performanceId of new Set(lines.map(l => l.performance_id))) {
       const performance = await getPerformance(performanceId).catch(() => null)
