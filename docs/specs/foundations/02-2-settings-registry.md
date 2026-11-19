@@ -83,7 +83,7 @@ export const settingRules = defineSettingRules('lost-property', [
 ])
 ```
 
-A failed rule refuses the save and shows the message at `lost-property.settings.rules.remind-before-disposal`.
+A failed rule refuses the save and shows the message at `lost-property.settings.rules.remind-before-disposal`. The rules see every change in one save together, so settings that depend on each other are saved at once in any order; a rule that already failed before the save is not the save's to fix and does not refuse it (as built, 19 November 2026).
 
 ## Reading a setting
 
