@@ -99,7 +99,7 @@ export default defineModule({
 
   credentials: {
     // The key verification lists are hashed with (V10). Lists cannot be used until it is set. Typed
-    // on Membership > Lists (Matt, 17 November), or set as a Worker secret of the same name. A new
+    // on Membership > Lists (Matt, 17 November). A new
     // key leaves every list already loaded unable to match, so the form asks first.
     MEMBERSHIP_LIST_KEY: credentialDecl({ needed: 'when-used', manage: 'membership.verification-list.manage', confirm: true }),
   },

@@ -230,12 +230,12 @@ export async function sweepJobs(at = nowMs()): Promise<{ reset: number, resent: 
   return { reset: reset.meta.changes ?? 0, resent: messages.length }
 }
 
-/** One minute of the cron trigger: tasks, the job sweep and external-call reconciliation. */
+/** One minute of the cron trigger: tasks, the job sweep, external-call reconciliation and moving old Worker secrets into the app. */
 export async function tick(env: KitEnv, at = nowMs()): Promise<void> {
   await runInContext({ env, actor: SYSTEM, cache: {} }, async () => {
     const { ensureMigrated } = await import('./migrations')
     await ensureMigrated()
-    for (const [step, fn] of [['scheduler', () => runScheduler(at)], ['sweep', () => sweepJobs(at)], ['reconcile', async () => (await import('./external')).reconcileDue(at)]] as const) {
+    for (const [step, fn] of [['scheduler', () => runScheduler(at)], ['sweep', () => sweepJobs(at)], ['reconcile', async () => (await import('./external')).reconcileDue(at)], ['credentials', async () => (await import('./secrets')).adoptWorkerSecrets()]] as const) {
       try { await fn() }
       catch (error) { log.error(`core.tick.${step}-failed`, { error: String((error as Error)?.message ?? error) }) }
     }

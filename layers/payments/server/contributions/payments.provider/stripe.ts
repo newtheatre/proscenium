@@ -2,7 +2,7 @@
 // a Stripe PaymentIntent: start creates one and hands its client secret to the checkout page, which
 // takes the card with Stripe's own form. Stripe's answer is always read back with status, never taken
 // from a webhook's body. Its keys are credentials, typed into each provider account on the Providers
-// screen (a Worker secret of the same name is used when none is saved): the secret key, the webhook
+// screen: the secret key, the webhook
 // signing secret and the publishable key that the page's card form loads with. A key for test mode
 // starts sk_test_ or pk_test_.
 import { credential, nowMs } from '#kit'

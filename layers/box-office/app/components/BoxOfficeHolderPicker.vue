@@ -12,8 +12,10 @@ import type { Buyer } from './BoxOfficeBuyerPicker.vue'
 export interface Holder { accountId: string, label: string, byHand: boolean }
 interface Answer { accountId: string, label: string, met: boolean, reason: string | null, mayOverride: boolean, mayApply: boolean }
 
-const props = defineProps<{ performanceId: string, /** One of these: the kind of ticket, or the pass price, they are to qualify for. */ ticketTypeId?: string, passPriceId?: string, label: string, companion?: boolean, disabled?: boolean }>()
+// `removeLabel` draws a bin beside the ticket, so one pressed by mistake can come off again.
+const props = defineProps<{ performanceId: string, /** One of these: the kind of ticket, or the pass price, they are to qualify for. */ ticketTypeId?: string, passPriceId?: string, label: string, companion?: boolean, disabled?: boolean, removeLabel?: string }>()
 const model = defineModel<Holder | undefined>()
+const emit = defineEmits<{ remove: [] }>()
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -102,6 +104,14 @@ function change() {
         :disabled="disabled"
         @click="change"
       />
+      <IconButton
+        v-if="removeLabel"
+        icon="i-lucide-trash-2"
+        size="sm"
+        :label="removeLabel"
+        :disabled="disabled"
+        @click="emit('remove')"
+      />
     </div>
     <UFormField
       v-else
@@ -120,6 +130,13 @@ function change() {
           icon-only
           :disabled="disabled || busy"
           @scanned="(code: string) => ask({ code })"
+        />
+        <IconButton
+          v-if="removeLabel"
+          icon="i-lucide-trash-2"
+          :label="removeLabel"
+          :disabled="disabled"
+          @click="emit('remove')"
         />
       </div>
     </UFormField>

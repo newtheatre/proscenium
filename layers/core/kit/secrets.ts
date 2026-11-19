@@ -1,10 +1,14 @@
 // Secrets and credentials. A secret is a Worker secret set in the dashboard; a credential is a key
 // entered in the app and stored encrypted in core_credentials with CORE_ENCRYPTION_KEY, for the
-// module or for one of its records (a scope), falling back to a Worker secret of the same name.
-// Neither is ever logged or returned to a browser. Special-category columns use the same key.
+// module or for one of its records (a scope). A credential is never read from the Worker (Matt, 19
+// November: nothing the site can hold is set on the Worker). Neither is ever logged or returned to a
+// browser. Special-category columns use the same key.
 import { useContext } from './context'
 import { useRegistry } from './registry'
 import { nowMs } from './clock'
+import { createUnit } from './unit'
+import { log } from './log'
+import { changeSetting } from './settings-store'
 import type { RecordRef, UnitView } from './unit'
 import type { CredentialDecl } from './manifest'
 
@@ -64,14 +68,13 @@ async function storedRows(moduleId: string, name: string, scope: string): Promis
  * Reads a secret or a credential the calling module declared. Null when it is not set.
  *
  * A credential is read from what an administrator saved in the app: for `scope` (a record, such as a
- * payment provider account) first, then the module-wide value. When neither is saved, a Worker
- * secret of the same name is used, so a key set in the Cloudflare dashboard keeps working.
+ * payment provider account) first, then the module-wide value.
  */
 export async function credential(name: string, scope = ''): Promise<string | null> {
   const manifest = ownerOf(name)
   if (manifest.secrets?.[name]) return workerSecret(name)
   const [row] = await storedRows(manifest.id, name, scope)
-  if (!row) return workerSecret(name)
+  if (!row) return null
   useContext().env.DB.prepare('UPDATE core_credentials SET last_used_at = ? WHERE module_id = ? AND name = ? AND scope = ?').bind(nowMs(), manifest.id, name, row.scope).run().catch(() => {})
   return open(row.ciphertext)
 }
@@ -79,8 +82,8 @@ export async function credential(name: string, scope = ''): Promise<string | nul
 /** Where a credential's value comes from, for a screen. Never the value itself. */
 export interface CredentialStatus {
   name: string
-  /** Saved for this scope, saved for the whole module, a Worker secret, or not set. */
-  source: 'saved' | 'saved-for-module' | 'worker-secret' | null
+  /** Saved for this scope, saved for the whole module, or not set. */
+  source: 'saved' | 'saved-for-module' | null
   /** The last four characters of a long value. */
   hint: string | null
   /** A long value's provider prefix (`sk_live_`, `whsec_`), so a screen can tell live from test. */
@@ -95,11 +98,7 @@ export async function credentialStatus(names: readonly string[], scope = ''): Pr
     const manifest = ownerOf(name)
     const [row] = manifest.credentials?.[name] ? await storedRows(manifest.id, name, scope) : []
     if (row) out.push({ name, source: row.scope === scope ? 'saved' : 'saved-for-module', ...splitHint(row.hint), setAt: row.set_at, setBy: row.set_by })
-    else {
-      // A Worker secret is read here on the server, so it is shown the same way as a saved value.
-      const value = manifest.credentials?.[name] ? workerSecret(name) : null
-      out.push({ name, source: workerSecret(name) ? 'worker-secret' : null, ...splitHint(value ? hintOf(value) : null), setAt: null, setBy: null })
-    }
+    else out.push({ name, source: null, hint: null, start: null, setAt: null, setBy: null })
   }
   return out
 }
@@ -159,10 +158,51 @@ export async function setCredential(unit: UnitView, name: string, value: string,
   unit.audit({ action: 'update', record: options.record, detail: { credential: name, ...(scope ? { scope } : {}) } })
 }
 
-/** Removes a saved credential. A Worker secret of the same name, if there is one, is used again. */
+/** Removes a saved credential. Anything that reads it then finds it unset. */
 export function clearCredential(unit: UnitView, name: string, options: { scope?: string, record?: RecordRef } = {}): void {
   const manifest = credentialOf(name)
   const scope = options.scope ?? ''
   unit.add({ sql: 'DELETE FROM core_credentials WHERE module_id = ? AND name = ? AND scope = ?', params: [manifest.id, name, scope] })
   unit.audit({ action: 'delete', record: options.record, detail: { credential: name, ...(scope ? { scope } : {}) } })
 }
+
+/**
+ * Moves keys that a site set up before 19 November still holds on the Worker into the app, from the
+ * minute's cron tick. A credential is saved for the whole module, audited by name, and the Turnstile
+ * site key goes into its public setting; each only while it has never been saved, changed or removed
+ * in the app, so what an administrator did there always stands. The Worker copies are then never read
+ * and can be deleted. Answers the names it moved. Costs nothing once no Worker copy is left.
+ */
+export async function adoptWorkerSecrets(): Promise<string[]> {
+  const { DB } = useContext().env
+  const moved: string[] = []
+  for (const m of useRegistry().modules.values()) {
+    for (const name of Object.keys(m.manifest.credentials ?? {})) {
+      const value = workerSecret(name)
+      if (!value) continue
+      const touched = await DB.prepare("SELECT 1 FROM core_credentials WHERE module_id = ? AND name = ? AND scope = '' UNION ALL SELECT 1 FROM core_audit WHERE json_extract(detail, '$.credential') = ? LIMIT 1")
+        .bind(m.manifest.id, name, name).first()
+      if (touched) continue
+      const unit = createUnit()
+      unit.add({
+        sql: "INSERT INTO core_credentials (module_id, name, scope, ciphertext, key_version, set_at, set_by, hint) VALUES (?, ?, '', ?, 1, ?, NULL, ?) ON CONFLICT (module_id, name, scope) DO NOTHING",
+        params: [m.manifest.id, name, await seal(value), nowMs(), hintOf(value)],
+      })
+      unit.audit({ action: 'update', detail: { credential: name, from: 'worker-secret' } })
+      await unit.commit()
+      moved.push(name)
+    }
+  }
+  const siteKey = workerSecret(TURNSTILE_SITE_KEY_VARIABLE)
+  if (siteKey && !(await DB.prepare('SELECT 1 FROM core_setting_changes WHERE key = ? LIMIT 1').bind(TURNSTILE_SITE_KEY_SETTING).first())) {
+    const unit = createUnit()
+    await changeSetting(unit.view(), TURNSTILE_SITE_KEY_SETTING, siteKey, { reason: `Moved from the Worker variable ${TURNSTILE_SITE_KEY_VARIABLE}` })
+    await unit.commit()
+    moved.push(TURNSTILE_SITE_KEY_VARIABLE)
+  }
+  if (moved.length) log.info('core.credentials.moved-from-worker', { names: moved })
+  return moved
+}
+
+const TURNSTILE_SITE_KEY_VARIABLE = 'NUXT_PUBLIC_TURNSTILE_SITE_KEY'
+const TURNSTILE_SITE_KEY_SETTING = 'core.sign-in.turnstile-site-key'

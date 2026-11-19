@@ -89,7 +89,7 @@ import copyToRunPost from '../../server/api/box-office/performances/[id]/sales/c
 import runSeatsPut from '../../server/api/box-office/productions/[id]/sales/seats.put'
 import openRunPost from '../../server/api/box-office/productions/[id]/sales/open.post'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
-import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
+import { call, env, inContext, person, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 export const NOV_16 = Date.UTC(2026, 10, 16, 12)
 
@@ -193,7 +193,7 @@ export async function req<T = any>(method: string, path: string, body?: unknown,
 /** Switches the modules on, sets the time zone and adds a cash provider, so a paid price can be sold. */
 export async function ready(): Promise<void> {
   // No challenge secret, as at a theatre that has not set one: the challenge is then quietly off.
-  ;(env as any).CORE_TURNSTILE_SECRET_KEY = ''
+  await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
   for (const id of ['finance', 'payments', 'box-office', 'promotions']) await setModule(id, true)
   await inContext(async () => {
     const unit = createUnit()

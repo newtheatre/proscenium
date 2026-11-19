@@ -7,7 +7,7 @@ import { integer, text, check, index, uniqueIndex } from 'drizzle-orm/sqlite-cor
 import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
 
-/** One configured connection to a provider. Secrets are Worker secrets; this table holds none. */
+/** One configured connection to a provider. Its keys are credentials in core_credentials; this table holds none. */
 export const providerAccounts = defineTable('payments_provider_accounts', {
   id: col.id(),
   // The id of a contribution to payments.provider, such as cash or stripe.
