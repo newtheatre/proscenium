@@ -46,7 +46,8 @@ async function reserved(h: House, quantity: number, name = 'Desk Guest') {
   return { orderId: made.basket.orderId, reference: done.body.reference as string, deskCode: done.body.deskCode as string, totalMinor: made.basket.totalMinor }
 }
 
-const till = (input: Record<string, unknown>, actor = seller) => req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }] }, actor)
+/** A walk-up sale at the till; `codes` and `staff` are the till's, for the whole sale. */
+const till = (input: Record<string, unknown>, actor = seller, pricing?: { codes?: string[], staff?: { promotionId: string, reason?: string }[] }) => req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], ...(pricing ? { pricing } : {}) }, actor)
 const payCash = (intentId: string) => inContext(() => attest({ intentId, providerAccountId: cash, method: 'cash' }), seller)
 
 beforeAll(async () => {
@@ -279,10 +280,10 @@ describe('selling at the desk', () => {
   it('gives each person of a split sale a booking of their own as their receipt goes, however many there are', async () => {
     const h = await house(8)
     await promoCode('SPLITFIVE', { effect: 'amount_off', value: 500, maxPerSale: 1 })
-    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 6 }], promoCode: 'SPLITFIVE' }
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 6 }] }
     // Six people, one ticket each; the code came off the first ticket.
     const splits = [0, 1, 2, 3, 4, 5].map(line => ({ items: [{ basket: 'box-office', line, quantity: 1 }] }))
-    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits }, seller)
+    const sale = await req('POST', '/api/payments/till/sale', { panels: [{ basket: 'box-office', input }], splits, pricing: { codes: ['SPLITFIVE'] } }, seller)
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
     expect(sale.body.amountMinor).toBe(6700)
     for (const n of [1, 2, 3, 4, 5, 6]) await inContext(() => attest({ intentId: sale.body.intentId, providerAccountId: cash, method: 'cash', split: n, receipt: { email: `six${n}@example.org` } }), seller)
@@ -377,10 +378,11 @@ describe('selling at the desk', () => {
     const h = await house(5)
     const code = 'DESK' + h.performanceId.slice(-6).toUpperCase()
     await promoCode(code, { value: 5000, maxPerSale: 1, maxUses: 1 })
-    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }], promoCode: code.toLowerCase() }
-    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
-    expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 600 + 800, panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 600 }, { label: 'Concession', amountMinor: 800 }] }] })
-    const sale = await till(input)
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }] }
+    const pricing = { codes: [code.toLowerCase()] }
+    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }], pricing }, seller)
+    expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 600 + 800, savings: [{ label: code, code, amountMinor: 600 }], panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 600 }, { label: 'Concession', amountMinor: 800 }] }] })
+    const sale = await till(input, seller, pricing)
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
     expect(sale.body.amountMinor).toBe(1400)
     const [made] = await rows<{ id: string }>('SELECT id FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
@@ -388,14 +390,16 @@ describe('selling at the desk', () => {
       .toEqual([{ list_minor: 1200, discount_minor: 600, amount_minor: 600, redeemed: 1 }, { list_minor: 800, discount_minor: 0, amount_minor: 800, redeemed: 0 }])
     expect(await count('SELECT used AS n FROM promotions_codes WHERE code = ?', code)).toBe(1)
     // Its only use is taken, so a second sale cannot have it...
-    expect((await till(input)).body.code).toBe('promotions.code.used-up')
+    expect((await till(input, seller, pricing)).body.code).toBe('promotions.code.used-up')
     // ...until the first payment is cancelled and its seats let go: the use is given back when the code is next used.
     await commit(unit => cancelIntent(unit.view(), sale.body.intentId))
-    const again = await till(input)
+    const again = await till(input, seller, pricing)
     expect(again.status, JSON.stringify(again.body)).toBe(200)
     expect(await count('SELECT used AS n FROM promotions_codes WHERE code = ?', code)).toBe(1)
     expect(await count("SELECT count(*) AS n FROM promotions_redemptions r JOIN promotions_codes c ON c.id = r.code_id WHERE c.code = ? AND r.state = 'released'", code)).toBe(1)
-    expect((await till({ ...input, promoCode: 'NOSUCHCODE' })).body.code).toBe('promotions.code.unknown')
+    expect((await till(input, seller, { codes: ['NOSUCHCODE'] })).body.code).toBe('promotions.code.unknown')
+    // A code is the till's now: the panel no longer takes one.
+    expect((await till({ ...input, promoCode: code })).body.code).toBe('box-office.desk.bad-input')
   })
 
   it('shows what was sold after the payment, and emails the tickets afterwards', async () => {
@@ -434,12 +438,36 @@ describe('selling at the desk', () => {
     const h = await house(5)
     const code = 'NOREQ' + h.performanceId.slice(-6).toUpperCase()
     await promoCode(code, { value: 2000, notWithRequirements: true })
-    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }], promoCode: code }
-    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }] }, seller)
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }, { bandId: h.bandId, ticketTypeId: h.concessionId, quantity: 1 }] }
+    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }], pricing: { codes: [code] } }, seller)
     expect(summary.body, JSON.stringify(summary.body)).toMatchObject({ amountMinor: 960 + 800, panels: [{ lines: [{ label: `Full price (${code})`, amountMinor: 960 }, { label: 'Concession', amountMinor: 800 }] }] })
-    const sale = await till(input)
+    const sale = await till(input, seller, { codes: [code] })
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
     expect(sale.body.amountMinor).toBe(1760)
+  })
+
+  it('gives a staff discount at the till only to a seller allowed to, with the reason asked for', async () => {
+    const h = await house(5)
+    const name = 'Comp ' + h.performanceId.slice(-6)
+    const id = await commit(unit => createPromotion(unit.view(), { name, label: 'Staff comp', trigger: 'staff', needsReason: true, effect: 'percent_off', value: 5000, codes: [], targets: [{ role: 'applies', kind: 'box-office.ticket' }] }, null))
+    const giver = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment', 'promotions.promotion.apply'])
+    await commit(unit => openSession(unit.view(), { accountId: giver.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
+    const input = { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] }
+
+    // Only a seller who may give staff discounts sees it, and only they may use it.
+    expect((await req('GET', '/api/payments/till/discounts', undefined, seller)).body.choices.some((c: any) => c.promotionId === id)).toBe(false)
+    expect((await req('GET', '/api/payments/till/discounts', undefined, giver)).body.choices).toContainEqual({ promotionId: id, label: 'Staff comp', name, needsReason: true })
+    expect((await till(input, seller, { staff: [{ promotionId: id, reason: 'Cast guest' }] })).body.code).toBe('promotions.staff.not-yours')
+
+    // The reason is asked for, then written with who gave it.
+    const summary = await req('POST', '/api/payments/till/summary', { panels: [{ basket: 'box-office', input }], pricing: { staff: [{ promotionId: id }] } }, giver)
+    expect(summary.body.code, JSON.stringify(summary.body)).toBe('promotions.staff.reason')
+    const sale = await till(input, giver, { staff: [{ promotionId: id, reason: 'Cast guest' }] })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(sale.body.amountMinor).toBe(1200)
+    const [use] = await rows<{ reason: string, applied_by: string | null }>("SELECT reason, applied_by FROM promotions_redemptions WHERE promotion_id = ? AND state = 'live'", id)
+    expect(use).toMatchObject({ reason: 'Cast guest' })
+    expect(use!.applied_by).toBeTruthy()
   })
 
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {

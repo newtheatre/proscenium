@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { defineRoute, Refusal } from '#kit'
 import { sessionOf } from '../../../sessions'
 import { prepareSale } from '../../../till'
-import { panels } from './summary.post'
+import { panels, pricing } from './summary.post'
 import { receiptTo, resolveReceipt } from '../../../receipt-input'
 
 export default defineRoute({
@@ -18,9 +18,10 @@ export default defineRoute({
     }).strict()).min(2).max(100).optional(), // not-policy: bounds on a receipt's size
     // Where the whole sale's receipt goes; a split sale's are given person by person as they pay.
     receipt: receiptTo.optional(),
+    pricing: pricing.optional(),
   }).strict(),
 }, async (_event, { input, actor, unit }) => {
   const session = await sessionOf(actor.accountId!)
   if (!session || session.state !== 'open') throw new Refusal('payments.session.none', 'Open a till session first.', { status: 409 })
-  return prepareSale(unit.view(), actor, session.id, input.panels as { basket: string, input: unknown }[], input.splits, await resolveReceipt(input.receipt))
+  return prepareSale(unit.view(), actor, session.id, input.panels as { basket: string, input: unknown }[], input.splits, await resolveReceipt(input.receipt), input.pricing)
 })

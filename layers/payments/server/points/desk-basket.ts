@@ -3,6 +3,7 @@
 // among others, so a bar works without a box office. What `prepare` makes is undone by the owner's
 // payments.settlement release.
 import type { UnitView } from '#kit'
+import type { PricedSale, PricingItem } from './pricing'
 
 /** One line of a panel's summary. */
 export interface SummaryLine {
@@ -18,6 +19,12 @@ export interface DeskContext {
   sessionId: string
   /** What the seller has put in this module's panel, as the panel sent it. */
   input: unknown
+  /**
+   * The panel's share of the sale as priced together (payments.pricing), when the panel offers
+   * `items`: keys are the panel's own. The panel writes each item's saving on its line and redeems
+   * it in `prepare`; it must not price its items again.
+   */
+  priced?: PricedSale
 }
 
 export interface DeskBasket {
@@ -67,5 +74,11 @@ export interface DeskBasket {
    * amount is shared between them a penny at a time from the first. A sale is split only by these
    * lines, so they must add up to the amount `prepare` gives.
    */
-  summary: (context: Pick<DeskContext, 'input'>) => Promise<{ lines: SummaryLine[], amountMinor: number }>
+  summary: (context: Pick<DeskContext, 'input' | 'priced'>) => Promise<{ lines: SummaryLine[], amountMinor: number }>
+  /**
+   * The panel's items at their list prices, so the till can price the whole sale at once with a
+   * code or a promotion the seller picks. Keys are the panel's own, unique within it. A panel without
+   * this sells at its own prices. Reads only.
+   */
+  items?: (context: Pick<DeskContext, 'input'>) => Promise<PricingItem[]>
 }

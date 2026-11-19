@@ -34,6 +34,11 @@ interface PanelReceipt {
 
 interface Panel { id: string, module: string, label: string, tab: string, icon: string | null, panel: string, livePanel: string | null }
 interface Summary { basket: string, lines: { label: string, amountMinor: number, quantity?: number, item?: string }[], amountMinor: number }
+/** A saving on the whole sale, as the server priced it. */
+interface Saving { label: string, code: string | null, amountMinor: number }
+interface Totals { panels: Summary[], savings?: Saving[], amountMinor: number }
+/** A promotion the seller may pick (payments.pricing's choices). */
+interface Choice { promotionId: string, label: string, name: string, needsReason: boolean }
 /** One person's share of a split sale, as the server holds it once the sale is made. */
 interface Share { position: number, amountMinor: number, items: { label: string, quantity: number, amountMinor: number }[], paid: boolean }
 interface Offer { providerAccountId: string, provider: string, label: string, method: string, mode: 'live' | 'test', readers?: { id: string, label: string }[] }
@@ -116,8 +121,19 @@ const panels = computed(() => (loaded.value?.panels ?? []).flatMap((p) => {
 const inputs = reactive<Record<string, unknown>>({})
 const filled = computed(() => panels.value.filter(p => inputs[p.id] !== null && inputs[p.id] !== undefined).map(p => ({ basket: p.id, input: inputs[p.id] })))
 
+// What the seller added to the whole sale (the unified promotions design): codes the customer gave,
+// and discounts picked from the till's list, each with its reason where one is asked for. The server
+// prices every panel together with them; a panel never sees them.
+const pricing = reactive<{ codes: string[], staff: { promotionId: string, label: string, reason?: string }[] }>({ codes: [], staff: [] })
+const pricingOf = (p: typeof pricing) => (p.codes.length || p.staff.length ? { codes: p.codes, staff: p.staff.map(s => ({ promotionId: s.promotionId, ...(s.reason ? { reason: s.reason } : {}) })) } : undefined)
+function emptyPanels() {
+  for (const p of panels.value) inputs[p.id] = null
+  pricing.codes = []
+  pricing.staff = []
+}
+
 // What the filled panels add up to, asked again shortly after the seller stops changing them.
-const summary = ref<{ panels: Summary[], amountMinor: number } | null>(null)
+const summary = ref<Totals | null>(null)
 const summing = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 let asked = 0
@@ -137,7 +153,7 @@ async function sum() {
   }
   summing.value = true
   try {
-    const answer = await $api<{ panels: Summary[], amountMinor: number }>('/api/payments/till/summary', { method: 'POST', body: { panels: filled.value } })
+    const answer = await $api<Totals>('/api/payments/till/summary', { method: 'POST', body: { panels: filled.value, pricing: pricingOf(pricing) } })
     if (ask !== asked) return
     summary.value = answer
     refusal.value = null
@@ -155,7 +171,7 @@ async function sum() {
   }
 }
 let timer: ReturnType<typeof setTimeout> | undefined
-watch(filled, () => {
+watch([filled, () => pricing.codes.length + pricing.staff.length], () => {
   stale.value = true
   clearTimeout(timer)
   timer = setTimeout(sum, 300) // not-policy: a pause in typing before the total is asked again
@@ -177,13 +193,20 @@ const estimate = computed(() => {
   return total
 })
 const total = computed(() => ((stale.value || summing.value) ? estimate.value : null) ?? summary.value?.amountMinor ?? 0)
-const groups = computed<ReceiptGroup[]>(() => panels.value.flatMap((p) => {
+// The savings on the sale are a group of their own at the foot, each taken off the total.
+const SAVINGS = 'payments.savings'
+const savingsGroup = computed<ReceiptGroup | null>(() => {
+  const savings = summary.value?.savings ?? []
+  if (!savings.length || stale.value || summing.value) return null
+  return { id: SAVINGS, label: t('payments.screens.till.savings'), icon: 'i-lucide-ticket-percent', note: null, counted: false, lines: savings.map((v, i) => ({ key: String(i), label: v.code ? t('payments.screens.till.saving-code', { label: v.label, code: v.code }) : v.label, quantity: 1, amountMinor: -v.amountMinor })) }
+})
+const groups = computed<ReceiptGroup[]>(() => panels.value.flatMap<ReceiptGroup>((p) => {
   if (inputs[p.id] === null || inputs[p.id] === undefined) return []
   const own = receipts[p.id]
   const lines: ReceiptLine[] = own?.lines.length ? own.lines : (summaryOf(p.id)?.lines ?? []).map((l, i) => ({ key: String(i), label: l.label, quantity: 1, amountMinor: l.amountMinor }))
   return lines.length ? [{ id: p.id, label: t(p.tab), icon: p.icon, lines, note: own?.note ?? null, counted: !!own?.lines.length }] : []
-}))
-const countOf = (list: ReceiptGroup[]) => list.reduce((sum, g) => sum + (g.counted ? g.lines.reduce((n, l) => n + l.quantity, 0) : g.lines.length), 0)
+}).concat(savingsGroup.value ? [savingsGroup.value] : []))
+const countOf = (list: ReceiptGroup[]) => list.filter(g => g.id !== SAVINGS).reduce((sum, g) => sum + (g.counted ? g.lines.reduce((n, l) => n + l.quantity, 0) : g.lines.length), 0)
 // While a payment is taken the receipt keeps the lines it is for, as they were when it started.
 const held = ref<ReceiptGroup[] | null>(null)
 const shown = computed(() => (sale.value ? held.value ?? [] : groups.value))
@@ -195,9 +218,62 @@ function said(id: string, receipt: PanelReceipt | null) {
   if (receipt && 'added' in receipt) added.value = receipt.added ?? null
 }
 function clearAll() {
-  for (const p of panels.value) inputs[p.id] = null
+  emptyPanels()
   added.value = null
 }
+
+// "Add a code or discount": a code the customer gives, or a discount from the till's list. Each is
+// tried against the sale before it is added, so a code that cannot be used says why in the window.
+const discounting = ref(false)
+const codeTyped = ref('')
+const picked = ref<string | undefined>(undefined)
+const reason = ref('')
+const choices = ref<Choice[] | null>(null)
+const discountRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const trying = ref(false)
+const pickedChoice = computed(() => choices.value?.find(c => c.promotionId === picked.value))
+async function openDiscounts() {
+  codeTyped.value = ''
+  picked.value = undefined
+  reason.value = ''
+  discountRefusal.value = null
+  discounting.value = true
+  if (!choices.value) {
+    try { choices.value = (await $api<{ choices: Choice[] }>('/api/payments/till/discounts')).choices }
+    catch { choices.value = [] }
+  }
+}
+async function tryAdding(next: typeof pricing) {
+  trying.value = true
+  discountRefusal.value = null
+  try {
+    const answer = await $api<Totals>('/api/payments/till/summary', { method: 'POST', body: { panels: filled.value, pricing: pricingOf(next) } })
+    pricing.codes = next.codes
+    pricing.staff = next.staff
+    summary.value = answer
+    discounting.value = false
+  }
+  catch (e) {
+    discountRefusal.value = toRefusal(e)
+  }
+  finally {
+    trying.value = false
+  }
+}
+function addCode() {
+  const code = codeTyped.value.trim()
+  if (!code) return
+  void tryAdding({ codes: [...pricing.codes.filter(c => c.toUpperCase() !== code.toUpperCase()), code], staff: pricing.staff })
+}
+function addPicked() {
+  const choice = pickedChoice.value
+  if (!choice) return
+  void tryAdding({ codes: pricing.codes, staff: [...pricing.staff.filter(s => s.promotionId !== choice.promotionId), { promotionId: choice.promotionId, label: choice.label, ...(reason.value.trim() ? { reason: reason.value.trim() } : {}) }] })
+}
+const addedDiscounts = computed(() => [
+  ...pricing.codes.map(code => ({ key: `code:${code}`, label: code.toUpperCase(), remove: () => { pricing.codes = pricing.codes.filter(c => c !== code) } })),
+  ...pricing.staff.map(s => ({ key: `staff:${s.promotionId}`, label: s.label, remove: () => { pricing.staff = pricing.staff.filter(x => x.promotionId !== s.promotionId) } })),
+])
 
 // The receipt is drawn once and shown beside the panels, or in a sheet where there is no room.
 const [DefineReceipt, Receipt] = createReusableTemplate()
@@ -209,7 +285,7 @@ onMounted(() => { mounted.value = true })
 const beside = computed(() => !mounted.value || wide.value)
 const sheet = ref(false)
 // Payment can start once the server has agreed the total.
-const payable = computed(() => groups.value.length > 0 && !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
+const payable = computed(() => groups.value.some(g => g.id !== SAVINGS) && !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
 
 // In live mode each panel is a tab once there are two; its badge counts the lines it adds to the sale.
 const tabbed = computed(() => props.live && panels.value.length > 1)
@@ -286,7 +362,7 @@ async function takePayment() {
     if (!open.value && !await ensureSession()) return
     // A split sale says who pays for which items; the server works out each person's amount.
     const splits = splitting.value ? plan.value.map(p => ({ items: p.items.map(i => ({ basket: i.basket, line: i.line, quantity: i.quantity })) })) : undefined
-    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value, splits, receipt: splits ? undefined : destination(receiptTo.value[0]) }, headers: { 'idempotency-key': saleKey.value } })
+    const sell = () => $api<{ intentId: string, amountMinor: number }>('/api/payments/till/sale', { method: 'POST', body: { panels: filled.value, splits, receipt: splits ? undefined : destination(receiptTo.value[0]), pricing: pricingOf(pricing) }, headers: { 'idempotency-key': saleKey.value } })
     let made: Awaited<ReturnType<typeof sell>>
     try {
       made = await sell()
@@ -600,7 +676,7 @@ async function cancel() {
   taking.value = true
   try {
     await $api(`/api/payments/intents/${sale.value.intentId}/cancel` as string, { method: 'POST', body: {} })
-    if (ok.ticked) for (const p of panels.value) inputs[p.id] = null
+    if (ok.ticked) emptyPanels()
     ended()
   }
   catch (e) {
@@ -634,7 +710,7 @@ async function giveBack() {
     ].filter(Boolean).join(' ')
     reset()
     afterSale()
-    for (const p of panels.value) inputs[p.id] = null
+    emptyPanels()
     toast.add({ id: TOAST, title: t('payments.screens.till.given-back'), description: said || undefined, color: 'success' })
   }
   catch (e) {
@@ -676,7 +752,7 @@ function done() {
   const receiptSent = !split && !!receiptTo.value[0]
   reset()
   afterSale()
-  for (const p of panels.value) inputs[p.id] = null
+  emptyPanels()
   // The sale stays on the receipt, and each panel that sold something shows what it made, until the
   // seller moves on to the next customer (till proposal, "after the sale").
   finished.value = { intentId: paid.intentId, amountMinor: paid.amountMinor, changeMinor: change, panels: sold, split, receiptSent }
@@ -714,7 +790,7 @@ watch(() => filled.value.length, (now) => { if (now) finished.value = null })
 function undone() {
   reset()
   afterSale()
-  for (const p of panels.value) inputs[p.id] = null
+  emptyPanels()
   toast.add({ id: TOAST, title: t('payments.screens.till.unfulfilled'), description: t('payments.screens.till.unfulfilled-help'), color: 'error' })
 }
 function ended() {
@@ -958,6 +1034,36 @@ function ended() {
                   {{ t('payments.screens.till.nothing-yet') }}
                 </p>
               </template>
+
+              <div
+                v-if="!sale && groups.length"
+                class="flex flex-wrap items-center gap-2"
+              >
+                <UBadge
+                  v-for="d in addedDiscounts"
+                  :key="d.key"
+                  color="neutral"
+                  variant="subtle"
+                  size="lg"
+                  class="gap-1"
+                >
+                  {{ d.label }}
+                  <IconButton
+                    icon="i-lucide-x"
+                    :label="t('payments.screens.till.discount-remove', { name: d.label })"
+                    class="-me-1"
+                    @click="d.remove()"
+                  />
+                </UBadge>
+                <UButton
+                  icon="i-lucide-ticket-percent"
+                  color="neutral"
+                  variant="link"
+                  class="px-0"
+                  :label="t('payments.screens.till.discount-add')"
+                  @click="openDiscounts"
+                />
+              </div>
 
               <p
                 v-if="sale || !finished || groups.length"
@@ -1371,6 +1477,82 @@ function ended() {
               </div>
             </div>
           </DefineReceipt>
+          <UModal
+            v-model:open="discounting"
+            :title="t('payments.screens.till.discount-add')"
+          >
+            <template #body>
+              <div class="space-y-6">
+                <RefusalNotice :refusal="discountRefusal" />
+                <UForm
+                  :state="{ codeTyped }"
+                  novalidate
+                  @submit="addCode"
+                >
+                  <UFormField
+                    :label="t('payments.screens.till.discount-code')"
+                    name="promoCode"
+                  >
+                    <div class="flex gap-2">
+                      <UInput
+                        v-model="codeTyped"
+                        class="w-48 uppercase"
+                        maxlength="40"
+                        autocomplete="off"
+                      />
+                      <UButton
+                        type="submit"
+                        color="neutral"
+                        variant="outline"
+                        :label="t('payments.screens.till.discount-apply')"
+                        :loading="trying"
+                        :disabled="!codeTyped.trim()"
+                      />
+                    </div>
+                  </UFormField>
+                </UForm>
+                <UForm
+                  v-if="choices?.length"
+                  :state="{ picked, reason }"
+                  novalidate
+                  class="space-y-4"
+                  @submit="addPicked"
+                >
+                  <UFormField
+                    :label="t('payments.screens.till.discount-pick')"
+                    name="staff"
+                  >
+                    <USelectMenu
+                      v-model="picked"
+                      :items="choices.map(c => ({ value: c.promotionId, label: c.name }))"
+                      value-key="value"
+                      class="w-72"
+                    />
+                  </UFormField>
+                  <UFormField
+                    v-if="pickedChoice?.needsReason"
+                    :label="t('payments.screens.till.discount-reason')"
+                    name="reason"
+                    required
+                  >
+                    <UInput
+                      v-model="reason"
+                      maxlength="200"
+                      class="w-80"
+                    />
+                  </UFormField>
+                  <UButton
+                    type="submit"
+                    color="neutral"
+                    variant="outline"
+                    :label="t('payments.screens.till.discount-give')"
+                    :loading="trying"
+                    :disabled="!pickedChoice || (pickedChoice.needsReason && !reason.trim())"
+                  />
+                </UForm>
+              </div>
+            </template>
+          </UModal>
 
           <!-- While a payment is being taken nothing in the sale can change: the panels say so plainly. -->
           <UAlert

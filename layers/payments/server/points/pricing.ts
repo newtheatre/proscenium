@@ -26,6 +26,19 @@ export interface PricingInput {
   codes?: string[]
   /** For a preview: prices each item as if alone, ignoring a promotion's limit for one sale. */
   preview?: boolean
+  /** Promotions a seller picked at the till, with the reason given where one is asked for. Each is checked against what the seller may give. */
+  staff?: { promotionId: string, reason?: string }[]
+}
+
+/** A promotion a seller may pick at the till, for the till's list. */
+export interface StaffChoice {
+  promotionId: string
+  /** What the customer sees on the saving. */
+  label: string
+  /** The staff's own name for it. */
+  name: string
+  /** A reason must be given to apply it. */
+  needsReason: boolean
 }
 
 /** A saving the pricer has worked out and will write when asked, keyed by the item. */
@@ -35,6 +48,8 @@ export interface PricedSaving {
   codeId: string | null
   minor: number
   uses: number
+  /** The reason a seller gave for a promotion they picked. */
+  reason?: string | null
 }
 
 export interface PricedSale {
@@ -50,6 +65,8 @@ export interface PricedSale {
 
 export interface Pricing {
   price: (input: PricingInput) => Promise<PricedSale>
+  /** The promotions the seller now may pick at the till. Reads only. */
+  choices: () => Promise<StaffChoice[]>
   /** Whether anything could take money off a sale on this channel with no code given, so a seller can skip pricing when nothing would. Reads only. */
   automatic: (channel: PricingInput['channel']) => Promise<boolean>
   /**
