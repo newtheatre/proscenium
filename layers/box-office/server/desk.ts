@@ -9,7 +9,7 @@ import { and, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, can, first, newId, nowMs, refuse, requireAbility, requirements, searchWords, useContext, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { accountLabel, addressFor, applyAtDesk, canonicalAccount, deskAccessForm, findAccounts, findOrCreateAccount, getPerformance, getProduction, listPerformances, operatingDayOf, placeName, type AccessApplication, type DeskAccessForm } from '#modules/core'
-import type { DeskContext, SummaryLine } from '#modules/payments'
+import type { DeskContext, PricedSale, PricingItem, SummaryLine } from '#modules/payments'
 import { owedHere, passOwing, passSalesMinor, passSalesOn } from './pass-sales'
 import { planOrder, pricedLines, writeOrder, type BasketLineInput, type OrderPlan } from './baskets'
 import { entitle, holderVerdict } from './entitlement'
@@ -26,7 +26,7 @@ import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
-import { moveTicketSavings } from './promotions'
+import { moveTicketSavings, pricedTickets, ticketItems, unpriced, type PricedTickets } from './promotions'
 import { availability } from './availability'
 import { salesOf } from './setup'
 
@@ -38,7 +38,7 @@ const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: 
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 // `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
 // `accountId` instead, when the seller picked the buyer from the person picker: the order is theirs.
-// `promoCode`, as the buyer gave it (BO-17): applied as it is online, to the dearest tickets first.
+// A code the buyer gives is the till's, for the whole sale: the till prices every panel together.
 const id = z.string().min(1).max(64) // not-policy: shape bound
 // A pass's code as typed or scanned: an imported pass keeps its old system's longer code as well.
 const passCode = z.string().trim().min(1).max(500) // not-policy: shape bound, longer than any old system's pass code
@@ -57,7 +57,6 @@ const saleInput = z.object({
   admit: z.boolean().optional(),
   email: z.email().max(254).optional(), // not-policy: the longest address
   accountId: id.optional(),
-  promoCode: z.string().trim().min(1).max(40).optional(), // not-policy: longer than any code
 }).strict()
   .refine(sale => !(sale.email && sale.accountId), { message: 'A sale goes to an address or a person, not both.' })
   .refine(sale => sale.lines.length || sale.passes?.length || sale.buy?.length || sale.collect?.length, { message: 'There is nothing in the sale.' })
@@ -95,7 +94,7 @@ async function reservation(orderId: string): Promise<{ order: OrderRow, lines: L
 const forPerformance = (input: SaleInput) => input.lines.length > 0 || !!input.passes?.length || !!input.buy?.some(b => b.entry !== false)
 
 /** The desk sale planned: its tickets, its passes' entries, and what is paid for passes. Reads only. */
-async function deskSale(input: SaleInput, at: number): Promise<OrderPlan> {
+async function deskSale(input: SaleInput, at: number, priced?: PricedSale): Promise<OrderPlan> {
   if (forPerformance(input)) {
     const sales = await salesOf(input.performanceId)
     if (!sales || sales.state === 'draft') refuse('box-office.sales.none', 'This performance is not set up for sale.', { status: 404 })
@@ -108,7 +107,7 @@ async function deskSale(input: SaleInput, at: number): Promise<OrderPlan> {
     const cap = await useSetting('box-office.orders.desk-seat-cap') as number
     if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one desk order.`, { status: 422 })
   }
-  const plan = await planOrder({ performanceId: input.performanceId, lines: input.lines, promoCode: input.promoCode, passes: input.passes, buy: input.buy }, { channel: 'desk', account: null }, at)
+  const plan = await planOrder({ performanceId: input.performanceId, lines: input.lines, passes: input.passes, buy: input.buy }, { channel: 'desk', account: null }, at, undefined, lines => deskDiscounts(lines, priced))
   // A pass paid for on its own: what it owes is collected here, unless a live booking already waits to.
   const collecting = await owedHere(await Promise.all((input.collect ?? []).map(code => passOwing(code))), at)
   const owed = [...plan.owed]
@@ -138,6 +137,20 @@ function saleLines(plan: OrderPlan, names: Map<string, string>): SummaryLine[] {
   return [...tickets, ...sold, ...owed]
 }
 
+/** The sale's tickets as the till priced them with its other panels (payments.pricing); at list prices when it did not. */
+function deskDiscounts(lines: readonly unknown[], priced: PricedSale | undefined): PricedTickets {
+  return priced ? pricedTickets(lines, priced) : unpriced(lines.length)
+}
+
+/** The panel's tickets for the till to price with the rest of the sale: a sale's only, since a reservation and an exchange are priced already. Reads only. */
+export async function deskItems(context: Pick<DeskContext, 'input'>): Promise<PricingItem[]> {
+  const input = panelInput(context.input)
+  if (!('sale' in input)) return []
+  const plan = await deskSale(input.sale, nowMs())
+  // Only the tickets bought: a pass's entry is never discounted.
+  return ticketItems(input.sale.performanceId, plan.lines.slice(0, plan.bought))
+}
+
 /**
  * Where the panel's sale happens, for a till session it opens: the space of the performance it is
  * for, when that performance is today (tonight's show); otherwise it says nothing. Reads only.
@@ -156,7 +169,7 @@ export async function deskSpace(context: Pick<DeskContext, 'input'>): Promise<st
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
-export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: SummaryLine[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input' | 'priced'>): Promise<{ lines: SummaryLine[], amountMinor: number }> {
   const input = panelInput(context.input)
   if ('exchange' in input) {
     const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
@@ -168,7 +181,7 @@ export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<
   }
   else {
     const names = new Map((await all<{ id: string, name: string }>('SELECT id, name FROM box_office_ticket_types')).map(t => [t.id, t.name]))
-    lines = saleLines(await deskSale(input.sale, nowMs()), names)
+    lines = saleLines(await deskSale(input.sale, nowMs(), context.priced), names)
   }
   return { lines, amountMinor: lines.reduce((sum, l) => sum + l.amountMinor, 0) }
 }
@@ -199,7 +212,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   }
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
-  const plan = await deskSale(input.sale, at)
+  const plan = await deskSale(input.sale, at, context.priced)
   if (plan.totalMinor <= 0) {
     if (plan.entryOf.some(Boolean)) refuse('box-office.desk.issue-instead', 'There is nothing to pay for these entries.', { status: 422, remedy: 'Book them from the box office panel, without the till.' })
     refuse('box-office.desk.nothing-to-pay', 'These tickets cost nothing, so there is no payment to take for them.', { status: 422 })

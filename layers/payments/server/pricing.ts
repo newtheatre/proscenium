@@ -2,7 +2,7 @@
 // these and never the pricer itself, so a theatre without Promotions sells at list prices and no
 // module imports another.
 import { refuse, usePoint, type UnitView } from '#kit'
-import type { PricedSale, Pricing, PricingInput } from './points/pricing'
+import type { PricedSale, Pricing, PricingInput, StaffChoice } from './points/pricing'
 
 async function pricer(): Promise<Pricing | null> {
   return (await usePoint<Pricing>('payments.pricing'))[0]?.value ?? null
@@ -12,10 +12,16 @@ async function pricer(): Promise<Pricing | null> {
 export async function priceSale(input: PricingInput): Promise<PricedSale> {
   const p = await pricer()
   if (p) return p.price(input)
-  if (input.codes?.some(c => c.trim())) {
+  if (input.codes?.some(c => c.trim()) || input.staff?.length) {
     refuse('payments.pricing.no-codes', 'Codes are not taken here.', { status: 422, fields: { promoCode: 'invalid' } })
   }
   return { items: input.items.map(i => ({ key: i.key, discountMinor: 0 })), applied: [], savings: [], stale: [] }
+}
+
+/** The promotions the seller may pick at the till; none when nothing prices sales. Reads only. */
+export async function staffChoices(): Promise<StaffChoice[]> {
+  const p = await pricer()
+  return p ? p.choices() : []
 }
 
 /** Whether a sale on this channel with no code could be priced below its list prices at all. Reads only. */
