@@ -30,7 +30,10 @@ interface PanelReceipt {
   note?: { text: string, icon?: string, action?: { label: string, run: () => void } } | null
   /** What the seller last added, with the way to take it back. */
   added?: { label: string, undo: () => void } | null
+  /** Ways to finish the panel's part without taking payment, such as reserving to pay later; offered beside the ways to pay, never in live mode. */
+  actions?: PanelAction[]
 }
+interface PanelAction { key: string, label: string, icon?: string, loading?: boolean, run: () => void }
 
 interface Panel { id: string, module: string, label: string, tab: string, icon: string | null, panel: string, livePanel: string | null }
 interface Summary { basket: string, lines: { label: string, amountMinor: number, quantity?: number, item?: string }[], amountMinor: number }
@@ -217,6 +220,8 @@ function said(id: string, receipt: PanelReceipt | null) {
   receipts[id] = receipt
   if (receipt && 'added' in receipt) added.value = receipt.added ?? null
 }
+// The panels' other ways to finish, at the console's till only: live mode takes payment and nothing else.
+const panelActions = computed(() => (props.live ? [] : panels.value.flatMap(p => (inputs[p.id] === null || inputs[p.id] === undefined ? [] : receipts[p.id]?.actions ?? []))))
 function clearAll() {
   emptyPanels()
   added.value = null
@@ -1227,6 +1232,19 @@ function ended() {
                   :disabled="!payable"
                   :label="t('payments.screens.till.take', { amount: money(total) })"
                   @click="takePayment"
+                />
+                <UButton
+                  v-for="a in panelActions"
+                  :key="a.key"
+                  block
+                  size="lg"
+                  color="neutral"
+                  variant="outline"
+                  :icon="a.icon"
+                  :loading="a.loading"
+                  :disabled="taking || stale || summing"
+                  :label="a.label"
+                  @click="a.run"
                 />
               </template>
 
