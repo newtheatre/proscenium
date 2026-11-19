@@ -46,7 +46,7 @@ const passCode = z.string().trim().min(1).max(500) // not-policy: shape bound, l
 // unless `entry` is false, and its holder when the seller picked one. `collect`: passes whose money
 // is still owed, paid for here on their own.
 const passAsk = z.object({ code: passCode, bandId: id.optional(), wheelchair: z.boolean().optional() }).strict()
-const passBuy = z.object({ passTypeId: id, passPriceId: id, bandId: id.optional(), wheelchair: z.boolean().optional(), entry: z.boolean().optional(), accountId: id.optional(), email: z.email().max(254).optional() }).strict() // not-policy: the longest address
+const passBuy = z.object({ passTypeId: id, passPriceId: id, bandId: id.optional(), wheelchair: z.boolean().optional(), entry: z.boolean().optional(), accountId: id.optional(), email: z.email().max(254).optional(), reference: z.string().trim().min(1).max(64).optional() }).strict() // not-policy: the longest address; the longest reference any list holds
   .refine(b => !(b.accountId && b.email), { message: 'A pass is held by a person or an address, not both.' })
 const saleInput = z.object({
   performanceId: z.string(),
@@ -802,6 +802,12 @@ export interface DeskHolder {
   mayApply: boolean
 }
 
+/** A pass price only some people may have, in the shape the holder check reads. */
+async function passPriceAsType(passPriceId: string): Promise<{ name: string, requirementRefs: string[], maxPerHolder: number } | undefined> {
+  const row = await first<{ name: string, price: string, refs: string | null }>('SELECT y.name, p.name AS price, p.requirement_refs AS refs FROM box_office_pass_prices p JOIN box_office_pass_types y ON y.id = p.pass_type_id WHERE p.id = ? AND p.active = 1', passPriceId)
+  return row ? { name: `${row.name} ${row.price}`, requirementRefs: row.refs ? JSON.parse(row.refs) as string[] : [], maxPerHolder: 1 } : undefined
+}
+
 /** A requirement the access scheme answers, such as core.access-scheme:wheelchair. */
 const ACCESS_SCHEME = 'core.access-scheme:'
 
@@ -810,10 +816,11 @@ const ACCESS_SCHEME = 'core.access-scheme:'
  * card scanned, such as a membership card, whose module says whose it is, or a person found by name.
  * Says whether they qualify, so the seller knows before taking payment; the sale checks again.
  */
-export async function deskHolder(input: { performanceId: string, ticketTypeId: string, code?: string, accountId?: string }): Promise<DeskHolder> {
+export async function deskHolder(input: { performanceId: string, ticketTypeId?: string, passPriceId?: string, code?: string, accountId?: string }): Promise<DeskHolder> {
   const actor = useContext().actor
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.performanceId])
-  const type = (await sellableTypes()).get(input.ticketTypeId)
+  // A pass's price only some people may have is checked the same way (Matt, 19 November).
+  const type = input.passPriceId ? await passPriceAsType(input.passPriceId) : (await sellableTypes()).get(input.ticketTypeId ?? '')
   if (!type || !type.requirementRefs.length) refuse('box-office.ticket-type.not-found', 'That kind of ticket does not need its holder named.', { status: 422 })
   let found: string | null = null
   if (input.code) {
@@ -833,11 +840,12 @@ export async function deskHolder(input: { performanceId: string, ticketTypeId: s
   }
   const accountId = await canonicalAccount(found!)
   const verdict = await holderVerdict(input.performanceId, type, accountId)
+  const what = input.passPriceId ? `the ${type.name} price` : `${type.name} tickets`
   return {
     accountId,
     label: await accountLabel(accountId),
     met: !!verdict.met,
-    reason: verdict.met ? null : verdict.reason ?? (verdict.unavailable ? `${type.name} tickets cannot be checked just now.` : `This person does not qualify for ${type.name} tickets, as far as we can tell.`),
+    reason: verdict.met ? null : verdict.reason ?? (verdict.unavailable ? `${what} cannot be checked just now.` : `This person does not qualify for ${what}, as far as we can tell.`),
     mayOverride: !verdict.met && (await can(actor, 'box-office.ticket-type.override-requirement', ['core.performance', input.performanceId])).allowed,
     mayApply: !verdict.met && type.requirementRefs.some(r => r.startsWith(ACCESS_SCHEME)) && accountId !== actor.accountId && (await deskAccessForm(accountId))?.applied === false,
   }
