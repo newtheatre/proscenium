@@ -80,7 +80,12 @@ const usable = computed(() => open.value || !!session.value?.mayOpen)
 // changes (useRealtime), and where it cannot, the strip asks again by itself.
 const SESSION_REFRESH = 15_000 // not-policy: how often the till asks after the shared session without news
 const visibility = useDocumentVisibility()
-const { connected: told } = useRealtime('payments.session', () => { void refreshSession() })
+const { connected: told } = useRealtime('payments.session', () => {
+  void refreshSession()
+  // A sale being taken on a linked device, or answered by a reader, moves on at once. Not while this
+  // device is itself taking it: its own answer carries the change to give, and comes first.
+  if (sale.value && !taking.value) void check().catch(() => {})
+})
 useIntervalFn(() => { if (visibility.value === 'visible' && !told.value) void refreshSession() }, SESSION_REFRESH)
 watch(visibility, (now) => { if (now === 'visible') void refreshSession() })
 const { time } = useDates()
@@ -588,8 +593,11 @@ const methodLabel = (m: Offer) => (shared(m) ? `${plainName(m)} · ${m.label}` :
 
 async function check() {
   if (!sale.value) return
+  const asked = sale.value.intentId
   const before = payment.value?.paidMinor ?? 0
-  const now = await $api<Status>(`/api/payments/intents/${sale.value.intentId}` as string)
+  const now = await $api<Status>(`/api/payments/intents/${asked}` as string)
+  // Asked twice at once, as by news and the timer: the first answer may already have ended the sale.
+  if (sale.value?.intentId !== asked) return
   payment.value = now
   if (now.state === 'succeeded') return done()
   if (now.state === 'unfulfilled') return undone()
@@ -703,6 +711,7 @@ async function resume(intentId: string, said: string) {
       poll()
     }
     else if (said === 'reload') pickedUp = toast.add({ id: `${TOAST}-picked-up`, title: t('payments.screens.till.picked-up', { amount: money(now.amountMinor - now.paidMinor) }), description: t('payments.screens.till.picked-up-help'), color: 'warning' }).id
+    else if (said === 'linked') return
     else if (said === 'succeeded') toast.add({ id: TOAST, title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
     else if (said === 'failed') result.value = { kind: 'declined' }
     else toast.add({ id: TOAST, title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
@@ -723,6 +732,159 @@ onMounted(() => {
   const left = mine === undefined ? session.value?.unfinished : session.value?.openSales?.find(s => s.intentId === mine)
   if (left) void resume(left.intentId, 'reload')
   else if (mine) forget()
+})
+
+// Linked tills (linked tills proposal, 19 November 2026): every device signed in to the seller's
+// account that has the till open shares one sale. What is in the panels, the codes and discounts and
+// the payment being taken are passed to the others as they change (useRealtime, device.payments.till)
+// and kept by the room for a device that arrives later. A device can disconnect, and then stays its
+// own till, on that device, until it is linked again. Money is not passed this way: each device
+// reads the payment from the server, as it always has.
+const SOLO_KEY = 'payments.till.solo'
+interface SharedSale { rev: number, by: string, inputs: Record<string, unknown>, pricing: { codes: string[], staff: { promotionId: string, label: string, reason?: string }[] }, sale: { intentId: string, by: string, held: ReceiptGroup[], splitting: boolean } | null }
+const solo = ref(false)
+/** The device that started the payment being taken, where it was not this one. */
+const saleBy = ref<string | null>(null)
+/** Another device's sale that arrived while this one had items too: the seller says which to keep. */
+const clash = ref<SharedSale | null>(null)
+let rev = 0
+let applying = false
+let lastShared = ''
+const link = useRealtime('device.payments.till', (data, meta) => { void heard(data as SharedSale | null, meta) })
+const others = computed(() => link.devices.value.filter(d => d.id !== link.deviceId()))
+const linked = computed(() => !solo.value && link.connected.value && others.value.length > 0)
+const nameOf = (id: string | null) => link.devices.value.find(d => d.id === id)?.name ?? t('payments.screens.till.linked.another-device')
+const syncLabel = computed(() => {
+  if (solo.value) return t('payments.screens.till.linked.button-solo')
+  if (!others.value.length) return t('payments.screens.till.linked.button-alone')
+  return others.value.length === 1 ? t('payments.screens.till.linked.button-linked', { name: others.value[0]!.name }) : t('payments.screens.till.linked.button-linked-many', { count: others.value.length })
+})
+const deviceLabel = ref('')
+watch(link.deviceName, (now) => { deviceLabel.value = now }, { immediate: true })
+
+function snapshot(): SharedSale {
+  return JSON.parse(JSON.stringify({
+    rev,
+    by: link.deviceId(),
+    inputs: Object.fromEntries(filled.value.map(f => [f.basket, f.input])),
+    pricing: { codes: pricing.codes, staff: pricing.staff },
+    sale: sale.value ? { intentId: sale.value.intentId, by: saleBy.value ?? link.deviceId(), held: plain(held.value ?? []), splitting: splitting.value } : null,
+  })) as SharedSale
+}
+/** What a sale holds, without who said it or when: two devices with the same have nothing to pass on. */
+const contentOf = (s: SharedSale) => JSON.stringify([s.inputs, s.pricing, s.sale?.intentId ?? null, s.sale?.splitting ?? false])
+const holds = (s: SharedSale) => Object.keys(s.inputs).length > 0 || !!s.sale
+
+function share() {
+  if (solo.value || applying || !link.connected.value) return
+  const mine = snapshot()
+  if (contentOf(mine) === lastShared) return
+  mine.rev = ++rev
+  lastShared = contentOf(mine)
+  link.send(mine, { keep: true })
+}
+let sharing: ReturnType<typeof setTimeout> | undefined
+watch([filled, () => JSON.stringify(pricing), () => sale.value?.intentId ?? null, splitting], () => {
+  if (applying || solo.value) return
+  clearTimeout(sharing)
+  sharing = setTimeout(share, 150) // not-policy: a pause so one press is one message
+}, { deep: true })
+
+async function adopt(theirs: SharedSale) {
+  clash.value = null
+  rev = theirs.rev
+  lastShared = contentOf(theirs)
+  // The payment ended on the other device: the server says how, before the panels are emptied.
+  if (sale.value && theirs.sale?.intentId !== sale.value.intentId) {
+    await check().catch(() => {})
+    if (sale.value) reset()
+  }
+  applying = true
+  try {
+    for (const p of panels.value) {
+      const value = theirs.inputs[p.id] ?? null
+      if (JSON.stringify(inputs[p.id] ?? null) !== JSON.stringify(value)) inputs[p.id] = value
+    }
+    pricing.codes = [...theirs.pricing.codes]
+    pricing.staff = [...theirs.pricing.staff]
+    await nextTick()
+  }
+  finally {
+    applying = false
+  }
+  if (theirs.sale && sale.value?.intentId !== theirs.sale.intentId) {
+    saleBy.value = theirs.sale.by === link.deviceId() ? null : theirs.sale.by
+    held.value = theirs.sale.held
+    splitting.value = theirs.sale.splitting
+    await resume(theirs.sale.intentId, 'linked')
+  }
+}
+
+async function heard(theirs: SharedSale | null, meta: { from: string | null, kept: boolean }) {
+  if (solo.value) return
+  if (!theirs) {
+    // The room keeps nothing: what this device holds becomes the linked sale.
+    if (meta.kept) {
+      lastShared = ''
+      share()
+    }
+    return
+  }
+  if (meta.kept) {
+    const mine = snapshot()
+    if (contentOf(mine) === contentOf(theirs)) {
+      rev = Math.max(rev, theirs.rev)
+      lastShared = contentOf(theirs)
+      return
+    }
+    if (!holds(theirs)) {
+      rev = Math.max(rev, theirs.rev)
+      lastShared = ''
+      return share()
+    }
+    // Both have something, and a payment cannot be set aside: the seller chooses.
+    if (holds(mine) && theirs.by !== link.deviceId() && !theirs.sale && !sale.value) {
+      clash.value = theirs
+      return
+    }
+    if (sale.value) return
+  }
+  else if (theirs.rev < rev || (theirs.rev === rev && theirs.by <= link.deviceId())) {
+    return
+  }
+  await adopt(theirs)
+}
+function keepMine() {
+  if (!clash.value) return
+  rev = Math.max(rev, clash.value.rev)
+  clash.value = null
+  lastShared = ''
+  share()
+}
+
+/** This device becomes its own till. The sale stays with the others, unless this device is taking the payment. */
+function disconnect() {
+  solo.value = true
+  clash.value = null
+  try { localStorage.setItem(SOLO_KEY, '1') }
+  catch { /* storage refused: the device links again when the page is loaded */ }
+  if (!linkedBefore()) return
+  if (sale.value && !saleBy.value) return
+  if (sale.value) reset()
+  emptyPanels()
+}
+// Whether there was anyone to leave: a device alone in the room keeps what it has.
+const linkedBefore = () => link.connected.value && others.value.length > 0
+function linkAgain() {
+  solo.value = false
+  try { localStorage.removeItem(SOLO_KEY) }
+  catch { /* nothing kept */ }
+  lastShared = ''
+  link.ask()
+}
+onMounted(() => {
+  try { solo.value = localStorage.getItem(SOLO_KEY) === '1' }
+  catch { /* storage refused: linked, as a new device is */ }
 })
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
@@ -797,6 +959,7 @@ function reset() {
   splitting.value = false
   added.value = null
   sale.value = null
+  saleBy.value = null
   payment.value = null
   result.value = null
   choice.value = undefined
@@ -893,6 +1056,72 @@ function ended() {
             class="size-4 shrink-0"
           />
           <span class="min-w-0 flex-1 truncate">{{ open && session?.session ? t('payments.screens.till.session-since-short', { time: time(session.session.openedAt) }) : t('payments.screens.till.session-opens-short') }}</span>
+          <UPopover v-if="link.connected.value">
+            <UButton
+              color="neutral"
+              variant="outline"
+              :size="live ? 'lg' : 'sm'"
+              :icon="linked ? 'i-lucide-link' : 'i-lucide-unlink'"
+              :label="syncLabel"
+              data-testid="till-sync"
+            />
+            <template #content>
+              <div class="w-80 max-w-[90vw] space-y-3 p-3 text-sm">
+                <p class="font-medium text-highlighted">
+                  {{ t('payments.screens.till.linked.title') }}
+                </p>
+                <UFormField :label="t('payments.screens.till.linked.this-device')">
+                  <UInput
+                    v-model="deviceLabel"
+                    maxlength="60"
+                    @change="link.rename(deviceLabel)"
+                  />
+                </UFormField>
+                <p
+                  v-if="!others.length"
+                  class="text-muted"
+                >
+                  {{ t('payments.screens.till.linked.none') }}
+                </p>
+                <ul
+                  v-else
+                  class="space-y-1"
+                >
+                  <li
+                    v-for="d in others"
+                    :key="d.id"
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <span class="min-w-0 truncate">{{ d.name }}</span>
+                    <UBadge
+                      :color="solo ? 'neutral' : 'success'"
+                      variant="subtle"
+                      :label="solo ? t('payments.screens.till.linked.not-linked') : t('payments.screens.till.linked.in-sync')"
+                    />
+                  </li>
+                </ul>
+                <p class="text-muted">
+                  {{ solo ? t('payments.screens.till.linked.help-solo') : t('payments.screens.till.linked.help-linked') }}
+                </p>
+                <UButton
+                  v-if="solo"
+                  block
+                  icon="i-lucide-link"
+                  :label="t('payments.screens.till.linked.link')"
+                  @click="linkAgain"
+                />
+                <UButton
+                  v-else
+                  block
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-unlink"
+                  :label="t('payments.screens.till.linked.disconnect')"
+                  @click="disconnect"
+                />
+              </div>
+            </template>
+          </UPopover>
           <UPopover>
             <IconButton
               icon="i-lucide-map-pin"
@@ -931,6 +1160,72 @@ function ended() {
               @update:model-value="move"
             />
           </div>
+          <UPopover v-if="link.connected.value">
+            <UButton
+              color="neutral"
+              variant="outline"
+              :size="live ? 'lg' : 'sm'"
+              :icon="linked ? 'i-lucide-link' : 'i-lucide-unlink'"
+              :label="syncLabel"
+              data-testid="till-sync-wide"
+            />
+            <template #content>
+              <div class="w-80 max-w-[90vw] space-y-3 p-3 text-sm">
+                <p class="font-medium text-highlighted">
+                  {{ t('payments.screens.till.linked.title') }}
+                </p>
+                <UFormField :label="t('payments.screens.till.linked.this-device')">
+                  <UInput
+                    v-model="deviceLabel"
+                    maxlength="60"
+                    @change="link.rename(deviceLabel)"
+                  />
+                </UFormField>
+                <p
+                  v-if="!others.length"
+                  class="text-muted"
+                >
+                  {{ t('payments.screens.till.linked.none') }}
+                </p>
+                <ul
+                  v-else
+                  class="space-y-1"
+                >
+                  <li
+                    v-for="d in others"
+                    :key="d.id"
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <span class="min-w-0 truncate">{{ d.name }}</span>
+                    <UBadge
+                      :color="solo ? 'neutral' : 'success'"
+                      variant="subtle"
+                      :label="solo ? t('payments.screens.till.linked.not-linked') : t('payments.screens.till.linked.in-sync')"
+                    />
+                  </li>
+                </ul>
+                <p class="text-muted">
+                  {{ solo ? t('payments.screens.till.linked.help-solo') : t('payments.screens.till.linked.help-linked') }}
+                </p>
+                <UButton
+                  v-if="solo"
+                  block
+                  icon="i-lucide-link"
+                  :label="t('payments.screens.till.linked.link')"
+                  @click="linkAgain"
+                />
+                <UButton
+                  v-else
+                  block
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-unlink"
+                  :label="t('payments.screens.till.linked.disconnect')"
+                  @click="disconnect"
+                />
+              </div>
+            </template>
+          </UPopover>
           <UButton
             to="/console/payments/sessions"
             color="neutral"
@@ -944,6 +1239,27 @@ function ended() {
         <PaymentsHandBack
           :live="live"
           class="mb-6"
+        />
+        <UAlert
+          v-if="clash"
+          class="mb-6"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-link"
+          :title="t('payments.screens.till.linked.clash', { name: nameOf(clash.by) })"
+          :description="t('payments.screens.till.linked.clash-help')"
+          :actions="[
+            { label: t('payments.screens.till.linked.keep-mine'), color: 'neutral', variant: 'outline', onClick: keepMine },
+            { label: t('payments.screens.till.linked.keep-theirs', { name: nameOf(clash.by) }), onClick: () => { if (clash) void adopt(clash) } },
+          ]"
+        />
+        <UAlert
+          v-if="sale && saleBy"
+          class="mb-6"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-link"
+          :title="t('payments.screens.till.linked.sale-elsewhere', { name: nameOf(saleBy) })"
         />
         <EmptyState
           v-if="!panels.length"
