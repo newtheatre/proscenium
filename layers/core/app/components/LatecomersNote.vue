@@ -31,7 +31,7 @@ const { t } = useT()
       name="i-lucide-clock-alert"
       class="mt-0.5 size-4 shrink-0 text-muted"
     />
-    <span>{{ t(`core.latecomers.${rule}`) }}<template v-if="rules"> <ULink
+    <span>{{ t(`core.latecomers.${rule}`) }}{{ rules ? ' ' : '' }}<template v-if="rules"><ULink
       to="/policies/visiting#section-if-you-are-late"
       class="text-muted underline underline-offset-2 hover:text-primary"
     >{{ t('core.latecomers.rules') }}</ULink></template></span>

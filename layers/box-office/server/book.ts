@@ -82,7 +82,9 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     maxPerOrder: sales?.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number,
     timing,
     // A pass that must be paid for when it is bought is not offered where online orders can only be reserved.
-    passes: { ...await passesFor(performanceId, account), onSale: (await passesOnSale(performanceId, { channel: 'online', account })).filter(p => p.reserveUnpaid || timing !== 'reserve'), wheelchair: [...types.values()].some(type => type.managedBy === WHEELCHAIR_TYPE && judged.get(type.id)?.most !== undefined && found.bands.some(b => b.free > 0 && b.prices.some(p => p.ticketTypeId === type.id))) },
+    passes: { ...await passesFor(performanceId, account), onSale: (await passesOnSale(performanceId, { channel: 'online', account }))
+      // Online a pass is offered only as a swap for the tickets its prices are offered instead of (Matt, 18 and 19 November).
+      .map(p => ({ ...p, prices: p.prices.filter(price => price.insteadOf.length) })).filter(p => p.prices.length && (p.reserveUnpaid || timing !== 'reserve')), wheelchair: [...types.values()].some(type => type.managedBy === WHEELCHAIR_TYPE && judged.get(type.id)?.most !== undefined && found.bands.some(b => b.free > 0 && b.prices.some(p => p.ticketTypeId === type.id))) },
     bands: found.bands.map(b => ({
       bandId: b.bandId,
       name: b.name,

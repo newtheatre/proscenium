@@ -1,5 +1,5 @@
-// The price line on listings and production pages: one open price reads as itself, a range as
-// "From", lower prices for those who qualify by name, and a show whose every price is nothing as "Free".
+// The price line on listings and production pages: one price for everyone reads as itself, anything
+// else as "From" the lowest anyone pays, and a show whose every price is nothing as "Free".
 import { describe, expect, it } from 'vitest'
 import catalogue from '../../i18n/en-GB.json'
 import { priceSummary } from '../../app/utils/price-summary'
@@ -12,9 +12,10 @@ describe('the price line', () => {
     expect(priceSummary({ currency: 'GBP', fromMinor: 0, toMinor: 0, others: [] }, t)).toBe('Free')
   })
 
-  it('gives one open price as itself, with concessions and members after it', () => {
+  it('gives one price for everyone as itself, and otherwise the lowest anyone pays', () => {
+    expect(priceSummary({ currency: 'GBP', fromMinor: 1200, toMinor: 1200, others: [] }, t)).toBe('£12')
     expect(priceSummary({ currency: 'GBP', fromMinor: 1200, toMinor: 1200, others: [{ label: 'Member', amountMinor: 700 }, { label: 'Concession', amountMinor: 900 }] }, t))
-      .toBe('£12 · Member £7 · Concession £9')
+      .toBe('From £7')
   })
 
   it('says "From" across a range of open prices and keeps pence that are not whole', () => {
