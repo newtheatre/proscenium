@@ -277,7 +277,9 @@ export async function issueDeskSale(unit: UnitView, input: unknown): Promise<{ o
   const at = nowMs()
   const plan = await deskSale(sale, at)
   if (plan.totalMinor > 0) refuse('box-office.desk.to-pay', 'There is something to pay for this sale.', { status: 409, remedy: 'Take payment for it at the till.' })
-  const { order, lineIds } = await writeDeskOrder(unit, sale, plan, at, at + FREE_HOLD)
+  // With nobody named, entries on one holder's passes are theirs, so the booking is in their account and emailed to them.
+  const holder = sale.accountId || sale.email ? null : await passHolderOf(plan)
+  const { order, lineIds } = await writeDeskOrder(unit, sale, plan, at, at + FREE_HOLD, holder ? { channel: 'desk', accountId: holder } : undefined)
   const types = new Map((await all<{ id: string, name: string, kind: string }>('SELECT id, name, kind FROM box_office_ticket_types')).map(t => [t.id, t]))
   const lines: LineRow[] = plan.lines.map((l, i) => ({
     id: lineIds[i]!, performance_id: plan.performanceId, band_id: l.bandId, ticket_type_id: l.ticketTypeId, amount_minor: 0,
@@ -323,9 +325,9 @@ export async function prepareDeskReservation(unit: UnitView, input: { sale: unkn
   }
   else {
     // With nobody named, a reservation on passes goes to their one holder.
-    const holders = [...new Set(plan.entryOf.map(p => p?.accountId).filter((a): a is string => !!a))]
-    if (holders.length !== 1) refuse('box-office.desk.reserve-for', 'Say who the reservation is for, so it can be sent to them.', { status: 422, fields: { buyer: 'required' } })
-    accountId = await pickedBuyer(holders[0]!)
+    const holder = await passHolderOf(plan)
+    if (!holder) refuse('box-office.desk.reserve-for', 'Say who the reservation is for, so it can be sent to them.', { status: 422, fields: { buyer: 'required' } })
+    accountId = holder
   }
   const { order } = await writeDeskOrder(unit, sale, plan, at, at + RESERVE_HOLD, { channel: 'phone', accountId })
   return { orderId: order.id, accountId, madeWith }
@@ -575,8 +577,8 @@ export async function splitReservation(unit: UnitView, orderId: string, lineIds:
   return { orderId: newOrderId, reference, totalMinor: movingMinor, remainingMinor }
 }
 
-const AHEAD = 14 * 86_400_000 // not-policy: how far ahead the desk's list of performances looks, in milliseconds
-const MOST = 30 // not-policy: performances offered at the desk at once
+const AHEAD = 366 * 86_400_000 // not-policy: how far ahead the desk's list looks; phone bookings are taken for any performance on sale
+const MOST = 60 // not-policy: performances offered at the desk at once
 
 export interface DeskPerformance {
   performanceId: string
@@ -600,6 +602,14 @@ async function pickedBuyer(picked: string): Promise<string> {
   const accountId = await canonicalAccount(picked)
   if (!await addressFor(accountId, 'audience')) refuse('box-office.desk.no-address', 'There is no email address for this person, so the tickets cannot be sent.', { status: 422, remedy: 'Type their email address instead.' })
   return accountId
+}
+
+/** The one person holding every pass used for an entry in the plan, when they have an address to write to; otherwise null. */
+async function passHolderOf(plan: OrderPlan): Promise<string | null> {
+  const holders = [...new Set(plan.entryOf.map(p => p?.accountId).filter((a): a is string => !!a))]
+  if (holders.length !== 1) return null
+  const accountId = await canonicalAccount(holders[0]!)
+  return await addressFor(accountId, 'audience') ? accountId : null
 }
 
 /** The performances a seller can sell for now: set up for sale, and not yet past the desk's closing time. */

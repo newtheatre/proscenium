@@ -178,7 +178,7 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
 
 test('Sell books a pass\'s entry from the find box without the till, and sells a new pass with a booking', async ({ page }) => {
   await visit(page, '/console/box-office/sell')
-  // A pass typed in the find box adds its entry for tonight: there is nothing to pay, so it is booked from the panel.
+  // A pass typed in the find box adds its entry for tonight: there is nothing to pay, so it is booked beside the till's ways to pay.
   await page.getByRole('textbox', { name: 'Booking reference, desk code, name or pass' }).fill(passCode.toLowerCase())
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText(`${passName} · No holder named`).first()).toBeVisible()
