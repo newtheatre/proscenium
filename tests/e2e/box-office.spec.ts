@@ -7,7 +7,7 @@ import AxeBuilder from '@axe-core/playwright'
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
 const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage', 'payments.settings.manage'])
-const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
+const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage', 'box-office.pass.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
 const office = person('acc_officeboss', 'Office Boss', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange', 'box-office.report.export', 'promotions.promotion.manage'])
 const producer = person('acc_compproducer', 'Pat Producer', ['box-office.comp.request'])
@@ -27,6 +27,8 @@ let cancelling = ''
 const premiumName = `Premium ${stamp}`
 let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
+const passName = `Desk season pass ${stamp}`
+let passCode = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, headers: Record<string, string> = {}) {
   const response = await api.post(path, { data, headers: { ...key(), ...headers } })
@@ -65,6 +67,10 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, `/api/box-office/productions/${production.id}/prices`, { prices: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, amountMinor: 1200 }, { bandId: band.bandId, ticketTypeId: dearer.ticketTypeId, amountMinor: 1500 }] })
   await post(api, '/api/payments/providers', { provider: 'cash', label: 'Desk cash', channels: ['desk'], mode: 'live' })
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
+  // A season pass covering the show, on sale at the box office, and one already given and paid for.
+  const passType = await post(api, '/api/box-office/pass-types', { name: passName, covers: 'productions', productionIds: [production.id], perShow: 'once', onSale: true, prices: [{ name: 'Adult', amountMinor: 3000 }] })
+  const passPriceId = (await (await api.get('/api/box-office/pass-types')).json()).rows.find((t: { id: string }) => t.id === passType.id).prices[0].id
+  passCode = (await post(api, `/api/box-office/pass-types/${passType.id}/passes`, { passPriceId, settled: true })).code
   await api.dispose()
 
   // Each reservation is made by its own guest buyer, in a browser of their own. One person may only
@@ -171,9 +177,38 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   await expect(left).toHaveText(`${before - 2} left`)
 })
 
+test('Sell books a pass\'s entry from the find box without the till, and sells a new pass with a booking', async ({ page }) => {
+  await visit(page, '/console/box-office/sell')
+  // A pass typed in the find box adds its entry for tonight: there is nothing to pay, so it is booked from the panel.
+  await page.getByRole('textbox', { name: 'Booking reference, desk code, name or pass' }).fill(passCode.toLowerCase())
+  await page.getByRole('button', { name: 'Find' }).click()
+  await expect(page.getByText(`${passName} · No holder named`).first()).toBeVisible()
+  await expect(page.getByText('One entry for tonight is in the sale.')).toBeVisible()
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Book the entry' }).click()
+  await expect(page.getByText(/^Booked as /)).toBeVisible()
+  // The same pass again is turned away for this performance, saying why; nothing joins the sale.
+  await page.getByRole('textbox', { name: 'Booking reference, desk code, name or pass' }).fill(passCode)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await expect(page.getByText('This pass already has a ticket for this performance.', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'Dismiss' }).first().click()
+  // A new pass sold with tonight's entry: the pass's price is the sale.
+  await page.getByRole('button', { name: 'Sell a pass' }).click()
+  await expect(page.getByRole('checkbox', { name: 'Use one entry tonight' })).toBeChecked()
+  await page.getByRole('button', { name: 'Add to sale' }).click()
+  await expect(page.getByText(`New ${passName}, Adult, with 1 entry tonight · No holder named`)).toBeVisible()
+  await expect(payButton(page, '£30.00')).toBeEnabled()
+  await noViolations(page)
+  await payCash(page, '£30.00', async () => {
+    // Nobody was named for it, so its code is shown to hand over.
+    await expect(page.getByRole('list', { name: 'Passes' })).toContainText(`${passName}, Adult · No holder named`)
+    await expect(page.getByRole('list', { name: 'Passes' })).toContainText(/PASS-[A-Z0-9]{4}-[A-Z0-9]{4}/)
+  })
+})
+
 test('Sell finds a reservation by its reference and takes payment for it', async ({ page }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(reference.toLowerCase())
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(reference.toLowerCase())
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByRole('heading', { name: `Booking ${reference}` })).toBeVisible()
   await expect(page.getByText('Reserved, not paid')).toBeVisible()
@@ -188,7 +223,7 @@ test('Sell finds a reservation by its reference and takes payment for it', async
 
 test('a payment left by a reload is picked up again, and another till can cancel it to take the booking', async ({ page, browser }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(unfinished)
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(unfinished)
   await page.getByRole('button', { name: 'Find' }).click()
   await cash(page).click()
   await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
@@ -202,7 +237,7 @@ test('a payment left by a reload is picked up again, and another till can cancel
   const officeContext = await browser.newContext(as(office))
   const other = await officeContext.newPage()
   await visit(other, '/console/box-office/sell')
-  await other.getByLabel(/^Booking reference, desk code or name/).fill(unfinished)
+  await other.getByLabel(/^Booking reference, desk code, name or pass/).fill(unfinished)
   await other.getByRole('button', { name: 'Find' }).click()
   await expect(other.getByText('A payment was started and not finished')).toBeVisible()
   await noViolations(other)
@@ -214,7 +249,7 @@ test('a payment left by a reload is picked up again, and another till can cancel
 
 test('Sell splits a reservation so one of a group pays for their own tickets', async ({ page }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(group)
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(group)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('To pay: £36.00')).toBeVisible()
   await page.getByRole('button', { name: 'Pay for some of these' }).click()
@@ -229,14 +264,14 @@ test('Sell splits a reservation so one of a group pays for their own tickets', a
   await expect(page.getByText('To pay: £12.00')).toBeVisible()
   await payCash(page, '£12.00')
 
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(group)
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(group)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('To pay: £24.00')).toBeVisible()
 })
 
 test('Sell takes the difference on an exchange for a dearer ticket', async ({ page, browser, playwright }) => {
   await visit(page, '/console/box-office/sell')
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(swapping)
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(swapping)
   await page.getByRole('button', { name: 'Find' }).click()
   await payCash(page, '£12.00')
 
@@ -255,7 +290,7 @@ test('Sell takes the difference on an exchange for a dearer ticket', async ({ pa
   await noViolations(page)
   await payCash(page, '£3.00')
 
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(swapping)
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(swapping)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText(premiumName)).toBeVisible()
   await officeContext.close()
@@ -284,7 +319,7 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
 test('the till in live mode collects a reservation, changed to who came, and takes payment', async ({ page }) => {
   await page.setViewportSize({ width: 820, height: 1180 }) // a tablet held upright, as at a desk
   await visit(page, '/live/till')
-  await page.getByLabel(/^Booking reference, desk code or name/).fill(amending)
+  await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(amending)
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('To pay: £24.00')).toBeVisible()
   // One of them wants the dearer seat, and the other could not come.

@@ -15,6 +15,7 @@ export default defineModule({
   manifest: 1,
   since: '0.1.0',
   stability: 'experimental',
+  uses: ['maintenance'],
   switchable: false,
 
   settings: defineSettings('forms', {
@@ -135,6 +136,11 @@ export default defineModule({
   },
 
   contributes: {
+    // A link already sent by email to change a response keeps working while maintenance mode is on.
+    'maintenance.open-address': [
+      { id: 'forms.changes-page', prefix: '/forms/changes/' },
+      { id: 'forms.changes', prefix: '/api/forms/changes/' },
+    ],
     // What forms add to the privacy notice (/policies/privacy): its table of what is held, and what a browser keeps.
     'core.privacy-record': [
       { id: 'forms.responses', holds: 'Answers you give on a form', why: 'For the purpose the form states', basis: 'As stated on each form', keptFor: 'As stated on each form', order: 400 },
