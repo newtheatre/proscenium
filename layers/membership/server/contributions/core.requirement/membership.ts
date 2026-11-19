@@ -5,10 +5,11 @@
 // It answers by account, and, where the scheme accepts a reference (V8 to V11), by a reference
 // presented in place of signing in: an entry on the scheme's list (a student ID) or a member number.
 // Evidence is the list entry's id where one exists, otherwise the membership's id (V11).
-import { all, defineRequirementSource, first, localDate, useSetting, type SourceAnswer } from '#kit'
+import { all, createUnit, defineRequirementSource, first, localDate, refuse, useContext, useSetting, type SourceAnswer } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findEntry, getList, normalise, nounOf, schemeList, wellFormed, type ListRow } from '../../lists'
 import { getScheme, listSchemes, type Scheme } from '../../schemes'
+import { joinScheme } from '../../join'
 import { shapeText } from '../../verify'
 
 const ANY = 'any'
@@ -30,6 +31,44 @@ async function heldBy(accountId: string, day: string): Promise<Held[]> {
 /** The surviving account a membership belongs to now. */
 async function survivor(accountId: string): Promise<string> {
   return (await first<{ id: string }>('SELECT coalesce(merged_into_id, id) AS id FROM core_accounts WHERE id = ?', accountId))?.id ?? accountId
+}
+
+// A request for staff to check a reference the list did not hold (or held under another name) gives
+// the price while it waits, as a pending access application does: evidence `pending:<membership id>`,
+// judged afresh at the door, so a request still waiting or declined shows there as not met.
+const PENDING = 'pending:'
+const WAITING_SUMMARY = 'Membership check not decided yet. Ask to see their card.'
+
+/** The latest request of this account waiting for staff to check its reference, for a reference. */
+async function waitingBy(accountId: string, ref: string): Promise<string | null> {
+  const row = await first<{ id: string }>(
+    `SELECT m.id FROM membership_memberships m WHERE m.state = 'pending' AND m.needs_verification = 1 AND m.verified_at IS NULL
+      AND m.account_id IN (${accountScopeSql('?1')}) ${ref === ANY ? '' : 'AND m.scheme_id = ?2'}
+      AND EXISTS (SELECT 1 FROM membership_verifications v WHERE v.membership_id = m.id AND v.outcome = 'needs-staff' AND v.reason IN ('not-on-list', 'name-differs'))
+      ORDER BY m.created_at DESC LIMIT 1`,
+    accountId, ...(ref === ANY ? [] : [ref]),
+  )
+  return row?.id ?? null
+}
+
+/** Pending evidence judged again: met once staff have passed it and it is current, otherwise not met. */
+async function pendingAnswer(ref: string, membershipId: string, day: string): Promise<Omit<SourceAnswer, 'account' | 'ref'>> {
+  const m = (await all<Held>(`${HELD} WHERE ${CURRENT_ON} AND m.id = ?2`, day, membershipId))[0]
+  if (m && matches(ref, m)) return { ...metFor({ ...m, accountId: await survivor(m.accountId) }, true), evidence: `${PENDING}${membershipId}` }
+  const row = await first<{ state: string }>('SELECT state FROM membership_memberships WHERE id = ?', membershipId)
+  return row?.state === 'pending'
+    ? { verdict: 'not-met', summary: WAITING_SUMMARY }
+    : { verdict: 'not-met', summary: 'Membership check not passed.' }
+}
+
+/** Whether a well-formed reference the list did not hold may be sent to staff to check: an open scheme people apply to. */
+async function askableFor(lists: { list: ListRow, schemeId: string }[], typed: string): Promise<boolean> {
+  for (const { list, schemeId } of lists) {
+    if (!wellFormed(list.referenceShape, typed)) continue
+    const s = await getScheme(schemeId)
+    if (s?.state === 'open' && s.joinMode === 'apply') return true
+  }
+  return false
 }
 
 const matches = (ref: string, m: Held) => ref === ANY || m.schemeId === ref
@@ -182,10 +221,19 @@ export default defineRequirementSource({
             out.push({ account, ref: fullRef, ...metFor(held[0]!, false) })
             continue
           }
+          const waiting = await waitingBy(account, ref)
+          if (waiting) {
+            out.push({ account, ref: fullRef, verdict: 'met', evidence: `${PENDING}${waiting}`, summary: WAITING_SUMMARY })
+            continue
+          }
         }
         if (offered && (ref === ANY || scheme?.acceptsReference)) {
           let m: Held | undefined
           const lists = await listsFor(ref, scheme)
+          if ('evidence' in offered && offered.evidence.startsWith(PENDING)) {
+            out.push({ account, ref: fullRef, ...(await pendingAnswer(ref, offered.evidence.slice(PENDING.length), day)) })
+            continue
+          }
           if ('evidence' in offered) {
             // Judged afresh: holding the evidence proves nothing by itself.
             const byEntry = await entryByEvidence(offered.evidence, day)
@@ -233,7 +281,8 @@ export default defineRequirementSource({
             : lists.some(l => wellFormed(l.list.referenceShape, typedValue))
               ? `We could not find a current membership with that ${nounOf(list)}. Have a membership? Contact us.`
               : shapeText(nounOf(list), list.referenceShape)
-          out.push({ account, ref: fullRef, verdict: 'not-met', reason, help, summary: 'No current membership found for the reference given.' })
+          const ask = typedValue !== null && await askableFor(lists, typedValue)
+          out.push({ account, ref: fullRef, verdict: 'not-met', reason, help, summary: 'No current membership found for the reference given.', ...(ask ? { ask } : {}) })
           continue
         }
         if (ref !== ANY && (!scheme || scheme.state === 'archived')) {
@@ -254,6 +303,38 @@ export default defineRequirementSource({
       }
     }
     return out
+  },
+
+  // A request for staff to check a reference not found, made while booking: the scheme's own join
+  // with askStaff, so it waits in the applications queue. A scheme asking more goes to its join page.
+  async ask(_accountId, fullRef, value) {
+    const ref = schemeIdOf(fullRef)
+    const typed = normalise('reference', value)
+    const lists = await listsFor(ref, ref === ANY ? null : await getScheme(ref))
+    let scheme: Scheme | null = null
+    for (const { list, schemeId } of lists) {
+      if (!wellFormed(list.referenceShape, typed)) continue
+      const s = await getScheme(schemeId)
+      if (s?.state === 'open' && s.joinMode === 'apply') {
+        scheme = s
+        break
+      }
+    }
+    if (!scheme) refuse('membership.ask.not-taken', 'The theatre cannot check that by hand online.', { status: 409, remedy: 'Contact the theatre.' })
+    const toJoinPage = () => refuse('membership.ask.join-page', 'This membership needs a little more from you than your ID.', { status: 409, remedy: 'Finish your request on the membership page.', detail: { to: `/join/${scheme!.key}` } })
+    if (scheme!.requiresPayment || scheme!.needsApproval) toJoinPage()
+    const unit = createUnit()
+    let joined: { pending: boolean }
+    try {
+      joined = await joinScheme(unit.view(), useContext().actor, scheme!, { reference: value, askStaff: true })
+    }
+    catch (error) {
+      const code = (error as { code?: string }).code
+      if (code === 'membership.join.form-needed' || code === 'membership.option.choose') toJoinPage()
+      throw error
+    }
+    await unit.commit()
+    return { state: joined!.pending ? 'requested' : 'met' }
   },
 
   // The name to compare with the card shown, for staff only (V18): the list's name for an entry,
