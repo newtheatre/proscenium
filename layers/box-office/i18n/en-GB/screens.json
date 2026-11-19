@@ -106,6 +106,8 @@
   "box-office.orders.column.total": "Total",
   "box-office.orders.column.created": "Made",
   "box-office.orders.filter.channel": "Sold",
+  "box-office.orders.filter.show": "Show",
+  "box-office.orders.filter.performance": "Performance",
   "box-office.orders.state.reserved": "Reserved",
   "box-office.orders.state.awaiting_payment": "Awaiting payment",
   "box-office.orders.state.confirmed": "Paid",

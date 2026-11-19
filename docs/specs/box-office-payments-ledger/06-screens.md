@@ -51,7 +51,7 @@ What the three screens must get right:
 | Screen | Route | Ability | What it does | Release |
 | --- | --- | --- | --- | --- |
 | Sell | `/console/box-office/sell` | `box-office.order.sell` | The desk: pick a performance, add tickets, take payment; find and collect a reservation | First |
-| Orders | `/console/box-office/orders` | `box-office.order.view`; export needs `box-office.order.export` | Search by name, email or reference; filter by performance and state | First |
+| Orders | `/console/box-office/orders` | `box-office.order.view`; export needs `box-office.order.export` | Search by name, email or reference; filter by show, performance, state and how it was sold | First |
 | Order | `/console/box-office/orders/<id>` | `box-office.order.view` | Lines, tickets, payments, refunds, history; actions to resend, reissue, cancel, exchange, refund, each under its own ability | First |
 | Door list | `/console/box-office/door-list/<performance>` | `box-office.ticket.admit` | Everyone expected, with admitted state and that an access note exists; printable. The fallback when the door has no connection | First |
 | Performances | `/console/box-office/performances` | `box-office.performance.manage` | Every performance with its sale state, sold and free | First |

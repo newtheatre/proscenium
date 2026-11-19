@@ -128,16 +128,31 @@ onBeforeUnmount(() => clearTimeout(timer))
 
 // One panel holds every filter; a chip for each one that is on says so and opens the panel.
 const panel = ref(false)
+// A lookup filter's address holds an id: its resolve route names it for the chip and the field.
+const lookupLabels = reactive<Record<string, Record<string, string>>>({})
+const { $api } = useNuxtApp()
+async function resolveLookups(on: Record<string, string>) {
+  for (const [name, def] of Object.entries(decl.value.filters)) {
+    const id = on[name]
+    if (def.kind !== 'lookup' || !def.lookup?.resolve || !id || lookupLabels[name]?.[id]) continue
+    try {
+      const found = await $api<{ rows: ListOption[] }>(def.lookup.resolve, { query: { ids: id } })
+      lookupLabels[name] = { ...lookupLabels[name], ...Object.fromEntries(found.rows.map(r => [r.value, r.label])) }
+    }
+    catch { /* the chip shows the id */ }
+  }
+}
 watch(panel, endVisit)
 // A built-in view's own filters count as on, so the panel and the chips tell the truth about the rows.
 const effective = computed(() => ({ ...(state.value.view ? decl.value.views?.[state.value.view]?.filters : undefined), ...state.value.filters }))
 const chips = computed(() => Object.entries(decl.value.filters).flatMap(([name, def]) => {
   if (data.value?.dropped?.includes(name)) return []
   const value = effective.value[name]
-  const text = value ? filterChipText(def, value, { yes: t('core.list.yes'), no: t('core.list.no') }) : null
+  const text = value ? filterChipText(def, value, { yes: t('core.list.yes'), no: t('core.list.no'), lookup: lookupLabels[name]?.[value] }) : null
   return text ? [{ name, text }] : []
 }))
 const onFilter = (name: string, value: string) => { void setInPanel({ filters: { [name]: value } }) }
+onMounted(() => watch(effective, (on) => { void resolveLookups(on) }, { immediate: true }))
 
 // Pressing a heading sorts by it in its natural direction, again reverses, a third time returns to the default.
 function sortBy(sortKey: string) {
@@ -284,6 +299,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
           :filters="decl.filters"
           :values="effective"
           :count="Object.keys(effective).length"
+          :lookup-labels="lookupLabels"
           @change="onFilter"
           @clear="set({ filters: Object.fromEntries(Object.keys(state.filters).map(k => [k, ''])) })"
         />
