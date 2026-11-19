@@ -23,6 +23,15 @@ test.describe('someone who may view the gallery', () => {
     expect(text).toContain('3 sample drafts are waiting.')
     expect(text).not.toContain('never shows')
     expect(text).not.toContain('Due today')
+    // What needs the person comes before the quick actions and the figures.
+    expect(text.indexOf('Good to know')).toBeLessThan(text.indexOf('New sample booking'))
+    expect(text.indexOf('New sample booking')).toBeLessThan(text.indexOf('Drafts written'))
+    const tile = page.getByRole('region', { name: 'Drafts written' })
+    await expect(tile).toContainText('13')
+    await expect(tile).toContainText('10 sent')
+    await expect(tile.getByRole('figure', { name: 'Drafts written' })).toBeVisible()
+    expect(text).not.toContain('Never shown') // a figure that fails is left out
+    expect(text).not.toContain('Nothing is waiting for you')
     await noViolations(page)
   })
 
@@ -57,5 +66,17 @@ test.describe('someone with the history ability', () => {
     await visit(page, '/console/gallery/productions/prod-9')
     await page.getByRole('button', { name: 'History', exact: true }).click()
     await expect(page.getByText('Nothing has changed yet')).toBeVisible()
+  })
+})
+
+test.describe('someone with nothing waiting', () => {
+  test.use(as(person('Nadia Nothing', [grant('core.production.create')])))
+
+  test('the console home has no empty panel when there are quick actions', async ({ page }) => {
+    await visit(page, '/console')
+    await expect(page.getByRole('link', { name: 'New production' })).toBeVisible()
+    await expect(page.getByText('Nothing is waiting for you')).toHaveCount(0)
+    await expect(page.getByText('Overdue')).toHaveCount(0)
+    await noViolations(page)
   })
 })

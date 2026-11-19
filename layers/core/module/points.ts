@@ -71,6 +71,8 @@ export const points = {
       icon: z.string(),
       ability,
       keywords: z.string().optional(),
+      // Its place in the palette and on the console home, lowest first.
+      order: z.number().int().optional(),
     }).strict(),
   }),
   // A section of My account (or of a member's own pages, or of a person's page in the console). The
@@ -139,6 +141,8 @@ export const points = {
   // A figure beside each of tonight's performances on the Tonight hub (sold, in, taken at the tills),
   // read for one performance and left out for anyone without its ability there.
   'core.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
+  // A headline figure, with an optional chart, on the console home's grid, read for the person asking.
+  'core.home-figure': point({ kind: 'code', contract: 'home-figure' }),
   // Something on My account's overview that needs the person (an address to confirm, a renewal
   // that is open), for the person asking. A notice that fails is left out, never the page.
   'core.account-notice': point({ kind: 'code', contract: 'account-notice' }),

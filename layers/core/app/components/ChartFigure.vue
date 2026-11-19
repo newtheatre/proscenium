@@ -21,7 +21,9 @@ withDefaults(defineProps<{
   stacked?: boolean
   /** In pixels. The chart is as wide as its container, so a height holds its shape on a phone where a ratio would flatten it. */
   height?: number
-}>(), { type: 'bar', height: 240 })
+  /** Where the words around the chart already name it (a tile on the console home): the caption and sentence are read out but not shown. */
+  quiet?: boolean
+}>(), { type: 'bar', height: 240, quiet: false })
 
 // The first and third of the theme's chart colours: the first is the brand colour and the second
 // sits too close to the default brand blue to tell two series apart.
@@ -29,8 +31,8 @@ const colours = ['var(--ui-chart-1)', 'var(--ui-chart-3)', 'var(--ui-chart-6)', 
 </script>
 
 <template>
-  <figure class="space-y-2">
-    <figcaption class="text-sm font-medium text-highlighted">
+  <figure :class="quiet ? '' : 'space-y-2'">
+    <figcaption :class="quiet ? 'sr-only' : 'text-sm font-medium text-highlighted'">
       {{ title }}
     </figcaption>
     <UChart
@@ -47,6 +49,7 @@ const colours = ['var(--ui-chart-1)', 'var(--ui-chart-3)', 'var(--ui-chart-6)', 
     />
     <!-- The chart carries the same sentence as its description, so this copy is for the eye only. -->
     <p
+      v-if="!quiet"
       class="text-sm text-muted"
       aria-hidden="true"
     >
