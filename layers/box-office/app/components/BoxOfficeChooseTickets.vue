@@ -52,36 +52,43 @@ const chosen = computed(() => (data.value?.bands ?? []).flatMap(b => b.types.map
 const passes = ref<ChosenPass[]>((data.value?.passes.mine ?? []).filter(m => !m.unusable).slice(0, 1).map(m => ({ code: m.code, name: m.name, priceName: m.priceName, owedMinor: m.owedMinor, wheelchair: false, own: true })))
 // Passes bought with this booking: each gives its first entry here.
 const buying = ref<BoughtPass[]>([])
-const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length + buying.value.length)
 // Tickets swapped for a pass (mock-up approved by Matt, 18 November): each becomes a pass bought
-// here, whose first entry is tonight in the same part of the house. The count of people stays.
+// here, whose first entry is tonight in the same part of the house. Swapping one takes it off its
+// ticket's count, and its reference with it (Matt, 19 November), so the count of people stays.
 const swaps = ref<PassSwap[]>([])
+const swapped = computed(() => swaps.value.reduce((sum, s) => sum + s.count, 0))
+const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length + buying.value.length + swapped.value)
 // A pass type with a price offered instead of a ticket is offered as a swap; any other as a pass to add.
 const swappable = computed(() => (data.value?.passes.onSale ?? []).filter(p => p.prices.some(price => price.insteadOf.length)))
 const holdsOwn = computed(() => (data.value?.passes.mine ?? []).some(m => !m.unusable))
-const kinds = computed(() => [...chosen.value.reduce((map, c) => {
-  const was = map.get(c.type.ticketTypeId)
-  map.set(c.type.ticketTypeId, { ticketTypeId: c.type.ticketTypeId, name: c.type.name, amountMinor: Math.min(was?.amountMinor ?? Infinity, c.type.amountMinor), quantity: (was?.quantity ?? 0) + c.quantity })
-  return map
-}, new Map<string, { ticketTypeId: string, name: string, amountMinor: number, quantity: number }>()).values()])
-// What is asked for once the swaps are taken out: fewer tickets, and a pass bought for each swapped.
+// Each kind of ticket chosen, counting those swapped for a pass, so a swap row stays while its tickets are passes.
+const kinds = computed(() => {
+  const map = new Map<string, { ticketTypeId: string, name: string, amountMinor: number, quantity: number }>()
+  const add = (type: { ticketTypeId: string, name: string, amountMinor: number }, quantity: number) => {
+    const was = map.get(type.ticketTypeId)
+    map.set(type.ticketTypeId, { ticketTypeId: type.ticketTypeId, name: type.name, amountMinor: Math.min(was?.amountMinor ?? Infinity, type.amountMinor), quantity: (was?.quantity ?? 0) + quantity })
+  }
+  for (const c of chosen.value) add(c.type, c.quantity)
+  for (const swap of swaps.value) {
+    const type = (data.value?.bands ?? []).flatMap(b => b.types).find(x => x.ticketTypeId === swap.ticketTypeId)
+    if (type) add(type, swap.count)
+  }
+  return [...map.values()]
+})
+function setSwapCount(row: Omit<PassSwap, 'count' | 'references' | 'bands'>, n: number) {
+  const next = swapTickets({ counts: counts.value, references: references.value, swaps: swaps.value }, chosen.value.map(c => keyOf(c.band.bandId, c.type.ticketTypeId)), row, n)
+  counts.value = next.counts
+  references.value = next.references
+  swaps.value = next.swaps
+}
+// What is asked for: the tickets left, and a pass bought for each ticket swapped, in its part of the house.
 const asked = computed(() => {
-  const left = new Map<string, PassSwap[]>()
-  for (const swap of swaps.value) left.set(swap.ticketTypeId, [...(left.get(swap.ticketTypeId) ?? []), ...Array.from({ length: swap.count }, () => swap)])
-  const buys: { passTypeId: string, passPriceId: string, bandId: string, reference?: string }[] = []
-  const used = new Map<PassSwap, number>()
-  const lines = chosen.value.map((c) => {
-    const queue = left.get(c.type.ticketTypeId) ?? []
-    const taken = queue.splice(0, c.quantity)
-    for (const swap of taken) {
-      const n = used.get(swap) ?? 0
-      used.set(swap, n + 1)
-      const reference = swap.references[n]?.trim()
-      buys.push({ passTypeId: swap.passTypeId, passPriceId: swap.passPriceId, bandId: c.band.bandId, ...(reference ? { reference } : {}) })
-    }
-    return { ...c, quantity: c.quantity - taken.length }
-  })
-  return { lines, buys }
+  const firstBand = data.value?.bands[0]?.bandId ?? ''
+  const buys = swaps.value.flatMap(swap => Array.from({ length: swap.count }, (_, n) => {
+    const reference = swap.references[n]?.trim()
+    return { passTypeId: swap.passTypeId, passPriceId: swap.passPriceId, bandId: swap.bands?.[n] ?? firstBand, ...(reference ? { reference } : {}) }
+  }))
+  return { lines: chosen.value, buys }
 })
 const swapMinor = computed(() => swaps.value.reduce((sum, s) => sum + s.amountMinor * s.count, 0))
 const passMinor = computed(() => buying.value.reduce((sum, b) => sum + b.amountMinor, 0) + swapMinor.value)
@@ -410,6 +417,7 @@ async function hold() {
         :passes="swappable"
         :chosen="kinds"
         :currency="currency"
+        @count="setSwapCount"
       />
       <p
         v-if="swapReferencesMissing"
