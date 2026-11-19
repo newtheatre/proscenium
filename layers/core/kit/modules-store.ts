@@ -40,6 +40,25 @@ export async function isEnabled(id: string): Promise<boolean> {
   return alwaysOn(id) || (await states()).get(id) === true
 }
 
+/** Whether anybody has ever switched the module on or off (it has a row). A new site has none. */
+export async function everSwitched(id: string): Promise<boolean> {
+  return (await states()).has(id)
+}
+
+/**
+ * First-run setup: switch on every module that asks to start on (onAtSetup) and that nobody has
+ * switched either way yet, with what it requires. One whose secrets are not set yet is left off.
+ */
+export async function switchOnAtSetup(unit: UnitView): Promise<string[]> {
+  const out: string[] = []
+  for (const entry of useRegistry().modules.values()) {
+    const id = entry.manifest.id
+    if (!entry.manifest.onAtSetup || alwaysOn(id) || await everSwitched(id) || missingSecrets(id).length) continue
+    out.push(...await setModuleEnabled(unit, id, true, { withRequired: true }))
+  }
+  return out
+}
+
 /** The `always` secrets a module declares that are not set: switching it on is blocked until they are (F-16). */
 export function missingSecrets(id: string): string[] {
   const manifest = useRegistry().modules.get(id)?.manifest

@@ -93,6 +93,12 @@ export interface ModuleManifest {
   stability?: 'experimental' | 'stable' | 'deprecated'
   /** false: has its own layer and id but is always on. */
   switchable?: boolean
+  /**
+   * true: a new site starts with it on. First-run setup switches it on, unless someone has already
+   * switched it either way, and the module may treat itself as on before then (maintenance mode,
+   * so a new site is closed until its Owner opens it).
+   */
+  onAtSetup?: boolean
   requires?: readonly string[]
   uses?: readonly string[]
   settings?: Record<string, SettingEntry<any, any>>
@@ -152,7 +158,7 @@ const SIGNING_MIN = 86_400 // not-policy: a signing key lives at least a day, in
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
 const kebab = new RegExp(`^${KEBAB}$`)
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9a-z.-]+)?$/
-const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'settingsIn', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
+const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'onAtSetup', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'settingsIn', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export function snake(id: string): string {
@@ -168,6 +174,8 @@ export function validateManifest(m: ModuleManifest): void {
   if (typeof m.since !== 'string' || !SEMVER.test(m.since)) throw new DeclarationError('since', 'is the release the module first shipped in, such as 0.3.0')
   if (m.stability !== undefined && !['experimental', 'stable', 'deprecated'].includes(m.stability)) throw new DeclarationError('stability', "is 'experimental', 'stable' or 'deprecated'")
   if (m.switchable !== undefined && typeof m.switchable !== 'boolean') throw new DeclarationError('switchable', 'is true or false')
+  if (m.onAtSetup !== undefined && typeof m.onAtSetup !== 'boolean') throw new DeclarationError('onAtSetup', 'is true or false')
+  if (m.onAtSetup && m.switchable === false) throw new DeclarationError('onAtSetup', 'is for a module that can be switched; one that cannot is always on')
   const id = m.id
   const own = (kind: string, rest: string) => new RegExp(`^${escape(id)}\\.${rest}$`)
 

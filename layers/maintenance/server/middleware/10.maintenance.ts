@@ -3,11 +3,16 @@
 // refusal, so search engines keep the pages they know and browsers do not keep the holding page.
 // Staff are those the console, Admin or live mode is open to, so the door, the till and the scanner
 // keep working. Before anything is read, an address that is always open goes straight on.
+//
+// A new site is closed from its first deploy: until first-run setup switches the module on (or
+// anybody switches it either way), it counts as on while the site has no Owner, and the holding
+// page points whoever is installing it to setup.
 import { defineEventHandler, getRequestURL, setResponseHeader, setResponseStatus } from 'h3'
 import { isEnabled, runInContext, usePoint, type KitEnv } from '#kit'
+import { everSwitched } from '#kit/modules-store'
 import { useAccessProvider } from '#kit/access'
 import { requestCache } from '#kit/route'
-import { holdsAdmin, holdsConsole, holdsLive } from '#modules/core'
+import { holdsAdmin, holdsConsole, holdsLive, setupNeeded } from '#modules/core'
 import { isApi, isOpenAddress } from '../../shared/addresses'
 import { noticePage, retryAfter } from '../notice'
 
@@ -19,13 +24,14 @@ export default defineEventHandler(async (event) => {
   const env = (event.context as { cloudflare?: { env?: KitEnv } }).cloudflare?.env
   if (!env?.DB) return // prerendering: nothing is closed while the site is built
   const answer = await runInContext({ env, cache: requestCache(event) }, async () => {
-    if (!(await isEnabled('maintenance'))) return null
+    const firstRun = !(await isEnabled('maintenance')) && !(await everSwitched('maintenance')) && await setupNeeded()
+    if (!firstRun && !(await isEnabled('maintenance'))) return null
     const contributed = (await usePoint<{ prefix: string }>('maintenance.open-address')).map(c => c.value.prefix)
     if (isOpenAddress(path, contributed)) return null
     const actor = await useAccessProvider().actor(event)
     if (actor.kind === 'person' && ((await holdsConsole(actor)) || (await holdsAdmin(actor)) || (await holdsLive(actor)))) return null
     const wait = await retryAfter()
-    const page = isApi(path) || !['GET', 'HEAD'].includes(event.method.toUpperCase()) ? null : await noticePage()
+    const page = isApi(path) || !['GET', 'HEAD'].includes(event.method.toUpperCase()) ? null : await noticePage({ setup: firstRun })
     return { wait, page }
   })
   if (!answer) return

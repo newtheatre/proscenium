@@ -6,6 +6,7 @@ import { clearTicket, readTicket, requireSetupNeeded, writeOwner } from '../../.
 import { digest, normaliseRecoveryCode } from '../../../identity/crypto'
 import { startSession } from '../../../identity/sessions'
 import { ensureModuleDefaults } from '../../../identity/defaults'
+import { switchOnAtSetup } from '#kit/modules-store'
 
 export default defineRoute({
   public: true,
@@ -33,6 +34,8 @@ export default defineRoute({
     await changeSetting(unit, 'core.organisation.country', ticket.theatre.country)
     if (ticket.theatre.contactEmail) await changeSetting(unit, 'core.organisation.contact-email', ticket.theatre.contactEmail)
   }
+  // Modules a new site starts with (maintenance mode, so the site stays closed until the Owner opens it).
+  await switchOnAtSetup(unit)
   unit.afterCommit(() => clearTicket(event))
   // Core is always on, so its roles and fact mappings are made with the site rather than on a switch.
   unit.afterCommit(async () => {
