@@ -74,8 +74,8 @@ describe('the booking button from Box office', () => {
     ] })
     expect(set.status, JSON.stringify(set.body)).toBe(200)
     const found = await inContext(() => priceSummaries([h.productionId]))
-    // The concession asks for proof, so it is named rather than read as "From".
-    expect(found[h.productionId]).toEqual({ currency: 'GBP', fromMinor: 1200, toMinor: 1200, others: [{ label: `Member rate ${h.productionId}`, amountMinor: 400 }, { label: 'Concession', amountMinor: 900 }] })
+    // The concession asks for proof, so it is named rather than read as "From"; the member rate is held by an account, so it is gated.
+    expect(found[h.productionId]).toEqual({ currency: 'GBP', fromMinor: 1200, toMinor: 1200, others: [{ label: `Member rate ${h.productionId}`, amountMinor: 400, gated: true }, { label: 'Concession', amountMinor: 900 }] })
   })
 
   it('gives no price for a production whose dates are past or not priced', async () => {
