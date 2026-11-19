@@ -1,7 +1,7 @@
 {
   "box-office.navigation.sell.label": "Sell",
   "box-office.screens.sell.description": "Sell tickets, or find a reservation and take payment for it.",
-  "box-office.screens.panel.no-performances": "Nothing is on sale at the desk in the next two weeks.",
+  "box-office.screens.panel.no-performances": "Nothing is on sale at the desk.",
   "box-office.screens.panel.paused": "Sales are paused for this performance.",
   "box-office.screens.panel.row": "{band}, {type}, {price}",
   "box-office.screens.panel.row-whole": "{type}, {price}",

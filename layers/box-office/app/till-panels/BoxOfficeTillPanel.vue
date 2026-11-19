@@ -17,10 +17,12 @@ interface Order { orderId: string, reference: string, state: 'reserved' | 'await
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
 /** One line on the till's receipt; `more` and `fewer` draw its stepper there. */
 interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more?: () => void, fewer?: () => void }
+/** Another way to finish the sale, which the till offers beside its ways to pay at the console. */
+interface ReceiptAction { key: string, label: string, icon?: string, loading?: boolean, run: () => void }
 const emit = defineEmits<{
   'update:modelValue': [unknown]
   /** The tickets for the till's receipt, with their steppers, and what was last added (till proposal, 17 November 2026). */
-  'receipt': [{ lines: ReceiptLine[], added: { label: string, undo: () => void } | null } | null]
+  'receipt': [{ lines: ReceiptLine[], added: { label: string, undo: () => void } | null, actions?: ReceiptAction[] } | null]
 }>()
 
 const { t } = useT()
@@ -265,6 +267,18 @@ async function reserveSale() {
   }
 }
 
+// Beside the till's ways to pay: book what costs nothing, or reserve the sale to pay later.
+function panelActions(): ReceiptAction[] {
+  return [
+    ...(canIssue.value ? [{ key: 'book', icon: 'i-lucide-check', loading: issuing.value, label: t(admit.value ? 'box-office.screens.panel.pass.book-admit' : 'box-office.screens.panel.pass.book', { count: passEntries.value.length }), run: () => void issueFree() }] : []),
+    ...(canReserve.value ? [{ key: 'reserve', icon: 'i-lucide-calendar-clock', label: t('box-office.screens.panel.reserve.open'), run: openReserve }] : []),
+  ]
+}
+const saleRows = () => (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0 && !unnamed(r))
+watch([canIssue, canReserve, issuing], () => {
+  if (mode.value === 'sell' && !exchange.value && performance.value) sendReceipt(saleRows())
+})
+
 // Collecting: one order, found by what the buyer shows.
 const query = ref('')
 const order = ref<Order | null>(null)
@@ -293,6 +307,7 @@ function sendReceipt(rows: PerformanceRow[]) {
   const detail = t('box-office.screens.panel.receipt-detail', { title: show.title, when: dateTime(show.startsAt) })
   const added = rows.find(r => keyOf(r) === lastAdded.value)
   emit('receipt', {
+    actions: panelActions(),
     lines: [...rows.map((r) => {
       const quantity = quantities.value[keyOf(r)]!
       return { key: keyOf(r), label: rowLabel(r), detail, quantity, amountMinor: r.amountMinor * quantity, more: () => addOne(r), fewer: () => takeOne(r) }
@@ -1096,26 +1111,6 @@ function clear() {
             :locked="locked"
             :tickets="saleTickets"
             @swap="swapTicket"
-          />
-          <!-- The till takes no payment of nothing: a pass's entry alone is booked from here. -->
-          <UButton
-            v-if="canIssue"
-            icon="i-lucide-check"
-            size="lg"
-            :label="t(admit ? 'box-office.screens.panel.pass.book-admit' : 'box-office.screens.panel.pass.book', { count: passEntries.length })"
-            :loading="issuing"
-            :disabled="locked"
-            @click="issueFree"
-          />
-          <!-- Paid later: reserved for somebody, at the desk or by phone, under the buyer's own rules. -->
-          <UButton
-            v-if="canReserve"
-            icon="i-lucide-calendar-clock"
-            color="neutral"
-            variant="outline"
-            :label="t('box-office.screens.panel.reserve.open')"
-            :disabled="locked"
-            @click="openReserve"
           />
           <UModal
             v-model:open="reserveOpen"
