@@ -37,6 +37,7 @@ export const CREDENTIAL = {
   'recovery-codes': 'a new set of recovery codes',
   'recovery-used': 'a recovery code, used to sign in',
   'enrolment-link': 'a link from the theatre for adding a passkey',
+  'address': 'a new email address',
 } as const
 
 /**

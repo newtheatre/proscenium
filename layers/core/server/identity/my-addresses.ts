@@ -61,12 +61,16 @@ async function claimOn(held: AddressRow): Promise<'merge' | 'take'> {
   return refuseUnavailable()
 }
 
-/** Adds an address and sends its verification link. Nothing else is ever sent to it until it is verified. */
-export async function addAddress(unit: UnitView, event: H3Event, accountId: string, typed: string): Promise<{ id: string | null }> {
+/**
+ * Adds an address and sends its verification link. Nothing else is ever sent to it until it is
+ * verified. Staff adding one for a person see whose account already holds it, so they can merge.
+ */
+export async function addAddress(unit: UnitView, event: H3Event, accountId: string, typed: string, by: 'self' | 'staff' = 'self'): Promise<{ id: string | null, created: boolean }> {
   const address = normaliseAddress(typed)
   if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) refuse('core.rate-limited', 'Too many tries for this address.', { status: 429, remedy: 'Wait a while, then try again.' })
   const existing = await addressRow(address)
   let id: string | null = null
+  let created = false
   if (existing?.account_id === accountId) {
     if (existing.verified_at) refuse('core.address.already-yours', 'This address is already on your account.', { status: 409 })
     // Not verified yet: send its link again, once the pause since the last one has passed.
@@ -75,13 +79,17 @@ export async function addAddress(unit: UnitView, event: H3Event, accountId: stri
     if (last !== null && last + wait > nowMs()) refuse('core.address.resend-wait', 'A link was sent to this address a moment ago.', { status: 429, remedy: 'Check your email, or wait a little and send it again.' })
     id = existing.id
   }
+  else if (existing && by === 'staff') {
+    refuse('core.address.on-another-account', 'This address belongs to another account.', { status: 409, remedy: 'If both are this person\'s, merge the two accounts.', detail: { accountId: existing.account_id } })
+  }
   else if (existing) {
     // Held elsewhere: nothing is written to the other account until the link is used.
     await claimOn(existing)
   }
   else {
     id = newId('aem')
-    unit.add({ sql: 'INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, ?, NULL, \'self\', ?)', params: [id, accountId, address, nowMs()] })
+    created = true
+    unit.add({ sql: 'INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, ?, NULL, ?, ?)', params: [id, accountId, address, by, nowMs()] })
   }
   const token = randomToken()
   const at = nowMs()
@@ -94,7 +102,7 @@ export async function addAddress(unit: UnitView, event: H3Event, accountId: stri
     params: [newId('tok', { random: true }), await digest('link', token), accountId, address, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
   await queueNotice(unit, 'core.address-verify', [address], { link: await siteUrl(`/sign-in/verify-address#${token}`) })
-  return { id }
+  return { id, created }
 }
 
 const LINK_BAD = { code: 'core.address.link-unknown', reason: 'This link is not valid, or has been used or run out.', remedy: 'Add the address again to get a new link.' }

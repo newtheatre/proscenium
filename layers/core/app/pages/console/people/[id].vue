@@ -1,9 +1,11 @@
 <!-- One person in the console (Identity Doc part 5, "Account"): who they are and their addresses
      beside the sections, how they sign in, their roles, standings and sessions. Every action the
-     viewer may take is offered and asks for confirmation; the server says which those are. Opening
+     viewer may take is offered and asks for confirmation, or offers Undo; the server says which those
+     are. Details and addresses are edited here, on the person's own page (ID-46). Opening
      the page is audited. Emergency contacts and access needs stay closed until asked for, and each
      read is recorded; a section the viewer may not open is absent, not empty. -->
 <script setup lang="ts">
+import { z } from 'zod'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { RefusalView } from '../../../utils/refusal'
 import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
@@ -14,6 +16,7 @@ interface Person {
   id: string
   name: string | null
   preferredName: string | null
+  pronouns: string | null
   origin: string
   createdAt: number
   claimed: boolean
@@ -21,14 +24,15 @@ interface Person {
   disabled: { at: number, reason: string | null } | null
   anonymised: boolean
   mergedInto: string | null
-  addresses: { id: string, address: string, verified: boolean }[]
+  addresses: Address[]
   passkeys: { id: string, label: string, addedAt: number, lastUsedAt: number | null }[]
   providers: string[]
   liveSessions: number
   standings: { source: string, label?: string }[]
   accessScheme?: { status: 'submitted' | 'more-info' | 'accepted' | 'rejected', submittedAt: number } | null
-  actions: { recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean, emergencyContacts: boolean, accessNeeds: boolean, accessScheme: boolean }
+  actions: { update: boolean, recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean, emergencyContacts: boolean, accessNeeds: boolean, accessScheme: boolean }
 }
+interface Address { id: string, address: string, verified: boolean, audience: boolean, members: boolean }
 interface Contact { name: string, relationship: string | null, phone: string }
 interface Needs { shared: boolean, needs?: { key: string, label: string, note?: string }[], companions?: number }
 interface Grant { id: string, role: string, state: string, scope: { kind: string, module: string | null }, expiresAt: number | null, endedAt: number | null }
@@ -38,6 +42,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const { day, dateTime } = useDates()
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -81,6 +86,117 @@ async function act(run: () => Promise<unknown>, done: string) {
   catch (e) {
     refusal.value = toRefusal(e)
   }
+}
+
+// Details (ID-46): the same limits as the person's own form. Undo puts back what was there.
+const detailsSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  preferredName: z.string().trim().max(60),
+  pronouns: z.string().trim().max(40),
+})
+const editing = ref(false)
+const details = reactive({ name: '', preferredName: '', pronouns: '' })
+const saving = ref(false)
+const detailsRefusal = ref<RefusalView | null>(null)
+function openDetails() {
+  const p = person.value
+  if (!p) return
+  Object.assign(details, { name: p.name ?? '', preferredName: p.preferredName ?? '', pronouns: p.pronouns ?? '' })
+  detailsRefusal.value = null
+  editing.value = true
+}
+const patch = (body: Record<string, string | null>) => $api<unknown>(`/api/core/accounts/${encodeURIComponent(id.value)}`, { method: 'PATCH', body })
+async function saveDetails() {
+  const p = person.value
+  if (!p) return
+  const before = { preferredName: p.preferredName, pronouns: p.pronouns, ...(p.name ? { name: p.name } : {}) }
+  saving.value = true
+  detailsRefusal.value = null
+  try {
+    await patch({ name: details.name.trim(), preferredName: details.preferredName.trim() || null, pronouns: details.pronouns.trim() || null })
+    editing.value = false
+    // A nameless account cannot be made nameless again, so Undo there keeps the name.
+    offer(t('core.person.details.saved'), async () => {
+      await patch(before)
+      await refresh()
+    })
+    await refresh()
+  }
+  catch (e) {
+    detailsRefusal.value = toRefusal(e)
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+// Addresses (ID-46): an added one does nothing until its link is used; the server keeps ID-12's rules.
+const addresses = (): string => at('addresses')
+const addressAt = (a: Address): string => `${addresses()}/${encodeURIComponent(a.id)}`
+const addingAddress = ref(false)
+const newAddress = reactive({ address: '' })
+const addressSchema = z.object({ address: z.email().max(254) })
+const sendingLink = ref(false)
+const addRefusal = ref<RefusalView | null>(null)
+const heldBy = computed(() => addRefusal.value?.code === 'core.address.on-another-account' ? addRefusal.value.detail?.accountId : undefined)
+function openAddAddress() {
+  newAddress.address = ''
+  addRefusal.value = null
+  addingAddress.value = true
+}
+async function sendLink(address: string) {
+  await $api<unknown>(addresses(), { method: 'POST', body: { address } })
+  toast.add({ title: t('core.person.email.sent', { address }), color: 'success' })
+  await refresh()
+}
+async function addAddress() {
+  sendingLink.value = true
+  addRefusal.value = null
+  try {
+    await sendLink(newAddress.address.trim())
+    addingAddress.value = false
+  }
+  catch (e) {
+    addRefusal.value = toRefusal(e)
+  }
+  finally {
+    sendingLink.value = false
+  }
+}
+async function writeTo(a: Address) {
+  const was = person.value?.addresses.find(x => x.audience)
+  refusal.value = null
+  try {
+    await $api<unknown>(addressAt(a), { method: 'PUT', body: { use: 'audience' } })
+    offer(t('core.person.email.now-used', { address: a.address }), was
+      ? async () => {
+        await $api<unknown>(addressAt(was), { method: 'PUT', body: { use: 'audience' } })
+        await refresh()
+      }
+      : undefined)
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+async function removeAddress(a: Address) {
+  if (!await confirm({ verb: t('core.person.email.remove'), thing: a.address, consequence: t('core.person.email.remove-consequence'), button: t('core.person.email.remove') })) return
+  await act(() => $api<unknown>(addressAt(a), { method: 'DELETE', body: {} }), t('core.person.email.removed', { address: a.address }))
+}
+function addressActions(a: Address): DropdownMenuItem[][] {
+  const groups: DropdownMenuItem[][] = []
+  const main: DropdownMenuItem[] = []
+  if (a.verified && !a.audience) main.push({ label: t('core.person.email.use-audience'), icon: 'i-lucide-mail-check', onSelect: () => { void writeTo(a) } })
+  if (!a.verified) {
+    main.push({ label: t('core.person.email.resend'), icon: 'i-lucide-send', onSelect: () => {
+      refusal.value = null
+      sendLink(a.address).catch((e) => { refusal.value = toRefusal(e) })
+    } })
+  }
+  if (main.length) groups.push(main)
+  if (!a.audience) groups.push([{ label: t('core.person.email.remove'), icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { void removeAddress(a) } }])
+  return groups
 }
 
 // Issue a passkey enrolment link: shown here once, for the member of staff to hand over.
@@ -218,7 +334,53 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
         :trail="trail"
       >
         <template #aside>
+          <PageSection :title="t('core.person.details.title')">
+            <template
+              v-if="p.actions.update"
+              #actions
+            >
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-pencil"
+                :label="t('core.person.details.edit')"
+                @click="openDetails"
+              />
+            </template>
+            <dl class="space-y-2 text-sm">
+              <div>
+                <dt class="text-muted">
+                  {{ t('core.person.details.name') }}
+                </dt>
+                <dd>{{ p.name ?? t('core.person.details.none') }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  {{ t('core.person.details.preferred') }}
+                </dt>
+                <dd>{{ p.preferredName ?? t('core.person.details.none') }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  {{ t('core.person.details.pronouns') }}
+                </dt>
+                <dd>{{ p.pronouns ?? t('core.person.details.none') }}</dd>
+              </div>
+            </dl>
+          </PageSection>
           <PageSection :title="t('core.person.addresses')">
+            <template
+              v-if="p.actions.update"
+              #actions
+            >
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-plus"
+                :label="t('core.person.email.add')"
+                @click="openAddAddress"
+              />
+            </template>
             <p
               v-if="!p.addresses.length"
               class="text-sm text-muted"
@@ -234,10 +396,20 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
                 :key="a.id"
                 class="flex flex-wrap items-center gap-2 text-sm"
               >
-                <span class="break-all">{{ a.address }}</span>
+                <span class="min-w-0 flex-1 break-all">{{ a.address }}</span>
                 <StatusBadge
                   :tone="a.verified ? 'success' : 'neutral'"
                   :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                />
+                <StatusBadge
+                  v-if="a.audience"
+                  tone="info"
+                  :label="t('core.person.email.audience')"
+                />
+                <RowActions
+                  v-if="p.actions.update"
+                  :items="addressActions(a)"
+                  :label="t('core.person.email.actions', { address: a.address })"
                 />
               </li>
             </ul>
@@ -448,6 +620,111 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
         :person="{ id: p.id, name: title }"
         @changed="refreshGrants()"
       />
+
+      <UModal
+        v-model:open="editing"
+        :title="t('core.person.details.edit-title', { name: title })"
+      >
+        <template #body>
+          <UForm
+            id="person-details"
+            :schema="detailsSchema"
+            :state="details"
+            class="space-y-4"
+            novalidate
+            @submit="saveDetails"
+          >
+            <RefusalNotice :refusal="detailsRefusal" />
+            <UFormField
+              name="name"
+              :label="t('core.person.details.name')"
+              required
+            >
+              <UInput
+                v-model="details.name"
+                autocomplete="off"
+                maxlength="120"
+              />
+            </UFormField>
+            <UFormField
+              name="preferredName"
+              :label="t('core.person.details.preferred')"
+              :help="t('core.person.details.preferred-help')"
+            >
+              <UInput
+                v-model="details.preferredName"
+                autocomplete="off"
+                maxlength="60"
+              />
+            </UFormField>
+            <UFormField
+              name="pronouns"
+              :label="t('core.person.details.pronouns')"
+            >
+              <UInput
+                v-model="details.pronouns"
+                autocomplete="off"
+                maxlength="40"
+              />
+            </UFormField>
+          </UForm>
+        </template>
+        <template #footer>
+          <UButton
+            type="submit"
+            form="person-details"
+            :loading="saving"
+            :label="t('core.person.details.save')"
+          />
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="addingAddress"
+        :title="t('core.person.email.add-title', { name: title })"
+        :description="t('core.person.email.add-help')"
+      >
+        <template #body>
+          <UForm
+            id="person-address"
+            :schema="addressSchema"
+            :state="newAddress"
+            class="space-y-4"
+            novalidate
+            @submit="addAddress"
+          >
+            <RefusalNotice :refusal="addRefusal" />
+            <UButton
+              v-if="heldBy"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-merge"
+              :label="t('core.person.email.merge')"
+              :to="`/console/people/merge?survivorId=${encodeURIComponent(p.id)}&mergedAccountId=${encodeURIComponent(heldBy)}`"
+            />
+            <UFormField
+              name="address"
+              :label="t('core.person.email.address')"
+              required
+            >
+              <UInput
+                v-model="newAddress.address"
+                type="email"
+                autocomplete="off"
+                maxlength="254"
+              />
+            </UFormField>
+          </UForm>
+        </template>
+        <template #footer>
+          <UButton
+            type="submit"
+            form="person-address"
+            :loading="sendingLink"
+            :label="t('core.person.email.send-link')"
+          />
+        </template>
+      </UModal>
 
       <UModal
         v-model:open="disabling"
