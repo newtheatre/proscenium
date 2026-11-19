@@ -342,6 +342,8 @@ export const saleLines = defineTable('bar_sale_lines', {
   unitMinor: col.minor('unit_minor').notNull(),
   discountMinor: col.minor('discount_minor').notNull().default(0),
   amountMinor: col.minor('amount_minor').notNull(),
+  // The first promotion's use behind the discount, kept by Promotions (payments.pricing's redeem).
+  promotionRedemptionId: col.internal(text('promotion_redemption_id')),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
