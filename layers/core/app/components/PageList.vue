@@ -303,10 +303,11 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
     </template>
 
     <!-- Built-in views, when the list declares any: tabs kept in the address as view=. -->
-    <!-- Scrolls sideways on a phone rather than cutting each tab's name short. -->
+    <!-- Scrolls sideways on a phone rather than cutting each tab's name short. Never upwards: the
+         underline sits a pixel below the strip, so pb-px keeps it in and overflow-y-hidden stops a scrollbar. -->
     <div
       v-if="viewItems.length"
-      class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+      class="-mx-4 overflow-x-auto overflow-y-hidden px-4 pb-px [scrollbar-width:none] sm:mx-0 sm:px-0"
     >
       <UTabs
         :model-value="state.view"
