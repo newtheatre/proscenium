@@ -50,6 +50,8 @@ interface SettingView {
   of?: string
   /** reference only: the record type it names. */
   record?: string
+  /** list of text only: the route listing the values to pick from. */
+  choices?: string
 }
 
 const { $api } = useNuxtApp()
@@ -422,9 +424,21 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
+                <FieldListChoices
+                  v-else-if="s.kind === 'list' && s.choices"
+                  :model-value="draft[s.key]"
+                  :route="s.choices"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <!-- Free values are tags: a value typed and left, or pasted, is kept, not lost. -->
                 <UInputTags
                   v-else-if="s.kind === 'list'"
                   :model-value="draft[s.key]"
+                  :max-length="s.maxLength"
+                  :placeholder="t('core.settings-page.add-value')"
+                  add-on-blur
+                  add-on-paste
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />

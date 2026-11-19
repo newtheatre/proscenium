@@ -1,1 +1,0 @@
-ALTER TABLE `membership_verification_lists` ADD `reference_noun` text;

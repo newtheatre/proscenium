@@ -1,1 +1,0 @@
-ALTER TABLE `box_office_orders` ADD `split_from_id` text REFERENCES box_office_orders(id);
