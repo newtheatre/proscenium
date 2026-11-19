@@ -12,6 +12,8 @@ import type { CoverChoice } from './BoxOfficePassCoverList.vue'
 
 export interface TillPass { passId?: string, code: string, name: string, priceName: string, holder: string | null, owedMinor: number, left: number | null, unusable: { code: string, reason: string, remedy: string | null } | null }
 export interface TillPassBuy { passTypeId: string, passPriceId: string, name: string, priceName: string, amountMinor: number, entry: boolean, holder?: Buyer, /** Typed for a price only some people may have, in place of finding the holder. */ reference?: string, /** Tickets the holder already has, for this pass to cover once the sale is made (Matt, 19 November). */ cover?: string[] }
+/** A booking's buyer to sell a pass to on its own, whose tickets it then covers (Matt, 19 November). */
+export interface TillUpgrade { holder?: Buyer }
 interface OnSale { id: string, name: string, covers: boolean, holder: 'auto' | 'named' | 'open', uses: number | null, ahead: number, prices: { id: string, name: string, amountMinor: number, proofNote: string | null, restricted: boolean, insteadOf: string[], reference?: { label: string, field?: string, shape: string } }[] }
 interface SaleTicket { ticketTypeId: string, name: string, amountMinor: number, quantity: number }
 
@@ -23,6 +25,8 @@ const buys = defineModel<TillPassBuy[]>('buys', { required: true })
 const collect = defineModel<TillPass[]>('collect', { required: true })
 /** The pass just found, until the next search. */
 const found = defineModel<TillPass | null>('found', { required: true })
+/** Set by the panel to open the sale of a pass as an upgrade; taken back to null once opened. */
+const upgrade = defineModel<TillUpgrade | null>('upgrade', { default: null })
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -85,8 +89,10 @@ const choice = computed(() => {
 })
 // A pass in one person's name needs them named; an open one may be anyone's.
 const needsHolder = computed(() => !!choice.value && (choice.value.type.holder === 'named' || (choice.value.type.holder === 'auto' && choice.value.price.restricted)))
+// An upgrade is sold on its own: tonight's ticket is already theirs, and becomes one of its entries.
+const upgrading = ref(false)
 watch(choice, (c) => {
-  entry.value = !!c?.type.covers
+  entry.value = !upgrading.value && !!c?.type.covers
   qualified.value = undefined
   reference.value = ''
 })
@@ -115,6 +121,15 @@ async function loadOnSale() {
   onSale.value = (await $api<{ passes: OnSale[] }>('/api/box-office/desk/passes', { query: { performanceId: props.performanceId } })).passes
   loadedFor = props.performanceId
 }
+watch(upgrade, (u) => {
+  if (!u) return
+  upgrade.value = null
+  closeSelling()
+  upgrading.value = true
+  entry.value = false
+  holder.value = u.holder
+  void openSelling()
+}, { immediate: true })
 async function openSelling(prefill?: { value: string, swapping: string }) {
   selling.value = true
   saleRefusal.value = null
@@ -168,6 +183,7 @@ function addSale() {
 }
 function closeSelling() {
   selling.value = false
+  upgrading.value = false
   swapping.value = null
   chosen.value = undefined
   holder.value = undefined
@@ -258,7 +274,8 @@ const buyerLabel = (b: Buyer | undefined) => (!b ? t('box-office.screens.panel.p
       v-if="!selling"
       icon="i-lucide-id-card"
       color="neutral"
-      variant="link"
+      variant="outline"
+      class="w-full justify-center sm:w-auto"
       :label="t('box-office.screens.panel.pass.sell')"
       :disabled="locked"
       @click="openSelling()"
@@ -268,8 +285,14 @@ const buyerLabel = (b: Buyer | undefined) => (!b ? t('box-office.screens.panel.p
       class="space-y-3 rounded-lg border border-default p-3"
     >
       <h4 class="text-sm font-medium">
-        {{ t('box-office.screens.panel.pass.sell') }}
+        {{ t(upgrading ? 'box-office.screens.panel.upgrade' : 'box-office.screens.panel.pass.sell') }}
       </h4>
+      <p
+        v-if="upgrading"
+        class="text-sm text-muted"
+      >
+        {{ t('box-office.screens.panel.upgrade-help') }}
+      </p>
       <RefusalNotice :refusal="saleRefusal" />
       <p
         v-if="!saleRefusal && !options.length"

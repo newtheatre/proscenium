@@ -5,13 +5,13 @@
 <script setup lang="ts">
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
-import type { TillPass, TillPassBuy } from '../components/BoxOfficeTillPasses.vue'
+import type { TillPass, TillPassBuy, TillUpgrade } from '../components/BoxOfficeTillPasses.vue'
 
 interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, noun?: string, shape: string }, holder?: true, companion?: true }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
-interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
+interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null, free?: 'comp' | 'pass' | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
-interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired', released: boolean, currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
+interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired', released: boolean, currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, buyer: string | null, accountId?: string | null, scannedLineId?: string | null, performance: { title: string, startsAt: number } | null, lines: OrderLine[] }
 
 /** `settled`: the till payment just taken that this panel sold something in, until the next customer. */
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, settled?: string | null }>()
@@ -51,7 +51,9 @@ function dropExchange() {
   void router.replace({ query })
 }
 
-const { data } = await useAPI<{ performances: Performance[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
+const { data } = await useAPI<{ performances: Performance[], admit?: boolean }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
+// The "Admit now" box is a setting (box-office.sales.desk-admit): off, the door lets everyone in.
+const admitOffered = computed(() => data.value?.admit !== false)
 const performances = computed(() => data.value?.performances ?? [])
 
 // One search box finds a booking to collect; with none found, the panel sells walk-up tickets.
@@ -373,7 +375,7 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
   references.value = Object.fromEntries(lines.filter(l => l.references).map(l => [keyOf(l), l.references!]))
   // Who each ticket was for is kept by account; their names were on the screen before the reload.
   holders.value = Object.fromEntries(lines.filter(l => l.holders).map(l => [keyOf(l), l.holders!.map(id => (id ? { accountId: id, label: t('box-office.screens.panel.holder.restored'), byHand: false } : undefined))]))
-  admit.value = value.admit === true
+  admit.value = value.admit === true && admitOffered.value
   await restorePasses(value)
 }
 
@@ -566,6 +568,41 @@ async function split() {
   finally {
     busy.value = false
   }
+}
+
+// What a booking found means for the money, said large enough to read across a counter (Matt, 19
+// November): a ticket already paid for, or a comp, must never look like something to charge for.
+const verdict = computed(() => {
+  const o = order.value
+  if (!o || o.released) return null
+  const scanned = o.lines.find(l => l.id === o.scannedLineId)
+  const inAlready = scanned?.admittedAt ? t('box-office.screens.panel.verdict.in-already') : undefined
+  if (o.state === 'cancelled') return { color: 'error' as const, icon: 'i-lucide-ban', title: t('box-office.screens.panel.verdict.cancelled'), description: t('box-office.screens.panel.verdict.cancelled-help') }
+  if (o.state !== 'confirmed') return null
+  const lines = scanned ? [scanned] : o.lines
+  const kind = lines.length && lines.every(l => l.free === 'comp') ? 'comp' : lines.length && lines.every(l => l.free === 'pass') ? 'pass' : 'paid'
+  return { color: kind === 'paid' ? 'success' as const : 'info' as const, icon: kind === 'comp' ? 'i-lucide-gift' : kind === 'pass' ? 'i-lucide-id-card' : 'i-lucide-circle-check-big', title: t(`box-office.screens.panel.verdict.${kind}`), description: inAlready ?? t('box-office.screens.panel.verdict.nothing-to-take') }
+})
+// A ticket scanned is felt as well as seen, on a phone that can.
+watch(verdict, (v) => {
+  if (v && typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(v.color === 'success' || v.color === 'info' ? 80 : [60, 60, 60]) // not-policy: a short buzz, or three for something to do
+})
+const lineFree = (line: OrderLine) => (line.free ? t(`box-office.screens.panel.free.${line.free}`) : null)
+
+// Upgrading someone who has a booking to a pass (Matt, 19 November): the pass is sold on its own to
+// the booking's buyer, and their tickets for shows it covers, tonight's included, become its entries.
+const upgrade = ref<TillUpgrade | null>(null)
+const canUpgrade = computed(() => !!order.value && (order.value.state === 'confirmed' || order.value.state === 'reserved') && performances.value.some(p => p.performanceId === order.value!.lines[0]?.performanceId))
+function upgradeToPass() {
+  const o = order.value
+  if (!o) return
+  const holder: Buyer | undefined = o.accountId ? { accountId: o.accountId, label: o.buyer ?? o.reference } : undefined
+  const at = o.lines[0]?.performanceId
+  clear()
+  if (at && at !== performanceId.value) performanceId.value = at
+  void nextTick(() => {
+    upgrade.value = { holder }
+  })
 }
 
 function addTicket() {
@@ -813,6 +850,16 @@ function clear() {
       >
         {{ about(order) }}
       </p>
+      <UAlert
+        v-if="verdict"
+        :color="verdict.color"
+        variant="solid"
+        :icon="verdict.icon"
+        :title="verdict.title"
+        :description="verdict.description"
+        role="status"
+        :ui="{ title: 'text-xl font-bold sm:text-2xl', description: 'text-base', icon: 'size-8' }"
+      />
       <ul class="space-y-2">
         <li
           v-for="(line, i) in order.lines"
@@ -835,7 +882,26 @@ function clear() {
             :aria-label="t('box-office.screens.panel.type', { n: i + 1 })"
             @update:model-value="(value: string) => amend({ retype: [{ lineId: line.id, ticketTypeId: value }] })"
           />
-          <span v-else>{{ line.ticketType }}</span>
+          <span
+            v-else
+            class="flex flex-wrap items-center gap-2"
+          >
+            {{ line.ticketType }}
+            <UBadge
+              v-if="line.id === order.scannedLineId && order.lines.length > 1"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :label="t('box-office.screens.panel.scanned')"
+            />
+            <UBadge
+              v-if="lineFree(line)"
+              color="info"
+              variant="subtle"
+              size="sm"
+              :label="lineFree(line)!"
+            />
+          </span>
           <span class="flex shrink-0 items-center gap-2">
             <span v-if="line.admittedAt">{{ t('box-office.screens.panel.admitted') }}</span>
             <span>{{ money(line.amountMinor, order.currency) }}</span>
@@ -938,6 +1004,16 @@ function clear() {
       >
         {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
       </p>
+      <UButton
+        v-if="canUpgrade"
+        icon="i-lucide-id-card"
+        color="neutral"
+        variant="outline"
+        class="w-full justify-center sm:w-auto"
+        :label="t('box-office.screens.panel.upgrade')"
+        :disabled="locked || busy"
+        @click="upgradeToPass"
+      />
       <!-- While the booking is in the sale, the receipt's Clear puts it away; one Clear at a time. -->
       <UButton
         v-if="modelValue === null || modelValue === undefined"
@@ -1107,6 +1183,7 @@ function clear() {
             v-model:buys="passBuys"
             v-model:collect="passCollect"
             v-model:found="passFound"
+            v-model:upgrade="upgrade"
             :performance-id="performance.performanceId"
             :locked="locked"
             :tickets="saleTickets"
@@ -1170,6 +1247,7 @@ function clear() {
     </template>
 
     <UCheckbox
+      v-if="admitOffered"
       v-model="admit"
       :label="t('box-office.screens.panel.admit')"
       :description="t('box-office.screens.panel.admit-help')"

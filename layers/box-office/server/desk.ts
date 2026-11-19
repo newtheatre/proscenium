@@ -21,7 +21,7 @@ import { hashOf, newReference, randomToken } from './codes'
 import { confirmOrder, sendTickets } from './confirm'
 import { reserveBasket } from './reservations'
 import { siteUrl } from './links'
-import { DOOR_CODE_PURPOSE, doorCodesForOrder, issueTickets, signedPart, ticketNumbers } from './tickets'
+import { DOOR_CODE_PURPOSE, doorCodesForOrder, issueTickets, signedPart, TICKET_KIND, ticketNumbers } from './tickets'
 import { doorCodeKind } from './door-codes'
 import { cancellations, orderLines, orders } from './db/schema'
 import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
@@ -367,16 +367,22 @@ export interface DeskOrder {
   performance: { title: string, startsAt: number } | null
   /** The payment being taken for it, while one is: it can be cancelled, which puts a reservation back as it was. */
   intentId: string | null
-  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }[]
+  /** The buyer's account, so the till can sell them a pass that takes these tickets as its entries. */
+  accountId: string | null
+  /** The ticket whose own code was scanned, when it was found that way. */
+  scannedLineId: string | null
+  /** `free`: why a ticket cost nothing, a comp or a pass's entry, so the till can say so plainly (Matt, 19 November). */
+  lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null, free: 'comp' | 'pass' | null }[]
 }
 
 /** One order as the desk shows it. Nothing about the buyer: that is the account's, and Identity's to show. */
-export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
+export async function deskOrder(orderId: string, scannedLineId: string | null = null): Promise<DeskOrder | null> {
   const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number, intent_id: string | null, account_id: string | null, reserved_at: number | null }>(
     'SELECT id, reference, state, channel, currency, total_minor, release_at, keep, intent_id, account_id, reserved_at FROM box_office_orders WHERE id = ?', orderId)
   if (!order) return null
-  const lines = await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, type_name: string, amount_minor: number, admitted_at: number | null }>(
-    `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, t.name AS type_name, l.amount_minor, k.admitted_at FROM box_office_order_lines l
+  const lines = await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, type_name: string, amount_minor: number, admitted_at: number | null, comp: number, pass: number }>(
+    `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, t.name AS type_name, l.amount_minor, k.admitted_at,
+        (l.comp_request_id IS NOT NULL OR t.kind = 'complimentary') AS comp, l.pass_redemption_id IS NOT NULL AS pass FROM box_office_order_lines l
       JOIN box_office_ticket_types t ON t.id = l.ticket_type_id LEFT JOIN box_office_tickets k ON k.order_line_id = l.id AND k.state = 'valid'
       WHERE l.order_id = ? AND l.kind = 'ticket' AND l.state = 'live' ORDER BY l.id`, order.id)
   return {
@@ -393,13 +399,26 @@ export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
     buyer: order.account_id ? await accountLabel(order.account_id) : null,
     performance: lines[0] ? await showOf(lines[0].performance_id) : null,
     intentId: order.state === 'awaiting_payment' ? order.intent_id : null,
-    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor, admittedAt: l.admitted_at })),
+    accountId: order.account_id,
+    scannedLineId: lines.some(l => l.id === scannedLineId) ? scannedLineId : null,
+    lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor, admittedAt: l.admitted_at, free: l.comp ? 'comp' as const : l.pass ? 'pass' as const : null })),
   }
 }
 
 async function showOf(performanceId: string): Promise<{ title: string, startsAt: number }> {
   const performance = await getPerformance(performanceId)
   return { title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt }
+}
+
+/** The booking a ticket's own door code belongs to, scanned at the till from the ticket email or a printed ticket. */
+async function byTicketCode(code: string): Promise<{ orderId: string, lineId: string } | null> {
+  const parts = code.split('.')
+  if (parts.length !== 4 || parts[0] !== TICKET_KIND) return null // not-policy: kind, key id, code and signature
+  const [kind, keyId, random, signature] = parts as [string, string, string, string]
+  if (!await signing.verify(DOOR_CODE_PURPOSE, keyId, signedPart(kind, keyId, random), signature)) return null
+  const found = await first<{ order_id: string, line_id: string }>(
+    'SELECT l.order_id, l.id AS line_id FROM box_office_tickets k JOIN box_office_order_lines l ON l.id = k.order_line_id WHERE k.code_hash = ?', await hashOf(random))
+  return found ? { orderId: found.order_id, lineId: found.line_id } : null
 }
 
 // A reservation released unpaid: still found, so the buyer can be seated again.
@@ -428,6 +447,11 @@ export async function findOrders(query: string, by?: { unit: UnitView, actor: Ac
 async function findByCode(query: string): Promise<DeskOrder[]> {
   const typed = query.trim().toUpperCase()
   if (!typed) return []
+  const ticket = await byTicketCode(query.trim())
+  if (ticket) {
+    const found = await deskOrder(ticket.orderId, ticket.lineId)
+    return found ? [found] : []
+  }
   const found = await all<{ id: string }>(
     "SELECT id FROM box_office_orders WHERE (state IN ('reserved', 'awaiting_payment', 'confirmed', 'cancelled') OR (state = 'expired' AND reserved_at IS NOT NULL)) AND (reference = ?1 OR desk_code_hash = ?2) ORDER BY created_at DESC LIMIT 5", // not-policy: both are unique, so one is expected
     typed, await hashOf(typed))

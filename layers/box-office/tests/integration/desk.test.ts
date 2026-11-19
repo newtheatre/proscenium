@@ -374,6 +374,14 @@ describe('selling at the desk', () => {
     expect(rowsOf.find(r => r.ticketTypeId === h.fullId)).not.toHaveProperty('companion')
   })
 
+  it('says whether the till offers to admit as it sells, as the theatre has set', async () => {
+    expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.admit).toBe(true)
+    const set = (on: boolean) => commit(unit => changeSetting(unit.view(), 'box-office.sales.desk-admit', on, { reason: 'test', confirm: true }))
+    await set(false)
+    expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.admit).toBe(false)
+    await set(true)
+  })
+
   it('takes a promo code the buyer gives, on the dearest tickets first, and gives its use back when the payment is cancelled', async () => {
     const h = await house(5)
     const code = 'DESK' + h.performanceId.slice(-6).toUpperCase()
@@ -421,6 +429,14 @@ describe('selling at the desk', () => {
     expect(printed.body.reference).toBe(o.reference)
     expect(printed.body.tickets).toEqual([1, 2].map(n => expect.objectContaining({ number: `${o.reference}-${n}`, ticketType: 'Full price', holder: null, admitted: false, doorCode: expect.stringMatching(/^tkt\./), startsAt: o.performance.startsAt })))
     expect((await req('GET', `/api/box-office/desk/orders/${o.orderId}/tickets`, undefined, onlooker)).status).toBe(403)
+    // Scanned back at the till, a ticket's own code finds its booking, said to be paid, with that ticket picked out.
+    const scanned = await req('GET', `/api/box-office/desk/orders?q=${encodeURIComponent(printed.body.tickets[1].doorCode)}`, undefined, seller)
+    expect(scanned.body.orders).toEqual([expect.objectContaining({ orderId: o.orderId, state: 'confirmed', amountDueMinor: 0, scannedLineId: expect.any(String) })])
+    expect(scanned.body.orders[0].lines.map((l: { free: string | null }) => l.free)).toEqual([null, null])
+    expect(scanned.body.orders[0].lines.map((l: { id: string }) => l.id)).toContain(scanned.body.orders[0].scannedLineId)
+    // A code whose signature does not hold finds nothing.
+    const forged = printed.body.tickets[0].doorCode.replace(/\.[^.]+$/, '.AAAA')
+    expect((await req('GET', `/api/box-office/desk/orders?q=${encodeURIComponent(forged)}`, undefined, seller)).body.orders).toEqual([])
 
     expect((await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'after@example.org' }, onlooker, { 'idempotency-key': `send-${o.orderId}-x` })).status).toBe(403)
     const sent = await req('POST', `/api/box-office/desk/orders/${o.orderId}/send`, { email: 'After.Sale@Example.org' }, seller, { 'idempotency-key': `send-${o.orderId}` })
