@@ -2,7 +2,7 @@
 // this person has made, the requests waiting that they may decide, and the performances they may
 // ask for, each with its bands. Anyone signed in may open it; what it holds depends on their grants.
 import { sql } from 'drizzle-orm'
-import { can, defineRoute, inAccountScope, nowMs, useSetting } from '#kit'
+import { can, defineRoute, first, inAccountScope, nowMs, useSetting } from '#kit'
 import { accountLabel, getPerformance, getProduction, getTerm, listPerformances } from '#modules/core'
 import { compsWhere, type CompRow } from '../../../comps'
 import { poolsOf } from '../../../setup'
@@ -24,6 +24,8 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
       show: await titleOf(performance.productionId), startsAt: performance.startsAt, band: bandNames.get(r.band_id) ?? '',
       forName: await accountLabel(r.for_account_id), reason: (await getTerm(r.reason_term_id))?.label ?? '',
       requestedBy: await accountLabel(r.requested_by),
+      // A request still waiting with an order already named makes that reservation complimentary.
+      reservation: r.order_id && (r.state === 'requested' || r.state === 'approved') ? (await first<{ reference: string }>('SELECT reference FROM box_office_orders WHERE id = ?', r.order_id))?.reference ?? null : null,
     }
   }
 

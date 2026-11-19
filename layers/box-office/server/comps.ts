@@ -5,13 +5,13 @@
 // person, scanned and counted like any other ticket. Nobody decides their own request: the ability
 // refuses the owner and a CHECK refuses the row.
 import { sql, type SQL } from 'drizzle-orm'
-import { first, inAccountScope, newId, nowMs, refuse, useContext, useDb, useSetting, type UnitView } from '#kit'
+import { first, inAccountScope, newId, nowMs, refuse, requireAbility, useContext, useDb, useSetting, type UnitView } from '#kit'
 import { findOrCreateAccount, getPerformance, getTerm } from '#modules/core'
 import { claimSeats } from './capacity'
 import { newReference } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { orderLines } from './db/schema'
-import type { LineRow, OrderRow } from './orders'
+import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
 import { poolsOf } from './setup'
 import { ensureManagedTicketTypes, managedType } from './ticket-types'
@@ -85,7 +85,7 @@ export async function requestComps(unit: UnitView, input: CompRequestInput): Pro
   unit.announce('box-office.comp-request.requested', { requestId }, { record: ['box-office.comp-request', requestId] })
   // With no approval needed, the tickets are issued in the same batch, decided by nobody.
   if (!await useSetting('box-office.comps.needs-approval')) {
-    await issueComps(unit, { id: requestId, performance_id: input.performanceId, band_id: bandId, quantity: input.quantity, for_account_id: accountId }, null)
+    await issueComps(unit, { id: requestId, performance_id: input.performanceId, band_id: bandId, quantity: input.quantity, for_account_id: accountId, order_id: null }, null)
     return { requestId, issued: true }
   }
   return { requestId, issued: false }
@@ -104,24 +104,17 @@ export async function approveComps(unit: UnitView, requestId: string): Promise<C
 }
 
 /** Approves a request still asked for, in the unit, and issues its tickets. */
-async function issueComps(unit: UnitView, request: Pick<CompRow, 'id' | 'performance_id' | 'band_id' | 'quantity' | 'for_account_id'>, decidedBy: string | null): Promise<Confirmed> {
+async function issueComps(unit: UnitView, request: Pick<CompRow, 'id' | 'performance_id' | 'band_id' | 'quantity' | 'for_account_id' | 'order_id'>, decidedBy: string | null): Promise<Confirmed> {
   const actor = useContext().actor
   const requestId = request.id
-  // Box office keeps its own Complimentary type; it is made here if this site has not listed its types yet.
-  await ensureManagedTicketTypes()
-  const type = await managedType('box-office.complimentary')
-  if (!type) refuse('box-office.comp.no-type', 'The Complimentary ticket type has been retired, so there is nothing to issue them on.', { status: 409, remedy: 'Bring it back on the Ticket types screen.' })
+  const type = await compType()
+  if (request.order_id) return convertReservation(unit, { ...request, order_id: request.order_id }, type, decidedBy)
   const pool = (await poolsOf(request.performance_id)).find(p => p.bandId === request.band_id)
   if (!pool) refuse('box-office.comp.bad-band', 'That band is no longer on sale for this performance.', { status: 409 })
-  const cap = await useSetting('box-office.comps.per-performance') as number | null
   const at = nowMs()
   // Nothing is charged: the currency is the performance's, for the order's money columns.
   const currency = (await pricesFor(request.performance_id, at))[0]?.currency ?? 'GBP'
-  const over = { code: 'box-office.comp.over-cap', reason: `Approving these would take this performance past its ${cap ?? 0} complimentary tickets.`, remedy: 'Decline it, or raise the limit in the box office settings.' }
-  unit.add(sql`UPDATE box_office_comp_requests SET state = 'approved', decided_by = ${decidedBy}, decided_at = ${at}, updated_at = ${at}
-    WHERE id = ${requestId} AND state = 'requested'
-      AND (${cap} IS NULL OR quantity + (SELECT coalesce(sum(quantity), 0) FROM box_office_comp_requests
-        WHERE performance_id = ${request.performance_id} AND state IN ('approved', 'issued') AND id <> ${requestId}) <= ${cap})`).expect(1, cap === null ? CHANGED : over)
+  await approveWithinCap(unit, request, decidedBy, at)
 
   const orderId = newId('ord')
   const holdId = newId('hold')
@@ -159,4 +152,96 @@ export async function closeComps(unit: UnitView, request: CompRow, as: 'declined
       WHERE id = ${request.id} AND state = 'requested'`).expect(1, CHANGED)
   }
   unit.announce('box-office.comp-request.decided', { requestId: request.id, state: as }, { record: ['box-office.comp-request', request.id] })
+}
+
+/** Box office keeps its own Complimentary type; it is made here if this site has not listed its types yet. */
+async function compType(): Promise<{ id: string, name: string }> {
+  await ensureManagedTicketTypes()
+  const type = await managedType('box-office.complimentary')
+  if (!type) refuse('box-office.comp.no-type', 'The Complimentary ticket type has been retired, so there is nothing to issue them on.', { status: 409, remedy: 'Bring it back on the Ticket types screen.' })
+  return type
+}
+
+/** Approves the request, keeping the performance within `box-office.comps.per-performance` in the same statement. */
+async function approveWithinCap(unit: UnitView, request: Pick<CompRow, 'id' | 'performance_id'>, decidedBy: string | null, at: number): Promise<void> {
+  const cap = await useSetting('box-office.comps.per-performance') as number | null
+  const over = { code: 'box-office.comp.over-cap', reason: `Approving these would take this performance past its ${cap ?? 0} complimentary tickets.`, remedy: 'Decline it, or raise the limit in the box office settings.' }
+  unit.add(sql`UPDATE box_office_comp_requests SET state = 'approved', decided_by = ${decidedBy}, decided_at = ${at}, updated_at = ${at}
+    WHERE id = ${request.id} AND state = 'requested'
+      AND (${cap} IS NULL OR quantity + (SELECT coalesce(sum(quantity), 0) FROM box_office_comp_requests
+        WHERE performance_id = ${request.performance_id} AND state IN ('approved', 'issued') AND id <> ${request.id}) <= ${cap})`).expect(1, cap === null ? CHANGED : over)
+}
+
+const GONE = { code: 'box-office.comp.reservation-gone', reason: 'This reservation has been paid for, changed, released or cancelled since it was asked to be made complimentary.', remedy: 'Decline the request, and ask again if it is still wanted.' }
+
+/** A reservation that can become complimentary: still unpaid, only tickets, and nothing a pass rides on. */
+async function convertible(orderId: string): Promise<{ order: OrderRow, lines: LineRow[] }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order) refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (order.state !== 'reserved') refuse('box-office.desk.not-reserved', 'This order is not a reservation waiting to be paid for.', { status: 409 })
+  if (!order.account_id) refuse('box-office.comp.no-buyer', 'This reservation has nobody to send complimentary tickets to.', { status: 409 })
+  const lines = await liveLines(order.id)
+  const other = await first<{ one: number }>('SELECT 1 AS one FROM box_office_order_lines WHERE order_id = ? AND state = \'live\' AND (kind <> \'ticket\' OR pass_redemption_id IS NOT NULL OR comp_request_id IS NOT NULL) LIMIT 1', order.id)
+  const covered = await first<{ one: number }>(`SELECT 1 AS one FROM box_office_pass_covers WHERE state IN ('held', 'applied')
+    AND (order_id = ? OR line_id IN (SELECT id FROM box_office_order_lines WHERE order_id = ?)) LIMIT 1`, order.id, order.id)
+  if (!lines.length || other || covered)
+    refuse('box-office.comp.reservation-mixed', 'Only a reservation of tickets alone can be made complimentary: this one has a pass or something else on it.', { status: 409, remedy: 'Split the tickets off into a reservation of their own first, or cancel it and ask for complimentary tickets instead.' })
+  return { order, lines }
+}
+
+/**
+ * Asks for a reservation not yet paid for to become complimentary tickets, keeping its seats
+ * (Matt, 2026-11-19). It is a request like any other, for the reservation's buyer and every ticket on
+ * it, decided by someone else where the theatre needs approval; until then the reservation stands.
+ */
+export async function requestReservationComps(unit: UnitView, orderId: string, reasonTermId: string): Promise<{ requestId: string, issued: boolean, reference: string }> {
+  const actor = useContext().actor
+  if (!actor.accountId) refuse('box-office.comp.signed-out', 'Sign in to ask for complimentary tickets.', { status: 401 })
+  const { order, lines } = await convertible(orderId)
+  const performanceId = lines[0]!.performance_id
+  await requireAbility(actor, 'box-office.comp.request', ['core.performance', performanceId])
+  const performance = await getPerformance(performanceId)
+  if (performance.state === 'cancelled') refuse('box-office.comp.cancelled', 'This performance is cancelled.', { status: 409 })
+  const most = await useSetting('box-office.comps.per-request') as number
+  if (lines.length > most) refuse('box-office.comp.too-many', `At most ${most} complimentary tickets in one request.`, { status: 422, remedy: 'Split some tickets off into a reservation of their own, and make each complimentary.' })
+  const term = await getTerm(reasonTermId)
+  if (!term || term.vocabularyKey !== REASONS || term.retired)
+    refuse('box-office.comp.bad-reason', 'That reason is not on the list of reasons for complimentary tickets.', { status: 422, fields: { reasonTermId: 'invalid' }, remedy: 'Choose a reason from the list.' })
+
+  const at = nowMs()
+  const requestId = newId('comp')
+  const pending = { code: 'box-office.comp.already-asked', reason: 'This reservation is already waiting to be made complimentary.', remedy: 'Wait for the request to be decided, or withdraw it on the Complimentary tickets screen.' }
+  // The band named is the one most of its tickets are in: the request shows one, and every seat stays as it is.
+  const counts = new Map<string, number>()
+  for (const l of lines) counts.set(l.band_id, (counts.get(l.band_id) ?? 0) + 1)
+  const bandId = [...counts].sort((a, b) => b[1] - a[1])[0]![0]
+  unit.add(sql`INSERT INTO box_office_comp_requests (id, performance_id, band_id, quantity, for_account_id, reason_term_id, requested_by, state, order_id, created_at, updated_at)
+    SELECT ${requestId}, ${performanceId}, ${bandId}, ${lines.length}, ${order.account_id}, ${reasonTermId}, ${actor.accountId}, 'requested', ${order.id}, ${at}, ${at}
+    WHERE NOT EXISTS (SELECT 1 FROM box_office_comp_requests WHERE order_id = ${order.id} AND state IN ('requested', 'approved'))`).expect(1, pending)
+  unit.announce('box-office.comp-request.requested', { requestId }, { record: ['box-office.comp-request', requestId] })
+  if (!await useSetting('box-office.comps.needs-approval')) {
+    await issueComps(unit, { id: requestId, performance_id: performanceId, band_id: bandId, quantity: lines.length, for_account_id: order.account_id!, order_id: order.id }, null)
+    return { requestId, issued: true, reference: order.reference }
+  }
+  return { requestId, issued: false, reference: order.reference }
+}
+
+/** Approves a request to make a reservation complimentary: its tickets become free ones on the same seats, and it is confirmed and sent. */
+async function convertReservation(unit: UnitView, request: Pick<CompRow, 'id' | 'performance_id' | 'quantity'> & { order_id: string }, type: { id: string, name: string }, decidedBy: string | null): Promise<Confirmed> {
+  const { order, lines } = await convertible(request.order_id).catch((e: unknown) => {
+    if ((e as { code?: string }).code === 'box-office.order.not-found') throw e
+    return refuse(GONE.code, GONE.reason, { status: 409, remedy: GONE.remedy })
+  })
+  if (lines.length !== request.quantity) refuse(GONE.code, GONE.reason, { status: 409, remedy: GONE.remedy })
+  const at = nowMs()
+  await approveWithinCap(unit, request, decidedBy, at)
+  unit.add(sql`UPDATE box_office_order_lines SET ticket_type_id = ${type.id}, price_id = NULL, list_minor = 0, discount_minor = 0, amount_minor = 0, comp_request_id = ${request.id}, updated_at = ${at}
+    WHERE order_id = ${order.id} AND kind = 'ticket' AND state = 'live' AND pass_redemption_id IS NULL AND comp_request_id IS NULL`).expect(lines.length, GONE)
+  // Nothing was paid on a reservation, so no money moves: it is confirmed at nothing, as a free order is.
+  unit.add(sql`UPDATE box_office_orders SET total_minor = 0, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, GONE)
+  const free: LineRow[] = lines.map(l => ({ ...l, ticket_type_id: type.id, amount_minor: 0, type_name: type.name, type_kind: 'complimentary' }))
+  const confirmed = await confirmOrder(unit, { ...order, total_minor: 0 }, free, { from: 'reserved' })
+  unit.add(sql`UPDATE box_office_comp_requests SET state = 'issued', updated_at = ${at} WHERE id = ${request.id} AND state = 'approved'`).expect(1, CHANGED)
+  unit.announce('box-office.comp-request.decided', { requestId: request.id, state: 'issued' }, { record: ['box-office.comp-request', request.id] })
+  return confirmed
 }

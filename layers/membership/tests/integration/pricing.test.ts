@@ -107,6 +107,7 @@ describe('the member price', () => {
     const refs = [open, staffOnly, closed].map(id => `membership:${id}`)
     const described = await inContext(() => requirements.describe(refs))
     expect(refs.map(ref => described[ref]!.open)).toEqual([true, undefined, undefined])
+    expect((await inContext(() => requirements.describe(['membership:any'])))['membership:any']!.open).toBe(true)
     await env.DB.prepare("INSERT INTO core_settings (key, value, updated_at) VALUES ('membership.join.public-listing', 'false', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
     try {
       expect((await inContext(() => requirements.describe([refs[0]!])))[refs[0]!]!.open).toBeUndefined()

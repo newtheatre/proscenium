@@ -169,7 +169,7 @@ export default defineRequirementSource({
     const out: Record<string, { label: string, presentable?: { label: string, field?: string, noun?: string, shape: string }, open?: true }> = {}
     // A price is open to everyone when visitors can see the schemes and join one themselves.
     const listed = !!(await useSetting('membership.join.public-listing'))
-    const openTo = async (ref: string, scheme: Scheme | null) => listed && await mayJoin(ref, scheme) ? { open: true as const } : {}
+    const openTo = async (id: string, scheme: Scheme | null) => listed && await mayJoin(id, scheme) ? { open: true as const } : {}
     const presentableOf = async (scheme: Scheme) => {
       const list = await schemeList(scheme)
       // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a
@@ -189,7 +189,7 @@ export default defineRequirementSource({
           ...(taking.length === 1
             ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
             : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', noun: 'membership reference', shape: 'reference' } } : { label: 'Members' }),
-          ...await openTo(ref, null),
+          ...await openTo(ANY, null),
         }
         continue
       }
@@ -199,7 +199,7 @@ export default defineRequirementSource({
         continue
       }
       // V13: the list's own question, never a bare noun; for member numbers, built from the scheme's name.
-      out[ref] = { ...(scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }), ...await openTo(ref, scheme) }
+      out[ref] = { ...(scheme.acceptsReference ? { label: scheme.name, presentable: await presentableOf(scheme) } : { label: scheme.name }), ...await openTo(id, scheme) }
     }
     return out
   },
