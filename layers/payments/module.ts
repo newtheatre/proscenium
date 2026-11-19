@@ -145,7 +145,7 @@ export default defineModule({
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
     ],
-    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'stripe' }, { id: 'sumup' }, { id: 'sumup-handoff' }],
+    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'other' }, { id: 'stripe' }, { id: 'sumup' }, { id: 'sumup-handoff' }],
     // Payments' own part: guided setup's test payment.
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],

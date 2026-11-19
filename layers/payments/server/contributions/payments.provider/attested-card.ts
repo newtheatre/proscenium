@@ -4,6 +4,6 @@ import type { PaymentProvider } from '../../points/provider'
 
 export default {
   capabilities: ['attested', 'refund', 'partial-refund'],
-  methods: [{ method: 'card_attested', channels: ['desk'] }, { method: 'other_attested', channels: ['desk'] }],
+  methods: [{ method: 'card_attested', channels: ['desk'] }],
   secrets: [],
 } satisfies PaymentProvider
