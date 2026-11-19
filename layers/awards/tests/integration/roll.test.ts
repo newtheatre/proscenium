@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
 import * as standings from '../../../core/server/identity/standings'
-import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import { awardType, holder, issue, NOV_17, ready, req } from './stage'
 
 beforeAll(ready)
@@ -46,6 +46,31 @@ describe('the roll of honour', () => {
     const spy = vi.spyOn(standings, 'hasStanding').mockImplementation(async actor => actor.accountId === member.accountId)
     expect(await namesOn('roll-members', member)).toEqual(['Quiet Holder'])
     spy.mockRestore()
+  })
+
+  it('links a show only where its page answers: never a past one while past shows are not public', async () => {
+    const show = async (slug: string, lastEndsAt: number) => {
+      await rows('INSERT INTO core_productions (id, slug, title, kind, credits_public, state, last_ends_at, created_at) VALUES (?, ?, ?, \'own\', 1, \'published\', ?, ?)', `prd_${slug}`, slug, slug, lastEndsAt, NOV_17)
+      return `prd_${slug}`
+    }
+    const type = await awardType({ key: 'roll-shows' })
+    const past = await issue(type, { recipientName: 'Past Holder', awardedOn: '2001-06-01' })
+    const current = await issue(type, { recipientName: 'Current Holder', awardedOn: '2002-06-01' })
+    await rows('UPDATE awards_awards SET production_id = ? WHERE id = ?', await show('roll-past', Date.UTC(2001, 5, 1)), past)
+    await rows('UPDATE awards_awards SET production_id = ? WHERE id = ?', await show('roll-current', Date.UTC(2999, 0, 1)), current)
+    const shows = async () => Object.fromEntries(((await req('GET', '/api/awards/roll?type=roll-shows', undefined, null)).body.types[0].awards as any[]).map(a => [a.name, a.production]))
+
+    await setModule('public-site', true)
+    expect(await shows()).toEqual({
+      'Past Holder': { title: 'roll-past', slug: 'roll-past', to: '/shows/roll-past' },
+      'Current Holder': { title: 'roll-current', slug: 'roll-current', to: '/whats-on/roll-current' },
+    })
+    await set('public-site.archive.public', false)
+    expect(await shows()).toMatchObject({ 'Past Holder': { title: 'roll-past', to: null }, 'Current Holder': { to: '/whats-on/roll-current' } })
+    await set('public-site.archive.public', true)
+    await setModule('public-site', false)
+    expect(await shows()).toMatchObject({ 'Past Holder': { to: null }, 'Current Holder': { title: 'roll-current', to: null } })
+    await setModule('public-site', true)
   })
 
   it('answers "not found" while the roll is not public', async () => {

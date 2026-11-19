@@ -2,7 +2,7 @@
      file. Everybody holding a listed award, by award type; `type` takes one type's web address and
      then shows that type alone, with no heading. The roll being off, or the module, shows nothing. -->
 <script setup lang="ts">
-interface Entry { id: string, name: string, awardedOn: string, awardedFor: string | null, citation: string | null, production: { title: string, slug: string } | null }
+interface Entry { id: string, name: string, awardedOn: string, awardedFor: string | null, citation: string | null, production: { title: string, slug: string, to: string | null } | null }
 interface RollType { key: string, name: string, summary: string | null, awards: Entry[] }
 
 const props = defineProps<{ type?: string }>()
@@ -59,12 +59,15 @@ const year = (date: string) => date.slice(0, 4) // not-policy: the year of a dat
               ·
             </template>
             <ULink
-              v-if="a.production"
-              :to="`/whats-on/${a.production.slug}`"
+              v-if="a.production?.to"
+              :to="a.production.to"
               class="underline"
             >
               {{ a.production.title }}
             </ULink>
+            <template v-else-if="a.production">
+              {{ a.production.title }}
+            </template>
           </p>
           <p
             v-if="a.citation"
