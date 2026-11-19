@@ -430,6 +430,14 @@ record: every page that listens must still be right, only slower, without it.
   message is the whole sale with a revision number, the newest wins, and money is never passed
   this way. A till panel must take up a `modelValue` it did not emit (Bar's `adopt`, Box office's
   `restore`).
+- **Another account's room.** A module that has decided an account may join another's room signs
+  it a grant (`signGrant({ room, accountId, expires })`); the page keeps it and passes it to
+  `useRealtime(channel, on, { grant })`, and the ticket route trades it for tickets to that room
+  while it lasts, for that account only. A grant carries no authority beyond hearing and speaking
+  in the room. `holdUnder(code, value, until)` and `heldUnder(code)` hold a value under a short
+  code for someone to type, with no table behind it. The till's link code
+  (`layers/payments/server/till-link.ts`) uses both: a six digit code, good for two minutes, buys
+  a pass to the seller's room for twelve hours.
 - **Without the binding** (`nuxt dev`) the ticket route answers `available: false` and pages keep
   to their own reads.
 
