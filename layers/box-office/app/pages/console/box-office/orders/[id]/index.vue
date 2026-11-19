@@ -23,6 +23,8 @@ interface Order {
   totalMinor: number
   complimentary: boolean
   pass: OrderPass | null
+  compPending: boolean
+  compNeedsApproval: boolean
   keep: boolean
   releaseAt: number | null
   createdAt: number
@@ -36,7 +38,7 @@ interface Order {
   payments: Payment[]
   refunds: Refund[]
   cancellations: Cancellation[]
-  can: { release: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean }
+  can: { release: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean }
 }
 
 const { t } = useT()
@@ -54,6 +56,7 @@ const { data, status, error, refresh } = await useAPI<Order>(() => `/api/box-off
 
 const cancelling = ref(false)
 const exchanging = ref(false)
+const comping = ref(false)
 // What can be exchanged: live tickets not yet used at the door.
 const exchangeable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live' && !l.admittedAt))
 // What can be cancelled: live tickets. Those used at the door are shown in the dialogue but cannot be ticked.
@@ -94,6 +97,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   if (!o) return []
   const groups: DropdownMenuItem[][] = []
   if (o.can.release) groups.push([{ label: t(o.keep ? 'box-office.order.keep.off' : 'box-office.order.keep.on'), icon: 'i-lucide-bookmark', onSelect: () => { void keep(!o.keep) } }])
+  if (o.can.comp && !o.compPending) groups.push([{ label: t('box-office.order.comp.action'), icon: 'i-lucide-gift', onSelect: () => { comping.value = true } }])
   if (o.can.exchange && exchangeable.value.length) groups.push([{ label: t('box-office.order.exchange.title'), icon: 'i-lucide-arrow-left-right', onSelect: () => { exchanging.value = true } }])
   // One way to undo a reservation: the cancel dialogue, which can leave some tickets on it, or, for
   // someone who may only release, releasing it whole. A paid booking's tickets are cancelled.
@@ -124,6 +128,7 @@ const summary = computed(() => {
     ...(o.pass ? [{ label: t('box-office.order.pass'), value: t(o.pass.paid ? 'box-office.order.pass-paid' : 'box-office.order.pass-unpaid', { name: o.pass.name }) }] : []),
     { label: t('box-office.order.sold'), value: sold(o) },
     { label: t('box-office.order.made'), value: dateTime(o.createdAt) },
+    ...(o.compPending ? [{ label: t('box-office.order.comp.summary'), value: t('box-office.order.comp.pending'), to: '/console/box-office/comps' }] : []),
     ...(o.state === 'reserved' && o.releaseAt ? [{ label: t('box-office.order.releases'), value: o.keep ? t('box-office.order.kept') : dateTime(o.releaseAt) }] : []),
   ]
 })
@@ -271,6 +276,13 @@ const refundDetail = (o: Order, r: Refund) => {
         :fee-minor="d.cancellationFeeMinor"
         :lines="cancellable"
         @cancelled="refresh()"
+      />
+      <BoxOfficeCompDialog
+        v-model:open="comping"
+        :order-id="d.id"
+        :count="cancellable.length"
+        :needs-approval="d.compNeedsApproval"
+        @done="refresh()"
       />
       <BoxOfficeExchangeDialog
         v-model:open="exchanging"

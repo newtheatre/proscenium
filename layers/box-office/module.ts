@@ -296,6 +296,8 @@ export default defineModule({
       terms: [
         { slug: 'cast', label: 'Cast' },
         { slug: 'crew', label: 'Crew' },
+        // Directors, producers and the rest of the team who are neither on stage nor crewing.
+        { slug: 'production-team', label: 'Production team' },
         { slug: 'press', label: 'Press' },
         { slug: 'reviewer', label: 'Reviewer' },
         { slug: 'sponsor', label: 'Sponsor' },
