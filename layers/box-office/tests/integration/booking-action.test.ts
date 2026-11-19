@@ -78,6 +78,24 @@ describe('the booking button from Box office', () => {
     expect(found[h.productionId]).toEqual({ currency: 'GBP', fromMinor: 1200, toMinor: 1200, others: [{ label: `Member rate ${h.productionId}`, amountMinor: 400, gated: true }, { label: 'Concession', amountMinor: 900 }] })
   })
 
+  it('quotes a price held by a membership anyone may join, but not one held by something they cannot take up', async () => {
+    const h = await house(10)
+    const member = await req('POST', '/api/box-office/ticket-types', { name: `Joinable member ${h.productionId}`, requirementRefs: ['seats:joinable'] })
+    expect(member.status, JSON.stringify(member.body)).toBe(200)
+    const fellow = await req('POST', '/api/box-office/ticket-types', { name: `Fellow ${h.productionId}`, requirementRefs: ['seats:member'] })
+    const set = await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [
+      { bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 800 },
+      { bandId: h.bandId, ticketTypeId: member.body.ticketTypeId, amountMinor: 600 },
+      { bandId: h.bandId, ticketTypeId: fellow.body.ticketTypeId, amountMinor: 0 },
+    ] })
+    expect(set.status, JSON.stringify(set.body)).toBe(200)
+    const found = await inContext(() => priceSummaries([h.productionId]))
+    expect(found[h.productionId]!.others).toEqual([
+      { label: `Fellow ${h.productionId}`, amountMinor: 0, gated: true },
+      { label: `Joinable member ${h.productionId}`, amountMinor: 600 },
+    ])
+  })
+
   it('gives no price for a production whose dates are past or not priced', async () => {
     const past = await house(10)
     await env.DB.prepare('UPDATE core_performances SET starts_at = ?1, ends_at = ?1 + 3600000, doors_at = NULL WHERE id = ?2').bind(Date.now() - 86_400_000, past.performanceId).run() // not-policy: a day ago
