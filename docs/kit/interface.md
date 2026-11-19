@@ -463,7 +463,9 @@ a layout, not a shell, and it has no navigation of its own.
   may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
   one receipt beside the panels, grouped by panel, with the ways to pay on it: one press makes the
   sale and starts that way of paying, and Split takes it in parts. On a narrow screen the receipt is
-  a sheet, opened from a bar at the foot that also takes payment. A panel is shown on the receipt by
+  a sheet, opened from a bar at the foot that also takes payment. The sheet swipes down to close; its
+  body scrolls only when the sale is too long to fit (a scrolling box takes a swipe as a scroll), and
+  "Add a code or discount" closes it while that window is open and opens it again after. A panel is shown on the receipt by
   the lines of its `summarise`; one that wants steppers on its lines, or them shown before the
   server has answered, emits `receipt` with `{ lines, note?, added? }`: each line is
   `{ key, label, detail?, quantity, amountMinor, more?, fewer? }`, `note` is a line that stays under
