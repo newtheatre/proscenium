@@ -5,12 +5,13 @@ import { changeSetting, createUnit, newId, nowMs, setClock } from '#kit'
 import { confirmRefund, createIntent, requestRefund, startAttempt } from '../../server/services'
 import returnRoute from '../../server/api/payments/handoff/[attempt]/[proof].get'
 import providersRoute from '../../server/api/payments/providers.get'
+import tillMethodsRoute from '../../server/api/payments/till/methods.get'
 import { call, env, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 19)
 const MINUTE = 60_000
 let account: string
-const handle = server({ 'GET /api/payments/handoff/:attempt/:proof': returnRoute, 'GET /api/payments/providers': providersRoute })
+const handle = server({ 'GET /api/payments/handoff/:attempt/:proof': returnRoute, 'GET /api/payments/providers': providersRoute, 'GET /api/payments/till/methods': tillMethodsRoute })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
   return inContext(async () => {
@@ -138,5 +139,14 @@ describe('Providers and readers', () => {
     expect(byId.sumup.pairsReaders).toBe(true)
     expect(byId['sumup-handoff'].pairsReaders).toBe(false)
     expect(byId.cash).toMatchObject({ pairsReaders: false })
+  })
+})
+
+describe('the till', () => {
+  it('offers the hand-off as card with no reader to choose, so one press opens the SumUp app', async () => {
+    const listed = await (await call(handle, 'GET', '/api/payments/till/methods', { actor: person(['payments.attempt.attest']) })).json() as any
+    const offer = listed.methods.find((m: any) => m.providerAccountId === account)
+    expect(offer).toMatchObject({ provider: 'sumup-handoff', method: 'card_reader' })
+    expect(offer.readers).toBeUndefined()
   })
 })
