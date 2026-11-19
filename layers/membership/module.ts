@@ -32,6 +32,7 @@ export default defineModule({
     'join.public-listing': setting.boolean({ default: true, change, audience: 'public' }),
     'card.show': setting.boolean({ default: true, change, audience: 'public' }),
     'voting.qualifying-period': setting.duration({ default: '0d', min: '0d', max: '365d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'verification.member-prices': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'verification.list-keep-for': setting.duration({ default: '400d', min: '30d', max: '800d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'verification.names-keep-for': setting.duration({ default: '365d', min: '0d', max: '800d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'retention.ended-after': setting.duration({ default: '2190d', min: '365d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
