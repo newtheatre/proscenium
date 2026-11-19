@@ -688,9 +688,15 @@ function partTaken(amountMinor: number) {
 // reload does not repeat it.
 // The note that a payment was picked up after a reload, taken away once that payment has ended.
 let pickedUp: string | number | undefined
+// Back from SumUp, the address and the linked room can both pick up the same sale; the second finish
+// would find the panels already emptied and lose the after-sale panel.
+const resuming = new Set<string>()
 async function resume(intentId: string, said: string) {
+  if (resuming.has(intentId) || finished.value?.intentId === intentId) return
+  resuming.add(intentId)
   try {
     const now = await $api<Status>(`/api/payments/intents/${intentId}` as string)
+    if (finished.value?.intentId === intentId) return
     // What this device kept of it: its lines, what was in the panels, and any split under way.
     const was = kept(intentId)
     if (was) {
@@ -718,6 +724,9 @@ async function resume(intentId: string, said: string) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+  }
+  finally {
+    resuming.delete(intentId)
   }
 }
 onMounted(() => {
@@ -792,6 +801,12 @@ watch([filled, () => JSON.stringify(pricing), () => sale.value?.intentId ?? null
 
 async function adopt(theirs: SharedSale) {
   clash.value = null
+  // The room still holds a sale this device has just finished, such as on return from SumUp.
+  if (theirs.sale && theirs.sale.intentId === finished.value?.intentId) {
+    rev = Math.max(rev, theirs.rev)
+    lastShared = ''
+    return share()
+  }
   rev = theirs.rev
   lastShared = contentOf(theirs)
   // The payment ended on the other device: the server says how, before the panels are emptied.
