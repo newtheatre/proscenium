@@ -13,7 +13,7 @@ export default defineAppConfig({
     // read and tap, rather than sitting small at the left of the card.
     pinInput: {
       slots: { root: 'flex w-full max-w-md gap-2' },
-      variants: { size: { xl: { base: 'h-12 sm:h-14 w-0 flex-1 text-xl' } } },
+      variants: { size: { xl: { base: 'h-14 sm:h-16 w-0 flex-1 text-2xl' } } },
       defaultVariants: { size: 'xl' },
     },
     // A select's placeholder is readable text (a filter shows its name there), so it meets 4.5:1.
