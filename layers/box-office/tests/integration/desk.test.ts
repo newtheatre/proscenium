@@ -175,6 +175,30 @@ describe('a reservation at the desk', () => {
     expect(await claimed(h)).toBe(2)
   })
 
+  it('makes a reserved ticket complimentary from the swap menu, and confirms a reservation left with nothing to pay', async () => {
+    const h = await house(2)
+    const r = await reserved(h, 2)
+    const lines = (await rows<{ id: string }>("SELECT id FROM box_office_order_lines WHERE order_id = ? AND state = 'live' ORDER BY id", r.orderId)).map(l => l.id)
+    const reason = (await inContext(() => listTerms('box-office.comp-reason'))).find(t => t.slug === 'press')!.id
+    const comper = person(['box-office.order.take-payment', 'box-office.comp.request'])
+    await commit(unit => changeSetting(unit.view(), 'box-office.comps.needs-approval', false, { reason: 'test', confirm: true }))
+    // Without the right to give comps, nothing changes.
+    const refused = await req('POST', `/api/box-office/orders/${r.orderId}/comp-lines`, { lineIds: [lines[0]], reasonTermId: reason }, seller)
+    expect(refused.status, JSON.stringify(refused.body)).toBe(403)
+    const one = await req('POST', `/api/box-office/orders/${r.orderId}/comp-lines`, { lineIds: [lines[0]], reasonTermId: reason }, comper)
+    expect(one.status, JSON.stringify(one.body)).toBe(200)
+    expect(one.body.totalMinor).toBe(1200)
+    // Something is still to pay, so it is not confirmed without the till.
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/confirm-free`, {}, seller)).body.code).toBe('box-office.desk.to-pay')
+    expect((await req('POST', `/api/box-office/orders/${r.orderId}/comp-lines`, { lineIds: [lines[1]], reasonTermId: reason }, comper)).body.totalMinor).toBe(0)
+    expect(await rows('SELECT state, quantity FROM box_office_comp_requests WHERE order_id = ? ORDER BY created_at', r.orderId)).toEqual([{ state: 'issued', quantity: 1 }, { state: 'issued', quantity: 1 }])
+    const done = await req('POST', `/api/box-office/orders/${r.orderId}/confirm-free`, { admit: true }, seller)
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(await order(r.orderId)).toMatchObject({ state: 'confirmed', total_minor: 0 })
+    expect((await tickets(r.orderId)).map(k => [k.state, k.admitted_at !== null])).toEqual([['valid', true], ['valid', true]])
+    expect(await claimed(h)).toBe(2)
+  })
+
   it('changes the type of a ticket reserved before its prices were set, such as an imported booking, at today\'s price', async () => {
     const h = await house(2)
     const r = await reserved(h, 1)

@@ -589,6 +589,16 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   return { orderId: order.id, totalMinor, amountDueMinor: totalMinor }
 }
 
+/** Confirms a reservation that has come to nothing to pay, such as after a swap to a free ticket, with no payment. */
+export async function confirmFreeReservation(unit: UnitView, orderId: string, admit: boolean): Promise<{ orderId: string, reference: string }> {
+  const actor = useContext().actor
+  const { order, lines } = await reservation(orderId)
+  if (order.total_minor !== 0) refuse('box-office.desk.to-pay', 'There is something to pay for this booking.', { status: 409, remedy: 'Take payment for it at the till.' })
+  if (!lines.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  await confirmOrder(unit, order, lines, { from: 'reserved', ...(admit && actor.accountId ? { admitBy: actor.accountId } : {}) })
+  return { orderId: order.id, reference: order.reference }
+}
+
 /**
  * Splits tickets off a reservation into a reservation of their own, so one of a group can pay for
  * theirs while the rest stay reserved (Matt, 2026-11-17). The new one has its own reference, the
