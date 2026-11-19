@@ -62,6 +62,7 @@ describe('the hand-off', () => {
     const { out, url, back } = await handedOff(1250)
     expect(`${url.protocol}//${url.host}${url.pathname}`).toBe('sumupmerchant://pay/1.0')
     expect(url.searchParams.get('total')).toBe('12.50')
+    expect(url.searchParams.get('amount')).toBe('12.50')
     expect(url.searchParams.get('currency')).toBe('GBP')
     expect(url.searchParams.get('affiliate-key')).toBe('sup_afk_test')
     expect(url.searchParams.get('app-id')).toBe('com.example.theatre')
