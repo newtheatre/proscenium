@@ -52,6 +52,7 @@ import orderGet from '../../server/api/box-office/orders/[id]/index.get'
 import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import deskSoldGet from '../../server/api/box-office/desk/sold.get'
 import deskIssuePost from '../../server/api/box-office/desk/issue.post'
+import deskReservePost from '../../server/api/box-office/desk/reserve.post'
 import deskPassGet from '../../server/api/box-office/desk/pass.get'
 import deskPassesGet from '../../server/api/box-office/desk/passes.get'
 import deskCoversGet from '../../server/api/box-office/desk/covers.get'
@@ -149,6 +150,7 @@ export const handle = server({
   'GET /api/box-office/desk/orders': deskOrdersGet,
   'GET /api/box-office/desk/sold': deskSoldGet,
   'POST /api/box-office/desk/issue': deskIssuePost,
+  'POST /api/box-office/desk/reserve': deskReservePost,
   'GET /api/box-office/desk/pass': deskPassGet,
   'GET /api/box-office/desk/passes': deskPassesGet,
   'GET /api/box-office/desk/covers': deskCoversGet,

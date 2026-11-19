@@ -61,7 +61,7 @@ This is how the first theatre sells, so all seven are Gate stories. The rules ar
 | BO-31 | As a seller I take cash | I enter the amount handed over, see the change, and confirm. The sale is in my session's expected cash | First |
 | BO-32 | As a seller I am told the truth when the reader does not answer | After the wait the screen says there was no answer. I can check again, cancel, or state the reader's own result, which is recorded under my name. The seats stay held meanwhile | First |
 | BO-33 | As a seller I find an order for someone at the desk | Searching by name, email or reference finds it; I can resend or show the tickets. Name and email go through Identity's findAccounts (part 4); reference ships first | First |
-| BO-34 | As a seller I take a booking by phone | A phone order is confirmed by a payment taken at the desk, or held unpaid until a time I set and released automatically after it | First |
+| BO-34 | As a seller I take a booking by phone | A phone order is confirmed by a payment taken at the desk, or reserved for the person I name as an ordinary reservation: emailed to them, under the per-person limit, released unpaid at the performance's release time, and carrying what a pass used on it still owes (the seller-set time is cut: 10-questions-for-matt, cut 5) | First |
 | BO-35 | As a seller I split a payment between cash and card | The sale completes when the parts add up to the total. If the buyer abandons it part-paid, the paid part is refunded | Later |
 | BO-36 | As a box-office manager I hold seats back | I hold a number of seats with a label and an optional end date. They are not for sale. I can sell from the hold or release it | First |
 
