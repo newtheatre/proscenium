@@ -209,6 +209,19 @@ export async function rowsOf(intentId: string): Promise<SplitRow[]> {
   return all<SplitRow>('SELECT * FROM payments_till_splits WHERE intent_id = ? ORDER BY position', intentId)
 }
 
+/**
+ * Who paid for each keyed line of an owner's part in a split till sale, for an owner that gives what
+ * was bought to whoever paid for it (Box office's passes; Matt, 18 November). Only people who said
+ * where their receipt goes can be named. Empty when the sale is not split. Reads only.
+ */
+export async function payersOf(intentId: string, owner: { module: string, record: string }): Promise<{ key: string, to: Destination }[]> {
+  return (await rowsOf(intentId)).filter(r => r.position > 0).flatMap((row) => {
+    const to = destinationOf(row)
+    if (!to) return []
+    return (JSON.parse(row.items) as SplitItem[]).flatMap(i => (i.key && i.module === owner.module && i.record === owner.record ? [{ key: i.key, to }] : []))
+  })
+}
+
 /** How each row was paid: a person's own attempt, or every succeeded attempt for the whole sale. */
 export async function paidByOf(intentId: string, rows: SplitRow[], including?: { id: string, method: string }): Promise<Map<string, string[]>> {
   const attempts = await all<{ id: string, method: string }>("SELECT id, method FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded'", intentId)

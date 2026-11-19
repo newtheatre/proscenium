@@ -42,6 +42,8 @@ export const signedPart = (kind: string, keyId: string, code: string) => `${kind
  * exactly as the door would have written it.
  */
 export async function issueTickets(unit: UnitView, lines: readonly { id: string, performance_id: string }[], admit?: { by: string, at: number }): Promise<string[]> {
+  // An order of passes alone has no tickets to issue.
+  if (!lines.length) return []
   const made = await Promise.all(lines.map(async (line) => {
     const code = base32(crypto.getRandomValues(new Uint8Array(CODE_BYTES)))
     const { keyId, signature } = await signing.sign(DOOR_CODE_PURPOSE, id => signedPart(TICKET_KIND, id, code))
