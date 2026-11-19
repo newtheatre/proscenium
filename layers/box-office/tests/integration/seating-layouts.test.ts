@@ -400,3 +400,71 @@ describe('the section a space\'s seats come from', () => {
     expect((await api('PUT', `/api/box-office/performances/${h.performanceId}/layout`, { use: 'numbers', wheelchairSpaces: 2, seatsPerSpace: 1, seatsBandId: other.bandId })).body.code).toBe('box-office.band.not-found')
   })
 })
+
+describe('a busy space', () => {
+  /** `count` more performances of `h`'s show in its space, a day apart, each set up for sale (and, if `open`, on sale). */
+  async function nights(h: House, count: number, from: number, open = false): Promise<House[]> {
+    const [at] = await rows<{ venue_id: string, space_id: string }>('SELECT venue_id, space_id FROM core_performances WHERE id = ?', h.performanceId)
+    const made: House[] = []
+    for (let i = 0; i < count; i++) {
+      const night = await req('POST', `/api/core/productions/${h.productionId}/performances`, { venueId: at!.venue_id, spaceId: at!.space_id, startsAt: from + i * 24 * HOUR, capacity: 500 })
+      expect(night.status, JSON.stringify(night.body)).toBe(200)
+      expect((await req('POST', `/api/core/performances/${night.body.id}/schedule`, {})).status).toBe(200)
+      expect((await req('PUT', `/api/box-office/performances/${night.body.id}/sales`, { pools: [{ bandId: h.bandId, capacity: 10 }] })).status).toBe(200)
+      if (open) expect((await req('POST', `/api/box-office/performances/${night.body.id}/sales/open`, {})).status).toBe(200)
+      made.push({ ...h, performanceId: night.body.id })
+    }
+    return made
+  }
+  /** Another show in `h`'s space, with its own Stalls, and `count` performances set up for sale. */
+  async function anotherShow(h: House, count: number, from: number): Promise<House[]> {
+    const [at] = await rows<{ venue_id: string, space_id: string }>('SELECT venue_id, space_id FROM core_performances WHERE id = ?', h.performanceId)
+    const production = await req('POST', '/api/core/productions', { title: 'Busy space second show', kind: 'own' })
+    expect(production.status, JSON.stringify(production.body)).toBe(200)
+    const band = await req('POST', `/api/box-office/productions/${production.body.id}/bands`, { name: 'Stalls' })
+    const first = await req('POST', `/api/core/productions/${production.body.id}/performances`, { venueId: at!.venue_id, spaceId: at!.space_id, startsAt: from, capacity: 500 })
+    expect(first.status, JSON.stringify(first.body)).toBe(200)
+    expect((await req('POST', `/api/core/performances/${first.body.id}/schedule`, {})).status).toBe(200)
+    expect((await req('PUT', `/api/box-office/performances/${first.body.id}/sales`, { pools: [{ bandId: band.body.bandId, capacity: 10 }] })).status).toBe(200)
+    const lead: House = { ...h, productionId: production.body.id, performanceId: first.body.id, bandId: band.body.bandId }
+    return [lead, ...await nights(lead, count - 1, from + 24 * HOUR)]
+  }
+
+  it('takes a first layout, a change to it, a new usual one and a run\'s numbers at every performance to come, however many there are', async () => {
+    const h = await house(10)
+    const all = [h, ...await nights(h, 11, Date.UTC(2027, 4, 1, 19, 30)), ...await anotherShow(h, 12, Date.UTC(2027, 5, 1, 19, 30))]
+    const capacities = async () => Promise.all(all.map(async night => (await pools(night)).spaces?.capacity ?? null))
+
+    const id = await layout(h, { wheelchairSpaces: 2, seatsPerSpace: 2 })
+    expect(await capacities()).toEqual(all.map(() => 2))
+    expect(await count('SELECT count(*) AS n FROM box_office_bands WHERE production_id IN (?, ?) AND kind = \'wheelchair\'', h.productionId, all.at(-1)!.productionId)).toBe(2)
+
+    expect((await bookSpace(h)).ok).toBe(true)
+    const changed = await api('PUT', `/api/box-office/seating-layouts/${id}`, { spaceId: await spaceOf(h), name: 'End-on', seats: null, wheelchairSpaces: 3, seatsPerSpace: 1 })
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200)
+    expect(await capacities()).toEqual(all.map(() => 3))
+    expect(await pools(h)).toMatchObject({ spaces: { capacity: 3, claimed: 1 } })
+
+    const round = await layout(h, { wheelchairSpaces: 4, seatsPerSpace: 1 }, 'In the round')
+    const usual = await api('POST', `/api/box-office/seating-layouts/${round}/usual`, {})
+    expect(usual.status, JSON.stringify(usual.body)).toBe(200)
+    expect(await capacities()).toEqual(all.map(() => 4))
+
+    const run = await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'numbers', wheelchairSpaces: 5, seatsPerSpace: 1 })
+    expect(run.status, JSON.stringify(run.body)).toBe(200)
+    expect(await capacities()).toEqual(all.map(night => night.productionId === h.productionId ? 5 : 4))
+    expect((await api('PUT', `/api/box-office/productions/${h.productionId}/layout`, { use: 'inherit' })).status).toBe(200)
+    expect(await capacities()).toEqual(all.map(() => 4))
+  })
+
+  it('still refuses a change below the spaces booked at any one performance, naming how many', async () => {
+    const h = await house(10)
+    const later = await nights(h, 11, Date.UTC(2027, 6, 1, 19, 30), true)
+    const id = await layout(h, { wheelchairSpaces: 3, seatsPerSpace: 1 })
+    for (let i = 0; i < 2; i++) expect((await bookSpace(later.at(-1)!)).ok).toBe(true)
+    const cut = await api('PUT', `/api/box-office/seating-layouts/${id}`, { spaceId: await spaceOf(h), name: 'End-on', seats: null, wheelchairSpaces: 1, seatsPerSpace: 1 })
+    expect(cut.body).toMatchObject({ code: 'box-office.layout.spaces-booked' })
+    expect(cut.body.reason).toContain('2 wheelchair spaces')
+    expect((await pools(h)).spaces).toMatchObject({ capacity: 3 })
+  })
+})
