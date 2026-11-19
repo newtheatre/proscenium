@@ -3,6 +3,12 @@
 # search engines follow. `to` is a page on this site, such as /about or /whats-on/hamlet, or an
 # https address. An old address may carry its query, such as /show.php?id=12, to match only that.
 # `bun run check` fails an entry whose page does not exist.
-redirects: []
-#  - from: /about-us.html
-#    to: /about
+redirects:
+  - from: /technical-specification
+    to: /technical-information
+  - from: /my
+    to: /members
+  - from: /register
+    to: /sign-in
+# The old /policies/booking and /book/<performance> links are sent on by
+# site/server/middleware/old-links.ts, because those addresses fall under pages of this site.

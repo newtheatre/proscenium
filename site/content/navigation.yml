@@ -1,5 +1,19 @@
 # The public menu. Each link is a label and where it goes: a page on this site, such as /about
 # (site/content/pages/about.md), or an https address. `bun run check` fails a link to a missing page.
 # The theatre's name in the header already goes home, so the menu needs no Home link.
-header: []
-footer: []
+header:
+  - label: Get involved
+    to: /get-involved
+  - label: About us
+    to: /about
+footer:
+  - label: About us
+    to: /about
+  - label: Our history
+    to: /history
+  - label: Get involved
+    to: /get-involved
+  - label: Technical information
+    to: /technical-information
+  - label: History project
+    to: https://history.newtheatre.org.uk/

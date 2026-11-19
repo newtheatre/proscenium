@@ -1,0 +1,51 @@
+# The home page. Each part is optional except the hero and what's on; leave one out to drop it.
+title: The Nottingham New Theatre
+description: England's only entirely student-run theatre, at the University of Nottingham since 1926.
+
+hero:
+  headline: 1926 to 2026, our centenary season
+  title: A century of
+  highlight: first nights
+  description: England's only entirely student-run theatre.
+  image: /images/nnt-building.jpg
+  links:
+    - label: See what's on
+      to: /whats-on
+    - label: Get involved
+      to: /get-involved
+
+whatsOn:
+  title: On stage this term
+  limit: 3
+  link:
+    label: Full season
+    to: /whats-on
+
+feature:
+  headline: The centenary
+  title: 100 years, 2,000 shows, and one creaky building we love.
+  description: From the Dramatic Society of 1926 to today's fourteen-show terms, students have run the theatre the whole way through.
+  link:
+    label: Our history
+    to: /history
+
+involved:
+  title: No experience needed.
+  highlight: Everyone starts somewhere.
+  description: Act, direct, build sets, rig lights, mix sound, run the bar or design the posters. Every show is made by students, and most of them had never done it before they joined.
+  link:
+    label: Join the theatre
+    to: /get-involved
+  items:
+    - title: Acting
+      description: Audition for any show. You don't need a CV or headshots.
+      icon: i-lucide-drama
+    - title: Backstage and tech
+      description: Build the set, rig the lights and run the sound.
+      icon: i-lucide-lightbulb
+    - title: Front of house
+      description: Welcome the audience, run the bar and learn the building.
+      icon: i-lucide-ticket
+    - title: Design and marketing
+      description: Posters, trailers and social media for every show.
+      icon: i-lucide-palette
