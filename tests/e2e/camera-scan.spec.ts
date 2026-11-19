@@ -22,6 +22,7 @@ let reference = ''
 let deskCode = ''
 let doorCode = ''
 let liveCode = ''
+let pairReference = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, headers: Record<string, string> = {}) {
   const response = await api.post(path, { data, headers: { 'idempotency-key': crypto.randomUUID(), ...headers } })
@@ -99,6 +100,9 @@ test.beforeAll(async ({ playwright }) => {
   // Another, for the door in live mode.
   const third = await post(buyer, '/api/box-office/baskets', { performanceId, lines: [{ bandId: band.bandId, ticketTypeId: free.ticketTypeId, quantity: 1 }] })
   liveCode = (await post(buyer, `/api/box-office/baskets/${third.orderId}/checkout`, { expectedTotalMinor: 0, email: `scan.live.${stamp}@example.org` }, { 'x-basket-token': third.token })).doorCodes[0]
+  // Two tickets on one paid booking, whose reference is held up instead of a ticket.
+  const fourth = await post(buyer, '/api/box-office/baskets', { performanceId, lines: [{ bandId: band.bandId, ticketTypeId: free.ticketTypeId, quantity: 2 }] })
+  pairReference = (await post(buyer, `/api/box-office/baskets/${fourth.orderId}/checkout`, { expectedTotalMinor: 0, email: `scan.pair.${stamp}@example.org` }, { 'x-basket-token': fourth.token })).reference
   await buyer.dispose()
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
@@ -213,6 +217,24 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.getByRole('button', { name: 'Resume camera' }).click()
     await page.waitForTimeout(500)
     await page.screenshot({ path: 'test-results/live-door-phone.png' })
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+test('a paid booking\'s own code offers Admit one or Admit all, and the door clears for the next', async ({ playwright }) => {
+  const { browser, page } = await withCamera(playwright.chromium, cameraShowing(pairReference, `pair-${stamp}`))
+  try {
+    await visit(page, `/live/door/${performanceId}`)
+    await expect(page.getByRole('status').filter({ hasText: 'Booking found' })).toContainText('2 of 2 still to come in', { timeout: 15_000 })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: `Admit one ticket for ${pairReference}` }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Admitted' })).toContainText('1 admitted')
+    await expect(page.getByRole('button', { name: /^Admit all/ })).toHaveCount(0)
+    await page.getByRole('button', { name: `Admit one ticket for ${pairReference}` }).click()
+    await expect(page.getByRole('button', { name: `Admit one ticket for ${pairReference}` })).toHaveCount(0)
+    await expect(page.getByRole('status').filter({ hasText: 'Hold a ticket or a booking code up to the camera.' })).toBeVisible({ timeout: 10_000 })
   }
   finally {
     await browser.close()
