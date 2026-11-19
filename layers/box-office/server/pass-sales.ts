@@ -251,12 +251,23 @@ export interface Owed { pass: JudgedPass, fromLine: string | null }
 export async function owedHere(passes: readonly JudgedPass[], at = nowMs()): Promise<Owed[]> {
   const out: Owed[] = []
   for (const pass of passes.filter(p => p.owedMinor > 0)) {
-    const row = await first<{ order_line_id: string | null, waiting: number }>(
-      `SELECT p.order_line_id, EXISTS (SELECT 1 FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id WHERE l.id = p.order_line_id AND l.state = 'live' AND ${LIVE_ORDER(at)}) AS waiting
-        FROM box_office_passes p WHERE p.id = ? AND p.paid_at IS NULL`, pass.passId)
+    const row = await unpaidLine(pass.passId, at)
     if (row && !row.waiting) out.push({ pass, fromLine: row.order_line_id })
   }
   return out
+}
+
+function unpaidLine(passId: string, at: number) {
+  return first<{ order_line_id: string | null, waiting: number }>(
+    `SELECT p.order_line_id, EXISTS (SELECT 1 FROM box_office_order_lines l JOIN box_office_orders o ON o.id = l.order_id WHERE l.id = p.order_line_id AND l.state = 'live' AND ${LIVE_ORDER(at)}) AS waiting
+      FROM box_office_passes p WHERE p.id = ? AND p.paid_at IS NULL`, passId)
+}
+
+/** What a pass owes if it were used now: nothing while a live booking already waits to collect it. Reads only. */
+export async function owedNow(pass: Pick<JudgedPass, 'passId' | 'owedMinor'>, at = nowMs()): Promise<number> {
+  if (pass.owedMinor <= 0) return 0
+  const row = await unpaidLine(pass.passId, at)
+  return row && !row.waiting ? pass.owedMinor : 0
 }
 
 /** Writes a sale line on this order for each pass `owedHere` found, and points the pass at it. */
