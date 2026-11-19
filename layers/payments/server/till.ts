@@ -124,7 +124,7 @@ export async function prepareSale(unit: UnitView, actor: Actor, sessionId: strin
   const { byPanel } = await priceTogether(filled, pricing)
   for (const { panel, input } of filled) {
     const priced = byPanel.get(panel.id)
-    const part = await panel.value.prepare(unit, { sessionId, input, priced })
+    const part = await panel.value.prepare(unit, { sessionId, input, priced, receipt, split: !!splits })
     if (part.owner.module !== panel.module) throw new Error(`${panel.module}'s panel prepared a part for ${part.owner.module}`)
     parts.push(part)
     prepared.push({ panel, part })

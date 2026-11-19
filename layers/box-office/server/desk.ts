@@ -216,6 +216,9 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   }
 
   await requireAbility(actor, 'box-office.order.sell', ['core.performance', input.sale.performanceId])
+  // New tickets or a pass need somewhere to send them, where the theatre says so; a split sale's receipts come as each person pays.
+  if ((input.sale.lines.length || input.sale.buy?.length) && !context.receipt && !context.split && await useSetting('box-office.sales.desk-email'))
+    refuse('box-office.desk.email-needed', 'Tickets sold here need an email address for their receipt.', { status: 422, remedy: 'Type the buyer\'s email in the receipt box.', fields: { receipt: 'required' } })
   const plan = await deskSale(input.sale, at, context.priced)
   if (plan.totalMinor <= 0) {
     if (plan.entryOf.some(Boolean)) refuse('box-office.desk.issue-instead', 'There is nothing to pay for these entries.', { status: 422, remedy: 'Book them from the box office panel, without the till.' })

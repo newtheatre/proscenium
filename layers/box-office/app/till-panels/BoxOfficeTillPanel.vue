@@ -22,7 +22,7 @@ interface ReceiptAction { key: string, label: string, icon?: string, loading?: b
 const emit = defineEmits<{
   'update:modelValue': [unknown]
   /** The tickets for the till's receipt, with their steppers, and what was last added (till proposal, 17 November 2026). */
-  'receipt': [{ lines: ReceiptLine[], added: { label: string, undo: () => void } | null, actions?: ReceiptAction[] } | null]
+  'receipt': [{ lines: ReceiptLine[], added: { label: string, undo: () => void } | null, actions?: ReceiptAction[], needsReceipt?: boolean } | null]
 }>()
 
 const { t } = useT()
@@ -51,7 +51,7 @@ function dropExchange() {
   void router.replace({ query })
 }
 
-const { data } = await useAPI<{ performances: Performance[], admit?: boolean }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
+const { data } = await useAPI<{ performances: Performance[], admit?: boolean, email?: boolean }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
 // The "Admit now" box is a setting (box-office.sales.desk-admit): off, the door lets everyone in.
 const admitOffered = computed(() => data.value?.admit !== false)
 const performances = computed(() => data.value?.performances ?? [])
@@ -310,6 +310,8 @@ function sendReceipt(rows: PerformanceRow[]) {
   const added = rows.find(r => keyOf(r) === lastAdded.value)
   emit('receipt', {
     actions: panelActions(),
+    // New tickets or a pass need an email for their receipt, where the theatre says so (box-office.sales.desk-email).
+    needsReceipt: data.value?.email === true && (rows.length > 0 || passBuys.value.length > 0),
     lines: [...rows.map((r) => {
       const quantity = quantities.value[keyOf(r)]!
       return { key: keyOf(r), label: rowLabel(r), detail, quantity, amountMinor: r.amountMinor * quantity, more: () => addOne(r), fewer: () => takeOne(r) }
