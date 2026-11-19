@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "2bd319fb-1599-4223-81b5-a160b0486fb8",
+  "id": "36b165a9-0031-46f4-b636-7a9d057a8065",
   "prevIds": [
-    "903d7f4e-64c3-43d9-b45c-f92b0b406813"
+    "e4601c68-4490-4065-ba62-09202cb0bc58"
   ],
   "ddl": [
     {
@@ -5155,6 +5155,16 @@
     {
       "table": "box_office_pass_prices",
       "name": "proof_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pass_prices",
+      "name": "instead_of",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
