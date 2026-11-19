@@ -179,7 +179,7 @@ function foundPass(pass: TillPass) {
 }
 const passBody = () => ({
   ...(passEntries.value.length ? { passes: passEntries.value.map(p => ({ code: p.code })) } : {}),
-  ...(passBuys.value.length ? { buy: passBuys.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.entry ? {} : { entry: false }), ...(b.holder ? ('email' in b.holder ? { email: b.holder.email } : { accountId: b.holder.accountId }) : {}) })) } : {}),
+  ...(passBuys.value.length ? { buy: passBuys.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.entry ? {} : { entry: false }), ...(b.holder ? ('email' in b.holder ? { email: b.holder.email } : { accountId: b.holder.accountId }) : {}), ...(b.reference ? { reference: b.reference } : {}) })) } : {}),
   ...(passCollect.value.length ? { collect: passCollect.value.map(p => p.code) } : {}),
 })
 const passReceipt = (detail: string): ReceiptLine[] => [
@@ -322,12 +322,12 @@ async function restorePasses(value: { passes?: unknown, buy?: unknown, collect?:
   passCollect.value = await look(value.collect)
   if (!Array.isArray(value.buy) || !value.buy.length || !performanceId.value) return
   const onSale = (await $api<{ passes: { id: string, name: string, prices: { id: string, name: string, amountMinor: number }[] }[] }>('/api/box-office/desk/passes', { query: { performanceId: performanceId.value } })).passes
-  passBuys.value = (value.buy as { passTypeId: string, passPriceId: string, entry?: boolean, accountId?: string, email?: string }[]).flatMap((b) => {
+  passBuys.value = (value.buy as { passTypeId: string, passPriceId: string, entry?: boolean, accountId?: string, email?: string, reference?: string }[]).flatMap((b) => {
     const type = onSale.find(x => x.id === b.passTypeId)
     const price = type?.prices.find(p => p.id === b.passPriceId)
     if (!type || !price) return []
     const holder = b.email ? { email: b.email } : b.accountId ? { accountId: b.accountId, label: t('box-office.screens.panel.holder.restored') } : undefined
-    return [{ passTypeId: type.id, passPriceId: price.id, name: type.name, priceName: price.name, amountMinor: price.amountMinor, entry: b.entry !== false, ...(holder ? { holder } : {}) }]
+    return [{ passTypeId: type.id, passPriceId: price.id, name: type.name, priceName: price.name, amountMinor: price.amountMinor, entry: b.entry !== false, ...(holder ? { holder } : {}), ...(b.reference ? { reference: b.reference } : {}) }]
   })
 }
 

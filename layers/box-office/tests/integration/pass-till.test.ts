@@ -11,9 +11,11 @@ import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { issuePass } from '../../server/pass-holding'
 import { listPassTypes } from '../../server/passes'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
+import { deskHolder } from '../../server/desk'
+import { members } from '../../../../tests/fixtures/modules/seats/server/contributions/core.requirement/seats'
 import { house, NOV_16, ready, req, type House } from './stage'
 
-const seller = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment', 'box-office.pass.manage'])
+const seller = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment', 'box-office.pass.manage', 'seats.members.look-up'])
 let cash: string
 let a: House
 let b: House
@@ -174,5 +176,36 @@ describe('paying what a pass owes on its own', () => {
     expect((await pass(owed.id)).paid_at).not.toBeNull()
     const again = await summary({ performanceId: b.performanceId, lines: [], collect: [owed.code] })
     expect(again.body.code).toBe('box-office.pass.paid')
+  })
+})
+
+describe('a pass at a price only some people may have, sold at the till', () => {
+  const memberType = () => passType({ prices: [{ name: 'Member', amountMinor: 2100, requirementRefs: ['seats:member'] }] })
+  const person_ = async (address: string) => commit(async unit => (await (await import('#modules/core')).findOrCreateAccount(unit.view(), { address, origin: 'guest' })).accountId)
+  const buyOf = (type: Awaited<ReturnType<typeof passType>>, more: Record<string, unknown>) => ({ performanceId: a.performanceId, lines: [], buy: [{ passTypeId: type.id, passPriceId: type.prices[0]!.id, ...more }] })
+
+  it('asks who qualifies: refused with nobody named, or someone who does not qualify', async () => {
+    const type = await memberType()
+    expect((await summary(buyOf(type, {}))).body).toMatchObject({ code: 'box-office.pass.holder-needed' })
+    const stranger = await person_('not.a.member@example.org')
+    expect((await summary(buyOf(type, { accountId: stranger }))).body).toMatchObject({ code: 'box-office.pass.holder-not-met' })
+  })
+
+  it('is sold to a member found by the seller, who checks them there and then', async () => {
+    const type = await memberType()
+    const member = await person_('a.member@example.org')
+    members.add(member)
+    const checked = await inContext(() => deskHolder({ performanceId: a.performanceId, passPriceId: type.prices[0]!.id, accountId: member }), seller)
+    expect(checked).toMatchObject({ accountId: member, met: true })
+    const made = await sale(buyOf(type, { accountId: member }))
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    expect(made.body.amountMinor).toBe(2100)
+  })
+
+  it('takes their reference instead, such as a membership number, checked against the list', async () => {
+    const type = await memberType()
+    expect((await summary(buyOf(type, { reference: '00000000' }))).body).toMatchObject({ code: 'box-office.pass.reference-not-met' })
+    const ok = await summary(buyOf(type, { reference: '12345678' }))
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
   })
 })

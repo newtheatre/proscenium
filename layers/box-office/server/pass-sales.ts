@@ -6,13 +6,14 @@
 // collected with whatever booking it is next used on: its sale line is written again there. The
 // money is pass income when it is paid, never split between performances.
 import { sql } from 'drizzle-orm'
-import { all, first, newId, nowMs, openColumn, refuse, requirements, useSetting, type UnitView } from '#kit'
+import { all, can, first, newId, nowMs, openColumn, refuse, requirements, useContext, useSetting, type UnitView } from '#kit'
 import { findOrCreateAccount, getPerformance, getProduction, listPerformances, notify } from '#modules/core'
 import { orderLines } from './db/schema'
 import type { JudgedPass } from './pass-entries'
 import { issuePass, passCodeHashes, shownPassCode } from './pass-holding'
 import { getPassType, listPassTypes, type PassType } from './passes'
 import { soldOn } from './ticket-types'
+import { holderVerdict } from './entitlement'
 
 export interface PassBuy {
   passTypeId: string
@@ -28,9 +29,10 @@ export interface PassBuy {
   /** At the till: an address typed for who holds it, the account for which is found or made as the sale is made. */
   email?: string
   /**
-   * Online: typed in place of signing in for a price only some people may have, such as a
-   * membership number, checked as a Member ticket's is (Matt, 18 November). The pass is then the
-   * holder's that the reference names, where it names one.
+   * Typed for a price only some people may have, such as a membership number or a student ID on a
+   * verification list, checked as a Member ticket's is (Matt, 18 and 19 November): online in place
+   * of signing in, at the till in place of finding the holder. The pass is then the holder's that
+   * the reference names, where it names one.
    */
   reference?: string
 }
@@ -130,7 +132,7 @@ export async function passesOnSale(performanceId: string, buyer: Buyer, at = now
 export interface DeskPassOnSale extends Omit<PassOnSale, 'prices'> {
   covers: boolean
   holder: 'named' | 'open' | 'auto'
-  prices: { id: string, name: string, amountMinor: number, proofNote: string | null, /** Only some people may have it: the seller checks. */ restricted: boolean, insteadOf: string[] }[]
+  prices: { id: string, name: string, amountMinor: number, proofNote: string | null, /** Only some people may have it: the seller checks. */ restricted: boolean, insteadOf: string[], /** What the seller may type in place of finding the holder, worded by its source. */ reference?: { label: string, field?: string, shape: string } }[]
 }
 
 /** Every pass on sale at the till: at the desk the seller checks who may have a price. */
@@ -140,11 +142,28 @@ export async function deskPassesOnSale(performanceId: string, at = nowMs()): Pro
   const performance = await getPerformance(performanceId)
   const production = await getProduction(performance.productionId)
   const ahead = await showsAhead(types, at)
+  const references = new Map<string, Awaited<ReturnType<typeof referenceFor>>>()
+  for (const p of types.flatMap(t => t.prices)) if (p.active && p.requirementRefs.length) references.set(p.id, await referenceFor(p.requirementRefs))
   return types.flatMap((type) => {
-    const prices = type.prices.filter(p => p.active).map(p => ({ id: p.id, name: p.name, amountMinor: p.amountMinor, proofNote: p.proofNote, restricted: p.requirementRefs.length > 0, insteadOf: p.insteadOf }))
+    const prices = type.prices.filter(p => p.active).map((p) => {
+      const reference = references.get(p.id)
+      return { id: p.id, name: p.name, amountMinor: p.amountMinor, proofNote: p.proofNote, restricted: p.requirementRefs.length > 0, insteadOf: p.insteadOf, ...(reference ? { reference } : {}) }
+    })
     if (!prices.length) return []
     return [{ id: type.id, name: type.name, description: type.description, shows: type.covers === 'productions' ? type.productionIds.length : null, once: type.perShow === 'once', uses: type.uses, reserveUnpaid: type.reserveUnpaid, ahead: ahead.get(type.id) ?? 0, covers: covers(type, performance, production), holder: type.holder, prices }]
   })
+}
+
+const OVERRIDE = 'box-office.ticket-type.override-requirement'
+
+/** A pass at a price only some people may have, sold at the till to the holder found: they qualify, or the seller may check by hand. */
+async function deskQualifies(name: string, price: { name: string, requirementRefs: string[] }, performanceId: string, accountId: string | undefined): Promise<void> {
+  if (!accountId)
+    refuse('box-office.pass.holder-needed', `The ${price.name} ${name} is for someone who qualifies: scan their card, find them, or type their reference.`, { status: 422, remedy: 'Name who holds it, or choose another price.', fields: { holder: 'missing' } })
+  const verdict = await holderVerdict(performanceId, { requirementRefs: price.requirementRefs, maxPerHolder: 1 }, accountId)
+  if (verdict.met) return
+  if (!(await can(useContext().actor, OVERRIDE, ['core.performance', performanceId])).allowed)
+    refuse('box-office.pass.holder-not-met', verdict.reason ?? `The ${price.name} price is for people who qualify, and this person does not, as far as we can tell.`, { status: 403, remedy: 'Ask a box office manager to check by hand, or choose another price.', fields: { holder: 'not-met' } })
 }
 
 export interface PlannedPass {
@@ -169,10 +188,10 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
       refuse('box-office.pass.not-on-sale', `${type.name} is not on sale here.`, { status: 422, remedy: 'Reload to see what is on sale.', fields: { pass: 'not-on-sale' } })
     if (buy.entry !== false && !covers(type, performance, production))
       refuse('box-office.pass.not-covered', `${type.name} does not cover this show.`, { status: 422, remedy: 'Buy it with a booking for a show it covers.', fields: { pass: 'not-covered' } })
-    const typed = buyer.channel === 'online' ? buy.reference?.trim() : undefined
+    const typed = buy.reference?.trim()
     let holder: string | null = null
     let vouched = false
-    if (typed && price.requirementRefs.length && !(await mayBuy(price.requirementRefs, performanceId, buyer)).allowed) {
+    if (typed && price.requirementRefs.length && (buyer.channel === 'desk' || !(await mayBuy(price.requirementRefs, performanceId, buyer)).allowed)) {
       // A reference typed in place of signing in, checked as a Member ticket's is; each one buys one pass.
       const answers = await requirements.check({ accounts: [buyer.account], refs: price.requirementRefs, presented: price.requirementRefs.map(ref => ({ ref, value: typed })), record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
       const met = answers.find(a => a.verdict === 'met' && !a.unavailable && a.evidence)
@@ -182,6 +201,12 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
       holder = met.holderAccountId ?? null
       vouched = true
     }
+    // At the till a price only some people may have is sold to someone the seller has checked, as a
+    // Member ticket is (Matt, 19 November): a reference typed, or the holder found or scanned and
+    // checked, or checked by hand by a seller who may.
+    if (buyer.channel === 'desk' && price.requirementRefs.length && !vouched) await deskQualifies(type.name, price, performanceId, buy.accountId)
+    if (buyer.channel === 'desk' && vouched && !holder && !buy.accountId && !buy.email)
+      refuse('box-office.pass.holder-needed', `Say who holds the ${type.name} too.`, { status: 422, remedy: 'Find them, or type their address.', fields: { holder: 'missing' } })
     const may = vouched ? { allowed: true, why: null } : await mayBuy(price.requirementRefs, performanceId, buyer)
     if (!may.allowed) {
       refuse('box-office.pass.price-not-yours', may.why === 'sign-in' ? `The ${price.name} price is only for some people.` : may.why && may.why !== 'not-met' ? may.why : `You cannot have the ${price.name} price.`,
@@ -192,7 +217,7 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
       buy,
       amountMinor: price.amountMinor,
       currency: type.currency,
-      judged: { passId: newId('pass'), passTypeId: type.id, name: type.name, priceName: price.name, accountId: buyer.channel === 'online' ? holder ?? buyer.account : buy.accountId ?? null, named, once: type.perShow === 'once', owedMinor: price.amountMinor, left: type.uses },
+      judged: { passId: newId('pass'), passTypeId: type.id, name: type.name, priceName: price.name, accountId: buyer.channel === 'online' ? holder ?? buyer.account : holder ?? buy.accountId ?? null, named, once: type.perShow === 'once', owedMinor: price.amountMinor, left: type.uses },
     })
   }
   return out
