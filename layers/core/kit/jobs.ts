@@ -235,7 +235,7 @@ export async function tick(env: KitEnv, at = nowMs()): Promise<void> {
   await runInContext({ env, actor: SYSTEM, cache: {} }, async () => {
     const { ensureMigrated } = await import('./migrations')
     await ensureMigrated()
-    for (const [step, fn] of [['scheduler', () => runScheduler(at)], ['sweep', () => sweepJobs(at)], ['reconcile', async () => (await import('./external')).reconcileDue(at)], ['credentials', async () => (await import('./secrets')).adoptWorkerSecrets()]] as const) {
+    for (const [step, fn] of [['scheduler', () => runScheduler(at)], ['sweep', () => sweepJobs(at)], ['reconcile', async () => (await import('./external')).reconcileDue(at)], ['credentials', async () => (await import('./secrets')).adoptWorkerSecrets()], ['content', async () => (await import('./content-upkeep')).runContentUpkeep(at)]] as const) {
       try { await fn() }
       catch (error) { log.error(`core.tick.${step}-failed`, { error: String((error as Error)?.message ?? error) }) }
     }

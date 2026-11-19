@@ -4,6 +4,7 @@
   "gallery.abilities.sample.view.label": "View the gallery",
   "gallery.abilities.sample.manage.label": "Change the gallery's settings",
   "gallery.abilities.sample.admin.label": "Administer the gallery",
+  "gallery.abilities.sample.slow.label": "See a card whose count never answers",
   "gallery.settings.demo.title.label": "Show title",
   "gallery.settings.demo.title.help": "The name of the show used in the gallery's sample pages.",
   "gallery.settings.demo.limit.label": "Most seats in one order",
