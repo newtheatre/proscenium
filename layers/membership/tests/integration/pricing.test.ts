@@ -116,4 +116,23 @@ describe('the member price', () => {
       await env.DB.prepare("DELETE FROM core_settings WHERE key = 'membership.join.public-listing'").run()
     }
   })
+
+  it('gives the price unchecked while checks are switched off, and keeps it at the door once they are back on', async () => {
+    const id = await openScheme()
+    const ref = `membership:${id}`
+    const stranger = person([], { accountId: 'acc_nobody' })
+    const setting = (value: string) => env.DB.prepare(`INSERT INTO core_settings (key, value, updated_at) VALUES ('membership.verification.member-prices', '${value}', 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value`).run()
+    await setting('false')
+    try {
+      expect((await check(stranger, { accounts: ['acc_nobody'], refs: [ref], whenUnavailable: 'not-met' }))[0]).toMatchObject({ verdict: 'met', evidence: 'unchecked:account' })
+      expect((await check(person([]), { accounts: [null], refs: [ref], whenUnavailable: 'not-met' }))[0]!.verdict).toBe('not-met')
+      const [typed] = await check(person([]), { accounts: [null], refs: [ref], presented: [{ ref, value: '20123456' }], whenUnavailable: 'not-met' })
+      expect(typed).toMatchObject({ verdict: 'met', evidence: 'unchecked:20123456' })
+    }
+    finally {
+      await setting('true')
+    }
+    expect((await check(stranger, { accounts: ['acc_nobody'], refs: [ref], whenUnavailable: 'not-met' }))[0]!.verdict).toBe('not-met')
+    expect((await check(person([]), { accounts: [null], refs: [ref], presented: [{ ref, evidence: 'unchecked:20123456' }], whenUnavailable: 'not-met' }))[0]!.verdict).toBe('met')
+  })
 })
