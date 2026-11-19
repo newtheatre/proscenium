@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { ACCOUNT_GROUP_ORDER, type NavItem } from '../../../shared/navigation'
 
-interface Me { signedIn: boolean, account?: { name: string | null, preferredName: string | null, pronouns: string | null } }
+interface Me { signedIn: boolean, account?: { name: string | null, pronouns: string | null } }
 interface Notice { key: string, tone: 'warning' | 'info', icon: string, title: string, description?: string, params?: Record<string, string>, to?: string, action?: string }
 
 const { t } = useT()
@@ -21,8 +21,8 @@ const { data: navigation } = await useNavigation('account')
 const { viewer } = useViewer()
 const account = computed(() => me.value?.account)
 const name = computed(() => account.value?.name ?? viewer.value.name ?? '')
-const greeting = computed(() => account.value?.preferredName || name.value)
-const who = computed(() => [account.value?.preferredName ? name.value : '', account.value?.pronouns ?? ''].filter(Boolean).join(' · ') || undefined)
+const greeting = computed(() => name.value)
+const who = computed(() => account.value?.pronouns || undefined)
 const notices = computed(() => noticeData.value.notices)
 
 // A name that no component answers to is left out rather than breaking the page.

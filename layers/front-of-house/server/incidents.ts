@@ -28,11 +28,11 @@ const WORKING_ON = `SELECT s.account_id FROM front_of_house_assignments s JOIN f
 export async function workingPeople(performanceId: string, text: string): Promise<PickerPerson[]> {
   const rows = await all<{ id: string, name: string | null, preferred_name: string | null, created_at: number, first_signed_in_at: number | null, disabled_at: number | null }>(
     `SELECT a.id, a.name, a.preferred_name, a.created_at, a.first_signed_in_at, a.disabled_at FROM core_accounts a
-      WHERE a.id IN (${WORKING_ON}) AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL ORDER BY coalesce(a.preferred_name, a.name)`, performanceId)
+      WHERE a.id IN (${WORKING_ON}) AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL ORDER BY a.name`, performanceId)
   const words = text.toLowerCase().split(/\s+/).filter(Boolean)
   return rows
     .filter(r => words.every(w => `${r.preferred_name ?? ''} ${r.name ?? ''}`.toLowerCase().includes(w)))
-    .map(r => ({ id: r.id, label: r.preferred_name || r.name || 'Unnamed person', name: r.name, since: r.created_at, claimed: !!r.first_signed_in_at, disabled: !!r.disabled_at }))
+    .map(r => ({ id: r.id, label: r.name || 'Unnamed person', name: r.name, since: r.created_at, claimed: !!r.first_signed_in_at, disabled: !!r.disabled_at }))
 }
 
 const rank = (s: Severity) => SEVERITIES.indexOf(s)

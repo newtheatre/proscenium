@@ -103,7 +103,7 @@ async function invitationOf(row: TokenRow & { issued_by?: string | null }, accou
     `SELECT DISTINCT r.name FROM core_grants g JOIN core_roles r ON r.id = g.role_id WHERE g.account_id = ? AND ${LIVE} ORDER BY r.name`,
     accountId, at, at,
   )
-  return { by: issuer?.preferred_name || issuer?.name || null, roles: roles.map(r => r.name) }
+  return { by: issuer?.name || null, roles: roles.map(r => r.name) }
 }
 
 /** Set by "Not now" on the passkey offer; read here so the offer is skipped while it lasts. */

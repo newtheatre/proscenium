@@ -45,7 +45,7 @@ Public shell, audience side. Other modules add their own sections here through t
 | Screen | Purpose | Who sees it | Release |
 | --- | --- | --- | --- |
 | Overview | The sections available, and anything needing attention such as an unverified address | Any signed-in person | First |
-| Your details | Name, preferred name, pronouns, phone, language | Any signed-in person | First |
+| Your details | Name, pronouns, phone, language (no "known as" name, ID-11) | Any signed-in person | First |
 | Email addresses | Add, verify and remove addresses; choose the address for tickets and receipts | Any signed-in person | First |
 | Signing in | Passkeys with their labels and last use; linked Google account; recovery codes | Any signed-in person | First |
 | Where you are signed in | Each session with its device and last use; end one, or all the others | Any signed-in person | First |

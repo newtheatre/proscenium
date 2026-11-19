@@ -18,8 +18,8 @@ export async function searchAccounts(text: string): Promise<PickerPerson[]> {
        FROM core_accounts a LEFT JOIN core_account_emails e ON e.account_id = a.id
       WHERE a.merged_into_id IS NULL AND a.anonymised_at IS NULL
         AND (${words.length ? `a.rowid IN (SELECT rowid FROM "${NAMES}" WHERE "${NAMES}" MATCH ?)` : '0'} OR e.address = ?)
-      ORDER BY coalesce(a.preferred_name, a.name) LIMIT ${PAGE}`,
+      ORDER BY a.name LIMIT ${PAGE}`,
     ...(words.length ? [searchQuery(words, ['name', 'preferred_name'])] : []), normaliseAddress(text),
   )
-  return rows.map(r => ({ id: r.id, label: r.preferred_name || r.name || 'Unnamed person', name: r.name, since: r.created_at, claimed: !!r.first_signed_in_at, disabled: !!r.disabled_at }))
+  return rows.map(r => ({ id: r.id, label: r.name || 'Unnamed person', name: r.name, since: r.created_at, claimed: !!r.first_signed_in_at, disabled: !!r.disabled_at }))
 }
