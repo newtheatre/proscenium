@@ -58,6 +58,10 @@ test.describe('a visitor who is not signed in', () => {
     await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
     await expect(page.getByRole('contentinfo')).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
+    // The theatre's name in the header is drawn in the brand's heading font.
+    const [font, token] = await page.evaluate(() => [getComputedStyle(document.querySelector('header [data-slot="title"]')!).fontFamily, getComputedStyle(document.documentElement).getPropertyValue('--brand-display-font').trim()])
+    expect(token).not.toBe('')
+    expect(font.replace(/\s/g, '')).toBe(token.replace(/\s/g, ''))
   })
 })
 
@@ -331,6 +335,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(chart.getByRole('img', { name: 'Drafts written and sent' }).or(chart.locator('[aria-label="Drafts written and sent"]')).first()).toBeVisible()
       await expect(chart.locator('svg').first()).toBeVisible()
       await noViolations(page)
+    })
+
+    test('the console wears the brand\'s primary, shaded for this scheme', async ({ page }) => {
+      await visit(page, '/console')
+      const tokens = await page.evaluate(() => ['--brand-solid', '--ui-primary'].map(p => getComputedStyle(document.documentElement).getPropertyValue(p).trim()))
+      expect(tokens[0]).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(tokens[1]).toMatch(/^#[0-9a-f]{6}$/i)
     })
 
     test('the account menu marks the current shell and offers the console', async ({ page }) => {

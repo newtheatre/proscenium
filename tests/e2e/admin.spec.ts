@@ -24,6 +24,8 @@ test.describe('a site owner with no console', () => {
     await expect(page).toHaveTitle(/^Overview · Admin · /)
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
+    // Admin wears the brand like every shell (C-35).
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brand-solid').trim())).toMatch(/^#[0-9a-f]{6}$/i)
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
     // A new site's first steps, each a link to where it is done until it is.
     await expect(page.getByText('Get your theatre ready')).toBeVisible()

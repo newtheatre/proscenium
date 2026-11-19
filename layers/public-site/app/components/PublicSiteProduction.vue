@@ -75,6 +75,7 @@ const here = 'moved' in data.value ? null : data.value
 const prefix = here ? (here.past ? 'shows' : 'whats-on') : props.prefix
 if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 302 })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
+const priceLine = computed(() => production.value?.price ? priceSummary(production.value.price, t) : '')
 
 // What it is, in one line: where, how long, and the company for a visiting show.
 const tell = useTellMeAbout()
@@ -395,12 +396,6 @@ useHead(() => {
               >
                 {{ t('public-site.production.dates-and-tickets') }}
               </h2>
-              <p
-                v-if="production.price"
-                class="mb-2 text-sm"
-              >
-                {{ priceSummary(production.price, t) }}
-              </p>
               <LatecomersNote
                 v-if="production.latecomers && !production.past"
                 :rule="production.latecomers"
@@ -455,13 +450,21 @@ useHead(() => {
                     v-if="p.state === 'cancelled'"
                     class="text-sm font-medium"
                   >{{ t('public-site.production.date-cancelled') }}</span>
-                  <PublicSiteBookingButton
+                  <div
                     v-else-if="p.state === 'scheduled'"
-                    :booking="p.booking"
-                    :when="dateTime(p.startsAt)"
-                    :company="production.companyName"
-                    :title="production.title"
-                  />
+                    class="flex items-center gap-3"
+                  >
+                    <PublicSiteBookingButton
+                      :booking="p.booking"
+                      :when="dateTime(p.startsAt)"
+                      :company="production.companyName"
+                      :title="production.title"
+                    />
+                    <span
+                      v-if="priceLine"
+                      class="text-sm text-muted"
+                    >{{ priceLine }}</span>
+                  </div>
                 </li>
               </ul>
             </section>
