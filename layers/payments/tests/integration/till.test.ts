@@ -20,6 +20,8 @@ import intentGet from '../../server/api/payments/intents/[id].get'
 import methodsGet from '../../server/api/payments/methods.get'
 import panelsGet from '../../server/api/payments/till/panels.get'
 import tillMethodsGet from '../../server/api/payments/till/methods.get'
+import { ownTicket } from '#kit/realtime'
+import { connectRealtime } from '../../../core/server/realtime-hub'
 import { call, deliver, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 12)
@@ -100,6 +102,28 @@ describe('opening a session', () => {
     expect((await get('/api/payments/session', me)).body.session).toBeNull()
     const sale = await post('/api/payments/till/sale', me, { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] }, true)
     expect(sale).toMatchObject({ status: 409, body: { code: 'payments.session.none' } })
+  })
+})
+
+describe('news of a session', () => {
+  it('tells the seller\'s other devices when a session opens and when a sale in it starts and ends', async () => {
+    const me = seller()
+    const ticket = await inContext(() => ownTicket(me.accountId!, null, Date.now()))
+    const joined = await connectRealtime(new Request(`https://theatre.test/api/realtime?ticket=${encodeURIComponent(ticket)}`, { headers: { upgrade: 'websocket' } }), env)
+    const heard: string[] = []
+    joined.webSocket!.accept()
+    joined.webSocket!.addEventListener('message', (event) => { heard.push(JSON.parse(event.data as string).channel) })
+    const told = async (times: number) => {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(heard).toEqual(Array.from({ length: times }, () => 'payments.session'))
+    }
+    await post('/api/payments/sessions', me, { pointLabel: 'Bar' }, true)
+    await told(1)
+    const sale = await post('/api/payments/till/sale', me, { panels: [{ basket: 'snacks', input: { amountMinor: 350 } }] }, true)
+    await told(2)
+    await post(`/api/payments/intents/${sale.body.intentId}/cancel`, me)
+    await told(3)
+    joined.webSocket!.close()
   })
 })
 
