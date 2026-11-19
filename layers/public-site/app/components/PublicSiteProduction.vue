@@ -225,6 +225,7 @@ useHead(() => {
                   :booking="only.booking"
                   :when="dateTime(only.startsAt)"
                   :company="production.companyName"
+                  :title="production.title"
                   size="lg"
                   class="justify-start"
                 />
@@ -457,6 +458,7 @@ useHead(() => {
                       :booking="p.booking"
                       :when="dateTime(p.startsAt)"
                       :company="production.companyName"
+                      :title="production.title"
                     />
                     <span
                       v-if="priceLine"

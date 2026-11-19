@@ -8,6 +8,9 @@ import type { BookingAction, BookingAnswer, PriceSummary } from '#modules/core'
 import { pricesFor, WHEELCHAIR_TYPE } from '../../prices'
 import { sellableTypes, soldOn } from '../../ticket-types'
 
+/** Choose tickets and Check and pay, in a drawer over the show's page (BoxOfficeBookingDrawer.global.vue). */
+const DRAWER = 'BoxOfficeBookingDrawer'
+
 interface Sale { performance_id: string, state: string, on_sale_at: number | null, off_sale_at: number | null }
 
 async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promise<Record<string, BookingAnswer>> {
@@ -50,7 +53,7 @@ async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promi
     const left = freeOf.get(subject.id) ?? 0
     out[subject.id] = left <= 0
       ? { state: 'sold-out' }
-      : left <= under ? { state: 'limited', link, seatsLeft: left } : { state: 'available', link }
+      : left <= under ? { state: 'limited', link, seatsLeft: left, drawer: DRAWER } : { state: 'available', link, drawer: DRAWER }
   }
   return out
 }
