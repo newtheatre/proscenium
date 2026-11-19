@@ -1,6 +1,6 @@
 // The Cloudflare API, for setting up the sending domain by itself (C-52). Only core calls it, with
 // the optional credential CORE_CLOUDFLARE_TOKEN (Email Sending edit and Zone read), saved on Admin >
-// Email sending or set as a Worker secret of the same name. The token is never
+// Email sending. The token is never
 // shown, logged or returned: errors carry Cloudflare's numeric codes only. Tests swap the transport
 // with setCloudflareFetch(), as they swap the mail binding with setMailer().
 //

@@ -2,15 +2,14 @@
      credentials; Matt, 17 November). A key is never shown again, but one that is set is obvious at a
      glance: its field is filled with dots between its provider's prefix and its last four characters
      (sk_live_••••••••4242), and says where the value comes from. Replace opens the field to type a
-     new value, and Cancel keeps the one there. A saved key can be removed, and then a Worker secret
-     of the same name, if there is one, is used again. The page that hosts the fields saves them. -->
+     new value, and Cancel keeps the one there. A saved key can be removed. The page that hosts the fields saves them. -->
 <script setup lang="ts">
 interface Item {
   name: string
   label: string
   help?: string
-  /** Where the value comes from now: saved here, saved for the whole site, a Worker secret, or nowhere. */
-  source: 'saved' | 'saved-for-module' | 'worker-secret' | null
+  /** Where the value comes from now: saved here, saved for the whole site, or nowhere. */
+  source: 'saved' | 'saved-for-module' | null
   /** The last four characters of a long value. */
   hint?: string | null
   /** A long value's provider prefix, such as sk_live_. */

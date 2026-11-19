@@ -9,7 +9,7 @@ import { setCloudflareFetch, zoneCandidates } from '../../server/notifications/c
 import setUpDomain from '../../server/api/core/notifications/set-up-domain.post'
 import senderState from '../../server/api/core/notifications/sender.get'
 import verifyDomain from '../../server/api/core/notifications/verify-domain.post'
-import { env, inContext, person, rows, sent, server } from '../../../../tests/integration/helpers'
+import { env, inContext, person, rows, saveKey, sent, server } from '../../../../tests/integration/helpers'
 
 const handle = server({
   'POST /api/core/notifications/set-up-domain': setUpDomain,
@@ -17,7 +17,6 @@ const handle = server({
   'POST /api/core/notifications/verify-domain': verifyDomain,
 })
 const admin = () => person(['core.sender.manage'])
-const secrets = env as unknown as Record<string, string | undefined>
 
 /** What the pretend Cloudflare knows, and every call made to it. */
 const cloudflare = { zones: [] as { id: string, name: string, status: string }[], subdomains: new Map<string, { tag: string, name: string, enabled: boolean }[]>(), calls: [] as { method: string, path: string, body?: unknown, auth: string | null }[], failCreate: false, hang: false }
@@ -28,8 +27,8 @@ function reply(result: unknown, status = 200) {
   return new Response(JSON.stringify(status < 300 ? { success: true, errors: [], messages: [], result } : { success: false, errors: [{ code: 1000, message: 'refused' }], messages: [] }), { status })
 }
 
-beforeEach(() => {
-  secrets.CORE_CLOUDFLARE_TOKEN = 'test-cloudflare-token'
+beforeEach(async () => {
+  await saveKey('CORE_CLOUDFLARE_TOKEN', 'test-cloudflare-token')
   cloudflare.zones = [{ id: 'zone-1', name: 'example.org', status: 'active' }]
   cloudflare.subdomains = new Map()
   cloudflare.calls = []
@@ -66,7 +65,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  delete secrets.CORE_CLOUDFLARE_TOKEN
+  await saveKey('CORE_CLOUDFLARE_TOKEN', null)
   setCloudflareFetch()
   setMailer()
   setClock()
@@ -210,7 +209,7 @@ describe('setting the sending domain up automatically (C-52)', () => {
     const refused = await request('POST', 'https://proscenium.someone.workers.dev', '/api/core/notifications/set-up-domain', { actor: admin(), body: {} })
     expect((await refused.json()).code).toBe('core.notifications.automatic-workers-dev')
 
-    delete secrets.CORE_CLOUDFLARE_TOKEN
+    await saveKey('CORE_CLOUDFLARE_TOKEN', null)
     const noToken = await (await request('GET', 'https://example.org', '/api/core/notifications/sender', { actor: admin() })).json()
     expect(noToken.automatic).toEqual({ proposed: 'mail.example.org', unavailable: 'no-token' })
     expect(JSON.stringify(noToken)).not.toContain('test-cloudflare-token')
@@ -264,7 +263,7 @@ describe('setting the sending domain up automatically (C-52)', () => {
     const refused = await check()
     expect(refused.state).toBe('warning')
     expect(JSON.stringify(refused)).not.toContain('test-cloudflare-token')
-    delete secrets.CORE_CLOUDFLARE_TOKEN
+    await saveKey('CORE_CLOUDFLARE_TOKEN', null)
     expect((await check()).sentence).toContain('No Cloudflare token')
   })
 })

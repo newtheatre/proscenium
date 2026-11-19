@@ -1,12 +1,14 @@
 // Keys typed into the app on the shared keys form (Matt, 17 November): the generic credentials routes
-// behind KeysCard, the keys that moved from Worker secrets, and the readers that now use them.
+// behind KeysCard, the keys that moved from Worker secrets, and the readers that now use them. A
+// Worker secret of a credential's name is never read (Matt, 19 November); the tick moves it in once.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { credential } from '#kit'
+import { adoptWorkerSecrets } from '#kit/secrets'
 import { verifyTurnstile } from '#kit/turnstile'
 import { cloudflareToken } from '../../server/notifications/cloudflare'
 import getRoute from '../../server/api/core/credentials/index.get'
 import postRoute from '../../server/api/core/credentials/index.post'
-import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
+import { call, env, inContext, person, rows, saveKey, server } from '../../../../tests/integration/helpers'
 
 const NAMES = ['CORE_TURNSTILE_SECRET_KEY', 'CORE_GOOGLE_CLIENT_SECRET', 'CORE_CLOUDFLARE_TOKEN']
 const secrets = env as unknown as Record<string, string | undefined>
@@ -21,11 +23,11 @@ beforeEach(async () => {
 
 describe('GET /api/core/credentials', () => {
   it('says where each key the viewer manages comes from, and leaves out the rest', async () => {
-    secrets.CORE_GOOGLE_CLIENT_SECRET = 'from-cloudflare'
+    await saveKey('CORE_GOOGLE_CLIENT_SECRET', 'saved-in-the-app')
     const res = await call(handle, 'GET', `/api/core/credentials?names=${NAMES.join(',')}`, { actor: signIn })
     expect(res.status).toBe(200)
     const { keys } = await res.json() as { keys: { name: string, source: string | null, labelKey: string }[] }
-    expect(keys.map(k => [k.name, k.source])).toEqual([['CORE_TURNSTILE_SECRET_KEY', null], ['CORE_GOOGLE_CLIENT_SECRET', 'worker-secret']])
+    expect(keys.map(k => [k.name, k.source])).toEqual([['CORE_TURNSTILE_SECRET_KEY', null], ['CORE_GOOGLE_CLIENT_SECRET', 'saved']])
     expect(keys[0]!.labelKey).toBe('core.credentials.turnstile-secret-key.label')
   })
 
@@ -36,9 +38,8 @@ describe('GET /api/core/credentials', () => {
 })
 
 describe('what a set key shows', () => {
-  it('shows a long key\'s prefix and last four, a shorter one\'s last four, a short one nothing, and a Worker secret the same way', async () => {
-    secrets.CORE_GOOGLE_CLIENT_SECRET = 'GOCSPX-from-cloudflare-abcd1234'
-    await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: '0x4AAAAAAAshort9999' } } })
+  it('shows a long key\'s prefix and last four, a shorter one\'s last four, and a short one nothing', async () => {
+    await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: '0x4AAAAAAAshort9999', CORE_GOOGLE_CLIENT_SECRET: 'GOCSPX-typed-in-the-app-abcd1234' } } })
     const { keys } = await (await call(handle, 'GET', `/api/core/credentials?names=${NAMES.join(',')}`, { actor: signIn })).json() as { keys: { name: string, hint: string | null, start: string | null }[] }
     expect(keys.map(k => [k.name, k.start, k.hint])).toEqual([['CORE_TURNSTILE_SECRET_KEY', null, '9999'], ['CORE_GOOGLE_CLIENT_SECRET', 'GOCSPX-', '1234']])
     await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: 'short' } } })
@@ -62,13 +63,16 @@ describe('POST /api/core/credentials', () => {
     expect(audit.every(a => !a.detail.includes('abcdefghijklmnop'))).toBe(true)
   })
 
-  it('removes a saved key, after which the Worker secret of the same name is used again', async () => {
+  it('removes a saved key, after which it is not set, whatever the Worker holds', async () => {
     secrets.CORE_TURNSTILE_SECRET_KEY = 'from-cloudflare'
     await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: 'typed-in-the-app-0000000' } } })
     expect(await inContext(() => credential('CORE_TURNSTILE_SECRET_KEY'))).toBe('typed-in-the-app-0000000')
     const removed = await (await call(handle, 'POST', '/api/core/credentials', { actor: signIn, body: { keys: { CORE_TURNSTILE_SECRET_KEY: null } } })).json() as { keys: { source: string | null }[] }
-    expect(removed.keys[0]!.source).toBe('worker-secret')
-    expect(await inContext(() => credential('CORE_TURNSTILE_SECRET_KEY'))).toBe('from-cloudflare')
+    expect(removed.keys[0]!.source).toBeNull()
+    expect(await inContext(() => credential('CORE_TURNSTILE_SECRET_KEY'))).toBeNull()
+    // The removal stands: the tick does not bring the Worker's copy back.
+    expect(await inContext(() => adoptWorkerSecrets())).toEqual([])
+    expect(await inContext(() => credential('CORE_TURNSTILE_SECRET_KEY'))).toBeNull()
   })
 
   it('refuses a key the person does not manage, one saved per record, and an unknown one', async () => {

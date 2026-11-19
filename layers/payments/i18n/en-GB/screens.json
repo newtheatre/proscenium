@@ -351,7 +351,7 @@
   "payments.screens.providers.keys.intro": "Saved keys are encrypted and never shown again. Saving asks you to confirm it's you.",
   "payments.screens.providers.keys.save": "Save keys",
   "payments.screens.providers.keys.saved": "Keys saved",
-  "payments.screens.providers.keys.remove-body": "The account stops taking payments until the key is saved again, unless a Worker secret of the same name is set in Cloudflare.",
+  "payments.screens.providers.keys.remove-body": "The account stops taking payments until the key is saved again.",
   "payments.screens.providers.keys.removed": "Key removed",
   "payments.screens.providers.keys.remove-verb": "Remove",
   "payments.screens.providers.keys.remove-thing": "the {key} for {account}",

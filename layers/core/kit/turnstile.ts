@@ -1,6 +1,6 @@
 // Turnstile, the one challenge (protect: 'turnstile'). Quietly off when the theatre has not set
 // CORE_TURNSTILE_SECRET_KEY, as an optional credential should be. The key is saved on Admin >
-// Sign-in, or set as a Worker secret of the same name.
+// Sign-in.
 import { credential } from './secrets'
 
 const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'

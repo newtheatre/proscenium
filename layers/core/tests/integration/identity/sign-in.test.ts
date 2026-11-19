@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Authenticator } from './authenticator'
 import { Browser, addPasskey, address, emailSignIn, env, leaveIdentity, mailbox, passkeySignIn, reset, signInByEmail, tokenOf, useIdentity, deliver } from './helpers'
-import { rows } from '../../../../../tests/integration/helpers'
+import { rows, saveKey } from '../../../../../tests/integration/helpers'
 
 beforeAll(useIdentity)
 afterAll(leaveIdentity)
@@ -132,15 +132,14 @@ describe('abuse (ID-10)', () => {
   })
 
   it('refuses outright when the bot check has no secret', async () => {
-    const saved = env.CORE_TURNSTILE_SECRET_KEY
-    env.CORE_TURNSTILE_SECRET_KEY = ''
+    await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
     try {
       const asked = await new Browser().post('/api/core/sign-in/email', { address: address() }, { 'cf-turnstile-response': 'pass' })
       expect(asked.status).toBe(503)
       expect(asked.body.code).toBe('core.sign-in.unavailable')
     }
     finally {
-      env.CORE_TURNSTILE_SECRET_KEY = saved
+      await saveKey('CORE_TURNSTILE_SECRET_KEY', 'test-turnstile-secret')
     }
   })
 

@@ -82,7 +82,7 @@ export interface PaymentProvider {
   methods: readonly { method: Method, channels: readonly ('online' | 'desk')[] }[]
   /**
    * The keys it needs, by name: credentials of Payments', saved per provider account on the Providers
-   * screen, or Worker secrets of the same names. None for cash and attested card.
+   * screen. None for cash and attested card.
    */
   secrets: readonly string[]
   /** Which of its secrets signs its webhooks, if it sends any. */

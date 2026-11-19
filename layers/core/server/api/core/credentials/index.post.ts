@@ -1,7 +1,6 @@
 // Saves or removes keys from a KeysCard (Matt, 17 November: keys are managed in the app). Each is a
 // credential saved for the whole site, encrypted with CORE_ENCRYPTION_KEY and audited by name, never
-// by value. A key not named is left as it is; null removes the saved one, and a Worker secret of the
-// same name, if there is one, is used again. Each needs the ability its declaration names, which
+// by value. A key not named is left as it is; null removes the saved one. Each needs the ability its declaration names, which
 // the registry holds to be privileged, so saving asks for a fresh sign-in. The answer is the keys' new state, never a value.
 import { z } from 'zod'
 import { clearCredential, credentialEntry, credentialStatus, defineRoute, refuse, requireAbility, setCredential, useContext } from '#kit'

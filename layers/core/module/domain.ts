@@ -549,7 +549,7 @@ export const jobs = {
 }
 
 // C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard. Typed
-// on Admin > Email sending (Matt, 17 November), or set as a Worker secret of the same name.
+// on Admin > Email sending (Matt, 17 November).
 export const credentials = {
   CORE_CLOUDFLARE_TOKEN: credentialDecl({ needed: 'optional', manage: 'core.sender.manage' }),
 }

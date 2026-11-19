@@ -5,7 +5,7 @@
      statement. -->
 <script setup lang="ts">
 interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean }
-interface Key { name: string, source: 'saved' | 'saved-for-module' | 'worker-secret' | null, hint: string | null, start?: string | null }
+interface Key { name: string, source: 'saved' | 'saved-for-module' | null, hint: string | null, start?: string | null }
 interface Account { id: string, provider: string, label: string, channels: string[], mode: 'live' | 'test', externalRef: string | null, active: boolean, keys: Key[], missingKeys: string[] }
 type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', provider: string, secret: string, publishableKey: string } | { kind: 'waiting-for-reader' } | { kind: 'none' }
 
