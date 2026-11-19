@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c8a809d4-266e-4bfb-b424-7ab34c5e06be",
+  "id": "2bd319fb-1599-4223-81b5-a160b0486fb8",
   "prevIds": [
-    "8dd5b727-ed2c-49f1-aed3-eae72b960ba4"
+    "903d7f4e-64c3-43d9-b45c-f92b0b406813"
   ],
   "ddl": [
     {
@@ -2827,6 +2827,16 @@
       "name": "amount_minor",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_lines",
+      "name": "promotion_redemption_id",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
