@@ -18,7 +18,7 @@ const toast = useToast()
 const route = useRoute()
 
 const survivorId = ref<string | undefined>(typeof route.query.survivorId === 'string' ? route.query.survivorId : undefined)
-const mergedAccountId = ref<string | undefined>()
+const mergedAccountId = ref<string | undefined>(typeof route.query.mergedAccountId === 'string' ? route.query.mergedAccountId : undefined)
 const preview = ref<Preview | null>(null)
 const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)

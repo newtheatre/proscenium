@@ -1,6 +1,6 @@
 # 7. Stories
 
-Forty-five stories, each with criteria a test can check. Thirty-eight are in the first release: nine needed at the gate before anything else can be built, and twenty-nine others. Seven wait. A story is "first release" when box office or front of house cannot open safely without it.
+Forty-six stories, each with criteria a test can check. Thirty-nine are in the first release: nine needed at the gate before anything else can be built, and thirty others. Seven wait. A story is "first release" when box office or front of house cannot open safely without it.
 
 | Group | First release | Later |
 | --- | --- | --- |
@@ -8,7 +8,7 @@ Forty-five stories, each with criteria a test can check. Thirty-eight are in the
 | My account | ID-11 to ID-17; the access scheme, ID-38 to ID-44 | ID-45 |
 | Audience and members | ID-18 to ID-21 |  |
 | Roles and permissions | ID-22 to ID-24, ID-28, ID-29 | ID-25, ID-26, ID-27 |
-| People in the console | ID-30 to ID-32, ID-35, ID-37 | ID-33, ID-34, ID-36 |
+| People in the console | ID-30 to ID-32, ID-35, ID-37, ID-46 | ID-33, ID-34, ID-36 |
 
 ## Getting in
 
@@ -311,6 +311,16 @@ This is the eight separation rules in part 3, as one story.
 - After the merge, every reference to the old account resolves to the survivor, and a test that walks the registry proves none was missed.
 - Addresses, passkeys and grants move; sessions on the old account end.
 - The merge is one batch: it happens entirely or not at all.
+
+### ID-46 Edit somebody's account (first release)
+
+Matt, 19 November 2026: staff could merge accounts but not correct them.
+
+- Staff with `core.account.update` change a person's name, the name they are known by and pronouns on the person's page, with the limits of ID-11. Undo puts the previous values back. The name can be corrected but never emptied.
+- Staff add an email address for a person. It is sent its link and does nothing until the link is used, as in ID-12; every verified address on the account is told that a new address was added by the theatre's staff.
+- An address held by another account is refused with that account's id, and the page offers to merge the two. Staff already see both accounts, so nothing is revealed.
+- Staff choose which verified address the theatre writes to (the old one is told, and Undo switches back) and remove an address, under ID-12's rules: never the one written to, never the last verified one.
+- An erased or merged-away account cannot be edited. Each change is audited with the fields or the address id it touched, never the words (0011).
 
 ### ID-33 Undo a merge (later)
 
