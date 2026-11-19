@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0f6fac7a-43ac-49ed-8b71-27cdd8c3a61b",
+  "id": "62758e5b-a46d-472c-a2ac-bf0d33db15b0",
   "prevIds": [
-    "8837de33-3b77-4fd4-99bd-c6513773b23e",
-    "a0e84b9c-77c5-4923-bbb9-e1978e124b58"
+    "8dd5b727-ed2c-49f1-aed3-eae72b960ba4"
   ],
   "ddl": [
     {
@@ -197,14 +196,6 @@
     },
     {
       "name": "box_office_prices",
-      "entityType": "tables"
-    },
-    {
-      "name": "box_office_promo_codes",
-      "entityType": "tables"
-    },
-    {
-      "name": "box_office_promo_redemptions",
       "entityType": "tables"
     },
     {
@@ -733,6 +724,22 @@
     },
     {
       "name": "payments_webhook_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "promotions_codes",
+      "entityType": "tables"
+    },
+    {
+      "name": "promotions_promotions",
+      "entityType": "tables"
+    },
+    {
+      "name": "promotions_redemptions",
+      "entityType": "tables"
+    },
+    {
+      "name": "promotions_targets",
       "entityType": "tables"
     },
     {
@@ -6168,266 +6175,6 @@
     {
       "table": "box_office_prices",
       "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "code",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "effect",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "value",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "production_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "performance_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "ticket_type_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "band_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "max_uses",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "used",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "max_per_order",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "not_with_requirements",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "valid_from",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "valid_until",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "active",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "note",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "created_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "promo_code_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "order_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "claim_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'live'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "updated_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -19336,6 +19083,596 @@
       "entityType": "columns"
     },
     {
+      "table": "promotions_codes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "promotion_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "code",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "max_uses",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "used",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "trigger",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "effect",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "value",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "buy_quantity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "free_quantity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "channel",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'all'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "valid_from",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "valid_until",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "schedule",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "requirement_refs",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "min_spend_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "max_uses",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "used",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "count_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'item'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "max_per_sale",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "max_per_person",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "combines",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "not_with_requirements",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "staff_ability",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "needs_reason",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotion_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "code_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "sale_ref",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "ref",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "uses",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "discount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "applied_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'live'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "promotion_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "role",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "scope",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "awards_awards",
       "name": "awards_awards_type",
       "columns": [
@@ -20793,48 +21130,6 @@
         },
         {
           "value": "effective_from",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "box_office_promo_codes_code",
-      "columns": [
-        {
-          "value": "code",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "box_office_promo_redemptions_order",
-      "columns": [
-        {
-          "value": "order_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "box_office_promo_redemptions_claim",
-      "columns": [
-        {
-          "value": "claim_id",
           "isExpression": false
         }
       ],
@@ -24018,6 +24313,116 @@
       "entityType": "indexes"
     },
     {
+      "table": "promotions_codes",
+      "name": "promotions_codes_code",
+      "columns": [
+        {
+          "value": "code",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "promotions_codes_promotion",
+      "columns": [
+        {
+          "value": "promotion_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_live",
+      "columns": [
+        {
+          "value": "active",
+          "isExpression": false
+        },
+        {
+          "value": "trigger",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_promotion",
+      "columns": [
+        {
+          "value": "promotion_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_ref",
+      "columns": [
+        {
+          "value": "kind",
+          "isExpression": false
+        },
+        {
+          "value": "ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_sale",
+      "columns": [
+        {
+          "value": "sale_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "promotions_targets_promotion",
+      "columns": [
+        {
+          "value": "promotion_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "awards_awards",
       "name": "fk_awards_awards_type_id_awards_types_id_fk",
       "columns": [
@@ -25449,21 +25854,6 @@
         "ticket_type_id"
       ],
       "tableTo": "box_office_ticket_types",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "fk_box_office_promo_redemptions_promo_code_id_box_office_promo_codes_id_fk",
-      "columns": [
-        "promo_code_id"
-      ],
-      "tableTo": "box_office_promo_codes",
       "columnsTo": [
         "id"
       ],
@@ -27249,6 +27639,66 @@
       "entityType": "fks"
     },
     {
+      "table": "promotions_codes",
+      "name": "fk_promotions_codes_promotion_id_promotions_promotions_id_fk",
+      "columns": [
+        "promotion_id"
+      ],
+      "tableTo": "promotions_promotions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "fk_promotions_redemptions_promotion_id_promotions_promotions_id_fk",
+      "columns": [
+        "promotion_id"
+      ],
+      "tableTo": "promotions_promotions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "fk_promotions_redemptions_code_id_promotions_codes_id_fk",
+      "columns": [
+        "code_id"
+      ],
+      "tableTo": "promotions_codes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "fk_promotions_targets_promotion_id_promotions_promotions_id_fk",
+      "columns": [
+        "promotion_id"
+      ],
+      "tableTo": "promotions_promotions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "bar_stock_levels",
       "name": "bar_stock_levels_pk",
       "columns": [
@@ -27907,24 +28357,6 @@
     {
       "table": "box_office_prices",
       "name": "box_office_prices_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "box_office_promo_codes_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "box_office_promo_redemptions_pk",
       "columns": [
         "id"
       ],
@@ -28886,6 +29318,42 @@
       "entityType": "pks"
     },
     {
+      "table": "promotions_codes",
+      "name": "promotions_codes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "promotions_targets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_files",
       "name": "core_files_object_key_unique",
       "columns": [
@@ -29573,30 +30041,6 @@
       "table": "box_office_prices",
       "name": "box_office_prices_amount",
       "value": "\"amount_minor\" IS NULL OR \"amount_minor\" >= 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "box_office_promo_codes_effect",
-      "value": "\"effect\" IN ('percent_off', 'amount_off', 'set_price')",
-      "entityType": "checks"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "box_office_promo_codes_value",
-      "value": "\"value\" >= 0 AND (\"effect\" <> 'percent_off' OR \"value\" <= 10000)",
-      "entityType": "checks"
-    },
-    {
-      "table": "box_office_promo_codes",
-      "name": "box_office_promo_codes_used",
-      "value": "\"used\" >= 0 AND (\"max_uses\" IS NULL OR \"used\" <= \"max_uses\")",
-      "entityType": "checks"
-    },
-    {
-      "table": "box_office_promo_redemptions",
-      "name": "box_office_promo_redemptions_state",
-      "value": "\"state\" IN ('live', 'released')",
       "entityType": "checks"
     },
     {
@@ -30893,6 +31337,84 @@
       "table": "payments_till_splits",
       "name": "payments_till_splits_one_receipt",
       "value": "\"receipt_account_id\" IS NULL OR \"receipt_to\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_codes",
+      "name": "promotions_codes_used",
+      "value": "\"used\" >= 0 AND (\"max_uses\" IS NULL OR \"used\" <= \"max_uses\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_trigger",
+      "value": "\"trigger\" IN ('automatic', 'code', 'staff')",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_effect",
+      "value": "\"effect\" IN ('percent_off', 'amount_off', 'set_price', 'multi_buy', 'basket_amount_off')",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_channel",
+      "value": "\"channel\" IN ('all', 'online', 'till')",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_count_by",
+      "value": "\"count_by\" IN ('item', 'sale')",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_value",
+      "value": "\"value\" >= 0 AND (\"effect\" <> 'percent_off' OR (\"value\" >= 1 AND \"value\" <= 10000))",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_multi_buy",
+      "value": "\"effect\" <> 'multi_buy' OR (\"buy_quantity\" >= 2 AND (\"free_quantity\" IS NULL OR (\"free_quantity\" >= 1 AND \"free_quantity\" < \"buy_quantity\")))",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_promotions",
+      "name": "promotions_promotions_used",
+      "value": "\"used\" >= 0 AND (\"max_uses\" IS NULL OR \"used\" <= \"max_uses\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_state",
+      "value": "\"state\" IN ('live', 'released')",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_uses",
+      "value": "\"uses\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_redemptions",
+      "name": "promotions_redemptions_discount",
+      "value": "\"discount_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "promotions_targets_role",
+      "value": "\"role\" IN ('applies', 'requires')",
+      "entityType": "checks"
+    },
+    {
+      "table": "promotions_targets",
+      "name": "promotions_targets_quantity",
+      "value": "\"quantity\" >= 1",
       "entityType": "checks"
     }
   ],
