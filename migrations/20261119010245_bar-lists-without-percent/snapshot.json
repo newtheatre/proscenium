@@ -3,7 +3,7 @@
   "dialect": "sqlite",
   "id": "36b165a9-0031-46f4-b636-7a9d057a8065",
   "prevIds": [
-    "e4601c68-4490-4065-ba62-09202cb0bc58"
+    "b680f18a-8f06-4f39-a900-aeb59e7046b5"
   ],
   "ddl": [
     {
@@ -11267,6 +11267,16 @@
       "name": "created_at",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "latecomers",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,

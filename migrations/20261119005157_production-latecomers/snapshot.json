@@ -3,7 +3,7 @@
   "dialect": "sqlite",
   "id": "b680f18a-8f06-4f39-a900-aeb59e7046b5",
   "prevIds": [
-    "903d7f4e-64c3-43d9-b45c-f92b0b406813"
+    "e4601c68-4490-4065-ba62-09202cb0bc58"
   ],
   "ddl": [
     {
@@ -5207,6 +5207,16 @@
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pass_prices",
+      "name": "instead_of",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
