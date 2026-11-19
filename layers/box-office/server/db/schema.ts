@@ -271,6 +271,8 @@ export const passTypes = defineTable('box_office_pass_types', {
   holder: col.internal(text('holder', { enum: ['auto', 'named', 'open'] }).notNull().default('auto')),
   // Whether a pass reserved and not yet paid for may make reservations.
   reserveUnpaid: col.internal(integer('reserve_unpaid', { mode: 'boolean' }).notNull().default(true)),
+  // Whether a holder must book an entry before coming; off, the door books and admits a pass scanned with no booking.
+  bookAhead: col.internal(integer('book_ahead', { mode: 'boolean' }).notNull().default(true)),
   // Whether who may buy a price is checked again each time the pass reserves, and not only when bought.
   recheck: col.internal(integer('recheck', { mode: 'boolean' }).notNull().default(false)),
   // Where it is sold, as a ticket type's channel.

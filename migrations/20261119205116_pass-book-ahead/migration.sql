@@ -1,0 +1,1 @@
+ALTER TABLE `box_office_pass_types` ADD `book_ahead` integer DEFAULT true NOT NULL;

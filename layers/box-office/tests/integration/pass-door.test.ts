@@ -28,8 +28,8 @@ async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>
   })
 }
 
-async function newPass(paid: boolean) {
-  const made = await req('POST', '/api/box-office/pass-types', { name: `Door pass ${++names}`, covers: 'productions', productionIds: [tonight.productionId], perShow: 'any', reserveUnpaid: true, prices: [{ name: 'Member', amountMinor: 2100 }], onSale: true }, seller)
+async function newPass(paid: boolean, bookAhead = true) {
+  const made = await req('POST', '/api/box-office/pass-types', { name: `Door pass ${++names}`, covers: 'productions', productionIds: [tonight.productionId], perShow: 'any', reserveUnpaid: true, bookAhead, prices: [{ name: 'Member', amountMinor: 2100 }], onSale: true }, seller)
   expect(made.status, JSON.stringify(made.body)).toBe(200)
   const type = (await inContext(() => listPassTypes())).find(t => t.id === made.body.id)!
   const holder = await commit(async unit => (await findOrCreateAccount(unit.view(), { address: `door.pass.${names}@example.org`, name: 'Sam Patel', origin: 'guest' })).accountId)
@@ -71,6 +71,36 @@ describe('a pass code at the door', () => {
     const pass = await newPass(true)
     expect((await req('POST', '/api/box-office/desk/issue', entry(later.performanceId, pass.code), seller)).status).toBe(200)
     expect(await atDoor(pass.code)).toMatchObject({ result: 'pass', scanId: null })
+  })
+
+  it('books and admits in one scan when its holders need not book ahead', async () => {
+    const pass = await newPass(true, false)
+    const first = await atDoor(pass.code)
+    expect(first).toMatchObject({ result: 'admitted', viaPass: { booked: true }, booking: { admitted: 1, tickets: 1 } })
+    expect(await find(pass.code)).toMatchObject([{ state: 'confirmed' }])
+    expect(await atDoor(pass.code)).toMatchObject({ result: 'already_admitted' })
+  })
+
+  it('still sends an unpaid pass to the box office when it need not book ahead', async () => {
+    const pass = await newPass(false, false)
+    const said = await atDoor(pass.code)
+    expect(said.result).toBe('pass')
+    expect(said.pass?.reason).toBeTruthy()
+    expect(await find(pass.code)).toEqual([])
+  })
+})
+
+describe('a pass code offline', () => {
+  it('is in the door\'s offline list with the entry it booked tonight', async () => {
+    const pass = await newPass(true)
+    const booked = await req('POST', '/api/box-office/desk/issue', entry(tonight.performanceId, pass.code), seller)
+    expect(booked.status, JSON.stringify(booked.body)).toBe(200)
+    const pack = await req('GET', `/api/box-office/performances/${tonight.performanceId}/door/offline`, undefined, steward)
+    expect(pack.status, JSON.stringify(pack.body)).toBe(200)
+    const ticketHashes = new Set((pack.body.tickets as { hash: string }[]).map(t => t.hash))
+    const entries = pack.body.passes as { hashes: string[], ticketHash: string }[]
+    expect(entries.length).toBeGreaterThan(0)
+    expect(entries.every(p => p.hashes.length > 0 && ticketHashes.has(p.ticketHash))).toBe(true)
   })
 })
 

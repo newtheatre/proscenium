@@ -8,6 +8,7 @@ import { call, inContext, person, rows, server } from '../../../../tests/integra
 import releaseUnpaid from '../../server/api/box-office/performances/[id]/door/release-unpaid.post'
 import reinstatePost from '../../server/api/box-office/orders/[id]/reinstate.post'
 import { findOrders } from '../../server/desk'
+import { scan } from '../../server/door'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const handle = server({
@@ -74,6 +75,14 @@ describe('releasing no-shows at the door', () => {
     expect((await order(a.orderId)).state).toBe('expired')
     expect((await order(kept.orderId)).state).toBe('reserved')
     expect((await api(`/api/box-office/performances/${h.performanceId}/door/release-unpaid`, person(['box-office.ticket.admit']))).status).toBe(403)
+  })
+
+  it('says a released booking was released when its reference is scanned, so the till can seat them again', async () => {
+    const h = await house(10)
+    const r = await reserved(h, 1)
+    expect((await api(`/api/box-office/performances/${h.performanceId}/door/release-unpaid`, door)).status).toBe(200)
+    const said = await inContext(() => scan({ performanceId: h.performanceId, code: r.reference.toLowerCase() }), door)
+    expect(said).toMatchObject({ result: 'released', scanId: null, reservation: { reference: r.reference } })
   })
 })
 
