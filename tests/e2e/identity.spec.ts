@@ -77,11 +77,12 @@ test('opening an emailed link uses nothing until Sign in is pressed, so a mail s
   page.on('request', (request) => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/core/sign-in/link') used.push(request.url())
   })
-  await page.goto('/sign-in/link#not-a-real-token')
+  // The shape of a real token (43 characters), so the refusal is the unknown link, not the input check.
+  await page.goto(`/sign-in/link#${'x'.repeat(43)}`)
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
   const signIn = page.getByRole('button', { name: 'Sign in' })
   await expect(signIn).toBeVisible()
-  expect(page.url()).not.toContain('not-a-real-token')
+  expect(page.url()).not.toContain('#')
   expect(used).toEqual([])
   const results = await new AxeBuilder({ page }).withTags(tags).analyze()
   expect(results.violations.map(v => v.id)).toEqual([])
