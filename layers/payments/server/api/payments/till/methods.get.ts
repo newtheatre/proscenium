@@ -10,7 +10,7 @@ export default defineRoute({
 }, async () => {
   const cash = await useSetting('payments.cash.enabled')
   const attested = await useSetting('payments.desk.attested-card')
-  const offers = (await methodsFor('desk')).filter(m => m.method === 'cash' ? cash : m.method.endsWith('_attested') ? attested : true)
+  const offers = (await methodsFor('desk')).filter(m => m.method === 'cash' ? cash : m.method === 'card_attested' ? attested : true)
   const readers = new Map<string, { id: string, label: string }[]>()
   for (const m of offers) {
     if (m.method !== 'card_reader' || readers.has(m.providerAccountId)) continue
