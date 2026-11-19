@@ -148,7 +148,8 @@ async function byReference(performanceId: string, type: TicketType, mine: { l: {
     const met = answers.find(a => a.verdict === 'met' && !a.unavailable && a.evidence)
     if (!met) {
       const said = answers.find(a => a.reason)
-      refuse('box-office.requirement.reference-not-met', said?.reason ?? `That reference does not give a ${type.name} ticket.`, { status: 403, remedy: 'Check it, or choose another kind of ticket.', fields: { reference: 'not-met' } })
+      // `ask`: the source can have staff check it by hand, so the page offers that (POST book/ask-check).
+      refuse('box-office.requirement.reference-not-met', said?.reason ?? `That reference does not give a ${type.name} ticket.`, { status: 403, remedy: 'Check it, or choose another kind of ticket.', fields: { reference: answers.some(a => a.ask) ? 'ask' : 'not-met' } })
     }
     const evidence = met.evidence!
     if (seen.has(evidence)) refuse(REFERENCE_USED.code, `The same reference is given for two ${type.name} tickets.`, { status: 422, remedy: 'Each one is for one ticket.', fields: { reference: 'repeated' } })
