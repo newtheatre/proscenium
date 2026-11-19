@@ -34,6 +34,8 @@ interface PanelReceipt {
   added?: { label: string, undo: () => void } | null
   /** Ways to finish the panel's part without taking payment, such as reserving to pay later; offered beside the ways to pay, never in live mode. */
   actions?: PanelAction[]
+  /** These lines need an email for the receipt before they can be paid for, such as tickets the receipt carries. */
+  needsReceipt?: boolean
 }
 interface PanelAction { key: string, label: string, icon?: string, loading?: boolean, run: () => void }
 
@@ -331,7 +333,10 @@ const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const beside = computed(() => !mounted.value || wide.value)
 // Payment can start once the server has agreed the total.
-const payable = computed(() => groups.value.some(g => g.id !== SAVINGS) && !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
+// A panel may need the receipt's email before its part is paid for; a split sale asks each person.
+const receiptNeeded = computed(() => panels.value.some(p => inputs[p.id] !== null && inputs[p.id] !== undefined && receipts[p.id]?.needsReceipt))
+const payable = computed(() => groups.value.some(g => g.id !== SAVINGS) && !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0
+  && (!receiptNeeded.value || splitting.value || !!receiptTo.value[0]))
 
 // In live mode each panel is a tab once there are two; its badge counts the lines it adds to the sale.
 const tabbed = computed(() => props.live && panels.value.length > 1)
@@ -1223,7 +1228,9 @@ function ended() {
               <UFormField
                 v-if="!isSplit && !splitting && (sale || groups.length) && methods.length && !waiting"
                 :label="t('payments.screens.till.receipt-to')"
-                :hint="t('payments.screens.optional')"
+                :hint="receiptNeeded ? undefined : t('payments.screens.optional')"
+                :required="receiptNeeded"
+                :help="receiptNeeded && !receiptTo[0] ? t('payments.screens.till.receipt-needed') : undefined"
               >
                 <PaymentsReceiptTo
                   v-model="receiptTo[0]"
@@ -1297,7 +1304,7 @@ function ended() {
                   :methods="methods"
                   :method-label="methodLabel"
                   :method-icon="methodIcon"
-                  :busy="taking || !payable || planIncomplete"
+                  :busy="taking || !payable || planIncomplete || (receiptNeeded && persons.some(p => !receiptTo[p.position]))"
                   :paying="paying"
                   :money="money"
                   @pay="payPerson"

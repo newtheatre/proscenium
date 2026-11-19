@@ -51,6 +51,8 @@
   "box-office.settings.sales.desk-until-after.label": "Desk sells until this long after the start",
   "box-office.settings.sales.desk-until-after.help": "How long after the performance starts the desk may still sell, for latecomers.",
   "box-office.settings.sales.desk-admit.label": "Offer to admit at the till",
+  "box-office.settings.sales.desk-email.label": "Tickets sold at the till need an email",
+  "box-office.settings.sales.desk-email.help": "A sale at the till with new tickets or a pass can't be paid until an email address is given for its receipt, which carries the tickets. Other sales, such as the bar, keep the receipt optional.",
   "box-office.settings.sales.desk-admit.help": "Shows the till's \"Admit now\" box, so a seller can let the buyer in as the sale is made. Turn it off where everyone is let in at the door.",
   "box-office.settings.retention.holds.label": "Keep the label of a staff hold for",
   "box-office.settings.retention.holds.help": "How long after the performance a hold placed by staff keeps its label, such as the name of the guests it was for.",
