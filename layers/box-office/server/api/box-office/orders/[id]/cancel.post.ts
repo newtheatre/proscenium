@@ -1,5 +1,6 @@
 // Cancel tickets on an order (BO-50): the seats go back on sale and the tickets are void at the
-// door. Refunding as well needs its own ability, which cancelling does not imply.
+// door. Refunding as well needs its own ability, which cancelling does not imply. Staff may leave the
+// buyer unemailed, and may cancel a duplicate whose ticket was already scanned in (it stays admitted).
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute, requireAbility } from '#kit'
@@ -15,8 +16,10 @@ export default defineRoute({
     refund: z.enum(['full', 'less-fee', 'none']),
     reasonTermId: z.string().optional(),
     note: z.string().trim().max(200).optional(), // not-policy: the column's own limit
+    quiet: z.boolean().optional(),
+    admitted: z.boolean().optional(),
   }).strict(),
 }, async (_event, { input, record, actor, unit }) => {
   if (input.refund !== 'none') await requireAbility(actor, 'box-office.order.refund', ['box-office.order', record!.id!])
-  return cancelLines(unit.view(), record!.id!, { ...input, by: actor.accountId! })
+  return cancelLines(unit.view(), record!.id!, { ...input, kind: 'staff', by: actor.accountId! })
 })

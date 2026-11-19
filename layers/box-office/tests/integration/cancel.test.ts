@@ -204,6 +204,31 @@ describe('a seat let go', () => {
   })
 })
 
+describe('cancelling quietly, and cancelling a duplicate already scanned in (Matt, 19 November)', () => {
+  it('leaves the buyer unemailed when staff say so', async () => {
+    const h = await house(3)
+    const o = await paid(h, 2)
+    const done = await cancel(o.orderId, { lineIds: [o.lines[0]], refund: 'none', quiet: true })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(await count("SELECT count(*) AS n FROM core_notifications WHERE type_key = 'box-office.order-cancelled' AND subject_id = ?", o.orderId)).toBe(0)
+    expect(await rows('SELECT state, void_reason FROM box_office_tickets WHERE order_line_id = ?', o.lines[0])).toEqual([{ state: 'void', void_reason: 'cancelled' }])
+  })
+
+  it('cancels a ticket already used at the door only when asked, leaving it admitted and its seat free', async () => {
+    const h = await house(3)
+    const o = await paid(h, 2)
+    await env.DB.prepare('UPDATE box_office_tickets SET admitted_at = ? WHERE order_line_id = ?').bind(NOV_16, o.lines[0]).run()
+    expect((await cancel(o.orderId, { refund: 'none' })).body).toMatchObject({ code: 'box-office.order.already-admitted' })
+    const done = await cancel(o.orderId, { refund: 'none', admitted: true, quiet: true })
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toMatchObject({ state: 'cancelled', totalMinor: 0 })
+    expect(await rows('SELECT state, admitted_at FROM box_office_tickets WHERE order_line_id = ?', o.lines[0])).toEqual([{ state: 'valid', admitted_at: NOV_16 }])
+    expect(await rows('SELECT state, void_reason FROM box_office_tickets WHERE order_line_id = ?', o.lines[1])).toEqual([{ state: 'void', void_reason: 'cancelled' }])
+    expect(await claimed(h)).toBe(0)
+    expect(await count("SELECT count(*) AS n FROM core_notifications WHERE type_key = 'box-office.order-cancelled' AND subject_id = ?", o.orderId)).toBe(0)
+  })
+})
+
 describe('a refund after the performance has taken place', () => {
   it('comes off ticket income once the income has been recognised, and leaves deferred income at nothing', async () => {
     const DAY = 86_400_000

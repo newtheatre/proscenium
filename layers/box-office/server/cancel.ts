@@ -38,6 +38,13 @@ export interface CancelInput {
   kind?: 'staff' | 'performance' | 'customer'
   /** For `performance`: what happened to it, as the message says it, such as "has been cancelled". */
   what?: string
+  /** Staff only: the buyer is not emailed, such as for a duplicate booking already sorted out with them. */
+  quiet?: boolean
+  /**
+   * Staff only: tickets already used at the door may be among those cancelled, such as a duplicate
+   * booking scanned by mistake. Their seat goes back and the line is cancelled; the ticket stays admitted.
+   */
+  admitted?: boolean
 }
 
 export interface Cancelled {
@@ -138,8 +145,9 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
   }
   const ids = JSON.stringify(chosen.map(l => l.id))
   const used = { code: 'box-office.order.already-admitted', reason: 'A ticket that has been used at the door cannot be cancelled.', remedy: 'Leave out the tickets that have been scanned in.' }
-  if (paid && await first('SELECT 1 AS one FROM box_office_tickets WHERE state = \'valid\' AND admitted_at IS NOT NULL AND order_line_id IN (SELECT value FROM json_each(?))', ids))
-    refuse(used.code, used.reason, { status: 409, remedy: used.remedy })
+  const byStaff = !input.kind || input.kind === 'staff'
+  const admitted = paid ? (await first<{ n: number }>('SELECT count(*) AS n FROM box_office_tickets WHERE state = \'valid\' AND admitted_at IS NOT NULL AND order_line_id IN (SELECT value FROM json_each(?))', ids))!.n : 0
+  if (admitted && !(byStaff && input.admitted)) refuse(used.code, used.reason, { status: 409, remedy: used.remedy })
 
   // What goes back, and what is kept of it.
   const chosenMinor = chosen.reduce((sum, l) => sum + l.amount_minor, 0)
@@ -160,7 +168,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
     WHERE state = 'confirmed' AND id IN (SELECT claim_id FROM box_office_order_lines WHERE order_id = ${order.id} AND id IN (SELECT value FROM json_each(${ids})))`).expect(chosen.length, changed)
   if (paid) {
     unit.add(sql`UPDATE box_office_tickets SET state = 'void', void_reason = ${byPerformance ? 'performance_cancelled' : 'cancelled'}, updated_at = ${at}
-      WHERE state = 'valid' AND admitted_at IS NULL AND order_line_id IN (SELECT value FROM json_each(${ids}))`).expect(chosen.length, used)
+      WHERE state = 'valid' AND admitted_at IS NULL AND order_line_id IN (SELECT value FROM json_each(${ids}))`).expect(chosen.length - admitted, used)
   }
   const still = sql`id = ${order.id} AND state = ${order.state} AND total_minor = ${order.total_minor} AND ${input.reasonTermId ? assertTerm(input.reasonTermId, REASONS) : sql`1 = 1`}`
   unit.add(kept.length
@@ -187,7 +195,9 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
   }
 
   unit.announce('box-office.order.cancelled', { orderId: order.id, cancellationId: cancellationId! }, { record: ['box-office.order', order.id] })
-  if (order.account_id) {
+  const quiet = byStaff && !!input.quiet
+  if (quiet || admitted) unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { cancellationId: cancellationId!, notEmailed: quiet, admittedCancelled: admitted } })
+  if (order.account_id && !quiet) {
     const words = await wordsFor(order, lines, totalMinor)
     const left = kept.length ? await wordsFor(order, kept, totalMinor) : null
     const money = refund ? ` A refund of ${(await wordsFor(order, lines, refundMinor)).amount} will go back the way you paid.` : ''

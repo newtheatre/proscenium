@@ -4,7 +4,7 @@
 // may hold any number of passes. Issuing here is by staff, or for passes brought in from another
 // system; a pass bought in an order is issued by the sale (pass-sales.ts) through the same function.
 import { sql } from 'drizzle-orm'
-import { all, first, newId, nowMs, openColumn, refuse, sealColumn, useSetting, type UnitView } from '#kit'
+import { all, can, first, newId, nowMs, openColumn, refuse, sealColumn, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { accountLabel, getPerformance, getProduction, notify } from '#modules/core'
 import { hashOf, REFERENCE_ALPHABET } from './codes'
@@ -244,4 +244,33 @@ export async function myPasses(accountId: string): Promise<MyPass[]> {
     out.push({ id: pass.id, name: pass.name, priceName: pass.priceName, code: pass.code, owedMinor: pass.paidAt ? 0 : pass.amountMinor - pass.creditMinor, currency: pass.currency, left: pass.usesTotal === null ? null : pass.usesTotal - pass.usesTaken, state: pass.state, entries, open })
   }
   return out
+}
+
+/** A pass as staff see it on an order or a person's page, with its code (Matt, 19 November). */
+export interface StaffPass { id: string, passTypeId: string, name: string, priceName: string, code: string | null, state: 'active' | 'void', paid: boolean, holder: string | null, holderId: string | null, /** Bought on this order, or used for an entry on it. */ how: 'bought' | 'entry' | 'held', entries: number }
+
+async function toStaffPass(r: PassRow, how: StaffPass['how']): Promise<StaffPass> {
+  const pass = await toPass(r)
+  const entries = (await first<{ n: number }>(`SELECT count(*) AS n FROM box_office_pass_redemptions d JOIN box_office_orders o ON o.id = d.order_id
+    WHERE d.pass_id = ? AND d.state = 'live' AND o.state IN ('reserved', 'awaiting_payment', 'confirmed')`, pass.id))!.n
+  return { id: pass.id, passTypeId: pass.passTypeId, name: pass.name, priceName: pass.priceName, code: pass.code, state: pass.state, paid: pass.paidAt !== null, holder: pass.accountId ? await accountLabel(pass.accountId) : null, holderId: pass.accountId, how, entries }
+}
+
+/** The passes bought on an order and those its tickets were booked with, each once. */
+export async function passesOnOrder(orderId: string): Promise<StaffPass[]> {
+  const bought = await all<PassRow>(`${PASSES} WHERE p.order_line_id IN (SELECT id FROM box_office_order_lines WHERE order_id = ? AND kind = 'pass_sale') ORDER BY p.created_at, p.id`, orderId)
+  const used = await all<PassRow>(`${PASSES} WHERE p.id IN (SELECT d.pass_id FROM box_office_pass_redemptions d JOIN box_office_order_lines l ON l.pass_redemption_id = d.id WHERE l.order_id = ?) ORDER BY p.created_at, p.id`, orderId)
+  const seen = new Set(bought.map(r => r.id))
+  return Promise.all([...bought.map(r => toStaffPass(r, 'bought')), ...used.filter(r => !seen.has(r.id)).map(r => toStaffPass(r, 'entry'))])
+}
+
+/** The passes a person holds, newest first, for their console page. */
+export async function passesHeldBy(accountId: string): Promise<StaffPass[]> {
+  const rows = await all<PassRow>(`${PASSES} WHERE p.issued_at IS NOT NULL AND p.account_id IN (${accountScopeSql('?1')}) ORDER BY p.created_at DESC, p.id`, accountId)
+  return Promise.all(rows.map(r => toStaffPass(r, 'held')))
+}
+
+/** Pass codes are shown to staff who set passes up or sell at the desk, where codes are handed over. */
+export async function mayReadPassCodes(actor: Actor): Promise<boolean> {
+  return (await can(actor, 'box-office.pass.manage')).allowed || (await can(actor, 'box-office.order.sell')).allowed
 }
