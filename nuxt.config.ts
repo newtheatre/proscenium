@@ -22,6 +22,10 @@ const theatreLayers = existsSync(r('./site/layers'))
 const gallery = process.env.PROSCENIUM_GALLERY === '1' ? ['./tests/fixtures/gallery/gallery'] : []
 const COMPATIBILITY_DATE = '2026-11-01'
 
+// NNT branch only (see send_email below).
+const emailAllowed = (process.env.EMAIL_ALLOWED_TO ?? '').split(',').map(a => a.trim()).filter(Boolean)
+const emailBinding = emailAllowed.length ? { name: 'EMAIL', allowed_destination_addresses: emailAllowed } : { name: 'EMAIL' }
+
 export default defineNuxtConfig({
   // The gallery fixture module is added only to the browser tests' build.
   extends: [...theatreLayers, ...gallery],
@@ -51,7 +55,9 @@ export default defineNuxtConfig({
         r2_buckets: [{ binding: 'FILES' }],
         kv_namespaces: [{ binding: 'CACHE' }],
         // Cloudflare Email Sending. Sends only from a domain onboarded in the dashboard.
-        send_email: [{ name: 'EMAIL' }],
+        // NNT branch only: a build variable EMAIL_ALLOWED_TO (addresses, comma separated) limits who
+        // the Worker may email, so a preview holding real people's data emails nobody else.
+        send_email: [emailBinding],
         triggers: { crons: ['* * * * *'] },
         // The shared rate-limit counts (F-36). The class is exported from layers/core/server/entry.ts.
         durable_objects: { bindings: [{ name: 'RATE_LIMITS', class_name: 'RateLimitCounter' }] },
@@ -99,7 +105,7 @@ export default defineNuxtConfig({
         d1_databases: [{ binding: 'DB', database_name: `${name}-db`, database_id: 'local' }],
         r2_buckets: [{ binding: 'FILES', bucket_name: `${name}-files` }],
         kv_namespaces: [{ binding: 'CACHE', id: 'local' }],
-        send_email: [{ name: 'EMAIL' }],
+        send_email: [emailBinding],
         queues: { producers: [{ binding: 'JOBS_PROMPT', queue: queue.prompt }, { binding: 'JOBS_BULK', queue: queue.bulk }, { binding: 'EMAIL_EVENTS', queue: queue.emailEvents }] },
       }, null, 2))
       config.cloudflare = { ...config.cloudflare, dev: { ...config.cloudflare?.dev, configPath: path, persistDir: r('./.wrangler/state') } }
