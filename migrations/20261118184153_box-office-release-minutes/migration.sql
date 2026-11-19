@@ -1,5 +1,0 @@
-ALTER TABLE `box_office_performance_sales` ADD `release_minutes` integer;--> statement-breakpoint
--- A reservation released unpaid keeps its record, and staff may seat the buyer again when seats are
--- free (Matt, 2026-11-18): such an order, and only such, moves back from expired to reserved.
-DROP TRIGGER `box_office_orders_fixed`;--> statement-breakpoint
-CREATE TRIGGER `box_office_orders_fixed` BEFORE UPDATE ON `box_office_orders` WHEN NEW.`reference` <> OLD.`reference` OR NEW.`channel` <> OLD.`channel` OR NEW.`currency` <> OLD.`currency` OR (NEW.`state` <> OLD.`state` AND NOT ((OLD.`state` = 'basket' AND NEW.`state` IN ('awaiting_payment', 'confirmed', 'reserved', 'expired')) OR (OLD.`state` = 'awaiting_payment' AND NEW.`state` IN ('confirmed', 'reserved', 'expired', 'cancelled')) OR (OLD.`state` = 'reserved' AND NEW.`state` IN ('awaiting_payment', 'confirmed', 'cancelled', 'expired')) OR (OLD.`state` = 'expired' AND NEW.`state` = 'reserved' AND OLD.`reserved_at` IS NOT NULL) OR (OLD.`state` = 'confirmed' AND NEW.`state` = 'cancelled'))) BEGIN SELECT RAISE(ABORT, 'box-office: an order moves only along its life cycle'); END;

@@ -1,1 +1,0 @@
-ALTER TABLE `core_account_merges` ADD `completed_at` integer;

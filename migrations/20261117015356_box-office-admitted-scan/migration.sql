@@ -1,1 +1,0 @@
-ALTER TABLE `box_office_tickets` ADD `admitted_scan_id` text;

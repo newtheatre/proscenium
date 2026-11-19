@@ -1,1 +1,0 @@
-ALTER TABLE `box_office_tickets` ADD `door_code` text;
