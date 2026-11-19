@@ -158,7 +158,7 @@ const runs = computed(() => {
   const on = dates.value.filter(p => p.state !== 'cancelled')
   return on.length ? range(on[0]!.startsAt, on[on.length - 1]!.startsAt) : ''
 })
-const priceLine = computed(() => (production.value?.price ? priceSummary(production.value.price, t) : ''))
+const priceLine = computed(() => fromPrice(production.value?.price, t))
 const spotlightFacts = computed(() => [
   { label: 'Dates', value: runs.value },
   { label: 'Running time', value: length.value },

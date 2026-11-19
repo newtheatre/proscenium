@@ -18,7 +18,7 @@ const props = defineProps<{
   price?: PriceSummaryView | null
 }>()
 const { t } = useT()
-const priceLine = computed(() => props.price ? priceSummary(props.price, t) : '')
+const priceLine = computed(() => fromPrice(props.price, t))
 // The artless frame's two hues come from the show's name, so a show keeps its colours.
 const tint = computed(() => {
   let h = 0
@@ -116,13 +116,16 @@ const tint = computed(() => {
       </p>
     </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-3 border-t-2 border-(--color-ash-950) p-4">
-      <span class="font-mono text-sm">{{ priceLine }}</span>
+    <div class="flex flex-wrap items-center gap-3 border-t-2 border-(--color-ash-950) p-4">
       <span
         v-if="!cancelled"
         class="rounded-md bg-primary px-2.5 py-1.5 text-sm font-semibold text-inverted group-hover:bg-primary/90"
         aria-hidden="true"
       >Book tickets</span>
+      <span
+        v-if="priceLine"
+        class="text-sm font-medium"
+      >{{ priceLine }}</span>
     </div>
   </article>
 </template>
