@@ -38,6 +38,7 @@ describe('an ID not on the list', () => {
     const passed = await req('POST', `/api/membership/applications/${applied.body.membershipId}/decide`, { outcome: 'pass', addToList: true })
     expect(passed.body, JSON.stringify(passed.body)).toMatchObject({ state: 'active', endsOn: '2027-11-16' })
     expect(await entry(listId)).toEqual({ by_hand: 1, ends_on: '2027-11-16', used_by: applied.body.membershipId, holder_name: 'Bea Missing' })
+    expect(queued).toMatchObject({ startsNow: true, endsOn: '2027-11-16' })
     expect((await check(listId, '20777777')).body).toMatchObject({ found: true })
     expect((await req('GET', `/api/membership/lists/${listId}`)).body).toMatchObject({ byHand: 1, list: { entryCount: 2 } })
 
@@ -61,5 +62,17 @@ describe('an ID not on the list', () => {
     expect((await req('POST', `/api/membership/lists/${listId}/entries`, { value: '20999999', name: 'Di Hand' })).status).toBe(200)
     expect((await req('POST', `/api/membership/lists/${listId}/import`, { file: FILE })).status).toBe(200)
     expect((await check(listId, '20999999')).body).toMatchObject({ found: true, name: 'Di Hand' })
+  })
+
+  it('ends on the day staff set when they pass it, and the entry added with it ends then too', async () => {
+    const { id, listId } = await listScheme()
+    const eve = await applicant('Eve Dated')
+    const applied = await req('POST', `/api/membership/schemes/${id}/join`, { reference: '20666666', askStaff: true }, eve)
+    const decide = (body: Record<string, unknown>) => req('POST', `/api/membership/applications/${applied.body.membershipId}/decide`, { outcome: 'pass', addToList: true, ...body })
+    const { today } = (await req('GET', '/api/membership/applications')).body
+    const refused = await decide({ endsOn: today })
+    expect(refused.body).toMatchObject({ code: 'membership.application.ends-before-start', fields: { endsOn: 'membership.application.ends-before-start' } })
+    expect((await decide({ endsOn: '2027-07-31' })).body).toMatchObject({ state: 'active', endsOn: '2027-07-31' })
+    expect(await entry(listId)).toMatchObject({ ends_on: '2027-07-31', used_by: applied.body.membershipId })
   })
 })
