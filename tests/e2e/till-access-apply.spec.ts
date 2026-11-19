@@ -32,7 +32,6 @@ test.beforeAll(async ({ playwright }) => {
   await set([{ key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }, { key: 'core.rate-limits.write', value: { count: 10000, per: '1m' } }])
   await set([{ key: 'core.locale.time-zone', value: 'Europe/London' }])
   for (const id of ['finance', 'payments', 'box-office']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
-  await set([{ key: 'payments.cash.enabled', value: true }])
   await settings.dispose()
 
   const api = await playwright.request.newContext({ ...base, ...as(manager) })

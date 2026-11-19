@@ -95,7 +95,7 @@ describe('opening from the till', () => {
 
 describe('what Your session shows', () => {
   it('says what the session has taken by each way of paying, and lists its sales, newest first', async () => {
-    await setting('payments.cash.enabled', true)
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
     try {
       const me = seller()
       await send('POST', '/api/payments/till/session', me, {})
@@ -112,7 +112,7 @@ describe('what Your session shows', () => {
       ])
     }
     finally {
-      await setting('payments.cash.enabled', false)
+      await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(0).run()
     }
   })
 
@@ -142,7 +142,7 @@ describe('moving a session', () => {
   })
 
   it('changes the float only before the first cash is taken', async () => {
-    await setting('payments.cash.enabled', true)
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
     try {
       const me = seller()
       const id = (await send('POST', '/api/payments/till/session', me, {})).body.session.id as string
@@ -152,14 +152,14 @@ describe('moving a session', () => {
       expect(await send('PATCH', `/api/payments/sessions/${id}`, me, { floatMinor: 3000 })).toMatchObject({ status: 409, body: { code: 'payments.session.float-fixed' } })
     }
     finally {
-      await setting('payments.cash.enabled', false)
+      await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(0).run()
     }
   })
 })
 
 describe('awaiting a count', () => {
   it('does not stop the seller opening the next session, and is listed for them and under Needs attention', async () => {
-    await setting('payments.cash.enabled', true)
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
     try {
       const me = seller()
       const first = (await send('POST', '/api/payments/sessions', me, { floatMinor: 1000 })).body.session.id as string
@@ -173,7 +173,7 @@ describe('awaiting a count', () => {
       expect(attention.awaitingCount).toEqual(expect.arrayContaining([expect.objectContaining({ id: first, expectedCashMinor: 1000 })]))
     }
     finally {
-      await setting('payments.cash.enabled', false)
+      await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(0).run()
     }
   })
 })
@@ -213,7 +213,7 @@ describe('closing when quiet', () => {
   })
 
   it('stops a quiet session with cash in it, to be counted', async () => {
-    await setting('payments.cash.enabled', true)
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
     try {
       const me = seller()
       const id = (await send('POST', '/api/payments/sessions', me, { floatMinor: 2000 })).body.session.id as string
@@ -222,7 +222,7 @@ describe('closing when quiet', () => {
       expect(await stateOf(id)).toEqual({ state: 'counting', closed_how: null })
     }
     finally {
-      await setting('payments.cash.enabled', false)
+      await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(0).run()
     }
   })
 })

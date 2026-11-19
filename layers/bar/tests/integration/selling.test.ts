@@ -57,7 +57,7 @@ beforeAll(async () => {
     stock.crisps = (await addProduct(v, { categoryId, name: 'Selling crisps' }, { amountMinor: 120 }, seller.accountId!)).variantId
     stock.outlet = addOutlet(v, { name: 'Selling bar', kind: 'bar' })
   })
-  await commit(unit => changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }))
+  await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
   await commit(unit => changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true }))
   for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Bar', floatMinor: 0 }))
   // Finance makes bar.income when the bar is switched on.

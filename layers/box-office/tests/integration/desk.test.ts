@@ -11,7 +11,7 @@ import { attest, cancelIntent, openSession } from '../../../payments/server/serv
 import releaseReservations from '../../server/tasks/release-reservations'
 import { createPromotion } from '../../../promotions/server/promotions'
 import { cancelLines } from '../../server/cancel'
-import { deliver, inContext, person, rows } from '../../../../tests/integration/helpers'
+import { deliver, env, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const seller = person(['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
@@ -56,7 +56,7 @@ beforeAll(async () => {
   await ready()
   await commit(async (unit) => {
     await changeSetting(unit.view(), 'box-office.reservations.confirm-email', false, { reason: 'test', confirm: true })
-    await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }) // these take cash
+    await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run() // these take cash
     await changeSetting(unit.view(), 'box-office.checkout.payment-timing', 'buyer-chooses', { reason: 'test', confirm: true })
     // Receipts go from a job, with no request to take the site's address from.
     await changeSetting(unit.view(), 'core.site.origin', 'https://theatre.example', { reason: 'test', confirm: true })

@@ -26,8 +26,8 @@ test.beforeAll(async ({ playwright }) => {
   // The till posts a sale to the ledger, which dates it in the theatre's time zone.
   expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'core.locale.time-zone', value: 'Europe/London' }], confirm: true } })).ok()).toBe(true)
   for (const id of ['finance', 'payments']) expect((await api.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
-  // The till tests take cash, which a theatre turns on; the last test turns it off again.
-  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: true }], confirm: true } })).ok()).toBe(true)
+  // The till tests take cash, which a theatre has by adding a cash account; the last test takes them out of use.
+  expect((await api.post('/api/payments/providers', { data: { provider: 'cash', label: 'Cash', channels: ['desk'], mode: 'live' }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
   await api.dispose()
 })
 test.use(as(treasurer))
@@ -316,8 +316,9 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
 
 test('without cash, a seller\'s session has no float and closes in one step from Your session', async ({ page, playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
-  // Back to the default, which later files expect too.
-  expect((await api.put('/api/core/settings', { data: { changes: [{ key: 'payments.cash.enabled', value: false }], confirm: true } })).ok()).toBe(true)
+  // Back to the default, no cash account in use, which later files expect too.
+  const { accounts } = await (await api.get('/api/payments/providers')).json() as { accounts: { id: string, provider: string, active: boolean }[] }
+  for (const a of accounts.filter(a => a.provider === 'cash' && a.active)) expect((await api.patch(`/api/payments/providers/${a.id}`, { data: { active: false } })).ok()).toBe(true)
   await api.dispose()
   // A seller who may not see everyone's sessions sees only their own on Sessions.
   const seller = { ...treasurer, accountId: 'acc_nocashseller', name: 'Nora No-Cash', grants: ['payments.session.open', 'gallery.sample.view'].map(grant) }

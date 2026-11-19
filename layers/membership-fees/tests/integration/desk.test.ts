@@ -6,7 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId } from '#kit'
 import { attest, cancelIntent, openSession } from '../../../payments/server/services'
-import { call, inContext, person, rows } from '../../../../tests/integration/helpers'
+import { call, env, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { applicant, req } from '../../../membership/tests/integration/stage'
 import { charge, fees, handle, income, membership, paid, pay, providers, ready } from './stage'
 
@@ -40,7 +40,7 @@ async function applied(name: string) {
 beforeAll(async () => {
   await ready()
   // Payments takes no cash until a theatre turns it on.
-  await commit(unit => changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }))
+  await env.DB.prepare("UPDATE payments_provider_accounts SET active = ? WHERE provider = 'cash'").bind(1).run()
   for (const who of [seller, onlooker]) await commit(unit => openSession(unit.view(), { accountId: who.accountId!, pointLabel: 'Desk', floatMinor: 0 }))
 })
 
