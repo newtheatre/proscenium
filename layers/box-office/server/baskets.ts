@@ -206,7 +206,7 @@ export async function planOrder(input: Omit<BasketInput, 'performanceId'> & { pe
   const requests = [...asked.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), ...ordinary.map(e => ({ poolId: pool.get(e.bandId)!.id, quantity: 1 }))]
   const owed = await owedHere(used, at)
   const covers = await planCovers(input.cover ?? [], planned, { id: input.performanceId, productionId: performance.productionId }, at)
-  const totalMinor = charged.reduce((sum, amount) => sum + amount, 0) + planned.reduce((sum, p) => sum + p.amountMinor, 0) + owed.reduce((sum, o) => sum + o.pass.owedMinor, 0)
+  const totalMinor = charged.reduce((sum, amount) => sum + amount, 0) + planned.reduce((sum, p) => sum + p.amountMinor - p.creditMinor, 0) + owed.reduce((sum, o) => sum + o.pass.owedMinor, 0)
   return { performanceId: input.performanceId, productionId: performance.productionId, currency, pool, guard, lines, entryOf, tickets, discounts, charged, bought, used, planned, owed, covers, requests, totalMinor }
 }
 

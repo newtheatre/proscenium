@@ -391,7 +391,7 @@ A season ticket or a multi-show pass as a product.
 
 ### `box_office_pass_covers` (guarded)
 
-A ticket someone already held that a pass now covers (part 4, "Using a pass for tickets already held"). The pass also gains `credit_minor`, what paid tickets took off its price, which stays 0 until paid tickets can be switched.
+A ticket someone already held that a pass now covers (part 4, "Using a pass for tickets already held"). The pass also gains `credit_minor`, what paid tickets took off its price: what it owes is `amount_minor` less `credit_minor` until it is paid, and the writes keep the credit within the price.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |

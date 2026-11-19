@@ -7,6 +7,8 @@ import type { PassSwap } from './BoxOfficePassSwap.vue'
 
 const props = defineProps<{ performanceId: string, swaps: PassSwap[], currency?: string }>()
 const covered = defineModel<string[]>({ default: () => [] })
+/** What the ticked tickets already paid for take off the passes' price. */
+const credit = defineModel<number>('credit', { default: 0 })
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -31,7 +33,10 @@ watch(asked, async (now, before) => {
   const found = await $api<{ choices: CoverChoice[], others: number }>(`/api/box-office/book/performances/${encodeURIComponent(props.performanceId)}/covers`, { query: now }).catch(() => ({ choices: [], others: 0 }))
   choices.value = found.choices
   others.value = found.others
-  covered.value = found.choices.map(c => c.lineId)
+  covered.value = found.choices.filter(c => !c.ask).map(c => c.lineId)
+}, { immediate: true })
+watch([covered, choices], () => {
+  credit.value = choices.value.filter(c => c.paid && covered.value.includes(c.lineId)).reduce((sum, c) => sum + c.amountMinor, 0)
 }, { immediate: true })
 const shows = computed(() => new Set(choices.value.map(c => c.show)).size)
 </script>

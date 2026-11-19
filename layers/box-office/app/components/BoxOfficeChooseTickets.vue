@@ -59,6 +59,7 @@ const swaps = ref<PassSwap[]>([])
 const swapped = computed(() => swaps.value.reduce((sum, s) => sum + s.count, 0))
 // Tickets the signed-in buyer already has for other shows, for the passes swapped for to cover (Matt, 19 November).
 const covered = ref<string[]>([])
+const coverCredit = ref(0)
 const quantity = computed(() => chosen.value.reduce((sum, c) => sum + c.quantity, 0) + passes.value.length + buying.value.length + swapped.value)
 // A pass type with a price offered instead of a ticket is offered as a swap; any other as a pass to add.
 const swappable = computed(() => (data.value?.passes.onSale ?? []).filter(p => p.prices.some(price => price.insteadOf.length)))
@@ -93,7 +94,7 @@ const asked = computed(() => {
   return { lines: chosen.value, buys }
 })
 const swapMinor = computed(() => swaps.value.reduce((sum, s) => sum + s.amountMinor * s.count, 0))
-const passMinor = computed(() => buying.value.reduce((sum, b) => sum + b.amountMinor, 0) + swapMinor.value)
+const passMinor = computed(() => buying.value.reduce((sum, b) => sum + b.amountMinor, 0) + swapMinor.value - (asked.value.buys.length ? coverCredit.value : 0))
 // A promo code (BO-17), tried before holding so the saving shows; sent with the hold, which applies it again.
 const promoInput = ref('')
 const promo = ref<{ code: string, maxPerOrder: number | null, prices: { bandId: string, ticketTypeId: string, amountMinor: number }[] } | null>(null)
@@ -424,6 +425,7 @@ async function hold() {
       <BoxOfficePassCovers
         v-if="viewer.signedIn && swaps.length && !holdsOwn"
         v-model="covered"
+        v-model:credit="coverCredit"
         :performance-id="performanceId"
         :swaps="swaps"
         :currency="currency"

@@ -171,6 +171,8 @@ export interface PlannedPass {
   /** The pass as it will be, so its first entry can be taken in the same batch. */
   judged: JudgedPass
   amountMinor: number
+  /** What tickets already paid for put towards it, taken off what is paid for it here. */
+  creditMinor: number
   currency: string
 }
 
@@ -216,6 +218,7 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
     out.push({
       buy,
       amountMinor: price.amountMinor,
+      creditMinor: 0,
       currency: type.currency,
       judged: { passId: newId('pass'), passTypeId: type.id, name: type.name, priceName: price.name, accountId: buyer.channel === 'online' ? holder ?? buyer.account : holder ?? buy.accountId ?? null, named, once: type.perShow === 'once', owedMinor: price.amountMinor, left: type.uses },
     })
@@ -229,10 +232,10 @@ export async function planPassBuys(buys: readonly PassBuy[], performanceId: stri
  */
 export async function addPassSales(unit: UnitView, orderId: string, planned: readonly PlannedPass[], issuedBy: string | null): Promise<number> {
   if (!planned.length) return 0
-  const lineIds = unit.insertSet(orderLines, planned.map(p => ({ orderId, kind: 'pass_sale', listMinor: p.amountMinor, discountMinor: 0, amountMinor: p.amountMinor, state: 'live' })))
+  const lineIds = unit.insertSet(orderLines, planned.map(p => ({ orderId, kind: 'pass_sale', listMinor: p.amountMinor, discountMinor: p.creditMinor, amountMinor: p.amountMinor - p.creditMinor, state: 'live' })))
   for (const [i, p] of planned.entries())
     await issuePass(unit, { id: p.judged.passId, passTypeId: p.judged.passTypeId, passPriceId: p.buy.passPriceId, accountId: p.judged.accountId, paid: false, issued: false, orderLineId: lineIds[i]!, issuedBy })
-  return planned.reduce((sum, p) => sum + p.amountMinor, 0)
+  return planned.reduce((sum, p) => sum + p.amountMinor - p.creditMinor, 0)
 }
 
 const LIVE_ORDER = (at: number) => `(o.state IN ('awaiting_payment', 'reserved') OR (o.state = 'basket' AND o.expires_at > ${Math.trunc(at)}))`
@@ -348,12 +351,12 @@ export function settlePassSales(unit: UnitView, orderId: string, accountId: stri
  * money is taken with this sale unless a live booking is already waiting to collect it.
  */
 export async function passOwing(typed: string): Promise<JudgedPass> {
-  const row = await first<{ id: string, pass_type_id: string, name: string, price_name: string, account_id: string | null, named: number, once: number, amount_minor: number, paid_at: number | null, state: string, uses_total: number | null, uses_taken: number }>(
-    `SELECT p.id, p.pass_type_id, t.name, r.name AS price_name, p.account_id, p.named, p.once, p.amount_minor, p.paid_at, p.state, p.uses_total, p.uses_taken
+  const row = await first<{ id: string, pass_type_id: string, name: string, price_name: string, account_id: string | null, named: number, once: number, amount_minor: number, credit_minor: number, paid_at: number | null, state: string, uses_total: number | null, uses_taken: number }>(
+    `SELECT p.id, p.pass_type_id, t.name, r.name AS price_name, p.account_id, p.named, p.once, p.amount_minor, p.credit_minor, p.paid_at, p.state, p.uses_total, p.uses_taken
       FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id JOIN box_office_pass_prices r ON r.id = p.pass_price_id
       WHERE (p.code_hash = ? OR p.alias_hash = ?) AND p.issued_at IS NOT NULL`, ...await passCodeHashes(typed))
   if (!row) refuse('box-office.pass.unknown', 'We do not recognise that pass code.', { status: 422, remedy: 'Check how it is spelt. It is on the pass and in its email.', fields: { pass: 'unknown' } })
   if (row.state !== 'active') refuse('box-office.pass.void', 'That pass has been cancelled.', { status: 422, fields: { pass: 'void' } })
-  if (row.paid_at || !row.amount_minor) refuse('box-office.pass.paid', `${row.name} is paid for already.`, { status: 409, fields: { pass: 'paid' } })
-  return { passId: row.id, passTypeId: row.pass_type_id, name: row.name, priceName: row.price_name, accountId: row.account_id, named: !!row.named, once: !!row.once, owedMinor: row.amount_minor, left: row.uses_total === null ? null : row.uses_total - row.uses_taken }
+  if (row.paid_at || row.amount_minor <= row.credit_minor) refuse('box-office.pass.paid', `${row.name} is paid for already.`, { status: 409, fields: { pass: 'paid' } })
+  return { passId: row.id, passTypeId: row.pass_type_id, name: row.name, priceName: row.price_name, accountId: row.account_id, named: !!row.named, once: !!row.once, owedMinor: row.amount_minor - row.credit_minor, left: row.uses_total === null ? null : row.uses_total - row.uses_taken }
 }

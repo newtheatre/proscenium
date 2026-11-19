@@ -4,7 +4,7 @@
      cancelled, or sent to its holder again. -->
 <script setup lang="ts">
 interface Price { id: string, name: string, amountMinor: number, requirementRefs: string[], active: boolean }
-interface Holder { id: string, name: string, priceName: string, accountId: string | null, named: boolean, code: string | null, usesTotal: number | null, usesTaken: number, amountMinor: number, paidAt: number | null, state: 'active' | 'void', holder: string | null, entries: number, shows: number }
+interface Holder { id: string, name: string, priceName: string, accountId: string | null, named: boolean, code: string | null, usesTotal: number | null, usesTaken: number, amountMinor: number, creditMinor: number, paidAt: number | null, state: 'active' | 'void', holder: string | null, entries: number, shows: number }
 interface Entry { orderId: string, reference: string, show: string, startsAt: number, confirmed: boolean }
 
 const props = defineProps<{ pass: { id: string, name: string, active: boolean, prices: Price[] } | null }>()
@@ -168,7 +168,7 @@ const describe = (h: Holder) => [
             color="warning"
             variant="subtle"
             icon="i-lucide-hand-coins"
-            :title="t('box-office.passes.holders.not-paid', { amount: money(picked.pass.amountMinor) })"
+            :title="t('box-office.passes.holders.not-paid', { amount: money(picked.pass.amountMinor - (picked.pass.creditMinor ?? 0)) })"
             :description="t('box-office.passes.holders.not-paid-help')"
           />
           <section class="space-y-2">

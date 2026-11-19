@@ -134,7 +134,7 @@ function saleLines(plan: OrderPlan, names: Map<string, string>): SummaryLine[] {
     return { label: plan.discounts[i] ? `${names.get(l.ticketTypeId) ?? ''} (${said(i)})` : names.get(l.ticketTypeId) ?? '', amountMinor: plan.charged[i]! }
   })
   // Each pass sold is a line of its own with a key, so a split sale says who paid for it: it is theirs.
-  const sold = plan.planned.map((p, i) => ({ label: `${p.judged.name}, ${p.judged.priceName}`, amountMinor: p.amountMinor, key: `pass:${i}` }))
+  const sold = plan.planned.map((p, i) => ({ label: `${p.judged.name}, ${p.judged.priceName}`, amountMinor: p.amountMinor - p.creditMinor, key: `pass:${i}` }))
   const owed = plan.owed.map(o => ({ label: `${o.pass.name}, ${o.pass.priceName} (owed)`, amountMinor: o.pass.owedMinor, key: `owed:${o.pass.passId}` }))
   return [...tickets, ...sold, ...owed]
 }

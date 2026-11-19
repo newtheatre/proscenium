@@ -24,7 +24,7 @@ async function load() {
   const found = await $api<{ choices: CoverChoice[], others: number }>(base.value).catch(() => ({ choices: [], others: 0 }))
   choices.value = found.choices
   others.value = found.others
-  ticked.value = found.choices.map(c => c.lineId)
+  ticked.value = found.choices.filter(c => !c.ask).map(c => c.lineId)
 }
 watch(() => props.passId, () => {
   dismissed.value = false

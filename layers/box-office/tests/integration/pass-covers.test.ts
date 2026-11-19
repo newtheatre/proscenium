@@ -2,10 +2,12 @@
 // another show the pass covers becomes its entry where it stands, asked for while buying the pass or
 // afterwards, one a performance and one a show where the pass says so, and only the holder's own.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, setClock } from '#kit'
+import { changeSetting, createUnit, newId, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { findOrCreateAccount } from '#modules/core'
-import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
+import { addAttempt } from '../../../payments/server/answers'
+import { recordAnswer } from '../../../payments/server/services'
+import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import typesPost from '../../server/api/box-office/pass-types/index.post'
 import staffCoversGet from '../../server/api/box-office/passes/[id]/covers.get'
 import staffCoversPost from '../../server/api/box-office/passes/[id]/covers.post'
@@ -29,6 +31,10 @@ const line = async (id: string) => (await rows<Record<string, any>>('SELECT * FR
 const order = async (id: string) => (await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE id = ?', id))[0]!
 const passOn = async (orderId: string) => (await rows<Record<string, any>>('SELECT p.* FROM box_office_passes p JOIN box_office_order_lines l ON l.id = p.order_line_id WHERE l.order_id = ?', orderId))[0]!
 const coversOf = async (passId: string) => rows<Record<string, any>>('SELECT * FROM box_office_pass_covers WHERE pass_id = ? ORDER BY created_at, id', passId)
+const passRow = async (id: string) => (await rows<Record<string, any>>('SELECT * FROM box_office_passes WHERE id = ?', id))[0]!
+const deferred = async (performanceId: string) => (await rows<{ total: number }>('SELECT coalesce(sum(e.amount_minor), 0) AS total FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id WHERE a.system_key = \'box-office.deferred-ticket-income\' AND e.performance_id = ?', performanceId))[0]!.total
+const passIncomeFrom = async (orderId: string) => (await rows<{ total: number }>('SELECT coalesce(sum(e.amount_minor), 0) AS total FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id JOIN finance_postings p ON p.id = e.posting_id WHERE a.system_key = \'box-office.pass-income\' AND p.source_id = ? AND p.kind = \'transfer\'', orderId))[0]!.total
+let card: string
 
 let a: House
 let b: House
@@ -81,6 +87,21 @@ async function reserved(h: House, who: ReturnType<typeof person>, quantity = 1) 
   await reserve(basket, who)
   return { orderId: basket.orderId, lineIds: basket.lines.map(l => l.id) }
 }
+/** Tickets for a house, bought and paid for online by this person: its order and line ids. */
+async function paidFor(h: House, who: ReturnType<typeof person>, quantity = 1) {
+  const basket = await hold({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity }] }, who)
+  const started = await req('POST', `/api/box-office/baskets/${basket.orderId}/checkout`, { expectedTotalMinor: basket.totalMinor, ageConfirmed: true }, who, { 'x-basket-token': basket.token })
+  expect(started.body.state, JSON.stringify(started.body)).toBe('awaiting_payment')
+  const attemptId = await inContext(async () => {
+    const unit = createUnit()
+    const attempt = addAttempt(unit.view(), { intentId: started.body.intentId, providerAccountId: card, method: 'card_online', amountMinor: basket.totalMinor })
+    await unit.commit()
+    return attempt.id
+  })
+  expect(await inContext(() => recordAnswer(attemptId, { state: 'succeeded', providerRef: `cc_${attemptId}` }, { kind: 'poll' }))).toMatchObject({ settled: true })
+  expect(await order(basket.orderId)).toMatchObject({ state: 'confirmed' })
+  return { orderId: basket.orderId, lineIds: basket.lines.map(l => l.id) }
+}
 async function boughtPass(type: PassType, who: ReturnType<typeof person>, at = a) {
   const basket = await hold({ performanceId: at.performanceId, lines: [], buy: [{ passTypeId: type.id, passPriceId: type.prices[0]!.id }] }, who)
   await reserve(basket, who)
@@ -95,9 +116,13 @@ beforeAll(async () => {
   b = await house(30)
   c = await house(30)
   await inContext(() => ensureManagedTicketTypes())
+  await setModule('cardco', true)
+  card = newId('ppa')
+  await env.DB.prepare('INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, \'cardco\', \'CardCo\', \'["online"]\', \'live\', 1, ?, ?)').bind(card, NOV_16, NOV_16).run()
   await inContext(async () => {
     const unit = createUnit()
     await changeSetting(unit.view(), 'box-office.reservations.confirm-email', false, { reason: 'test', confirm: true })
+    await changeSetting(unit.view(), 'box-office.checkout.payment-timing', 'buyer-chooses', { reason: 'test', confirm: true })
     await unit.commit()
   })
 })
@@ -187,5 +212,71 @@ describe('using a pass already held', () => {
     const done = await call(handle, 'POST', `/api/box-office/passes/${passId}/covers`, { actor: staff, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: earlier.lineIds } })
     expect(done.status).toBe(200)
     expect(await coversOf(passId)).toMatchObject([{ state: 'applied', by: staff.accountId }])
+  })
+})
+
+describe('tickets already paid for', () => {
+  it('takes what a paid ticket cost off a pass bought later, and moves that money to Pass income', async () => {
+    const type = await passType()
+    const who = await someone()
+    const show = await house(30, { of: b })
+    const paid = await paidFor(show, who)
+    expect(await deferred(show.performanceId)).toBe(-1200)
+    const offered = await inContext(() => coverChoicesOnBuying(a.performanceId, type.id, type.prices[0]!.id, 1, who.accountId!))
+    expect(offered.choices).toMatchObject([{ lineId: paid.lineIds[0], amountMinor: 1200, paid: true, ask: false }])
+
+    const basket = await hold({ performanceId: a.performanceId, lines: [], buy: [{ passTypeId: type.id, passPriceId: type.prices[0]!.id }], cover: paid.lineIds }, who)
+    expect(basket.totalMinor).toBe(2300)
+    await reserve(basket, who)
+
+    const pass = await passOn(basket.orderId)
+    expect(pass).toMatchObject({ amount_minor: 3500, credit_minor: 1200, paid_at: null })
+    expect(await rows('SELECT list_minor, discount_minor, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = \'pass_sale\'', basket.orderId)).toEqual([{ list_minor: 3500, discount_minor: 1200, amount_minor: 2300 }])
+    expect(await line(paid.lineIds[0]!)).toMatchObject({ amount_minor: 0, state: 'live', pass_redemption_id: expect.any(String) })
+    expect(await order(paid.orderId)).toMatchObject({ state: 'confirmed', total_minor: 0 })
+    expect(await rows('SELECT id FROM box_office_tickets WHERE order_line_id = ? AND state = \'valid\'', paid.lineIds[0])).toHaveLength(1)
+    expect(await coversOf(pass.id)).toMatchObject([{ state: 'applied', was_minor: 1200, credit_minor: 1200 }])
+    // The show no longer owes that money to the audience: the pass has it.
+    expect(await deferred(show.performanceId)).toBe(0)
+    expect(await passIncomeFrom(paid.orderId)).toBe(-1200)
+  })
+
+  it('leaves a paid ticket costing more than the pass owes to the box office', async () => {
+    const type = await passType({ prices: [{ name: 'Adult', amountMinor: 1000 }] })
+    const who = await someone()
+    const paid = await paidFor(await house(30, { of: b }), who)
+    const offered = await inContext(() => coverChoicesOnBuying(a.performanceId, type.id, type.prices[0]!.id, 1, who.accountId!))
+    expect(offered.choices).toMatchObject([{ lineId: paid.lineIds[0], paid: true, ask: true }])
+    expect(await refusedHold({ performanceId: a.performanceId, lines: [], buy: [{ passTypeId: type.id, passPriceId: type.prices[0]!.id }], cover: paid.lineIds }, who)).toBe('box-office.pass.cover-ask')
+  })
+
+  it('brings down the reservation waiting to collect a pass\'s money, from the holder\'s passes page', async () => {
+    const type = await passType()
+    const who = await someone()
+    const passId = await boughtPass(type, who)
+    const waiting = (await rows<{ order_id: string }>('SELECT l.order_id FROM box_office_passes p JOIN box_office_order_lines l ON l.id = p.order_line_id WHERE p.id = ?', passId))[0]!.order_id
+    expect(await order(waiting)).toMatchObject({ state: 'reserved', total_minor: 3500 })
+    const paid = await paidFor(await house(30, { of: c }), who)
+    const done = await call(handle, 'POST', `/api/box-office/passes/mine/${passId}/covers`, { actor: who, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: paid.lineIds } })
+    expect(done.status, JSON.stringify(await done.clone().json())).toBe(200)
+    expect(await order(waiting)).toMatchObject({ state: 'reserved', total_minor: 2300 })
+    expect(await passRow(passId)).toMatchObject({ credit_minor: 1200, paid_at: null })
+    expect(await order(paid.orderId)).toMatchObject({ state: 'confirmed', total_minor: 0 })
+  })
+
+  it('pays a pass whose credit reaches its price, and confirms the reservation that was to collect it', async () => {
+    const type = await passType({ prices: [{ name: 'Adult', amountMinor: 1200 }] })
+    const who = await someone()
+    const passId = await boughtPass(type, who)
+    const waiting = (await rows<{ order_id: string }>('SELECT l.order_id FROM box_office_passes p JOIN box_office_order_lines l ON l.id = p.order_line_id WHERE p.id = ?', passId))[0]!.order_id
+    const paid = await paidFor(await house(30, { of: b }), who)
+    const done = await call(handle, 'POST', `/api/box-office/passes/mine/${passId}/covers`, { actor: who, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: paid.lineIds } })
+    expect(done.status, JSON.stringify(await done.clone().json())).toBe(200)
+    expect(await passRow(passId)).toMatchObject({ credit_minor: 1200, paid_at: expect.any(Number) })
+    expect(await order(waiting)).toMatchObject({ state: 'confirmed', total_minor: 0 })
+    // Paid in full, the pass offers no more paid tickets but to the box office.
+    const later = await paidFor(await house(30, { of: c }), who)
+    const asked = await (await call(handle, 'GET', `/api/box-office/passes/mine/${passId}/covers`, { actor: who })).json() as { choices: { lineId: string, ask: boolean }[] }
+    expect(asked.choices).toMatchObject([{ lineId: later.lineIds[0], ask: true }])
   })
 })

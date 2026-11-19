@@ -107,7 +107,7 @@ watch([choice, holderAccount, entry], async () => {
   const found = await $api<{ choices: CoverChoice[], others: number }>('/api/box-office/desk/covers', { query: { performanceId: props.performanceId, passTypeId: c.type.id, passPriceId: c.price.id, accountId, entry: String(entry.value && c.type.covers) } }).catch(() => ({ choices: [], others: 0 }))
   if (choice.value !== c || holderAccount.value !== accountId) return
   coverChoices.value = found
-  cover.value = found.choices.map(x => x.lineId)
+  cover.value = found.choices.filter(x => !x.ask).map(x => x.lineId)
 })
 let loadedFor = ''
 async function loadOnSale() {
@@ -161,7 +161,7 @@ function addSale() {
   if (!c || !ready.value) return
   const typed = restricted.value && !qualified.value ? reference.value.trim() : ''
   const who: Buyer | undefined = restricted.value ? (qualified.value ? { accountId: qualified.value.accountId, label: qualified.value.label } : holder.value) : holder.value
-  buys.value = [...buys.value, { passTypeId: c.type.id, passPriceId: c.price.id, name: c.type.name, priceName: c.price.name, amountMinor: c.price.amountMinor, entry: entry.value && c.type.covers, ...(who ? { holder: who } : {}), ...(typed ? { reference: typed } : {}), ...(cover.value.length ? { cover: cover.value } : {}) }]
+  buys.value = [...buys.value, { passTypeId: c.type.id, passPriceId: c.price.id, name: c.type.name, priceName: c.price.name, amountMinor: c.price.amountMinor - coverChoices.value.choices.filter(x => x.paid && cover.value.includes(x.lineId)).reduce((sum, x) => sum + x.amountMinor, 0), entry: entry.value && c.type.covers, ...(who ? { holder: who } : {}), ...(typed ? { reference: typed } : {}), ...(cover.value.length ? { cover: cover.value } : {}) }]
   // A swap: the ticket it replaces comes out of the sale, as its entry is the pass's.
   if (swapping.value && entry.value && c.type.covers) emit('swap', swapping.value)
   closeSelling()
