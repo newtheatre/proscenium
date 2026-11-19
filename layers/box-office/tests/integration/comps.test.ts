@@ -6,6 +6,7 @@ import { changeSetting, createUnit, setClock, type UnitView } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { listTerms } from '#modules/core'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { doorCodesForOrder } from '../../server/tickets'
 import { house, NOV_16, ready, req, type House } from './stage'
 
 const requester = person(['box-office.comp.request'])
@@ -57,6 +58,11 @@ describe('complimentary tickets', () => {
     // Orders shows it as complimentary, not as paid.
     const page = await req('GET', `/api/box-office/orders/${approved.body.orderId}`, undefined, person(['box-office.order.view']))
     expect(page.body.complimentary).toBe(true)
+    // At the till, a comp's ticket scanned says it is a comp, so nobody tries to take money for it.
+    const [code] = await inContext(() => doorCodesForOrder(approved.body.orderId))
+    const desk = await req('GET', `/api/box-office/desk/orders?q=${encodeURIComponent(code!.doorCode!)}`, undefined, person(['box-office.order.view']))
+    expect(desk.body.orders).toEqual([expect.objectContaining({ orderId: approved.body.orderId, state: 'confirmed', amountDueMinor: 0, scannedLineId: code!.lineId })])
+    expect(desk.body.orders[0].lines.every((l: { free: string | null }) => l.free === 'comp')).toBe(true)
     // The sales report counts them as complimentary, not as sold at the desk.
     const report = await req('GET', `/api/box-office/reports/sales?productionId=${h.productionId}`, undefined, person(['box-office.report.view']))
     expect(report.body.report.byChannel).toEqual([expect.objectContaining({ channel: 'complimentary', tickets: 2, valueMinor: 0 })])
