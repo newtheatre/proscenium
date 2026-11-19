@@ -297,6 +297,20 @@ after 5 seconds; a throw waits 30. After five tries the message is set aside in
 `<worker>-email-events-dead`. The body names the recipient and the subject, so only the queue
 message's id and the event's type are ever logged.
 
+### The content store
+
+Nuxt Content keeps each collection (the theatre's pages, the menu, redirects, policies) in D1 and
+loads a collection, after a deploy changes it, in whichever request first reads it. Its row in
+`_content_info` says "not ready" while the load runs, and every other reader waits up to 90 seconds
+for it. A load cut short (the visitor left, the request was cancelled) used to leave that row "not
+ready" for good: every read of the collection then waited 90 seconds and gave up, so the Admin
+overview, whose site-readiness count reads the pages, never finished loading. The minute's cron
+tick now mends the store (`layers/core/server/content-store.ts`): a row still "not ready" two
+minutes after the tick first saw it is deleted, so the collection is loaded again from scratch, and
+the tick then asks for one row of every collection, so the load after a deploy runs in the tick
+rather than in a visitor's request. Separately, a count (`core.count`) that has not answered in three
+seconds reads as zero, so no count can hold up a home page or a menu.
+
 ## Public components
 
 A module offers a component to the fork's Markdown pages through `core.public-component`:
