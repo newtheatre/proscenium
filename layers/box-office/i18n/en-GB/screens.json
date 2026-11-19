@@ -51,6 +51,8 @@
   "box-office.screens.panel.holder.named": "{name}",
   "box-office.screens.panel.holder.by-hand": "{name}, checked by hand",
   "box-office.screens.panel.holder.change": "Change",
+  "box-office.screens.panel.holder.remove": "Remove ticket {n}",
+  "box-office.screens.panel.holder.companion-remove": "Remove companion ticket {n}",
   "box-office.screens.panel.holder.not-met": "{name} does not qualify, as far as we can tell",
   "box-office.screens.panel.holder.sell-anyway": "Sell to {name} anyway",
   "box-office.screens.panel.access.start": "Apply to the access scheme with {name}",
