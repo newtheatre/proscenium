@@ -27,7 +27,7 @@ interface Production {
 
 const props = defineProps<{ show: Listing }>()
 const { t } = useT()
-const { range, dayBrief, time, dateTime, toLocal } = useDates()
+const { span, dayBrief, time, dateTime, toLocal } = useDates()
 // The same request, and so the same cached answer, as the production's own page.
 const { data } = await useAPI<Production | { moved: string }>(() => `/api/public-site/productions/${encodeURIComponent(props.show.slug)}`, { key: `public-site:production:${props.show.slug}` })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
@@ -40,7 +40,7 @@ const more = computed(() => upcoming.value.length - dates.value.length)
 const to = computed(() => `/whats-on/${props.show.slug}`)
 const tonight = computed(() => toLocal(props.show.nextStartsAt).slice(0, 10) === toLocal(now).slice(0, 10)) // not-policy: the date part of a local date and time
 const eyebrow = computed(() => [tonight.value ? t('public-site.whats-on.tonight') : t('public-site.whats-on.next-up'), props.show.category?.label].filter(Boolean).join(' · '))
-const facts = computed(() => [range(props.show.nextStartsAt, props.show.lastStartsAt), props.show.venues.join(', ')].filter(Boolean).join(' · '))
+const facts = computed(() => [span(props.show.nextStartsAt, props.show.lastStartsAt), props.show.venues.join(', ')].filter(Boolean).join(' · '))
 const priceLine = computed(() => (props.show.price ? priceSummary(props.show.price, t) : ''))
 const bookable = (b: Booking | null) => !!b?.link && (b.state === 'available' || b.state === 'limited')
 const note = (b: Booking | null) => b?.state === 'limited' ? t('public-site.booking.last-few') : b?.state === 'sold-out' ? t('public-site.booking.sold-out') : b?.state === 'not-yet' ? t('public-site.booking.not-yet') : b?.state === 'closed' ? t('public-site.booking.closed') : ''
