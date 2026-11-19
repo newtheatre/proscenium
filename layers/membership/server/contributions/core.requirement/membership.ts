@@ -39,6 +39,10 @@ async function survivor(accountId: string): Promise<string> {
 const PENDING = 'pending:'
 const WAITING_SUMMARY = 'Membership check not decided yet. Ask to see their card.'
 
+// Evidence for a price given while checks were switched off: met at the door even once they are back on.
+const UNCHECKED = 'unchecked:'
+const UNCHECKED_SUMMARY = 'Sold while membership checks were switched off. Ask to see their card.'
+
 /** The latest request of this account waiting for staff to check its reference, for a reference. */
 async function waitingBy(accountId: string, ref: string): Promise<string | null> {
   const row = await first<{ id: string }>(
@@ -213,6 +217,7 @@ export default defineRequirementSource({
       return schemes.get(id)!
     }
     const help = String(await useSetting('membership.help.link') ?? '') || undefined
+    const checking = (await useSetting('membership.verification.member-prices')) !== false
 
     for (const fullRef of refs) {
       const ref = schemeIdOf(fullRef)
@@ -220,6 +225,16 @@ export default defineRequirementSource({
       const offered = presented?.find(p => p.ref === fullRef)
 
       for (const account of accountIds) {
+        if (offered && 'evidence' in offered && offered.evidence.startsWith(UNCHECKED)) {
+          out.push({ account, ref: fullRef, verdict: 'met', evidence: offered.evidence, summary: UNCHECKED_SUMMARY })
+          continue
+        }
+        // Checks off: anyone signed in, or anyone typing a reference, gets the price unchecked.
+        if (!checking && (account || (offered && 'value' in offered && normalise('reference', offered.value)))) {
+          const typed = offered && 'value' in offered ? normalise('reference', offered.value) : ''
+          out.push({ account, ref: fullRef, verdict: 'met', evidence: `${UNCHECKED}${typed || 'account'}`, summary: UNCHECKED_SUMMARY })
+          continue
+        }
         // The account is judged first: a signed-in holder is never asked for their own reference.
         if (account) {
           const held = (await heldBy(account, day)).filter(m => matches(ref, m))

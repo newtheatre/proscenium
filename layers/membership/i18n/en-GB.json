@@ -34,6 +34,8 @@
   "membership.settings.card.show.help": "Whether My membership offers a full-screen card the holder can show.",
   "membership.settings.voting.qualifying-period.label": "A member may vote after",
   "membership.settings.voting.qualifying-period.help": "How long somebody must have been a member of a voting scheme before they count as a voting member.",
+  "membership.settings.verification.member-prices.label": "Check memberships for member prices",
+  "membership.settings.verification.member-prices.help": "Turn off for a while, such as before the members list is uploaded, to give the member price to anyone signed in or typing a reference, without checking it. Tickets sold meanwhile still pass at the door after it is turned back on.",
   "membership.settings.verification.list-keep-for.label": "Keep an uploaded list for at most",
   "membership.settings.verification.list-keep-for.help": "The longest the entries of an uploaded list are kept. Shortening it removes entries at the next sweep, which changes who is verified and who gets a member price by reference.",
   "membership.settings.verification.names-keep-for.label": "Keep names from a list after the entry ends",
