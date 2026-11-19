@@ -515,7 +515,6 @@ const folders = computed(() => {
 })
 // Nuxt UI has no --ui-neutral, so a category coloured neutral is drawn grey.
 const shade = (colour: string) => (colour === 'neutral' ? 'var(--ui-color-neutral-400)' : `var(--ui-${colour})`)
-const edge = (colour: string | null) => ({ borderInlineStartColor: colour ? shade(colour) : undefined })
 const dot = (colour: string | null) => ({ backgroundColor: colour ? shade(colour) : 'var(--ui-border-accented)' })
 
 // Allergens: what the customer avoids is tapped once and kept for the sale. A product is never
@@ -673,37 +672,19 @@ watch([avoid, refused], keep, { deep: true })
 
     <template v-if="menu">
       <DefineTile v-slot="{ tile }">
-        <div class="relative">
+        <div class="relative h-full">
           <UButton
             color="neutral"
             variant="outline"
             block
-            class="flex-col items-stretch justify-between gap-1 border-s-4 text-start"
+            class="h-full flex-col items-stretch gap-1 text-start"
             :class="[large ? 'min-h-20 xl:min-h-24 xl:text-lg' : 'min-h-16', inSale(tile) ? 'bg-elevated' : '', RINGS[mark(tile)?.tone ?? 'success']]"
-            :style="edge(tile.colour)"
             :disabled="locked || barred(tile)"
             :aria-haspopup="tile.items.length > 1 || tile.choices ? 'dialog' : undefined"
+            :title="tile.name"
             @click="press(tile)"
           >
-            <span class="flex items-start justify-between gap-2 font-medium">
-              <span class="min-w-0 break-words">{{ tile.name }}</span>
-              <UBadge
-                v-if="barred(tile)"
-                color="error"
-                variant="subtle"
-                size="sm"
-                icon="i-lucide-ban"
-                :label="t('bar.desk.refused.tile')"
-              />
-              <UBadge
-                v-else-if="tile.ageRestricted && menu.ageCheck.enabled"
-                color="warning"
-                variant="subtle"
-                size="sm"
-                :label="String(menu.ageCheck.challengeAge)"
-                :aria-label="t('bar.desk.age-check')"
-              />
-            </span>
+            <span class="line-clamp-2 font-medium break-words">{{ tile.name }}</span>
             <span
               v-if="mark(tile)"
               class="flex items-start gap-1 text-xs font-medium"
@@ -713,12 +694,34 @@ watch([avoid, refused], keep, { deep: true })
                 :name="mark(tile)!.icon"
                 class="mt-px size-3.5 shrink-0"
               />
-              <span class="min-w-0 break-words">{{ mark(tile)!.text }}</span>
+              <span class="line-clamp-2 min-w-0 break-words">{{ mark(tile)!.text }}</span>
             </span>
-            <span class="flex items-baseline justify-between gap-2 text-sm font-normal text-muted">
-              <span class="tabular-nums">{{ tile.items.length > 1 ? t('bar.desk.from', { amount: money(tile.fromMinor) }) : money(tile.fromMinor) }}</span>
-              <span v-if="tile.items.length > 1">{{ t('bar.desk.sizes', { count: tile.items.length }) }}</span>
-              <span v-else-if="tile.choices">{{ t('bar.desk.choose') }}</span>
+            <span class="mt-auto flex items-center gap-2 text-sm font-normal text-muted">
+              <span class="whitespace-nowrap tabular-nums">{{ tile.items.length > 1 ? t('bar.desk.from', { amount: money(tile.fromMinor) }) : money(tile.fromMinor) }}</span>
+              <span
+                v-if="barred(tile)"
+                class="ms-auto inline-flex items-center gap-1 text-xs font-medium text-error"
+              >
+                <UIcon
+                  name="i-lucide-ban"
+                  class="size-3.5"
+                />{{ t('bar.desk.refused.tile') }}
+              </span>
+              <template v-else>
+                <UIcon
+                  v-if="tile.items.length > 1 || tile.choices"
+                  name="i-lucide-ellipsis"
+                  class="ms-auto size-4 shrink-0"
+                /><span
+                  v-if="tile.items.length > 1 || tile.choices"
+                  class="sr-only"
+                >{{ tile.items.length > 1 ? t('bar.desk.sizes', { count: tile.items.length }) : t('bar.desk.choose') }}</span>
+                <span
+                  v-if="tile.ageRestricted && menu.ageCheck.enabled"
+                  class="shrink-0 text-xs font-semibold text-warning tabular-nums"
+                  :class="tile.items.length > 1 || tile.choices ? '' : 'ms-auto'"
+                ><span aria-hidden="true">{{ menu.ageCheck.challengeAge }}+</span><span class="sr-only">{{ t('bar.desk.age-check') }}</span></span>
+              </template>
             </span>
           </UButton>
           <!-- How many are in the sale, large enough to read across the bar. -->
@@ -850,8 +853,8 @@ watch([avoid, refused], keep, { deep: true })
               />{{ s.heading }}
             </h3>
             <div
-              class="grid gap-2"
-              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]'"
+              class="grid auto-rows-fr gap-2"
+              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'"
             >
               <TileButton
                 v-for="tile in s.tiles"
@@ -880,8 +883,8 @@ watch([avoid, refused], keep, { deep: true })
               {{ t('bar.desk.folders') }}
             </h3>
             <div
-              class="grid gap-2"
-              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]'"
+              class="grid auto-rows-fr gap-2"
+              :class="large ? 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'"
             >
               <UButton
                 v-for="f in folders"
@@ -889,17 +892,17 @@ watch([avoid, refused], keep, { deep: true })
                 color="neutral"
                 variant="soft"
                 block
-                class="flex-col items-stretch justify-between gap-1 border-s-4 border-transparent text-start"
+                class="h-full flex-col items-stretch justify-between gap-1 text-start"
                 :class="large ? 'min-h-20' : 'min-h-16'"
-                :style="edge(f.colour)"
                 @click="f.open()"
               >
                 <span class="flex items-center gap-2 font-medium">
                   <UIcon
                     name="i-lucide-folder"
                     class="size-4 shrink-0"
+                    :style="f.colour ? { color: shade(f.colour) } : undefined"
                   />
-                  <span class="min-w-0 break-words">{{ f.name }}</span>
+                  <span class="line-clamp-2 min-w-0 break-words">{{ f.name }}</span>
                 </span>
                 <span class="flex items-center justify-between text-sm font-normal text-muted">
                   {{ t('bar.desk.folder-count', { count: f.count }) }}

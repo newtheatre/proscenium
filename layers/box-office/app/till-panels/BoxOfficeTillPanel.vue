@@ -938,13 +938,13 @@ function clear() {
                 :text="quantities[keyOf(row)]"
                 size="3xl"
                 inset
-                :ui="{ root: 'block' }"
+                :ui="{ root: 'block h-full' }"
               >
                 <UButton
                   color="neutral"
                   variant="outline"
                   block
-                  class="min-h-16 flex-col items-stretch justify-between gap-1 border-s-4 border-s-primary text-start"
+                  class="h-full min-h-16 flex-col items-stretch justify-between gap-1 text-start"
                   :class="(quantities[keyOf(row)] ?? 0) > 0 ? 'bg-elevated' : ''"
                   :disabled="locked || takenIn(b.bandId) >= b.free"
                   @click="addOne(row)"
