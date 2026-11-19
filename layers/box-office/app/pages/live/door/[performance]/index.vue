@@ -151,7 +151,7 @@ function show(result: Shown) {
   }
   clearTimeout(clearing)
   if (result.tone === 'success' && !result.override) clearing = setTimeout(() => {
-    if (shown.value === result) shown.value = group.value ? groupShown(group.value) : null
+    if (shown.value?.at === result.at) shown.value = group.value ? groupShown(group.value) : null
   }, CLEAR_MS)
 }
 
