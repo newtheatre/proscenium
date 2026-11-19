@@ -51,7 +51,9 @@ function dropExchange() {
   void router.replace({ query })
 }
 
-const { data } = await useAPI<{ performances: Performance[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
+const { data } = await useAPI<{ performances: Performance[], admit?: boolean }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
+// The "Admit now" box is a setting (box-office.sales.desk-admit): off, the door lets everyone in.
+const admitOffered = computed(() => data.value?.admit !== false)
 const performances = computed(() => data.value?.performances ?? [])
 
 // One search box finds a booking to collect; with none found, the panel sells walk-up tickets.
@@ -373,7 +375,7 @@ async function restore(value: { performanceId?: unknown, lines?: unknown, admit?
   references.value = Object.fromEntries(lines.filter(l => l.references).map(l => [keyOf(l), l.references!]))
   // Who each ticket was for is kept by account; their names were on the screen before the reload.
   holders.value = Object.fromEntries(lines.filter(l => l.holders).map(l => [keyOf(l), l.holders!.map(id => (id ? { accountId: id, label: t('box-office.screens.panel.holder.restored'), byHand: false } : undefined))]))
-  admit.value = value.admit === true
+  admit.value = value.admit === true && admitOffered.value
   await restorePasses(value)
 }
 
@@ -1245,6 +1247,7 @@ function clear() {
     </template>
 
     <UCheckbox
+      v-if="admitOffered"
       v-model="admit"
       :label="t('box-office.screens.panel.admit')"
       :description="t('box-office.screens.panel.admit-help')"

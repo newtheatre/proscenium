@@ -374,6 +374,14 @@ describe('selling at the desk', () => {
     expect(rowsOf.find(r => r.ticketTypeId === h.fullId)).not.toHaveProperty('companion')
   })
 
+  it('says whether the till offers to admit as it sells, as the theatre has set', async () => {
+    expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.admit).toBe(true)
+    const set = (on: boolean) => commit(unit => changeSetting(unit.view(), 'box-office.sales.desk-admit', on, { reason: 'test', confirm: true }))
+    await set(false)
+    expect((await req('GET', '/api/box-office/desk/performances', undefined, seller)).body.admit).toBe(false)
+    await set(true)
+  })
+
   it('takes a promo code the buyer gives, on the dearest tickets first, and gives its use back when the payment is cancelled', async () => {
     const h = await house(5)
     const code = 'DESK' + h.performanceId.slice(-6).toUpperCase()

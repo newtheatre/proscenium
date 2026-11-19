@@ -34,6 +34,8 @@ export default defineModule({
     'refunds.pay-within': setting.duration({ default: '14d', min: '1d', max: '30d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // How long after curtain the desk may still sell, for latecomers.
     'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
+    // Whether the till offers to admit the buyer as the sale is made; off where the door admits everyone (Matt, 19 November).
+    'sales.desk-admit': setting.boolean({ default: true, change, audience: 'staff' }),
     // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com"). Filed
     // under Till rather than among the closing times it once sat with.
     // Show "N seats left" only at or under this many; 0 never shows it.
