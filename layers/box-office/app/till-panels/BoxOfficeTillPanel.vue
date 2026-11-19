@@ -3,6 +3,7 @@
      the difference on an exchange to dearer tickets, sent here from the booking's page. The panel
      only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
+import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 import type { Holder } from '../components/BoxOfficeHolderPicker.vue'
 import type { TillPass, TillPassBuy } from '../components/BoxOfficeTillPasses.vue'
 
@@ -225,6 +226,42 @@ async function issueFree() {
   }
   finally {
     issuing.value = false
+  }
+}
+
+// Reserved for somebody to pay later, at the desk or by phone (BO-34): the reservation is emailed to them.
+const reserveOpen = ref(false)
+const reserving = ref(false)
+const reserveFor = ref<Buyer | undefined>()
+const reserveRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const reservedDone = ref<{ orderId: string, reference: string } | null>(null)
+const canReserve = computed(() => mode.value === 'sell' && !exchange.value && !passCollect.value.length && (props.summary?.amountMinor ?? 0) > 0 && props.modelValue !== null && props.modelValue !== undefined)
+// A reservation on passes goes to their holder when nobody else is named.
+const passHolder = computed(() => [...new Set(passEntries.value.map(p => p.holder).filter(Boolean))].length === 1 ? passEntries.value.find(p => p.holder)!.holder : null)
+function openReserve() {
+  reserveFor.value = undefined
+  reserveRefusal.value = null
+  reserveOpen.value = true
+}
+async function reserveSale() {
+  reserving.value = true
+  reserveRefusal.value = null
+  try {
+    const to = reserveFor.value ? ('email' in reserveFor.value ? { email: reserveFor.value.email } : { accountId: reserveFor.value.accountId }) : {}
+    reservedDone.value = await $api<{ orderId: string, reference: string }>('/api/box-office/desk/reserve', { method: 'POST', body: { sale: props.modelValue, expectedTotalMinor: props.summary!.amountMinor, ...to } })
+    reserveOpen.value = false
+    issued.value = null
+    quantities.value = {}
+    references.value = {}
+    holders.value = {}
+    dropPasses()
+    tell(null)
+  }
+  catch (e) {
+    reserveRefusal.value = toRefusal(e)
+  }
+  finally {
+    reserving.value = false
   }
 }
 
@@ -663,6 +700,15 @@ function clear() {
   >
     <RefusalNotice :refusal="refusal" />
     <UAlert
+      v-if="reservedDone"
+      color="success"
+      variant="subtle"
+      icon="i-lucide-check"
+      :title="t('box-office.screens.panel.reserve.done', { reference: reservedDone.reference })"
+      :description="t('box-office.screens.panel.reserve.done-help')"
+      :actions="[{ label: t('box-office.screens.panel.sold.open'), color: 'neutral', variant: 'outline', to: `/console/box-office/orders/${reservedDone.orderId}` }, { label: t('box-office.screens.panel.pass.dismiss'), color: 'neutral', variant: 'link', onClick: () => { reservedDone = null } }]"
+    />
+    <UAlert
       v-if="issued"
       color="success"
       variant="subtle"
@@ -1061,6 +1107,57 @@ function clear() {
             :disabled="locked"
             @click="issueFree"
           />
+          <!-- Paid later: reserved for somebody, at the desk or by phone, under the buyer's own rules. -->
+          <UButton
+            v-if="canReserve"
+            icon="i-lucide-calendar-clock"
+            color="neutral"
+            variant="outline"
+            :label="t('box-office.screens.panel.reserve.open')"
+            :disabled="locked"
+            @click="openReserve"
+          />
+          <UModal
+            v-model:open="reserveOpen"
+            :title="t('box-office.screens.panel.reserve.title')"
+            :description="t('box-office.screens.panel.reserve.description', { amount: money(summary?.amountMinor ?? 0) })"
+          >
+            <template #body>
+              <UForm
+                :state="{ reserveFor }"
+                novalidate
+                class="space-y-4"
+                @submit="reserveSale"
+              >
+                <RefusalNotice :refusal="reserveRefusal" />
+                <UFormField
+                  :label="t('box-office.screens.panel.reserve.for')"
+                  :help="passHolder ? t('box-office.screens.panel.reserve.for-holder', { name: passHolder }) : t('box-office.screens.panel.reserve.for-help')"
+                  :required="!passHolder"
+                >
+                  <BoxOfficeBuyerPicker
+                    v-model="reserveFor"
+                    :domains="[]"
+                    :placeholder="t('box-office.screens.panel.reserve.for-placeholder')"
+                  />
+                </UFormField>
+                <div class="flex justify-end gap-2">
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    :label="t('box-office.screens.panel.reserve.cancel')"
+                    @click="reserveOpen = false"
+                  />
+                  <UButton
+                    type="submit"
+                    :label="t('box-office.screens.panel.reserve.confirm')"
+                    :loading="reserving"
+                    :disabled="!reserveFor && !passHolder"
+                  />
+                </div>
+              </UForm>
+            </template>
+          </UModal>
         </template>
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
           <USelect
