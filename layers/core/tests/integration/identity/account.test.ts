@@ -19,10 +19,19 @@ describe('my details (ID-11)', () => {
   it('a change of name shows at once wherever the label is used', async () => {
     const browser = new Browser()
     const accountId = await signInByEmail(browser)
-    expect((await browser.patch('/api/core/me', { name: 'Harriet Vane', preferredName: 'Harry' })).status).toBe(200)
-    expect(await inContext(() => accountLabel(accountId))).toBe('Harry')
-    await browser.patch('/api/core/me', { preferredName: null })
+    expect((await browser.patch('/api/core/me', { name: 'Harriet Vane' })).status).toBe(200)
     expect(await inContext(() => accountLabel(accountId))).toBe('Harriet Vane')
+  })
+
+  it('no longer asks for or shows a known-as name, and keeps one already held without using it', async () => {
+    const browser = new Browser()
+    const accountId = await signInByEmail(browser)
+    await browser.patch('/api/core/me', { name: 'Harriet Vane' })
+    expect((await browser.patch('/api/core/me', { preferredName: 'Harry' })).status).toBe(422)
+    await env.DB.prepare('UPDATE core_accounts SET preferred_name = \'Harry\' WHERE id = ?').bind(accountId).run()
+    expect(await inContext(() => accountLabel(accountId))).toBe('Harriet Vane')
+    expect((await browser.get('/api/core/me')).body.account).not.toHaveProperty('preferredName')
+    expect(await rows('SELECT preferred_name FROM core_accounts WHERE id = ?', accountId)).toEqual([{ preferred_name: 'Harry' }])
   })
 
   it('keeps pronouns as optional free text, at most 40 characters, and clears them', async () => {

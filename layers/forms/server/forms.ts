@@ -73,7 +73,7 @@ export const getVersion = (id: string | null) => id ? first<VersionRow>(`SELECT 
 export const listVersions = (formId: string) => all<Omit<VersionRow, 'definition'>>('SELECT id, number, definition_hash AS definitionHash, change_summary AS changeSummary, published_by AS publishedBy, created_at AS publishedAt FROM forms_versions WHERE form_id = ? ORDER BY number DESC', formId)
 
 export async function accountName(id: string): Promise<string | null> {
-  const row = await first<{ name: string | null }>('SELECT coalesce(preferred_name, name) AS name FROM core_accounts WHERE id = ?', id)
+  const row = await first<{ name: string | null }>('SELECT name AS name FROM core_accounts WHERE id = ?', id)
   return row?.name ?? null
 }
 

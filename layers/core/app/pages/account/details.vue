@@ -1,4 +1,4 @@
-<!-- Your details (ID-11; identity spec part 6): the name, the name the person goes by and pronouns,
+<!-- Your details (ID-11; identity spec part 6): the name and pronouns,
      and for a member their emergency contacts (ID-17).
      Everything that shows the person reads the account, so after saving the app's data is fetched
      again and the header shows the new name at once. -->
@@ -6,7 +6,7 @@
 import { z } from 'zod'
 import type { RefusalView } from '../../utils/refusal'
 
-interface Me { signedIn: boolean, account?: { name: string | null, preferredName: string | null, pronouns: string | null } }
+interface Me { signedIn: boolean, account?: { name: string | null, pronouns: string | null } }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -17,12 +17,11 @@ const { data, status, error, refresh } = await useAPI<Me>('/api/core/me', { key:
 // The same limits as the route's.
 const schema = z.object({
   name: z.string().trim().min(1).max(120),
-  preferredName: z.string().trim().max(60),
   pronouns: z.string().trim().max(40),
 })
-const form = reactive({ name: '', preferredName: '', pronouns: '' })
+const form = reactive({ name: '', pronouns: '' })
 watch(() => data.value?.account, (a) => {
-  if (a) Object.assign(form, { name: a.name ?? '', preferredName: a.preferredName ?? '', pronouns: a.pronouns ?? '' })
+  if (a) Object.assign(form, { name: a.name ?? '', pronouns: a.pronouns ?? '' })
 }, { immediate: true })
 
 const saving = ref(false)
@@ -32,7 +31,7 @@ async function save() {
   saving.value = true
   refusal.value = null
   try {
-    await $api('/api/core/me', { method: 'PATCH', body: { name: form.name.trim(), preferredName: form.preferredName.trim() || null, pronouns: form.pronouns.trim() || null } })
+    await $api('/api/core/me', { method: 'PATCH', body: { name: form.name.trim(), pronouns: form.pronouns.trim() || null } })
     toast.add({ title: t('core.me.details.saved'), color: 'success' })
     await refreshNuxtData()
   }
@@ -76,17 +75,6 @@ async function save() {
             v-model="form.name"
             autocomplete="name"
             maxlength="120"
-          />
-        </UFormField>
-        <UFormField
-          name="preferredName"
-          :label="t('core.me.details.preferred')"
-          :help="t('core.me.details.preferred-help')"
-        >
-          <UInput
-            v-model="form.preferredName"
-            autocomplete="nickname"
-            maxlength="60"
           />
         </UFormField>
         <UFormField

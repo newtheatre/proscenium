@@ -4,9 +4,9 @@
 import { defineList } from './list'
 
 /**
- * Accounts: the console's People list (Identity Doc part 5, "Accounts"), searched by name and the
- * name the person goes by. Unclaimed and anonymised accounts are hidden unless looked for, through
- * the state filter or a view. Labels are the English fallback; the page shows translated ones.
+ * Accounts: the console's People list (Identity Doc part 5, "Accounts"), searched by name and by any
+ * "known as" name already held, which is never shown (ID-11). Unclaimed and anonymised accounts are
+ * hidden unless looked for, through the state filter or a view. Labels are the English fallback; the page shows translated ones.
  */
 export const accountsList = defineList('core.accounts', {
   filters: {
@@ -26,10 +26,10 @@ export const accountsList = defineList('core.accounts', {
   },
   columns: {
     name: { label: 'Name', sort: 'name', always: true, card: true },
-    preferredName: { label: 'Known as', hidden: true },
     state: { label: 'State', card: true },
     since: { label: 'Since' },
   },
+  search: ['preferredName'],
   views: {
     people: { label: 'People', filters: { state: 'active,disabled' } },
     unclaimed: { label: 'Not yet signed in', filters: { state: 'unclaimed' } },

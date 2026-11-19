@@ -1,17 +1,16 @@
-// Change my name, the name I go by and my pronouns (ID-11). The label other modules show reads the account, so
+// Change my name and my pronouns (ID-11). The label other modules show reads the account, so
 // the change shows everywhere at once.
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { sessionOf } from '../../identity/guards'
 
 const name = z.string().trim().min(1).max(120) // not-policy: the column's own length check
-const preferred = z.string().trim().max(60) // not-policy: the column's own length check
 const pronouns = z.string().trim().max(40) // not-policy: the column's own length check
 
 export default defineRoute({
   ability: 'signed-in',
   rateLimit: 'write',
-  input: z.object({ name: name.nullable().optional(), preferredName: preferred.nullable().optional(), pronouns: pronouns.nullable().optional() }).strict(),
+  input: z.object({ name: name.nullable().optional(), pronouns: pronouns.nullable().optional() }).strict(),
 }, async (event, { input, unit, actor }) => {
   const session = await sessionOf(event)
   const sets: string[] = []
@@ -19,10 +18,6 @@ export default defineRoute({
   if (input.name !== undefined) {
     sets.push('name = ?')
     params.push(input.name || null)
-  }
-  if (input.preferredName !== undefined) {
-    sets.push('preferred_name = ?')
-    params.push(input.preferredName || null)
   }
   if (input.pronouns !== undefined) {
     sets.push('pronouns = ?')

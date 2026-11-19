@@ -214,7 +214,7 @@ const RECENT = 50 // not-policy: a screenful of recent merges
 export async function recentMerges(): Promise<MergeSummary[]> {
   const at = nowMs()
   const rows = await all<MergeRow & { started_by: MergeSummary['startedBy'], performed_at: number, undo_until: number, closed_at: number | null, survivor_name: string | null, merged_name: string | null }>(
-    `SELECT m.*, coalesce(s.preferred_name, s.name) AS survivor_name, coalesce(a.preferred_name, a.name) AS merged_name
+    `SELECT m.*, s.name AS survivor_name, a.name AS merged_name
        FROM core_account_merges m
        JOIN core_accounts s ON s.id = m.survivor_id
        JOIN core_accounts a ON a.id = m.merged_account_id

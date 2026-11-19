@@ -53,7 +53,7 @@ export async function describeMe(session: CurrentSession) {
   const addresses = await all<{ id: string, address: string, verified: number }>('SELECT id, address, verified_at IS NOT NULL AS verified FROM core_account_emails WHERE account_id = ? ORDER BY created_at', session.accountId)
   return {
     signedIn: true as const,
-    account: { id: session.accountId, name: account?.name ?? null, preferredName: account?.preferred_name ?? null, pronouns: account?.pronouns ?? null },
+    account: { id: session.accountId, name: account?.name ?? null, pronouns: account?.pronouns ?? null },
     addresses: addresses.map(a => ({ id: a.id, address: a.address, verified: !!a.verified })),
     session: { id: session.id, assurance: session.assurance, methods: session.methods, reassertedAt: session.reassertedAt, limited: session.limited },
     passkeys,
