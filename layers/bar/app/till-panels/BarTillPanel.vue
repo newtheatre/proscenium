@@ -36,6 +36,8 @@ interface Menu { outletId: string, outlet: string, priceListId: string, priceLis
 interface Tile { key: string, productId: string, name: string, items: Item[], ageRestricted: boolean, fromMinor: number, choices: boolean, colour: string | null }
 interface Outlet { id: string, name: string, kind: string }
 
+// What this panel last said its sale was, so a value from elsewhere can be told from its own.
+let lastSaid = 'null'
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null, large?: boolean, settled?: string | null }>()
 const emit = defineEmits<{
   'update:modelValue': [unknown]
@@ -84,7 +86,13 @@ watch(outletId, async (id) => {
     menu.value = null
     refusal.value = toRefusal(e)
   }
-  if (!restore()) clear()
+  // A sale already here from a linked device is taken up, not cleared away.
+  const given = props.modelValue as Said | null | undefined
+  if (menu.value && given && typeof given === 'object' && given.outletId === menu.value.outletId && JSON.stringify(given) !== lastSaid) {
+    restored = true
+    adopt(given)
+  }
+  else if (!restore()) clear()
 })
 
 // The basket: a line a size and its choices, in the order they were first added. Different choices
@@ -192,14 +200,39 @@ function send() {
       : null,
     added: lastEntry ? { label: label(lastEntry.item), undo: undoLast } : null,
   })
-  if (!lines.value.length || !menu.value) return emit('update:modelValue', null)
-  emit('update:modelValue', {
+  if (!lines.value.length || !menu.value) {
+    lastSaid = 'null'
+    return emit('update:modelValue', null)
+  }
+  const value = {
     outletId: menu.value.outletId,
     clientKey: clientKey.value,
     lines: lines.value.map(l => ({ variantId: l.item.variantId, quantity: l.quantity, ...(l.picks.length ? { choices: l.picks } : {}) })),
     expectedTotalMinor: total.value,
     ...(restricted.value && answer.value ? { ageCheck: answer.value, ...(answer.value === 'id_checked' && idType.value && idTypes.value.length ? { idType: idType.value } : {}) } : {}),
-  })
+  }
+  lastSaid = JSON.stringify(value)
+  emit('update:modelValue', value)
+}
+interface Said { outletId: string, clientKey: string, lines: { variantId: string, quantity: number, choices?: Choice[] }[], ageCheck?: typeof answer.value, idType?: string }
+/** Takes up a sale made on a linked device (linked tills): its lines, its key and its age check. */
+function adopt(value: Said) {
+  if (!menu.value || value.outletId !== menu.value.outletId) return
+  const items = new Map(cats.value.flatMap(c => c.items.map(i => [i.variantId, i] as const)))
+  const next = new Map<string, Entry>()
+  for (const l of value.lines) {
+    const item = items.get(l.variantId)
+    if (!item) continue
+    const picks = l.choices ?? []
+    const key = keyOf(item, picks)
+    next.set(key, { key, item, picks, quantity: l.quantity, unitMinor: unitOf(item, picks), restricted: needsAge(item, picks) })
+  }
+  basket.value = next
+  clientKey.value = value.clientKey
+  answer.value = value.ageCheck ?? null
+  idType.value = (value.idType ?? null) as typeof idType.value
+  last.value = null
+  send()
 }
 
 // The prompt: opened by the first line that needs an age check (the product itself, or something
@@ -336,7 +369,11 @@ function clear() {
 // with a new key. A paid sale (the till was locked while it was taken) ends the customer, and with
 // them any refusal; clearing the sale by hand does not.
 watch(() => [props.modelValue, props.locked] as const, ([value], [, wasLocked]) => {
-  if (value !== null) return
+  if (value !== null && value !== undefined) {
+    if (typeof value === 'object' && JSON.stringify(value) !== lastSaid) adopt(value as Said)
+    return
+  }
+  if (value === undefined) return
   if (wasLocked) refused.value = null
   if (basket.value.size) {
     clientKey.value = crypto.randomUUID()

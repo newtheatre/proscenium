@@ -14,7 +14,8 @@ async function join(ticket: string, headers: Record<string, string> = {}) {
   const response = await connectRealtime(new Request(`https://theatre.test/api/realtime?ticket=${encodeURIComponent(ticket)}`, { headers: { upgrade: 'websocket', ...headers } }), env)
   const heard: string[] = []
   response.webSocket?.accept()
-  response.webSocket?.addEventListener('message', (event) => { heard.push(event.data as string) })
+  // Who is in the room is told as well; these tests are about the news.
+  response.webSocket?.addEventListener('message', (event) => { if (!(event.data as string).includes('"core.presence"')) heard.push(event.data as string) })
   return { response, socket: response.webSocket, heard }
 }
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
@@ -66,5 +67,65 @@ describe('realtime rooms', () => {
     expect((await join(await signTicket(KEY, { room: 'account:x', accountId: 'x', sessionId: null, expires: Date.now() - 1 }))).response.status).toBe(401)
     expect((await join(good, { origin: 'https://elsewhere.test' })).response.status).toBe(403)
     expect((await connectRealtime(new Request(`https://theatre.test/api/realtime?ticket=${good}`), env)).status).toBe(426)
+  })
+})
+
+describe('devices in a room', () => {
+  const ticketFor = (who: ReturnType<typeof person>) => inContext(() => ownTicket(who.accountId!, null, Date.now()))
+  async function device(who: ReturnType<typeof person>, id: string, name: string) {
+    const response = await connectRealtime(new Request(`https://theatre.test/api/realtime?ticket=${encodeURIComponent(await ticketFor(who))}&device=${id}&name=${encodeURIComponent(name)}`, { headers: { upgrade: 'websocket' } }), env)
+    const heard: { channel: string, data: any, from?: string, kept?: boolean }[] = []
+    response.webSocket!.accept()
+    response.webSocket!.addEventListener('message', (event) => { heard.push(JSON.parse(event.data as string)) })
+    return { socket: response.webSocket!, heard, say: (message: unknown) => response.webSocket!.send(JSON.stringify(message)) }
+  }
+  const last = (d: { heard: { channel: string, data: any }[] }, channel: string) => d.heard.filter(m => m.channel === channel).at(-1)
+
+  it('says who is in the room as devices come, rename themselves and go', async () => {
+    const me = person([])
+    const laptop = await device(me, 'dev-laptop', 'Chrome on macOS')
+    const phone = await device(me, 'dev-phone', 'Chrome on Android')
+    await settle()
+    expect(last(laptop, 'core.presence')!.data.devices.map((d: { name: string }) => d.name).sort()).toEqual(['Chrome on Android', 'Chrome on macOS'])
+    phone.say({ name: 'Bar phone' })
+    await settle()
+    expect(last(laptop, 'core.presence')!.data.devices).toContainEqual({ id: 'dev-phone', name: 'Bar phone', accountId: me.accountId })
+    phone.socket.close()
+    await settle()
+    expect(last(laptop, 'core.presence')!.data.devices.map((d: { id: string }) => d.id)).toEqual(['dev-laptop'])
+    laptop.socket.close()
+  })
+
+  it('passes a device\'s message to the others, keeps it for a later arrival, and lets no device speak for the server', async () => {
+    const me = person([])
+    const laptop = await device(me, 'dev-laptop', 'Laptop')
+    const phone = await device(me, 'dev-phone', 'Phone')
+    laptop.say({ channel: 'device.payments.till', data: { rev: 1 }, keep: true })
+    laptop.say({ channel: 'payments.session', data: 'forged' })
+    await settle()
+    expect(last(phone, 'device.payments.till')).toEqual({ channel: 'device.payments.till', data: { rev: 1 }, from: 'dev-laptop' })
+    expect(last(laptop, 'device.payments.till')).toBeUndefined()
+    expect(last(phone, 'payments.session')).toBeUndefined()
+    const tablet = await device(me, 'dev-tablet', 'Tablet')
+    tablet.say({ ask: 'device.payments.till' })
+    tablet.say({ ask: 'device.nothing-kept' })
+    await settle()
+    expect(last(tablet, 'device.payments.till')).toEqual({ channel: 'device.payments.till', data: { rev: 1 }, from: 'dev-laptop', kept: true })
+    expect(last(tablet, 'device.nothing-kept')).toEqual({ channel: 'device.nothing-kept', data: null, from: null, kept: true })
+    for (const d of [laptop, phone, tablet]) d.socket.close()
+  })
+
+  it('forgets what it kept once the last device has gone', async () => {
+    const me = person([])
+    const laptop = await device(me, 'dev-laptop', 'Laptop')
+    laptop.say({ channel: 'device.payments.till', data: { rev: 1 }, keep: true })
+    await settle()
+    laptop.socket.close()
+    await settle()
+    const phone = await device(me, 'dev-phone', 'Phone')
+    phone.say({ ask: 'device.payments.till' })
+    await settle()
+    expect(last(phone, 'device.payments.till')).toEqual({ channel: 'device.payments.till', data: null, from: null, kept: true })
+    phone.socket.close()
   })
 })

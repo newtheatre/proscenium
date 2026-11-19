@@ -124,6 +124,51 @@ test('one press adds a product sold one way; one with sizes asks which, and the 
   await expect(page.getByText('Nothing added yet.')).toBeVisible()
 })
 
+test('two devices signed in as the same seller share one sale until one disconnects', async ({ page, browser }) => {
+  await visit(page, '/live/till')
+  const context = await browser.newContext(as(seller))
+  const phone = await context.newPage()
+  await visit(phone, '/live/till')
+  const receipt = (p: Page) => p.getByRole('complementary', { name: 'Total to pay' })
+  const sync = (p: Page) => p.getByTestId('till-sync-wide')
+  await expect(sync(page)).toContainText('In sync with')
+  await expect(sync(phone)).toContainText('In sync with')
+
+  // Added on one, shown on the other; added to there, shown back here.
+  await tile(page, cola).click()
+  await expect(receipt(phone).getByText(cola)).toBeVisible()
+  await receipt(phone).getByRole('button', { name: `One more ${cola}` }).click()
+  await expect(receipt(page).getByText('£4.00', { exact: true }).last()).toBeVisible()
+
+  // The payment started on one is taken on the other, and both move on.
+  await cash(page).click()
+  await expect(phone.getByText(/^This payment was started on/)).toBeVisible()
+  await expect(phone.getByText('Still to pay: £4.00')).toBeVisible()
+  await cash(phone).click()
+  await phone.getByRole('button', { name: 'Cash taken' }).click()
+  await expect(phone.getByText('Paid £4.00', { exact: true })).toBeVisible()
+  await expect(page.getByText('Paid £4.00', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Next customer' }).click()
+
+  // Disconnected, the phone is its own till: nothing more arrives, and the choice outlives a reload.
+  await sync(phone).click()
+  await phone.getByRole('button', { name: 'Disconnect this device' }).click()
+  await expect(sync(phone)).toContainText('This device only')
+  await tile(page, cola).click()
+  await expect(receipt(page).getByText(cola)).toBeVisible()
+  await visit(phone, '/live/till')
+  await expect(sync(phone)).toContainText('This device only')
+  await expect(phone.getByText('Nothing added yet.')).toBeVisible()
+
+  // Linked again with nothing of its own, it takes up the sale.
+  await sync(phone).click()
+  await phone.getByRole('button', { name: 'Link this device' }).click()
+  await expect(receipt(phone).getByText(cola)).toBeVisible()
+  await receipt(phone).getByRole('button', { name: `Remove ${cola}` }).click()
+  await expect(page.getByText('Nothing added yet.')).toBeVisible()
+  await context.close()
+})
+
 test('refusing the age-restricted lines leaves the rest of the sale to carry on', async ({ page }) => {
   await visit(page, '/live/till')
   const receipt = page.getByRole('complementary', { name: 'Total to pay' })
