@@ -138,11 +138,12 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
       class="grow outline-none"
     >
       <!-- What's on is the platform's page, so the house's band goes here and the page's own plain
-           header is hidden under it (assets/css/nnt.css). -->
+           header is hidden under it (assets/css/nnt.css). A slim band, as the spotlight follows it. -->
       <NntHero
         v-if="whatsOn"
         src="/images/banners/whats-on.webp"
-        compact
+        align="start"
+        slim
       >
         <template #title>
           What's <span class="text-(--color-gold-400)">on</span>

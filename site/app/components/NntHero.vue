@@ -9,13 +9,16 @@ const props = withDefaults(defineProps<{
   align?: 'centre' | 'start'
   /** A band rather than a hero. */
   compact?: boolean
-}>(), { src: null, title: undefined, description: null, align: 'centre', compact: false })
+  /** A strip with the title on one line, for a page that opens with its own feature below. */
+  slim?: boolean
+}>(), { src: null, title: undefined, description: null, align: 'centre', compact: false, slim: false })
 
 const ui = computed(() => ({
   title: 'nnt-headline text-highlighted text-5xl sm:text-7xl',
   description: 'text-default',
   ...(props.align === 'start' ? { wrapper: 'max-w-2xl text-left items-start', header: 'text-left', links: 'justify-start' } : {}),
   ...(props.compact ? { container: 'py-10 sm:py-12 lg:py-14' } : {}),
+  ...(props.slim ? { container: 'py-6 sm:py-8 lg:py-8', title: 'nnt-headline text-highlighted text-4xl sm:text-5xl', description: 'text-default text-base sm:text-lg mt-2' } : {}),
 }))
 </script>
 
