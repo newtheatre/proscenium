@@ -83,7 +83,7 @@ export async function requestReservation(unit: UnitView, input: ReserveInput): P
   if (!input.email) refuse('box-office.reservation.email-needed', 'We need an email address to send your reservation to.', { status: 422, fields: { email: 'required' } })
   if (!await useSetting('box-office.reservations.confirm-email')) {
     const { accountId, madeWith } = await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
-    return reserve(unit, order, lines, accountId, false, madeWith)
+    return reserve(unit, order, lines, accountId, false, madeWith, input.email)
   }
 
   // Asked again, perhaps with the address put right: the earlier link stops working.
@@ -111,7 +111,7 @@ export async function confirmReservation(unit: UnitView, token: string): Promise
   if (!order) refuse('box-office.reservation.link-invalid', 'This link does not confirm a reservation. It may have been used already, or the seats were held for too short a time.', { status: 404, remedy: 'If your reservation was confirmed, its details are in the email that followed. Otherwise choose your tickets again.' })
   const lines = await checkBasket(order, order.total_minor)
   const { accountId, madeWith } = await findOrCreateAccount(unit, { address: order.confirm_email, name: order.confirm_name, origin: 'guest' })
-  return reserve(unit, order, lines, accountId, false, madeWith)
+  return reserve(unit, order, lines, accountId, false, madeWith, order.confirm_email)
 }
 
 // What can be told before the batch: the basket is still held, reserving is offered, and the size
@@ -133,17 +133,17 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
 }
 
 /** Staff reserving a basket for somebody (BO-34): no address to confirm, since the seller named them. */
-export function reserveBasket(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, madeWith: { address: string } | null): Promise<Reserved | Confirmed> {
+export function reserveBasket(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, madeWith: { address: string } | null, address?: string | null): Promise<Reserved | Confirmed> {
   if (!lines.length) refuse(RAN_OUT.code, RAN_OUT.reason, { status: 409, remedy: RAN_OUT.remedy })
-  return reserve(unit, order, lines, accountId, false, madeWith)
+  return reserve(unit, order, lines, accountId, false, madeWith, address)
 }
 
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
-async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean, madeWith?: { address: string } | null): Promise<Reserved | Confirmed> {
+async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean, madeWith?: { address: string } | null, address?: string | null): Promise<Reserved | Confirmed> {
   await stampTerms(unit, order.id)
   // An order with nothing to pay never rests reserved: it is confirmed and its tickets issued at once.
-  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith } })
+  if (order.total_minor === 0) return confirmOrder(unit, order, lines, { from: 'basket', account: { id: accountId, signedIn, madeWith, address } })
   await assertMayReserve(order.id)
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
@@ -166,7 +166,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   const deskCode = newDeskCode()
   unit.add(sql`UPDATE box_office_orders SET state = 'reserved', account_id = ${accountId}, signed_in = ${signedIn}, link_token_hash = ${await hashOf(token)},
       desk_code_hash = ${await hashOf(deskCode)}, expires_at = NULL, release_at = ${releaseAt}, reserved_at = ${at}, updated_at = ${at},
-      confirm_token_hash = NULL, confirm_expires_at = NULL, confirm_email = NULL, confirm_name = NULL
+      confirm_token_hash = NULL, confirm_expires_at = NULL, confirm_email = NULL, confirm_name = NULL, booked_with = ${address ?? null}
     WHERE id = ${order.id} AND state = 'basket' AND expires_at > ${at} AND total_minor = ${order.total_minor}`)
     .expect(1, RAN_OUT)
   // Every seat of the basket is still held: none lapsed and was taken while the buyer read their email.
@@ -184,8 +184,9 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   const variables = { reference: order.reference, show: words.show, when: words.when, ...await visitFor(lines), tickets: words.ticketsWithAge, amountDue: words.amount, deskCode, link: await siteUrl(`/book/order/${token}`) }
   // A buyer who has never signed in also gets the link that opens their account (core's claim link).
   const account = await claimLink(unit, accountId, madeWith)
+  // Booked signed out: the reservation goes to the address typed, not the account's usual one.
   await notify(unit, account ? 'box-office.order-reserved-guest' : 'box-office.order-reserved', {
-    to: accountId,
+    to: [{ accountId, ...address ? { address } : {} }],
     variables: account ? { ...variables, account } : variables,
     subject: ['box-office.order', order.id],
     dedupeKey: order.id,
