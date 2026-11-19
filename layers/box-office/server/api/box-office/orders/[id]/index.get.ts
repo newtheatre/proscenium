@@ -4,6 +4,7 @@ import { getRouterParam } from 'h3'
 import { all, can, defineRoute, first, refuse, useSetting } from '#kit'
 import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from '#modules/core'
 import { paymentsOf } from '#modules/payments'
+import { passOf } from '../../../../orders'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
 interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null, pass_entry: number }
@@ -51,6 +52,7 @@ export default defineRoute({
     refunds: money.refunds.map(r => ({ id: r.id, amountMinor: r.amountMinor, method: r.method, state: r.state, handBack: r.handBack, requestedBy: r.requestedByName, approvedBy: r.approvedByName, at: r.createdAt })),
     performance: performance ? { id: performance.id, title: (await getProduction(performance.productionId)).title, startsAt: performance.startsAt } : null,
     complimentary: (await first<{ one: number }>('SELECT 1 AS one FROM box_office_order_lines WHERE order_id = ? AND comp_request_id IS NOT NULL LIMIT 1', id)) !== null,
+    pass: await passOf(id),
     lines: lines.map(l => ({ id: l.id, kind: l.kind, bandId: l.band_id, band: l.band, ticketTypeId: l.ticket_type_id, ticketType: l.ticket_type, amountMinor: l.amount_minor, state: l.state, admittedAt: l.admitted_at, ticketState: l.ticket_state, requirementPending: l.requirement_evidence_id === 'pending', passEntry: !!l.pass_entry })),
     // The fee kept on each ticket when a cancellation is refunded less the fee, so the dialogue can show the refund.
     cancellationFeeMinor: await useSetting('box-office.cancellations.fee') as number,

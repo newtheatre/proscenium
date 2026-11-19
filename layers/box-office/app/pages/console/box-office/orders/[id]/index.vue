@@ -22,6 +22,7 @@ interface Order {
   currency: string
   totalMinor: number
   complimentary: boolean
+  pass: OrderPass | null
   keep: boolean
   releaseAt: number | null
   createdAt: number
@@ -51,7 +52,6 @@ const id = computed(() => String(route.params.id))
 
 const { data, status, error, refresh } = await useAPI<Order>(() => `/api/box-office/orders/${encodeURIComponent(id.value)}`, { key: `box-office:order:${id.value}` })
 
-const TONES = { reserved: 'warning', awaiting_payment: 'info', confirmed: 'success', cancelled: 'neutral', expired: 'neutral' } as const
 const cancelling = ref(false)
 const exchanging = ref(false)
 // What can be exchanged: live tickets not yet used at the door.
@@ -121,6 +121,7 @@ const summary = computed(() => {
     { label: t('box-office.order.buyer'), value: o.buyer?.name ?? t('box-office.orders.no-buyer') },
     ...(o.buyer?.email ? [{ label: t('box-office.order.email'), value: o.buyer.email, to: `mailto:${o.buyer.email}` }] : []),
     { label: t('box-office.order.total'), value: money(o.totalMinor, o.currency) },
+    ...(o.pass ? [{ label: t('box-office.order.pass'), value: t(o.pass.paid ? 'box-office.order.pass-paid' : 'box-office.order.pass-unpaid', { name: o.pass.name }) }] : []),
     { label: t('box-office.order.sold'), value: sold(o) },
     { label: t('box-office.order.made'), value: dateTime(o.createdAt) },
     ...(o.state === 'reserved' && o.releaseAt ? [{ label: t('box-office.order.releases'), value: o.keep ? t('box-office.order.kept') : dateTime(o.releaseAt) }] : []),
@@ -180,7 +181,7 @@ const refundDetail = (o: Order, r: Refund) => {
     <template #default="{ data: d }">
       <PageRecord
         :title="t('box-office.order.title', { reference: d.reference })"
-        :status="{ label: t(`box-office.orders.state.${d.state === 'confirmed' && d.complimentary ? 'complimentary' : d.state}`), tone: TONES[d.state as State] }"
+        :status="orderStateBadge(d, t)"
         :primary="primary"
         :actions="actions"
         :summary="summary"

@@ -6,6 +6,7 @@ import { getQuery } from 'h3'
 import { defineRoute, first, readListQuery, searchWords, useDb } from '#kit'
 import { accountLabel, findAccounts, getPerformance, getProduction } from '#modules/core'
 import { orders } from '../../../db/schema'
+import { passOf } from '../../../orders'
 import source from '../../../lists/orders'
 import { ordersList } from '../../../../shared/lists'
 
@@ -39,6 +40,8 @@ export default defineRoute({ ability: 'box-office.order.view', rateLimit: 'defau
       startsAt: performance?.startsAt ?? null,
       // Issued free from a request for complimentary tickets: shown as such, not as paid.
       complimentary: !!line?.comp,
+      // Booked on a pass: named, with whether the pass itself is paid for.
+      pass: await passOf(o.id),
     })
   }
   return { rows, total, dropped: read.dropped, ignoredWords, searchTooShort }
