@@ -9,7 +9,7 @@ import AxeBuilder from '@axe-core/playwright'
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
 const owner = person('acc_bookowner', 'Book Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage', 'core.vocabulary.manage'])
-const manager = person('acc_bookmanager', 'Book Manager', ['core.production.create', 'core.production.edit', 'core.production.publish', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.promo.manage', 'payments.provider.manage'])
+const manager = person('acc_bookmanager', 'Book Manager', ['core.production.create', 'core.production.edit', 'core.production.publish', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'promotions.promotion.manage', 'payments.provider.manage'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
 const title = `The Booking Show ${stamp}`
@@ -31,7 +31,7 @@ test.beforeAll(async ({ playwright }) => {
   }
   await set([{ key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }, { key: 'core.rate-limits.write', value: { count: 10000, per: '1m' } }])
   await set([{ key: 'core.locale.time-zone', value: 'Europe/London' }])
-  for (const id of ['finance', 'payments', 'box-office']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
+  for (const id of ['finance', 'payments', 'box-office', 'promotions']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
   await set([{ key: 'box-office.reservations.confirm-email', value: false }, { key: 'box-office.checkout.payment-timing', value: 'buyer-chooses' }])
   const categories = await (await settings.get('/api/core/vocabularies/core.production-category')).json()
   await settings.dispose()
@@ -50,7 +50,7 @@ test.beforeAll(async ({ playwright }) => {
   await post(api, '/api/payments/providers', { provider: 'cash', label: `Box office cash ${stamp}`, channels: ['desk'], mode: 'live' })
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await post(api, `/api/core/productions/${production.id}/publish`, {})
-  await post(api, '/api/box-office/promo-codes', { code: promoCode, effect: 'percent_off', value: 2000, maxPerOrder: 1 })
+  await post(api, '/api/promotions', { name: promoCode, label: promoCode, trigger: 'code', effect: 'percent_off', value: 2000, maxPerSale: 1, codes: [{ code: promoCode }], targets: [{ role: 'applies', kind: 'box-office.ticket', scope: { productionId: production.id } }] })
   await api.dispose()
 })
 

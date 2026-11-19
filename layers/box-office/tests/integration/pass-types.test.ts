@@ -113,7 +113,7 @@ describe('setting up a pass', () => {
   })
 
   it('is for staff who may set passes up', async () => {
-    expect((await api('GET', '/api/box-office/pass-types', undefined, person(['box-office.promo.manage']))).status).toBe(403)
+    expect((await api('GET', '/api/box-office/pass-types', undefined, person(['promotions.promotion.manage']))).status).toBe(403)
     expect((await api('POST', '/api/box-office/pass-types', pass(), person(['box-office.order.view']))).status).toBe(403)
   })
 })

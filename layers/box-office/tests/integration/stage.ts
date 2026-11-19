@@ -192,7 +192,7 @@ export async function req<T = any>(method: string, path: string, body?: unknown,
 export async function ready(): Promise<void> {
   // No challenge secret, as at a theatre that has not set one: the challenge is then quietly off.
   ;(env as any).CORE_TURNSTILE_SECRET_KEY = ''
-  for (const id of ['finance', 'payments', 'box-office']) await setModule(id, true)
+  for (const id of ['finance', 'payments', 'box-office', 'promotions']) await setModule(id, true)
   await inContext(async () => {
     const unit = createUnit()
     await changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true })
