@@ -494,7 +494,9 @@ const destination = (to: ReceiptTo | undefined) => (!to ? undefined : 'accountId
 const paying = ref<number | null>(null)
 const payingFor = computed(() => persons.value.find(p => p.position === paying.value) ?? null)
 // A way to pay that needs nothing more from the seller starts as soon as it is pressed.
-const direct = (m: Offer) => m.method !== 'cash' && !m.method.endsWith('_attested') && (m.method !== 'card_reader' || m.readers?.length === 1)
+// A reader is chosen only where the provider pairs readers; the SumUp app hand-off lists none.
+const needsReader = (m: Offer) => m.method === 'card_reader' && !!m.readers && m.readers.length !== 1
+const direct = (m: Offer) => m.method !== 'cash' && !m.method.endsWith('_attested') && !needsReader(m)
 async function choose(m: Offer) {
   choice.value = key(m)
   await nextTick()
@@ -609,7 +611,11 @@ async function pay(succeeded = true) {
         result.value = { kind: 'declined' }
         return
       }
-      if (started.next.kind === 'handoff' || started.next.kind === 'redirect') result.value = { kind: 'handoff', url: started.next.url }
+      if (started.next.kind === 'handoff' || started.next.kind === 'redirect') {
+        result.value = { kind: 'handoff', url: started.next.url }
+        // Straight into the SumUp app; the Open button stays for a browser that holds the switch back.
+        if (started.next.kind === 'handoff') window.location.assign(started.next.url)
+      }
       else result.value = { kind: 'waiting' }
       poll()
     }
@@ -1451,7 +1457,7 @@ function ended() {
                       />
                     </UFormField>
                     <UFormField
-                      v-if="chosen.method === 'card_reader' && (chosen.readers ?? []).length !== 1"
+                      v-if="needsReader(chosen)"
                       :label="t('payments.screens.test.reader')"
                       required
                     >
@@ -1465,7 +1471,7 @@ function ended() {
                       <UButton
                         size="lg"
                         :loading="taking"
-                        :disabled="(chosen.method === 'card_reader' && !readerId) || (chosen.method === 'cash' && change !== null && change < 0)"
+                        :disabled="(needsReader(chosen) && !readerId) || (chosen.method === 'cash' && change !== null && change < 0)"
                         :label="chosen.method === 'other_attested' ? t('payments.screens.till.received', { amount: money(taken) }) : chosen.method === 'card_attested' ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
                         @click="pay()"
                       />
