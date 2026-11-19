@@ -12,6 +12,7 @@ import { members } from '../../../../tests/fixtures/modules/seats/server/contrib
 import attendance from '../../server/contributions/front-of-house.report-section/attendance'
 import { doorCodesForOrder } from '../../server/tickets'
 import { tonightNumbers } from '../../server/tonight'
+import boardLeft from '../../server/contributions/front-of-house.tonight-figure/left'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const steward = person(['box-office.ticket.admit'])
@@ -152,10 +153,8 @@ describe('scanning at the door', () => {
       expect.objectContaining({ id: 'box-office.to-come', value: 0 }),
       expect.objectContaining({ id: 'box-office.left', value: 4 }),
     ])
-    // The same numbers on the front of house board, for whoever may also admit.
-    const board = await req('GET', `/api/front-of-house/performances/${today.performanceId}/tonight`, undefined, person(['front-of-house.shift.view', 'box-office.ticket.admit']))
-    expect(board.status, JSON.stringify(board.body)).toBe(200)
-    expect(board.body.figures.map((f: { id: string }) => f.id)).toEqual(['box-office.sold', 'box-office.unpaid', 'box-office.in', 'box-office.to-come', 'box-office.left'])
+    // The same numbers on the front of house board, through its own point.
+    expect(await inContext(() => boardLeft.read(today.performanceId))).toEqual({ value: 4, state: 'ok' })
     expect((await req('GET', '/api/core/live/tonight', undefined, person([]))).status).toBe(403)
   })
 

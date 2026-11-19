@@ -48,7 +48,6 @@ import doorOfflineGet from '../../server/api/box-office/performances/[id]/door/o
 import doorOfflinePost from '../../server/api/box-office/performances/[id]/door/offline.post'
 import doorTonight from '../../server/api/box-office/door/tonight.get'
 import liveTonight from '../../../core/server/api/core/live/tonight.get'
-import boardTonight from '../../../front-of-house/server/api/front-of-house/performances/[id]/tonight.get'
 import productionsLookup from '../../server/api/box-office/productions/lookup.get'
 import performancesLookup from '../../server/api/box-office/performances/lookup.get'
 import ordersGet from '../../server/api/box-office/orders/index.get'
@@ -143,7 +142,6 @@ export const handle = server({
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
   'GET /api/box-office/door/tonight': doorTonight,
   'GET /api/core/live/tonight': liveTonight,
-  'GET /api/front-of-house/performances/:id/tonight': boardTonight,
   'GET /api/box-office/productions/lookup': productionsLookup,
   'GET /api/box-office/performances/lookup': performancesLookup,
   'GET /api/box-office/orders/:id': orderGet,
