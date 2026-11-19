@@ -30,7 +30,7 @@ interface Season {
 }
 
 const { t } = useT()
-const { range } = useDates()
+const { span } = useDates()
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const { data } = await useAPI<Season>(() => `/api/public-site/seasons/${encodeURIComponent(slug.value)}`, { key: `public-site:season:${slug.value}` })
@@ -53,7 +53,7 @@ useHead(() => ({
     <UPage>
       <UPageHeader
         :title="season.name"
-        :description="range(season.startsOn, season.endsOn)"
+        :description="span(season.startsOn, season.endsOn)"
       />
       <UPageBody>
         <MarkdownText
@@ -74,7 +74,7 @@ useHead(() => ({
               :title="p.title"
               :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
-              :when="p.firstStartsAt && p.lastStartsAt ? range(p.firstStartsAt, p.lastStartsAt) : t('public-site.season.dates-soon')"
+              :when="p.firstStartsAt && p.lastStartsAt ? span(p.firstStartsAt, p.lastStartsAt) : t('public-site.season.dates-soon')"
               :details="p.category?.label"
               :cancelled="p.cancelled"
               :age="p.age"

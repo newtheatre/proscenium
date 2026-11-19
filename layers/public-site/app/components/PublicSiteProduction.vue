@@ -64,7 +64,7 @@ interface Production {
 
 const props = defineProps<{ slug: string, prefix: 'whats-on' | 'shows' }>()
 const { t } = useT()
-const { dateTime, time } = useDates()
+const { dateTime, dayNamed, time } = useDates()
 
 const { data } = await useAPI<Production | { moved: string }>(() => `/api/public-site/productions/${encodeURIComponent(props.slug)}`, { key: `public-site:production:${props.slug}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.production.not-found'), fatal: true })
@@ -75,6 +75,7 @@ const here = 'moved' in data.value ? null : data.value
 const prefix = here ? (here.past ? 'shows' : 'whats-on') : props.prefix
 if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 302 })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
+const priceLine = computed(() => production.value?.price ? priceSummary(production.value.price, t) : '')
 
 // What it is, in one line: where, how long, and the company for a visiting show.
 const tell = useTellMeAbout()
@@ -224,6 +225,7 @@ useHead(() => {
                   :booking="only.booking"
                   :when="dateTime(only.startsAt)"
                   :company="production.companyName"
+                  :title="production.title"
                   size="lg"
                   class="justify-start"
                 />
@@ -394,12 +396,6 @@ useHead(() => {
               >
                 {{ t('public-site.production.dates-and-tickets') }}
               </h2>
-              <p
-                v-if="production.price"
-                class="mb-2 text-sm"
-              >
-                {{ priceSummary(production.price, t) }}
-              </p>
               <LatecomersNote
                 v-if="production.latecomers && !production.past"
                 :rule="production.latecomers"
@@ -410,18 +406,15 @@ useHead(() => {
                 <li
                   v-for="p in dates"
                   :key="p.id"
-                  class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
+                  class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-3"
                 >
                   <div class="min-w-0 space-y-1">
                     <p :class="p.state === 'cancelled' ? 'text-muted line-through' : 'font-medium'">
-                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dateTime(p.startsAt) }}</time>
+                      <time :datetime="new Date(p.startsAt).toISOString()">{{ dayNamed(p.startsAt) }}</time>
                       <span v-if="p.label"> · {{ p.label }}</span>
                     </p>
-                    <p
-                      v-if="where(p) || (p.doorsAt && p.state === 'scheduled')"
-                      class="text-sm text-muted"
-                    >
-                      {{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).join(' · ') }}
+                    <p class="text-sm text-muted">
+                      <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ time(p.startsAt) }}</span>{{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
                     </p>
                     <p
                       v-if="p.effectsOff.length && p.state === 'scheduled'"
@@ -454,12 +447,21 @@ useHead(() => {
                     v-if="p.state === 'cancelled'"
                     class="text-sm font-medium"
                   >{{ t('public-site.production.date-cancelled') }}</span>
-                  <PublicSiteBookingButton
+                  <div
                     v-else-if="p.state === 'scheduled'"
-                    :booking="p.booking"
-                    :when="dateTime(p.startsAt)"
-                    :company="production.companyName"
-                  />
+                    class="flex flex-col items-end gap-1 text-end"
+                  >
+                    <PublicSiteBookingButton
+                      :booking="p.booking"
+                      :when="dateTime(p.startsAt)"
+                      :company="production.companyName"
+                      :title="production.title"
+                    />
+                    <span
+                      v-if="priceLine"
+                      class="text-sm text-muted"
+                    >{{ priceLine }}</span>
+                  </div>
                 </li>
               </ul>
             </section>

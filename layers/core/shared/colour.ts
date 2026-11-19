@@ -70,16 +70,33 @@ function fromHsl({ h, s, l }: Hsl): Rgb {
  * hue and saturation, so the theatre's colour stays recognisably theirs.
  */
 export function nearestShade(hex: string, against: string, minimum = MINIMUM_CONTRAST): string {
-  if (contrast(hex, against) >= minimum) return hex.toLowerCase()
+  return shadeWhere(hex, luminance(against) > 0.5, c => contrast(c, against) >= minimum)
+}
+
+function shadeWhere(hex: string, darker: boolean, ok: (candidate: string) => boolean): string {
+  if (ok(hex)) return hex.toLowerCase()
   const hsl = toHsl(parseHex(hex))
-  const darker = luminance(against) > 0.5
   for (let step = 1; step <= 100; step++) {
     const l = darker ? hsl.l - step / 100 : hsl.l + step / 100
     if (l < 0 || l > 1) break
     const candidate = toHex(fromHsl({ ...hsl, l }))
-    if (contrast(candidate, against) >= minimum) return candidate
+    if (ok(candidate)) return candidate
   }
   return darker ? '#000000' : '#ffffff'
+}
+
+/** `top` laid over `under` at `alpha`, as a translucent fill is drawn. */
+export function over(top: string, under: string, alpha: number): string {
+  const [a, b] = [parseHex(top), parseHex(under)]
+  return toHex({ r: a.r * alpha + b.r * (1 - alpha), g: a.g * alpha + b.g * (1 - alpha), b: a.b * alpha + b.b * (1 - alpha) })
+}
+
+/**
+ * A fill whose `text` reaches the minimum both as it is and laid at `alpha` over `page`, the way a
+ * button under the pointer is drawn (app.config.ts: hover at 90%).
+ */
+export function fillUnder(hex: string, text: string, page: string, alpha: number, minimum = MINIMUM_CONTRAST): string {
+  return shadeWhere(hex, luminance(text) > 0.5, c => contrast(c, text) >= minimum && contrast(over(c, page, alpha), text) >= minimum)
 }
 
 /** White or near-black, whichever reads better on the colour. */

@@ -27,6 +27,11 @@ export interface BookingAnswer {
   waitingList?: string
   /** Words of the module's own in place of the state's usual ones. */
   label?: string
+  /**
+   * A global component that books this performance in a drawer over the public page, given `link`,
+   * `title` and `when`. The button opens it; without scripts the link is followed as usual.
+   */
+  drawer?: string
 }
 
 /**

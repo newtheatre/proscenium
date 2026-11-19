@@ -6,8 +6,6 @@ import { moduleTabOf, resolveEntry, shellOf } from '../../shared/navigation'
 
 const { t } = useT()
 const route = useRoute()
-const { data: brandData } = await useBrand()
-const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.default-name') }))
 const { data: navigation } = await useNavigation('console')
 const open = ref(false)
 provide(DASHBOARD_SHELL, true)
@@ -58,9 +56,12 @@ const items = computed(() => sidebarGroups(navigation.value?.groups ?? [], { t, 
       <template #header="{ collapsed }">
         <NuxtLink
           to="/console"
-          class="truncate font-semibold"
+          class="flex min-w-0 items-center font-semibold"
         >
-          <span v-if="!collapsed">{{ brand.name }}</span>
+          <BrandMark
+            v-if="!collapsed"
+            size="sm"
+          />
           <UIcon
             v-else
             name="i-lucide-drama"

@@ -150,6 +150,8 @@ export default defineModule({
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
+    // Asks for a provider's keys only once an account with that provider is added and lacks them.
+    'core.credential-use': [{ id: 'payments.provider-keys', file: 'provider-keys' }],
     // What the policies say about paying (/policies): which card companies are really connected,
     // worked out from the provider accounts, so the privacy notice names them and no others.
     'core.policy-fact': [{ id: 'payments.card-providers', file: 'card-providers' }, { id: 'payments.stripe', file: 'stripe' }, { id: 'payments.sumup', file: 'sumup' }],

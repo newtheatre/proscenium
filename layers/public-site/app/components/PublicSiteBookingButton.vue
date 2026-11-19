@@ -3,7 +3,8 @@
      facts, and the words for each of the five states are here, so they follow the visitor's
      language. `when` names the performance for a screen reader, so a page of "Book" buttons can be
      told apart. The theatre's own outside link says whose site it opens, with `company` for a
-     visiting show, and that it opens in a new tab. -->
+     visiting show, and that it opens in a new tab. When the answer names a drawer, the button opens
+     it over the page with `title` (the show's name) at its head; with scripts off the link is followed. -->
 <script setup lang="ts">
 interface Booking {
   state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed'
@@ -13,8 +14,9 @@ interface Booking {
   waitingList?: string
   label?: string
   external?: true
+  drawer?: string
 }
-const props = defineProps<{ booking: Booking | null, when: string, size?: 'sm' | 'md' | 'lg', company?: string | null }>()
+const props = defineProps<{ booking: Booking | null, when: string, size?: 'sm' | 'md' | 'lg', company?: string | null, title?: string }>()
 const { t } = useT()
 const { dateTime } = useDates()
 
@@ -34,6 +36,13 @@ const label = computed(() => {
   return t('public-site.booking.book')
 })
 const bookable = computed(() => !!props.booking?.link && (props.booking.state === 'available' || props.booking.state === 'limited'))
+const drawing = computed(() => !!props.booking?.drawer && !!props.title && !props.booking.external)
+const open = ref(false)
+function book(event: MouseEvent) {
+  if (!drawing.value || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+  event.preventDefault()
+  open.value = true
+}
 </script>
 
 <template>
@@ -51,6 +60,7 @@ const bookable = computed(() => !!props.booking?.link && (props.booking.state ==
       :target="booking.external ? '_blank' : undefined"
       :trailing-icon="booking.external ? 'i-lucide-external-link' : undefined"
       :size="size ?? 'md'"
+      @click="book"
     >
       {{ label }}<span class="sr-only">{{ t('public-site.booking.for', { when }) }}<template v-if="booking.external">{{ t('public-site.booking.new-tab') }}</template></span>
     </UButton>
@@ -61,5 +71,13 @@ const bookable = computed(() => !!props.booking?.link && (props.booking.state ==
     >
       {{ t('public-site.booking.waiting-list') }}<span class="sr-only">{{ t('public-site.booking.for', { when }) }}</span>
     </ULink>
+    <PublicSiteBookingDrawer
+      v-if="drawing && bookable"
+      v-model:open="open"
+      :name="booking.drawer!"
+      :link="booking.link!"
+      :title="title!"
+      :when="when"
+    />
   </div>
 </template>

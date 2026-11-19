@@ -9,13 +9,9 @@ const { data: navigation } = await useAsyncData('core:navigation', () => queryCo
 const route = useRoute()
 const { data: settings } = await usePublicSettings()
 
-// The brand's tokens go into the page's head with the page, so no stylesheet request holds up the
-// first paint and a saved brand shows on the next page load.
-useHead(() => ({
-  style: brand.value?.css ? [{ key: 'core-brand', innerHTML: brand.value.css }] : [],
-}))
-
 const name = computed(() => brand.value?.name ?? t('core.public.default-name'))
+// The heading font is the public shell's alone (main.css); the staff shells stay calm.
+useHead({ bodyAttrs: { class: 'public-shell' } })
 const links = computed(() => [
   { label: t('core.public.whats-on'), to: '/whats-on' },
   // The archive of past shows, unless the theatre keeps it private (public-site.archive.public).
