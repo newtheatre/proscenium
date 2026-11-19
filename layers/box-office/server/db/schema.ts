@@ -450,6 +450,8 @@ export const passCovers = defineTable('box_office_pass_covers', {
   creditMinor: col.minor('credit_minor').notNull().default(0),
   // What was paid for the ticket and went back, when the pass needed less than that.
   refundMinor: col.minor('refund_minor').notNull().default(0),
+  // The refund of `refund_minor`, so its ledger entries come off the ticket's performance.
+  refundId: col.ref('payments_refunds', { nullable: true }),
   state: col.internal(text('state', { enum: ['held', 'applied', 'lapsed', 'undone'] }).notNull().default('applied')),
   by: col.account('by', { role: 'actor', nullable: true }),
   createdAt: col.createdAt(),

@@ -399,6 +399,7 @@ A ticket someone already held that a pass now covers (part 4, "Using a pass for 
 | `order_id` | text | not null; the ticket's booking | Internal | keep |
 | `asked_on` | text | the booking buying the pass, while `held` | Internal | keep |
 | `was_minor`, `credit_minor`, `refund_minor` | integer | the ticket's price, and what of it paid towards the pass or went back; CHECK credit + refund within was | Internal | keep |
+| `refund_id` | text FK payments_refunds, nullable | the refund of `refund_minor`, so its entries come off the ticket's performance | Internal | keep |
 | `state` | text | `held`, `applied`, `lapsed`, `undone` | Internal | keep |
 
 ### `box_office_comp_requests` (guarded)

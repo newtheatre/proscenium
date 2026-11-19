@@ -11,6 +11,7 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const toast = useToast()
+const { money } = await useMoney()
 const base = computed(() => props.mode === 'mine' ? `/api/box-office/passes/mine/${encodeURIComponent(props.passId)}/covers` : `/api/box-office/passes/${encodeURIComponent(props.passId)}/covers`)
 const choices = ref<CoverChoice[]>([])
 const others = ref(0)
@@ -36,8 +37,8 @@ async function use() {
   refusal.value = null
   busy.value = true
   try {
-    const done = await $api<{ covered: number }>(base.value, { method: 'POST', body: { lineIds: ticked.value }, headers: { 'idempotency-key': `pass-covers:${props.passId}:${Date.now()}:${++keys}` } })
-    toast.add({ title: t(props.mode === 'mine' ? 'box-office.covers.used' : 'box-office.covers.staff.used', { count: done.covered }), color: 'success' })
+    const done = await $api<{ covered: number, refundMinor?: number }>(base.value, { method: 'POST', body: { lineIds: ticked.value }, headers: { 'idempotency-key': `pass-covers:${props.passId}:${Date.now()}:${++keys}` } })
+    toast.add({ title: t(props.mode === 'mine' ? 'box-office.covers.used' : 'box-office.covers.staff.used', { count: done.covered }), description: done.refundMinor ? t('box-office.covers.staff.refunded', { amount: money(done.refundMinor, props.currency) }) : undefined, color: 'success' })
     emit('covered', done.covered)
     await load()
   }

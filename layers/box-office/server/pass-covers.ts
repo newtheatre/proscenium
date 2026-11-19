@@ -5,7 +5,8 @@
 // pass of that kind, as any entry. Asked for while the pass is bought, the switch waits as `held`
 // and is made when that booking is reserved or paid; asked for later, it is made at once. A ticket
 // already paid for counts towards the pass: what it cost comes off what the pass still owes, and
-// that money moves from the show's ticket income to Pass income.
+// that money moves from the show's ticket income to Pass income. Staff may switch one that cost more
+// than the pass still owes, refunding the difference under the usual refund approval.
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, theatreTimeZone, useSetting, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
@@ -13,6 +14,7 @@ import { getPerformance, getProduction, notify } from '#modules/core'
 import { postEntries } from '#modules/finance'
 import { takenBack } from './cancel'
 import { confirmOrder } from './confirm'
+import { refundOrder } from './refunds'
 import { passCovers } from './db/schema'
 import { liveLines, ORDER, type OrderRow } from './orders'
 import { covers, type PlannedPass } from './pass-sales'
@@ -249,8 +251,10 @@ export async function applyHeldCovers(unit: UnitView, orderId: string, accountId
 /**
  * Uses an issued pass for tickets its holder already has, at once: from their account, from the
  * staff screen, or at the till. Each must be one the pass could cover now, and together they must fit.
+ * With `refunds` (staff only), paid tickets may cost more than the pass still owes: soonest first,
+ * each puts what the pass still owes towards it and the rest is refunded.
  */
-export async function coverWithPass(unit: UnitView, passId: string, lineIds: readonly string[], by: string | null, at = nowMs()): Promise<{ covered: number }> {
+export async function coverWithPass(unit: UnitView, passId: string, lineIds: readonly string[], by: string | null, at = nowMs(), refunds = false): Promise<{ covered: number, refundMinor: number }> {
   const room = await roomOf(passId, at)
   if (room.pass.state !== 'active') refuse('box-office.pass.void', 'That pass has been cancelled.', { status: 409 })
   if (!room.pass.accountId) refuse('box-office.pass.cover-no-holder', 'This pass is nobody\'s in particular, so it has no tickets of theirs to cover.', { status: 422, remedy: 'Give the pass to its holder first.' })
@@ -258,8 +262,14 @@ export async function coverWithPass(unit: UnitView, passId: string, lineIds: rea
   const tickets = [...new Set(lineIds)].map(id => found.find(c => c.lineId === id))
   if (!tickets.length || tickets.some(t => !t)) refuse('box-office.pass.cover-not-yours', 'A pass can only be used for tickets its holder has reserved, for shows it covers that are still to come.', { status: 422, remedy: 'Reload to see the tickets it can cover.', fields: { cover: 'not-yours' } })
   if (!fits(tickets as Candidate[], room)) refuse('box-office.pass.cover-too-many', 'A pass gives one entry at a performance, and some passes only one performance of each show.', { status: 422, remedy: 'Leave out the tickets that would be a second entry.', fields: { cover: 'too-many' } })
-  const creditMinor = (tickets as Candidate[]).reduce((sum, t) => sum + (t.paid ? t.amountMinor : 0), 0)
-  if (creditMinor > room.pass.owedMinor) refuseAsk()
+  let budget = room.pass.owedMinor
+  const shares = (tickets as Candidate[]).sort((a, b) => a.startsAt - b.startsAt).map((ticket) => {
+    const creditMinor = ticket.paid ? Math.min(ticket.amountMinor, budget) : 0
+    budget -= creditMinor
+    return { ticket, creditMinor, refundMinor: ticket.paid ? ticket.amountMinor - creditMinor : 0 }
+  })
+  if (!refunds && shares.some(s => s.refundMinor > 0)) refuseAsk()
+  const creditMinor = shares.reduce((sum, s) => sum + s.creditMinor, 0)
   const pass = await first<{ once: number }>('SELECT once FROM box_office_passes WHERE id = ?', passId)
   // What the pass still owes may be waiting on a reservation: that comes down by the credit too.
   let sale: Sale | null = null
@@ -271,11 +281,11 @@ export async function coverWithPass(unit: UnitView, passId: string, lineIds: rea
       refuse('box-office.pass.cover-paying', 'This pass is being paid for just now.', { status: 409, remedy: 'Try again once that payment is finished.' })
     if (waiting?.state === 'reserved') sale = { lineId: waiting.line_id, orderId: waiting.order_id, wasMinor: waiting.amount_minor, creditMinor }
   }
-  await switchLines(unit, (tickets as Candidate[]).map(ticket => ({ pass: { id: passId, once: !!pass!.once }, ticket, creditMinor: ticket.paid ? ticket.amountMinor : 0 })), by, at, sale)
-  return { covered: tickets.length }
+  await switchLines(unit, shares.map(s => ({ pass: { id: passId, once: !!pass!.once }, ...s })), by, at, sale)
+  return { covered: tickets.length, refundMinor: shares.reduce((sum, s) => sum + s.refundMinor, 0) }
 }
 
-interface Item { pass: { id: string, once: boolean }, ticket: Candidate, coverId?: string, /** What the ticket paid that goes towards the pass. */ creditMinor: number }
+interface Item { pass: { id: string, once: boolean }, ticket: Candidate, coverId?: string, /** What the ticket paid that goes towards the pass, and what of it goes back. */ creditMinor: number, refundMinor?: number }
 /** A pass's sale line on a reservation, still to be paid, that comes down by what is credited. */
 interface Sale { lineId: string, orderId: string, wasMinor: number, creditMinor: number }
 
@@ -291,7 +301,14 @@ async function switchLines(unit: UnitView, items: readonly Item[], by: string | 
   if (!items.length) return
   const names = new Map<string, string>()
   const coverIds = new Map<string, string>()
-  for (const { pass, ticket, coverId, creditMinor } of items) {
+  // What paid tickets cost beyond what the pass owed goes back, one refund for each booking.
+  const refunds = new Map<string, { id: string, state: 'requested' | 'approved', amountMinor: number }>()
+  for (const orderId of new Set(items.filter(i => i.refundMinor).map(i => i.ticket.orderId))) {
+    const order = (await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId))!
+    const amountMinor = items.filter(i => i.ticket.orderId === orderId).reduce((sum, i) => sum + (i.refundMinor ?? 0), 0)
+    refunds.set(orderId, await refundOrder(unit, order, amountMinor, by, 'Leave that ticket out.'))
+  }
+  for (const { pass, ticket, coverId, creditMinor, refundMinor = 0 } of items) {
     unit.add(sql`UPDATE box_office_passes SET credit_minor = credit_minor + ${creditMinor}, updated_at = ${at} WHERE id = ${pass.id} AND state = 'active' AND (uses_total IS NULL OR uses_taken < uses_total)
       AND credit_minor + ${creditMinor} <= amount_minor
       AND NOT EXISTS (SELECT 1 FROM box_office_pass_redemptions d WHERE d.pass_id = ${pass.id} AND d.state = 'live' AND (d.performance_id = ${ticket.performanceId} OR (d.once = 1 AND d.production_id = ${ticket.productionId})))`)
@@ -303,7 +320,7 @@ async function switchLines(unit: UnitView, items: readonly Item[], by: string | 
     unit.add(sql`UPDATE box_office_order_lines SET discount_minor = list_minor, amount_minor = 0, pass_redemption_id = ${entryId}, updated_at = ${at}
       WHERE id = ${ticket.lineId} AND state = 'live' AND pass_redemption_id IS NULL AND amount_minor = ${ticket.amountMinor}`).expect(1, CHANGED)
     if (coverId) unit.add(sql`UPDATE box_office_pass_covers SET state = 'applied', updated_at = ${at} WHERE id = ${coverId} AND state = 'held'`).expect(1, CHANGED)
-    const id = coverId ?? unit.insertSet(passCovers, [{ passId: pass.id, lineId: ticket.lineId, orderId: ticket.orderId, wasMinor: ticket.amountMinor, creditMinor, refundMinor: 0, state: 'applied', by }])[0]!
+    const id = coverId ?? unit.insertSet(passCovers, [{ passId: pass.id, lineId: ticket.lineId, orderId: ticket.orderId, wasMinor: ticket.amountMinor, creditMinor, refundMinor, refundId: refundMinor ? refunds.get(ticket.orderId)!.id : null, state: 'applied', by }])[0]!
     if (!coverIds.has(ticket.orderId)) coverIds.set(ticket.orderId, id)
     if (!names.has(pass.id)) names.set(pass.id, (await first<{ name: string }>('SELECT t.name FROM box_office_passes p JOIN box_office_pass_types t ON t.id = p.pass_type_id WHERE p.id = ?', pass.id))!.name)
   }
@@ -352,7 +369,10 @@ async function switchLines(unit: UnitView, items: readonly Item[], by: string | 
         tickets: list.map(i => `${i.ticket.ticket} for ${i.ticket.show}, ${when.format(i.ticket.startsAt)}`).join('; '),
         reference: order.reference,
         money: order.state === 'confirmed'
-          ? `The ${format(creditMinor)} you paid for ${list.length === 1 ? 'that ticket' : 'those tickets'} now goes towards your pass.`
+          ? [
+              creditMinor ? `${format(creditMinor)} of what you paid for ${list.length === 1 ? 'that ticket' : 'those tickets'} now goes towards your pass.` : '',
+              refunds.has(orderId) ? `${format(refunds.get(orderId)!.amountMinor)} ${refunds.get(orderId)!.state === 'approved' ? 'is' : 'will be'} refunded the way you paid.` : '',
+            ].filter(Boolean).join(' ')
           : totalMinor === 0 ? 'There is nothing to pay on this booking now, and your tickets are on their way.' : `There is ${format(totalMinor)} left to pay on this booking, at the box office.`,
       },
       subject: ['box-office.order', orderId],

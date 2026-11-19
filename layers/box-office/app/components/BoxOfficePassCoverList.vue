@@ -18,7 +18,7 @@ function toggle(lineId: string, on: boolean | 'indeterminate') {
 }
 const describe = (c: CoverChoice) => [
   props.staff ? t('box-office.covers.booking', { reference: c.reference, ticket: c.ticket }) : c.ticket,
-  t(c.ask ? 'box-office.covers.ask' : c.paid ? 'box-office.covers.paid' : 'box-office.covers.reserved', { amount: money(c.amountMinor, props.currency) }),
+  t(c.ask ? (props.staff ? 'box-office.covers.ask-staff' : 'box-office.covers.ask') : c.paid ? 'box-office.covers.paid' : 'box-office.covers.reserved', { amount: money(c.amountMinor, props.currency) }),
 ].join(' · ')
 </script>
 
@@ -30,7 +30,7 @@ const describe = (c: CoverChoice) => [
       :model-value="ticked.includes(c.lineId)"
       :label="t('box-office.covers.show', { show: c.show, when: dateTime(c.startsAt) })"
       :description="describe(c)"
-      :disabled="disabled || c.ask"
+      :disabled="disabled || (c.ask && !staff)"
       @update:model-value="toggle(c.lineId, $event)"
     />
     <p

@@ -14,6 +14,7 @@ import staffCoversPost from '../../server/api/box-office/passes/[id]/covers.post
 import mineCoversGet from '../../server/api/box-office/passes/mine/[id]/covers.get'
 import mineCoversPost from '../../server/api/box-office/passes/mine/[id]/covers.post'
 import { createBasket, type Basket, type BasketInput } from '../../server/baskets'
+import { refundEntries } from '../../server/cancel'
 import { coverChoicesOnBuying } from '../../server/pass-covers'
 import { listPassTypes, type PassType } from '../../server/passes'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
@@ -278,5 +279,48 @@ describe('tickets already paid for', () => {
     const later = await paidFor(await house(30, { of: c }), who)
     const asked = await (await call(handle, 'GET', `/api/box-office/passes/mine/${passId}/covers`, { actor: who })).json() as { choices: { lineId: string, ask: boolean }[] }
     expect(asked.choices).toMatchObject([{ lineId: later.lineIds[0], ask: true }])
+  })
+})
+
+describe('a paid ticket that cost more than the pass still owes', () => {
+  it('is switched by staff, who refund the difference, and the refund comes off that show', async () => {
+    const type = await passType({ prices: [{ name: 'Adult', amountMinor: 1000 }] })
+    const who = await someone()
+    const passId = await boughtPass(type, who)
+    const waiting = (await rows<{ order_id: string }>('SELECT l.order_id FROM box_office_passes p JOIN box_office_order_lines l ON l.id = p.order_line_id WHERE p.id = ?', passId))[0]!.order_id
+    const show = await house(30, { of: b })
+    const paid = await paidFor(show, who)
+    const mine = await call(handle, 'POST', `/api/box-office/passes/mine/${passId}/covers`, { actor: who, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: paid.lineIds } })
+    expect([mine.status, (await mine.json() as { code: string }).code]).toEqual([422, 'box-office.pass.cover-ask'])
+    const listed = await (await call(handle, 'GET', `/api/box-office/passes/${passId}/covers`, { actor: staff })).json() as { choices: { lineId: string, ask: boolean }[] }
+    expect(listed.choices).toMatchObject([{ lineId: paid.lineIds[0], ask: true }])
+
+    const done = await call(handle, 'POST', `/api/box-office/passes/${passId}/covers`, { actor: staff, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: paid.lineIds } })
+    expect(done.status, JSON.stringify(await done.clone().json())).toBe(200)
+    expect(await done.json()).toMatchObject({ covered: 1, refundMinor: 200 })
+    expect(await passRow(passId)).toMatchObject({ credit_minor: 1000, paid_at: expect.any(Number) })
+    expect(await order(waiting)).toMatchObject({ state: 'confirmed', total_minor: 0 })
+    expect(await order(paid.orderId)).toMatchObject({ state: 'confirmed', total_minor: 0 })
+    const [cover] = await coversOf(passId)
+    expect(cover).toMatchObject({ credit_minor: 1000, refund_minor: 200, refund_id: expect.any(String) })
+    expect(await rows('SELECT amount_minor FROM payments_refunds WHERE id = ?', cover!.refund_id)).toEqual([{ amount_minor: 200 }])
+    expect(await passIncomeFrom(paid.orderId)).toBe(-1000)
+    const entries = await inContext(() => refundEntries(paid.orderId, { id: cover!.refund_id, amountMinor: 200 }))
+    expect(entries).toMatchObject([{ account: { key: 'box-office.deferred-ticket-income' }, amountMinor: 200, performanceId: show.performanceId }])
+  })
+
+  it('is refunded in full when the pass is paid for already', async () => {
+    const type = await passType({ prices: [{ name: 'Adult', amountMinor: 1200 }] })
+    const who = await someone()
+    const passId = await boughtPass(type, who)
+    const first = await paidFor(await house(30, { of: b }), who)
+    expect((await call(handle, 'POST', `/api/box-office/passes/mine/${passId}/covers`, { actor: who, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: first.lineIds } })).status).toBe(200)
+    const second = await paidFor(await house(30, { of: c }), who)
+    const done = await call(handle, 'POST', `/api/box-office/passes/${passId}/covers`, { actor: staff, headers: { 'idempotency-key': `pc${++keys}` }, body: { lineIds: second.lineIds } })
+    expect(done.status, JSON.stringify(await done.clone().json())).toBe(200)
+    expect(await done.json()).toMatchObject({ refundMinor: 1200 })
+    expect(await passRow(passId)).toMatchObject({ credit_minor: 1200 })
+    expect(await line(second.lineIds[0]!)).toMatchObject({ amount_minor: 0, pass_redemption_id: expect.any(String) })
+    expect(await passIncomeFrom(second.orderId)).toBe(0)
   })
 })
