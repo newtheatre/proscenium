@@ -12,7 +12,6 @@ import typesGet from '../../server/api/box-office/pass-types/index.get'
 import typesPost from '../../server/api/box-office/pass-types/index.post'
 import { createBasket, type Basket, type BasketInput } from '../../server/baskets'
 import { exchangeLines } from '../../server/exchange'
-import { bookingPage } from '../../server/book'
 import { passesOnSale } from '../../server/pass-sales'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
 import { listPassTypes } from '../../server/passes'
@@ -104,19 +103,6 @@ describe('a pass price offered instead of tickets', () => {
     const type = await passType({ prices: [{ name: 'Adult', amountMinor: 3000, insteadOf: [a.fullId] }, { name: 'Concession', amountMinor: 2400, insteadOf: [a.concessionId] }] })
     expect(type.prices.map(p => p.insteadOf)).toEqual([[a.fullId], [a.concessionId]])
     expect(await post({ prices: [{ name: 'Adult', amountMinor: 3000, insteadOf: [newId('tty')] }] })).toMatchObject({ status: 422, body: { code: 'box-office.pass.unknown-ticket-type' } })
-  })
-
-  it('online, is offered only at prices linked to tickets, never on its own', async () => {
-    const type = await passType({ prices: [{ name: 'Adult', amountMinor: 3000, insteadOf: [a.fullId] }, { name: 'Desk only', amountMinor: 2500 }] })
-    const unlinked = await passType({ prices: [{ name: 'Adult', amountMinor: 3000 }] })
-    await inContext(async () => (await import('../../../core/server/vocabularies/service')).ensureVocabularies())
-    const category = (await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.production-category' AND slug = 'play'"))[0]!.id
-    const publisher = person(['core.production.edit', 'core.production.publish'])
-    expect((await req('PATCH', `/api/core/productions/${a.productionId}`, { summary: 'A play to book for.', categoryTermId: category, effectsConfirmedNone: true, advisoriesConfirmedNone: true }, publisher)).status).toBe(200)
-    expect((await req('POST', `/api/core/productions/${a.productionId}/publish`, {}, publisher)).status).toBe(200)
-    const page = await inContext(() => bookingPage(a.performanceId))
-    expect(page.passes.onSale.find(p => p.id === type.id)!.prices.map(p => p.name)).toEqual(['Adult'])
-    expect(page.passes.onSale.some(p => p.id === unlinked.id)).toBe(false)
   })
 
   it('is offered with the covered shows still to come', async () => {

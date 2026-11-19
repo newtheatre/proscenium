@@ -299,6 +299,14 @@ async function hold() {
               :wheelchair="data.passes.wheelchair"
               :refusal="passRefusal"
             />
+            <BoxOfficePassOffer
+              v-for="pass in data.passes.onSale.filter(p => !swappable.includes(p))"
+              :key="pass.id"
+              v-model="buying"
+              :pass="pass"
+              :currency="currency"
+              :wheelchair="data.passes.wheelchair"
+            />
             <p
               v-if="passes.length || buying.length"
               class="text-sm font-medium text-muted"
