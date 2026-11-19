@@ -18,6 +18,8 @@ interface Performance {
   space: { id: string, name: string }
   access: Note[]
   effectsOff: string[]
+  /** Absent from an answer cached before latecomers were added. */
+  latecomers?: string
   booking: Booking | null
 }
 interface VenueSummary {
@@ -46,6 +48,8 @@ interface Production {
   contentNote: string | null
   runningMinutes: number | null
   intervalCount: number
+  /** When latecomers are let in to this show; a date with no interval may differ. Absent from an older cached answer. */
+  latecomers?: string
   state: 'published' | 'cancelled'
   past: boolean
   credits: { id: string, creditedName: string, role: string, section: string }[]
@@ -99,6 +103,8 @@ const only = computed(() => (dates.value.length === 1 && dates.value[0]!.state =
 // The dates and tickets panel: beside the story from lg, sticky; on a phone, after the guidance, with
 // a button by the title that jumps to it.
 const hasPanel = computed(() => !!production.value && (dates.value.length > 0 || !production.value.past || (production.value.venues?.length ?? 0) > 0))
+// A date says when latecomers are let in only where it differs from the show (one with no interval).
+const differs = (p: Performance) => !!p.latecomers && p.state === 'scheduled' && p.latecomers !== production.value?.latecomers
 const where = (p: Performance) => venues.value.length > 1 || p.space.name !== p.venue.name ? `${p.space.name}, ${p.venue.name}` : ''
 const credits = computed(() => {
   const sections = new Map<string, { section: string, people: { id: string, creditedName: string, role: string }[] }>()
@@ -146,7 +152,6 @@ useHead(() => {
     script: [{ key: 'public-site-events', type: 'application/ld+json', innerHTML: JSON.stringify(events).replace(/</g, '\\u003c') }],
   }
 })
-
 // NNT: the spotlight's four facts.
 const { range } = useDates()
 const runs = computed(() => {
@@ -433,6 +438,12 @@ const spotlightFacts = computed(() => [
                 >
                   {{ priceSummary(production.price, t) }}
                 </p>
+                <LatecomersNote
+                  v-if="production.latecomers && !production.past"
+                  :rule="production.latecomers"
+                  rules
+                  class="mb-2"
+                />
                 <ul class="divide-y divide-default border-y border-default">
                   <li
                     v-for="p in dates"
@@ -456,6 +467,10 @@ const spotlightFacts = computed(() => [
                       >
                         {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
                       </p>
+                      <LatecomersNote
+                        v-if="differs(p)"
+                        :rule="p.latecomers!"
+                      />
                       <ul
                         v-if="p.access.length"
                         class="flex flex-wrap gap-1"

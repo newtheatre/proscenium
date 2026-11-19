@@ -64,6 +64,14 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
 <template>
   <div class="flex min-h-screen flex-col">
     <SkipLink />
+    <!-- Until the first Owner is made, a banner across the top of every page points to setup. -->
+    <UBanner
+      v-if="setupNeeded && !onSetup"
+      color="info"
+      icon="i-lucide-wand-sparkles"
+      :title="t('core.public.setup-needed.title')"
+      :actions="[{ label: t('core.public.setup-needed.action'), to: '/setup', color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }]"
+    />
     <div class="dark">
       <UHeader
         :title="name"
@@ -129,19 +137,6 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
       tabindex="-1"
       class="grow outline-none"
     >
-      <UContainer
-        v-if="setupNeeded && !onSetup"
-        class="pt-6"
-      >
-        <UAlert
-          color="info"
-          variant="subtle"
-          icon="i-lucide-wand-sparkles"
-          :title="t('core.public.setup-needed.title')"
-          :description="t('core.public.setup-needed.description')"
-          :actions="[{ label: t('core.public.setup-needed.action'), to: '/setup', trailingIcon: 'i-lucide-arrow-right' }]"
-        />
-      </UContainer>
       <!-- What's on is the platform's page, so the house's band goes here and the page's own plain
            header is hidden under it (assets/css/nnt.css). -->
       <NntHero
