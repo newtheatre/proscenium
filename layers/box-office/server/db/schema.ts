@@ -368,6 +368,9 @@ export const passes = defineTable('box_office_passes', {
   usesTaken: col.internal(integer('uses_taken').notNull().default(0)),
   once: col.internal(integer('once', { mode: 'boolean' }).notNull().default(true)),
   amountMinor: col.minor('amount_minor').notNull(),
+  // What tickets already paid for, now covered by the pass, took off what it costs (box_office_pass_covers).
+  // Never more than amount_minor: the writes guard it, since a CHECK here would rebuild the table.
+  creditMinor: col.minor('credit_minor').notNull().default(0),
   currency: col.currency('currency').notNull(),
   // When it became somebody's: its order was reserved or confirmed, or staff issued it. Null while it
   // is only in a basket, where it works for that basket's own tickets and nothing else.
@@ -425,6 +428,44 @@ export const passRedemptions = defineTable('box_office_pass_redemptions', {
     index('box_office_pass_redemptions_order').on(t.orderId),
     index('box_office_pass_redemptions_claim').on(t.claimId),
     check('box_office_pass_redemptions_state', sql`${t.state} IN ('live', 'released')`),
+  ],
+})
+
+/**
+ * A ticket someone already had that a pass now covers (Matt, 19 November): its line becomes the
+ * pass's entry where it stands, in the same seat with the same code. `held` while the booking that
+ * buys the pass is being made, `applied` once switched, `lapsed` when the ticket changed first, and
+ * `undone` when it was switched back. What the ticket cost is kept, and what it paid comes off the pass.
+ */
+export const passCovers = defineTable('box_office_pass_covers', {
+  id: col.id(),
+  passId: col.ref('box_office_passes'),
+  lineId: col.ref('box_office_order_lines'),
+  // The ticket's own booking.
+  orderId: col.internal(text('order_id').notNull()),
+  // The booking that buys the pass, while the switch waits for it to be reserved or paid.
+  askedOn: col.internal(text('asked_on')),
+  wasMinor: col.minor('was_minor').notNull(),
+  // What was paid for the ticket and now pays towards the pass.
+  creditMinor: col.minor('credit_minor').notNull().default(0),
+  // What was paid for the ticket and went back, when the pass needed less than that.
+  refundMinor: col.minor('refund_minor').notNull().default(0),
+  // The refund of `refund_minor`, so its ledger entries come off the ticket's performance.
+  refundId: col.ref('payments_refunds', { nullable: true }),
+  state: col.internal(text('state', { enum: ['held', 'applied', 'lapsed', 'undone'] }).notNull().default('applied')),
+  by: col.account('by', { role: 'actor', nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'pcv',
+  realm: 'audience',
+  subject: { via: 'order_id' },
+  extra: t => [
+    uniqueIndex('box_office_pass_covers_line').on(t.lineId).where(sql`state = 'applied'`),
+    index('box_office_pass_covers_pass').on(t.passId, t.state),
+    index('box_office_pass_covers_asked').on(t.askedOn).where(sql`asked_on IS NOT NULL`),
+    check('box_office_pass_covers_state', sql`${t.state} IN ('held', 'applied', 'lapsed', 'undone')`),
+    check('box_office_pass_covers_money', sql`${t.creditMinor} >= 0 AND ${t.refundMinor} >= 0 AND ${t.creditMinor} + ${t.refundMinor} <= ${t.wasMinor}`),
   ],
 })
 
@@ -797,4 +838,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, passTypes, passShows, passPrices, passes, passRedemptions, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, passTypes, passShows, passPrices, passes, passRedemptions, passCovers, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }

@@ -8,9 +8,10 @@
 <script setup lang="ts">
 import type { Buyer } from './BoxOfficeBuyerPicker.vue'
 import type { Holder } from './BoxOfficeHolderPicker.vue'
+import type { CoverChoice } from './BoxOfficePassCoverList.vue'
 
-export interface TillPass { code: string, name: string, priceName: string, holder: string | null, owedMinor: number, left: number | null, unusable: { code: string, reason: string, remedy: string | null } | null }
-export interface TillPassBuy { passTypeId: string, passPriceId: string, name: string, priceName: string, amountMinor: number, entry: boolean, holder?: Buyer, /** Typed for a price only some people may have, in place of finding the holder. */ reference?: string }
+export interface TillPass { passId?: string, code: string, name: string, priceName: string, holder: string | null, owedMinor: number, left: number | null, unusable: { code: string, reason: string, remedy: string | null } | null }
+export interface TillPassBuy { passTypeId: string, passPriceId: string, name: string, priceName: string, amountMinor: number, entry: boolean, holder?: Buyer, /** Typed for a price only some people may have, in place of finding the holder. */ reference?: string, /** Tickets the holder already has, for this pass to cover once the sale is made (Matt, 19 November). */ cover?: string[] }
 interface OnSale { id: string, name: string, covers: boolean, holder: 'auto' | 'named' | 'open', uses: number | null, ahead: number, prices: { id: string, name: string, amountMinor: number, proofNote: string | null, restricted: boolean, insteadOf: string[], reference?: { label: string, field?: string, shape: string } }[] }
 interface SaleTicket { ticketTypeId: string, name: string, amountMinor: number, quantity: number }
 
@@ -93,6 +94,21 @@ const restricted = computed(() => !!choice.value?.price.restricted)
 // A price only some people may have needs someone who qualifies, or their reference; a pass in one
 // person's name needs them named; an open one may be anyone's.
 const ready = computed(() => !!choice.value && (restricted.value ? !!qualified.value || !!reference.value.trim() : !needsHolder.value || !!holder.value))
+// Tickets the person found already has for other shows this pass covers, ticked to begin with (Matt, 19 November).
+const holderAccount = computed(() => restricted.value ? qualified.value?.accountId : holder.value && 'accountId' in holder.value ? holder.value.accountId : undefined)
+const coverChoices = ref<{ choices: CoverChoice[], others: number }>({ choices: [], others: 0 })
+const cover = ref<string[]>([])
+watch([choice, holderAccount, entry], async () => {
+  const c = choice.value
+  const accountId = holderAccount.value
+  coverChoices.value = { choices: [], others: 0 }
+  cover.value = []
+  if (!c || !accountId) return
+  const found = await $api<{ choices: CoverChoice[], others: number }>('/api/box-office/desk/covers', { query: { performanceId: props.performanceId, passTypeId: c.type.id, passPriceId: c.price.id, accountId, entry: String(entry.value && c.type.covers) } }).catch(() => ({ choices: [], others: 0 }))
+  if (choice.value !== c || holderAccount.value !== accountId) return
+  coverChoices.value = found
+  cover.value = found.choices.filter(x => !x.ask).map(x => x.lineId)
+})
 let loadedFor = ''
 async function loadOnSale() {
   if (loadedFor === props.performanceId) return
@@ -145,7 +161,7 @@ function addSale() {
   if (!c || !ready.value) return
   const typed = restricted.value && !qualified.value ? reference.value.trim() : ''
   const who: Buyer | undefined = restricted.value ? (qualified.value ? { accountId: qualified.value.accountId, label: qualified.value.label } : holder.value) : holder.value
-  buys.value = [...buys.value, { passTypeId: c.type.id, passPriceId: c.price.id, name: c.type.name, priceName: c.price.name, amountMinor: c.price.amountMinor, entry: entry.value && c.type.covers, ...(who ? { holder: who } : {}), ...(typed ? { reference: typed } : {}) }]
+  buys.value = [...buys.value, { passTypeId: c.type.id, passPriceId: c.price.id, name: c.type.name, priceName: c.price.name, amountMinor: c.price.amountMinor - coverChoices.value.choices.filter(x => x.paid && cover.value.includes(x.lineId)).reduce((sum, x) => sum + x.amountMinor, 0), entry: entry.value && c.type.covers, ...(who ? { holder: who } : {}), ...(typed ? { reference: typed } : {}), ...(cover.value.length ? { cover: cover.value } : {}) }]
   // A swap: the ticket it replaces comes out of the sale, as its entry is the pass's.
   if (swapping.value && entry.value && c.type.covers) emit('swap', swapping.value)
   closeSelling()
@@ -171,6 +187,12 @@ const buyerLabel = (b: Buyer | undefined) => (!b ? t('box-office.screens.panel.p
       :title="t('box-office.screens.panel.pass.title', { name: found.name, holder: holderOf(found) })"
       :description="foundWords"
       :actions="foundActions"
+    />
+    <BoxOfficePassCoverPanel
+      v-if="found?.passId && !locked"
+      :pass-id="found.passId"
+      mode="staff"
+      :holder="found.holder"
     />
 
     <UAlert
@@ -309,6 +331,20 @@ const buyerLabel = (b: Buyer | undefined) => (!b ? t('box-office.screens.panel.p
             :placeholder="t('box-office.screens.panel.pass.holder-placeholder')"
           />
         </UFormField>
+        <div
+          v-if="coverChoices.choices.length"
+          class="space-y-2"
+        >
+          <p class="text-sm font-medium">
+            {{ t('box-office.covers.till.sell-title', { holder: buyerLabel(restricted ? (qualified ? { accountId: qualified.accountId, label: qualified.label } : holder) : holder) }) }}
+          </p>
+          <BoxOfficePassCoverList
+            v-model="cover"
+            :choices="coverChoices.choices"
+            :others="coverChoices.others"
+            staff
+          />
+        </div>
         <UCheckbox
           v-model="entry"
           :disabled="!choice?.type.covers"

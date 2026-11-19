@@ -53,6 +53,15 @@ watch(() => props.outcome.token, async (token) => {
       :headers="{ 'x-order-token': outcome.token }"
       @sent="booking = { ...booking!, passes: $event }"
     />
+    <UAlert
+      v-if="booking?.passes?.length"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-id-card"
+      :title="t('box-office.covers.done.title')"
+      :description="t('box-office.covers.done.help')"
+      :actions="[{ label: t('box-office.covers.done.go'), to: '/account/passes', color: 'neutral', variant: 'outline' }]"
+    />
     <BoxOfficeAccountCard
       v-if="outcome.accountLinkSent && !viewer.signedIn"
       :order-token="outcome.token"

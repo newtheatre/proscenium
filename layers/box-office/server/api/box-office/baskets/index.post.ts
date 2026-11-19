@@ -19,5 +19,7 @@ export default defineRoute({
     passes: z.array(z.object({ code: z.string().trim().min(4).max(40), bandId: idSchema('band').optional(), wheelchair: z.boolean().optional() }).strict()).max(20).optional(), // not-policy: shape bounds
     // Passes bought with this booking, each giving its first entry here.
     buy: z.array(z.object({ passTypeId: idSchema('pty'), passPriceId: idSchema('ppr'), bandId: idSchema('band').optional(), wheelchair: z.boolean().optional(), reference: z.string().trim().min(1).max(64).optional() }).strict()).max(20).optional(), // not-policy: shape bounds
+    // Tickets the signed-in buyer already has for other shows, for the passes bought here to cover.
+    cover: z.array(idSchema('orl')).max(50).optional(), // not-policy: shape bound
   }).strict().refine(v => v.lines.length + (v.passes?.length ?? 0) + (v.buy?.length ?? 0) > 0, 'Choose at least one ticket.'),
 }, (_event, { input, unit }) => createBasket(unit.view(), input))
