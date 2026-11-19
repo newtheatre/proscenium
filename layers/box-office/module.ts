@@ -284,7 +284,10 @@ export default defineModule({
     // Orders found by reference or buyer in the command palette.
     'core.search-source': [{ id: 'box-office.orders', record: 'box-office.order', ability: 'box-office.order.view', route: '/api/box-office/search', shells: ['console'] }],
     // The Tickets tab and fact on a production's page (show walkthrough, decision 1).
-    'core.record-tab': [{ id: 'box-office.production', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTickets', order: 10 }],
+    'core.record-tab': [
+      { id: 'box-office.production', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTickets', order: 10 },
+      { id: 'box-office.account', record: 'core.account', ability: 'box-office.order.view', component: 'BoxOfficeAccountTab', order: 20 },
+    ],
     'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
     'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],

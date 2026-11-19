@@ -1,8 +1,8 @@
 <!-- One order (Box office specification, part 6, "Order"): its tickets, alike ones counted together,
      and whether each has been used; what was paid, how and by whom, and every refund with where it
      stands; its cancellations; and what may be done with it now. The server says which of collect,
-     release, cancel, refund and exchange the viewer may do; a reservation can also be kept past its
-     release time. A reservation is cancelled one way, and a paid booking's tickets another. -->
+     release, cancel, refund, exchange and assign the viewer may do; a reservation can also be kept past
+     its release time. A booking nobody owns can be given to a person. A reservation is cancelled one way, and a paid booking's tickets another. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -23,6 +23,7 @@ interface Order {
   totalMinor: number
   complimentary: boolean
   pass: OrderPass | null
+  passes: { id: string, passTypeId: string, name: string, priceName: string, code: string | null, state: 'active' | 'void', paid: boolean, holder: string | null, holderId: string | null, how: 'bought' | 'entry', entries: number }[]
   compPending: boolean
   compNeedsApproval: boolean
   keep: boolean
@@ -38,7 +39,7 @@ interface Order {
   payments: Payment[]
   refunds: Refund[]
   cancellations: Cancellation[]
-  can: { release: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean }
+  can: { release: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean, assign: boolean }
 }
 
 const { t } = useT()
@@ -57,9 +58,10 @@ const { data, status, error, refresh } = await useAPI<Order>(() => `/api/box-off
 const cancelling = ref(false)
 const exchanging = ref(false)
 const comping = ref(false)
+const assigning = ref(false)
 // What can be exchanged: live tickets not yet used at the door.
 const exchangeable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live' && !l.admittedAt))
-// What can be cancelled: live tickets. Those used at the door are shown in the dialogue but cannot be ticked.
+// What can be cancelled: live tickets. Those used at the door start unticked in the dialogue and stay admitted.
 const cancellable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live'))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const at = (action: string): string => `/api/box-office/orders/${encodeURIComponent(id.value)}/${action}`
@@ -96,6 +98,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   const o = data.value
   if (!o) return []
   const groups: DropdownMenuItem[][] = []
+  if (o.can.assign) groups.push([{ label: t('box-office.order.assign.action'), icon: 'i-lucide-user-plus', onSelect: () => { assigning.value = true } }])
   if (o.can.release) groups.push([{ label: t(o.keep ? 'box-office.order.keep.off' : 'box-office.order.keep.on'), icon: 'i-lucide-bookmark', onSelect: () => { void keep(!o.keep) } }])
   if (o.can.comp && !o.compPending) groups.push([{ label: t('box-office.order.comp.action'), icon: 'i-lucide-gift', onSelect: () => { comping.value = true } }])
   if (o.can.exchange && exchangeable.value.length) groups.push([{ label: t('box-office.order.exchange.title'), icon: 'i-lucide-arrow-left-right', onSelect: () => { exchanging.value = true } }])
@@ -103,7 +106,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   // someone who may only release, releasing it whole. A paid booking's tickets are cancelled.
   const destructive: DropdownMenuItem[] = []
   const paid = o.state === 'confirmed'
-  if (o.can.cancel && cancellable.value.some(l => !paid || !l.admittedAt))
+  if (o.can.cancel && cancellable.value.length)
     destructive.push({ label: t(paid ? 'box-office.order.cancel.title' : 'box-office.order.cancel.reservation-title'), icon: 'i-lucide-circle-x', color: 'error', onSelect: () => { cancelling.value = true } })
   else if (o.can.release)
     destructive.push({ label: t('box-office.order.release.button'), icon: 'i-lucide-circle-x', color: 'error', onSelect: () => { void release() } })
@@ -132,6 +135,12 @@ const summary = computed(() => {
     ...(o.state === 'reserved' && o.releaseAt ? [{ label: t('box-office.order.releases'), value: o.keep ? t('box-office.order.kept') : dateTime(o.releaseAt) }] : []),
   ]
 })
+const passDetail = (p: Order['passes'][number]) => [
+  p.priceName,
+  p.code ? t('box-office.order.passes.code', { code: p.code }) : null,
+  p.holder ? t('box-office.order.passes.holder', { name: p.holder }) : t('box-office.order.passes.no-holder'),
+  p.state === 'void' ? t('box-office.order.passes.void') : p.paid ? null : t('box-office.order.passes.unpaid'),
+].filter(Boolean).join(' · ')
 const trail = computed(() => [{ label: t('box-office.navigation.orders.label'), to: '/console/box-office/orders' }])
 
 // Alike tickets are one row: the same seats, type, price and state, and each used at the door or not.
@@ -218,6 +227,28 @@ const refundDetail = (o: Order, r: Refund) => {
                 </RecordListItem>
               </RecordList>
             </PageSection>
+            <PageSection
+              v-if="d.passes.length"
+              :title="t('box-office.order.passes.title')"
+            >
+              <RecordList :label="t('box-office.order.passes.title')">
+                <RecordListItem
+                  v-for="p in d.passes"
+                  :key="p.id"
+                  icon="i-lucide-ticket"
+                  :to="`/console/box-office/passes?holders=${encodeURIComponent(p.passTypeId)}`"
+                  :name="t(p.how === 'bought' ? 'box-office.order.passes.bought' : 'box-office.order.passes.used', { name: p.name })"
+                  :description="passDetail(p)"
+                  :muted="p.state === 'void'"
+                >
+                  <StatusBadge
+                    v-if="p.state === 'void'"
+                    tone="warning"
+                    :label="t('box-office.order.passes.void-badge')"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </PageSection>
             <PageSection :title="t('box-office.order.payments')">
               <p
                 v-if="!d.payments.length && !d.refunds.length"
@@ -275,7 +306,15 @@ const refundDetail = (o: Order, r: Refund) => {
         :currency="d.currency"
         :fee-minor="d.cancellationFeeMinor"
         :lines="cancellable"
+        :has-buyer="!!d.buyer"
         @cancelled="refresh()"
+      />
+      <BoxOfficeAssignDialog
+        v-model:open="assigning"
+        :order-id="d.id"
+        :reference="d.reference"
+        :paid="d.state === 'confirmed'"
+        @assigned="refresh()"
       />
       <BoxOfficeCompDialog
         v-model:open="comping"

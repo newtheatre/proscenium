@@ -707,6 +707,31 @@ export async function sendDeskTickets(unit: UnitView, orderId: string, to: { ema
 }
 
 /**
+ * Gives a booking nobody owns to a person, from its console page: one sold at the desk with nobody's
+ * details, found later to be someone's (Matt, 19 November). Nobody is emailed unless staff ask, and
+ * then only a paid booking's tickets are sent. A pass sold on it to nobody in particular becomes theirs.
+ */
+export async function assignBuyer(unit: UnitView, orderId: string, to: { email?: string, accountId?: string }, send: boolean): Promise<{ buyer: string, sent: boolean }> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, orderId)
+  if (!order || order.state === 'basket') refuse('box-office.order.not-found', 'There is no such order.', { status: 404 })
+  if (!['reserved', 'awaiting_payment', 'confirmed'].includes(order.state)) refuse('box-office.order.not-assignable', 'Only a booking that still stands can be given to somebody.', { status: 409 })
+  if (order.account_id) refuse('box-office.order.has-buyer', 'This booking is somebody\'s already.', { status: 409, remedy: 'Reload to see whose.' })
+  const lines = await liveLines(order.id)
+  if (send && (order.state !== 'confirmed' || !lines.length)) refuse('box-office.order.nothing-to-send', 'Only the tickets of a paid booking can be emailed.', { status: 422, fields: { send: 'not-paid' } })
+  const accountId = to.accountId ? await canonicalAccount(to.accountId) : (await findOrCreateAccount(unit, { address: to.email!, origin: 'guest' })).accountId
+  if (send && to.accountId && !await addressFor(accountId, 'audience')) refuse('box-office.desk.no-address', 'There is no email address for this person, so the tickets cannot be sent.', { status: 422, remedy: 'Leave the tickets unsent, or type their email address instead.' })
+  const at = nowMs()
+  const token = send ? randomToken() : null
+  unit.add(sql`UPDATE box_office_orders SET account_id = ${accountId}, link_token_hash = coalesce(${token ? await hashOf(token) : null}, link_token_hash), updated_at = ${at}
+    WHERE id = ${order.id} AND state = ${order.state} AND account_id IS NULL`).expect(1, { code: 'box-office.order.has-buyer', reason: 'This booking has just changed.', remedy: 'Reload to see it as it is now.' })
+  unit.add(sql`UPDATE box_office_passes SET account_id = ${accountId}, updated_at = ${at}
+    WHERE account_id IS NULL AND order_line_id IN (SELECT id FROM box_office_order_lines WHERE order_id = ${order.id} AND kind = 'pass_sale' AND state = 'live')`)
+  if (send) await sendTickets(unit, order, lines, { accountId, token: token!, dedupeKey: `confirmed:${order.id}` })
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { assignedTo: accountId, sent: send } })
+  return { buyer: await accountLabel(accountId), sent: send }
+}
+
+/**
  * The till's receipt is going to one person, for a paid sale with this order in it (Matt, 18
  * November: one receipt, which carries the tickets). The receipt links to a booking showing that
  * person's tickets and their codes, so no separate tickets email is sent:

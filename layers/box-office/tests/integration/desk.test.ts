@@ -402,6 +402,44 @@ describe('selling at the desk', () => {
     expect((await till({ ...input, promoCode: code })).body.code).toBe('box-office.desk.bad-input')
   })
 
+  it('gives a sale made with nobody\'s details to a person later, emailing nobody unless asked (Matt, 19 November)', async () => {
+    const clerk = person(['box-office.order.view', 'box-office.order.exchange', 'box-office.order.sell'])
+    const h = await house(4)
+    const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const o = (await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, seller)).body.orders[0]
+    expect((await req('GET', `/api/box-office/orders/${o.orderId}`, undefined, clerk)).body).toMatchObject({ buyer: null, can: { assign: true }, passes: [] })
+    const before = await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', o.orderId)
+
+    expect((await req('POST', `/api/box-office/orders/${o.orderId}/assign`, { email: 'found@example.org' }, onlooker)).status).toBe(403)
+    const done = await req('POST', `/api/box-office/orders/${o.orderId}/assign`, { email: 'found@example.org' }, clerk)
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toMatchObject({ sent: false })
+    const owner = (await order(o.orderId)).account_id as string
+    expect(owner).toMatch(/^acc_/)
+    expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', o.orderId)).toBe(before)
+    expect((await req('POST', `/api/box-office/orders/${o.orderId}/assign`, { email: 'other@example.org' }, clerk)).body).toMatchObject({ code: 'box-office.order.has-buyer' })
+    expect((await req('GET', `/api/box-office/orders/${o.orderId}`, undefined, clerk)).body).toMatchObject({ buyer: { id: owner }, can: { assign: false } })
+
+    // The person's console page lists the booking.
+    const tab = await req('GET', `/api/box-office/accounts/${owner}`, undefined, clerk)
+    expect(tab.status, JSON.stringify(tab.body)).toBe(200)
+    expect(tab.body).toMatchObject({ orders: [expect.objectContaining({ id: o.orderId, reference: o.reference })], passes: [] })
+  })
+
+  it('emails the tickets when a sale is given to a person and staff ask for it', async () => {
+    const clerk = person(['box-office.order.view', 'box-office.order.exchange', 'box-office.order.sell'])
+    const h = await house(4)
+    const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }] })
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    const o = (await req('GET', `/api/box-office/desk/sold?intent=${sale.body.intentId}`, undefined, seller)).body.orders[0]
+    const done = await req('POST', `/api/box-office/orders/${o.orderId}/assign`, { email: 'sendme@example.org', send: true }, clerk)
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toMatchObject({ sent: true })
+    expect(await count("SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE 'box-office.order-confirmed%'", o.orderId)).toBe(1)
+  })
+
   it('shows what was sold after the payment, and emails the tickets afterwards', async () => {
     const h = await house(4)
     const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 2 }] })
