@@ -45,6 +45,14 @@ search. `col.internal()` and `col.personal()` take `encrypted: true`, sealed wit
 `col.special()` always is. After changing a table run `bun run db:generate -- --name <what>`;
 the conformance check fails while the code and the migrations disagree.
 
+Until the first release the migrations were squashed into one baseline per journal on 19 November
+2026 (`migrations/…_baseline`, `tests/fixtures/migrations/…_baseline`). Drizzle Kit wrote the
+tables; the life-cycle and counter triggers it cannot write, and the `none` tax code, follow at the
+end of the upstream baseline, carried over by hand. The unused `core_productions.age_guidance`
+column was dropped. A database made from the old migrations does not upgrade to the baseline: it
+is reset (every table dropped, or a new D1 database bound) and migrated afresh. Once a release is
+tagged, migrations are never squashed again.
+
 ### Accounts, the account scope and merges
 
 `col.account(name, { role, onMerge })` refers to an account. `onMerge` is `alias` when left out: the
