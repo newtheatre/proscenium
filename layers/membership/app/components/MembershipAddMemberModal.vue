@@ -137,7 +137,7 @@ async function submit() {
           <UFormField
             v-if="scheme.reference"
             name="reference"
-            :label="scheme.reference.label ?? t('membership.screens.add-member.reference')"
+            :label="t('membership.screens.add-member.reference-their', { noun: scheme.reference.noun })"
             :help="t('membership.screens.add-member.reference-help', { list: scheme.reference.listName })"
           >
             <UInput

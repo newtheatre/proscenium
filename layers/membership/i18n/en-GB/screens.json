@@ -135,7 +135,7 @@
   "membership.screens.add-member.scheme-placeholder": "Choose a scheme",
   "membership.screens.add-member.address": "Email address",
   "membership.screens.add-member.length": "Length",
-  "membership.screens.add-member.reference": "Student ID",
+  "membership.screens.add-member.reference-their": "Their {noun}",
   "membership.screens.add-member.reference-help": "Optional. Checked against {list}, and the entry is used up. Its end date applies unless you set one.",
   "membership.screens.add-member.already-ended": "This end date has already passed",
   "membership.screens.add-member.already-ended-help": "The membership will count as lapsed as soon as it is added, and will still use up a member number.",

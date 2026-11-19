@@ -127,15 +127,15 @@ export default defineRequirementSource({
   },
 
   async describe(refs) {
-    const out: Record<string, { label: string, presentable?: { label: string, field?: string, shape: string } }> = {}
+    const out: Record<string, { label: string, presentable?: { label: string, field?: string, noun?: string, shape: string } }> = {}
     const presentableOf = async (scheme: Scheme) => {
       const list = await schemeList(scheme)
       // The list's label is a whole phrase (V13), so it is the field's own name and never set inside a
       // sentence; the hint uses the list's short noun, and says a member number works too, since a
       // member added by staff may have no reference on the list.
       return list?.keyKind === 'reference'
-        ? { label: `${scheme.name}: type your ${nounOf(list)} or member number to get this price`, field: list.referenceLabel ?? 'Membership reference', shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
-        : { label: `${scheme.name}: type your member number to get this price`, field: 'Member number', shape: 'member-number' }
+        ? { label: `${scheme.name}: type your ${nounOf(list)} or member number to get this price`, field: list.referenceLabel ?? 'Membership reference', noun: nounOf(list), shape: list.referenceShape ? `${list.referenceShape.kind}:${list.referenceShape.min}-${list.referenceShape.max}` : 'reference' }
+        : { label: `${scheme.name}: type your member number to get this price`, field: 'Member number', noun: 'member number', shape: 'member-number' }
     }
     for (const ref of refs) {
       const id = schemeIdOf(ref)
@@ -145,7 +145,7 @@ export default defineRequirementSource({
         const taking = (await listSchemes(['open', 'closed'])).filter(s => s.acceptsReference)
         out[ref] = taking.length === 1
           ? { label: 'Members', presentable: await presentableOf(taking[0]!) }
-          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', shape: 'reference' } } : { label: 'Members' }
+          : taking.length ? { label: 'Members', presentable: { label: 'Members: type your membership reference or member number to get this price', field: 'Membership reference', noun: 'membership reference', shape: 'reference' } } : { label: 'Members' }
         continue
       }
       const scheme = await getScheme(id)

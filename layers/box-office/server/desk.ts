@@ -531,7 +531,7 @@ export interface DeskPerformance {
    * `reference`, on a member price: what the buyer may give instead of the seller checking by hand,
    * worded by its source. `holder`: each ticket is for someone who qualifies, named at the till.
    */
-  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, shape: string }, holder?: true, companion?: true }[]
+  rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, field?: string, noun?: string, shape: string }, holder?: true, companion?: true }[]
 }
 
 /**
