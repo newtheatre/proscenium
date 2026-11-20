@@ -79,7 +79,10 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
     :title="t('front-of-house.open-shifts.title')"
     :trail="trail"
   >
-    <div class="mb-6 flex flex-wrap gap-3">
+    <div
+      v-if="data?.shifts.length"
+      class="mb-6 flex flex-wrap gap-3"
+    >
       <UFormField :label="t('front-of-house.open-shifts.production')">
         <USelect
           v-model="production"

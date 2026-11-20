@@ -33,6 +33,8 @@ watch(data, (d) => {
 
 const cards = computed(() => data.value?.cards ?? kept.value)
 const card = computed(() => cards.value.find(c => c.venueId === venue.value) ?? null)
+// Opened from a performance's board, the way back is that board; otherwise front of house tonight.
+const back = computed(() => typeof route.query.performance === 'string' ? `/live/front-of-house/${encodeURIComponent(route.query.performance)}` : '/live/front-of-house')
 const fromDevice = computed(() => !data.value && !!card.value)
 </script>
 
@@ -40,6 +42,7 @@ const fromDevice = computed(() => !data.value && !!card.value)
   <PageLive
     :title="t('front-of-house.live.emergency-card')"
     :context="card?.venueName"
+    :back="back"
   >
     <div class="mx-auto max-w-3xl space-y-4">
       <template v-if="card">
