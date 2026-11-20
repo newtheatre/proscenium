@@ -28,6 +28,8 @@ const { data, status, error, refresh } = await useAPI<{ stocktake: Stocktake, li
   () => `/api/bar/stocktakes/${id.value}`,
   { key: `bar:stocktake:${id.value}` },
 )
+// Chosen by width after hydration, so a count's fields are never on the page twice.
+const phone = useScreenQuery('(max-width: 639px)')
 const state = computed(() => data.value?.stocktake.state)
 const tone = (s: State) => ({ counting: 'info', submitted: 'warning', approved: 'success', abandoned: 'neutral' } as const)[s]
 
@@ -269,7 +271,74 @@ const facts = computed(() => {
               :title="t('bar.screens.stocktakes.counting')"
               :description="[d.blind ? t('bar.screens.stocktakes.counting-blind') : t('bar.screens.stocktakes.counting-help'), anyWeighable ? t('bar.screens.stocktakes.counting-weighed') : ''].filter(Boolean).join(' ')"
             >
+              <!-- On a phone: one item a row, its fields under its name, for counting on the move. -->
+              <RecordList
+                v-if="phone"
+                :label="t('bar.screens.stocktakes.counting')"
+              >
+                <RecordListItem
+                  v-for="l in d.lines"
+                  :key="l.id"
+                  :name="l.name"
+                  :description="l.level === null ? undefined : t('bar.screens.stocktakes.level-is', { amount: signedAmount(l, l.level) })"
+                >
+                  <IconButton
+                    icon="i-lucide-x"
+                    :label="t('bar.screens.stocktakes.take-out', { name: l.name })"
+                    @click="takeOut(l)"
+                  />
+                  <template #below>
+                    <div
+                      v-if="entries[l.id]"
+                      class="space-y-2"
+                    >
+                      <UFieldGroup>
+                        <UInputNumber
+                          v-model="entries[l.id]!.count"
+                          :min="0"
+                          size="lg"
+                          :step="l.countUnitSize === 1 ? 1 : 0.1"
+                          :format-options="{ maximumFractionDigits: l.countUnitSize === 1 ? 0 : 2 }"
+                          :aria-label="l.weighable ? t('bar.screens.stocktakes.full-of', { name: l.name }) : t('bar.screens.stocktakes.count-of', { name: l.name })"
+                        />
+                        <UBadge
+                          color="neutral"
+                          variant="outline"
+                          size="lg"
+                          :label="l.weighable ? t('bar.screens.stocktakes.full', { unit: countWord(l, 2) }) : countWord(l, 2)"
+                        />
+                      </UFieldGroup>
+                      <UFormField
+                        v-if="l.weighable"
+                        :label="t('bar.screens.stocktakes.weighed')"
+                      >
+                        <UFieldGroup>
+                          <UInputNumber
+                            v-model="entries[l.id]!.weighed"
+                            :min="0"
+                            size="lg"
+                            :aria-label="t('bar.screens.stocktakes.weight-of', { name: l.name })"
+                          />
+                          <UBadge
+                            color="neutral"
+                            variant="outline"
+                            size="lg"
+                            :label="unitLabel('g')"
+                          />
+                        </UFieldGroup>
+                      </UFormField>
+                      <p
+                        v-if="l.weighable && workedText(l)"
+                        class="text-sm text-muted tabular-nums"
+                      >
+                        {{ workedText(l) }}
+                      </p>
+                    </div>
+                  </template>
+                </RecordListItem>
+              </RecordList>
               <UTable
+                v-else
                 :data="d.lines"
                 :columns="countColumns"
                 :caption="t('bar.screens.stocktakes.counting')"
@@ -331,7 +400,59 @@ const facts = computed(() => {
             :title="t('bar.screens.stocktakes.review')"
             :description="d.stocktake.state === 'submitted' ? t('bar.screens.stocktakes.review-help', { amount: money(d.reasonOverMinor) }) : undefined"
           >
+            <!-- On a phone: one item a row, with its reason under it where it differs. -->
+            <RecordList
+              v-if="phone"
+              :label="t('bar.screens.stocktakes.review')"
+            >
+              <RecordListItem
+                v-for="l in d.lines"
+                :key="l.id"
+                :name="l.name"
+                :description="[l.expected === null ? null : t('bar.screens.stocktakes.expected-is', { amount: signedAmount(l, l.expected) }), l.counted === null ? null : t('bar.screens.stocktakes.counted-is', { amount: signedAmount(l, l.counted) })].filter(Boolean).join(' · ')"
+              >
+                <span class="text-right text-sm">
+                  <span
+                    v-if="differs(l)"
+                    :class="['block tabular-nums', l.counted! < l.expected! ? 'text-error' : 'text-success']"
+                  >{{ l.counted! > l.expected! ? '+' : '' }}{{ signedAmount(l, l.counted! - l.expected!) }}</span>
+                  <span
+                    v-else
+                    class="block text-muted"
+                  >{{ t('bar.screens.stocktakes.matches') }}</span>
+                  <span
+                    v-if="l.varianceValueMinor"
+                    class="block tabular-nums text-muted"
+                  >{{ money(l.varianceValueMinor) }}</span>
+                </span>
+                <template
+                  v-if="differs(l)"
+                  #below
+                >
+                  <UFormField
+                    v-if="d.stocktake.state === 'submitted'"
+                    :label="t('bar.screens.stocktakes.reason-for', { name: l.name })"
+                    :name="`reason-${l.id}`"
+                    :error="reasonError(l)"
+                    :ui="{ label: 'sr-only' }"
+                  >
+                    <USelect
+                      :model-value="l.reasonTermId ?? NONE"
+                      :items="reasonItems"
+                      @update:model-value="v => setReason(l, v as string)"
+                    />
+                  </UFormField>
+                  <p
+                    v-else-if="l.reasonTermId"
+                    class="text-sm text-muted"
+                  >
+                    {{ reasonLabel(l.reasonTermId) }}
+                  </p>
+                </template>
+              </RecordListItem>
+            </RecordList>
             <UTable
+              v-else
               :data="d.lines"
               :columns="reviewColumns"
               :caption="t('bar.screens.stocktakes.review')"

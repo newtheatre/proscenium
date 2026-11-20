@@ -59,7 +59,6 @@ const placeItems = computed(() => [
 ])
 const placeName = (l: Location) => placeItems.value.find(p => p.value === (l.spaceId ? `s:${l.spaceId}` : l.venueId ? `v:${l.venueId}` : 'none'))?.label
 
-const locationName = (id: string) => data.value?.locations.find(l => l.id === id)?.name ?? ''
 const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
 // What the label says, for someone who records allergens: products made from the item answer with it.
 function allergenText(i: Item): string | null {
@@ -69,9 +68,12 @@ function allergenText(i: Item): string | null {
   if (!a.contains.length && !a.mayContain.length) return t('bar.screens.product.none-listed')
   return [a.contains.length ? `${t('bar.screens.product.contains')}: ${named(a.contains)}` : null, a.mayContain.length ? `${t('bar.screens.product.may-contain')}: ${named(a.mayContain)}` : null].filter(Boolean).join(' · ')
 }
+// Levels by location are the console's Stock screen; set-up shows the pack and the label.
 function describeItem(i: Item): string {
-  const where = i.levels.filter(l => l.quantity !== 0).map(l => `${locationName(l.locationId)} ${amount(i, l.quantity)}`)
-  return [t('bar.screens.stock.pack', { size: number(i.packSize, 0), unit: t(`bar.screens.stock.units.${i.baseUnit}`), pack: i.packName }), ...where, allergenText(i)].filter(Boolean).join(' · ')
+  const pack = i.baseUnit === 'each'
+    ? t('bar.screens.stock.pack-each', { size: number(i.packSize, 0), pack: i.packName })
+    : t('bar.screens.stock.pack', { size: number(i.packSize, 0), unit: t(`bar.screens.stock.units.${i.baseUnit}`), pack: i.packName })
+  return [pack, allergenText(i)].filter(Boolean).join(' · ')
 }
 const checking = ref<{ title: string, endpoint: string, contains: string[], mayContain: string[] } | null>(null)
 function checkLabel(i: Item) {
@@ -208,7 +210,22 @@ async function setActive(path: string, name: string, active: boolean) {
         v-if="data"
         class="space-y-6"
       >
+        <EmptyState
+          v-if="!data.items.length"
+          icon="i-lucide-package"
+          :title="t('bar.screens.stock.empty-title')"
+          :description="t('bar.screens.stock.empty')"
+        >
+          <template #actions>
+            <UButton
+              icon="i-lucide-plus"
+              :label="t('bar.screens.stock.new-item')"
+              @click="editItem()"
+            />
+          </template>
+        </EmptyState>
         <PageSection
+          v-else
           :title="t('bar.screens.stock.items')"
           :description="t('bar.screens.stock.items-help')"
         >
@@ -221,16 +238,7 @@ async function setActive(path: string, name: string, active: boolean) {
             :actions="[{ label: t('bar.screens.stock.show-all'), to: '/admin/modules/bar/stock', color: 'neutral', variant: 'outline' }]"
             class="mb-3"
           />
-          <EmptyState
-            v-if="!data.items.length"
-            icon="i-lucide-package"
-            :title="t('bar.screens.stock.empty-title')"
-            :description="t('bar.screens.stock.empty')"
-          />
-          <div
-            v-else
-            class="space-y-4"
-          >
+          <div class="space-y-4">
             <p
               v-if="!shownItems.length"
               class="text-sm text-muted"

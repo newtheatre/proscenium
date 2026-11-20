@@ -1,6 +1,6 @@
 <!-- Stocktakes (S10): counts going on and waiting for approval first, then the latest finished. A
      count is started at a location, of everything or of one category, and of every item in use or
-     only those the location has held; a row opens it to count, to review or as its record. -->
+     only those the location has held; a row opens it to count, to review or as its record. A table on a laptop, a list on a phone. -->
 <script setup lang="ts">
 type State = 'counting' | 'submitted' | 'approved' | 'abandoned'
 interface Stocktake { id: string, location: string, state: State, category: string | null, startedBy: string, startedAt: number, submittedAt: number | null, approvedAt: number | null, varianceValueMinor: number | null }
@@ -13,6 +13,8 @@ const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 const { data, status, error, refresh } = await useAPI<{ stocktakes: Stocktake[], locations: { id: string, name: string }[], categories: { id: string, name: string }[], uncategorised: number, can: { approve: boolean } }>('/api/bar/stocktakes', { key: 'bar:stocktakes' })
 
+// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
+const phone = useScreenQuery('(max-width: 639px)')
 const tone = (s: State) => ({ counting: 'info', submitted: 'warning', approved: 'success', abandoned: 'neutral' } as const)[s]
 const columns = computed(() => [
   { id: 'when', header: t('bar.screens.stocktakes.started') },
@@ -73,12 +75,43 @@ async function start() {
           :title="t('bar.screens.stocktakes.empty.title')"
           :description="t('bar.screens.stocktakes.empty.description')"
           icon="i-lucide-clipboard-list"
-        />
+        >
+          <template #actions>
+            <UButton
+              icon="i-lucide-plus"
+              :label="t('bar.screens.stocktakes.start')"
+              @click="openStart"
+            />
+          </template>
+        </EmptyState>
+        <RecordList
+          v-if="d.stocktakes.length && phone"
+          :label="t('bar.navigation.stocktakes.label')"
+        >
+          <RecordListItem
+            v-for="r in d.stocktakes"
+            :key="r.id"
+            :to="`/console/bar/stocktakes/${r.id}`"
+            :name="[r.location, r.category ?? t('bar.screens.stocktakes.everything')].join(' · ')"
+            :description="[dateTime(r.startedAt), r.startedBy].join(' · ')"
+          >
+            <span
+              v-if="r.varianceValueMinor !== null"
+              class="text-sm tabular-nums"
+            >{{ money(r.varianceValueMinor) }}</span>
+            <StatusBadge
+              :tone="tone(r.state)"
+              :label="t(`bar.screens.stocktakes.states.${r.state}`)"
+            />
+          </RecordListItem>
+        </RecordList>
         <UTable
-          v-else
+          v-else-if="d.stocktakes.length"
           :data="d.stocktakes"
           :columns="columns"
           :caption="t('bar.navigation.stocktakes.label')"
+          :meta="{ class: { tr: 'cursor-pointer' } }"
+          @select="(_event: Event, row: { original: Stocktake }) => navigateTo(`/console/bar/stocktakes/${row.original.id}`)"
         >
           <template #when-cell="{ row }">
             <ULink

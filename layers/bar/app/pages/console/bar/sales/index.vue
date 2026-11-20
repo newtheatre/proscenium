@@ -1,5 +1,5 @@
 <!-- Bar sales (S3): newest first, found by reference, filtered by outlet, state and whether refunded,
-     all kept in the address. A row opens the sale. -->
+     all kept in the address. A row opens the sale. A table on a laptop, a list on a phone. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
 
@@ -12,6 +12,8 @@ const router = useRouter()
 const { money } = await useMoney()
 const { dateTime } = useDates()
 
+// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
+const phone = useScreenQuery('(max-width: 639px)')
 const ALL = 'all'
 const param = (key: string) => computed({
   get: () => (route.query[key] as string | undefined) ?? ALL,
@@ -48,8 +50,11 @@ const columns = computed(() => [
 
 <template>
   <PageFrame :title="t('bar.navigation.sales.label')">
-    <div class="mb-6 grid gap-4 sm:grid-cols-4">
-      <UFormField :label="t('bar.screens.sales.find')">
+    <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <UFormField
+        :label="t('bar.screens.sales.find')"
+        class="max-sm:col-span-2"
+      >
         <UInput
           v-model="search"
           icon="i-lucide-search"
@@ -68,7 +73,10 @@ const columns = computed(() => [
           :items="stateItems"
         />
       </UFormField>
-      <UFormField :label="t('bar.screens.sales.refunds')">
+      <UFormField
+        :label="t('bar.screens.sales.refunds')"
+        class="max-sm:col-span-2"
+      >
         <USelect
           v-model="refunded"
           :items="refundedItems"
@@ -88,8 +96,33 @@ const columns = computed(() => [
           :description="t('bar.screens.sales.empty.description')"
           icon="i-lucide-receipt"
         />
+        <RecordList
+          v-if="d.rows.length && phone"
+          :label="t('bar.navigation.sales.label')"
+        >
+          <RecordListItem
+            v-for="r in d.rows"
+            :key="r.reference"
+            :to="`/console/bar/sales/${r.reference}`"
+            :name="r.reference"
+            :description="[dateTime(r.at), r.outlet].join(' · ')"
+          >
+            <StatusBadge
+              v-if="r.state !== 'paid'"
+              :tone="tone(r.state)"
+              :label="stateLabel(r.state)"
+            />
+            <span class="text-right text-sm">
+              <span class="block font-medium tabular-nums">{{ money(r.totalMinor) }}</span>
+              <span
+                v-if="r.refundedMinor"
+                class="block text-muted"
+              >{{ t('bar.screens.sales.refunded', { amount: money(r.refundedMinor) }) }}</span>
+            </span>
+          </RecordListItem>
+        </RecordList>
         <UTable
-          v-else
+          v-else-if="d.rows.length"
           :data="d.rows"
           :columns="columns"
           :caption="t('bar.navigation.sales.label')"
