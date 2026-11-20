@@ -37,6 +37,9 @@ const id = computed(() => String(route.params.performance))
 const base = computed(() => `/api/front-of-house/performances/${encodeURIComponent(id.value)}`)
 const { data, status, error, refresh } = await useAPI<Board>(() => `${base.value}/tonight`, { key: `front-of-house:board:${id.value}` })
 useIntervalFn(() => { void refresh() }, REFRESH)
+// The emergency card is kept on the device from here, before anyone needs it in a hurry.
+const { fetchAhead } = useKeptCards()
+onMounted(() => { if (data.value?.can.emergency) void fetchAhead() })
 
 const now = ref(Date.now())
 useIntervalFn(() => { now.value = Date.now() }, 15_000) // not-policy: how often the countdown moves
