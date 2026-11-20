@@ -1,6 +1,7 @@
 <!-- The Columns control (UI-11): ticks optional columns on and off. A column marked `always`
      cannot be hidden. The choice is kept on this device for each list, not in the address, because
-     it changes how rows look and not which rows. -->
+     it changes how rows look and not which rows. Below 1024 pixels rows are cards, which have no
+     columns to choose, so the control is not drawn. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -29,6 +30,7 @@ const optional = computed(() => Object.values(props.columns).some(c => !c.always
       variant="outline"
       icon="i-lucide-columns-3"
       :label="t('core.list.columns')"
+      class="max-lg:hidden"
     />
   </UDropdownMenu>
 </template>

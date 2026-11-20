@@ -45,5 +45,6 @@ async function submit(values: Record<string, unknown>) {
     :initial="initial"
     :submit="submit"
     :return-to="back"
+    :trail="[{ label: t('core.navigation.access-scheme-queue.label'), to: '/console/people/access-scheme' }, { label: data?.name ?? t('core.access.queue.unnamed'), to: back }]"
   />
 </template>
