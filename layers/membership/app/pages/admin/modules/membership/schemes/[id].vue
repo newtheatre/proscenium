@@ -209,7 +209,10 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
 </script>
 
 <template>
-  <PageFrame :title="scheme?.name ?? t('membership.navigation.schemes.label')">
+  <PageFrame
+    :title="scheme?.name ?? t('membership.navigation.schemes.label')"
+    :trail="[{ label: t('membership.navigation.schemes.label'), to: '/admin/modules/membership/schemes' }]"
+  >
     <template
       v-if="scheme"
       #status
@@ -452,6 +455,7 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 :rows="2"
               />
             </UFormField>
+            <USeparator :label="t('membership.screens.scheme.groups.who')" />
             <UFormField
               :label="t('membership.screens.scheme.side')"
               :help="data.sideLocked ? t('membership.screens.scheme.side-locked') : t('membership.screens.scheme.side-help')"
@@ -468,6 +472,7 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 :items="(['apply', 'staff-only'] as const).map(v => ({ value: v, label: t(`membership.screens.join-modes.${v}`), description: t(`membership.screens.join-modes.${v}-help`) }))"
               />
             </UFormField>
+            <USeparator :label="t('membership.screens.scheme.groups.length')" />
             <MembershipLengthRule
               v-model:rule="details.lengthRule"
               v-model:month="details.fixedEndMonth"
@@ -517,10 +522,11 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
               </UFormField>
             </div>
             <USwitch
-              v-model="details.acceptsReference"
-              :label="t('membership.screens.scheme.accepts-reference')"
-              :description="t('membership.screens.scheme.accepts-reference-help')"
+              v-model="details.holderMayEnd"
+              :label="t('membership.screens.scheme.holder-may-end')"
+              :description="t('membership.screens.scheme.holder-may-end-help')"
             />
+            <USeparator :label="t('membership.screens.scheme.groups.checks')" />
             <UFormField
               :label="t('membership.screens.scheme.checks')"
               :help="t('membership.screens.scheme.checks-help')"
@@ -570,17 +576,18 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
                 :description="t('membership.screens.scheme.needs-approval-help')"
               />
             </UFormField>
+            <USeparator :label="t('membership.screens.scheme.groups.tickets')" />
+            <USwitch
+              v-model="details.acceptsReference"
+              :label="t('membership.screens.scheme.accepts-reference')"
+              :description="t('membership.screens.scheme.accepts-reference-help')"
+            />
             <USwitch
               :model-value="data.feesModuleOn && details.requiresPayment"
               :disabled="!data.feesModuleOn"
               :label="t('membership.screens.scheme.requires-payment')"
               :description="t(data.feesModuleOn ? 'membership.screens.scheme.requires-payment-help' : 'membership.screens.scheme.requires-payment-off')"
               @update:model-value="details.requiresPayment = $event"
-            />
-            <USwitch
-              v-model="details.holderMayEnd"
-              :label="t('membership.screens.scheme.holder-may-end')"
-              :description="t('membership.screens.scheme.holder-may-end-help')"
             />
           </UForm>
           <template #footer>

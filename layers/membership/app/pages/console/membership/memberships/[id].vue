@@ -29,6 +29,7 @@ const facts = computed(() => {
   const x = m.value
   if (!x) return []
   return [
+    { label: t('membership.membership.holder'), value: x.name, to: `/console/people/${x.accountId}` },
     { label: t('membership.membership.scheme'), value: x.schemeName },
     { label: t('membership.membership.number'), value: data.value?.number ?? '' },
     { label: t('membership.membership.starts'), value: x.startsOn ? day(x.startsOn) : '' },
@@ -47,6 +48,9 @@ watch(() => m.value?.responseId, async (responseId) => {
   const found = await $api<{ records: { title: string, to: string | null }[] }>('/api/core/records', { query: { type: 'forms.response', ids: responseId } }).catch(() => ({ records: [] }))
   answers.value = found.records[0] ?? null
 }, { immediate: true })
+
+// The custom fields' own request, shared by key, so a theatre that keeps none sees no empty section.
+const { data: fieldSets } = await useAPI<{ sets: unknown[] }>(() => `/api/forms/records/membership.member-fields/${encodeURIComponent(id.value)}`, { key: `forms:record:membership.member-fields:${id.value}`, immediate: !!data.value?.canEditFields })
 
 const ending = ref(false)
 const note = ref('')
@@ -179,18 +183,8 @@ async function saveDates() {
         class="space-y-6"
       >
         <FactStrip :facts="facts" />
-        <PageSection :title="t('membership.membership.holder')">
-          <UButton
-            color="neutral"
-            variant="link"
-            class="px-0"
-            icon="i-lucide-user"
-            :to="`/console/people/${m.accountId}`"
-            :label="t('membership.membership.open-person')"
-          />
-        </PageSection>
         <PageSection
-          v-if="data.canEditFields"
+          v-if="data.canEditFields && fieldSets?.sets.length"
           :title="t('membership.membership.fields')"
         >
           <FormsRecordFields
