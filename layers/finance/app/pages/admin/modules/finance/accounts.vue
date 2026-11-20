@@ -85,11 +85,11 @@ async function save() {
             <RecordListItem
               v-for="a in g.accounts"
               :key="a.id"
-              :description="a.scope ? `${moduleLabel(a.module)} · ${a.scope}` : moduleLabel(a.module)"
+              :name="a.name"
               :muted="!a.active"
             >
-              <template #name>
-                <span class="font-mono text-muted">{{ a.code }}</span> {{ a.name }}
+              <template #description>
+                <span class="font-mono break-all">{{ a.code }}</span> · {{ moduleLabel(a.module) }}
               </template>
               <StatusBadge
                 v-if="!a.active"

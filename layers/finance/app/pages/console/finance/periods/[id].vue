@@ -124,46 +124,21 @@ async function reopen() {
           <FactStrip
             :facts="[
               { label: t('finance.screens.period.dates'), value: t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }), strong: false },
-              { label: t('finance.screens.period.debits'), value: money(loaded.period.debitsMinor) },
-              { label: t('finance.screens.period.credits'), value: money(loaded.period.creditsMinor) },
+              { label: t('finance.screens.period.income'), value: money(total('income')) },
+              { label: t('finance.screens.period.expenses'), value: money(total('expense')) },
             ]"
           />
-          <ULink
-            :to="{ path: '/console/finance/ledger', query: { periodId: loaded.period.id } }"
-            class="inline-flex items-center gap-1.5"
-          >
-            <UIcon name="i-lucide-book-open" />
-            {{ t('finance.screens.period.postings') }}
-          </ULink>
-
-          <PageSection
-            v-if="loaded.movement.length"
-            :title="t('finance.screens.period.movement')"
-            :description="t('finance.screens.period.movement-help')"
-          >
-            <div class="space-y-4">
-              <ChartFigure
-                v-if="bars.length > 1"
-                :title="t('finance.screens.period.movement-chart')"
-                :summary="t('finance.screens.period.movement-summary', { income: money(total('income')), expense: money(total('expense')) })"
-                :data="bars"
-                index="account"
-                :categories="[{ key: 'income', label: t('finance.screens.accounts.kinds.income') }, { key: 'expense', label: t('finance.screens.accounts.kinds.expense') }]"
-                :format="(value: number) => money(value)"
-                stacked
-              />
-              <RecordList>
-                <RecordListItem
-                  v-for="m in loaded.movement"
-                  :key="`${m.accountId}:${m.currency}`"
-                  :name="m.name"
-                  :description="`${m.code} · ${t(`finance.screens.accounts.kinds.${m.kind}`)}`"
-                >
-                  <span class="font-medium tabular-nums">{{ money(m.amountMinor, m.currency) }}</span>
-                </RecordListItem>
-              </RecordList>
-            </div>
-          </PageSection>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+            <span :title="t('finance.screens.period.posted-help')">{{ t('finance.screens.periods.moved', { amount: money(loaded.period.debitsMinor) }) }}</span>
+            <UButton
+              :to="{ path: '/console/finance/ledger', query: { period: loaded.period.id } }"
+              :label="t('finance.screens.period.postings')"
+              icon="i-lucide-book-open"
+              color="neutral"
+              variant="link"
+              class="px-0"
+            />
+          </div>
 
           <PageSection
             v-if="!loaded.period.closed"
@@ -203,6 +178,35 @@ async function reopen() {
                 <span v-else>{{ b.sentence }}</span>
               </li>
             </ul>
+          </PageSection>
+
+          <PageSection
+            v-if="loaded.movement.length"
+            :title="t('finance.screens.period.movement')"
+            :description="t('finance.screens.period.movement-help')"
+          >
+            <div class="space-y-4">
+              <ChartFigure
+                v-if="bars.length > 1"
+                :title="t('finance.screens.period.movement-chart')"
+                :summary="t('finance.screens.period.movement-summary', { income: money(total('income')), expense: money(total('expense')) })"
+                :data="bars"
+                index="account"
+                :categories="[{ key: 'income', label: t('finance.screens.accounts.kinds.income') }, { key: 'expense', label: t('finance.screens.accounts.kinds.expense') }]"
+                :format="(value: number) => money(value)"
+                stacked
+              />
+              <RecordList>
+                <RecordListItem
+                  v-for="m in loaded.movement"
+                  :key="`${m.accountId}:${m.currency}`"
+                  :name="m.name"
+                  :description="`${m.code} · ${t(`finance.screens.accounts.kinds.${m.kind}`)}`"
+                >
+                  <span class="font-medium tabular-nums">{{ money(m.amountMinor, m.currency) }}</span>
+                </RecordListItem>
+              </RecordList>
+            </div>
           </PageSection>
         </div>
       </template>

@@ -14,6 +14,7 @@ const { money } = await useMoney()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ today: string, schemes: Scheme[] }>('/api/membership-fees/schemes', { key: 'membership-fees:schemes' })
 
+const historyOpen = reactive<Record<string, boolean>>({})
 const setting = ref<Scheme | null>(null)
 const form = reactive({ lengthOptionId: 'all', appliesTo: 'join-and-renew', amountMinor: null as number | null, fromDate: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -23,7 +24,7 @@ function openSet(s: Scheme) {
   refusal.value = null
 }
 const lengthItems = computed(() => [{ value: 'all', label: t('membership-fees.prices.every-length') }, ...(setting.value?.lengths ?? []).filter(l => l.id).map(l => ({ value: l.id!, label: l.name! }))])
-const appliesItems = computed(() => ['join-and-renew', 'join', 'renew'].map(v => ({ value: v, label: t(`membership-fees.prices.applies.${v}`) })))
+const appliesItems = computed(() => ['join-and-renew', 'join', 'renew'].map(v => ({ value: v, label: t(`membership-fees.prices.applies-option.${v}`) })))
 async function save() {
   refusal.value = null
   try {
@@ -52,12 +53,12 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
         v-if="data"
         class="space-y-6"
       >
-        <p
+        <EmptyState
           v-if="!data.schemes.length"
-          class="text-muted"
-        >
-          {{ t('membership-fees.prices.no-schemes') }}
-        </p>
+          :title="t('membership-fees.prices.no-schemes')"
+          :description="t('membership-fees.prices.no-schemes-help')"
+          icon="i-lucide-banknote"
+        />
         <PageSection
           v-for="s in data.schemes"
           :key="s.id"
@@ -81,22 +82,20 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
               :description="t('membership-fees.prices.in-force', { join: shown(l.join), renew: shown(l.renew) })"
             />
           </RecordList>
-          <details
-            v-if="s.history.length"
-            class="mt-3 text-sm"
+          <CollapsibleDivider
+            v-model:open="historyOpen[s.id]"
+            :label="t('membership-fees.prices.history')"
+            :count="s.history.length"
           >
-            <summary class="cursor-pointer text-muted">
-              {{ t('membership-fees.prices.history', { count: s.history.length }) }}
-            </summary>
-            <ul class="mt-2 space-y-1">
-              <li
+            <RecordList :label="t('membership-fees.prices.history')">
+              <RecordListItem
                 v-for="p in s.history"
                 :key="p.id"
-              >
-                {{ t('membership-fees.prices.history-line', { amount: money(p.amountMinor, p.currency), length: lengthName(s, p.lengthOptionId), applies: t(`membership-fees.prices.applies.${p.appliesTo}`), date: day(p.fromDate) }) }}
-              </li>
-            </ul>
-          </details>
+                :name="money(p.amountMinor, p.currency)"
+                :description="t('membership-fees.prices.history-line', { length: lengthName(s, p.lengthOptionId), applies: t(`membership-fees.prices.applies.${p.appliesTo}`), date: day(p.fromDate) })"
+              />
+            </RecordList>
+          </CollapsibleDivider>
         </PageSection>
       </div>
     </DataBoundary>
