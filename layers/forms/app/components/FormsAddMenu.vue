@@ -23,6 +23,7 @@ const items = computed(() => [
 <template>
   <UDropdownMenu
     :items="items"
+    :content="{ align: 'start' }"
     :ui="{ content: 'w-[38rem] max-w-[calc(100vw-1rem)] max-h-[min(36rem,var(--reka-dropdown-menu-content-available-height))]', viewport: 'grid grid-cols-2 gap-x-1 divide-y-0 sm:grid-cols-3' }"
   >
     <UButton

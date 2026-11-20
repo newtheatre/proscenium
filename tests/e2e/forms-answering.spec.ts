@@ -115,6 +115,7 @@ test('a shared form is answered without an account, and the author reads the res
   await page.keyboard.press('Escape')
 
   // A view is in the address, so it can be sent to somebody else.
+  await page.getByRole('button', { name: 'Filters' }).click()
   await page.getByRole('combobox').filter({ hasText: 'Any question' }).click()
   await page.getByRole('option', { name: 'Who are you nominating?' }).click()
   await page.getByLabel('Is', { exact: true }).fill('Somebody else')

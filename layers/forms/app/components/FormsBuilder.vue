@@ -28,6 +28,8 @@ const templating = ref(false)
 
 // Beside the canvas on a laptop; a panel that slides over it on anything narrower.
 const wide = useMediaQuery('(min-width: 1280px)')
+// From a tablet up, sharing and the responses have buttons of their own, so the menu leaves them out.
+const roomy = useScreenQuery('(min-width: 768px)')
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const panel = computed({ get: () => !wide.value && builder.selected.value !== null, set: (open: boolean) => { if (!open) builder.selected.value = null } })
@@ -79,9 +81,10 @@ const badges = computed<{ tone: Tone, label: string }[]>(() => [
   ...(fields.value ? [{ tone: 'info' as const, label: t('forms.screens.fields.badge') }] : []),
   ...(form.value.status === 'paused' || form.value.status === 'closed' || form.value.status === 'archived' ? [{ tone: form.value.status === 'paused' ? 'warning' as const : 'neutral' as const, label: t(`forms.screens.status.${form.value.status}`) }] : []),
 ])
+const live = computed(() => !fields.value && form.value.liveVersion !== null)
 const more = computed(() => [[
-  ...(fields.value ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
-  ...(fields.value ? [] : [{ label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` }]),
+  ...(fields.value || (roomy.value && live.value) ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
+  ...(fields.value || (roomy.value && live.value) ? [] : [{ label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` }]),
   ...(form.value.liveVersion === null ? [] : [{ label: t('forms.screens.versions.title'), icon: 'i-lucide-history', to: `/console/forms/${form.value.id}/versions` }]),
 ], [
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
@@ -158,16 +161,7 @@ const reload = () => window.location.reload()
       />
     </template>
     <template #toolbar>
-      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <!-- On a phone the badges sit here, so the header keeps room for the form's name. -->
-        <span class="flex w-full flex-wrap items-center gap-1.5 sm:hidden">
-          <StatusBadge
-            v-for="b in badges"
-            :key="b.label"
-            :tone="b.tone"
-            :label="b.label"
-          />
-        </span>
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-sm:py-2">
         <UFieldGroup>
           <UButton
             v-for="v in (['build', 'preview'] as const)"
@@ -230,6 +224,15 @@ const reload = () => window.location.reload()
             </div>
           </template>
         </UPopover>
+        <!-- On a phone the badges sit here, so the header keeps room for the form's name. -->
+        <span class="flex flex-wrap items-center gap-1.5 sm:hidden">
+          <StatusBadge
+            v-for="b in badges"
+            :key="b.label"
+            :tone="b.tone"
+            :label="b.label"
+          />
+        </span>
         <span
           class="ms-auto flex items-center gap-1.5 text-sm text-muted"
           aria-live="polite"
@@ -238,8 +241,26 @@ const reload = () => window.location.reload()
             :name="builder.state.value === 'saved' ? 'i-lucide-cloud-check' : builder.state.value === 'stale' || builder.state.value === 'failed' ? 'i-lucide-cloud-alert' : 'i-lucide-cloud-upload'"
             :class="builder.state.value === 'stale' || builder.state.value === 'failed' ? 'text-error' : ''"
           />
-          {{ saveWords }}
+          <span class="max-sm:sr-only">{{ saveWords }}</span>
         </span>
+        <UButton
+          v-if="live && !unshared"
+          class="hidden md:inline-flex"
+          :label="t('forms.screens.link.title')"
+          icon="i-lucide-share-2"
+          color="neutral"
+          variant="outline"
+          @click="sharing = true"
+        />
+        <UButton
+          v-if="live"
+          class="hidden md:inline-flex"
+          :label="t('forms.screens.responses.title')"
+          icon="i-lucide-table-2"
+          color="neutral"
+          variant="outline"
+          :to="`/console/forms/${form.id}/responses`"
+        />
         <UDropdownMenu :items="more">
           <IconButton
             icon="i-lucide-ellipsis"
@@ -266,7 +287,7 @@ const reload = () => window.location.reload()
     >
       <FormsBuilderCanvas />
       <aside
-        class="hidden xl:block xl:sticky xl:top-4 xl:max-h-[calc(100vh-10rem)] xl:self-start xl:overflow-y-auto xl:rounded-lg xl:border xl:border-default xl:bg-default xl:p-4"
+        class="hidden xl:block xl:sticky xl:top-0 xl:max-h-[calc(100vh-10rem)] xl:self-start xl:overflow-y-auto xl:rounded-lg xl:border xl:border-default xl:bg-default xl:p-4"
         :aria-label="t('forms.screens.details.title')"
       >
         <p class="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
