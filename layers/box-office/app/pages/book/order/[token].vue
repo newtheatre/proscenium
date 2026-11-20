@@ -95,7 +95,16 @@ async function cancel(all: boolean) {
             :title="t('box-office.manage.not-found.title')"
             :description="t('box-office.manage.not-found.description')"
             icon="i-lucide-ticket-x"
-          />
+          >
+            <template #actions>
+              <UButton
+                to="/whats-on"
+                color="neutral"
+                variant="outline"
+                :label="t('box-office.basket.none.whats-on')"
+              />
+            </template>
+          </EmptyState>
           <template v-else>
             <UAlert
               v-if="cancelled"
