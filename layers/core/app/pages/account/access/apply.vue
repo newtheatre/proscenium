@@ -71,6 +71,7 @@ async function sendAnswer() {
   <PageFrame
     v-if="answerOnly"
     :title="t('core.access.answer.title')"
+    :trail="[{ label: data?.name ?? '', to: '/account/access' }]"
     width="reading"
   >
     <div class="space-y-6">

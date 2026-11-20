@@ -33,6 +33,15 @@ async function finish() {
     >
       Your address is confirmed. You can close this page.
     </p>
+    <UButton
+      v-if="done || refusal"
+      block
+      to="/account/email"
+      color="neutral"
+      variant="outline"
+    >
+      {{ done ? 'Go to your email addresses' : 'Send a new link from your account' }}
+    </UButton>
     <template v-else-if="!refusal">
       <p class="text-sm text-muted">
         Press Confirm address to finish adding it to your account.

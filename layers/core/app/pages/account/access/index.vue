@@ -105,6 +105,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
 <template>
   <PageFrame
     :title="name"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <RefusalNotice :refusal="refusal" />

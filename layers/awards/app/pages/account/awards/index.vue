@@ -52,6 +52,7 @@ const qr = computed(() => {
   <PageFrame
     :title="t('awards.navigation.mine.label')"
     :description="t('awards.screens.mine.help')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <FormsSlotOpen

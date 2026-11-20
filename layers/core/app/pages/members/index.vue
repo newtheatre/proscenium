@@ -47,16 +47,31 @@ const cards = computed(() => (home.value?.cards ?? []).flatMap((c) => {
         :title="t('core.members.nothing')"
         :description="t('core.members.nothing-description')"
       />
-      <UPageGrid v-else-if="navigation?.items.length">
-        <UPageCard
-          v-for="item in navigation.items"
-          :key="item.id"
-          :to="item.to"
-          :icon="item.icon"
-          :title="t(item.label)"
-          :description="describe(item)"
-        />
-      </UPageGrid>
+      <template v-else-if="navigation?.items.length">
+        <UPageGrid class="max-sm:hidden">
+          <UPageCard
+            v-for="item in navigation.items"
+            :key="item.id"
+            :to="item.to"
+            :icon="item.icon"
+            :title="t(item.label)"
+            :description="describe(item)"
+          />
+        </UPageGrid>
+        <RecordList
+          :label="title"
+          class="sm:hidden"
+        >
+          <RecordListItem
+            v-for="item in navigation.items"
+            :key="item.id"
+            :to="item.to"
+            :icon="item.icon"
+            :name="t(item.label)"
+            :description="describe(item)"
+          />
+        </RecordList>
+      </template>
     </div>
   </PageFrame>
 </template>
