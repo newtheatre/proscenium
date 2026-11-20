@@ -1041,7 +1041,7 @@
   "box-office.layouts.each-label": "Seats each space takes the place of",
   "box-office.layouts.each-help": "0 where the spaces are kept apart from the seats. Booking a space takes these seats out of the house.",
   "box-office.layouts.performance.title": "Wheelchair spaces",
-  "box-office.layouts.performance.description": "As the run has them, or this performance's own. A layout chosen here for a show sold as one part of the house also sets its seats.",
+  "box-office.layouts.performance.description": "This performance follows the run unless it is given its own here. Choosing a layout for a show sold as one part of the house also sets its seats.",
   "box-office.layouts.performance.manage": "Seating layouts",
   "box-office.layouts.performance.layout": "Layout",
   "box-office.layouts.performance.placeholder": "Choose a layout",
