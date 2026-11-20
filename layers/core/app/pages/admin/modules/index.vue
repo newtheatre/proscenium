@@ -105,7 +105,16 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <h2 class="font-medium text-highlighted">
-                    {{ nameOf(m.id) }}
+                    <ULink
+                      v-if="m.open"
+                      :to="m.open"
+                      class="text-highlighted hover:underline"
+                    >
+                      {{ nameOf(m.id) }}
+                    </ULink>
+                    <template v-else>
+                      {{ nameOf(m.id) }}
+                    </template>
                   </h2>
                   <UBadge
                     v-if="m.owner === 'site'"

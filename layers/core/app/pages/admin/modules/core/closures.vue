@@ -76,6 +76,7 @@ async function remove(c: Closure) {
   <PageFrame
     title="Closures"
     description="Times when the theatre, a venue or a space is shut. A closure that blocks performances stops one being scheduled inside it."
+    width="reading"
   >
     <template #primary>
       <UButton

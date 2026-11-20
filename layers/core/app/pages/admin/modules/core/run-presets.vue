@@ -11,14 +11,24 @@ const { data, status, error, refresh } = await useAPI<{ rows: Preset[], usual: s
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
-async function run(fn: () => Promise<unknown>, done: string) {
+// Says what was done, with an Undo where the act has a clean reverse.
+async function run<T>(fn: () => Promise<T>, done: string, undo?: (result: T) => Promise<unknown>) {
   refusal.value = null
   try {
-    await fn()
+    const result = await fn()
     await refresh()
-    toast.add({ title: done, color: 'success' })
+    if (undo) {
+      offer(done, async () => {
+        await undo(result)
+        await refresh()
+      })
+    }
+    else {
+      toast.add({ title: done, color: 'success' })
+    }
     return true
   }
   catch (e) {
@@ -40,9 +50,12 @@ function open(p?: Preset) {
 }
 async function save() {
   const body = { name: form.name.trim(), slots: slots.value }
-  const ok = editId.value
-    ? await run(() => $api<unknown>(`/api/core/run-presets/${editId.value}` as string, { method: 'PUT', body }), 'Preset saved')
-    : await run(() => $api<unknown>('/api/core/run-presets' as string, { method: 'POST', body }), 'Preset added')
+  const id = editId.value
+  const before = data.value?.rows.find(p => p.id === id)
+  const put = (to: typeof body) => $api<unknown>(`/api/core/run-presets/${id}` as string, { method: 'PUT', body: to })
+  const ok = id
+    ? await run(() => put(body), 'Preset saved', before ? () => put({ name: before.name, slots: before.slots }) : undefined)
+    : await run(() => $api<{ id: string }>('/api/core/run-presets' as string, { method: 'POST', body }), 'Preset added', made => $api<unknown>(`/api/core/run-presets/${made.id}` as string, { method: 'DELETE' }))
   if (ok) editing.value = false
 }
 async function remove(p: Preset) {
