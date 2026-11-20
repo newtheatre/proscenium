@@ -49,7 +49,6 @@ const moduleName = (managedBy: string) => t(`${managedBy.slice(0, managedBy.last
 
 interface FormState { name: string, kind: 'standard' | 'concession', channel: Channel, proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
 const blank = (): FormState => ({ name: '', kind: 'standard', channel: 'all', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
-const form = ref<FormState>(blank())
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 function body(f: FormState, managed: boolean) {
@@ -82,26 +81,41 @@ async function run<T>(fn: () => Promise<T>, done: string, undo?: (result: T) => 
   }
 }
 
-async function add() {
-  const name = form.value.name.trim()
-  if (await run(() => create(body(form.value, false)), t('box-office.ticket-types.added', { name }), ({ ticketTypeId }) => $api(url(ticketTypeId), { method: 'DELETE' }))) form.value = blank()
-}
-
-// Editing one type, in a dialog.
+// Adding a type and editing one share a dialog: `editing` is the type being edited, or null for a new one.
 const editing = ref<TicketType | null>(null)
+const adding = ref(false)
 const editForm = ref<FormState>(blank())
 const editRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const editOpen = computed({ get: () => !!editing.value, set: (v) => { if (!v) editing.value = null } })
+const editOpen = computed({
+  get: () => adding.value || !!editing.value,
+  set: (v) => {
+    if (v) return
+    adding.value = false
+    editing.value = null
+  },
+})
 
+function startAdd() {
+  editRefusal.value = null
+  editForm.value = blank()
+  editing.value = null
+  adding.value = true
+}
 function startEdit(type: TicketType) {
   editRefusal.value = null
   editForm.value = asForm(type)
+  adding.value = false
   editing.value = type
+}
+
+async function add() {
+  const name = editForm.value.name.trim()
+  if (await run(() => create(body(editForm.value, false)), t('box-office.ticket-types.added', { name }), ({ ticketTypeId }) => $api(url(ticketTypeId), { method: 'DELETE' }), editRefusal)) adding.value = false
 }
 
 async function save() {
   const type = editing.value
-  if (!type) return
+  if (!type) return add()
   const managed = !!type.managedBy
   const before = body(asForm(type), managed)
   if (await run(() => patch(type.id, body(editForm.value, managed)), t('box-office.ticket-types.saved', { name: editForm.value.name.trim() }), () => patch(type.id, before), editRefusal)) editing.value = null
@@ -237,6 +251,11 @@ function describe(type: TicketType): string {
         v-model="search"
         :label="t('box-office.ticket-types.search')"
       />
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('box-office.ticket-types.new')"
+        @click="startAdd"
+      />
     </template>
     <div class="space-y-8">
       <RefusalNotice :refusal="refusal" />
@@ -329,78 +348,11 @@ function describe(type: TicketType): string {
           >{{ moved }}</span>
         </template>
       </DataBoundary>
-
-      <PageSection :title="t('box-office.ticket-types.add.title')">
-        <UForm
-          class="space-y-4"
-          :state="form"
-          :validate="() => needs({ name: form.name })"
-          novalidate
-          @submit="add"
-        >
-          <UFormField
-            name="name"
-            :label="t('box-office.ticket-types.add.name')"
-            required
-          >
-            <UInput
-              v-model="form.name"
-              maxlength="60"
-            />
-          </UFormField>
-          <UFormField :label="t('box-office.ticket-types.add.kind')">
-            <USelect
-              v-model="form.kind"
-              :items="kinds"
-            />
-          </UFormField>
-          <UFormField :label="t('box-office.ticket-types.channel.label')">
-            <USelect
-              v-model="form.channel"
-              :items="channels"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('box-office.ticket-types.add.proof')"
-            :help="t('box-office.ticket-types.add.proof-help')"
-          >
-            <UInput
-              v-model="form.proofNote"
-              maxlength="120"
-            />
-          </UFormField>
-          <UFormField
-            v-if="options.length"
-            :label="t('box-office.ticket-types.add.requirements')"
-            :help="t('box-office.ticket-types.add.requirements-help')"
-          >
-            <UCheckboxGroup
-              v-model="form.requirementRefs"
-              :items="options"
-            />
-          </UFormField>
-          <UFormField
-            v-if="form.requirementRefs.length"
-            :label="t('box-office.ticket-types.add.max-per-holder')"
-            :help="t('box-office.ticket-types.add.max-per-holder-help')"
-          >
-            <UInputNumber
-              v-model="form.maxPerHolder"
-              :min="1"
-              :max="50"
-            />
-          </UFormField>
-          <UButton
-            type="submit"
-            :label="t('box-office.ticket-types.add.button')"
-          />
-        </UForm>
-      </PageSection>
     </div>
 
     <UModal
       v-model:open="editOpen"
-      :title="t('box-office.ticket-types.edit-title', { name: editing?.name ?? '' })"
+      :title="editing ? t('box-office.ticket-types.edit-title', { name: editing.name }) : t('box-office.ticket-types.add.title')"
       :description="editing?.managedBy ? t('box-office.ticket-types.managed-help', { module: moduleName(editing.managedBy) }) : undefined"
     >
       <template #body>
@@ -453,9 +405,12 @@ function describe(type: TicketType): string {
               :label="t('box-office.ticket-types.add.requirements')"
               :help="t('box-office.ticket-types.add.requirements-help')"
             >
-              <UCheckboxGroup
+              <USelectMenu
                 v-model="editForm.requirementRefs"
+                multiple
+                value-key="value"
                 :items="options"
+                :placeholder="t('box-office.ticket-types.add.requirements-anyone')"
               />
             </UFormField>
             <UFormField
@@ -476,7 +431,7 @@ function describe(type: TicketType): string {
         <UButton
           type="submit"
           form="box-office-ticket-type"
-          :label="t('box-office.ticket-types.save')"
+          :label="editing ? t('box-office.ticket-types.save') : t('box-office.ticket-types.add.button')"
         />
       </template>
     </UModal>

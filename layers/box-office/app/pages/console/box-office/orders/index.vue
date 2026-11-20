@@ -35,6 +35,14 @@ const list = computed(() => ({
     :row-to="(row: Row) => `/console/box-office/orders/${encodeURIComponent(row.id)}`"
     :empty="{ title: t('box-office.orders.empty.title'), description: t('box-office.orders.empty.description'), icon: 'i-lucide-receipt' }"
   >
+    <!-- A phone's card is titled by the reference, so its first line is where the order stands and what it comes to. -->
+    <template #card-description="{ row }">
+      <span class="inline-flex flex-wrap items-center gap-2">
+        <StatusBadge v-bind="orderStateBadge(row, t)" />
+        <span v-if="!row.pass?.only">{{ money(row.totalMinor, row.currency) }}</span>
+        <span v-if="row.pass">{{ row.pass.name }}</span>
+      </span>
+    </template>
     <template #cell-reference="{ row }">
       <span class="font-mono">{{ row.reference }}</span>
     </template>

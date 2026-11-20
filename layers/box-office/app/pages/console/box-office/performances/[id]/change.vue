@@ -78,6 +78,7 @@ const trail = computed(() => [
         :title="t('box-office.change.title', { title: d.performance.title, when: dateTime(d.performance.startsAt) })"
         :description="t(forKind ? `box-office.change.description.${forKind}` : 'box-office.change.description.any')"
         :trail="trail"
+        long-title
       >
         <div class="space-y-8">
           <PageSection :title="t('box-office.change.affected')">
@@ -144,6 +145,7 @@ const trail = computed(() => [
             <UForm
               class="space-y-4"
               :state="{ choice }"
+              :validate="() => needs({ choice })"
               novalidate
               @submit="save"
             >
@@ -154,7 +156,10 @@ const trail = computed(() => [
               >
                 {{ t('box-office.change.current', { decision: t(`box-office.change.decision.${d.decision}.label`), when: dateTime(d.decidedAt!) }) }}
               </p>
-              <UFormField :label="t('box-office.change.decision.label')">
+              <UFormField
+                name="choice"
+                :label="t('box-office.change.decision.label')"
+              >
                 <URadioGroup
                   v-model="choice"
                   :items="choices"
@@ -164,7 +169,6 @@ const trail = computed(() => [
                 type="submit"
                 :label="t('box-office.change.save')"
                 :loading="saving"
-                :disabled="!choice"
               />
             </UForm>
           </PageSection>
