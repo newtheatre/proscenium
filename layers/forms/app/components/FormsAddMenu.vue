@@ -5,20 +5,15 @@ import type { QuestionType } from '../../shared/engine'
 const props = withDefaults(defineProps<{ questionsOnly?: boolean, label?: string }>(), { questionsOnly: false, label: undefined })
 const emit = defineEmits<{ add: [kind: QuestionType | 'content' | 'group'] }>()
 const { t } = useT()
-// Once a kind is chosen the menu does not take focus back: it goes to the new item's first field,
-// so its wording can be typed straight away.
+// Once a kind is chosen the menu does not take focus back: the canvas sends it to the new item's wording.
 let chosen = false
 function pick(kind: QuestionType | 'content' | 'group') {
   chosen = true
   emit('add', kind)
 }
 function closed(event: Event) {
-  if (!chosen) return
+  if (chosen) event.preventDefault()
   chosen = false
-  const field = [...document.querySelectorAll<HTMLElement>('[data-forms-details] :is(textarea, input)')].find(el => el.offsetParent !== null)
-  if (!field) return
-  event.preventDefault()
-  field.focus()
 }
 const items = computed(() => [
   ...FORMS_PALETTE.map(g => [

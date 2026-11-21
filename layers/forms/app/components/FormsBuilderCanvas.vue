@@ -77,6 +77,7 @@ function add(kind: QuestionType | 'content' | 'group', into = page.value.id) {
   if (item.kind === 'question') item.options?.forEach((o, i) => { o.label = t('forms.screens.options.placeholder', { n: i + 1 }) })
   builder.apply(addItem(def.value, into, item))
   builder.select(item.id)
+  formsFocusDetails()
 }
 defineExpose({ add })
 const outline = ref(false)
