@@ -312,6 +312,13 @@ const openTo = (id: string) => router.resolve({ query: { ...route.query, open: i
 const close = () => router.replace({ query: { ...route.query, open: undefined } })
 // Who sent the open response: the name the table has for it, or the address it came with.
 const openFrom = computed(() => data.value?.rows.find(r => r.id === openId.value)?.who || one.value?.response.respondentEmail || '')
+// The moves a response has taken, oldest first; a note sent with one reads under who made it.
+const timeline = computed(() => (one.value?.history ?? []).map(h => ({
+  title: h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }),
+  date: dateTime(h.at),
+  description: [h.by ? t('forms.screens.responses.by', { who: h.by }) : '', h.note ? t('forms.screens.responses.history-note', { note: h.note }) : ''].filter(Boolean).join('\n') || undefined,
+  icon: h.from === null ? 'i-lucide-inbox' : 'i-lucide-arrow-right',
+})))
 const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!v) close() } })
 </script>
 
@@ -343,7 +350,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
       <component
         :is="phone ? UDrawer : UPopover"
         v-model:open="filtering"
-        v-bind="phone ? { direction: 'bottom', title: t('core.list.filters'), description: t('core.list.filters-description') } : {}"
+        v-bind="phone ? { direction: 'bottom', title: t('core.list.filters'), description: t('core.list.filters-description') } : { content: { align: 'start' } }"
       >
         <UButton
           :label="filterCount ? t('core.list.filters-on', { count: filterCount }) : t('core.list.filters')"
@@ -497,13 +504,16 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             :key="row.id"
             :to="openTo(row.id)"
             :name="row.who || row.reference"
-            :description="row.who ? `${row.reference} · ${row.sent}` : row.sent"
           >
-            <StatusBadge
-              v-if="row.stage"
-              :tone="formsStageTone(row.stage.kind)"
-              :label="row.stage.name"
-            />
+            <template #description>
+              <span class="block">{{ row.who ? `${row.reference} · ${row.sent}` : row.sent }}</span>
+              <StatusBadge
+                v-if="row.stage"
+                class="mt-1"
+                :tone="formsStageTone(row.stage.kind)"
+                :label="row.stage.name"
+              />
+            </template>
           </RecordListItem>
         </RecordList>
         <UTable
@@ -719,19 +729,12 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             <h3 class="text-sm font-medium text-muted">
               {{ t('forms.screens.responses.history') }}
             </h3>
-            <ol class="space-y-1 text-sm">
-              <li
-                v-for="(h, i) in one.history"
-                :key="i"
-              >
-                <span class="block font-medium">{{ h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }) }}</span>
-                <span class="block text-muted">{{ h.by ? t('forms.screens.responses.by-at', { who: h.by, when: dateTime(h.at) }) : dateTime(h.at) }}</span>
-                <span
-                  v-if="h.note"
-                  class="mt-1 block border-l-2 border-default pl-2 whitespace-pre-line"
-                >{{ t('forms.screens.responses.history-note', { note: h.note }) }}</span>
-              </li>
-            </ol>
+            <UTimeline
+              :items="timeline"
+              color="neutral"
+              size="xs"
+              :ui="{ description: 'whitespace-pre-line' }"
+            />
           </section>
         </div>
         <UProgress

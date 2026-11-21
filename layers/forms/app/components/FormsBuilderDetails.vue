@@ -128,7 +128,10 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div
+    class="space-y-5"
+    data-forms-details
+  >
     <div
       v-if="!found && !ending && !calculation"
       class="space-y-3 text-sm text-muted"

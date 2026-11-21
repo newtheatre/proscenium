@@ -627,7 +627,7 @@
   "forms.screens.responses.history": "History",
   "forms.screens.responses.arrived": "Arrived in {stage}",
   "forms.screens.responses.went": "{move}: now {stage}",
-  "forms.screens.responses.by-at": "by {who}, {when}",
+  "forms.screens.responses.by": "by {who}",
   "forms.problems.review-wrong-kind": "Only a stage that means \"being considered\" can ask for review.",
   "forms.problems.review-no-reviewers": "Nobody is asked to review here. Choose a role, name people, or both.",
   "forms.problems.review-no-criteria": "Add at least one thing for reviewers to mark.",
