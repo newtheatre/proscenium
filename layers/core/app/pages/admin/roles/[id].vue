@@ -146,6 +146,7 @@ async function archive() {
 <template>
   <PageFrame
     :title="title"
+    :trail="[{ label: t('core.roles.title'), to: '/admin/roles' }]"
     width="reading"
   >
     <template #status>
