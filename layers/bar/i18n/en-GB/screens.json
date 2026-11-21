@@ -599,6 +599,7 @@
   "bar.screens.stock-levels.show": "Show",
   "bar.screens.stock-levels.empty.title": "No stock items yet",
   "bar.screens.stock-levels.empty.description": "Stock items and the places they are kept are set up in Admin, under the bar's Stock tab.",
+  "bar.screens.stock-levels.none": "None yet",
   "bar.screens.stock-levels.no-match": "No item matches these filters.",
   "bar.screens.stock-levels.missing": "Count or delivery missing",
   "bar.screens.stock-levels.waste": "Write off",

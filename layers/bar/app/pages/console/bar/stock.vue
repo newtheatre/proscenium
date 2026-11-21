@@ -65,9 +65,9 @@ const rows = computed(() => (data.value?.items ?? []).filter((i) => {
   return true
 }))
 
-// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words; never held, a dash.
+// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words, and so does never held.
 function amount(i: Item, quantity: number | null): string {
-  if (quantity === null) return '—'
+  if (quantity === null) return t('bar.screens.stock-levels.none')
   const text = stockAmount(i, Math.abs(quantity))
   return quantity < 0 ? t('bar.screens.stock-levels.below-zero', { amount: text }) : text
 }
