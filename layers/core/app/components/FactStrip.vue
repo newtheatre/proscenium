@@ -3,13 +3,13 @@
      figure stays in text. Extra facts (a module's own, a small chart) go in the default slot. -->
 <script setup lang="ts">
 export interface Fact { label: string, value: string | number, /** The figure the others lead to. */ strong?: boolean, /** Where the value leads, such as the record it names or a mailto: address. */ to?: string }
-defineProps<{ facts: Fact[], /** A border round the strip, when it stands alone on the page. */ framed?: boolean, /** Centred in a row, for a card. */ centred?: boolean }>()
+defineProps<{ facts: Fact[], /** A border round the strip, when it stands alone on the page. */ framed?: boolean, /** Centred in a row, for a card. */ centred?: boolean, /** On a laptop, one row shared evenly however many facts there are. */ row?: boolean }>()
 </script>
 
 <template>
   <dl
     :class="[
-      centred ? 'flex flex-wrap justify-center gap-x-8 gap-y-3 text-center' : ['grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3', facts.length > 3 && 'lg:grid-cols-6'],
+      centred ? 'flex flex-wrap justify-center gap-x-8 gap-y-3 text-center' : ['grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3', row ? 'lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none' : facts.length > 3 && 'lg:grid-cols-6'],
       framed && 'rounded-lg border border-default p-4',
     ]"
   >

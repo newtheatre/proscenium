@@ -273,6 +273,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       :trail="[{ label: 'Productions', to: '/console/programme/productions' }]"
       checklist-title="Ready to publish?"
       :checklist="production.state === 'draft' || production.state === 'withdrawn'"
+      aside-below
       @primary="onPrimary"
     >
       <template #aside>
@@ -424,6 +425,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   maxlength="20000"
                 />
               </UFormField>
+              <USeparator />
+              <h3 class="text-sm font-semibold text-highlighted">
+                In the programme
+              </h3>
               <div class="grid gap-4 sm:grid-cols-2">
                 <UFormField
                   name="kind"
@@ -477,9 +482,15 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                     maxlength="200"
                   />
                 </UFormField>
+              </div>
+              <USeparator />
+              <h3 class="text-sm font-semibold text-highlighted">
+                On the night
+              </h3>
+              <div class="grid gap-4 sm:grid-cols-2">
                 <UFormField
                   label="Running time"
-                  help="Including the intervals."
+                  hint="Including the intervals"
                   name="runningMinutes"
                 >
                   <DefaultedMinutes
@@ -541,24 +552,28 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                     :items="latecomerItems"
                   />
                 </UFormField>
-                <UCheckbox
-                  :model-value="elsewhere"
-                  :disabled="!sellsHere"
-                  label="Booked elsewhere"
-                  :description="sellsHere ? 'Tickets are sold on another website, not here.' : 'Nothing here sells tickets, so every production is booked on another website.'"
-                  @update:model-value="details.bookedElsewhere = !!$event"
-                />
-                <UFormField
-                  name="slug"
-                  label="Web address"
-                  help="An old address keeps working once the production has been public."
-                >
-                  <UInput
-                    v-model="details.slug"
-                    maxlength="60"
-                  />
-                </UFormField>
               </div>
+              <USeparator />
+              <h3 class="text-sm font-semibold text-highlighted">
+                Public page and tickets
+              </h3>
+              <UFormField
+                name="slug"
+                label="Web address"
+                help="An old address keeps working once the production has been public."
+              >
+                <UInput
+                  v-model="details.slug"
+                  maxlength="60"
+                />
+              </UFormField>
+              <UCheckbox
+                :model-value="elsewhere"
+                :disabled="!sellsHere"
+                label="Booked elsewhere"
+                :description="sellsHere ? 'Tickets are sold on another website, not here.' : 'Nothing here sells tickets, so every production is booked on another website.'"
+                @update:model-value="details.bookedElsewhere = !!$event"
+              />
               <UFormField
                 v-if="elsewhere"
                 label="Booking link"

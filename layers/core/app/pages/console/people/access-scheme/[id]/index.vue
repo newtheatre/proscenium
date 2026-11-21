@@ -110,6 +110,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
 <template>
   <PageFrame
     :title="data?.name ?? t('core.access.queue.unnamed')"
+    :trail="[{ label: t('core.navigation.access-scheme-queue.label'), to: '/console/people/access-scheme' }]"
     width="reading"
   >
     <DataBoundary
@@ -278,8 +279,8 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
           :description="t('core.access.review.behalf-help')"
         >
           <UButton
-            color="neutral"
-            variant="outline"
+            :color="app ? 'neutral' : 'primary'"
+            :variant="app ? 'outline' : 'solid'"
             icon="i-lucide-file-pen-line"
             :label="t('core.access.review.start-behalf')"
             :to="`/console/people/access-scheme/${encodeURIComponent(id)}/apply`"

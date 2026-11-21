@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
   description?: string
   /** The parents of this page, nearest last: where it sits below a navigation entry. Drawn here and nowhere else. */
   trail?: { label: string, to: string }[]
-  /** A record's own name, which can be long: on a phone in the console it takes a line of its own under the bar, where the bar's actions cannot squeeze it. */
+  /** A record's own name, which can be long: on a phone in the console it takes a line of its own under the bar, where the bar's actions cannot squeeze it. A page with a trail does so anyway. */
   longTitle?: boolean
 }>(), { width: 'standard', description: undefined, trail: undefined, longTitle: false })
 
@@ -57,6 +57,8 @@ const navbarUi = {
   left: 'max-sm:max-w-full',
   right: 'max-sm:ms-auto',
 }
+// On a phone a page below another has a back button in the bar too, so its title takes the line under it.
+const titleBelow = computed(() => props.longTitle || !!nearest.value)
 const [DefineBody, ReuseBody] = createReusableTemplate()
 </script>
 
@@ -109,7 +111,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
     <template #header>
       <UDashboardNavbar
         :title="title"
-        :ui="longTitle ? { ...navbarUi, title: 'max-sm:sr-only' } : navbarUi"
+        :ui="titleBelow ? { ...navbarUi, title: 'max-sm:sr-only' } : navbarUi"
       >
         <template #leading>
           <UDashboardSidebarCollapse />
@@ -148,7 +150,10 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
           <ShellTools />
         </template>
       </UDashboardNavbar>
-      <UDashboardToolbar v-if="$slots.toolbar">
+      <UDashboardToolbar
+        v-if="$slots.toolbar"
+        :ui="{ root: 'max-sm:py-2' }"
+      >
         <template #left>
           <slot name="toolbar" />
         </template>
@@ -161,7 +166,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
       >
         <!-- The heading stays in the bar for assistive technology; this line is what a phone shows. -->
         <p
-          v-if="longTitle"
+          v-if="titleBelow"
           class="text-lg font-semibold text-pretty text-highlighted sm:hidden"
           aria-hidden="true"
         >
