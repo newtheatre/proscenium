@@ -63,7 +63,12 @@ const allPicked = computed<boolean | 'indeterminate'>(() => {
 function pickAll(on: boolean | 'indeterminate') {
   picked.value = on === true ? [...pickable.value] : []
 }
+const templateError = ref(false)
 async function apply() {
+  if (!template.value) {
+    templateError.value = true
+    return
+  }
   refusal.value = null
   try {
     const result = await write<{ added: unknown[], skipped: unknown[] }>(`/api/front-of-house/rota-templates/${encodeURIComponent(template.value!)}/apply`, { method: 'POST', body: { performanceIds: picked.value } })
@@ -115,17 +120,20 @@ const lineText = (l: Line) => t('front-of-house.rota.line', { duty: l.duty, take
         :title="t('front-of-house.rota.picked', { count: picked.length })"
       >
         <div class="flex flex-wrap items-end gap-3">
-          <UFormField :label="t('front-of-house.rota.template')">
+          <UFormField
+            :label="t('front-of-house.rota.template')"
+            :error="templateError ? t('front-of-house.rota.choose-template-first') : undefined"
+          >
             <USelectMenu
               v-model="template"
               :items="templateItems"
               value-key="value"
               :placeholder="t('front-of-house.rota.choose-template')"
+              @update:model-value="templateError = false"
             />
           </UFormField>
           <UButton
             :label="t('front-of-house.rota.apply')"
-            :disabled="!template"
             loading-auto
             @click="apply"
           />
@@ -165,7 +173,6 @@ const lineText = (l: Line) => t('front-of-house.rota.line', { duty: l.duty, take
               <RecordListItem
                 v-for="p in d.performances"
                 :key="p.id"
-                icon="i-lucide-calendar-range"
                 :description="[dateTime(p.startsAt), p.venue].filter(Boolean).join(' · ')"
               >
                 <template #leading>

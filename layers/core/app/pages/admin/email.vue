@@ -90,7 +90,7 @@ async function setUp() {
 
         <PageSection
           title="Sending domain"
-          :description="data.domain ?? 'Not set'"
+          :description="data.domain ?? undefined"
         >
           <template #actions>
             <StatusBadge
@@ -102,7 +102,7 @@ async function setUp() {
             {{ data.verified
               ? 'Email is sent from this domain.'
               : !data.domain
-                ? 'No domain is set, so nothing is sent yet.'
+                ? 'No domain is set, so nothing is sent yet. Set one up automatically below, or enter one you have already set up in Cloudflare under Email settings.'
                 : data.contactSet
                   ? 'A test message goes to the theatre\'s contact email.'
                   : 'Set the theatre\'s contact email in the organisation settings first: the test message goes there.' }}

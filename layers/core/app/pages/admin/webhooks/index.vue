@@ -20,6 +20,7 @@ function describe(hook: Webhook): string {
   <PageFrame
     :title="t('core.webhooks.title')"
     :description="t('core.webhooks.description')"
+    width="reading"
   >
     <template #primary>
       <UButton

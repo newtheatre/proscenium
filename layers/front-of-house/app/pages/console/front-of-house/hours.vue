@@ -53,7 +53,7 @@ const columns = computed(() => [
     </template>
     <UFormField
       :label="t('front-of-house.hours.range')"
-      class="mb-6"
+      class="mb-6 max-w-sm"
     >
       <FieldDateRange v-model="range" />
     </UFormField>

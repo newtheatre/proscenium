@@ -6,11 +6,14 @@ import { vocabularyInput } from '../../../../server/vocabularies/input'
 interface Row { key: string, owner: string, label: string, description: string | null, locked: boolean, live: number, retired: number }
 
 const { $api } = useNuxtApp()
+const { nameOf } = useModuleWords()
+// Who a vocabulary belongs to, in words: the theatre, the platform, or the module by its name.
+const owner = (id: string) => id === 'theatre' ? 'The theatre' : id === 'core' ? 'The platform' : nameOf(id)
 const columns = [
-  { key: 'label', label: 'Vocabulary', sortable: true, card: true },
+  { key: 'label', label: 'Vocabulary', sortable: true },
   { key: 'owner', label: 'Belongs to', card: true },
   { key: 'live', label: 'Terms', card: true },
-  { key: 'retired', label: 'Retired', card: true },
+  { key: 'retired', label: 'Retired' },
 ]
 const filters = [{
   name: 'owner',
@@ -46,7 +49,7 @@ const created = (result: unknown) => navigateTo(`/admin/vocabularies/${encodeURI
       />
     </template>
     <template #cell-owner="{ row }">
-      {{ row.owner === 'theatre' ? 'The theatre' : row.owner }}
+      {{ owner(row.owner) }}
     </template>
     <template #cell-label="{ row }">
       <span class="inline-flex items-center gap-2">

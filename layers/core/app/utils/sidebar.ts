@@ -1,5 +1,5 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from './navigation'
+import { resolveEntry } from '../../shared/navigation'
 
 interface Entry { id: string, label: string, to: string, icon: string, match?: string, count?: number }
 interface Group { id: string, label: string, icon: string, everyday: Entry[], setup: Entry[] }
@@ -10,7 +10,9 @@ interface Group { id: string, label: string, icon: string, everyday: Entry[], se
  * entries keep their order, everyday first). `onSelect` closes the drawer on a phone.
  */
 export function sidebarGroups(groups: Group[], options: { t: (key: string) => string, path: string, onSelect: () => void }): NavigationMenuItem[] {
-  const link = (e: Entry, icon = e.icon): NavigationMenuItem => ({ label: options.t(e.label), icon, to: e.to, active: isCurrent(e, options.path), badge: e.count || undefined, onSelect: options.onSelect })
+  // One entry is current: the one whose address covers the page most closely, so Merges is not Accounts too.
+  const current = resolveEntry(groups.flatMap(g => [...g.everyday, ...g.setup]), options.path)?.id
+  const link = (e: Entry, icon = e.icon): NavigationMenuItem => ({ label: options.t(e.label), icon, to: e.to, active: e.id === current, badge: e.count || undefined, onSelect: options.onSelect })
   return groups.flatMap((g): NavigationMenuItem[] => {
     const entries = [...g.everyday, ...g.setup]
     if (!entries.length) return []
@@ -19,7 +21,7 @@ export function sidebarGroups(groups: Group[], options: { t: (key: string) => st
       label: options.t(g.label),
       icon: g.icon,
       type: 'trigger',
-      defaultOpen: entries.some(e => isCurrent(e, options.path)),
+      defaultOpen: entries.some(e => e.id === current),
       badge: entries.reduce((n, e) => n + (e.count ?? 0), 0) || undefined,
       children: entries.map(e => link(e, e.icon)),
     }]

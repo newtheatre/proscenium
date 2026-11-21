@@ -63,7 +63,7 @@ test.describe('someone who looks after the public site', () => {
     const pages = page.getByRole('region', { name: 'Pages with starter text' })
     await expect(pages.getByRole('link', { name: /Welcome/ })).toHaveAttribute('href', '/')
     await expect(pages.getByText(/Edit site\/content\/pages\/index\.md/)).toBeVisible()
-    await expect(page.getByRole('region', { name: 'Parts of pages from a switched-off module' }).getByText('Every part a page uses is switched on.')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Nothing left to do' }).getByText('Every part a page uses is switched on.')).toBeVisible()
     await noViolations(page)
 
     await page.getByRole('switch', { name: 'Turn search engines away' }).click()

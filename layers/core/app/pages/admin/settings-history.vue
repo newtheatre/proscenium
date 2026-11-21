@@ -48,14 +48,14 @@ const query = computed(() => ({
   <PageFrame
     :title="t('core.settings-history.title')"
     :description="t('core.settings-history.description')"
+    width="reading"
   >
-    <div class="mb-6 flex flex-wrap gap-4">
+    <div class="mb-6 grid gap-4 sm:grid-cols-3">
       <UFormField :label="t('core.settings-history.filter-module')">
         <USelect
           v-model="module"
           :items="moduleItems"
           value-key="value"
-          class="w-56"
         />
       </UFormField>
       <UFormField :label="t('core.settings-history.filter-page')">
@@ -63,7 +63,6 @@ const query = computed(() => ({
           v-model="page"
           :items="pageItems"
           value-key="value"
-          class="w-56"
         />
       </UFormField>
       <UFormField :label="t('core.settings-history.filter-person')">
@@ -71,7 +70,6 @@ const query = computed(() => ({
           v-model="actor"
           :items="people"
           value-key="value"
-          class="w-56"
         />
       </UFormField>
     </div>

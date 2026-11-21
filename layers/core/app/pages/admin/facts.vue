@@ -33,6 +33,27 @@ function fits(fact: Fact) {
   return (ability: CatalogueAbility) => ability.module === fact.module
     || (fact.on ? !!ability.within?.includes(fact.on) : !ability.on && ability.risk === 'normal')
 }
+// A fact shows what it brings in a line; its tickboxes open only while it is being changed.
+const open = reactive<Record<string, boolean>>({})
+const saved = (fact: Fact) => fact.abilities.map(a => a.ability)
+const SUMMARY_NAMES = 3 // not-policy: how many abilities the closed line names before "and N more"
+function summary(fact: Fact): string {
+  const catalogue = new Map((data.value?.catalogue ?? []).map(a => [a.name, a]))
+  const names = saved(fact).map((name) => {
+    const ability = catalogue.get(name)
+    return ability && te(ability.label) ? t(ability.label) : name
+  })
+  if (!names.length) return t('core.facts.brings-none')
+  const more = names.length - SUMMARY_NAMES
+  const listed = more > 0 ? `${names.slice(0, SUMMARY_NAMES).join('; ')}; ${t('core.facts.and-more', { count: more })}` : names.join('; ')
+  return t('core.facts.brings', { count: names.length, abilities: listed })
+}
+function cancel(fact: Fact) {
+  drafts[fact.name] = saved(fact)
+  confirmations[fact.name] = false
+  refusals[fact.name] = null
+  open[fact.name] = false
+}
 const hiddenCount = (fact: Fact) => (data.value?.catalogue ?? []).filter(a => !fits(fact)(a) && !(drafts[fact.name] ?? []).includes(a.name)).length
 
 /** Privileged abilities ticked for this fact that the theatre has not confirmed yet. */
@@ -44,6 +65,7 @@ async function save(fact: Fact) {
     await $api(`/api/core/facts/${encodeURIComponent(fact.name)}` as '/api/core/facts/:fact', { method: 'PUT', body: { abilities: drafts[fact.name] ?? [], confirmPrivileged: !!confirmations[fact.name] } })
     toast.add({ title: t('core.facts.saved', { fact: nameOf(fact) }), color: 'success' })
     confirmations[fact.name] = false
+    open[fact.name] = false
     await refresh()
   }
   catch (e) {
@@ -75,30 +97,60 @@ async function save(fact: Fact) {
         :title="nameOf(fact)"
         :description="fact.standing ? t('core.facts.standing') : undefined"
       >
-        <RefusalNotice :refusal="refusals[fact.name] ?? null" />
-        <AbilityPicker
-          v-if="data && drafts[fact.name]"
-          v-model="drafts[fact.name]!"
-          :catalogue="data.catalogue"
-          :confirmed="confirmedOf(fact)"
-          :shown="everything[fact.name] ? undefined : fits(fact)"
-        />
-        <USwitch
-          v-if="hiddenCount(fact)"
-          v-model="everything[fact.name]"
-          :label="t('core.facts.show-all', { count: hiddenCount(fact) })"
-        />
-        <UCheckbox
-          v-if="unconfirmed(fact).length"
-          v-model="confirmations[fact.name]"
-          :label="t('core.facts.confirm')"
-          :description="t('core.facts.confirm-help')"
-        />
-        <UButton
-          :label="t('core.facts.save')"
-          loading-auto
-          @click="save(fact)"
-        />
+        <template #actions>
+          <UButton
+            v-if="!open[fact.name]"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            :label="t('core.facts.change')"
+            :aria-label="t('core.facts.change-fact', { fact: nameOf(fact) })"
+            @click="open[fact.name] = true"
+          />
+        </template>
+        <p
+          v-if="!open[fact.name]"
+          class="text-sm text-muted"
+        >
+          {{ summary(fact) }}
+        </p>
+        <template v-else>
+          <RefusalNotice :refusal="refusals[fact.name] ?? null" />
+          <AbilityPicker
+            v-if="data && drafts[fact.name]"
+            v-model="drafts[fact.name]!"
+            :catalogue="data.catalogue"
+            :confirmed="confirmedOf(fact)"
+            :shown="everything[fact.name] ? undefined : fits(fact)"
+          />
+          <USwitch
+            v-if="hiddenCount(fact)"
+            v-model="everything[fact.name]"
+            :label="t('core.facts.show-all', { count: hiddenCount(fact) })"
+          />
+          <UCheckbox
+            v-if="unconfirmed(fact).length"
+            v-model="confirmations[fact.name]"
+            :label="t('core.facts.confirm')"
+            :description="t('core.facts.confirm-help')"
+          />
+        </template>
+        <template
+          v-if="open[fact.name]"
+          #footer
+        >
+          <UButton
+            color="neutral"
+            variant="outline"
+            :label="t('core.facts.cancel')"
+            @click="cancel(fact)"
+          />
+          <UButton
+            :label="t('core.facts.save')"
+            loading-auto
+            @click="save(fact)"
+          />
+        </template>
       </PageSection>
     </DataBoundary>
   </PageFrame>

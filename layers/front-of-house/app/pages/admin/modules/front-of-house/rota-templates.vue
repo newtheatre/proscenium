@@ -39,14 +39,19 @@ const blank = () => ({ name: '', venueId: ANY, isDefault: false, lines: [] as Li
 const form = ref(blank())
 const editing = ref<Template | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const open = ref(false)
 
 function edit(template: Template) {
   editing.value = template
   form.value = { name: template.name, venueId: template.venueId ?? ANY, isDefault: template.isDefault, lines: template.lines.map(l => ({ ...l })) }
+  refusal.value = null
+  open.value = true
 }
-function stop() {
+function add() {
   editing.value = null
   form.value = blank()
+  refusal.value = null
+  open.value = true
 }
 function addLine() {
   const free = dutyItems.value.find(d => !form.value.lines.some(l => l.dutyId === d.value))
@@ -60,7 +65,7 @@ async function save() {
     if (editing.value) await write(`/api/front-of-house/rota-templates/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/rota-templates', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.templates.saved' : 'front-of-house.templates.added', { name: body.name }), color: 'success' })
-    stop()
+    open.value = false
     await refresh()
   }
   catch (e) {
@@ -97,8 +102,18 @@ const describe = (template: Template) => [
     :title="t('front-of-house.navigation.rota-templates.label')"
     :description="t('front-of-house.templates.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <template #primary>
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('front-of-house.templates.add-button')"
+        @click="add"
+      />
+    </template>
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!open"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -130,15 +145,22 @@ const describe = (template: Template) => [
           </RecordList>
         </template>
       </DataBoundary>
+    </div>
 
-      <PageSection :title="editing ? t('front-of-house.templates.edit-title', { name: editing.name }) : t('front-of-house.templates.add-title')">
+    <UModal
+      v-model:open="open"
+      :title="editing ? t('front-of-house.templates.edit-title', { name: editing.name }) : t('front-of-house.templates.add-title')"
+    >
+      <template #body>
         <UForm
+          id="fh-template"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
             :label="t('front-of-house.templates.name')"
@@ -204,21 +226,15 @@ const describe = (template: Template) => [
               @click="addLine"
             />
           </fieldset>
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="editing ? t('front-of-house.save') : t('front-of-house.templates.add-button')"
-            />
-            <UButton
-              v-if="editing"
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="stop"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-template"
+          :label="editing ? t('front-of-house.save') : t('front-of-house.templates.add-button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>
