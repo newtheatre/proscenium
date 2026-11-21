@@ -43,9 +43,12 @@ async function decide() {
     refusal.value = toRefusal(e)
   }
 }
+// Which scheme and when, then why it waits: the second line is what staff act on.
 const describe = (a: Application) => [
   a.schemeName,
   t('membership.screens.applications.applied', { date: day(new Date(a.appliedAt).toISOString().slice(0, 10)) }), // not-policy: the length of a date
+].join(' · ')
+const waitsFor = (a: Application) => [
   t(`membership.screens.applications.reasons.${a.reason ?? 'staff-check'}`),
   ...(a.reason === 'not-on-list' && a.reference ? [t('membership.screens.applications.reference', { reference: a.reference })] : []),
   ...(a.listName ? [t('membership.screens.applications.list-name', { name: a.listName })] : []),
@@ -78,8 +81,11 @@ const describe = (a: Application) => [
           v-for="a in data.applications"
           :key="a.id"
           :name="a.accountName ?? t('membership.screens.applications.no-name')"
-          :description="describe(a)"
         >
+          <template #description>
+            <span class="block">{{ describe(a) }}</span>
+            <span class="block text-default">{{ waitsFor(a) }}</span>
+          </template>
           <div class="flex gap-2">
             <UButton
               size="sm"

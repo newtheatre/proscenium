@@ -19,6 +19,7 @@ const facts = computed(() => {
   const x = a.value
   if (!x) return []
   return [
+    ...(x.accountId ? [{ label: t('awards.screens.award.holder'), value: x.recipientName, to: `/console/people/${x.accountId}` }] : []),
     { label: t('awards.screens.award.type'), value: x.typeName },
     { label: t('awards.screens.award.awarded-on'), value: awardDate(x) },
     ...(x.awardedFor ? [{ label: t('awards.screens.award.awarded-for'), value: x.awardedFor }] : []),
@@ -197,22 +198,6 @@ async function revoke() {
           :actions="data.canUpdate && a.typeDefaultVisibility !== 'hidden' ? [{ label: t('awards.screens.award.list-for-holder'), color: 'neutral', variant: 'outline', onClick: listForHolder }] : undefined"
         />
         <FactStrip :facts="facts" />
-        <PageSection
-          v-if="a.accountId"
-          :title="t('awards.screens.award.holder')"
-        >
-          <p class="font-medium">
-            {{ a.recipientName }}
-          </p>
-          <UButton
-            color="neutral"
-            variant="link"
-            class="px-0"
-            icon="i-lucide-user"
-            :to="`/console/people/${a.accountId}`"
-            :label="t('awards.screens.award.open-person')"
-          />
-        </PageSection>
         <PageSection :title="t('awards.screens.award.citation')">
           <p
             v-if="a.citation"
