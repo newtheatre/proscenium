@@ -24,7 +24,7 @@ const onMedia = computed(() => route.query.tab === 'media')
   <section
     v-if="data"
     aria-labelledby="side-poster-heading"
-    class="mb-4 space-y-3 rounded-lg border border-default p-4"
+    class="space-y-3 rounded-lg border border-default p-4"
   >
     <h2
       id="side-poster-heading"

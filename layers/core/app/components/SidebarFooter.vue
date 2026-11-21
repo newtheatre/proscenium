@@ -15,7 +15,7 @@ const back = computed(() => has('console')
 
 const links = computed<NavigationMenuItem[]>(() => [
   // Documentation is always first and the link to the other shell always beneath it, so the two never swap places.
-  { label: t('core.sidebar.documentation'), icon: 'i-lucide-book-open', to: 'https://github.com/MattA-Official/proscenium/tree/next/docs', target: '_blank' },
+  { label: t('core.sidebar.documentation'), icon: 'i-lucide-book-open', to: 'https://github.com/newtheatre/proscenium/tree/next/docs', target: '_blank' },
   ...(props.admin ? [back.value] : []),
   ...(has('admin') && !props.admin ? [{ label: t('core.menu.admin'), icon: 'i-lucide-shield-check', to: '/admin' }] : []),
 ])

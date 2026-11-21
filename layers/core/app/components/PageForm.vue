@@ -55,6 +55,8 @@ const props = withDefaults(defineProps<{
   current?: () => Promise<{ values: Record<string, unknown>, version?: string | number }>
   /** Where to go once saved, and on Cancel. Default: back to where the person came from. */
   returnTo?: string
+  /** A page form's parents, nearest last, as on any PageFrame. */
+  trail?: { label: string, to: string }[]
   /** Long forms keep a draft on the device under this key. */
   draftKey?: string
   /** What the toast says once saved when "Saved" is too vague: "Venue added". */
@@ -65,7 +67,7 @@ const props = withDefaults(defineProps<{
   open?: boolean
   /** What the toast says once saved, such as "Production created". Default: "Saved". */
   savedTitle?: string
-}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined, done: undefined, undo: undefined })
+}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, trail: undefined, draftKey: undefined, done: undefined, undo: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -250,7 +252,7 @@ useLeaveGuard(() => dirty.value && !saved.value)
   <!-- One body, placed in the panel's body slot or the page's default slot. -->
   <component
     :is="panel ? USlideover : PageFrame"
-    v-bind="panel ? { open, title, description } : { title, description, width: 'reading' }"
+    v-bind="panel ? { open, title, description } : { title, description, trail, width: 'reading' }"
     @update:open="(v: boolean) => { if (!v) cancel(); else emit('update:open', v) }"
   >
     <template #[bodySlot]>
