@@ -137,6 +137,7 @@ test('a response moves through stages, goes back for changes and returns as a ne
   await expect(panel).toBeHidden()
 
   // The table filters by stage, from the address.
+  await page.getByRole('button', { name: 'Filters' }).click()
   await page.getByRole('combobox').filter({ hasText: 'Any stage' }).click()
   await page.getByRole('option', { name: 'Declined' }).click()
   await expect(page.getByText('No responses match these filters')).toBeVisible()
