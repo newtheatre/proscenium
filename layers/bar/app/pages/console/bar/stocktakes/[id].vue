@@ -240,6 +240,7 @@ const facts = computed(() => {
 <template>
   <PageFrame
     :title="title"
+    long-title
     :trail="[{ label: t('bar.navigation.stocktakes.label'), to: '/console/bar/stocktakes' }]"
   >
     <template #status>

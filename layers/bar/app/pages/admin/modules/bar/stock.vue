@@ -255,38 +255,7 @@ async function setActive(path: string, name: string, active: boolean) {
                 :name="i.name"
                 :description="describeItem(i)"
               >
-                <StatusBadge
-                  v-if="i.active && i.low"
-                  tone="warning"
-                  :label="t('bar.screens.stock.low')"
-                />
-                <span class="text-sm tabular-nums">{{ amount(i, i.total) }}</span>
-                <RowActions
-                  :label="t('bar.screens.stock.item-actions', { name: i.name })"
-                  :items="[
-                    { label: t('bar.screens.stock.edit-item'), icon: 'i-lucide-pencil', onSelect: () => editItem(i) },
-                    ...(data.canAllergens ? [{ label: t('bar.screens.product.check-label'), icon: 'i-lucide-clipboard-check', onSelect: () => checkLabel(i) }] : []),
-                    i.active
-                      ? { label: t('bar.screens.stock.retire-item'), icon: 'i-lucide-archive', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, i.name, false) }
-                      : { label: t('bar.screens.stock.restore-item'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, i.name, true) },
-                  ]"
-                />
-              </RecordListItem>
-            </RecordList>
-            <CollapsibleDivider
-              :open="showRetiredItems || !!query.trim()"
-              :label="t('bar.screens.stock.retired-items')"
-              :count="retiredItems.length"
-              @update:open="v => showRetiredItems = v"
-            >
-              <RecordList :label="t('bar.screens.stock.retired-items')">
-                <RecordListItem
-                  v-for="i in retiredItems"
-                  :key="i.id"
-                  :name="i.name"
-                  :description="describeItem(i)"
-                  muted
-                >
+                <div class="flex shrink-0 items-center gap-2">
                   <StatusBadge
                     v-if="i.active && i.low"
                     tone="warning"
@@ -303,6 +272,41 @@ async function setActive(path: string, name: string, active: boolean) {
                         : { label: t('bar.screens.stock.restore-item'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, i.name, true) },
                     ]"
                   />
+                </div>
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              :open="showRetiredItems || !!query.trim()"
+              :label="t('bar.screens.stock.retired-items')"
+              :count="retiredItems.length"
+              @update:open="v => showRetiredItems = v"
+            >
+              <RecordList :label="t('bar.screens.stock.retired-items')">
+                <RecordListItem
+                  v-for="i in retiredItems"
+                  :key="i.id"
+                  :name="i.name"
+                  :description="describeItem(i)"
+                  muted
+                >
+                  <div class="flex shrink-0 items-center gap-2">
+                    <StatusBadge
+                      v-if="i.active && i.low"
+                      tone="warning"
+                      :label="t('bar.screens.stock.low')"
+                    />
+                    <span class="text-sm tabular-nums">{{ amount(i, i.total) }}</span>
+                    <RowActions
+                      :label="t('bar.screens.stock.item-actions', { name: i.name })"
+                      :items="[
+                        { label: t('bar.screens.stock.edit-item'), icon: 'i-lucide-pencil', onSelect: () => editItem(i) },
+                        ...(data.canAllergens ? [{ label: t('bar.screens.product.check-label'), icon: 'i-lucide-clipboard-check', onSelect: () => checkLabel(i) }] : []),
+                        i.active
+                          ? { label: t('bar.screens.stock.retire-item'), icon: 'i-lucide-archive', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, i.name, false) }
+                          : { label: t('bar.screens.stock.restore-item'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(`/api/bar/stock/items/${i.id}`, i.name, true) },
+                      ]"
+                    />
+                  </div>
                 </RecordListItem>
               </RecordList>
             </CollapsibleDivider>

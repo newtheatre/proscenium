@@ -105,13 +105,8 @@ const columns = computed(() => [
             :key="r.reference"
             :to="`/console/bar/sales/${r.reference}`"
             :name="r.reference"
-            :description="[dateTime(r.at), r.outlet].join(' · ')"
+            :description="[dateTime(r.at), r.outlet, r.state === 'paid' ? null : stateLabel(r.state)].filter(Boolean).join(' · ')"
           >
-            <StatusBadge
-              v-if="r.state !== 'paid'"
-              :tone="tone(r.state)"
-              :label="stateLabel(r.state)"
-            />
             <span class="text-right text-sm">
               <span class="block font-medium tabular-nums">{{ money(r.totalMinor) }}</span>
               <span

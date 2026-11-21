@@ -230,23 +230,26 @@ function actions(i: Item) {
                 class="block"
               >{{ l.name }}: <span :class="['tabular-nums', (levelAt(i, l.id) ?? 0) < 0 && 'text-error']">{{ amount(i, levelAt(i, l.id)) }}</span></span>
             </template>
-            <span class="text-right text-sm">
-              <span :class="['block font-medium tabular-nums', (shown(i) ?? 0) < 0 && 'text-error', shown(i) === null && 'text-muted']">{{ amount(i, shown(i)) }}</span>
+            <span :class="['text-sm font-medium tabular-nums', (shown(i) ?? 0) < 0 && 'text-error', shown(i) === null && 'text-muted']">{{ amount(i, shown(i)) }}</span>
+            <RowActions
+              :label="t('bar.screens.stock.item-actions', { name: i.name })"
+              :items="actions(i)"
+            />
+            <template
+              v-if="i.low || i.levels.some(l => l.quantity < 0)"
+              #below
+            >
               <StatusBadge
                 v-if="i.levels.some(l => l.quantity < 0)"
                 tone="danger"
                 :label="t('bar.screens.stock-levels.missing')"
               />
               <StatusBadge
-                v-else-if="i.low"
+                v-else
                 tone="warning"
                 :label="t('bar.screens.stock.low')"
               />
-            </span>
-            <RowActions
-              :label="t('bar.screens.stock.item-actions', { name: i.name })"
-              :items="actions(i)"
-            />
+            </template>
           </RecordListItem>
         </RecordList>
         <UTable

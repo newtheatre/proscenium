@@ -187,6 +187,7 @@ const title = computed(() => isNew.value
 <template>
   <PageFrame
     :title="title"
+    long-title
     :trail="[{ label: t('bar.navigation.deliveries.label'), to: '/console/bar/deliveries' }]"
   >
     <template #status>

@@ -93,6 +93,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
 <template>
   <PageFrame
     :title="data ? t('bar.screens.sale.title', { reference: data.sale.reference }) : t('bar.navigation.sales.label')"
+    long-title
     :trail="trail"
   >
     <template #status>
