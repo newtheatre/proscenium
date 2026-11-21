@@ -16,6 +16,8 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
+// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
+const phone = useScreenQuery('(max-width: 639px)')
 // Filters live in the address.
 const ALL = 'all'
 const range = computed({
@@ -133,8 +135,11 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
     >
       {{ t('bar.screens.age-checks.ages', { minimum: data.ages.minimum, challenge: data.ages.challenge }) }}
     </p>
-    <div class="mb-6 grid gap-4 sm:grid-cols-3">
-      <UFormField :label="t('bar.screens.age-checks.days-filter')">
+    <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <UFormField
+        :label="t('bar.screens.age-checks.days-filter')"
+        class="max-sm:col-span-2"
+      >
         <FieldDateRange v-model="range" />
       </UFormField>
       <UFormField :label="t('bar.screens.age-checks.outlet')">
@@ -177,8 +182,46 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
             :description="t('bar.screens.age-checks.empty.description')"
             icon="i-lucide-id-card"
           />
+          <!-- On a phone: one row a check, what happened first and the rest under it. -->
+          <RecordList
+            v-if="d.rows.length && phone"
+            :label="t('bar.navigation.age-checks.label')"
+          >
+            <RecordListItem
+              v-for="r in d.rows"
+              :key="r.id"
+              :name="[r.reason ?? (r.idType ? idTypeLabel(r.idType) : null), r.scope === 'all' ? t('bar.screens.age-checks.whole-sale') : r.product].filter(Boolean).join(' · ') || outcomeLabel(r.outcome)"
+              :description="[dateTime(r.at), r.outlet, r.by, r.sale].filter(Boolean).join(' · ')"
+            >
+              <StatusBadge
+                v-if="r.outcome === 'refused'"
+                tone="warning"
+                :label="outcomeLabel(r.outcome)"
+              />
+              <UBadge
+                v-else
+                :color="r.outcome === 'id_checked' ? 'success' : 'neutral'"
+                icon="i-lucide-circle-check"
+                :label="outcomeLabel(r.outcome)"
+              />
+              <template
+                v-if="r.description"
+                #below
+              >
+                <div class="flex items-center gap-2 text-sm">
+                  <span>{{ r.description }}</span>
+                  <IconButton
+                    v-if="d.canReview"
+                    icon="i-lucide-eraser"
+                    :label="t('bar.screens.age-checks.erase')"
+                    @click="erase(r)"
+                  />
+                </div>
+              </template>
+            </RecordListItem>
+          </RecordList>
           <UTable
-            v-else
+            v-else-if="d.rows.length"
             :data="d.rows"
             :columns="columns"
             :caption="t('bar.navigation.age-checks.label')"
@@ -217,7 +260,17 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
               </template>
             </template>
             <template #sale-cell="{ row }">
-              {{ row.original.sale ?? t('bar.screens.age-checks.no-sale') }}
+              <ULink
+                v-if="row.original.sale"
+                :to="`/console/bar/sales/${row.original.sale}`"
+                class="font-medium"
+              >
+                {{ row.original.sale }}
+              </ULink>
+              <span
+                v-else
+                class="text-muted"
+              >{{ t('bar.screens.age-checks.no-sale') }}</span>
             </template>
             <template #description-cell="{ row }">
               <div

@@ -31,6 +31,12 @@ const labelEl = useTemplateRef<FormRef>('labelEl')
 const trail = computed(() => [{ label: t('bar.navigation.products.label'), to: '/admin/modules/bar/products' }])
 const categoryItems = computed(() => (data.value?.categories ?? []).map(c => ({ value: c.id, label: c.name })))
 
+// A product sold one way has a single size called Each, which the till never shows: its card says what it holds instead.
+function sizeTitle(v: Variant): string {
+  const sold = data.value?.product.variants.filter(x => !x.mixerMeasure) ?? []
+  if (sold.length === 1 && v.name === 'Each' && v.active) return t(data.value?.canStock ? 'bar.screens.product.one-size' : 'bar.screens.product.one-size-prices')
+  return v.active ? v.name : t('bar.screens.products.retired-name', { name: v.name })
+}
 const groupItems = computed(() => (data.value?.groups ?? []).map(g => ({ value: g.id, label: g.name })))
 const isMixer = computed(() => !!data.value?.product.variants.some(v => v.mixerMeasure && v.active))
 const groupNames = computed(() => (data.value?.product.groupIds ?? []).map(g => data.value!.groups.find(x => x.id === g)?.name).filter(Boolean).join(', '))
@@ -182,7 +188,7 @@ const allergenItems = computed(() => ALLERGENS.map(k => ({ value: k as string, l
 const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
 const allergenFacts = computed(() => {
   const a = allergens.value
-  if (!a?.checked) return [{ label: t('bar.screens.product.allergens-state'), value: t('bar.screens.product.allergens-unchecked') }]
+  if (!a?.checked) return [{ label: t('bar.screens.product.allergens-state'), value: t('bar.screens.product.label-unchecked') }]
   return [
     { label: t('bar.screens.product.contains'), value: a.contains.length ? named(a.contains) : t('bar.screens.product.none-listed') },
     { label: t('bar.screens.product.may-contain'), value: a.mayContain.length ? named(a.mayContain) : t('bar.screens.product.none-listed') },
@@ -385,7 +391,7 @@ function planned(v: Variant, l: List): string | null {
         <PageSection
           v-for="v in data.product.variants.filter(x => x.active || !x.mixerMeasure)"
           :key="v.id"
-          :title="v.active ? v.name : t('bar.screens.products.retired-name', { name: v.name })"
+          :title="sizeTitle(v)"
           :description="v.mixerMeasure ? t('bar.screens.product.mixer-measure-help') : v.barcode ? t('bar.screens.product.barcode-is', { barcode: v.barcode }) : undefined"
         >
           <template
@@ -431,7 +437,7 @@ function planned(v: Variant, l: List): string | null {
                 color="neutral"
                 variant="outline"
                 size="sm"
-                :label="t('bar.screens.product.set-price')"
+                :label="priceOf(v, l)?.from === 'list' ? t('bar.screens.product.change-price') : t('bar.screens.product.set-price')"
                 :aria-label="t('bar.screens.product.set-price-on', { size: v.name, list: l.name })"
                 @click="setPrice(v, l)"
               />

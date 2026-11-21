@@ -1,5 +1,5 @@
 <!-- Deliveries (S9): drafts first, then the latest received. A row opens the delivery; a draft is
-     finished and received there, a received one is its record. -->
+     finished and received there, a received one is its record. A table on a laptop, a list on a phone. -->
 <script setup lang="ts">
 interface Delivery { id: string, locationId: string, supplier: string | null, supplierRef: string | null, state: 'draft' | 'received', createdBy: string, receivedBy: string | null, receivedAt: number | null, createdAt: number, lines: unknown[] }
 
@@ -7,6 +7,8 @@ const { t } = useT()
 const { dateTime } = useDates()
 const { data, status, error, refresh } = await useAPI<{ deliveries: Delivery[], locations: { id: string, name: string }[] }>('/api/bar/stock/deliveries', { key: 'bar:deliveries' })
 
+// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
+const phone = useScreenQuery('(max-width: 639px)')
 const locationName = (id: string) => data.value?.locations.find(l => l.id === id)?.name ?? ''
 const columns = computed(() => [
   { id: 'when', header: t('bar.screens.deliveries.when') },
@@ -38,12 +40,39 @@ const columns = computed(() => [
           :title="t('bar.screens.deliveries.empty.title')"
           :description="t('bar.screens.deliveries.empty.description')"
           icon="i-lucide-truck"
-        />
+        >
+          <template #actions>
+            <UButton
+              to="/console/bar/deliveries/new"
+              icon="i-lucide-plus"
+              :label="t('bar.screens.deliveries.record')"
+            />
+          </template>
+        </EmptyState>
+        <RecordList
+          v-if="d.deliveries.length && phone"
+          :label="t('bar.navigation.deliveries.label')"
+        >
+          <RecordListItem
+            v-for="r in d.deliveries"
+            :key="r.id"
+            :to="`/console/bar/deliveries/${r.id}`"
+            :name="[r.supplier ?? t('bar.screens.deliveries.no-supplier'), locationName(r.locationId)].join(' · ')"
+            :description="[dateTime(r.receivedAt ?? r.createdAt), r.supplierRef ? t('bar.screens.deliveries.note-ref', { ref: r.supplierRef }) : null, t('bar.screens.deliveries.items-count', { count: r.lines.length })].filter(Boolean).join(' · ')"
+          >
+            <StatusBadge
+              :tone="r.state === 'received' ? 'success' : 'warning'"
+              :label="t(`bar.screens.deliveries.states.${r.state}`)"
+            />
+          </RecordListItem>
+        </RecordList>
         <UTable
-          v-else
+          v-else-if="d.deliveries.length"
           :data="d.deliveries"
           :columns="columns"
           :caption="t('bar.navigation.deliveries.label')"
+          :meta="{ class: { tr: 'cursor-pointer' } }"
+          @select="(_event: Event, row: { original: Delivery }) => navigateTo(`/console/bar/deliveries/${row.original.id}`)"
         >
           <template #when-cell="{ row }">
             <ULink

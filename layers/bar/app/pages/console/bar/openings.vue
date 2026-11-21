@@ -71,9 +71,8 @@ async function close(o: Opening) {
               color="neutral"
               variant="outline"
               size="sm"
-              :label="t('bar.screens.openings.close')"
+              :label="t('bar.screens.openings.close-title', { outlet: o.outlet })"
               :disabled="o.waiting > 0"
-              :aria-label="t('bar.screens.openings.close-title', { outlet: o.outlet })"
               @click="close(o)"
             />
           </RecordListItem>
