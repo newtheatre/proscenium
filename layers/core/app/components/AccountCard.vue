@@ -21,7 +21,7 @@ const props = defineProps<{
     :title="props.title"
     :description="props.description"
     orientation="horizontal"
-    :ui="{ container: 'grid-cols-[1fr_auto] lg:grid-cols-[1fr_auto] items-center gap-4' }"
+    :ui="{ container: 'grid grid-cols-[1fr_auto] lg:grid-cols-[1fr_auto] items-center gap-4' }"
   >
     <template #title>
       <h3 :id="props.headingId">
