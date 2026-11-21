@@ -30,6 +30,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function edit(venue: { id: string, name: string, card: Card | null }) {
   editing.value = { id: venue.id, name: venue.name }
   form.value = { body: venue.card?.body ?? '', reviewed: false }
+  refusal.value = null
 }
 async function save() {
   refusal.value = null
@@ -50,8 +51,11 @@ async function save() {
     :title="t('front-of-house.navigation.emergency-cards.label')"
     :description="t('front-of-house.emergency.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!editing"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -84,18 +88,23 @@ async function save() {
           </RecordListItem>
         </RecordList>
       </DataBoundary>
+    </div>
 
-      <PageSection
-        v-if="editing"
-        :title="t('front-of-house.emergency.edit-title', { venue: editing.name })"
-      >
+    <UModal
+      :open="!!editing"
+      :title="t('front-of-house.emergency.edit-title', { venue: editing?.name ?? '' })"
+      @update:open="v => { if (!v) editing = null }"
+    >
+      <template #body>
         <UForm
+          id="fh-emergency"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ body: form.body })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="body"
             :label="t('front-of-house.emergency.body')"
@@ -116,9 +125,11 @@ async function save() {
               {{ t('front-of-house.emergency.preview') }}
             </p>
             <UCard>
-              <p class="text-xl whitespace-pre-line">
-                {{ form.body }}
-              </p>
+              <MarkdownText
+                :text="form.body"
+                link-phones
+                class="text-2xl leading-relaxed text-highlighted"
+              />
             </UCard>
           </div>
           <UCheckbox
@@ -126,20 +137,15 @@ async function save() {
             :label="t('front-of-house.emergency.reviewed')"
             :description="t('front-of-house.emergency.reviewed-help')"
           />
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="t('front-of-house.save')"
-            />
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="editing = null"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-emergency"
+          :label="t('front-of-house.save')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

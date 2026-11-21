@@ -47,7 +47,8 @@ export const incidentsList = defineList('front-of-house.incidents', {
     number: { label: 'Number', type: 'number', natural: 'desc' },
   },
   columns: {
-    reference: { label: 'Number', sort: 'number', always: true, card: true },
+    // Not on a phone's card: the card is already headed by the number.
+    reference: { label: 'Number', sort: 'number', always: true },
     occurred: { label: 'Happened', card: true },
     kind: { label: 'Kind' },
     severity: { label: 'Severity', card: true },

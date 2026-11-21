@@ -9,6 +9,9 @@ interface Tonight {
 const { t } = useT()
 const { time } = useDates()
 const { data, status, error, refresh } = await useAPI<Tonight>('/api/front-of-house/tonight', { key: 'front-of-house:tonight' })
+// The cards are kept on the device from here, before anyone needs one in a hurry.
+const { fetchAhead } = useKeptCards()
+onMounted(() => { if (data.value?.cards.length) void fetchAhead() })
 </script>
 
 <template>

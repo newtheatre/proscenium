@@ -164,8 +164,10 @@ const summary = computed(() => {
   return [
     { label: t('front-of-house.incidents.column.kind'), value: t(`front-of-house.incident-kinds.${d.kind}`) },
     { label: t('front-of-house.incidents.column.occurred'), value: dateTime(d.occurredAt) },
-    { label: t('front-of-house.incident.category'), value: categoryLabel(d.categoryId) },
-    { label: t('front-of-house.incidents.column.severity'), value: t(`front-of-house.severities.${d.severity}`) },
+    // While it is open the severity and category are the two fields below, so they are not said twice.
+    ...(d.state === 'closed'
+      ? [{ label: t('front-of-house.incident.category'), value: categoryLabel(d.categoryId) }, { label: t('front-of-house.incidents.column.severity'), value: t(`front-of-house.severities.${d.severity}`) }]
+      : []),
     { label: t('front-of-house.incident.reported-by'), value: d.reportedBy.name },
     ...(d.whereNote ? [{ label: t('front-of-house.incident.where'), value: d.whereNote }] : []),
   ]
@@ -360,7 +362,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
                     />
                     <UButton
                       color="neutral"
-                      variant="ghost"
+                      variant="outline"
                       :label="t('front-of-house.incident.drop')"
                       loading-auto
                       @click="resolve(a, 'dropped')"
@@ -375,7 +377,10 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
               </RecordList>
             </PageSection>
 
-            <PageSection :title="t('front-of-house.incident.log')">
+            <PageSection
+              v-if="timeline.length"
+              :title="t('front-of-house.incident.log')"
+            >
               <UTimeline :items="timeline" />
             </PageSection>
           </div>
