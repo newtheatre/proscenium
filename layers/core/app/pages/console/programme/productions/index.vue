@@ -117,6 +117,9 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
         class="text-sm text-muted"
       > · {{ row.companyName }}</span>
     </template>
+    <template #card-description="{ row }">
+      {{ row.companyName }}
+    </template>
     <template #cell-dates="{ row }">
       <span v-if="row.firstStartsAt && row.lastEndsAt">{{ range(row.firstStartsAt, row.lastEndsAt) }}</span>
       <span

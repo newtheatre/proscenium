@@ -30,7 +30,9 @@ const props = withDefaults(defineProps<{
   checklistTitle?: string
   /** False once the checklist has nothing left to say, such as on a published production. */
   checklist?: boolean
-}>(), { trail: undefined, checklistTitle: undefined, checklist: true, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
+  /** On a phone, the side panel follows the tabs when it is reference and not the work (a poster). */
+  asideBelow?: boolean
+}>(), { trail: undefined, checklistTitle: undefined, checklist: true, asideBelow: false, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
 const emit = defineEmits<{ (e: 'primary'): void }>()
 defineSlots<{
   /** A side panel that stays put beside the tabs on a laptop (a poster); above them on a phone. */
@@ -147,7 +149,8 @@ const { te } = useT()
       v-if="summary.length || facts.length"
       :facts="summary"
       framed
-      class="mb-6 lg:grid-cols-6"
+      row
+      class="mb-6"
     >
       <component
         :is="f.component"
@@ -157,11 +160,12 @@ const { te } = useT()
       />
     </FactStrip>
 
-    <div :class="hasAside ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8' : ''">
+    <div :class="hasAside ? 'max-lg:flex max-lg:flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8' : ''">
       <!-- On a phone the side panel folds to one line above the tabs, so the poster does not push the work down. -->
       <aside
         v-if="hasAside"
         class="mb-4 lg:order-2"
+        :class="asideBelow && !checks.length && 'max-lg:order-last max-lg:mt-6'"
         :aria-label="t('core.record.side-panel')"
       >
         <!-- Both are drawn and CSS picks one, so the server and the browser draw the same markup. -->
@@ -183,7 +187,7 @@ const { te } = useT()
             />
           </template>
         </UCollapsible>
-        <div :class="checks.length ? 'max-lg:hidden' : undefined">
+        <div :class="['space-y-4', checks.length && 'max-lg:hidden']">
           <slot name="aside" />
           <RecordChecks
             v-if="checks.length"
