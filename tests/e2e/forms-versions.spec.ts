@@ -58,13 +58,13 @@ test('published versions are listed, read as they were, and one is made the draf
   await axe(page)
 
   // Version 2 says what changed; version 1 reads as it was, with one question.
-  await page.getByRole('button', { name: 'Open version 2' }).click()
+  await page.getByRole('link', { name: /^Version 2/ }).click()
   const panel = page.getByRole('dialog', { name: 'Version 2' })
   await expect(panel.getByText('Have you been before?').first()).toBeVisible()
   await expect(panel.getByText('New question')).toBeVisible()
   await axe(page)
   await panel.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: 'Open version 1' }).click()
+  await page.getByRole('link', { name: /^Version 1/ }).click()
   const first = page.getByRole('dialog', { name: 'Version 1' })
   await expect(first.getByLabel('Your name?')).toBeVisible()
   await expect(first.getByText('Have you been before?')).toHaveCount(0)

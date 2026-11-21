@@ -124,16 +124,31 @@ function setSource(key: string) {
 const ofPeople = computed(() => builder.sources.value.find(s => s.key === question.value?.source)?.people ?? false)
 const condition = (c: Condition | undefined) => c ? formsConditionSentence(c, def.value) : ''
 const text = (v: unknown) => String(v ?? '')
+const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-save', icon: 'i-lucide-cloud-check' }]
 </script>
 
 <template>
-  <div class="space-y-5">
-    <p
+  <div
+    class="space-y-5"
+    data-forms-details
+  >
+    <div
       v-if="!found && !ending && !calculation"
-      class="text-sm text-muted"
+      class="space-y-3 text-sm text-muted"
     >
-      {{ t('forms.screens.details.nothing') }}
-    </p>
+      <p>{{ t('forms.screens.details.nothing') }}</p>
+      <p
+        v-for="tip in TIPS"
+        :key="tip.key"
+        class="flex items-start gap-2"
+      >
+        <UIcon
+          :name="tip.icon"
+          class="mt-0.5 shrink-0"
+        />
+        <span class="text-pretty">{{ t(`forms.screens.details.${tip.key}`) }}</span>
+      </p>
+    </div>
 
     <!-- A question -->
     <template v-if="question">

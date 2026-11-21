@@ -118,6 +118,17 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
               {{ t('forms.screens.stages.stages-help') }}
             </p>
           </div>
+          <!-- Headings for the columns on a laptop; each field also carries its own name. -->
+          <div
+            class="hidden gap-2 px-3 text-xs font-medium text-muted sm:grid sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,2fr)_auto]"
+            aria-hidden="true"
+          >
+            <span class="w-4" />
+            <span>{{ t('forms.screens.stages.name') }}</span>
+            <span>{{ t('forms.screens.stages.col-kind') }}</span>
+            <span>{{ t('forms.screens.stages.col-status') }}</span>
+            <span class="w-21" />
+          </div>
           <DragDropProvider @drag-end="dropStage">
             <ol class="space-y-3">
               <FormsSortableItem
@@ -223,6 +234,17 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
             <p class="text-sm text-muted">
               {{ t('forms.screens.stages.moves-help') }}
             </p>
+          </div>
+          <div
+            v-if="flow.transitions.length"
+            class="hidden gap-2 px-3 text-xs font-medium text-muted lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,1.2fr)_auto]"
+            aria-hidden="true"
+          >
+            <span>{{ t('forms.screens.stages.move-label') }}</span>
+            <span>{{ t('forms.screens.stages.col-from') }}</span>
+            <span>{{ t('forms.screens.stages.col-to') }}</span>
+            <span>{{ t('forms.screens.stages.col-who') }}</span>
+            <span class="w-7" />
           </div>
           <ol class="space-y-3">
             <li

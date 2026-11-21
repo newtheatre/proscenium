@@ -77,6 +77,7 @@ function add(kind: QuestionType | 'content' | 'group', into = page.value.id) {
   if (item.kind === 'question') item.options?.forEach((o, i) => { o.label = t('forms.screens.options.placeholder', { n: i + 1 }) })
   builder.apply(addItem(def.value, into, item))
   builder.select(item.id)
+  formsFocusDetails()
 }
 defineExpose({ add })
 const outline = ref(false)
@@ -151,6 +152,8 @@ const calculationMenu = (id: string, i: number, name: string) => [
   [{ label: t('forms.screens.builder.remove'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => dropCalculation(id, name) }],
 ]
 const calculationWrong = (id: string) => builder.problemsAt.value.get(id)?.some(p => p.level === 'error')
+// Where the details open over the canvas, typing a page's title on its card does not open them.
+const beside = useScreenQuery('(min-width: 1280px)')
 const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(def.value, page.value.id, fn), `${page.value.id}:${field}`)
 </script>
 
@@ -162,7 +165,7 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
   >
     <div class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
       <nav
-        class="space-y-4 lg:sticky lg:top-4 lg:self-start"
+        class="flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start"
         :aria-label="t('forms.screens.builder.outline')"
       >
         <!-- On a phone the outline folds away, so the questions are not a screen below it. -->
@@ -206,6 +209,12 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('forms.screens.endings.title') }}
           </p>
+          <p
+            v-if="!def.endings?.length"
+            class="mb-1 text-xs text-pretty text-muted"
+          >
+            {{ t('forms.screens.endings.hint') }}
+          </p>
           <ul class="space-y-1">
             <li
               v-for="e in def.endings ?? []"
@@ -239,9 +248,15 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
             @click="newEnding"
           />
         </div>
-        <div>
+        <div :class="outline ? '' : 'hidden lg:block'">
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('forms.screens.calculations.title') }}
+          </p>
+          <p
+            v-if="!calculations.length"
+            class="mb-1 text-xs text-pretty text-muted"
+          >
+            {{ t('forms.screens.calculations.hint') }}
           </p>
           <ul class="space-y-1">
             <li
@@ -307,6 +322,7 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
             :placeholder="t('forms.screens.builder.page-title')"
             :aria-label="t('forms.screens.details.page-title')"
             :ui="{ base: 'px-0 text-xl font-semibold' }"
+            @click="beside || $event.stopPropagation()"
             @update:model-value="setPage((p) => { p.title = String($event) }, 'title')"
           />
           <p
@@ -323,7 +339,11 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
           :accept="['question', 'block']"
           :empty="t('forms.screens.builder.empty-page')"
           @add="add($event.kind, $event.into)"
-        />
+        >
+          <template #empty>
+            <FormsAddMenu @add="add($event)" />
+          </template>
+        </FormsBuilderList>
 
         <button
           v-for="c in shownHere"
@@ -348,9 +368,10 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
           <FormsProblemBadge :at="c.calculation.id" />
         </button>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <FormsAddMenu @add="add($event)" />
-        </div>
+        <FormsAddMenu
+          v-if="page.items.length"
+          @add="add($event)"
+        />
       </div>
     </div>
   </DragDropProvider>

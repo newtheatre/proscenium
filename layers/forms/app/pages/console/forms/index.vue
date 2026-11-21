@@ -209,18 +209,6 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
-            name="title"
-            :label="t('forms.screens.settings.name')"
-            :help="t('forms.screens.list.name-help')"
-            required
-          >
-            <UInput
-              v-model="state.title"
-              maxlength="120"
-              autofocus
-            />
-          </UFormField>
-          <UFormField
             v-if="!state.fileName"
             name="template"
             :label="t('forms.screens.templates.start-from')"
@@ -242,38 +230,56 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
             </div>
           </UFormField>
           <UFormField
+            v-else
             :label="t('forms.screens.list.from-file')"
-            :help="t('forms.screens.list.from-file-help')"
-            :hint="t('forms.screens.details.optional')"
           >
-            <div class="flex flex-wrap items-center gap-2">
-              <UButton
-                :label="t('forms.screens.json.open-file')"
-                icon="i-lucide-folder-open"
-                color="neutral"
-                variant="subtle"
-                @click="picker?.click()"
+            <div class="flex items-center gap-2">
+              <UIcon
+                name="i-lucide-file-json"
+                class="shrink-0 text-muted"
               />
-              <span
-                v-if="state.fileName"
-                class="text-sm text-muted"
-              >{{ state.fileName }}</span>
+              <span class="min-w-0 truncate text-sm">{{ state.fileName }}</span>
               <IconButton
-                v-if="state.fileName"
                 icon="i-lucide-x"
                 size="sm"
                 :label="t('forms.screens.list.clear-file')"
                 @click="Object.assign(state, { file: '', fileName: '' })"
               />
             </div>
-            <input
-              ref="picker"
-              type="file"
-              accept=".json,application/json"
-              class="hidden"
-              @change="load"
-            >
           </UFormField>
+          <UFormField
+            name="title"
+            :label="t('forms.screens.settings.name')"
+            :help="t('forms.screens.list.name-help')"
+            required
+          >
+            <UInput
+              v-model="state.title"
+              maxlength="120"
+              autofocus
+            />
+          </UFormField>
+          <p
+            v-if="!state.fileName"
+            class="flex flex-wrap items-center gap-x-2 text-sm text-muted"
+          >
+            <UButton
+              :label="t('forms.screens.list.from-file')"
+              icon="i-lucide-folder-open"
+              color="neutral"
+              variant="link"
+              class="px-0"
+              @click="picker?.click()"
+            />
+            <span>{{ t('forms.screens.list.from-file-help') }}</span>
+          </p>
+          <input
+            ref="picker"
+            type="file"
+            accept=".json,application/json"
+            class="hidden"
+            @change="load"
+          >
         </UForm>
       </template>
       <template #footer>

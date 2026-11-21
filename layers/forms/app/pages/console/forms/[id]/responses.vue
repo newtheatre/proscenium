@@ -4,6 +4,7 @@
      who may open it asks to, and each time is recorded. -->
 <script setup lang="ts">
 import { parseDate, toZoned } from '@internationalized/date'
+import { UDrawer, UPopover } from '#components'
 import type { ReviewResult } from '../../../../components/FormsReviewResult.vue'
 import type { CalculationType, Definition } from '../../../../../shared/engine'
 import type { Figure } from '../../../../../shared/figures'
@@ -76,6 +77,13 @@ const page = computed({ get: () => view.value.page, set: (p: number) => show({ p
 const from = computed({ get: () => view.value.from ?? '', set: (day: string | null) => show({ from: day || undefined }) })
 const to = computed({ get: () => view.value.to ?? '', set: (day: string | null) => show({ to: day || undefined }) })
 const filtered = computed(() => !!(view.value.from || view.value.to || view.value.question || view.value.stage))
+const filterCount = computed(() => [view.value.from, view.value.to, view.value.question, view.value.stage].filter(Boolean).length)
+// The filters open from one button: a popover on a laptop, a drawer from the bottom on a phone.
+const filtering = ref(false)
+const phone = useScreenQuery('(max-width: 639px)')
+// The bar stays once there has been something to filter, so it does not come and go as a view loads.
+const hasAny = ref(false)
+watchEffect(() => { if (data.value?.total || filtered.value) hasAny.value = true })
 const stage = computed({ get: () => view.value.stage, set: (key: string | undefined) => show({ stage: key }) })
 const stageItems = computed(() => (data.value?.stages ?? []).map(s => ({ value: s.key, label: s.name })))
 
@@ -300,14 +308,24 @@ const decisionWarning = computed(() => {
   return undefined
 })
 const open = (id: string) => router.replace({ query: { ...route.query, open: id } })
+const openTo = (id: string) => router.resolve({ query: { ...route.query, open: id } }).fullPath
 const close = () => router.replace({ query: { ...route.query, open: undefined } })
+// Who sent the open response: the name the table has for it, or the address it came with.
+const openFrom = computed(() => data.value?.rows.find(r => r.id === openId.value)?.who || one.value?.response.respondentEmail || '')
+// The moves a response has taken, oldest first; a note sent with one reads under who made it.
+const timeline = computed(() => (one.value?.history ?? []).map(h => ({
+  title: h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }),
+  date: dateTime(h.at),
+  description: [h.by ? t('forms.screens.responses.by', { who: h.by }) : '', h.note ? t('forms.screens.responses.history-note', { note: h.note }) : ''].filter(Boolean).join('\n') || undefined,
+  icon: h.from === null ? 'i-lucide-inbox' : 'i-lucide-arrow-right',
+})))
 const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!v) close() } })
 </script>
 
 <template>
   <PageFrame
     :title="t('forms.screens.responses.title')"
-    :description="data ? t('forms.screens.responses.count', { count: data.total }) : undefined"
+    :description="data && (data.total || filtered) ? t('forms.screens.responses.count', { count: data.total }) : undefined"
     width="full"
     :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }, ...(data ? [{ label: data.form.title, to: `/console/forms/${formId}` }] : [])]"
   >
@@ -325,63 +343,99 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         target="_blank"
       />
     </template>
-    <template #toolbar>
-      <div class="flex flex-wrap items-end gap-3">
-        <UFormField :label="t('forms.screens.responses.from-date')">
-          <FieldDate v-model="from" />
-        </UFormField>
-        <UFormField :label="t('forms.screens.responses.to-date')">
-          <FieldDate v-model="to" />
-        </UFormField>
-        <UFormField
-          v-if="stageItems.length"
-          :label="t('forms.screens.responses.stage')"
-        >
-          <USelect
-            v-model="stage"
-            :items="stageItems"
-            :placeholder="t('forms.screens.responses.any-stage')"
-            class="min-w-40"
-          />
-        </UFormField>
-        <UFormField :label="t('forms.screens.responses.where')">
-          <USelect
-            v-model="question"
-            :items="questionItems"
-            :placeholder="t('forms.screens.responses.any-answer')"
-            class="min-w-48"
-          />
-        </UFormField>
-        <UFormField
-          v-if="view.question"
-          :label="t('forms.screens.responses.is')"
-        >
-          <UInput
-            v-model="typed"
-            @change="show({ value: typed.trim() || undefined })"
-          />
-        </UFormField>
-        <UDropdownMenu
-          v-if="columnItems.length > 1"
-          :items="columnItems"
-          :ui="{ content: 'max-h-96 overflow-y-auto' }"
-        >
-          <UButton
-            :label="hidden.length ? t('forms.screens.responses.columns-n', { shown: columnItems.length - hidden.length, of: columnItems.length }) : t('forms.screens.responses.columns')"
-            icon="i-lucide-columns-3"
-            color="neutral"
-            variant="outline"
-          />
-        </UDropdownMenu>
+    <template
+      v-if="hasAny"
+      #toolbar
+    >
+      <component
+        :is="phone ? UDrawer : UPopover"
+        v-model:open="filtering"
+        v-bind="phone ? { direction: 'bottom', title: t('core.list.filters'), description: t('core.list.filters-description') } : { content: { align: 'start' } }"
+      >
         <UButton
-          v-if="filtered"
-          :label="t('forms.screens.responses.clear')"
-          icon="i-lucide-x"
+          :label="filterCount ? t('core.list.filters-on', { count: filterCount }) : t('core.list.filters')"
+          icon="i-lucide-sliders-horizontal"
           color="neutral"
-          variant="ghost"
-          @click="router.replace({ query: {} })"
+          variant="outline"
+          aria-haspopup="dialog"
         />
-      </div>
+        <template #content>
+          <div
+            class="w-full space-y-4 p-4 sm:w-96"
+            role="group"
+            :aria-label="t('core.list.filters')"
+          >
+            <div class="grid grid-cols-2 gap-3">
+              <UFormField :label="t('forms.screens.responses.from-date')">
+                <FieldDate v-model="from" />
+              </UFormField>
+              <UFormField :label="t('forms.screens.responses.to-date')">
+                <FieldDate v-model="to" />
+              </UFormField>
+            </div>
+            <UFormField
+              v-if="stageItems.length"
+              :label="t('forms.screens.responses.stage')"
+            >
+              <USelect
+                v-model="stage"
+                :items="stageItems"
+                :placeholder="t('forms.screens.responses.any-stage')"
+              />
+            </UFormField>
+            <UFormField :label="t('forms.screens.responses.where')">
+              <USelect
+                v-model="question"
+                :items="questionItems"
+                :placeholder="t('forms.screens.responses.any-answer')"
+              />
+            </UFormField>
+            <UFormField
+              v-if="view.question"
+              :label="t('forms.screens.responses.is')"
+              :help="t('forms.screens.responses.is-help')"
+            >
+              <UInput
+                v-model="typed"
+                @change="show({ value: typed.trim() || undefined })"
+              />
+            </UFormField>
+            <div class="flex items-center justify-between gap-2 border-t border-default pt-3">
+              <UButton
+                color="neutral"
+                variant="link"
+                :label="t('core.list.clear-all')"
+                :disabled="!filtered"
+                @click="router.replace({ query: {} })"
+              />
+              <UButton
+                :label="t('core.list.done')"
+                @click="filtering = false"
+              />
+            </div>
+          </div>
+        </template>
+      </component>
+      <UDropdownMenu
+        v-if="columnItems.length > 1 && !phone"
+        :items="columnItems"
+        :ui="{ content: 'max-h-96 overflow-y-auto' }"
+      >
+        <UButton
+          :label="hidden.length ? t('forms.screens.responses.columns-n', { shown: columnItems.length - hidden.length, of: columnItems.length }) : t('forms.screens.responses.columns')"
+          icon="i-lucide-columns-3"
+          color="neutral"
+          variant="outline"
+        />
+      </UDropdownMenu>
+      <UButton
+        v-if="filtered"
+        :label="t('forms.screens.responses.clear')"
+        icon="i-lucide-x"
+        color="neutral"
+        variant="ghost"
+        @click="router.replace({ query: {} })"
+      />
     </template>
 
     <DataBoundary
@@ -394,8 +448,21 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         v-if="!data?.rows.length"
         icon="i-lucide-inbox"
         :title="filtered ? t('forms.screens.responses.none-match') : t('forms.screens.responses.none')"
-        :description="filtered ? undefined : t('forms.screens.responses.none-help')"
-      />
+        :description="filtered ? undefined : t(data?.form.status === 'draft' ? 'forms.screens.responses.none-draft' : 'forms.screens.responses.none-help')"
+      >
+        <template
+          v-if="!filtered && data?.form.status === 'draft'"
+          #actions
+        >
+          <UButton
+            :label="t('forms.screens.responses.to-builder')"
+            icon="i-lucide-pencil-ruler"
+            color="neutral"
+            variant="outline"
+            :to="`/console/forms/${formId}`"
+          />
+        </template>
+      </EmptyState>
       <div
         v-else
         class="space-y-4"
@@ -428,7 +495,29 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             @click="chosen = {}"
           />
         </div>
+        <RecordList
+          v-if="phone"
+          :label="t('forms.screens.responses.title')"
+        >
+          <RecordListItem
+            v-for="row in rows"
+            :key="row.id"
+            :to="openTo(row.id)"
+            :name="row.who || row.reference"
+          >
+            <template #description>
+              <span class="block">{{ row.who ? `${row.reference} · ${row.sent}` : row.sent }}</span>
+              <StatusBadge
+                v-if="row.stage"
+                class="mt-1"
+                :tone="formsStageTone(row.stage.kind)"
+                :label="row.stage.name"
+              />
+            </template>
+          </RecordListItem>
+        </RecordList>
         <UTable
+          v-else
           :data="rows"
           :columns="columns"
           :caption="t('forms.screens.responses.title')"
@@ -493,6 +582,12 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             :description="data?.canReadSpecial ? t('forms.screens.responses.restricted-open') : t('forms.screens.responses.restricted-shut')"
             :actions="data?.canReadSpecial ? [{ label: t('forms.screens.responses.reveal'), color: 'neutral', variant: 'outline', loading: opening, onClick: () => { load(true) } }] : undefined"
           />
+          <p
+            v-if="openFrom"
+            class="text-sm"
+          >
+            <span class="font-medium">{{ t('forms.screens.responses.from') }}:</span> {{ openFrom }}
+          </p>
           <p
             v-if="one.about"
             class="text-sm"
@@ -634,19 +729,12 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             <h3 class="text-sm font-medium text-muted">
               {{ t('forms.screens.responses.history') }}
             </h3>
-            <ol class="space-y-1 text-sm">
-              <li
-                v-for="(h, i) in one.history"
-                :key="i"
-              >
-                <span class="block font-medium">{{ h.from === null ? t('forms.screens.responses.arrived', { stage: h.to }) : t('forms.screens.responses.went', { move: h.move, stage: h.to }) }}</span>
-                <span class="block text-muted">{{ h.by ? t('forms.screens.responses.by-at', { who: h.by, when: dateTime(h.at) }) : dateTime(h.at) }}</span>
-                <span
-                  v-if="h.note"
-                  class="mt-1 block border-l-2 border-default pl-2 whitespace-pre-line"
-                >{{ t('forms.screens.responses.history-note', { note: h.note }) }}</span>
-              </li>
-            </ol>
+            <UTimeline
+              :items="timeline"
+              color="neutral"
+              size="xs"
+              :ui="{ description: 'whitespace-pre-line' }"
+            />
           </section>
         </div>
         <UProgress

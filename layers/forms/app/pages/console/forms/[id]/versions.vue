@@ -45,7 +45,6 @@ watch(openNumber, async (number) => {
     close()
   }
 }, { immediate: true })
-const open = (number: number) => router.replace({ query: { ...route.query, version: String(number) } })
 const close = () => router.replace({ query: { ...route.query, version: undefined } })
 const panel = computed({ get: () => !!openNumber.value, set: (v: boolean) => { if (!v) close() } })
 
@@ -99,6 +98,7 @@ async function restore() {
           v-for="v in data.versions"
           :key="v.number"
           icon="i-lucide-history"
+          :to="`/console/forms/${formId}/versions?version=${v.number}`"
           :name="t('forms.screens.versions.n', { n: v.number })"
           :description="about(v)"
         >
@@ -106,14 +106,6 @@ async function restore() {
             v-if="v.live"
             tone="success"
             :label="t('forms.screens.versions.live')"
-          />
-          <UButton
-            :label="t('forms.screens.versions.open')"
-            :aria-label="t('forms.screens.versions.open-n', { n: v.number })"
-            size="sm"
-            color="neutral"
-            variant="subtle"
-            @click="open(v.number)"
           />
         </RecordListItem>
       </RecordList>
