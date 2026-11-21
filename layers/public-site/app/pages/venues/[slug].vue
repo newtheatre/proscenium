@@ -98,7 +98,7 @@ useHead(() => ({
           />
         </template>
       </UPageHeader>
-      <UPageBody class="max-w-3xl space-y-10">
+      <UPageBody class="max-w-3xl space-y-10 pb-10 lg:pb-12">
         <MarkdownText
           v-if="venue.description"
           :text="venue.description"

@@ -160,6 +160,11 @@ function labelOf(band: Page['bands'][number], type: TicketType): string {
   if (promoted !== undefined) return t('box-office.book.type-with-code', { type: only ? t('box-office.book.tickets') : type.name, price: price(promoted), was: price(type.amountMinor) })
   return only ? t('box-office.book.only-type', { price: price(type.amountMinor) }) : t('box-office.book.type', { type: type.name, price: price(type.amountMinor) })
 }
+// What a row says under its name: how to qualify or what to bring, and the limit once it is reached.
+const noteOf = (band: Page['bands'][number], type: TicketType) => [
+  typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : '')),
+  atMost(band.bandId, type) ? t('box-office.book.most', { count: type.most! }) : '',
+].filter(Boolean).join(' ') || undefined
 // Nuxt UI passes the stepper's button props through, attributes included; its type lists props only.
 const named = (label: string) => ({ 'aria-label': label }) as unknown as ButtonProps
 // The stepper's buttons, named for the type ("Add a Full price ticket"), or plainly when there is one type.
@@ -435,55 +440,59 @@ async function hold() {
                 </ULink>
               </template>
             </p>
-            <UFormField
+            <!-- One row a ticket: what it is and costs on the left, its stepper on the right, big enough for a thumb. -->
+            <div
               v-else
-              :label="labelOf(band, type)"
-              :help="typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined))"
-              :error="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)] ? referenceRefusal?.reason : undefined"
+              class="space-y-2"
             >
-              <template
-                v-if="atMost(band.bandId, type)"
-                #help
+              <UFormField
+                :label="labelOf(band, type)"
+                :description="noteOf(band, type)"
+                orientation="horizontal"
+                size="lg"
+                :ui="{ root: 'items-center gap-4', wrapper: 'min-w-0', container: 'w-36 shrink-0' }"
               >
-                {{ typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : undefined)) }}
-                {{ t('box-office.book.most', { count: type.most! }) }}
-              </template>
-              <div class="space-y-2">
                 <UInputNumber
                   v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
                   :min="0"
                   :max="mostOf(band.bandId, type)"
                   :default-value="0"
+                  size="xl"
                   :increment="named(stepLabel(band, type, 'add'))"
                   :decrement="named(stepLabel(band, type, 'remove'))"
                   :ui="{ increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
                 />
-                <template v-if="typing(type)">
-                  <UInput
-                    v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
-                    :id="`${referenceId}-${band.bandId}-${type.ticketTypeId}-${n}`"
-                    :key="n"
-                    :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
-                    :aria-label="t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"
-                    :placeholder="t('box-office.book.reference-placeholder', { n })"
-                    autocomplete="off"
-                    maxlength="64"
-                    class="block w-64"
-                    @update:model-value="setReference(band.bandId, type.ticketTypeId, n - 1, String($event))"
-                  />
-                  <UButton
-                    v-if="mayAsk && counts[keyOf(band.bandId, type.ticketTypeId)]"
-                    size="xs"
-                    color="neutral"
-                    variant="link"
-                    class="px-0"
-                    :loading="asking"
-                    :label="t('box-office.book.ask.button')"
-                    @click="askCheck(type.ticketTypeId)"
-                  />
-                </template>
-              </div>
-            </UFormField>
+              </UFormField>
+              <template v-if="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)]">
+                <UFormField :error="referenceRefusal?.reason">
+                  <div class="space-y-2">
+                    <UInput
+                      v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
+                      :id="`${referenceId}-${band.bandId}-${type.ticketTypeId}-${n}`"
+                      :key="n"
+                      :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
+                      :aria-label="t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"
+                      :placeholder="t('box-office.book.reference-placeholder', { n })"
+                      autocomplete="off"
+                      maxlength="64"
+                      size="lg"
+                      class="block max-w-xs"
+                      @update:model-value="setReference(band.bandId, type.ticketTypeId, n - 1, String($event))"
+                    />
+                  </div>
+                </UFormField>
+                <UButton
+                  v-if="mayAsk"
+                  size="xs"
+                  color="neutral"
+                  variant="link"
+                  class="px-0"
+                  :loading="asking"
+                  :label="t('box-office.book.ask.button')"
+                  @click="askCheck(type.ticketTypeId)"
+                />
+              </template>
+            </div>
           </template>
         </template>
       </section>
@@ -567,13 +576,17 @@ async function hold() {
         ref="turnstile"
         @token="challenge = $event"
       />
-      <UButton
-        size="lg"
-        :loading="busy"
-        :disabled="!ready"
-        :label="quantity ? (buying.length || swaps.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
-        @click="hold"
-      />
+      <!-- The button stays in reach while the list scrolls, on the page and in the drawer. -->
+      <div class="sticky bottom-0 z-10 border-t border-default bg-default py-3">
+        <UButton
+          size="xl"
+          class="justify-center max-sm:w-full"
+          :loading="busy"
+          :disabled="!ready"
+          :label="quantity ? (buying.length || swaps.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
+          @click="hold"
+        />
+      </div>
     </template>
   </div>
 </template>

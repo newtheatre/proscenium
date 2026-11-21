@@ -613,7 +613,7 @@ useHead(() => {
                 <h3 class="mb-1 text-sm font-semibold text-muted">
                   {{ s.section }}
                 </h3>
-                <dl class="grid gap-x-6 gap-y-1 sm:grid-cols-[auto_1fr]">
+                <dl class="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-6 gap-y-1 sm:grid-cols-[auto_1fr]">
                   <template
                     v-for="c in s.people"
                     :key="c.id"

@@ -19,7 +19,9 @@ useSeoMeta({ title: () => t('box-office.book.title', { title: data.value?.produc
   <UContainer v-if="data">
     <UPage>
       <UPageHeader
+        :headline="t('box-office.book.headline')"
         :title="data.production.title"
+        :links="[{ label: t('box-office.book.about-show'), to: `/whats-on/${data.production.slug}`, icon: 'i-lucide-arrow-left', color: 'neutral', variant: 'outline' }]"
         :description="t('box-office.book.when', { when: dateTime(data.performance.startsAt), venue: data.performance.venue })"
       />
       <UPageBody>

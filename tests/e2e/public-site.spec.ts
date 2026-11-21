@@ -275,7 +275,7 @@ test('a venue\'s page shows its address, getting here, access with labels, and w
   await expect(access.getByText('Step-free access')).toBeVisible()
   await expect(access.getByText(': From the front door')).toBeVisible()
   await expect(access.getByText('Hearing loop')).toBeVisible()
-  await expect(page.getByRole('region', { name: 'On here' }).getByRole('link', { name: new RegExp(title) })).toHaveAttribute('href', `/whats-on/${slug}`)
+  await expect(page.getByRole('region', { name: "What's on here" }).getByRole('link', { name: new RegExp(title) })).toHaveAttribute('href', `/whats-on/${slug}`)
   await noViolations(page)
   await page.emulateMedia({ colorScheme: 'dark' })
   await noViolations(page)
