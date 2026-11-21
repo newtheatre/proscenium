@@ -121,6 +121,7 @@ async function withdraw(a: Mine['applications'][number]) {
 <template>
   <PageFrame
     :title="t('membership.navigation.mine.label')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <DataBoundary

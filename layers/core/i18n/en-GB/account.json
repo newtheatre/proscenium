@@ -64,7 +64,7 @@
   "core.me.sign-in.none": "You have no passkeys yet. You sign in with a link sent to your email.",
   "core.me.sign-in.synced": "Synced between your devices",
   "core.me.sign-in.this-device": "On one device",
-  "core.me.sign-in.added": "Added {date}",
+  "core.me.sign-in.added": "added {date}",
   "core.me.sign-in.used": "last used {date}",
   "core.me.sign-in.never-used": "not used yet",
   "core.me.sign-in.add": "Add a passkey",
