@@ -119,6 +119,7 @@ const ownerName = (o: YourSale['owners'][number]) => o.reference ?? (te(`${o.mod
             <PaymentsSessionPlace
               :model-value="data.session.spaceId"
               :disabled="busy"
+              class="sm:w-80"
               @update:model-value="move"
             />
           </UFormField>

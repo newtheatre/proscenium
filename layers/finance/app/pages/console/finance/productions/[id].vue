@@ -39,10 +39,12 @@ const amount = <R extends Record<Key, number> & { currency: string }>(key: Key, 
   ...(footer ? { footer: () => totals.value.map(total => money(total[key], total.currency)).join(' · ') } : {}),
   meta: right,
 })
+// Other is left out while nothing sits in it, so Net stays in view on a phone.
+const hasOther = computed(() => [...(data.value?.lines ?? []), ...(data.value?.performances ?? [])].some(l => l.otherMinor !== 0))
 const amounts = <R extends Record<Key, number> & { currency: string }>(footer: boolean): TableColumn<R>[] => [
   amount<R>('salesMinor', t('finance.screens.statement.sales'), footer),
   amount<R>('refundsMinor', t('finance.screens.statement.refunds'), footer),
-  amount<R>('otherMinor', t('finance.screens.statement.other'), footer),
+  ...(hasOther.value ? [amount<R>('otherMinor', t('finance.screens.statement.other'), footer)] : []),
   amount<R>('netMinor', t('finance.screens.statement.net'), footer),
 ]
 const columns = computed<TableColumn<Line>[]>(() => [

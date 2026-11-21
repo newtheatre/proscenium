@@ -85,9 +85,20 @@ async function save() {
             <RecordListItem
               v-for="a in g.accounts"
               :key="a.id"
-              :name="a.name"
               :muted="!a.active"
             >
+              <template #name>
+                <span class="flex items-baseline justify-between gap-3">
+                  <span>{{ a.name }}</span>
+                  <span class="shrink-0 text-right tabular-nums">
+                    <span
+                      v-for="b in a.balances"
+                      :key="b.currency"
+                      class="block"
+                    >{{ money(b.balanceMinor, b.currency) }}</span>
+                  </span>
+                </span>
+              </template>
               <template #description>
                 <span class="font-mono break-all">{{ a.code }}</span> · {{ moduleLabel(a.module) }}
               </template>
@@ -96,13 +107,6 @@ async function save() {
                 tone="neutral"
                 :label="t('finance.screens.accounts.retired')"
               />
-              <span class="text-right tabular-nums">
-                <span
-                  v-for="b in a.balances"
-                  :key="b.currency"
-                  class="block"
-                >{{ money(b.balanceMinor, b.currency) }}</span>
-              </span>
               <IconButton
                 icon="i-lucide-pencil"
                 :label="t('finance.screens.accounts.edit-label', { account: a.name })"
