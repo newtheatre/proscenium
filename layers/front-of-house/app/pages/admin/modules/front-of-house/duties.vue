@@ -31,14 +31,19 @@ const blank = () => ({ name: '', description: '', isLead: false, callBeforeMinut
 const form = ref(blank())
 const editing = ref<Duty | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const open = ref(false)
 
 function edit(duty: Duty) {
   editing.value = duty
   form.value = { name: duty.name, description: duty.description ?? '', isLead: duty.isLead, callBeforeMinutes: duty.callBeforeMinutes, stayAfterMinutes: duty.stayAfterMinutes, requirements: [...duty.requirements] }
+  refusal.value = null
+  open.value = true
 }
-function stop() {
+function add() {
   editing.value = null
   form.value = blank()
+  refusal.value = null
+  open.value = true
 }
 
 async function save() {
@@ -48,7 +53,7 @@ async function save() {
     if (editing.value) await write(`/api/front-of-house/duties/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/duties', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.duties.saved' : 'front-of-house.duties.added', { name: body.name }), color: 'success' })
-    stop()
+    open.value = false
     await refresh()
   }
   catch (e) {
@@ -81,8 +86,18 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
     :title="t('front-of-house.navigation.duties.label')"
     :description="t('front-of-house.duties.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <template #primary>
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('front-of-house.duties.add-button')"
+        @click="add"
+      />
+    </template>
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!open"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -114,15 +129,22 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
           </RecordList>
         </template>
       </DataBoundary>
+    </div>
 
-      <PageSection :title="editing ? t('front-of-house.duties.edit-title', { name: editing.name }) : t('front-of-house.duties.add-title')">
+    <UModal
+      v-model:open="open"
+      :title="editing ? t('front-of-house.duties.edit-title', { name: editing.name }) : t('front-of-house.duties.add-title')"
+    >
+      <template #body>
         <UForm
+          id="fh-duty"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
             :label="t('front-of-house.duties.name')"
@@ -181,21 +203,15 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
               :placeholder="t('front-of-house.duties.requirements-none')"
             />
           </UFormField>
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="editing ? t('front-of-house.save') : t('front-of-house.duties.add-button')"
-            />
-            <UButton
-              v-if="editing"
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="stop"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-duty"
+          :label="editing ? t('front-of-house.save') : t('front-of-house.duties.add-button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

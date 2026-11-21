@@ -14,7 +14,7 @@ interface Page { performance: { startsAt: number, venue: string }, production: {
 type Outcome
   = | (BookingDoneOutcome & { state: 'confirmed', totalMinor: number })
     | (BookingDoneOutcome & { state: 'reserved' })
-    | { state: 'confirm-email' }
+    | { state: 'confirm-email', expiresAt?: number }
     | { state: 'processing' }
 
 interface CardStep { kind: 'client-secret', provider: string, secret: string, publishableKey: string }
@@ -200,7 +200,10 @@ async function detailsValid(): Promise<boolean> {
 }
 const body = computed(() => ({ expectedTotalMinor: basket.value!.totalMinor, ...(ageMin.value !== null ? { ageConfirmed: form.value.ageConfirmed } : {}), ...(detailsNeeded.value ? { email: form.value.email.trim(), name: form.value.name.trim() || undefined } : {}) }))
 
+// The address the confirmation link went to, said back so a mistyped one is noticed.
+const sentTo = ref('')
 function done(result: Outcome) {
+  if (result.state === 'confirm-email') sentTo.value = form.value.email.trim()
   outcome.value = result
   forgetBasket()
 }
@@ -269,6 +272,14 @@ watch(title, value => emit('title', value), { immediate: true })
         v-if="outcome.state === 'confirmed' || outcome.state === 'reserved'"
         :outcome="{ currency: basket?.currency, ...outcome }"
       />
+      <UAlert
+        v-else-if="outcome.state === 'confirm-email'"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-mail"
+        :title="sentTo ? t('box-office.basket.done.confirm-email.sent-to', { address: sentTo }) : t('box-office.basket.done.confirm-email.body')"
+        :description="outcome.expiresAt ? t('box-office.basket.done.confirm-email.until', { until: time(outcome.expiresAt) }) : t('box-office.basket.done.confirm-email.junk')"
+      />
       <p v-else>
         {{ t(`box-office.basket.done.${outcome.state}.body`) }}
       </p>
@@ -279,7 +290,17 @@ watch(title, value => emit('title', value), { immediate: true })
       :title="t('box-office.basket.none.title')"
       :description="t('box-office.basket.none.description')"
       icon="i-lucide-shopping-basket"
-    />
+    >
+      <template
+        v-if="!drawer"
+        #actions
+      >
+        <UButton
+          to="/whats-on"
+          :label="t('box-office.basket.none.whats-on')"
+        />
+      </template>
+    </EmptyState>
 
     <template v-else-if="lapsed">
       <UAlert
@@ -352,7 +373,7 @@ watch(title, value => emit('title', value), { immediate: true })
           <span>{{ t('box-office.basket.total') }}</span>
           <span>{{ amount(basket.totalMinor) }}</span>
         </p>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2 pt-2">
           <UButton
             v-if="basket.state === 'basket'"
             color="neutral"
@@ -465,14 +486,16 @@ watch(title, value => emit('title', value), { immediate: true })
           <UButton
             v-if="canPay"
             type="submit"
-            size="lg"
+            size="xl"
+            class="justify-center max-sm:w-full"
             :loading="busy"
             :label="free ? t('box-office.basket.confirm') : t('box-office.basket.pay', { amount: money(basket.totalMinor, basket.currency) })"
           />
           <UButton
             v-if="canReserve"
             :type="canPay ? 'button' : 'submit'"
-            size="lg"
+            size="xl"
+            class="justify-center max-sm:w-full"
             :color="canPay ? 'neutral' : 'primary'"
             :variant="canPay ? 'outline' : 'solid'"
             :loading="busy"

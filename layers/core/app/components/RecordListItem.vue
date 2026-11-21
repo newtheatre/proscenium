@@ -23,7 +23,7 @@ const slots = defineSlots<{ default?: () => unknown, leading?: () => unknown, na
         :name="name"
         :description="description"
         :avatar="icon ? { icon } : undefined"
-        class="min-w-0 flex-1 basis-48"
+        class="min-w-0 flex-1 basis-40"
       >
         <template
           v-if="slots.name"

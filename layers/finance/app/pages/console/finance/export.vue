@@ -51,6 +51,7 @@ async function download() {
     <UForm
       class="space-y-4"
       :state="form"
+      :validate="() => needs({ from: form.from, to: form.to })"
       novalidate
       @submit="download"
     >
@@ -59,15 +60,19 @@ async function download() {
         v-if="data?.periods.length"
         :label="t('finance.screens.export.period')"
         :hint="t('finance.screens.optional')"
+        :help="t('finance.screens.export.period-help')"
       >
-        <USelect
+        <USelectMenu
           v-model="period"
+          value-key="value"
           :items="[...data.periods].reverse().map(p => ({ value: p.id, label: p.label }))"
+          :placeholder="t('finance.screens.export.period-placeholder')"
           class="sm:w-64"
         />
       </UFormField>
       <div class="grid gap-4 sm:grid-cols-2">
         <UFormField
+          name="from"
           :label="t('finance.screens.export.from')"
           required
         >
@@ -77,6 +82,7 @@ async function download() {
           />
         </UFormField>
         <UFormField
+          name="to"
           :label="t('finance.screens.export.to')"
           required
           :error="refusal?.fields?.to ? refusal.reason : undefined"
@@ -91,7 +97,6 @@ async function download() {
         type="submit"
         icon="i-lucide-file-down"
         :loading="busy"
-        :disabled="!href"
         :label="t('finance.screens.export.button')"
       />
     </UForm>

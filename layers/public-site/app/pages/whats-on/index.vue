@@ -108,7 +108,6 @@ const groups = computed(() => {
                   :aria-current="!chosen[g.key] ? 'true' : undefined"
                   color="neutral"
                   :variant="!chosen[g.key] ? 'solid' : 'ghost'"
-                  size="sm"
                 />
               </li>
               <li
@@ -121,7 +120,6 @@ const groups = computed(() => {
                   :aria-current="chosen[g.key] === o.value ? 'true' : undefined"
                   color="neutral"
                   :variant="chosen[g.key] === o.value ? 'solid' : 'ghost'"
-                  size="sm"
                 />
               </li>
             </ul>

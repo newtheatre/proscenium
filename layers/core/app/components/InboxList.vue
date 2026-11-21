@@ -96,31 +96,29 @@ async function setArchived(item: InboxItem, archived: boolean) {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex flex-wrap items-center gap-3">
-        <UTabs
-          v-model="view"
-          :items="views"
-          :content="false"
-          size="sm"
-          variant="link"
-          :aria-label="t('core.inbox.which')"
-        />
-        <USelect
-          v-if="member"
-          v-model="side"
-          :items="sides"
-          size="sm"
-          class="w-48"
-          :aria-label="t('core.inbox.side')"
-        />
-      </div>
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <UTabs
+        v-model="view"
+        :items="views"
+        :content="false"
+        variant="link"
+        :class="member && 'max-sm:w-full'"
+        :aria-label="t('core.inbox.which')"
+      />
+      <USelect
+        v-if="member"
+        v-model="side"
+        :items="sides"
+        class="w-44 sm:w-48"
+        :aria-label="t('core.inbox.side')"
+      />
       <UButton
         v-if="view === 'current' && (data?.unread ?? 0) > 0"
         :label="t('core.inbox.read-all')"
         icon="i-lucide-check-check"
         color="neutral"
         variant="outline"
+        class="ms-auto shrink-0"
         @click="readAll"
       />
     </div>

@@ -14,7 +14,9 @@ useSeoMeta({ title: () => t('core.sign-in.page.title') })
 const route = useRoute()
 const next = nextPath(route.query.next)
 const sent = ref(false)
-const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, openSignUp?: boolean } }>('core:me')
+const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, providers?: unknown[], openSignUp?: boolean } }>('core:me')
+// An account is made by an emailed code or a provider; a passkey alone only signs in an existing one.
+const canCreate = computed(() => !!me.value?.signIn?.openSignUp && (!!me.value.signIn.email || !!me.value.signIn.providers?.length))
 </script>
 
 <template>
@@ -28,7 +30,7 @@ const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean,
     />
     <!-- What making an account agrees to; the version in force is kept on the account. -->
     <p
-      v-if="!sent && me?.signIn?.openSignUp"
+      v-if="!sent && canCreate"
       class="mt-4 text-sm text-muted"
     >
       {{ t('core.sign-in.page.terms.before') }}

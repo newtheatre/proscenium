@@ -296,7 +296,7 @@ the server for actions and sources when it is first opened, not on every page.
   named by `date`, `month`, `at` or `label`, drawn by `ChartFigure` (quiet: the tile's words name it),
   or `meters`, a list of rows each a share of its own `max`. A figure that takes longer than two
   seconds or throws is left out, and a module that is off adds none, so an install without the bar
-  shows no bar tile. The empty state shows only when there is nothing at all to put on the page.
+  shows no bar tile. A chart whose every value is nought is not drawn: the figure already says so. The empty state shows only when there is nothing at all to put on the page.
 
 ## Dates, times and money
 
@@ -551,7 +551,13 @@ gets the same declaration made for it: each filter is a `choice`, each `sortable
 - **Sort** says how the list is sorted ("Sort: Seats, Lowest first") and lists every declared sort, shown or not.
   A heading sorts in its natural direction, again reverses, a third press returns to the default.
 - **Columns** ticks optional columns; the choice is kept on the device for each list
-  (`core:list-columns:<id>`), is not in the address, and is cleared on sign-out.
+  (`core:list-columns:<id>`), is not in the address, and is cleared on sign-out. Below 1024 pixels the
+  rows are cards, so the control is not drawn.
+- **Cards** (below 1024 pixels) show the row's label as the title, then up to three columns marked
+  `card`. A column whose text the title already says (a name, a reference) is left out, so the next
+  one takes its place.
+- **Paging:** a list that fits on one page says "7 in all" and draws no pager; a longer one says
+  "Page 1 of 3, 60 in all".
 - **Address:** one key for each filter (`state=draft,published`, `when=7d`, `action=orders.refund`),
   `view`, `sort`, `order`, `page`, `size` (25, 50 or 100), left out when default (for `size`, the site's `core.lists.page-size`).
 - **Server:** `decodeList(query, list, { can, today })` (alias `parse`) validates strictly and answers a typed
@@ -607,7 +613,9 @@ and no overrides. All are read-only, gated by `ability`, and absent when the mod
 | `core.list-column` | A column after the owner's | `{ id, list, ability, component, order }`; the component (in `app/list-columns/`) gets `listId`, `query` and `rowId` and fetches once for the page (one fetch key for the query). Label `<module>.list-columns.<name>.label`. Not yet sortable |
 
 `PageRecord` shows the checklist and an `aside` slot beside the tabs on a laptop; on a phone the
-checklist folds to one line above the tabs ("Checklist: 3 of 5").
+checklist folds to one line above the tabs ("Checklist: 3 of 5"). `aside-below` puts a side panel
+that is reference and not the work (a poster) after the tabs on a phone. The summary strip shares one
+row evenly on a laptop however many facts it holds (`FactStrip`'s `row`).
 
 ### The trail and the way back
 
@@ -617,6 +625,10 @@ administration a `UBreadcrumb` of the parents sits in the navbar after the sideb
 pixels up, and below that an icon-only back button ("Back to Productions") takes its place. Outside
 the console a worded back link sits above the title. A link to a list returns the list as it was left
 (`useListMemory`, kept for the tab's session). A page passes its own parent once its record has arrived.
+On a phone a page with a trail shows its title on a line of its own under the bar, as a record does,
+so the back button and the page's actions never squeeze it. `PageForm` takes `trail` too, for a form
+that is a page. In a sidebar only one entry is current: the one whose address covers the page most
+closely (`resolveEntry`), so Merges is not Accounts as well.
 
 `PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
 `searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`

@@ -4,7 +4,7 @@
      moved; its menu writes stock off or moves it between locations. An amount to
      write off or move is typed in the unit people count in, in packs or in base units; taking more
      than a location holds is said plainly and asked about first. Setting up items and locations is
-     in Admin. -->
+     in Admin. A table on a laptop, a list on a phone. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
 
@@ -34,6 +34,8 @@ const { number, amount: stockAmount, entryUnits } = useStockAmounts()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: { id: string, name: string }[], wastageReasons: { id: string, label: string }[], can: { receive: boolean, waste: boolean } }>('/api/bar/stock/levels', { key: 'bar:stock-levels' })
 
+// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
+const phone = useScreenQuery('(max-width: 639px)')
 const ALL = 'all'
 const location = computed({
   get: () => (route.query.location as string | undefined) ?? ALL,
@@ -63,9 +65,9 @@ const rows = computed(() => (data.value?.items ?? []).filter((i) => {
   return true
 }))
 
-// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words; never held, a dash.
+// "1.5 bottles (1,050 ml)"; a can is counted as itself. Below nought it says so in words, and so does never held.
 function amount(i: Item, quantity: number | null): string {
-  if (quantity === null) return '—'
+  if (quantity === null) return t('bar.screens.stock-levels.none')
   const text = stockAmount(i, Math.abs(quantity))
   return quantity < 0 ? t('bar.screens.stock-levels.below-zero', { amount: text }) : text
 }
@@ -165,8 +167,11 @@ function actions(i: Item) {
         :label="t('bar.screens.deliveries.record')"
       />
     </template>
-    <div class="mb-6 grid gap-4 sm:grid-cols-3">
-      <UFormField :label="t('bar.screens.stock-levels.find')">
+    <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <UFormField
+        :label="t('bar.screens.stock-levels.find')"
+        class="max-sm:col-span-2"
+      >
         <UInput
           v-model="search"
           icon="i-lucide-search"
@@ -199,8 +204,56 @@ function actions(i: Item) {
           :description="t('bar.screens.stock-levels.empty.description')"
           icon="i-lucide-package"
         />
+        <p
+          v-else-if="!rows.length"
+          class="text-sm text-muted"
+        >
+          {{ t('bar.screens.stock-levels.no-match') }}
+        </p>
+        <!-- On a phone: one row an item, its level at each location under its name. -->
+        <RecordList
+          v-if="rows.length && phone"
+          :label="t('bar.navigation.stock-levels.label')"
+        >
+          <RecordListItem
+            v-for="i in rows"
+            :key="i.id"
+            :name="i.name"
+          >
+            <template
+              v-if="location === ALL && d.locations.length > 1"
+              #description
+            >
+              <span
+                v-for="l in d.locations"
+                :key="l.id"
+                class="block"
+              >{{ l.name }}: <span :class="['tabular-nums', (levelAt(i, l.id) ?? 0) < 0 && 'text-error']">{{ amount(i, levelAt(i, l.id)) }}</span></span>
+            </template>
+            <span :class="['text-sm font-medium tabular-nums', (shown(i) ?? 0) < 0 && 'text-error', shown(i) === null && 'text-muted']">{{ amount(i, shown(i)) }}</span>
+            <RowActions
+              :label="t('bar.screens.stock.item-actions', { name: i.name })"
+              :items="actions(i)"
+            />
+            <template
+              v-if="i.low || i.levels.some(l => l.quantity < 0)"
+              #below
+            >
+              <StatusBadge
+                v-if="i.levels.some(l => l.quantity < 0)"
+                tone="danger"
+                :label="t('bar.screens.stock-levels.missing')"
+              />
+              <StatusBadge
+                v-else
+                tone="warning"
+                :label="t('bar.screens.stock.low')"
+              />
+            </template>
+          </RecordListItem>
+        </RecordList>
         <UTable
-          v-else
+          v-else-if="rows.length"
           :data="rows"
           :columns="columns"
           :caption="t('bar.navigation.stock-levels.label')"

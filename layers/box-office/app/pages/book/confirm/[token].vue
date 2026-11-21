@@ -46,7 +46,8 @@ async function go() {
             <p>{{ t('box-office.confirm.body') }}</p>
             <RefusalNotice :refusal="refusal" />
             <UButton
-              size="lg"
+              size="xl"
+              class="justify-center max-sm:w-full"
               :loading="busy"
               :label="t('box-office.confirm.button')"
               @click="go"

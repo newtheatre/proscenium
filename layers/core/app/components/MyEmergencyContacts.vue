@@ -24,7 +24,7 @@ watch(() => data.value?.contacts, (contacts) => {
 }, { immediate: true })
 
 // The route's schema, with the confirmation held as a tick box until it is ticked.
-const schema = emergencyContactsInput.extend({ told: z.boolean().refine(v => v, t('core.me.contacts.told-needed')) })
+const schema = emergencyContactsInput.extend({ told: z.boolean() }).refine(v => v.told || !v.contacts.length, { path: ['told'], message: t('core.me.contacts.told-needed') })
 const formRef = useTemplateRef('formRef')
 const uid = useId()
 const saving = ref(false)
@@ -148,6 +148,7 @@ const reasonLabel = (reason: string) => REASONS.includes(reason) ? t(`core.perso
         @click="add"
       />
       <UFormField
+        v-if="form.contacts.length"
         name="told"
         required
       >
@@ -157,6 +158,7 @@ const reasonLabel = (reason: string) => REASONS.includes(reason) ? t(`core.perso
         />
       </UFormField>
       <UButton
+        v-if="form.contacts.length || data.contacts.length"
         type="submit"
         :loading="saving"
         :label="t('core.me.contacts.save')"

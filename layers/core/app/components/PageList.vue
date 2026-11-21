@@ -251,11 +251,22 @@ const exportHref = computed(() => {
 })
 const exportBlocked = computed(() => total.value > props.exportCeiling)
 
-const cardColumns = computed(() => Object.entries(decl.value.columns).filter(([, c]) => c.card).slice(0, 3).map(([key, c]) => ({ key, ...c })))
+const cardColumns = computed(() => Object.entries(decl.value.columns).filter(([, c]) => c.card).map(([key, c]) => ({ key, ...c })))
+// A card's title already says the row's name, so a column holding the same words is not said twice.
+function cardColumnsOf(row: Row) {
+  const title = props.rowLabel(row)
+  return cardColumns.value.filter((c) => {
+    const value = row[c.key]
+    return !(typeof value === 'string' && value.trim().length > 2 && title.includes(value.trim()))
+  }).slice(0, 3)
+}
 function open(_event: Event, row: TableRow<Row>) {
   if (props.rowTo) void navigateTo(props.rowTo(row.original))
 }
-const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value }))
+// A list that fits on one page says only how many there are, and draws no pager.
+const pageLabel = computed(() => pages.value > 1
+  ? t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value })
+  : t('core.list.total', { total: total.value }))
 
 // A filter, a search or a new page changes only the query, so the route announcer says nothing:
 // the new count is announced here.
@@ -627,7 +638,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                     <ULink
                       v-if="rowTo"
                       :to="rowTo(row)"
-                      class="min-w-0 truncate font-medium text-highlighted hover:underline"
+                      class="-my-2 min-w-0 truncate py-2 font-medium text-highlighted hover:underline"
                     >
                       {{ rowLabel(row) }}
                     </ULink>
@@ -659,11 +670,11 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                   {{ matchLine(row) }}
                 </p>
                 <dl
-                  v-if="cardColumns.length"
+                  v-if="cardColumnsOf(row).length"
                   class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
                 >
                   <template
-                    v-for="c in cardColumns"
+                    v-for="c in cardColumnsOf(row)"
                     :key="c.key"
                   >
                     <dt class="text-muted">
@@ -723,6 +734,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               {{ pageLabel }}
             </p>
             <UPagination
+              v-if="pages > 1"
               :page="state.page"
               :total="total"
               :items-per-page="state.pageSize"

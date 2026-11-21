@@ -60,7 +60,9 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
         :description="t('public-site.archive.description')"
       />
       <UPageBody>
+        <!-- Nothing to search until a show has closed; the box and its button share a row on a phone. -->
         <UForm
+          v-if="years.length || searching || data?.searchTooShort"
           :state="search"
           action="/shows"
           method="get"
@@ -73,13 +75,13 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
             :label="t('public-site.archive.search')"
             name="q"
             :help="data?.searchTooShort ? t('public-site.archive.too-short') : undefined"
+            class="min-w-0 flex-1 sm:max-w-sm"
           >
             <UInput
               v-model="search.q"
               name="q"
               type="search"
               icon="i-lucide-search"
-              class="min-w-64"
             />
           </UFormField>
           <UButton

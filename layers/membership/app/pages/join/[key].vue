@@ -46,7 +46,7 @@ useSeoMeta({ title, description: () => scheme.value?.summary ?? undefined })
     >
       <div class="space-y-6">
         <template v-if="scheme">
-          <PageSection :title="scheme.name">
+          <PageSection :title="t('membership.join.about-title')">
             <MarkdownText
               v-if="scheme.summary"
               :text="scheme.summary"

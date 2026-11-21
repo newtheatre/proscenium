@@ -12,6 +12,7 @@ const pastOpen = ref(false)
   <PageFrame
     :title="t('box-office.navigation.mine.label')"
     :description="t('box-office.mine.help')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <DataBoundary
@@ -29,7 +30,14 @@ const pastOpen = ref(false)
           :title="t('box-office.mine.empty')"
           :description="t('box-office.mine.empty-description')"
           icon="i-lucide-ticket"
-        />
+        >
+          <template #actions>
+            <UButton
+              to="/whats-on"
+              :label="t('box-office.mine.see-whats-on')"
+            />
+          </template>
+        </EmptyState>
         <section
           v-else
           :aria-label="t('box-office.mine.upcoming')"

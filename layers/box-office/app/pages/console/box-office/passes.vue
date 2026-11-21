@@ -146,7 +146,6 @@ const actions = (p: PassType) => [[
   <PageFrame
     :title="t('box-office.navigation.passes.label')"
     :description="t('box-office.passes.description')"
-    width="reading"
   >
     <template #primary>
       <UButton
@@ -182,10 +181,9 @@ const actions = (p: PassType) => [[
             :name="p.name"
             :description="describe(p)"
           >
-            <UBadge
+            <StatusBadge
+              :tone="p.onSale ? 'success' : 'neutral'"
               :label="t(p.onSale ? 'box-office.passes.badge.on-sale' : 'box-office.passes.badge.off-sale')"
-              :color="p.onSale ? 'success' : 'neutral'"
-              variant="subtle"
             />
             <UButton
               color="neutral"

@@ -4,6 +4,8 @@
 <script setup lang="ts">
 const props = defineProps<{
   live?: boolean
+  /** On a narrow strip: with nothing to report, the button is its icon alone. */
+  compact?: boolean
   testid: string
   label: string
   linked: boolean
@@ -79,6 +81,8 @@ async function submit() {
       :size="live ? 'lg' : 'sm'"
       :icon="linked ? 'i-lucide-link' : 'i-lucide-unlink'"
       :label="label"
+      :square="compact && !linked && !solo"
+      :ui="{ label: compact && !linked && !solo ? 'sr-only' : '' }"
       :data-testid="testid"
     />
     <template #content>

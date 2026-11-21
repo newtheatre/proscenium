@@ -66,7 +66,7 @@ test('a sub-category shows under its parent on Products', async ({ page }) => {
 
 test('a product records its allergens from the label', async ({ page }) => {
   await visit(page, `/admin/modules/bar/products/${s.product}`)
-  await expect(page.getByText('Allergens: not checked yet')).toBeVisible()
+  await expect(page.getByText('Not checked yet', { exact: true })).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Check the label' }).click()
   const dialog = page.getByRole('dialog')

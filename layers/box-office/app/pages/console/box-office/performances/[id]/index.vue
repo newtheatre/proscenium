@@ -9,6 +9,8 @@
      number and its prices one per ticket type. The bands, called sections, appear once the house is
      split to price parts of it differently (show walkthrough, decision 4). -->
 <script setup lang="ts">
+import { createReusableTemplate } from '@vueuse/core'
+
 // The Wheelchair space and the Access ticket take the lowest price the buyer can have, so neither is priced here.
 const ACCESS_TYPES = ['box-office.wheelchair', 'box-office.access']
 definePageMeta({ layout: 'console' })
@@ -352,6 +354,11 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
 // Once a performance has gone on sale and nothing is missing, the checklist folds to one line.
 const folded = computed(() => !!data.value?.sales && data.value.sales.state !== 'draft' && checks.value.every(c => c.done))
 
+// The limits are rarely given their own numbers, so they fold away unless one is set.
+const limitsSet = computed(() => [windowForm.value.maxPerOrder, windowForm.value.holdMinutes, windowForm.value.releaseMinutes].filter(n => n !== null).length)
+const limitsOpen = ref(limitsSet.value > 0)
+const [DefineCopy, ReuseCopy] = createReusableTemplate()
+
 // Leaving with seats, prices or the sale window changed but not saved asks once.
 const dirty = computed(() => {
   const d = data.value
@@ -384,6 +391,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <PageFrame
         :title="t('box-office.setup.title', { title: d.performance.title, when: dateTime(d.performance.startsAt) })"
         :trail="trail"
+        long-title
       >
         <template #status>
           <StatusBadge v-bind="saleStateBadge(d.sales?.state ?? null, d.pools.reduce((sum, p) => sum + p.capacity, 0), t)" />
@@ -405,6 +413,45 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
         </template>
 
+        <DefineCopy>
+          <PageSection
+            :title="t('box-office.setup.copy.title')"
+            :description="t(d.pools.length ? 'box-office.setup.copy.description-replace' : 'box-office.setup.copy.description')"
+          >
+            <p
+              v-if="!sourceList.length"
+              class="text-sm text-muted"
+            >
+              {{ t('box-office.setup.copy.none') }}
+            </p>
+            <UForm
+              v-else
+              :state="{ copyFrom }"
+              novalidate
+              @submit="copySetup()"
+            >
+              <UFormField :label="t('box-office.setup.copy.from')">
+                <div class="flex flex-wrap gap-2">
+                  <USelectMenu
+                    v-model="copyFrom"
+                    class="min-w-72 flex-1"
+                    :items="sourceItems"
+                    value-key="value"
+                    :placeholder="t('box-office.setup.copy.placeholder')"
+                  />
+                  <UButton
+                    type="submit"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-copy"
+                    :label="t('box-office.setup.copy.button')"
+                    :disabled="!copyFrom"
+                  />
+                </div>
+              </UFormField>
+            </UForm>
+          </PageSection>
+        </DefineCopy>
         <div class="space-y-8">
           <RefusalNotice :refusal="refusal" />
           <UAlert
@@ -451,46 +498,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             :checks="checks"
           />
 
-          <PageSection
-            :title="t('box-office.setup.copy.title')"
-            :description="t('box-office.setup.copy.description')"
-          >
-            <p
-              v-if="!sourceList.length"
-              class="text-sm text-muted"
-            >
-              {{ t('box-office.setup.copy.none') }}
-            </p>
-            <UForm
-              v-else
-              :state="{ copyFrom }"
-              novalidate
-              @submit="copySetup()"
-            >
-              <UFormField :label="t('box-office.setup.copy.from')">
-                <div class="flex flex-wrap gap-2">
-                  <USelectMenu
-                    v-model="copyFrom"
-                    class="min-w-72 flex-1"
-                    :items="sourceItems"
-                    value-key="value"
-                    :placeholder="t('box-office.setup.copy.placeholder')"
-                  />
-                  <UButton
-                    type="submit"
-                    color="neutral"
-                    variant="outline"
-                    icon="i-lucide-copy"
-                    :label="t('box-office.setup.copy.button')"
-                    :disabled="!copyFrom"
-                  />
-                </div>
-              </UFormField>
-            </UForm>
-          </PageSection>
+          <ReuseCopy v-if="!d.pools.length" />
 
           <PageSection
-            v-if="others.length"
+            v-if="others.length && ((d.pools.length && othersBare) || runNotOnSale)"
             :title="t('box-office.setup.run.title')"
             :description="t('box-office.setup.run.description')"
           >
@@ -511,12 +522,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 :label="t('box-office.setup.run.open', { count: runNotOnSale })"
                 @click="openRun"
               />
-              <p
-                v-if="!(d.pools.length && othersBare) && !runNotOnSale"
-                class="text-sm text-muted"
-              >
-                {{ t('box-office.setup.run.all-done') }}
-              </p>
             </div>
           </PageSection>
 
@@ -587,26 +592,30 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               novalidate
               @submit="saveCapacity()"
             >
-              <UFormField
-                v-if="!d.bands.length"
-                :label="t('box-office.setup.capacity.whole')"
-              >
-                <UInputNumber
-                  v-model="wholeSeats"
-                  :min="0"
-                />
-              </UFormField>
-              <UFormField
-                v-for="b in d.bands"
-                :key="b.id"
-                :label="sectioned ? b.name : t('box-office.setup.capacity.whole')"
-                :help="t('box-office.setup.capacity.taken', { count: d.pools.find(p => p.bandId === b.id)?.claimed ?? 0 })"
-              >
-                <UInputNumber
-                  v-model="capacity[b.id]"
-                  :min="0"
-                />
-              </UFormField>
+              <div class="flex flex-wrap gap-x-6 gap-y-4">
+                <UFormField
+                  v-if="!d.bands.length"
+                  :label="t('box-office.setup.capacity.whole')"
+                >
+                  <UInputNumber
+                    v-model="wholeSeats"
+                    class="w-40"
+                    :min="0"
+                  />
+                </UFormField>
+                <UFormField
+                  v-for="b in d.bands"
+                  :key="b.id"
+                  :label="sectioned ? b.name : t('box-office.setup.capacity.whole')"
+                  :help="t('box-office.setup.capacity.taken', { count: d.pools.find(p => p.bandId === b.id)?.claimed ?? 0 })"
+                >
+                  <UInputNumber
+                    v-model="capacity[b.id]"
+                    class="w-40"
+                    :min="0"
+                  />
+                </UFormField>
+              </div>
               <UButton
                 type="submit"
                 :label="t('box-office.setup.capacity.save')"
@@ -667,22 +676,24 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               novalidate
               @submit="savePrices"
             >
-              <UFormField :label="t('box-office.setup.prices.scope.label')">
-                <URadioGroup
-                  v-model="scope"
-                  orientation="horizontal"
-                  variant="table"
-                  :items="scopes"
-                />
-              </UFormField>
-              <UFormField :label="t('box-office.setup.prices.when.label')">
-                <URadioGroup
-                  v-model="when"
-                  orientation="horizontal"
-                  variant="table"
-                  :items="whens"
-                />
-              </UFormField>
+              <div class="flex flex-wrap gap-x-8 gap-y-4">
+                <UFormField :label="t('box-office.setup.prices.scope.label')">
+                  <URadioGroup
+                    v-model="scope"
+                    orientation="horizontal"
+                    variant="table"
+                    :items="scopes"
+                  />
+                </UFormField>
+                <UFormField :label="t('box-office.setup.prices.when.label')">
+                  <URadioGroup
+                    v-model="when"
+                    orientation="horizontal"
+                    variant="table"
+                    :items="whens"
+                  />
+                </UFormField>
+              </div>
               <UFormField
                 v-if="when === 'later'"
                 name="from"
@@ -698,11 +709,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <fieldset
                 v-for="b in d.bands"
                 :key="b.id"
-                class="space-y-3"
+                class="grid grid-cols-2 items-start gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
               >
                 <legend
                   v-if="sectioned"
-                  class="font-medium"
+                  class="mb-3 font-medium"
                 >
                   {{ b.name }}
                 </legend>
@@ -776,54 +787,77 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               novalidate
               @submit="saveWindow"
             >
-              <UFormField
-                :label="t('box-office.setup.window.on-sale')"
-                :help="t('box-office.setup.window.on-sale-help')"
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField
+                  :label="t('box-office.setup.window.on-sale')"
+                  :help="t('box-office.setup.window.on-sale-help')"
+                >
+                  <FieldDateTime v-model="windowForm.onSaleAt" />
+                </UFormField>
+                <UFormField
+                  :label="t('box-office.setup.window.off-sale')"
+                  :help="t('box-office.setup.window.off-sale-help')"
+                >
+                  <FieldDateTime v-model="windowForm.offSaleAt" />
+                </UFormField>
+              </div>
+              <UCollapsible
+                v-model:open="limitsOpen"
+                :unmount-on-hide="false"
               >
-                <FieldDateTime v-model="windowForm.onSaleAt" />
-              </UFormField>
-              <UFormField
-                :label="t('box-office.setup.window.off-sale')"
-                :help="t('box-office.setup.window.off-sale-help')"
-              >
-                <FieldDateTime v-model="windowForm.offSaleAt" />
-              </UFormField>
-              <UFormField
-                :label="t('box-office.setup.window.max-per-order')"
-                :help="t('box-office.setup.window.default-help')"
-              >
-                <UInputNumber
-                  v-model="windowForm.maxPerOrder"
-                  :min="1"
-                  :max="500"
+                <UButton
+                  color="neutral"
+                  variant="link"
+                  class="px-0"
+                  :trailing-icon="limitsOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                  :label="limitsSet ? t('box-office.setup.window.limits-own', { count: limitsSet }) : t('box-office.setup.window.limits-usual')"
                 />
-              </UFormField>
-              <UFormField
-                :label="t('box-office.setup.window.hold')"
-                :help="t('box-office.setup.window.default-help')"
-              >
-                <UInputNumber
-                  v-model="windowForm.holdMinutes"
-                  :min="1"
-                  :max="60"
-                />
-              </UFormField>
-              <UFormField
-                :label="t('box-office.setup.window.release')"
-                :help="t('box-office.setup.window.release-help')"
-              >
-                <UInputNumber
-                  v-model="windowForm.releaseMinutes"
-                  :min="0"
-                  :max="1440"
-                />
-              </UFormField>
+                <template #content>
+                  <div class="grid gap-4 pt-4 sm:grid-cols-3">
+                    <UFormField
+                      :label="t('box-office.setup.window.max-per-order')"
+                      :help="t('box-office.setup.window.default-help')"
+                    >
+                      <UInputNumber
+                        v-model="windowForm.maxPerOrder"
+                        class="w-40"
+                        :min="1"
+                        :max="500"
+                      />
+                    </UFormField>
+                    <UFormField
+                      :label="t('box-office.setup.window.hold')"
+                      :help="t('box-office.setup.window.default-help')"
+                    >
+                      <UInputNumber
+                        v-model="windowForm.holdMinutes"
+                        class="w-40"
+                        :min="1"
+                        :max="60"
+                      />
+                    </UFormField>
+                    <UFormField
+                      :label="t('box-office.setup.window.release')"
+                      :help="t('box-office.setup.window.release-help')"
+                    >
+                      <UInputNumber
+                        v-model="windowForm.releaseMinutes"
+                        class="w-40"
+                        :min="0"
+                        :max="1440"
+                      />
+                    </UFormField>
+                  </div>
+                </template>
+              </UCollapsible>
               <UButton
                 type="submit"
                 :label="t('box-office.setup.window.save')"
               />
             </UForm>
           </PageSection>
+
+          <ReuseCopy v-if="d.pools.length" />
         </div>
         <UModal
           v-model:open="renameOpen"

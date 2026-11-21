@@ -1169,6 +1169,7 @@ function ended() {
           <PaymentsTillLinkMenu
             v-if="link.connected.value"
             :live="live"
+            compact
             testid="till-sync"
             :label="syncLabel"
             :linked="linked"
@@ -1698,6 +1699,7 @@ function ended() {
                         color="neutral"
                         variant="outline"
                         icon="i-lucide-split"
+                        :class="methods.length % 2 ? 'col-span-2' : undefined"
                         :disabled="!payable || taking || !canSplit"
                         :label="t('payments.screens.till.split')"
                         @click="startSplit(true)"
@@ -2004,6 +2006,7 @@ function ended() {
               size="xl"
               variant="link"
               class="min-w-0"
+              :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
             >
               <template #panel="{ item }">
                 <component
@@ -2142,6 +2145,18 @@ function ended() {
             >
               <template #body>
                 <div ref="sheetBody">
+                  <div
+                    v-if="groups.length && !sale && !splitting"
+                    class="-mt-2 flex justify-end"
+                  >
+                    <UButton
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-trash-2"
+                      :label="t('payments.screens.till.clear')"
+                      @click="clearAll"
+                    />
+                  </div>
                   <Receipt />
                 </div>
               </template>

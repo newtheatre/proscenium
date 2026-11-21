@@ -87,8 +87,13 @@ function occurredAt(): number {
 // Only a time still to come is refused: something at 23:50 reported at 00:10 is yesterday's.
 const later = ref(false)
 watch([at, day], () => { later.value = false })
-const canGo = computed(() => step.value !== 0 || form.value.whatHappened.trim().length > 0)
+const untold = ref(false)
+watch(() => form.value.whatHappened, () => { untold.value = false })
 function next() {
+  if (step.value === 0 && !form.value.whatHappened.trim()) {
+    untold.value = true
+    return
+  }
   if (step.value === 1 && occurredAt() > Date.now()) {
     later.value = true
     return
@@ -179,6 +184,7 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           <UFormField
             :label="t('front-of-house.live.incident.what')"
             :help="t('front-of-house.live.incident.what-help')"
+            :error="untold ? t('front-of-house.live.incident.what-needed') : undefined"
             required
           >
             <UTextarea
@@ -374,7 +380,6 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           size="xl"
           class="flex-1 justify-center"
           trailing-icon="i-lucide-arrow-right"
-          :disabled="!canGo"
           :label="t('front-of-house.live.incident.continue')"
           @click="next"
         />
@@ -384,7 +389,7 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           color="warning"
           class="flex-1 justify-center"
           icon="i-lucide-send"
-          :disabled="!online || !form.whatHappened.trim()"
+          :disabled="!online"
           :loading="sending"
           :label="t('front-of-house.live.incident.send')"
           @click="send"

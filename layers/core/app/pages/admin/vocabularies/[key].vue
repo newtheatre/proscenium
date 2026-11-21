@@ -16,6 +16,7 @@ const { data, status, error, refresh } = await useAPI<{ vocabulary: Vocabulary, 
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
+const { offer } = useUndo()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const live = computed(() => data.value?.terms.filter(t => !t.retired) ?? [])
@@ -35,12 +36,21 @@ function api(path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: ob
 }
 const labelOf = (id: string | null) => data.value?.terms.find(t => t.id === id)?.label ?? ''
 
-async function run(fn: () => Promise<unknown>, done?: string) {
+// Says what was done, with an Undo where the act has a reverse.
+async function run(fn: () => Promise<unknown>, done?: string, undo?: () => Promise<unknown>) {
   refusal.value = null
   try {
     await fn()
     await refresh()
-    if (done) toast.add({ title: done, color: 'success' })
+    if (done && undo) {
+      offer(done, async () => {
+        await undo()
+        await refresh()
+      })
+    }
+    else if (done) {
+      toast.add({ title: done, color: 'success' })
+    }
     return true
   }
   catch (e) {
@@ -50,23 +60,29 @@ async function run(fn: () => Promise<unknown>, done?: string) {
 }
 
 const adding = reactive({ label: '', groupId: '' })
+// The add box says what it lacks when pressed, in place of a dimmed button.
+function checkNew() {
+  const missing = needs({ label: adding.label })
+  if (missing.length || !grouped.value || adding.groupId) return missing
+  return [{ name: 'label', message: 'Choose the heading it goes under.' }]
+}
 async function add() {
   const label = adding.label.trim()
-  if (label && await run(() => api('/terms', 'POST', { label, ...(grouped.value ? { groupId: adding.groupId || headings.value[0]?.id } : {}) }), `Added ${label}`)) adding.label = ''
+  if (label && await run(() => api('/terms', 'POST', { label, ...(grouped.value ? { groupId: adding.groupId } : {}) }), `${label} added`)) adding.label = ''
 }
 
 // Headings (C-54)
 const addingHeading = reactive({ label: '' })
 async function addHeading() {
   const label = addingHeading.label.trim()
-  if (label && await run(() => api('/groups', 'POST', { label }), `Added the heading ${label}`)) addingHeading.label = ''
+  if (label && await run(() => api('/groups', 'POST', { label }), `Heading ${label} added`)) addingHeading.label = ''
 }
 const editingHeading = ref<string | null>(null)
 const editHeading = reactive({ label: '' })
 async function saveHeading(h: Heading) {
   const label = editHeading.label.trim()
   if (!label || label === h.label) return (editingHeading.value = null)
-  if (await run(() => api(`/groups/${h.id}`, 'PATCH', { label }), `Renamed to ${label}`)) editingHeading.value = null
+  if (await run(() => api(`/groups/${h.id}`, 'PATCH', { label }), `Renamed to ${label}`, () => api(`/groups/${h.id}`, 'PATCH', { label: h.label }))) editingHeading.value = null
 }
 async function moveHeading(h: Heading, by: -1 | 1) {
   const ids = headings.value.map(x => x.id)
@@ -78,7 +94,7 @@ async function moveHeading(h: Heading, by: -1 | 1) {
 }
 async function removeHeading(h: Heading) {
   if (!await confirm({ verb: 'Remove', thing: `the heading ${h.label}`, consequence: 'It has no terms, so nothing else changes.', button: 'Remove heading' })) return
-  await run(() => api(`/groups/${h.id}`, 'DELETE'), `Removed ${h.label}`)
+  await run(() => api(`/groups/${h.id}`, 'DELETE'), `Heading ${h.label} removed`)
 }
 function startEditHeading(h: Heading) {
   editingHeading.value = h.id
@@ -100,7 +116,8 @@ async function saveEdit(term: Term) {
   const label = edit.label.trim()
   const moved = grouped.value && edit.groupId && edit.groupId !== term.groupId
   if (!label || (label === term.label && !moved)) return (editing.value = null)
-  if (await run(() => api(`/terms/${term.id}`, 'PATCH', { label, ...(moved ? { groupId: edit.groupId } : {}) }), moved ? `Moved ${label}` : `Renamed to ${label}`)) editing.value = null
+  const back = { label: term.label, ...(moved && term.groupId ? { groupId: term.groupId } : {}) }
+  if (await run(() => api(`/terms/${term.id}`, 'PATCH', { label, ...(moved ? { groupId: edit.groupId } : {}) }), moved ? `${label} moved` : `Renamed to ${label}`, () => api(`/terms/${term.id}`, 'PATCH', back))) editing.value = null
 }
 
 async function move(term: Term, by: -1 | 1) {
@@ -114,12 +131,13 @@ async function move(term: Term, by: -1 | 1) {
   await run(() => api('/order', 'PUT', { ids }))
 }
 
-const retire = (term: Term) => run(() => api(`/terms/${term.id}/retire`, 'POST'), `Retired ${term.label}`)
-const restore = (term: Term) => run(() => api(`/terms/${term.id}/restore`, 'POST'), `Restored ${term.label}`)
+const retire = (term: Term) => run(() => api(`/terms/${term.id}/retire`, 'POST'), `${term.label} retired`, () => api(`/terms/${term.id}/restore`, 'POST'))
+const restore = (term: Term) => run(() => api(`/terms/${term.id}/restore`, 'POST'), `${term.label} restored`, () => api(`/terms/${term.id}/retire`, 'POST'))
+const showRetired = ref(false)
 
 async function remove(term: Term) {
   if (!await confirm({ verb: 'Delete', thing: `the term ${term.label}`, consequence: 'No record uses it, so nothing else changes. This cannot be undone.', button: 'Delete term' })) return
-  await run(() => api(`/terms/${term.id}`, 'DELETE'), `Deleted ${term.label}`)
+  await run(() => api(`/terms/${term.id}`, 'DELETE'), `${term.label} deleted`)
 }
 
 const uses = (term: Term) => t('core.counts.records', { count: term.uses })
@@ -135,6 +153,7 @@ const actions = (term: Term) => [[
   <PageFrame
     :title="data?.vocabulary.label ?? 'Vocabulary'"
     :description="data?.vocabulary.description ?? undefined"
+    :trail="[{ label: 'Vocabularies', to: '/admin/vocabularies' }]"
     width="reading"
   >
     <template #status>
@@ -160,25 +179,27 @@ const actions = (term: Term) => [[
         <UForm
           v-if="!locked"
           :state="addingHeading"
+          :validate="() => needs({ heading: addingHeading.label })"
+          :validate-on="[]"
           novalidate
           @submit="addHeading"
         >
-          <UFieldGroup class="flex">
-            <UInput
-              v-model="addingHeading.label"
-              name="heading"
-              placeholder="New heading"
-              aria-label="New heading"
-              maxlength="80"
-              class="flex-1"
-            />
-            <UButton
-              type="submit"
-              label="Add"
-              icon="i-lucide-plus"
-              :disabled="!addingHeading.label.trim()"
-            />
-          </UFieldGroup>
+          <UFormField name="heading">
+            <UFieldGroup class="flex">
+              <UInput
+                v-model="addingHeading.label"
+                placeholder="New heading"
+                aria-label="New heading"
+                maxlength="80"
+                class="flex-1"
+              />
+              <UButton
+                type="submit"
+                label="Add heading"
+                icon="i-lucide-plus"
+              />
+            </UFieldGroup>
+          </UFormField>
         </UForm>
         <RecordList label="Headings">
           <RecordListItem
@@ -250,33 +271,41 @@ const actions = (term: Term) => [[
         <UForm
           v-if="!locked"
           :state="adding"
+          :validate="checkNew"
+          :validate-on="[]"
           novalidate
           @submit="add"
         >
-          <UFieldGroup class="flex">
-            <UInput
-              v-model="adding.label"
-              name="label"
-              placeholder="New term"
-              aria-label="New term"
-              maxlength="80"
-              class="flex-1"
-            />
-            <USelect
-              v-if="grouped"
-              v-model="adding.groupId"
-              :items="headingItems"
-              placeholder="Heading"
-              aria-label="Heading for the new term"
-            />
-            <UButton
-              type="submit"
-              label="Add"
-              icon="i-lucide-plus"
-              :disabled="!adding.label.trim() || (grouped && !adding.groupId)"
-            />
-          </UFieldGroup>
+          <UFormField name="label">
+            <UFieldGroup class="flex">
+              <UInput
+                v-model="adding.label"
+                placeholder="New term"
+                aria-label="New term"
+                maxlength="80"
+                class="flex-1"
+              />
+              <USelect
+                v-if="grouped"
+                v-model="adding.groupId"
+                :items="headingItems"
+                placeholder="Heading"
+                aria-label="Heading for the new term"
+              />
+              <UButton
+                type="submit"
+                label="Add term"
+                icon="i-lucide-plus"
+              />
+            </UFieldGroup>
+          </UFormField>
         </UForm>
+        <p
+          v-if="!live.length"
+          class="text-sm text-muted"
+        >
+          {{ locked ? 'This vocabulary has no terms.' : 'No terms yet. Add the first one above; it then shows wherever this list is offered.' }}
+        </p>
 
         <template
           v-for="section in sections"
@@ -288,7 +317,16 @@ const actions = (term: Term) => [[
           >
             {{ section.label }}
           </h3>
-          <RecordList :label="section.label ? `Terms under ${section.label}` : 'Terms'">
+          <p
+            v-if="section.label && !section.terms.length"
+            class="text-sm text-muted"
+          >
+            No terms under this heading yet.
+          </p>
+          <RecordList
+            v-if="section.terms.length"
+            :label="section.label ? `Terms under ${section.label}` : 'Terms'"
+          >
             <RecordListItem
               v-for="(term, index) in section.terms"
               :key="term.id"
@@ -355,31 +393,34 @@ const actions = (term: Term) => [[
             </RecordListItem>
           </RecordList>
         </template>
-      </PageSection>
-
-      <PageSection
-        v-if="retired.length"
-        title="Retired"
-        description="Retired terms are left out of every picker and still show on the records that use them."
-      >
-        <RecordList label="Retired terms">
-          <RecordListItem
-            v-for="term in retired"
-            :key="term.id"
-            :name="term.mergedIntoId ? `${term.label} (merged into ${labelOf(term.mergedIntoId)})` : term.label"
-            :description="uses(term)"
-            muted
-          >
-            <UButton
-              v-if="!term.mergedIntoId && !locked"
-              label="Restore"
-              color="neutral"
-              variant="outline"
-              size="sm"
-              @click="restore(term)"
-            />
-          </RecordListItem>
-        </RecordList>
+        <CollapsibleDivider
+          v-model:open="showRetired"
+          label="Retired"
+          :count="retired.length"
+        >
+          <p class="mb-3 text-sm text-muted">
+            Retired terms are left out of every picker and still show on the records that use them.
+          </p>
+          <RecordList label="Retired terms">
+            <RecordListItem
+              v-for="term in retired"
+              :key="term.id"
+              :name="term.mergedIntoId ? `${term.label} (merged into ${labelOf(term.mergedIntoId)})` : term.label"
+              :description="uses(term)"
+              muted
+            >
+              <UButton
+                v-if="!term.mergedIntoId && !locked"
+                label="Restore"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                :aria-label="`Restore ${term.label}`"
+                @click="restore(term)"
+              />
+            </RecordListItem>
+          </RecordList>
+        </CollapsibleDivider>
       </PageSection>
     </DataBoundary>
   </PageFrame>

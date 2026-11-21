@@ -48,14 +48,19 @@ const blank = () => ({ name: '', moment: 'pre-show' as Moment, venueId: ANY, dut
 const form = ref(blank())
 const editing = ref<Checklist | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const open = ref(false)
 
 function edit(list: Checklist) {
   editing.value = list
   form.value = { name: list.name, moment: list.moment, venueId: list.venueId ?? ANY, dutyId: list.dutyId ?? ANY, items: list.items.map(i => ({ ...i, unit: i.unit ?? '' })) }
+  refusal.value = null
+  open.value = true
 }
-function stop() {
+function add() {
   editing.value = null
   form.value = blank()
+  refusal.value = null
+  open.value = true
 }
 function move(i: number, by: -1 | 1) {
   const items = form.value.items
@@ -78,7 +83,7 @@ async function save() {
     if (editing.value) await write(`/api/front-of-house/checklists/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/checklists', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.checklists.saved' : 'front-of-house.checklists.added', { name: body.name }), color: 'success' })
-    stop()
+    open.value = false
     await refresh()
   }
   catch (e) {
@@ -110,8 +115,18 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
     :title="t('front-of-house.navigation.checklists.label')"
     :description="t('front-of-house.checklists.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <template #primary>
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('front-of-house.checklists.add-button')"
+        @click="add"
+      />
+    </template>
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!open"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -143,15 +158,22 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
           </RecordList>
         </template>
       </DataBoundary>
+    </div>
 
-      <PageSection :title="editing ? t('front-of-house.checklists.edit-title', { name: editing.name }) : t('front-of-house.checklists.add-title')">
+    <UModal
+      v-model:open="open"
+      :title="editing ? t('front-of-house.checklists.edit-title', { name: editing.name }) : t('front-of-house.checklists.add-title')"
+    >
+      <template #body>
         <UForm
+          id="fh-checklist"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
             :label="t('front-of-house.checklists.name')"
@@ -260,21 +282,15 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
               @click="form.items.push(blankItem())"
             />
           </fieldset>
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
-            />
-            <UButton
-              v-if="editing"
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="stop"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-checklist"
+          :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

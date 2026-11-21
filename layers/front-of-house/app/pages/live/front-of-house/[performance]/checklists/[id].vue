@@ -55,7 +55,10 @@ async function run(key: string, call: () => Promise<unknown>, done?: string) {
 const enter = (item: Item, outcome: Outcome, extra: Record<string, unknown> = {}) =>
   run(item.id, () => write(`${base.value}/items/${encodeURIComponent(item.id)}`, { method: 'PUT', body: { outcome, ...extra } }))
 const start = () => run('start', () => write(`${base.value}/open`, { method: 'POST', body: {} }))
-const complete = () => run('complete', () => write(`${base.value}/complete`, { method: 'POST', body: {} }), t('front-of-house.live.checklist-completed'))
+// Pressed with answers missing, it says how many rather than sitting greyed out.
+const complete = () => !ready.value
+  ? toast.add({ title: t('front-of-house.live.complete-needs', { count: required.value.length - entered.value }), color: 'warning', icon: 'i-lucide-list-checks' })
+  : run('complete', () => write(`${base.value}/complete`, { method: 'POST', body: {} }), t('front-of-house.live.checklist-completed'))
 const reopen = () => run('reopen', () => write(`${base.value}/reopen`, { method: 'POST', body: {} }), t('front-of-house.live.checklist-reopened'))
 async function saveProblem() {
   const p = problem.value!
@@ -130,12 +133,16 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                 v-if="editable"
                 #below
               >
-                <div class="flex flex-wrap gap-2">
-                  <template v-if="item.kind === 'reading'">
+                <!-- On a phone the answer that is nearly always right fills the row, with the other two side by side under it. -->
+                <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <div
+                    v-if="item.kind === 'reading'"
+                    class="col-span-2 flex gap-2"
+                  >
                     <UInputNumber
                       v-model="readings[item.id]"
                       size="xl"
-                      class="w-40"
+                      class="min-w-0 flex-1 sm:w-40 sm:flex-none"
                       :aria-label="item.unit ? t('front-of-house.live.reading-in', { item: item.label, unit: item.unit }) : t('front-of-house.live.reading-of', { item: item.label })"
                     />
                     <UButton
@@ -146,10 +153,11 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                       :label="t('front-of-house.live.save-reading')"
                       @click="enter(item, 'done', { reading: readings[item.id] })"
                     />
-                  </template>
+                  </div>
                   <UButton
                     v-else
                     size="xl"
+                    class="col-span-2 justify-center"
                     icon="i-lucide-check"
                     :variant="item.entry?.outcome === 'done' ? 'solid' : 'outline'"
                     :aria-pressed="item.entry?.outcome === 'done'"
@@ -161,6 +169,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                   <UButton
                     size="xl"
                     color="warning"
+                    class="justify-center"
                     :variant="item.entry?.outcome === 'exception' ? 'solid' : 'outline'"
                     :aria-pressed="item.entry?.outcome === 'exception'"
                     icon="i-lucide-triangle-alert"
@@ -171,6 +180,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                   <UButton
                     size="xl"
                     color="neutral"
+                    class="justify-center"
                     :variant="item.entry?.outcome === 'not_applicable' ? 'solid' : 'outline'"
                     :aria-pressed="item.entry?.outcome === 'not_applicable'"
                     :label="t('front-of-house.live.outcome.not_applicable')"
@@ -204,7 +214,6 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
           size="xl"
           block
           icon="i-lucide-circle-check"
-          :disabled="!ready"
           :loading="busy === 'complete'"
           :label="t('front-of-house.live.complete')"
           @click="complete"

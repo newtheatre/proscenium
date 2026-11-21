@@ -255,7 +255,15 @@ async function saveAllergens() {
           icon="i-lucide-list-checks"
           :title="t('bar.screens.choices.empty-title')"
           :description="t('bar.screens.choices.empty')"
-        />
+        >
+          <template #actions>
+            <UButton
+              icon="i-lucide-plus"
+              :label="t('bar.screens.choices.new')"
+              @click="editGroup()"
+            />
+          </template>
+        </EmptyState>
         <PageSection
           v-for="g in data.groups"
           :key="g.id"
