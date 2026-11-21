@@ -413,7 +413,8 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
           icon="i-lucide-shield-alert"
           color="warning"
           size="xl"
-          class="flex-1 justify-center"
+          class="min-w-0 flex-1 justify-center"
+          :ui="{ leadingIcon: 'max-sm:hidden' }"
           :label="t('front-of-house.live.report-incident')"
         />
         <UButton
@@ -423,7 +424,8 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
           color="error"
           variant="outline"
           size="xl"
-          class="flex-1 justify-center"
+          class="min-w-0 flex-1 justify-center"
+          :ui="{ leadingIcon: 'max-sm:hidden' }"
           :label="t('front-of-house.live.emergency-card')"
         />
       </div>
