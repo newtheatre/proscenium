@@ -48,8 +48,10 @@ async function visit(page: Page, url: string) {
 
 test('Add a ticket type, then a band and its prices on a performance, all from the console forms', async ({ page }) => {
   await visit(page, '/admin/modules/box-office/ticket-types')
-  await page.getByLabel(/^Name/).fill(typeName)
-  await page.getByRole('button', { name: 'Add ticket type' }).click()
+  await page.getByRole('button', { name: 'New ticket type' }).click()
+  const adding = page.getByRole('dialog', { name: 'Add a ticket type' })
+  await adding.getByLabel(/^Name/).fill(typeName)
+  await adding.getByRole('button', { name: 'Add ticket type' }).click()
   await expect(page.getByText(`${typeName} added`).first()).toBeVisible()
   await expect(page.getByText('This request needs an Idempotency-Key header.')).toHaveCount(0)
 
