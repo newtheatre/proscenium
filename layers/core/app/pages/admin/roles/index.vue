@@ -30,6 +30,7 @@ function ends(role: Role): string {
         to="/admin/roles/new"
       />
     </template>
+    <RolesTabs />
     <DataBoundary
       :data="data"
       :status="status"

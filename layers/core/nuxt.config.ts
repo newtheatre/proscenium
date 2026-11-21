@@ -31,6 +31,8 @@ export default defineNuxtConfig({
     '/admin/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },
     '/console/system/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },
     '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
+    // Facts became the Automatic access tab of Roles.
+    '/admin/facts': { redirect: { to: '/admin/roles/automatic', statusCode: 301 } },
     '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
     '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },
     '/console/programme/venues': { redirect: { to: '/admin/modules/core/venues', statusCode: 301 } },

@@ -67,6 +67,12 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
   for (const id of registry.modules.keys()) {
     out.push({ id: `core.modules.about.${id}`, module: 'core', label: 'core.modules.tab.about', menu: 'admin', group: 'modules', to: `${moduleHome(id)}/about`, icon: 'i-lucide-info', ability: MODULE_VIEWERS, order: 1000 }) // not-policy: About is the last tab
   }
+  // A module that ships vocabularies has a Lists tab for them, beside the thing they are choices for.
+  const owners = new Set((await usePoint<unknown>('core.vocabulary')).map(c => c.module))
+  for (const id of owners) {
+    if (!on.has(id)) continue
+    out.push({ id: `core.modules.lists.${id}`, module: id, label: 'core.modules.tab.lists', menu: 'admin', group: 'modules', to: `${moduleHome(id)}/lists`, match: `${moduleHome(id)}/lists`, icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 900 }) // not-policy: Lists sits just before About
+  }
   return out
 }
 

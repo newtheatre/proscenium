@@ -53,10 +53,17 @@ test.describe('someone who reads roles and sets up sign-in', () => {
 
   // Facts and Sign-in are separate tests: Sign-in is a long page of settings, and visiting and
   // checking both pages with axe in one test overran the 30-second limit on a busy CI runner.
-  test('facts open', async ({ page }) => {
-    await visit(page, '/admin/facts')
-    await expect(page.getByRole('heading', { level: 1, name: 'Facts' })).toBeVisible()
+  test('automatic access is a tab of Roles, each line folded until it is changed; the old Facts address still arrives', async ({ page }) => {
+    await visit(page, '/admin/roles')
+    await page.getByRole('tab', { name: 'Automatic access' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Automatic access' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Facts' })).toHaveCount(0)
+    await expect(page.getByRole('checkbox')).toHaveCount(0)
+    await page.getByRole('button', { name: /^Change what/ }).first().click()
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
     await noViolations(page)
+    await visit(page, '/admin/facts')
+    await expect(page).toHaveURL(/\/admin\/roles\/automatic$/)
   })
 
   test('sign-in settings open', async ({ page }) => {
