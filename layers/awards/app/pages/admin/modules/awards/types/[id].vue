@@ -50,6 +50,11 @@ async function remove() {
     refusal.value = toRefusal(e)
   }
 }
+// Archive and Delete sit in the heading's menu, as they do on a membership scheme.
+const actions = computed(() => [
+  ...(type.value?.state === 'active' ? [{ label: t('awards.screens.type.archive'), icon: 'i-lucide-archive', onSelect: archive }] : []),
+  ...(data.value?.deletable ? [{ label: t('awards.screens.type.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove }] : []),
+])
 </script>
 
 <template>
@@ -67,6 +72,16 @@ async function remove() {
         :label="t(`awards.screens.type-states.${type.state}`)"
       />
     </template>
+    <template
+      v-if="type && data?.canManage"
+      #primary
+    >
+      <RowActions
+        :items="actions"
+        :label="t('awards.screens.type.actions', { type: type.name })"
+        variant="outline"
+      />
+    </template>
     <DataBoundary
       :data="data"
       :status="status"
@@ -77,6 +92,14 @@ async function remove() {
         v-if="data && type"
         class="space-y-6"
       >
+        <UAlert
+          v-if="type.state === 'archived'"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-archive"
+          :title="t('awards.screens.type.restore-help')"
+          :actions="data.canManage ? [{ label: t('awards.screens.type.restore'), icon: 'i-lucide-archive-restore', color: 'neutral', variant: 'outline', onClick: () => patch({ state: 'active' }, t('awards.screens.type.restored-toast')) }] : undefined"
+        />
         <PageSection
           :title="t('awards.screens.type.details')"
           :description="t('awards.screens.types.holders', { count: data.holders })"
@@ -114,37 +137,6 @@ async function remove() {
             slot-id="awards.nomination"
             :subject="type.id"
           />
-        </PageSection>
-        <PageSection
-          :title="t(type.state === 'active' ? 'awards.screens.type.retire' : 'awards.screens.type.restore')"
-          :description="t(type.state === 'active' ? 'awards.screens.type.retire-help' : 'awards.screens.type.restore-help')"
-        >
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              v-if="type.state === 'active'"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-archive"
-              :label="t('awards.screens.type.archive')"
-              @click="archive()"
-            />
-            <UButton
-              v-else
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-archive-restore"
-              :label="t('awards.screens.type.restore')"
-              @click="patch({ state: 'active' }, t('awards.screens.type.restored-toast'))"
-            />
-            <UButton
-              v-if="data.deletable"
-              color="error"
-              variant="outline"
-              icon="i-lucide-trash-2"
-              :label="t('awards.screens.type.delete')"
-              @click="remove()"
-            />
-          </div>
         </PageSection>
       </div>
     </DataBoundary>
