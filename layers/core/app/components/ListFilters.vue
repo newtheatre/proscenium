@@ -2,7 +2,6 @@
      phone. Each filter is a labelled field of its own kind; the list updates as each field changes
      and the panel ends with "Clear all" and "Done". The panel is controlled so a chip can open it. -->
 <script setup lang="ts">
-import { UDrawer, UPopover } from '#components'
 import type { FilterDef, ListOption } from '../../shared/list'
 
 const props = defineProps<{
@@ -19,9 +18,6 @@ const emit = defineEmits<{ change: [name: string, value: string], clear: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 
 const { t } = useT()
-// The drawer only once hydrated: the server draws the popover, and the first render must match it.
-const phone = useScreenQuery('(max-width: 639px)')
-const container = computed(() => (phone.value ? UDrawer : UPopover))
 const ANY = '__any' // a select item cannot have an empty value, so "Any" has its own
 
 const names = computed(() => Object.keys(props.filters))
@@ -86,127 +82,96 @@ function setRange(name: string) {
   if (r.from) setValue(name, r.to && r.to !== r.from ? `${r.from}..${r.to}` : r.from)
 }
 watch(() => props.values, () => { for (const name of names.value) if (!/^\d{4}-/.test(props.values[name] ?? '')) Reflect.deleteProperty(range, name) })
-
-const label = computed(() => props.count ? t('core.list.filters-on', { count: props.count }) : t('core.list.filters'))
 </script>
 
 <template>
-  <component
-    :is="container"
+  <FilterPanel
     v-model:open="open"
-    v-bind="phone ? { direction: 'bottom', title: t('core.list.filters'), description: t('core.list.filters-description') } : {}"
+    :count="count"
+    @clear="emit('clear')"
   >
-    <UButton
-      color="neutral"
-      variant="outline"
-      icon="i-lucide-sliders-horizontal"
-      :label="label"
-      aria-haspopup="dialog"
-    />
-    <template #content>
+    <UFormField
+      v-for="name in names"
+      :key="name"
+      :label="filters[name]!.label"
+      :name="`filter-${name}`"
+    >
+      <USelect
+        v-if="filters[name]!.kind === 'choice'"
+        :model-value="values[name] || ANY"
+        :items="withAny(filters[name]!.options)"
+        value-key="value"
+        @update:model-value="setValue(name, String($event))"
+      />
+
+      <UCheckboxGroup
+        v-else-if="filters[name]!.kind === 'choices'"
+        :model-value="listOf(name)"
+        :items="filters[name]!.options"
+        value-key="value"
+        @update:model-value="setValue(name, ($event as string[]).join(','))"
+      />
+
+      <USelectMenu
+        v-else-if="filters[name]!.kind === 'grouped'"
+        :model-value="values[name] || ANY"
+        :items="groupedItems(filters[name]!)"
+        value-key="value"
+        @update:model-value="setValue(name, String($event))"
+      />
+
+      <USelectMenu
+        v-else-if="filters[name]!.kind === 'lookup'"
+        :model-value="values[name]"
+        :items="lookupOptions(name)"
+        :search-term="lookupTerm[name] ?? ''"
+        :loading="lookupBusy[name]"
+        value-key="value"
+        ignore-filter
+        :placeholder="t('core.list.any')"
+        @update:search-term="searchLookup(name, $event)"
+        @update:model-value="setValue(name, $event ? String($event) : '')"
+      />
+
       <div
-        class="w-full space-y-4 p-4 sm:w-96"
-        role="group"
-        :aria-label="t('core.list.filters')"
+        v-else-if="filters[name]!.kind === 'dates'"
+        class="space-y-2"
       >
-        <UFormField
-          v-for="name in names"
-          :key="name"
-          :label="filters[name]!.label"
-          :name="`filter-${name}`"
-        >
-          <USelect
-            v-if="filters[name]!.kind === 'choice'"
-            :model-value="values[name] || ANY"
-            :items="withAny(filters[name]!.options)"
-            value-key="value"
-            @update:model-value="setValue(name, String($event))"
-          />
-
-          <UCheckboxGroup
-            v-else-if="filters[name]!.kind === 'choices'"
-            :model-value="listOf(name)"
-            :items="filters[name]!.options"
-            value-key="value"
-            @update:model-value="setValue(name, ($event as string[]).join(','))"
-          />
-
-          <USelectMenu
-            v-else-if="filters[name]!.kind === 'grouped'"
-            :model-value="values[name] || ANY"
-            :items="groupedItems(filters[name]!)"
-            value-key="value"
-            @update:model-value="setValue(name, String($event))"
-          />
-
-          <USelectMenu
-            v-else-if="filters[name]!.kind === 'lookup'"
-            :model-value="values[name]"
-            :items="lookupOptions(name)"
-            :search-term="lookupTerm[name] ?? ''"
-            :loading="lookupBusy[name]"
-            value-key="value"
-            ignore-filter
-            :placeholder="t('core.list.any')"
-            @update:search-term="searchLookup(name, $event)"
-            @update:model-value="setValue(name, $event ? String($event) : '')"
-          />
-
-          <div
-            v-else-if="filters[name]!.kind === 'dates'"
-            class="space-y-2"
-          >
-            <div class="flex flex-wrap gap-1.5">
-              <UButton
-                v-for="p in filters[name]!.presets"
-                :key="p.value"
-                size="sm"
-                color="neutral"
-                :variant="values[name] === p.value ? 'solid' : 'outline'"
-                :aria-pressed="values[name] === p.value"
-                :label="p.label"
-                @click="setValue(name, values[name] === p.value ? '' : p.value)"
-              />
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <UFormField :label="t('core.list.from')">
-                <FieldDate
-                  v-model="rangeOf(name).from"
-                  @update:model-value="setRange(name)"
-                />
-              </UFormField>
-              <UFormField :label="t('core.list.to')">
-                <FieldDate
-                  v-model="rangeOf(name).to"
-                  @update:model-value="setRange(name)"
-                />
-              </UFormField>
-            </div>
-          </div>
-
-          <URadioGroup
-            v-else-if="filters[name]!.kind === 'yes-no'"
-            :model-value="values[name] || 'any'"
-            :items="[{ value: 'any', label: t('core.list.any') }, { value: 'yes', label: t('core.list.yes') }, { value: 'no', label: t('core.list.no') }]"
-            orientation="horizontal"
-            @update:model-value="setValue(name, $event === 'any' ? '' : String($event))"
-          />
-        </UFormField>
-
-        <div class="flex items-center justify-between gap-2 border-t border-default pt-3">
+        <div class="flex flex-wrap gap-1.5">
           <UButton
+            v-for="p in filters[name]!.presets"
+            :key="p.value"
+            size="sm"
             color="neutral"
-            variant="link"
-            :label="t('core.list.clear-all')"
-            :disabled="!count"
-            @click="emit('clear')"
-          />
-          <UButton
-            :label="t('core.list.done')"
-            @click="open = false"
+            :variant="values[name] === p.value ? 'solid' : 'outline'"
+            :aria-pressed="values[name] === p.value"
+            :label="p.label"
+            @click="setValue(name, values[name] === p.value ? '' : p.value)"
           />
         </div>
+        <div class="grid grid-cols-2 gap-2">
+          <UFormField :label="t('core.list.from')">
+            <FieldDate
+              v-model="rangeOf(name).from"
+              @update:model-value="setRange(name)"
+            />
+          </UFormField>
+          <UFormField :label="t('core.list.to')">
+            <FieldDate
+              v-model="rangeOf(name).to"
+              @update:model-value="setRange(name)"
+            />
+          </UFormField>
+        </div>
       </div>
-    </template>
-  </component>
+
+      <URadioGroup
+        v-else-if="filters[name]!.kind === 'yes-no'"
+        :model-value="values[name] || 'any'"
+        :items="[{ value: 'any', label: t('core.list.any') }, { value: 'yes', label: t('core.list.yes') }, { value: 'no', label: t('core.list.no') }]"
+        orientation="horizontal"
+        @update:model-value="setValue(name, $event === 'any' ? '' : String($event))"
+      />
+    </UFormField>
+  </FilterPanel>
 </template>
