@@ -151,7 +151,7 @@ export async function shiftView(id: string, accountId: string): Promise<ShiftVie
     venueName: about?.venue_name ?? null,
     curtainAt: about?.curtain_at ?? null,
     releaseNotice: await useSetting('front-of-house.shifts.release-notice') as number,
-    people: await Promise.all(people.filter(p => p.state !== 'requested').map(async p => ({ name: await accountLabel(p.account_id), state: p.state }))),
+    people: await Promise.all(people.filter(p => p.state !== 'requested' && !p.mine).map(async p => ({ name: await accountLabel(p.account_id), state: p.state }))),
     mine: mine ? { assignmentId: mine.id, state: mine.state, calendar: `/api/front-of-house/assignments/${encodeURIComponent(mine.id)}/calendar.ics?k=${encodeURIComponent(await calendarKey(mine.id))}`, freeRelease: mine.moved_at !== null } : null,
     clash: mine ? null : clashing(await liveClashes(accountId), shift),
     coverFor: people.find(p => p.state === 'release_requested' && !p.mine)?.id ?? null,

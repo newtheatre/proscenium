@@ -19,7 +19,7 @@ FH-02 unblocks UI-05 (on-shift bar and Tonight), BO-44 (scan without a role) and
 
 | Id | Story | Done when | Needs |
 | --- | --- | --- | --- |
-| FH-05 | As a front-of-house manager, I define duties and rota templates, guided by a setup step | Duties and templates can be created, edited and archived; the setup step is complete once one of each and an emergency card exist | Interface console; core.setup-step |
+| FH-05 | As a front-of-house manager, I define duties and rota templates, guided by a setup step | Duties and templates can be created, edited, archived and restored; the setup step is complete once one of each and an emergency card exist | Interface console; core.setup-step |
 | FH-06 | As a manager, I apply a rota template to one or many performances | Draft shifts appear with default times; applying twice adds nothing twice | FH-01, FH-05 |
 | FH-07 | As a manager, I publish shifts so members can see them | Published shifts are visible; draft ones are not; the event is announced | FH-06 |
 | FH-08 | As a manager, I create a shift that is not tied to a performance | It can be signed up for and worked; it confers rostered only | FH-07 |
@@ -45,10 +45,10 @@ FH-02 unblocks UI-05 (on-shift bar and Tonight), BO-44 (scan without a role) and
 | FH-18 | As a steward on shift, Tonight is first in my menu and a bar tells me I am on shift | The module contributes to the on-shift bar and Tonight tiles; both vanish when the window closes | FH-02; UI-05 |
 | FH-19 | As anyone on shift, I open the front of house section of Tonight for my performance | People, timings, checklists and incidents shown; refreshes; works on a phone | FH-18; live mode |
 | FH-20 | As a duty manager, I see sold, admitted and till figures on the board | Contributed figures appear, are hidden from those without the ability, and show "unavailable" on failure | FH-19; Box office and Payments contributions |
-| FH-21 | As a volunteer, I tap "I'm here"; as a lead, I mark others arrived | Check-in only inside the window; "not arrived" flag after the late setting | FH-19 |
+| FH-21 | As a volunteer, I tap "I'm here"; as a lead, I mark others arrived | Check-in only inside the window; "not arrived" flag after the late setting; recording a timing or entering a checklist item on my own shift checks me in | FH-19 |
 | FH-22 | As a lead, I record house open, curtain up, interval and house clear | Each timing recorded once, adjustable, audited on change | FH-19 |
 | FH-23 | As a lead, I extend tonight when the show runs late | Every shift's window closes later; shown on the board; never earlier | FH-02 |
-| FH-24 | As a manager, I set up checklists for before and after the show | Checklists and items edited and ordered; used items archive | Interface console |
+| FH-24 | As a manager, I set up checklists for before and after the show | Checklists and items edited and ordered; used items archive; an archived checklist can be restored | Interface console |
 | FH-25 | As a steward, I work through a checklist on my phone, noting a problem without stopping the night, with or without signal | Entries, exceptions with reason, completion; queued writes offline; optional house-open block | FH-19, FH-24; queued writes |
 | FH-26 | As anyone on shift, I open the emergency card instantly, even offline | Card kept on the device; shows its review date; health check warns when stale | Live mode |
 
@@ -56,7 +56,7 @@ FH-02 unblocks UI-05 (on-shift bar and Tonight), BO-44 (scan without a role) and
 
 | Id | Story | Done when | Needs |
 | --- | --- | --- | --- |
-| FH-27 | As any member, I report an incident or near miss in under a minute, offline if need be, and can see my own reports afterwards | Three-step report; queued when offline; number given; reporter's limited view | Live mode; queued writes |
+| FH-27 | As any member, I report an incident or near miss in under a minute, offline if need be, and can see my own reports afterwards | One-page report; queued when offline; number given; reporter's limited view | Live mode; queued writes |
 | FH-28 | As a welfare lead, I am told at once about a serious incident and daily about the rest | Routing by the severity setting; notifications carry no detail | FH-27; holdersOf; core notifications |
 | FH-29 | As a reviewer, I add the category, the people involved and follow-up actions | People with or without an account; welfare details encrypted and read-audited; actions chased | FH-27; special data class |
 | FH-30 | As a reviewer, I close an incident; a serious one needs someone other than its reporter | Closing rules and refusals of part 3; reopening logged | FH-29 |

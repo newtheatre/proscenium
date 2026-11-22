@@ -2,7 +2,7 @@
 // withdrawing shifts, shifts not tied to a performance, changing places and times, cancelling, and
 // following the performance when the core moves or cancels it. A write that reaches many people is
 // set-wise; nobody is told twice about one change.
-import { all, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { getPerformance, holdersOf, notify, placeName } from '#modules/core'
 import { LIVE_STATES } from './db/schema'
 import { getShift, shiftTimes, type DutyInput, type Shift } from './shifts'
@@ -28,6 +28,21 @@ export function archiveDuty(unit: UnitView, id: string): void {
   unit.add({ sql: 'UPDATE front_of_house_duties SET archived_at = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL', params: [at, at, id] })
     .expect(1, { code: 'front-of-house.duty-archived', reason: 'This duty is already archived.' })
   unit.audit({ action: 'update', detail: { duty: id, archived: true } })
+}
+
+/** Brings an archived duty back with everything it had. Refused while a live duty holds its name. */
+export async function restoreDuty(unit: UnitView, id: string): Promise<void> {
+  const row = await first<{ archived_at: number | null }>('SELECT archived_at FROM front_of_house_duties WHERE id = ?', id)
+  if (!row) refuse('core.not-found', 'There is no such duty.', { status: 404 })
+  const refusal = row.archived_at === null
+    ? { code: 'front-of-house.duty-not-archived', reason: 'This duty is not archived.' }
+    : { code: 'front-of-house.duty-name-taken', reason: 'There is already a duty with that name.', remedy: 'Rename the other duty, then restore this one.' }
+  unit.add({
+    sql: `UPDATE front_of_house_duties SET archived_at = NULL, updated_at = ? WHERE id = ? AND archived_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM front_of_house_duties o WHERE o.name = front_of_house_duties.name AND o.archived_at IS NULL)`,
+    params: [nowMs(), id],
+  }).expect(1, refusal)
+  unit.audit({ action: 'update', detail: { duty: id, restored: true } })
 }
 
 // ---------------------------------------------------------------------------------------------

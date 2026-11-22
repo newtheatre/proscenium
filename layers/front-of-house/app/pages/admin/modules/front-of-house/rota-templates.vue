@@ -24,9 +24,9 @@ interface Choices {
 const { t } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const undo = useUndo()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ templates: Template[] }>('/api/front-of-house/rota-templates', { key: 'front-of-house:rota-templates' })
+const { data, status, error, refresh } = await useAPI<{ templates: Template[], archived?: Template[] }>('/api/front-of-house/rota-templates', { key: 'front-of-house:rota-templates' })
 const { data: choices } = await useAPI<Choices>('/api/front-of-house/choices', { key: 'front-of-house:choices' })
 
 const ANY = 'any'
@@ -73,22 +73,27 @@ async function save() {
   }
 }
 
-async function archive(template: Template) {
-  if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.templates.thing', { name: template.name }), consequence: t('front-of-house.templates.archive-consequence'), button: t('front-of-house.archive.button') })) return
+// Archiving asks nothing first: it is undone from its own toast, or later from the archived list.
+async function setArchived(template: Template, archived: boolean) {
   refusal.value = null
+  const call = (to: boolean) => write(`/api/front-of-house/rota-templates/${encodeURIComponent(template.id)}/${to ? 'archive' : 'restore'}`, { method: 'POST', body: {} })
   try {
-    await write(`/api/front-of-house/rota-templates/${encodeURIComponent(template.id)}/archive`, { method: 'POST', body: {} })
-    toast.add({ title: t('front-of-house.templates.archived', { name: template.name }), color: 'success' })
+    await call(archived)
+    undo.offer(t(archived ? 'front-of-house.templates.archived' : 'front-of-house.templates.restored', { name: template.name }), async () => {
+      await call(!archived)
+      await refresh()
+    })
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
 }
+const showArchived = ref(false)
 
 const actions = (template: Template): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(template) }],
-  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void archive(template) } }],
+  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(template, true) } }],
 ]
 const describe = (template: Template) => [
   venueName(template.venueId),
@@ -121,28 +126,56 @@ const describe = (template: Template) => [
         @retry="refresh()"
       >
         <template #default="{ data: d }">
-          <EmptyState
-            v-if="!d.templates.length"
-            :title="t('front-of-house.templates.empty.title')"
-            :description="t('front-of-house.templates.empty.description')"
-            icon="i-lucide-layout-list"
-          />
-          <RecordList
-            v-else
-            :label="t('front-of-house.navigation.rota-templates.label')"
-          >
-            <RecordListItem
-              v-for="template in d.templates"
-              :key="template.id"
-              :name="template.name"
-              :description="describe(template)"
+          <div class="space-y-4">
+            <EmptyState
+              v-if="!d.templates.length"
+              :title="t('front-of-house.templates.empty.title')"
+              :description="t('front-of-house.templates.empty.description')"
+              icon="i-lucide-layout-list"
+            />
+            <RecordList
+              v-else
+              :label="t('front-of-house.navigation.rota-templates.label')"
             >
-              <RowActions
-                :items="actions(template)"
-                :label="t('front-of-house.actions-for', { name: template.name })"
-              />
-            </RecordListItem>
-          </RecordList>
+              <RecordListItem
+                v-for="template in d.templates"
+                :key="template.id"
+                :name="template.name"
+                :description="describe(template)"
+              >
+                <RowActions
+                  :items="actions(template)"
+                  :label="t('front-of-house.actions-for', { name: template.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              v-model:open="showArchived"
+              :label="t('front-of-house.archived.label')"
+              :count="d.archived?.length ?? 0"
+            >
+              <RecordList :label="t('front-of-house.templates.archived-list')">
+                <RecordListItem
+                  v-for="template in d.archived"
+                  :key="template.id"
+                  :name="template.name"
+                  :description="describe(template)"
+                  muted
+                >
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    icon="i-lucide-archive-restore"
+                    :label="t('front-of-house.restore.button')"
+                    :aria-label="t('front-of-house.restore.named', { name: template.name })"
+                    loading-auto
+                    @click="setArchived(template, false)"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
+          </div>
         </template>
       </DataBoundary>
     </div>
