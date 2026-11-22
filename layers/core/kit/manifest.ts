@@ -61,20 +61,20 @@ export interface Preset {
   facts?: Record<string, string[]>
 }
 
-/** Where a page of settings is: the console, beside the work it governs, or Admin. */
-export type SettingPlace = 'console' | 'admin'
+/** Where a page of settings is: always Admin. Console staff open it from the cog on the page it governs. */
+export type SettingPlace = 'admin'
 /**
  * Where a group of settings (the first part of a short key, such as `sign-in`) is shown. Exactly one
  * home: a page of the module's own (`page`), the shared Advanced page (`advanced`), or a bespoke
  * screen that manages it (`screen`, left off every generated page). With none, the group is on the
- * module's own page in its `place`, Admin's page for the module (/admin/modules/<module>) unless it
- * says 'console'. Core has no page of its own, so each of its groups names one.
+ * module's own page, Admin's page for the module (/admin/modules/<module>). Core has no page of its
+ * own, so each of its groups names one.
  */
 export interface SettingGroupDecl { place?: SettingPlace, page?: string, advanced?: boolean, screen?: string }
 /**
  * A generated page of settings, declared once; it also makes the page's navigation entry. `group`
- * is the navigation group it sits in. `to` defaults to /admin/<page> or /console/<page>/settings for
- * core, and /admin/modules/<module>/<page> or /console/<module>/settings/<page> for another module.
+ * is the navigation group it sits in. `to` defaults to /admin/<page> for core, and
+ * /admin/modules/<module>/<page> for another module.
  */
 export interface SettingPageDecl {
   place: SettingPlace
@@ -320,7 +320,8 @@ function checkPayload(field: string, schema: z.ZodObject<any>) {
   }
 }
 
-const PLACES = ['console', 'admin']
+const PLACES = ['admin']
+const PLACE_RULE = "is 'admin': no page of settings is made in the console, whose staff open settings from the cog on the page they govern"
 const ADDRESS = /^\/(admin|console)(\/[a-z0-9-]+)+$/
 
 const validPlaces = (list: unknown) => Array.isArray(list) && list.length > 0 && list.every(x => typeof x === 'string' && /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/.test(x))
@@ -331,7 +332,7 @@ function validateSettingPlaces(m: ModuleManifest): void {
   for (const [page, decl] of Object.entries(pages)) {
     const f = (name: string) => `settingPages.${page}.${name}`
     if (!kebab.test(page)) throw new DeclarationError(`settingPages.${page}`, 'a page id is kebab-case')
-    if (!decl || !PLACES.includes(decl.place)) throw new DeclarationError(f('place'), "is 'console' or 'admin'")
+    if (!decl || !PLACES.includes(decl.place)) throw new DeclarationError(f('place'), PLACE_RULE)
     if (typeof decl.group !== 'string' || !kebab.test(decl.group)) throw new DeclarationError(f('group'), 'names the navigation group the page sits in')
     if (decl.to !== undefined && !(typeof decl.to === 'string' && ADDRESS.test(decl.to) && decl.to.startsWith(`/${decl.place}/`))) throw new DeclarationError(f('to'), `is an address under /${decl.place}`)
     if (decl.order !== undefined && !Number.isInteger(decl.order)) throw new DeclarationError(f('order'), 'is a whole number')
@@ -342,7 +343,7 @@ function validateSettingPlaces(m: ModuleManifest): void {
     if (!kebab.test(group)) throw new DeclarationError(`settingGroups.${group}`, 'a group is the first part of a setting\'s short key, kebab-case')
     if (!decl || typeof decl !== 'object') throw new DeclarationError(`settingGroups.${group}`, 'is { place, page }, { advanced: true } or { screen }')
     for (const key of Object.keys(decl)) if (!['place', 'page', 'advanced', 'screen'].includes(key)) throw new DeclarationError(f(key), 'is not a field of a setting group: place, page, advanced or screen')
-    if (decl.place !== undefined && !PLACES.includes(decl.place)) throw new DeclarationError(f('place'), "is 'console' or 'admin'")
+    if (decl.place !== undefined && !PLACES.includes(decl.place)) throw new DeclarationError(f('place'), PLACE_RULE)
     const homes = [decl.page !== undefined, decl.advanced === true, decl.screen !== undefined].filter(Boolean).length
     if (homes > 1) throw new DeclarationError(`settingGroups.${group}`, 'has one home: a page, the Advanced page or a bespoke screen, not more than one')
     if (decl.advanced !== undefined && decl.advanced !== true) throw new DeclarationError(f('advanced'), 'is true or left out')

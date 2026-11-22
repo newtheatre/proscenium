@@ -1,7 +1,7 @@
 <!-- The Live page type (UI-05): one job, done standing up. A thin status strip says what this screen
      is, which performance, whether the device can reach the server, and the way out; the page's own
-     task fills the rest. Leaving a screen goes back to the Tonight hub; leaving the hub goes back to
-     where the person works sitting down. A screen that works offline keeps a device copy of its data
+     task fills the rest. Leaving a screen goes back to the Tonight hub; leaving the hub (a worded
+     "Leave" button) goes back to where the person works sitting down. A screen that works offline keeps a device copy of its data
      (useLiveData) and queues its writes (useLiveQueue); the strip says how many are waiting to be sent. -->
 <script setup lang="ts">
 import { useOnline } from '@vueuse/core'
@@ -23,17 +23,29 @@ useHead({ title: () => props.context ? `${props.title}: ${props.context}` : prop
 
 const hub = '/live'
 const out = computed(() => {
-  if (props.back) return { to: props.back, label: t('core.live.back') }
-  if (useRoute().path.replace(/\/$/, '') !== hub) return { to: hub, label: t('core.live.back') }
+  if (props.back) return { to: props.back, label: t('core.live.back'), leaves: false }
+  if (useRoute().path.replace(/\/$/, '') !== hub) return { to: hub, label: t('core.live.back'), leaves: false }
   const to = has('console') ? '/console' : has('members') ? '/members' : '/account'
-  return { to, label: t('core.live.leave') }
+  return { to, label: t('core.live.leave'), leaves: true }
 })
 </script>
 
 <template>
   <div class="flex min-h-full flex-1 flex-col">
     <header class="sticky top-0 z-10 flex items-center gap-3 border-b border-default bg-elevated px-3 py-1">
+      <!-- The way out of live mode is worded: an arrow alone is easy to miss on a phone. -->
+      <UButton
+        v-if="out.leaves"
+        :to="out.to"
+        icon="i-lucide-log-out"
+        color="neutral"
+        variant="outline"
+        size="lg"
+        :label="t('core.live.leave-short')"
+        :aria-label="out.label"
+      />
       <IconButton
+        v-else
         :to="out.to"
         icon="i-lucide-arrow-left"
         size="xl"
