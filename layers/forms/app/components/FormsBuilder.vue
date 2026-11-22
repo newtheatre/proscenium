@@ -81,6 +81,8 @@ const badges = computed<{ tone: Tone, label: string }[]>(() => [
   ...(form.value.status === 'archived' || (fields.value && form.value.status === 'closed') ? [{ tone: 'neutral' as const, label: t(`forms.screens.status.${form.value.status}`) }] : []),
 ])
 const live = computed(() => !fields.value && form.value.liveVersion !== null)
+// On a phone the Open control already says the form is live, so its version badge gives way.
+const phoneBadges = computed(() => live.value && !unshared.value && form.value.status !== 'archived' ? badges.value.slice(1) : badges.value)
 // From a tablet up sharing has a button of its own, so the menu leaves it out.
 const roomy = useScreenQuery('(min-width: 768px)')
 const more = computed(() => [[
@@ -163,7 +165,7 @@ const reload = () => window.location.reload()
         <FormsTabs
           :form-id="form.id"
           current="build"
-          :responses="!fields && !!data.canRead"
+          :responses="live && !!data.canRead"
           :history="form.liveVersion !== null"
         />
         <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -232,7 +234,7 @@ const reload = () => window.location.reload()
           <!-- On a phone the badges sit here, so the header keeps room for the form's name. -->
           <span class="flex flex-wrap items-center gap-1.5 sm:hidden">
             <StatusBadge
-              v-for="b in badges"
+              v-for="b in phoneBadges"
               :key="b.label"
               :tone="b.tone"
               :label="b.label"

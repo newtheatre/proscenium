@@ -20,7 +20,7 @@
   "forms.types.address.label": "Address",
   "forms.types.file.label": "File upload",
   "forms.types.consent.label": "Consent tick",
-  "forms.types.record.label": "Pick from a list we keep",
+  "forms.types.record.label": "From our records",
   "forms.classes.public.label": "Public",
   "forms.classes.public.help": "May be shown to anybody, such as a name in a programme.",
   "forms.classes.internal.label": "Internal",
