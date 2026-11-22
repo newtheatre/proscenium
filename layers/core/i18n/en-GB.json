@@ -190,6 +190,7 @@
   "core.failed.reason": "We could not load this. Try again in a moment.",
   "core.failed.offline": "You seem to be offline, so this could not be loaded.",
   "core.failed.retry": "Try again",
+  "core.failed.back": "Go back",
   "core.failed.stale": "Could not refresh. Showing what was loaded at {time}.",
   "core.refusal.time-zone-unset.action": "Set the time zone",
   "core.refusal.time-zone-unset.ask": "Ask an admin to set the theatre's time zone in Admin, on the Theatre page.",
