@@ -192,7 +192,9 @@ Any module may import core's services without listing core: `import { notifyAddr
   `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
   label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
   your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
-  is refused. Staff edit terms at `/admin/vocabularies`; a term in use can be retired but
+  is refused. Staff edit a module's terms on the Lists tab of its page in Admin
+  (`/admin/modules/<module>/lists`, generated for any module that ships a vocabulary) and the
+  theatre's own lists at `/admin/vocabularies`; a term in use can be retired but
   never deleted, and the restrict reference makes the database refuse it too. Merging terms
   (C-22) comes later; `core.term.merged` is declared for it.
 
