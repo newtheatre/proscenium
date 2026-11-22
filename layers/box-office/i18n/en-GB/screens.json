@@ -1351,7 +1351,7 @@
   "box-office.setup.default.use": "Use theatre default ({value})",
   "box-office.setup.window.release-none": "The theatre has no time set, so staff release them by hand.",
   "box-office.setup.own.title": "This night differs from the run",
-  "box-office.setup.own.description": "Seats, prices and wheelchair spaces are set for the whole run on the production's Tickets tab. Change them here only where this night is different.",
+  "box-office.setup.own.description": "Seats, prices and wheelchair spaces are set once for the whole run, under The run's tickets. Change them here only where this night is different.",
   "box-office.setup.own.show": "Show",
   "box-office.setup.own.hide": "Hide",
   "box-office.setup.own.follows": "Nothing differs: this night follows the run.",
@@ -1375,5 +1375,6 @@
   "box-office.run.description": "Set up once for every performance. Open a night below for its sale dates or anything of its own.",
   "box-office.setup.title": "{title}, {when}",
   "box-office.setup.own.wheelchair-title": "Wheelchair spaces for this night",
-  "box-office.layouts.standing.own": "This night's own: {what}"
+  "box-office.layouts.standing.own": "This night's own: {what}",
+  "box-office.production-tickets.nights": "Each performance"
 }

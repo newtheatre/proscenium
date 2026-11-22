@@ -86,6 +86,8 @@ const when = (row: Row) => row.label ? `${dateTime(row.startsAt)}, ${row.label}`
               <UButton
                 :to="`/console/box-office/performances/run/${encodeURIComponent(group.id)}`"
                 icon="i-lucide-ticket"
+                color="neutral"
+                variant="outline"
                 size="sm"
                 :label="t('box-office.performances.run')"
                 :aria-label="t('box-office.performances.run-label', { title: group.title })"

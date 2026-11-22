@@ -247,6 +247,7 @@ async function openRun() {
             >
               <UInputNumber
                 v-model="wholeSeats"
+                class="w-40"
                 :min="0"
               />
             </UFormField>
@@ -257,6 +258,7 @@ async function openRun() {
             >
               <UInputNumber
                 v-model="seats[s.id]"
+                class="w-40"
                 :min="0"
               />
             </UFormField>
@@ -319,26 +321,6 @@ async function openRun() {
             >
               {{ t('box-office.setup.prices.wheelchair') }}
             </p>
-            <UFormField :label="t('box-office.setup.prices.when.label')">
-              <URadioGroup
-                v-model="takes"
-                orientation="horizontal"
-                variant="table"
-                :items="whens"
-              />
-            </UFormField>
-            <UFormField
-              v-if="takes === 'later'"
-              name="from"
-              :label="t('box-office.setup.prices.when.from')"
-              :help="t('box-office.setup.prices.when.from-help')"
-              required
-            >
-              <FieldDateTime
-                v-model="from"
-                :min="soon"
-              />
-            </UFormField>
             <fieldset
               v-for="s in data.sections"
               :key="s.id"
@@ -363,6 +345,26 @@ async function openRun() {
                 <FieldMoney v-model="prices[cell(s.id, type.id)]" />
               </UFormField>
             </fieldset>
+            <UFormField :label="t('box-office.setup.prices.when.label')">
+              <URadioGroup
+                v-model="takes"
+                orientation="horizontal"
+                variant="table"
+                :items="whens"
+              />
+            </UFormField>
+            <UFormField
+              v-if="takes === 'later'"
+              name="from"
+              :label="t('box-office.setup.prices.when.from')"
+              :help="t('box-office.setup.prices.when.from-help')"
+              required
+            >
+              <FieldDateTime
+                v-model="from"
+                :min="soon"
+              />
+            </UFormField>
             <UButton
               type="submit"
               :label="t(takes === 'later' ? 'box-office.setup.prices.save-later' : 'box-office.setup.prices.save')"
@@ -412,6 +414,9 @@ async function openRun() {
           @changed="refresh()"
         />
 
+        <h2 class="pt-2 font-semibold text-highlighted">
+          {{ t('box-office.production-tickets.nights') }}
+        </h2>
         <RecordList :label="t('box-office.record-tabs.production.label')">
           <RecordListItem
             v-for="row in data.performances"
