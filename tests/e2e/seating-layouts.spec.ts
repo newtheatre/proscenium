@@ -139,7 +139,9 @@ test('a wheelchair user books a space online, and the performance counts it', as
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
   await expect(section.getByText('1 of 2 booked')).toBeVisible()
   await expect(section.getByText(/^2 seats until /)).toBeVisible()
-  await expect(page.getByText('2 taken')).toBeVisible()
+  // The seats taken are with the night's own seats, folded until asked for.
+  await page.getByRole('button', { name: 'Show', exact: true }).click()
+  await expect(page.getByText(/^2 taken/)).toBeVisible()
 })
 
 test('the run types its own numbers on the Tickets tab, and one performance overrides them', async ({ page }) => {

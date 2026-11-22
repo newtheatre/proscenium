@@ -296,18 +296,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
         </template>
         <template #footer>
+          <!-- The note comes first: the bar is set to its end, so Save never moves when the note appears. -->
+          <p
+            v-if="dirty"
+            class="self-center text-sm text-muted"
+          >
+            {{ t('box-office.setup.unsaved') }}
+          </p>
           <UButton
             type="submit"
             form="night-set-up"
             :loading="saving"
             :label="t('box-office.setup.save')"
           />
-          <p
-            v-if="dirty"
-            class="text-sm text-muted"
-          >
-            {{ t('box-office.setup.unsaved') }}
-          </p>
         </template>
 
         <UForm
