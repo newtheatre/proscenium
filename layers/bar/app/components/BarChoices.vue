@@ -1,10 +1,10 @@
-<!-- Choices (Bar specification, tab 10): shared groups such as Spirit, Mixer or Milk, set up once and
+<!-- Choices (Bar specification, tab 10), a section at the foot of Products: shared groups such as Spirit, Mixer or Milk, set up once and
      attached to any number of products on each product's page. A Mixer group lists every drink ticked
      "Can be used as a mixer" by itself; the others list their own options, each with what it adds to
      the price, whether it needs an age check, and its allergens. Options are put in order by dragging
      their handle, its arrow keys or the menu; a retired one can be brought back with Undo. -->
 <script setup lang="ts">
-import { groupInput, groupPatch, optionInput } from '../../../../../server/input'
+import { groupInput, groupPatch, optionInput } from '../../server/input'
 
 type Source = 'options' | 'mixers'
 type Pricing = 'included' | 'fixed' | 'own_price'
@@ -232,14 +232,30 @@ async function saveAllergens() {
 </script>
 
 <template>
-  <PageFrame :title="t('bar.navigation.choices.label')">
-    <template #primary>
+  <section
+    id="choices"
+    aria-labelledby="bar-choices-title"
+    class="space-y-4 pt-6"
+  >
+    <div class="flex flex-wrap items-center gap-2">
+      <h2
+        id="bar-choices-title"
+        class="text-lg font-semibold text-highlighted"
+      >
+        {{ t('bar.screens.choices.title') }}
+      </h2>
       <UButton
+        color="neutral"
+        variant="outline"
         icon="i-lucide-plus"
         :label="t('bar.screens.choices.new')"
+        class="ms-auto"
         @click="editGroup()"
       />
-    </template>
+    </div>
+    <p class="text-sm text-muted">
+      {{ t('bar.screens.choices.about') }}
+    </p>
     <DataBoundary
       :data="data"
       :status="status"
@@ -567,5 +583,5 @@ async function saveAllergens() {
         />
       </template>
     </UModal>
-  </PageFrame>
+  </section>
 </template>

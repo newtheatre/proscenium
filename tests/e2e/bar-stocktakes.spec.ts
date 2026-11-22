@@ -53,7 +53,7 @@ async function noViolations(page: Page) {
 }
 
 test('a count is started, counted, submitted and approved, and the level is put right', async ({ page }) => {
-  await visit(page, '/console/bar/stocktakes')
+  await visit(page, '/console/bar/stock/stocktakes')
   await page.getByRole('button', { name: 'Start a count' }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('combobox', { name: /^Location/ }).click()
@@ -62,7 +62,7 @@ test('a count is started, counted, submitted and approved, and the level is put 
   await page.getByRole('option', { name: `Spirits ${stamp}` }).click()
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Start counting' }).click()
-  await expect(page).toHaveURL(/\/console\/bar\/stocktakes\/bstk_/)
+  await expect(page).toHaveURL(/\/console\/bar\/stock\/stocktakes\/bstk_/)
   await expect(page.getByRole('heading', { name: `Count of Spirits ${stamp} at Back store ${stamp}` })).toBeVisible()
 
   // Counts are blind unless the bar says otherwise, so the level is not shown; four and a half bottles are counted.

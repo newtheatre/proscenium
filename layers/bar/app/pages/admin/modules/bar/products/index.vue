@@ -242,6 +242,8 @@ async function move(p: Product, direction: 'up' | 'down') {
       </div>
     </DataBoundary>
 
+    <BarChoices />
+
     <UModal
       :open="!!category"
       :title="category?.id ? t('bar.screens.products.edit-category') : t('bar.screens.products.new-category')"

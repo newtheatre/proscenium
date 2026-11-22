@@ -1,8 +1,8 @@
-<!-- Outlets (S13): the places that sell, such as the foyer bar or an interval kiosk, each with the
+<!-- Outlets (S13), with the price lists they sell from as a section below: the places that sell, such as the foyer bar or an interval kiosk, each with the
      price list it sells from and where it is. One outlet at most is the box office desk. An outlet
      that has sold is retired, not deleted; retired ones sit below a divider. -->
 <script setup lang="ts">
-import { outletInput, outletPatch } from '../../../../../server/input'
+import { outletInput, outletPatch } from '../../../../../../server/input'
 
 type Kind = 'bar' | 'kiosk' | 'desk'
 type Layout = 'chips' | 'folders' | 'rail'
@@ -15,7 +15,9 @@ const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { offer } = useUndo()
-const { data, status, error, refresh } = await useAPI<{ outlets: Outlet[], lists: Option[], spaces: Option[], locations: Option[], sizes: Size[] }>('/api/bar/outlets', { key: 'bar:outlets' })
+// The tab is for whoever sets up outlets or prices: each sees the part they may change.
+const { data: may } = await useAPI<{ setup: { outlets: boolean, prices: boolean } }>('/api/bar/may', { key: 'bar:may' })
+const { data, status, error, refresh } = await useAPI<{ outlets: Outlet[], lists: Option[], spaces: Option[], locations: Option[], sizes: Size[] }>('/api/bar/outlets', { key: 'bar:outlets', immediate: !!may.value?.setup.outlets })
 
 const kindItems = computed(() => (['bar', 'kiosk', 'desk'] as const).map(k => ({ value: k, label: t(`bar.screens.outlets.kinds.${k}`) })))
 const listItems = computed(() => (data.value?.lists ?? []).map(l => ({ value: l.id, label: l.name })))
@@ -92,7 +94,10 @@ async function setActive(o: Outlet, active: boolean) {
 
 <template>
   <PageFrame :title="t('bar.navigation.outlets.label')">
-    <template #primary>
+    <template
+      v-if="may?.setup.outlets"
+      #primary
+    >
       <div class="flex items-center gap-2">
         <SearchToggle
           v-model="query"
@@ -108,6 +113,7 @@ async function setActive(o: Outlet, active: boolean) {
       </div>
     </template>
     <DataBoundary
+      v-if="may?.setup.outlets"
       :data="data"
       :status="status"
       :error="error"
@@ -184,6 +190,11 @@ async function setActive(o: Outlet, active: boolean) {
         </div>
       </template>
     </DataBoundary>
+
+    <BarPriceLists
+      v-if="may?.setup.prices"
+      @changed="may?.setup.outlets && refresh()"
+    />
 
     <UModal
       :open="!!form"

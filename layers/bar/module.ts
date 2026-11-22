@@ -189,7 +189,7 @@ export default defineModule({
     'core.setup-step': [
       { id: 'bar.first-product', required: true, to: '/admin/modules/bar/products', order: 60 },
       { id: 'bar.first-outlet', required: true, to: '/admin/modules/bar/outlets', order: 61 },
-      { id: 'bar.price-lists', required: false, to: '/admin/modules/bar/price-lists', order: 62 },
+      { id: 'bar.price-lists', required: false, to: '/admin/modules/bar/outlets#price-lists', order: 62 },
       { id: 'bar.sellers', required: false, to: '/console/people/grants', order: 63 },
     ],
     'core.record-resolver': [
@@ -216,16 +216,15 @@ export default defineModule({
     'core.navigation': [
       // Bar > Sell: Payments' till narrowed to the bar's panel. The combined till is /live/till.
       { id: 'bar.sell', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sell', icon: 'i-lucide-shopping-basket', ability: 'bar.sale.sell', order: 10 },
-      { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: 'bar.sale.view', order: 15 },
-      { id: 'bar.stock-levels', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stock', icon: 'i-lucide-package', ability: 'bar.stock.view', order: 25 },
-      { id: 'bar.deliveries', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/deliveries', match: '/console/bar/deliveries', icon: 'i-lucide-truck', ability: 'bar.stock.receive', order: 26 },
-      { id: 'bar.stocktakes', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stocktakes', match: '/console/bar/stocktakes', icon: 'i-lucide-clipboard-list', ability: 'bar.stock.count', order: 27 },
-      { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
+      // Bar sales also closes an outlet's opening (S5), so whoever may do either finds it.
+      { id: 'bar.sales', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/sales', match: '/console/bar/sales', icon: 'i-lucide-receipt', ability: ['bar.sale.view', 'bar.opening.manage'], order: 15 },
+      // Stock is one screen with tabs: levels, deliveries and counts, each for whoever may open it.
+      { id: 'bar.stock-levels', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/stock', match: '/console/bar/stock', icon: 'i-lucide-package', ability: 'bar.stock.view', order: 25 },
+      // Products holds the choices that products share, as a section at its foot.
       { id: 'bar.products', menu: 'admin', group: 'modules', to: '/admin/modules/bar/products', match: '/admin/modules/bar/products', icon: 'i-lucide-wine', ability: 'bar.product.manage', order: 10 },
-      { id: 'bar.choices', menu: 'admin', group: 'modules', to: '/admin/modules/bar/choices', icon: 'i-lucide-list-checks', ability: 'bar.product.manage', order: 15 },
-      { id: 'bar.price-lists', menu: 'admin', group: 'modules', to: '/admin/modules/bar/price-lists', match: '/admin/modules/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
       { id: 'bar.age-checks', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/age-checks', icon: 'i-lucide-id-card', ability: 'bar.age-check.view', order: 40 },
-      { id: 'bar.outlets', menu: 'admin', group: 'modules', to: '/admin/modules/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },
+      // Outlets holds the price lists they sell from, so whoever sets up either finds the tab.
+      { id: 'bar.outlets', menu: 'admin', group: 'modules', to: '/admin/modules/bar/outlets', match: '/admin/modules/bar/outlets', icon: 'i-lucide-store', ability: ['bar.outlet.manage', 'bar.price.manage'], order: 30 },
       { id: 'bar.stock', menu: 'admin', group: 'modules', to: '/admin/modules/bar/stock', icon: 'i-lucide-package', ability: 'bar.stock.manage', order: 35 },
     ],
   },
