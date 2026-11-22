@@ -1,4 +1,4 @@
-// The Bulk cancellation screen's figures (BO-52, BO-53): the bookings and money a change to the
+// What a change would touch (BO-52, BO-53): the bookings and money a change to the
 // performance would touch, and what has been decided for them.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'

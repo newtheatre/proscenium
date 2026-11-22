@@ -2,13 +2,13 @@
 // specification, part 3, "Cancelling, rescheduling or moving a performance with tickets", and
 // integration ruling R-11). The core asks every module before it changes a performance. Box office
 // refuses while the performance has bookings and nobody has decided what happens to them, and its
-// refusal links to the Bulk cancellation screen, where a box office manager records the decision:
-// refund everyone, offer an exchange, or keep the bookings (never for a cancellation). When the
+// refusal carries the question, asked in the window making the change (Matt, 21 Nov 2026): refund
+// everyone, offer an exchange, or keep the bookings (never for a cancellation). When the
 // core's change goes through, its event carries the decision out: refunds are one job per booking,
 // so one that fails is listed and retried without holding up the rest. Box office never refunds
 // without that decision. A decision is used once and then cleared, so the next change asks again.
 import { sql } from 'drizzle-orm'
-import { all, first, nowMs, refuse, type Actor, type UnitView } from '#kit'
+import { all, can, first, nowMs, refuse, type Actor, type UnitView } from '#kit'
 import { getPerformance, notify, placeName } from '#modules/core'
 import { cancelLines } from './cancel'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
@@ -67,7 +67,7 @@ export async function decide(unit: UnitView, performanceId: string, decision: De
 }
 
 /** Box office's answer to the core before a performance is changed. */
-export async function guard(change: { record: { type: string, id: string }, kind: string, to?: { capacity?: number | null } }, _actor: Actor) {
+export async function guard(change: { record: { type: string, id: string }, kind: string, to?: { capacity?: number | null } }, actor: Actor) {
   if (change.record.type !== 'core.performance') return { allowed: true as const }
   const performanceId = change.record.id
   if (change.kind === 'capacity') {
@@ -82,11 +82,22 @@ export async function guard(change: { record: { type: string, id: string }, kind
   if (!a.bookings && !a.reservations && !a.complimentaryBookings) return { allowed: true as const }
   if (a.decision && !(change.kind === 'cancel' && a.decision === 'keep')) return { allowed: true as const }
   const count = a.tickets + a.reservedTickets + a.complimentary
+  const booked = `${count === 1 ? '1 ticket is' : `${count} tickets are`} booked or reserved for this performance.`
+  const done = change.kind === 'cancel' ? 'cancelled' : change.kind === 'move' ? 'moved' : 'rescheduled'
+  // Only someone who may answer is asked; anyone else is told who can.
+  if (!(await can(actor, 'box-office.performance.manage', ['core.performance', performanceId])).allowed) {
+    return { allowed: false as const, code: 'box-office.change.decision-needed', reason: `${booked} Someone who manages its tickets must decide what happens to them before it is ${done}.` }
+  }
   return {
     allowed: false as const,
     code: 'box-office.change.decision-needed',
-    reason: `${count === 1 ? '1 ticket is' : `${count} tickets are`} booked or reserved for this performance. Decide what happens to them before it is ${change.kind === 'cancel' ? 'cancelled' : change.kind === 'move' ? 'moved' : 'rescheduled'}.`,
-    link: `/console/box-office/performances/${encodeURIComponent(performanceId)}/change?for=${change.kind}`,
+    reason: `${booked} Decide what happens to them before it is ${done}.`,
+    question: {
+      label: 'What happens to the bookings',
+      field: 'decision',
+      post: `/api/box-office/performances/${encodeURIComponent(performanceId)}/change`,
+      options: (['refund_all', 'offer_exchange', 'keep'] as const).filter(d => !(d === 'keep' && change.kind === 'cancel')).map(d => ({ value: d, ...CHOICES[d] })),
+    },
   }
 }
 
@@ -100,6 +111,12 @@ export async function impact(change: { record: { type: string, id: string }, kin
   if (a.reservations) lines.push(`${a.reservations === 1 ? '1 reservation' : `${a.reservations} reservations`} not yet paid for${change.kind === 'cancel' ? ', which will be cancelled' : ''}.`)
   if (lines.length && a.decision) lines.push(DECIDED[a.decision])
   return lines
+}
+
+const CHOICES: Record<Decision, { label: string, description: string }> = {
+  refund_all: { label: 'Refund everyone', description: 'Every booking is cancelled and refunded in full, the way it was paid, and every ticket holder is told.' },
+  offer_exchange: { label: 'Offer an exchange', description: 'Bookings are kept and every ticket holder is told, and asked to contact the box office to exchange or refund their tickets.' },
+  keep: { label: 'Keep the bookings', description: 'Tickets stay valid and every ticket holder is told the new time or place.' },
 }
 
 const DECIDED: Record<Decision, string> = {

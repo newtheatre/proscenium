@@ -85,6 +85,7 @@ import changeGet from '../../server/api/box-office/performances/[id]/change/inde
 import changePost from '../../server/api/box-office/performances/[id]/change/index.post'
 import corePerformancePatch from '../../../core/server/api/core/performances/[id]/index.patch'
 import corePerformanceCancel from '../../../core/server/api/core/performances/[id]/cancel.post'
+import corePerformanceImpact from '../../../core/server/api/core/performances/[id]/impact.get'
 import compsGet from '../../server/api/box-office/comps/index.get'
 import compsPost from '../../server/api/box-office/comps/index.post'
 import compApprove from '../../server/api/box-office/comps/[id]/approve.post'
@@ -182,6 +183,7 @@ export const handle = server({
   'POST /api/box-office/performances/:id/change': changePost,
   'PATCH /api/core/performances/:id': corePerformancePatch,
   'POST /api/core/performances/:id/cancel': corePerformanceCancel,
+  'GET /api/core/performances/:id/impact': corePerformanceImpact,
   'GET /api/box-office/comps': compsGet,
   'POST /api/box-office/comps': compsPost,
   'POST /api/box-office/comps/:id/approve': compApprove,

@@ -7,6 +7,7 @@
 // repeat. A run that stops part way can be finished or removed. Every run keeps the pattern it was
 // made from, so a whole run can be edited later: the new pattern is matched against what the run
 // made, and the difference is shown (added, moved, cancelled) before anything changes.
+import type { GuardQuestion } from '../points/change-guard'
 import { sql, type SQL } from 'drizzle-orm'
 import { all, createUnit, first, isRefusal, newId, nowMs, refuse, requireAbility, TIME_ZONE_REMEDY, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
@@ -407,7 +408,7 @@ export interface RunChange {
   keep: number
   /** What the changes to scheduled performances touch, from every module, once each. */
   lines: string[]
-  refusal: { code: string, reason: string, link: string | null } | null
+  refusal: { code: string, reason: string, link: string | null, question: GuardQuestion | null } | null
   limit: number
 }
 export interface RunEditInput { venueId: string, spaceId: string, pattern: StoredPattern }
@@ -458,7 +459,7 @@ async function matchRun(productionId: string, row: RunRow, input: RunEditInput, 
   const ask = async (change: Parameters<typeof changeImpact>[0]) => {
     for (const line of await changeImpact(change, actor)) lines.add(line)
     const refused = refusal ? null : await firstRefusal(change, actor)
-    if (refused) refusal = { code: refused.code, reason: refused.reason, link: refused.link ?? null }
+    if (refused) refusal = { code: refused.code, reason: refused.reason, link: refused.link ?? null, question: refused.question ?? null }
   }
   for (const m of move.filter(x => x.state === 'scheduled' && !x.problem)) {
     const e = existing.find(x => x.id === m.performanceId)!

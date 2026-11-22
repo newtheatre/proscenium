@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { noOverrides, overrideErrors, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
 import { parseTime } from '@internationalized/date'
+import type { HeldRefusal } from './ChangeHeld.vue'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
 // into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
 // first, and a module that refuses it says why. Times are shown and entered in the theatre's time
@@ -45,7 +46,7 @@ interface Answer {
   defaults: ShowDefaultValues & { productionDoorsBeforeMinutes: number | null, productionCapacity: number | null, theatreDoorsBeforeMinutes: number, usualSpaceId: string | null, usualPreset: string | null, scheduleRuns: boolean, sellsHere: boolean }
 }
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
-interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
+interface Reach { lines: string[], refusal: HeldRefusal | null }
 
 const { t } = useT()
 const props = defineProps<{ productionId: string, title: string }>()
@@ -59,6 +60,9 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { offer } = useUndo()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// What holds a change of time or place, with the answer given to its question, in the edit windows.
+const editHeld = ref<HeldRefusal | null>(null)
+const editAnswer = ref<string | undefined>(undefined)
 
 const TONES = { draft: 'neutral', scheduled: 'success', cancelled: 'danger', completed: 'info' } as const
 const performances = computed(() => data.value?.performances ?? [])
@@ -155,10 +159,13 @@ function checkPerformance() {
     ...(form.value.spaceId ? [] : [needed('spaceId')]),
     ...(form.value.startsAt ? [] : [needed('startsAt')]),
     ...overrideErrors(overrides.value, shown.value, !!data.value?.defaults.sellsHere),
+    ...(editHeld.value?.question && !editAnswer.value ? [needed('changeAnswer')] : []),
   ]
 }
 function start(p: Performance | null) {
   refusal.value = null
+  editHeld.value = null
+  editAnswer.value = undefined
   editing.value = p
   form.value = { spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
   overrides.value = noOverrides()
@@ -210,9 +217,10 @@ async function save() {
     if (form.value.spaceId !== p.spaceId) kinds.push('move')
     if (o.capacity !== p.capacity) kinds.push('capacity')
     const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
-    const refused = reached.find(r => r.refusal)?.refusal
-    if (refused) {
-      refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
+    const refused = reached.find(r => r.refusal)?.refusal ?? null
+    const recheck = async () => (await Promise.all(kinds.map(k => reach(p.id, k)))).find(r => r.refusal)?.refusal ?? null
+    if (!await settled(refused, editHeld.value ? editAnswer.value : undefined, recheck, (still) => { editHeld.value = still })) {
+      if (refused && !refused.question) refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
       return
     }
     const lines = reached.flatMap(r => r.lines)
@@ -229,17 +237,34 @@ async function remove(p: Performance) {
   await run(() => call(p.id, '', 'DELETE'), 'Performance deleted')
 }
 
+// A module's question about a change is answered before the change is made: true once nothing holds it.
+async function settled(held: HeldRefusal | null, answer: string | undefined, recheck: () => Promise<HeldRefusal | null>, show: (still: HeldRefusal | null) => void): Promise<boolean> {
+  if (!held) return true
+  try {
+    const still = await settleChange(held, answer, recheck)
+    show(still)
+    return !still
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    return false
+  }
+}
+
 // Cancelling
 const cancelling = ref<Performance | null>(null)
 const cancelOpen = computed({ get: () => !!cancelling.value, set: (v) => { if (!v) cancelling.value = null } })
 const cancelForm = ref({ reasonTermId: '', note: '' })
 const cancelReach = ref<Reach | null>(null)
+// The answer to a module's question about the change, such as what happens to the bookings.
+const cancelAnswer = ref<string | undefined>(undefined)
 const reasons = computed(() => (data.value?.options.reasons ?? []).map(r => ({ value: r.id, label: r.label })))
 async function startCancel(p: Performance) {
   refusal.value = null
   cancelForm.value.reasonTermId = ''
   cancelForm.value.note = ''
   cancelReach.value = null
+  cancelAnswer.value = undefined
   cancelling.value = p
   try {
     cancelReach.value = await reach(p.id, 'cancel')
@@ -251,6 +276,7 @@ async function startCancel(p: Performance) {
 async function cancel() {
   const p = cancelling.value
   if (!p) return
+  if (!await settled(cancelReach.value?.refusal ?? null, cancelAnswer.value, async () => (await reach(p.id, 'cancel')).refusal, (still) => { if (cancelReach.value) cancelReach.value.refusal = still })) return
   if (await run(() => call(p.id, '/cancel', 'POST', { reasonTermId: cancelForm.value.reasonTermId, note: cancelForm.value.note }), 'Performance cancelled')) cancelling.value = null
 }
 
@@ -355,6 +381,8 @@ const bulkTime = ref<{ open: boolean, time: string }>({ open: false, time: '' })
 const bulkBusy = ref(false)
 function startBulkTime() {
   refusal.value = null
+  editHeld.value = null
+  editAnswer.value = undefined
   const first = chosen.value[0]
   bulkTime.value = { open: true, time: first ? dates.toLocal(first.startsAt).slice(11, 16) : '' } // not-policy: positions in YYYY-MM-DDTHH:mm
 }
@@ -379,9 +407,10 @@ async function saveBulkTime() {
   try {
     // What the scheduled ones would touch, in one confirmation; a module's refusal stops it all.
     const reached = await Promise.all(moving.filter(w => w.p.state === 'scheduled').map(w => reach(w.p.id, 'reschedule')))
-    const refused = reached.find(x => x.refusal)?.refusal
-    if (refused) {
-      refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
+    const refused = reached.find(x => x.refusal)?.refusal ?? null
+    const recheck = async () => (await Promise.all(moving.filter(w => w.p.state === 'scheduled').map(w => reach(w.p.id, 'reschedule')))).find(x => x.refusal)?.refusal ?? null
+    if (!await settled(refused, editHeld.value ? editAnswer.value : undefined, recheck, (still) => { editHeld.value = still })) {
+      if (refused && !refused.question) refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
       return
     }
     const lines = [...new Set(reached.flatMap(x => x.lines))]
@@ -431,7 +460,7 @@ async function saveBulkAccess() {
 }
 
 // Cancelling the selected scheduled performances, with one reason; Undo reinstates them.
-const bulkCancel = ref<{ open: boolean, reasonTermId: string, note: string, reach: Reach | null }>({ open: false, reasonTermId: '', note: '', reach: null })
+const bulkCancel = ref<{ open: boolean, reasonTermId: string, note: string, reach: Reach | null, answer?: string }>({ open: false, reasonTermId: '', note: '', reach: null })
 async function startBulkCancel() {
   refusal.value = null
   bulkCancel.value = { open: true, reasonTermId: '', note: '', reach: null }
@@ -445,6 +474,8 @@ async function startBulkCancel() {
 }
 async function saveBulkCancel() {
   const rows = chosenScheduled.value
+  const recheck = async () => (await Promise.all(rows.map(p => reach(p.id, 'cancel')))).find(x => x.refusal)?.refusal ?? null
+  if (!await settled(bulkCancel.value.reach?.refusal ?? null, bulkCancel.value.answer, recheck, (still) => { if (bulkCancel.value.reach) bulkCancel.value.reach.refusal = still })) return
   bulkBusy.value = true
   try {
     const result = await eachOf(rows, p => call(p.id, '/cancel', 'POST', { reasonTermId: bulkCancel.value.reasonTermId, note: bulkCancel.value.note }))
@@ -745,6 +776,10 @@ function actions(p: Performance) {
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
+          <ChangeHeld
+            v-model:answer="editAnswer"
+            :refusal="editHeld"
+          />
           <UFormField
             label="Space"
             name="spaceId"
@@ -793,26 +828,15 @@ function actions(p: Performance) {
           id="cancel-performance"
           class="space-y-4"
           :state="cancelForm"
-          :validate="() => needs({ reasonTermId: cancelForm.reasonTermId })"
+          :validate="() => needs({ reasonTermId: cancelForm.reasonTermId, changeAnswer: cancelReach?.refusal?.question ? cancelAnswer : true })"
           novalidate
           @submit="cancel"
         >
           <RefusalNotice :refusal="refusal" />
-          <UAlert
-            v-if="cancelReach?.refusal"
-            color="error"
-            icon="i-lucide-circle-x"
-            :title="cancelReach.refusal.reason"
-          >
-            <template
-              v-if="cancelReach.refusal.link"
-              #description
-            >
-              <ULink :to="cancelReach.refusal.link">
-                See what is holding it
-              </ULink>
-            </template>
-          </UAlert>
+          <ChangeHeld
+            v-model:answer="cancelAnswer"
+            :refusal="cancelReach?.refusal ?? null"
+          />
           <ul
             v-if="cancelReach?.lines.length"
             class="list-disc space-y-1 ps-5 text-sm"
@@ -860,7 +884,7 @@ function actions(p: Performance) {
             form="cancel-performance"
             label="Cancel performance"
             color="error"
-            :disabled="!!cancelReach?.refusal"
+            :disabled="!!cancelReach?.refusal && !cancelReach.refusal.question"
           />
         </div>
       </template>
@@ -881,6 +905,10 @@ function actions(p: Performance) {
           @submit="saveBulkTime"
         >
           <RefusalNotice :refusal="refusal" />
+          <ChangeHeld
+            v-model:answer="editAnswer"
+            :refusal="editHeld"
+          />
           <UFormField
             label="Starts at"
             name="time"
@@ -960,26 +988,15 @@ function actions(p: Performance) {
           id="cancel-performances"
           class="space-y-4"
           :state="bulkCancel"
-          :validate="() => needs({ reasonTermId: bulkCancel.reasonTermId })"
+          :validate="() => needs({ reasonTermId: bulkCancel.reasonTermId, changeAnswer: bulkCancel.reach?.refusal?.question ? bulkCancel.answer : true })"
           novalidate
           @submit="saveBulkCancel"
         >
           <RefusalNotice :refusal="refusal" />
-          <UAlert
-            v-if="bulkCancel.reach?.refusal"
-            color="error"
-            icon="i-lucide-circle-x"
-            :title="bulkCancel.reach.refusal.reason"
-          >
-            <template
-              v-if="bulkCancel.reach.refusal.link"
-              #description
-            >
-              <ULink :to="bulkCancel.reach.refusal.link">
-                See what is holding it
-              </ULink>
-            </template>
-          </UAlert>
+          <ChangeHeld
+            v-model:answer="bulkCancel.answer"
+            :refusal="bulkCancel.reach?.refusal ?? null"
+          />
           <ul
             v-if="bulkCancel.reach?.lines.length"
             class="list-disc space-y-1 ps-5 text-sm"
@@ -1028,7 +1045,7 @@ function actions(p: Performance) {
             :label="chosenScheduled.length === 1 ? 'Cancel performance' : `Cancel ${chosenScheduled.length} performances`"
             color="error"
             :loading="bulkBusy"
-            :disabled="!!bulkCancel.reach?.refusal"
+            :disabled="!!bulkCancel.reach?.refusal && !bulkCancel.reach.refusal.question"
           />
         </div>
       </template>

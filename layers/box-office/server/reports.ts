@@ -30,16 +30,20 @@ export interface SalesSummary {
 }
 
 /** The productions Box office sells or has sold, newest run first. */
-export async function soldProductions(): Promise<{ id: string, title: string, startsAt: number }[]> {
+/** Productions with sales, latest first; `nearest` is how far its closest performance is from now. */
+export async function soldProductions(): Promise<{ id: string, title: string, startsAt: number, nearest: number }[]> {
   const rows = await all<{ performance_id: string }>('SELECT performance_id FROM box_office_performance_sales')
   const ids = new Set(rows.map(r => r.performance_id))
   const firsts = new Map<string, number>()
+  const nearest = new Map<string, number>()
+  const now = nowMs()
   for (const p of await listPerformances({})) {
     if (!ids.has(p.id)) continue
     firsts.set(p.productionId, Math.min(firsts.get(p.productionId) ?? Number.POSITIVE_INFINITY, p.startsAt))
+    nearest.set(p.productionId, Math.min(nearest.get(p.productionId) ?? Number.POSITIVE_INFINITY, Math.abs(p.startsAt - now)))
   }
   const out = []
-  for (const [id, startsAt] of firsts) out.push({ id, title: (await getProduction(id)).title, startsAt })
+  for (const [id, startsAt] of firsts) out.push({ id, title: (await getProduction(id)).title, startsAt, nearest: nearest.get(id)! })
   return out.sort((a, b) => b.startsAt - a.startsAt)
 }
 

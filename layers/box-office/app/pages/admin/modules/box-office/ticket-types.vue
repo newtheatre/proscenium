@@ -378,6 +378,7 @@ function describe(type: TicketType): string {
           <UFormField
             v-if="!editing?.managedBy"
             :label="t('box-office.ticket-types.add.kind')"
+            :help="t('box-office.ticket-types.add.kind-help')"
           >
             <USelect
               v-model="editForm.kind"

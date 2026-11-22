@@ -157,7 +157,7 @@ export default defineModule({
       'box-office.comp-request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), state: z.enum(['issued', 'declined', 'withdrawn']) }), internal: true }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
     },
-    // The decision recorded on the Bulk cancellation screen is carried out when the core's change goes through (R-11).
+    // The decision recorded for the bookings is carried out when the core's change goes through (R-11).
     listens: {
       // Makes the ticket types a module declares when it is switched on, Box office's own included.
       'core.module.enabled': 'managed-ticket-types',
