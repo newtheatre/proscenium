@@ -29,7 +29,7 @@ test('a question chooses from a source, and the preview searches it', async ({ p
   await page.getByRole('button', { name: 'Create form' }).click()
   await page.waitForURL(/\/console\/forms\/frm_/)
   await page.getByRole('button', { name: 'Add a question', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Record from a source', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Pick from a list we keep', exact: true }).click()
   await page.getByLabel('Question', { exact: true }).fill('Which venue?')
   // Until it has a source it is a problem.
   await expect(page.getByRole('button', { name: '1 problem' })).toBeVisible()

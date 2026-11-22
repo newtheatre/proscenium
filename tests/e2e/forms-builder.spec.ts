@@ -171,8 +171,8 @@ test('a form goes out as JSON and comes back in', async ({ page }) => {
   await add(page, 'Yes or no', 'Are you a member?')
   await saved(page)
   await page.getByRole('button', { name: 'More' }).click()
-  await page.getByRole('menuitem', { name: 'Form as JSON' }).click()
-  const box = page.getByRole('textbox', { name: 'Form as JSON' })
+  await page.getByRole('menuitem', { name: 'Export or import' }).click()
+  const box = page.getByRole('textbox', { name: 'Export or import' })
   const text = await box.inputValue()
   expect(JSON.parse(text).pages[0].title).toBe('About you')
 

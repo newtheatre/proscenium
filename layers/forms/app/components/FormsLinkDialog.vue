@@ -1,7 +1,7 @@
-<!-- Sharing a form (FB-301): its address, who may answer, when it opens and closes, how many
-     responses it takes and whether each person may answer once. A form is offered nowhere until
-     this is saved for the first time. The same terms apply where a form is attached to another
-     module's record (`place`): there it is offered at an address of its own, and saving attaches it. -->
+<!-- Sharing a form (FB-301): its address, who may answer, when it opens, how many responses it
+     takes and whether each person may answer once. Whether it is open, and when it closes, belong
+     to the builder's Open control. The same terms apply where a form is attached to another
+     module's record (`place`): there it also has a closing date and a switch, and saving attaches it. -->
 <script setup lang="ts">
 interface Link { audience: 'anyone' | 'signed_in', opensAt: number | null, closesAt: number | null, responseCap: number | null, responseCount: number, onePerPerson: boolean, status: 'active' | 'paused' | 'ended' }
 
@@ -62,7 +62,7 @@ watch(open, async (now) => {
 async function save() {
   refusal.value = null
   try {
-    await $api((props.place ? `${at.value}/${props.formId}` : `/api/forms/forms/${props.formId}/link`) as string, { method: 'PUT', body: { audience: state.audience, opensAt: state.opensAt, closesAt: state.closesAt, responseCap: state.responseCap, onePerPerson: state.onePerPerson, status: state.taking ? 'active' : 'paused' } })
+    await $api((props.place ? `${at.value}/${props.formId}` : `/api/forms/forms/${props.formId}/link`) as string, { method: 'PUT', body: { audience: state.audience, opensAt: state.opensAt, closesAt: state.closesAt, responseCap: state.responseCap, onePerPerson: state.onePerPerson, status: props.place && !state.taking ? 'paused' : 'active' } })
     toast.add({ title: t(shared.value ? 'forms.screens.link.saved' : props.place ? 'forms.screens.slot.attached' : 'forms.screens.link.shared'), color: 'success' })
     shared.value = true
     emit('saved')
@@ -146,6 +146,7 @@ async function save() {
             <FieldDateTime v-model="state.opensAt" />
           </UFormField>
           <UFormField
+            v-if="place"
             name="closesAt"
             :label="t('forms.screens.link.closes')"
             :hint="t('forms.screens.details.optional')"
@@ -176,6 +177,7 @@ async function save() {
           />
         </UFormField>
         <UFormField
+          v-if="place"
           name="status"
           :help="t('forms.screens.link.taking-help')"
         >
