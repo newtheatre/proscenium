@@ -14,6 +14,8 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = await useAPI<Printed>(() => `/api/box-office/desk/orders/${encodeURIComponent(id.value)}/tickets`, { key: `box-office:print-tickets:${id.value}` })
 const print = () => window.print()
+const when = (at: number) => `${dayNamed(at)} ${time(at)}`
+useHead({ title: () => t('box-office.print-tickets.title', { reference: data.value?.reference ?? '' }) })
 // A booking not yet paid for has no tickets to print: it says so and leads to the till instead.
 const { toRefusal } = useRefusal()
 const unpaid = computed(() => !!error.value && toRefusal(error.value).code === 'box-office.desk.not-sold')

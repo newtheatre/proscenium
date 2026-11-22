@@ -2,6 +2,7 @@
 // guarded in the statement that makes them, so two people pressing at once cannot both succeed; a
 // read beforehand only chooses the words of the refusal. Performances are in performances.ts;
 // credits and cancelling a whole production arrive in later slices.
+import type { GuardQuestion } from '../points/change-guard'
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
@@ -483,13 +484,13 @@ async function performancesToCancel(id: string): Promise<{ id: string }[]> {
 }
 
 /** What cancelling the production would touch: its own performances first, then every module's lines. */
-export async function productionCancelImpact(id: string, actor: Actor): Promise<{ lines: string[], refusal: { code: string, reason: string, link: string | null } | null }> {
+export async function productionCancelImpact(id: string, actor: Actor): Promise<{ lines: string[], refusal: { code: string, reason: string, link: string | null, question: GuardQuestion | null } | null }> {
   await productionRow(id)
   const change = { record: { type: 'core.production', id }, kind: 'cancel' as const }
   const count = (await performancesToCancel(id)).length
   const own = count ? [`${count} scheduled performance${count === 1 ? '' : 's'} still to come will be cancelled with the same reason.`] : []
   const refused = await firstRefusal(change, actor)
-  return { lines: [...own, ...await changeImpact(change, actor)], refusal: refused ? { code: refused.code, reason: refused.reason, link: refused.link ?? null } : null }
+  return { lines: [...own, ...await changeImpact(change, actor)], refusal: refused ? { code: refused.code, reason: refused.reason, link: refused.link ?? null, question: refused.question ?? null } : null }
 }
 
 /**

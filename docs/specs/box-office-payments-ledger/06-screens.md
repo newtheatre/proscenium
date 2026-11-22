@@ -64,7 +64,7 @@ What the three screens must get right:
 | Passes | `/console/box-office/passes` | `box-office.pass.manage` | Pass types and passes issued | Later |
 | Seating plans | `/console/box-office/plans` | `box-office.plan.manage` | Draw and publish a plan | Allocated-seating phase |
 | Sales report | `/console/box-office/reports/sales` | `box-office.report.view`; export needs `box-office.report.export` | By performance, ticket type and channel | First |
-| Bulk cancellation | `/console/box-office/performances/<id>/change`, reached from the link in the change guard's refusal | `box-office.performance.manage` | Shows the tickets and money affected and records the decision the core's cancel, reschedule or move then runs: refund all, offer exchange, or keep | First |
+| What happens to the bookings | No page of its own: asked inside Programme's cancel, reschedule and move windows, which post the answer to `POST /api/box-office/performances/<id>/change` (Matt, 21 November 2026) | `box-office.performance.manage` | The window shows the tickets and money affected and asks: refund all, offer exchange, or keep (never for a cancellation). The answer is recorded and the change made in one step | First |
 
 ![desk sale wireframe · 1 tablet screen](images/06-w2-desk-sale-wireframe.png)
 
