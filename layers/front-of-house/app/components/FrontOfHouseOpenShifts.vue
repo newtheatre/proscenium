@@ -1,9 +1,9 @@
-<!-- Open shifts (Front of house specification, part 5, "Members' area"): published shifts with a
-     place free, cover first, grouped by date. A shift the person cannot take is shown with why and
-     what would let them, not hidden. Production and duty narrow the list. -->
+<!-- Open shifts, the "Open" tab of Shifts (Front of house specification, part 5, "Members' area"):
+     published shifts with a place free, cover first, grouped by date. A shift the person cannot take
+     is shown with why and what would let them, not hidden. Production and duty narrow the list. -->
 <script setup lang="ts">
 interface Unmet { ref: string, label: string }
-interface OpenShift {
+export interface OpenShift {
   id: string
   performanceId: string | null
   productionTitle: string | null
@@ -23,11 +23,11 @@ interface OpenShift {
   clash: { shiftId: string, dutyName: string, productionTitle: string | null, title: string | null, callAt: number, endsAt: number } | null
 }
 
+const props = defineProps<{ shifts: OpenShift[] }>()
 const { t, te } = useT()
 const { dayNamed, time, dateTime } = useDates()
 const route = useRoute()
 const router = useRouter()
-const { data, status, error, refresh } = await useAPI<{ shifts: OpenShift[] }>('/api/front-of-house/open-shifts', { key: 'front-of-house:open-shifts' })
 
 const production = computed({
   get: () => (route.query.production as string | undefined) ?? 'all',
@@ -38,10 +38,10 @@ const duty = computed({
   set: v => router.replace({ query: { ...route.query, duty: v === 'all' ? undefined : v } }),
 })
 const options = (pairs: [string, string][]) => [{ value: 'all', label: t('front-of-house.open-shifts.any') }, ...new Map(pairs).entries()].map(o => Array.isArray(o) ? { value: o[0], label: o[1] } : o)
-const productions = computed(() => options((data.value?.shifts ?? []).filter(s => s.productionTitle).map(s => [s.productionTitle!, s.productionTitle!])))
-const duties = computed(() => options((data.value?.shifts ?? []).map(s => [s.dutyId, s.dutyName])))
+const productions = computed(() => options(props.shifts.filter(s => s.productionTitle).map(s => [s.productionTitle!, s.productionTitle!])))
+const duties = computed(() => options(props.shifts.map(s => [s.dutyId, s.dutyName])))
 
-const shown = computed(() => (data.value?.shifts ?? []).filter(s => (production.value === 'all' || s.productionTitle === production.value) && (duty.value === 'all' || s.dutyId === duty.value)))
+const shown = computed(() => props.shifts.filter(s => (production.value === 'all' || s.productionTitle === production.value) && (duty.value === 'all' || s.dutyId === duty.value)))
 // By date, one entry for each shift: a place needing cover is a badge on it, not a second listing.
 const groups = computed(() => {
   const out: { key: string, label: string, shifts: OpenShift[] }[] = []
@@ -71,17 +71,13 @@ const why = (s: OpenShift) => [
   ...(s.eligible ? [] : [t('front-of-house.open-shifts.needs-remedy')]),
   ...(s.clash ? [t('front-of-house.open-shifts.overlaps', { shift: name(s.clash), when: dateTime(s.clash.callAt) })] : []),
 ].join(' ')
-const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label'), to: '/members/front-of-house' }])
 </script>
 
 <template>
-  <PageFrame
-    :title="t('front-of-house.open-shifts.title')"
-    :trail="trail"
-  >
+  <div class="space-y-6">
     <div
-      v-if="data?.shifts.length"
-      class="mb-6 flex flex-wrap gap-3"
+      v-if="shifts.length"
+      class="flex flex-wrap gap-3"
     >
       <UFormField :label="t('front-of-house.open-shifts.production')">
         <USelect
@@ -98,55 +94,44 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
         />
       </UFormField>
     </div>
-    <DataBoundary
-      :data="data"
-      :status="status"
-      :error="error"
-      @retry="refresh()"
+    <EmptyState
+      v-if="!shown.length"
+      :title="t('front-of-house.open-shifts.empty.title')"
+      :description="t('front-of-house.open-shifts.empty.description')"
+      icon="i-lucide-calendar-clock"
+      help="/account/notifications"
+    />
+    <PageSection
+      v-for="g in groups"
+      v-else
+      :key="g.key"
+      :title="g.label"
     >
-      <EmptyState
-        v-if="!shown.length"
-        :title="t('front-of-house.open-shifts.empty.title')"
-        :description="t('front-of-house.open-shifts.empty.description')"
-        icon="i-lucide-calendar-clock"
-        help="/account/notifications"
-      />
-      <div
-        v-else
-        class="space-y-6"
-      >
-        <PageSection
-          v-for="g in groups"
-          :key="g.key"
-          :title="g.label"
+      <RecordList :label="g.label">
+        <RecordListItem
+          v-for="s in g.shifts"
+          :key="s.id"
+          :to="`/members/front-of-house/shifts/${encodeURIComponent(s.id)}`"
+          icon="i-lucide-calendar-clock"
+          :name="name(s)"
+          :description="row(s)"
+          :muted="!s.eligible || s.overlaps"
         >
-          <RecordList :label="g.label">
-            <RecordListItem
-              v-for="s in g.shifts"
-              :key="s.id"
-              :to="`/members/front-of-house/shifts/${encodeURIComponent(s.id)}`"
-              icon="i-lucide-calendar-clock"
-              :name="name(s)"
-              :description="row(s)"
-              :muted="!s.eligible || s.overlaps"
-            >
-              <StatusBadge
-                v-if="s.coverFor"
-                tone="warning"
-                :label="t('front-of-house.open-shifts.cover')"
-              />
-              <template
-                v-if="!s.eligible || s.overlaps"
-                #below
-              >
-                <p class="text-sm text-muted">
-                  {{ why(s) }}
-                </p>
-              </template>
-            </RecordListItem>
-          </RecordList>
-        </PageSection>
-      </div>
-    </DataBoundary>
-  </PageFrame>
+          <StatusBadge
+            v-if="s.coverFor"
+            tone="warning"
+            :label="t('front-of-house.open-shifts.cover')"
+          />
+          <template
+            v-if="!s.eligible || s.overlaps"
+            #below
+          >
+            <p class="text-sm text-muted">
+              {{ why(s) }}
+            </p>
+          </template>
+        </RecordListItem>
+      </RecordList>
+    </PageSection>
+  </div>
 </template>

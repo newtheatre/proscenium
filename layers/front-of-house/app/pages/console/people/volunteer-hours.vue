@@ -1,6 +1,6 @@
-<!-- Volunteer hours (Front of house specification, part 5, "Console"): for a range of the theatre's
-     days, each person's shifts worked, hours and no-shows, with the total. Export gives the same as a
-     CSV file. The range is kept in the address. Reading it is audited. -->
+<!-- Volunteer hours, under People (Front of house specification, part 5, "Console"): for a range of
+     the theatre's days, each person's shifts worked, hours and no-shows, with the total. Export gives
+     the same as a CSV file. The range is kept in the address. Reading it is audited. -->
 <script setup lang="ts">
 interface Row {
   accountId: string

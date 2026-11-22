@@ -49,7 +49,7 @@ const name = (s: MyShift) => s.productionTitle ? t('front-of-house.shift.of-show
       />
       <UButton
         v-if="takeable"
-        to="/members/front-of-house/open"
+        to="/members/front-of-house?view=open"
         :label="t('front-of-house.my-shifts.find')"
         color="neutral"
         variant="outline"

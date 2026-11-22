@@ -6,5 +6,9 @@ export default defineNuxtConfig({
     '/console/front-of-house/rota-templates': { redirect: { to: '/admin/modules/front-of-house/rota-templates', statusCode: 301 } },
     '/console/front-of-house/checklists': { redirect: { to: '/admin/modules/front-of-house/checklists', statusCode: 301 } },
     '/console/front-of-house/emergency-cards': { redirect: { to: '/admin/modules/front-of-house/emergency-cards', statusCode: 301 } },
+    // Volunteer hours is about people, so it sits with People.
+    '/console/front-of-house/hours': { redirect: { to: '/console/people/volunteer-hours', statusCode: 301 } },
+    // Open shifts became a tab of Shifts; old links and emails still land on it.
+    '/members/front-of-house/open': { redirect: { to: '/members/front-of-house?view=open', statusCode: 301 } },
   },
 })

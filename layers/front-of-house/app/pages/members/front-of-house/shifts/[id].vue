@@ -233,16 +233,16 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
               </p>
             </div>
           </PageSection>
-          <PageSection :title="t('front-of-house.shift.who-else')">
+          <PageSection :title="t(s.mine ? 'front-of-house.shift.who-else-too' : 'front-of-house.shift.who-else')">
             <p
               v-if="!s.people.length"
               class="text-muted"
             >
-              {{ t('front-of-house.shift.nobody-yet') }}
+              {{ t(s.mine ? 'front-of-house.shift.nobody-else-yet' : 'front-of-house.shift.nobody-yet') }}
             </p>
             <RecordList
               v-else
-              :label="t('front-of-house.shift.who-else')"
+              :label="t(s.mine ? 'front-of-house.shift.who-else-too' : 'front-of-house.shift.who-else')"
             >
               <RecordListItem
                 v-for="(p, i) in s.people"
