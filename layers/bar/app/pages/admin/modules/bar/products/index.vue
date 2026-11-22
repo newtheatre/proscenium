@@ -1,6 +1,6 @@
 <!-- Products (S11): the bar's categories, in till order, each with its products and their Standard
-     prices. A product opens its own page for its sizes and prices on every list. Products move up and
-     down within their category by button, so the keyboard can reorder them too. Retired categories
+     prices. A product opens its own page for its sizes and prices on every list. Products are put in
+     order within their category by dragging, or from the keyboard and the row's menu. Retired categories
      sit below a divider; the search finds a category or a product by name. -->
 <script setup lang="ts">
 import { categoryInput } from '../../../../../../server/input'
@@ -135,14 +135,21 @@ function newProduct(c?: Category) {
   adding.value = true
 }
 
-async function move(p: Product, direction: 'up' | 'down') {
+// The row goes to its new place at once, then the server is told; a refusal puts the list back.
+async function move(p: Product, to: number) {
+  const home = data.value?.categories.find(c => c.products.some(x => x.id === p.id))
+  const from = home?.products.findIndex(x => x.id === p.id) ?? -1
+  if (!home || from < 0 || to < 0 || to >= home.products.length || from === to) return
+  const next = [...home.products]
+  next.splice(to, 0, next.splice(from, 1)[0]!)
+  home.products = next
   try {
-    await $api(`/api/bar/products/${p.id}/move` as string, { method: 'POST', body: { direction } })
-    await refresh()
+    await $api(`/api/bar/products/${p.id}/move` as string, { method: 'POST', body: { to } })
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
   }
+  await refresh()
 }
 </script>
 
