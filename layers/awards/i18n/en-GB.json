@@ -23,8 +23,6 @@
   "awards.navigation.mine.label": "My awards",
   "awards.record-tabs.account.label": "Awards",
 
-  "awards.screens.type-states.active": "In use",
-  "awards.screens.type-states.archived": "Archived",
   "awards.screens.award-states.current": "Current",
   "awards.screens.award-states.revoked": "Revoked",
   "awards.screens.visibility.public": "On the public roll",
@@ -35,6 +33,7 @@
   "awards.screens.sources.import": "Imported",
 
   "awards.screens.types.help": "The kinds of award the theatre gives, such as a fellowship or a commendation. Each says whether it carries a ticket price.",
+  "awards.screens.types.added": "{name} added",
   "awards.screens.types.add": "New award type",
   "awards.screens.types.create": "Create award type",
   "awards.screens.types.empty": "No award types yet",
@@ -44,7 +43,6 @@
   "awards.screens.types.holders.other": "Held by {count} people",
   "awards.screens.types.with-benefit": "Carries a ticket price",
 
-  "awards.screens.type.details": "Details",
   "awards.screens.type.name": "Name",
   "awards.screens.type.name-help": "What the award is called wherever it is shown, such as Fellowship.",
   "awards.screens.type.key": "Web address",
