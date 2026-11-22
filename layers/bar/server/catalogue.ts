@@ -270,21 +270,22 @@ export async function updateProduct(unit: UnitView, id: string, input: Partial<P
   unit.audit({ action: 'update', record: ['bar.product', id] })
 }
 
-/** Moves a product one place up or down within its category, by keyboard as well as by dragging. */
-export async function moveProduct(unit: UnitView, id: string, direction: 'up' | 'down'): Promise<void> {
+/** Moves a product within its category: one place up or down, or to a place counted from nought (a drag). */
+export async function moveProduct(unit: UnitView, id: string, move: { direction: 'up' | 'down' } | { to: number }): Promise<void> {
   const row = await first<{ category_id: string }>('SELECT category_id FROM bar_products WHERE id = ?', id)
   if (!row) refuse(GONE('product').code, GONE('product').reason, { status: 404 })
   const order = await all<{ id: string }>('SELECT id FROM bar_products WHERE category_id = ? ORDER BY position, lower(name), id', row!.category_id)
   const ids = order.map(r => r.id)
   const from = ids.indexOf(id)
-  const to = direction === 'up' ? from - 1 : from + 1
-  if (to < 0 || to >= ids.length) return
-  ;[ids[from], ids[to]] = [ids[to]!, ids[from]!]
+  // A place past the end is the end, so a list that grew since the screen loaded still takes the drop.
+  const to = 'to' in move ? Math.min(move.to, ids.length - 1) : move.direction === 'up' ? from - 1 : from + 1
+  if (to < 0 || to >= ids.length || to === from) return
+  ids.splice(to, 0, ids.splice(from, 1)[0]!)
   unit.add({
     sql: 'UPDATE bar_products SET position = (SELECT key FROM json_each(?) WHERE value = bar_products.id), updated_at = ? WHERE category_id = ?',
     params: [JSON.stringify(ids), nowMs(), row!.category_id],
   })
-  unit.audit({ action: 'update', record: ['bar.product', id], detail: { moved: direction } })
+  unit.audit({ action: 'update', record: ['bar.product', id], detail: { moved: 'to' in move ? to : move.direction } })
 }
 
 export interface VariantInput { name: string, barcode?: string | null, active?: boolean }

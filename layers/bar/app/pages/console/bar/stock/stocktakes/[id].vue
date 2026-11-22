@@ -198,7 +198,7 @@ async function abandon() {
   if (!ok) return
   await attempt(async () => {
     await $api(`/api/bar/stocktakes/${id.value}/abandon` as string, { method: 'POST', body: {} })
-    await router.push('/console/bar/stocktakes')
+    await router.push('/console/bar/stock/stocktakes')
   })
 }
 
@@ -222,7 +222,7 @@ const reviewColumns = computed(() => [
 const reasonLabel = (termId: string | null) => data.value?.reasons.find(r => r.id === termId)?.label ?? ''
 const title = computed(() => data.value
   ? t('bar.screens.stocktakes.title', { location: data.value.stocktake.location, what: data.value.stocktake.category ?? t('bar.screens.stocktakes.everything') })
-  : t('bar.navigation.stocktakes.label'))
+  : t('bar.screens.stocktakes.list-title'))
 const showReview = computed(() => state.value !== 'counting' && (data.value?.lines ?? []).some(l => l.expected !== null))
 const facts = computed(() => {
   const s = data.value?.stocktake
@@ -241,7 +241,7 @@ const facts = computed(() => {
   <PageFrame
     :title="title"
     long-title
-    :trail="[{ label: t('bar.navigation.stocktakes.label'), to: '/console/bar/stocktakes' }]"
+    :trail="[{ label: t('bar.navigation.stock-levels.label'), to: '/console/bar/stock' }, { label: t('bar.screens.stock-tabs.counts'), to: '/console/bar/stock/stocktakes' }]"
   >
     <template #status>
       <StatusBadge
