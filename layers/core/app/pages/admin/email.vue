@@ -68,8 +68,8 @@ const picked = ref<Way | null>(null)
 const way = computed<Way>({ get: () => picked.value ?? startsOn.value, set: (v) => { picked.value = v } })
 const changing = ref(false)
 const ways = [
-  { label: 'Set it up for me', value: 'automatic', icon: 'i-lucide-wand-sparkles' },
-  { label: 'I already have one', value: 'own', icon: 'i-lucide-pencil-line' },
+  { label: 'Set it up for me', value: 'automatic' },
+  { label: 'I already have one', value: 'own' },
 ]
 const choosing = computed(() => !data.value?.verified || changing.value)
 const highlight = computed(() => typeof route.query.setting === 'string' ? route.query.setting : undefined)
