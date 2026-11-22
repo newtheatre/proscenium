@@ -39,7 +39,7 @@ interface Order {
   payments: Payment[]
   refunds: Refund[]
   cancellations: Cancellation[]
-  can: { release: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean, assign: boolean }
+  can: { release: boolean, print?: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean, assign: boolean }
 }
 
 const { t } = useT()
@@ -98,6 +98,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   const o = data.value
   if (!o) return []
   const groups: DropdownMenuItem[][] = []
+  if (o.can.print) groups.push([{ label: t('box-office.screens.panel.sold.print'), icon: 'i-lucide-printer', to: `/console/box-office/orders/${encodeURIComponent(o.id)}/print`, target: '_blank' }])
   if (o.can.assign) groups.push([{ label: t('box-office.order.assign.action'), icon: 'i-lucide-user-plus', onSelect: () => { assigning.value = true } }])
   if (o.can.release) groups.push([{ label: t(o.keep ? 'box-office.order.keep.off' : 'box-office.order.keep.on'), icon: 'i-lucide-bookmark', onSelect: () => { void keep(!o.keep) } }])
   if (o.can.comp && !o.compPending) groups.push([{ label: t('box-office.order.comp.action'), icon: 'i-lucide-gift', onSelect: () => { comping.value = true } }])

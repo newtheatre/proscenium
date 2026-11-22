@@ -31,7 +31,7 @@
   "membership.settings.join.public-listing.label": "Show open schemes to visitors who are not signed in",
   "membership.settings.join.public-listing.help": "When off, only signed-in people see which memberships the theatre offers.",
   "membership.settings.card.show.label": "Offer a membership card",
-  "membership.settings.card.show.help": "Whether My membership offers a full-screen card the holder can show.",
+  "membership.settings.card.show.help": "Whether Membership in My account offers a full-screen card the holder can show.",
   "membership.settings.voting.qualifying-period.label": "A member may vote after",
   "membership.settings.voting.qualifying-period.help": "How long somebody must have been a member of a voting scheme before they count as a voting member.",
   "membership.settings.verification.member-prices.label": "Check memberships for member prices",

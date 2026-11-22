@@ -21,7 +21,14 @@ export interface AccessProvider {
   grants?: (actor: Actor) => Promise<Grant[]>
   /** The theatre's mapping of facts to abilities. A privileged ability appears only once confirmed. */
   factAbilities?: () => Promise<Record<string, string[]>>
+  /** Whether the actor's account has any way to sign in strongly (a passkey, or an authenticator app where accepted). */
+  strongSetUp?: (actor: Actor) => Promise<boolean>
 }
+
+/** Refusals that mean "you hold this, but your sign-in is not strong enough": the second when nothing is set up to make it so. */
+export const STRONGER_SIGN_IN = ['core.access.needs-strong-sign-in', 'core.access.two-step-not-set-up'] as const
+/** Where a request keeps the first such refusal of its own actor, for a route whose own check would answer "no permission". */
+export const STRONGER_REFUSAL = 'accessStrongerSignIn'
 
 const defaultProvider: AccessProvider = {
   actor: async () => ({ kind: 'anonymous' }),
@@ -163,7 +170,15 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
   }
   if (!by) return refuse('core.access.denied', 'You do not have permission to do this.', 403, 'Ask an administrator for this permission.')
 
-  if (decl.assurance === 'strong' && actor.assurance !== 'strong') return refuse('core.access.needs-strong-sign-in', 'This needs a stronger sign-in.', 403, 'Sign in with a passkey or a second factor, then try again.')
+  if (decl.assurance === 'strong' && actor.assurance !== 'strong') {
+    // With nothing set up there is no stronger sign-in to ask for: say what to set up instead.
+    const decision = actor.kind === 'person' && (await provider.strongSetUp?.(actor)) === false
+      ? refuse('core.access.two-step-not-set-up', 'This needs two-step sign-in.', 403, 'Set up a passkey or an authenticator app in My account, then try again.')
+      : refuse('core.access.needs-strong-sign-in', 'This needs a stronger sign-in.', 403, 'Sign in with a passkey or a second factor, then try again.')
+    const context = currentContext()
+    if (context && context.actor.accountId === actor.accountId) context.cache[STRONGER_REFUSAL] ??= decision
+    return decision
+  }
   // Confirming it is you guards changes, not reads (Matt, 17 November): a screen loads, and shows its
   // fields as editable, however long ago the person confirmed; the save asks. So a read request
   // checks no freshness unless the caller asks for it, and "may change" flags it computes hold.

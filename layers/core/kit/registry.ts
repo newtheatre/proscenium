@@ -32,8 +32,8 @@ export interface Registry {
   settingRules: Map<string, SettingRule[]>
   /**
    * The generated pages of settings, by id `<module>.<page>`: every declared page, the shared
-   * Advanced page (`core.advanced`), and a module's own page (`<module>.settings` in the console,
-   * `<module>.admin` in Admin) where one of its groups uses it.
+   * Advanced page (`core.advanced`), and a module's own page (`<module>.admin`) where one of its
+   * groups uses it.
    */
   settingPages: Map<string, SettingPage>
   /** Where each setting is shown: on exactly one generated page, or on one bespoke screen. */
@@ -60,7 +60,7 @@ export interface Registry {
 export interface SettingPage {
   module: string
   place: SettingPlace
-  /** The navigation group the page sits in; a module's own console page uses the module's group. */
+  /** The navigation group the page sits in. */
   group?: string
   order: number
   icon: string
@@ -74,7 +74,9 @@ export type SettingHome = { page: string, screen?: undefined } | { screen: strin
 
 /** The shared page of engineering limits, under Upkeep in Admin. */
 export const ADVANCED_PAGE = 'core.advanced'
-const DEFAULT_PAGE = { console: 'settings', admin: 'admin' } as const
+/** A module's own page of settings; `settings` stays reserved, as the page the console once had. */
+const OWN_PAGE = 'admin'
+const RESERVED_PAGES = [OWN_PAGE, 'settings', 'about']
 const SETTINGS_ICON = 'i-lucide-settings-2'
 
 /** The events, jobs and tasks of the core itself are always present, so other modules may name them. */
@@ -338,10 +340,8 @@ function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntr
   }
   if (id === 'core') addPage(ADVANCED_PAGE, { module: 'core', place: 'admin', group: 'upkeep', order: 90, icon: 'i-lucide-sliders-horizontal', to: '/admin/advanced', label: 'core.settings-pages.advanced' }, 'settingPages.advanced') // not-policy: last in Upkeep
   for (const [page, decl] of Object.entries(m.settingPages ?? {})) {
-    if (Object.values(DEFAULT_PAGE).includes(page as never) || page === 'about' || (id === 'core' && page === 'advanced')) fail(entry, `settingPages.${page}`, `"${page}" is a page the platform makes itself`)
-    const to = decl.to ?? (id === 'core'
-      ? (decl.place === 'admin' ? `/admin/${page}` : `/console/${page}/settings`)
-      : (decl.place === 'admin' ? `/admin/modules/${id}/${page}` : `/console/${id}/settings/${page}`))
+    if (RESERVED_PAGES.includes(page) || (id === 'core' && page === 'advanced')) fail(entry, `settingPages.${page}`, `"${page}" is a page the platform makes itself`)
+    const to = decl.to ?? (id === 'core' ? `/admin/${page}` : `/admin/modules/${id}/${page}`)
     addPage(`${id}.${page}`, { module: id, place: decl.place, group: decl.group, order: decl.order ?? 100, icon: decl.icon ?? SETTINGS_ICON, to, label: `${id}.settings-pages.${page}`, ...(decl.settingsIn ? { settingsIn: decl.settingsIn } : {}) }, `settingPages.${page}`) // not-policy: sort position
   }
   for (const [key, setting] of Object.entries(m.settings ?? {})) {
@@ -352,13 +352,10 @@ function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntr
     else if (decl?.advanced) home = { page: ADVANCED_PAGE }
     else if (decl?.page) home = { page: `${id}.${decl.page}` }
     else {
-      // A module's own page is a tab on its page in Admin's Modules unless the group asks for the console.
-      const place = decl?.place ?? 'admin'
-      const pageId = `${id}.${DEFAULT_PAGE[place]}`
+      // A module's own page is a tab on its page in Admin's Modules.
+      const pageId = `${id}.${OWN_PAGE}`
       if (!r.settingPages.has(pageId)) {
-        addPage(pageId, place === 'console'
-          ? { module: id, place, order: 100, icon: SETTINGS_ICON, to: `/console/${id}/settings`, label: `${id}.module.name` } // not-policy: after the module's own entries
-          : { module: id, place, group: 'modules', order: 100, icon: SETTINGS_ICON, to: `/admin/modules/${id}`, label: `${id}.module.name` }, `settingGroups.${group}`) // not-policy: sort position
+        addPage(pageId, { module: id, place: 'admin', group: 'modules', order: 100, icon: SETTINGS_ICON, to: `/admin/modules/${id}`, label: `${id}.module.name` }, `settingGroups.${group}`) // not-policy: sort position
       }
       home = { page: pageId }
     }

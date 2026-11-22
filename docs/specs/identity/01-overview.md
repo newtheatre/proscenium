@@ -32,6 +32,7 @@ Three choices carry most of the weight. **States are read, not stored**, so an a
 | 7. Stories | Draft complete | 45 stories, 38 in the first release (9 at the gate, 29 others), 7 later |
 | 8. Test plan | Draft complete | Named never-regress cases by tier |
 | 9. Questions for Matt | **Decided 16 Nov 2026** | 12 questions, every recommendation accepted by Matt |
+| 12. The link without a press | **Decided 21 Nov 2026** | The emailed link signs in on arrival in the browser that asked; scanners and other browsers still get the press |
 
 Names follow the foundations formats as amended on 16 November 2026. The data model carries each table's heading line in the foundations layout.
 

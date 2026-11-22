@@ -10,7 +10,7 @@ export type { FigureAnswer, FigureChart, FigureText, HomeFigure } from './points
 export { attachFile, detachFile, fileUrl, storeFile } from './files/service'
 export type { FileAccess } from './points/file-access'
 export type { UpcomingItem, UpcomingSource } from './points/upcoming'
-export type { ChangeGuard, GuardAnswer } from './points/change-guard'
+export type { ChangeGuard, GuardAnswer, GuardQuestion } from './points/change-guard'
 export type { BookingAction, BookingAnswer, BookingState, BookingSubject, PriceSummary } from './points/booking-action'
 export { bookingActions, priceSummaries } from './programme/booking'
 export type { BookingTarget, ShownBooking } from './programme/booking'

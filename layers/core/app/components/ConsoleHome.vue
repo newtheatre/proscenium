@@ -41,6 +41,7 @@ const nothing = computed(() => !cards.value.length && !actions.value.length && !
           variant="outline"
           size="lg"
           class="justify-center sm:justify-start"
+          :ui="{ label: 'max-sm:whitespace-normal max-sm:text-start' }"
         />
       </nav>
 

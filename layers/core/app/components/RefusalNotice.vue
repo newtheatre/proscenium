@@ -1,5 +1,6 @@
 <!-- A refusal as the server wrote it: what happened and what to do next. A refusal that a setting
-     puts right says where that setting is to those who may change it, and to ask an admin otherwise. -->
+     puts right says where that setting is to those who may change it, and to ask an admin otherwise.
+     One that two-step sign-in would put right links to where the person sets it up. -->
 <script setup lang="ts">
 import type { Refusal } from '../utils/identity'
 
@@ -32,6 +33,7 @@ watch(settledBy, async (setting) => {
   }
 }, { immediate: true })
 const description = computed(() => settledBy.value && canChange.value === false ? t(settledBy.value.askKey) : props.refusal?.remedy)
+const go = computed(() => settledBy.value && canChange.value ? { label: t(settledBy.value.labelKey), to: settledBy.value.to } : refusalAction(props.refusal))
 </script>
 
 <template>
@@ -42,6 +44,6 @@ const description = computed(() => settledBy.value && canChange.value === false 
     icon="i-lucide-circle-alert"
     :title="refusal.reason"
     :description="description"
-    :actions="settledBy && canChange ? [{ label: t(settledBy.labelKey), to: settledBy.to, color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }] : undefined"
+    :actions="go ? [{ label: go.label, to: go.to, color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }] : undefined"
   />
 </template>

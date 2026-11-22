@@ -167,6 +167,8 @@ describe('the register', () => {
     expect(listed.body.rows.length).toBe(4)
     expect(listed.body.rows.every((r: any) => r.outcome === 'refused' && r.reason === 'No ID' && r.outlet === 'Checks bar')).toBe(true)
     expect(listed.body.canReview).toBe(true)
+    // Never signed: signing offers the register's first day to today.
+    expect(listed.body.nextReview).toEqual({ fromDay: '2026-11-17', toDay: '2026-11-17' })
 
     expect((await post('/api/bar/age-checks/review', { fromDay: '2026-11-17', toDay: '2026-11-18' }, manager)).body.code).toBe('bar.age-check.future')
     expect((await post('/api/bar/age-checks/review', { fromDay: '2026-11-17', toDay: '2026-11-17' }, seller)).status).toBe(403)
@@ -174,6 +176,12 @@ describe('the register', () => {
     expect(signed.status, JSON.stringify(signed.body)).toBe(200)
     expect(signed.body.refusals).toBe(4)
     expect((await send('GET', '/api/bar/age-checks', undefined, manager)).body.reviews).toMatchObject([{ fromDay: '2026-11-17', toDay: '2026-11-17', refusals: 4 }])
+
+    // Three days on, signing offers the days since the last one signed; on the day itself, only today.
+    expect((await send('GET', '/api/bar/age-checks', undefined, manager)).body.nextReview).toEqual({ fromDay: '2026-11-17', toDay: '2026-11-17' })
+    setClock(NOW + 3 * 86_400_000) // not-policy: three days of a test's clock
+    expect((await send('GET', '/api/bar/age-checks', undefined, manager)).body.nextReview).toEqual({ fromDay: '2026-11-18', toDay: '2026-11-20' })
+    setClock(NOW)
   })
 })
 

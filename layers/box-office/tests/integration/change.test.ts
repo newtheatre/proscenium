@@ -1,7 +1,6 @@
 // Cancelling, rescheduling or moving a performance with bookings (BO-52, BO-53; R-11): the core's
-// change is refused until a decision is recorded on the Bulk cancellation screen, which shows what
-// is affected; the change's event then carries the decision out, one job per booking, and every
-// ticket holder is told. A decision is used once. A capacity below the seats taken is refused.
+// change is refused until a decision is recorded, asked for in the window making the change; the
+// change's event then carries the decision out, one job per booking, and every ticket holder is told. A decision is used once. A capacity below the seats taken is refused.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
@@ -74,7 +73,16 @@ describe('a performance with bookings', () => {
 
     const refused = await cancel(h)
     expect(refused.status).toBe(409)
-    expect(refused.body).toMatchObject({ code: 'box-office.change.decision-needed', remedy: `/console/box-office/performances/${h.performanceId}/change?for=cancel` })
+    expect(refused.body).toMatchObject({ code: 'box-office.change.decision-needed' })
+    // The refusal carries the question the cancel window asks, and keeping is no answer to a cancellation.
+    // Only someone who may answer is asked.
+    expect((await req('GET', `/api/core/performances/${h.performanceId}/impact?kind=cancel`, undefined, programmer)).body.refusal).toMatchObject({ code: 'box-office.change.decision-needed', question: null })
+    const both = person(['core.performance.cancel', 'core.performance.schedule', 'box-office.performance.manage'])
+    const asked = await req('GET', `/api/core/performances/${h.performanceId}/impact?kind=cancel`, undefined, both)
+    expect(asked.body.refusal.question).toMatchObject({ field: 'decision', post: `/api/box-office/performances/${h.performanceId}/change` })
+    expect(asked.body.refusal.question.options.map((o: { value: string }) => o.value)).toEqual(['refund_all', 'offer_exchange'])
+    const moving = await req('GET', `/api/core/performances/${h.performanceId}/impact?kind=reschedule`, undefined, both)
+    expect(moving.body.refusal.question.options.map((o: { value: string }) => o.value)).toEqual(['refund_all', 'offer_exchange', 'keep'])
     const seen = await req('GET', `/api/box-office/performances/${h.performanceId}/change`, undefined, manager)
     expect(seen.body).toMatchObject({ bookings: 1, tickets: 2, paidMinor: 2400, reservations: 1, reservedTickets: 1, decision: null })
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/change`, undefined, person([]))).status).toBe(403)

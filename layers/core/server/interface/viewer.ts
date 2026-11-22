@@ -3,6 +3,8 @@
 // gives the whole answer, in this shape, so no component ever tests a role or an ability: it
 // draws from the name, the sides that are open and the entries the viewer may open.
 import { useSetting } from '#kit'
+import { useAccessProvider } from '#kit/access'
+import { useRegistry } from '#kit/registry'
 import type { Actor } from '#kit'
 import type { NavItem, ShellName } from '../../shared/navigation'
 import { allowedEntries, declaredEntries, holds, mayOpen } from './navigation'
@@ -18,6 +20,21 @@ export interface ViewerDescription {
   membersName?: string
   sides: Side[]
   navigation: (NavItem & { shell: ShellName })[]
+  /**
+   * Set while the person holds something their sign-in is not strong enough to use: 'set-up' when
+   * the account has no two-step sign-in, 'confirm' when a passkey or the app would make it strong.
+   */
+  strongerSignIn?: 'set-up' | 'confirm'
+}
+
+/** Whether a basic sign-in is keeping this person from something they hold, and what would put it right. */
+async function strongerSignIn(actor: Actor): Promise<ViewerDescription['strongerSignIn']> {
+  if (actor.kind !== 'person' || actor.assurance === 'strong') return undefined
+  const provider = useAccessProvider()
+  const registry = useRegistry()
+  const held = await provider.grants!(actor)
+  if (!held.some(g => g.ability && registry.abilities.get(g.ability)?.decl.assurance === 'strong')) return undefined
+  return (await provider.strongSetUp?.(actor)) === false ? 'set-up' : 'confirm'
 }
 
 export function isSignedIn(actor: Actor): boolean {
@@ -84,5 +101,6 @@ export async function describeViewer(actor: Actor): Promise<ViewerDescription> {
     }
   }
   const membersName = sides.includes('members') ? await useSetting('core.members-area.name') as string : undefined
-  return { signedIn: true, name: actor.name, membersName, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
+  const stronger = await strongerSignIn(actor)
+  return { signedIn: true, name: actor.name, membersName, sides, navigation: navigation.sort((a, b) => a.order - b.order), ...(stronger ? { strongerSignIn: stronger } : {}) }
 }

@@ -131,7 +131,7 @@ async function run(act: 'save' | 'receive') {
     else {
       toast.add({ title: t('bar.screens.deliveries.saved'), color: 'success' })
     }
-    if (isNew.value) await router.replace(`/console/bar/deliveries/${deliveryId}`)
+    if (isNew.value) await router.replace(`/console/bar/stock/deliveries/${deliveryId}`)
     else await refresh()
   }
   catch (e) {
@@ -146,7 +146,7 @@ async function discard() {
   if (!ok) return
   try {
     await $api(`/api/bar/stock/deliveries/${id.value}` as string, { method: 'DELETE', body: {} })
-    await router.push('/console/bar/deliveries')
+    await router.push('/console/bar/stock/deliveries')
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -188,7 +188,7 @@ const title = computed(() => isNew.value
   <PageFrame
     :title="title"
     long-title
-    :trail="[{ label: t('bar.navigation.deliveries.label'), to: '/console/bar/deliveries' }]"
+    :trail="[{ label: t('bar.navigation.stock-levels.label'), to: '/console/bar/stock' }, { label: t('bar.screens.stock-tabs.deliveries'), to: '/console/bar/stock/deliveries' }]"
   >
     <template #status>
       <StatusBadge

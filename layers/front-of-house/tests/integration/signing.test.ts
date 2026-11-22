@@ -189,7 +189,9 @@ describe('FH-09 and FH-17: what members see', () => {
     const view = (await req('GET', `/api/front-of-house/shifts/${id}`, undefined, meg)).body
     expect(view.mine).toMatchObject({ assignmentId: a, state: 'confirmed', freeRelease: false })
     expect(view.mine.calendar).toContain(`/api/front-of-house/assignments/${a}/calendar.ics?k=`)
-    expect(view.people).toHaveLength(1)
+    // "Who else is on" leaves the viewer out; everyone else sees them.
+    expect(view.people).toEqual([])
+    expect((await req('GET', `/api/front-of-house/shifts/${id}`, undefined, volunteer())).body.people).toHaveLength(1)
     expect(view).toMatchObject({ productionTitle: expect.stringContaining('Front of house show'), venueName: expect.stringContaining('Front of house venue'), releaseNotice: 172800, coverFor: null })
     // Once Meg asks for cover inside the notice, another member sees the place to take.
     await env.DB.prepare('UPDATE front_of_house_assignments SET state = \'release_requested\' WHERE id = ?').bind(a).run()

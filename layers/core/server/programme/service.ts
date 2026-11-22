@@ -2,6 +2,7 @@
 // guarded in the statement that makes them, so two people pressing at once cannot both succeed; a
 // read beforehand only chooses the words of the refusal. Performances are in performances.ts;
 // credits and cancelling a whole production arrive in later slices.
+import type { GuardQuestion } from '../points/change-guard'
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, useSetting } from '#kit'
 import type { Actor, UnitView } from '#kit'
@@ -259,9 +260,12 @@ export async function getProduction(id: string): Promise<Production & { advisori
   return { ...production, advisories, effects }
 }
 
-export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next' | 'dates', order?: 'asc' | 'desc' }
+export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, view?: 'coming-up' | 'drafts' | 'past' | 'all', page: number, size: number, sort?: 'title' | 'next' | 'dates', order?: 'asc' | 'desc' }
 
-/** The console's list: newest first by default, or by title, or by when the run starts. */
+/**
+ * The console's list. A view narrows it and orders it: coming up (not over, not called off) soonest
+ * first, past newest first. With no view: newest made first, or by title, or by when the run starts.
+ */
 export async function listProductions(query: ProductionQuery): Promise<{ rows: (Production & { next: { startsAt: number, space: string } | null, space: string | null })[], total: number }> {
   const where: string[] = []
   const params: unknown[] = []
@@ -277,9 +281,21 @@ export async function listProductions(query: ProductionQuery): Promise<{ rows: (
     where.push(`${column} = ?`)
     params.push(wanted)
   }
+  if (query.view === 'coming-up') {
+    where.push("state NOT IN ('cancelled', 'withdrawn') AND (last_ends_at IS NULL OR last_ends_at >= ?)")
+    params.push(nowMs())
+  }
+  else if (query.view === 'past') {
+    where.push('last_ends_at < ?')
+    params.push(nowMs())
+  }
+  else if (query.view === 'drafts' && !query.state) {
+    where.push("state = 'draft'")
+  }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const direction = query.order === 'asc' ? 'ASC' : 'DESC'
-  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' || query.sort === 'dates' ? `first_starts_at IS NULL, first_starts_at ${direction}` : 'created_at DESC'
+  const viewOrder = query.view === 'coming-up' ? 'first_starts_at IS NULL, first_starts_at ASC' : query.view === 'past' ? 'last_ends_at DESC' : 'created_at DESC'
+  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' || query.sort === 'dates' ? `first_starts_at IS NULL, first_starts_at ${direction}` : viewOrder
   const total = (await first<{ n: number }>(`SELECT count(*) AS n FROM core_productions ${clause}`, ...params))!.n
   const rows = await all<ProductionRow>(`SELECT * FROM core_productions ${clause} ORDER BY ${order}, id LIMIT ? OFFSET ?`, ...params, query.size, (query.page - 1) * query.size)
   const placed = await whereAndWhen(rows.map(r => r.id))
@@ -483,13 +499,13 @@ async function performancesToCancel(id: string): Promise<{ id: string }[]> {
 }
 
 /** What cancelling the production would touch: its own performances first, then every module's lines. */
-export async function productionCancelImpact(id: string, actor: Actor): Promise<{ lines: string[], refusal: { code: string, reason: string, link: string | null } | null }> {
+export async function productionCancelImpact(id: string, actor: Actor): Promise<{ lines: string[], refusal: { code: string, reason: string, link: string | null, question: GuardQuestion | null } | null }> {
   await productionRow(id)
   const change = { record: { type: 'core.production', id }, kind: 'cancel' as const }
   const count = (await performancesToCancel(id)).length
   const own = count ? [`${count} scheduled performance${count === 1 ? '' : 's'} still to come will be cancelled with the same reason.`] : []
   const refused = await firstRefusal(change, actor)
-  return { lines: [...own, ...await changeImpact(change, actor)], refusal: refused ? { code: refused.code, reason: refused.reason, link: refused.link ?? null } : null }
+  return { lines: [...own, ...await changeImpact(change, actor)], refusal: refused ? { code: refused.code, reason: refused.reason, link: refused.link ?? null, question: refused.question ?? null } : null }
 }
 
 /**
