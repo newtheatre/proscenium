@@ -54,7 +54,7 @@ const QR_PX = 180 // not-policy: how wide a QR code is drawn, in pixels, whateve
 
 // Drawn as table cells, not an image, so it shows when a mail client blocks images; black on white
 // with a quiet border of four. The first row fixes each column's width; the rest join runs of a colour.
-function qrTable(value: string): string {
+function qrTable(value: string, label = 'QR code'): string {
   const { size, data } = encode(value, { border: 4, ecc: 'L' }) // not-policy: the quiet border a QR code needs; low correction keeps a ticket's long code small
   const px = Math.max(2, Math.floor(QR_PX / size)) // not-policy: no module narrower than two pixels
   const widths = `<tr>${Array.from({ length: size }, () => `<td width=${px} height=${px}></td>`).join('')}</tr>`
@@ -68,7 +68,7 @@ function qrTable(value: string): string {
     }
     return `<tr>${runs.join('')}</tr>`
   })
-  return `<table role="img" aria-label="QR code" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse;margin:0 0 16px;background:#ffffff;font-size:0;line-height:0">${widths}${rows.join('')}</table>`
+  return `<table role="img" aria-label="${label}" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse;margin:0 0 16px;background:#ffffff;font-size:0;line-height:0">${widths}${rows.join('')}</table>`
 }
 
 /**
@@ -77,7 +77,7 @@ function qrTable(value: string): string {
  */
 function qrBlock(value: string): string {
   return value.split('\n').map(line => line.split('\t')).filter(parts => parts.at(-1)!.trim()).map(parts => parts.length > 1
-    ? `<p style="margin:0 0 8px;font-weight:600">${escapeHtml(parts[0]!)}</p>${qrTable(parts[1]!.trim())}`
+    ? `<p style="margin:0 0 8px;font-weight:600">${escapeHtml(parts[0]!)}</p>${qrTable(parts[1]!.trim(), `QR code: ${escapeHtml(parts[0]!)}`)}`
     : qrTable(parts[0]!.trim())).join('')
 }
 
@@ -95,6 +95,10 @@ export interface RenderOptions {
   accent: string
   theatre: string
   footer?: string | null
+  /** The language the wording is in, for screen readers. */
+  lang?: string
+  /** Colours for a reader whose mail client is in dark mode; left out, the message stays light. */
+  dark?: { background: string, text: string, muted: string, link: string }
   /**
    * The button that takes the reader to what the message is about: the type's `link`, made
    * absolute. Left out when the wording already has a link of its own.
@@ -128,7 +132,7 @@ function button(label: string, target: string, accent: string): string {
   const href = escapeHtml(target)
   return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 8px"><tr><td style="border-radius:6px;background:${accent}">`
     + `<a href="${href}" style="display:inline-block;padding:12px 20px;border-radius:6px;color:#ffffff;font-weight:600;text-decoration:none">${label}</a></td></tr></table>`
-    + `<p style="margin:0 0 16px;font-size:13px;color:#57534e;word-break:break-all">${href}</p>`
+    + `<p class="muted" style="margin:0 0 16px;font-size:13px;color:#57534e;word-break:break-all">${href}</p>`
 }
 
 /** Fills the wording. Plain-text and HTML bodies are built from the same parse, so they agree. */
@@ -151,9 +155,12 @@ export function render(wording: { subject: string, body: string, action?: string
     inboxParts.push(inlineText(paragraph, values, false))
     const lone = paragraph.match(LONE_LINK)
     const target = lone ? linkTarget(lone[2]!, values) : undefined
+    const items = listItems(paragraph, values)
     htmlParts.push(lone && target
       ? button(fragment(lone[1]!, values, options), target, options.accent)
-      : `<p style="margin:0 0 16px">${inlineHtml(paragraph, values, options)}</p>`)
+      : items
+        ? `<ul style="margin:0 0 16px;padding-left:24px">${items.map(item => `<li style="margin:0 0 4px">${escapeHtml(item)}</li>`).join('')}</ul>`
+        : `<p style="margin:0 0 16px">${inlineHtml(paragraph, values, options)}</p>`)
   }
   if (options.action && isSafeUrl(options.action.url)) {
     const label = plain(options.action.label).trim()
@@ -161,17 +168,37 @@ export function render(wording: { subject: string, body: string, action?: string
     htmlParts.push(button(escapeHtml(label), options.action.url, options.accent))
   }
   if (options.footer) {
-    textParts.push(`--\n${options.footer}`)
-    htmlParts.push(`<p style="margin:24px 0 0;font-size:13px;color:#57534e">${escapeHtml(options.footer).replace(/\n/g, '<br>')}</p>`)
+    textParts.push(`-- \n${options.footer}`)
+    htmlParts.push(`<p class="muted" style="margin:24px 0 0;font-size:13px;color:#57534e">${escapeHtml(options.footer).replace(/\n/g, '<br>')}</p>`)
   }
+  const lang = escapeHtml(options.lang ?? 'en-GB')
   const html = [
-    '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>',
-    '<body style="margin:0;padding:24px;background:#ffffff;color:#1c1917;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif">',
-    `<div style="max-width:560px;margin:0 auto"><p style="margin:0 0 24px;padding-bottom:12px;border-bottom:3px solid ${options.accent};font-weight:600">${escapeHtml(options.theatre)}</p>`,
+    `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">`,
+    `<meta name="color-scheme" content="${options.dark ? 'light dark' : 'light'}"><meta name="supported-color-schemes" content="${options.dark ? 'light dark' : 'light'}"><title>${escapeHtml(subject)}</title>${darkStyle(options)}</head>`,
+    '<body class="body" style="margin:0;padding:24px;background:#ffffff;color:#1c1917;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif">',
+    `<div role="article" aria-roledescription="email" aria-label="${escapeHtml(subject)}" lang="${lang}" style="max-width:560px;margin:0 auto"><p style="margin:0 0 24px;padding-bottom:12px;border-bottom:3px solid ${options.accent};font-weight:600">${escapeHtml(options.theatre)}</p>`,
     ...htmlParts,
     '</div></body></html>',
   ].join('')
   return { subject, text: `${textParts.join('\n\n')}\n`, html, inbox: inboxParts.join('\n\n') }
+}
+
+// A paragraph that is one variable whose every line starts with a bullet is drawn as a list.
+const BULLET = /^\s*•\s+/ // not-policy: the bullet a caller writes
+const LONE_VARIABLE = /^\s*\{\{\s*([a-z][a-zA-Z0-9]*)\s*\}\}\s*$/ // not-policy: the variable syntax
+
+function listItems(paragraph: string, values: Record<string, string>): string[] | null {
+  const name = paragraph.match(LONE_VARIABLE)?.[1]
+  const lines = name ? (values[name] ?? '').split('\n').filter(line => line.trim()) : []
+  return lines.length && lines.every(line => BULLET.test(line)) ? lines.map(line => line.replace(BULLET, '')) : null
+}
+
+// Clients that honour prefers-color-scheme repaint the page; the rest keep the light inline colours.
+// A QR code keeps its white ground and a button its fill, so both stay readable either way.
+function darkStyle(options: RenderOptions): string {
+  const d = options.dark
+  if (!d) return ''
+  return `<style>@media (prefers-color-scheme: dark){.body{background:${d.background}!important;color:${d.text}!important}.muted{color:${d.muted}!important}a.link{color:${d.link}!important}}</style>`
 }
 
 function linkTarget(raw: string, values: Record<string, string>): string | undefined {
@@ -198,7 +225,7 @@ function inlineHtml(paragraph: string, values: Record<string, string>, options: 
     pieces.push(fragment(paragraph.slice(last, match.index), values, options))
     const target = linkTarget(match[2]!, values)
     const label = fragment(match[1]!, values, options)
-    pieces.push(target ? `<a href="${escapeHtml(target)}" style="color:${options.accent};font-weight:600">${label}</a>` : label)
+    pieces.push(target ? `<a class="link" href="${escapeHtml(target)}" style="color:${options.accent};font-weight:600">${label}</a>` : label)
     last = match.index! + match[0].length
   }
   pieces.push(fragment(paragraph.slice(last), values, options))
@@ -213,7 +240,7 @@ function fragment(source: string, values: Record<string, string>, options: Rende
     const name = match[1]!
     const value = values[name] ?? ''
     parts.push(isLink(options.kinds[name]) && isSafeUrl(value)
-      ? `<a href="${escapeHtml(value)}" style="color:${options.accent}">${escapeHtml(value)}</a>`
+      ? `<a class="link" href="${escapeHtml(value)}" style="color:${options.accent}">${escapeHtml(value)}</a>`
       : escapeHtml(value))
     last = match.index! + match[0].length
   }

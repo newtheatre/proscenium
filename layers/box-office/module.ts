@@ -487,7 +487,7 @@ export default defineModule({
       variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, cancelled: 'text' as const, remaining: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Cancelled: {{ show }}, {{ when }}',
+          subject: 'Tickets cancelled: {{ show }}, {{ when }}',
           body: 'We have cancelled {{ cancelled }} on booking **{{ reference }}** for **{{ show }}**, {{ when }}.\n\n{{ remaining }}',
         },
       },
@@ -501,7 +501,7 @@ export default defineModule({
       variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, what: 'text' as const, money: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Cancelled: {{ show }}, {{ when }}',
+          subject: 'Booking cancelled: {{ show }}, {{ when }}',
           body: 'We are sorry: **{{ show }}**, {{ when }}, {{ what }}.\n\n{{ money }}\n\nBooking reference: **{{ reference }}**',
         },
       },
@@ -530,7 +530,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'Something to know before you see {{ show }}',
-          body: 'We have added information about **{{ show }}** that you may want to read before you come.\n\n{{ what }}\n\nYou can read it all on the show\'s page: {{ pageUrl }}\n\nNothing is needed from you. If you cannot come now, contact the box office to exchange your tickets or to have them refunded.\n\nBooking reference: **{{ reference }}**',
+          body: 'We have added information about **{{ show }}** that you may want to read before you come.\n\n{{ what }}\n\n[Read it on the show\'s page]({{ pageUrl }})\n\nNothing is needed from you. If you cannot come now, contact the box office to exchange your tickets or to have them refunded.\n\nBooking reference: **{{ reference }}**',
         },
       },
     }],

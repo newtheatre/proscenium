@@ -248,11 +248,15 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByTestId('answer')).toHaveText('restored')
     })
 
-    test('a failed first load shows only the reason and Retry', async ({ page }) => {
+    test('a failed first load shows only the reason and Retry, or the way back when a retry cannot help', async ({ page }) => {
       await visit(page, '/console/gallery/feedback')
-      const failed = page.getByRole('alert').filter({ hasText: 'Try again' })
+      const failed = page.getByRole('alert').filter({ hasText: 'The sample service is not answering.' })
       await expect(failed).toBeVisible()
       await expect(failed.getByRole('button', { name: 'Try again' })).toBeVisible()
+      // Something that is not there will not be there on a second try: the way back is offered instead.
+      const missing = page.getByRole('alert').filter({ has: page.getByRole('link', { name: 'Go back' }) })
+      await expect(missing).toBeVisible()
+      await expect(missing.getByRole('button', { name: 'Try again' })).toHaveCount(0)
       await expect(page.getByText('never shown')).toHaveCount(0)
       await expect(page.getByText('Loaded 60 rows.')).toBeVisible()
     })

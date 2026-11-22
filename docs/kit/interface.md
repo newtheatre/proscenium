@@ -134,16 +134,34 @@ account menu (**ShellTools**) beside it; elsewhere it is a page header in a cont
 the same in both: `status` beside the title, `primary` for the page's main action, `toolbar` for
 filters under the top bar, the default slot for the body and `footer` for the buttons that act on
 the whole page, which stay in view while the body scrolls. `width` is `reading`, `standard` or `full`.
+On a phone a page below another shows its parent's name above its own title (the last entry of `trail`),
+so "Responses" says whose. The console body scrolls inside its own padding: something that sticks to
+the top of it uses `top-0`, not `top-4`.
 
 Inside a page, **PageSection** is a titled card (`title`, `description`, and `actions` and `footer`
 slots) and **RecordList** with **RecordListItem** (`to`, `icon`, `name`, `description`, `muted`) is a
 bordered list of records. Use these two for headings and lists; do not hand-build either. A row's `below` slot
-holds what belongs under it (a short form, a detail). **FactStrip** (`facts: { label, value }[]`) is the
-row of figures on a record's summary and on a screen's totals.
+holds what belongs under it (a short form, a detail). A row that is a link takes a second link or a
+button in its `trailing` slot, which is drawn beside the link and never inside it; `label` gives the
+link a fuller accessible name than its visible words; `align="start"` keeps what the row ends with level
+with the name when the description runs to several lines. A RecordList that fills a PageSection is
+`flush`: no border of its own inside the card's. **FactStrip** (`facts: { label, value }[]`) is the
+row of figures on a record's summary and on a screen's totals; its columns follow the width of what
+holds it, and a long value takes two columns. **FieldGroup** (`title`, `description`, `first`) is a
+titled group of fields inside one form or card: a real heading, with a rule above every group but the
+first. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
+a PageList: a popover on a laptop, a drawer on a phone, ending in "Clear all" and "Done", with the
+screen's own fields in its slot. **TabStrip** wraps a row of tabs that scrolls sideways and fades the
+edge that has more. **EmptyState** takes one `action` (`label`, `to` or `onClick`, `icon`) for the usual
+single button, or the `actions` slot for more.
+
+A first load that fails shows the reason and "Try again"; when the answer is one a retry cannot change
+(not found, not allowed, gone) it shows the way back instead: the page's parent, or the address one step up.
 
 A list the user puts in order is a **SortableList** of **SortableRow** (`id`, `index`, and RecordListItem's props), built on
 `@dnd-kit/vue`. A row's handle is the element with `data-drag-handle` in its `leading` slot; the list emits
-`reorder({ id, from, to })` and the page reorders its own array. Dragging has its own keyboard (Space, arrows, Space), but give
+`reorder({ id, from, to })` and the page reorders its own array. Every slot of the item passes through, so a row
+can hold an inline rename in `name` or a short form in `below`: only the handle drags. Dragging has its own keyboard (Space, arrows, Space), but give
 the row arrow keys on the handle and Move up and Move down in its menu too (see Ticket types).
 
 `bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
@@ -542,20 +560,24 @@ keeps filter and sort keys literal and refuses a reserved key (`q`, `sort`, `ord
 `PageList` takes `:list` (a declaration) and, for a choice filter whose options are the theatre's own
 (seasons), `:filter-options="{ seasonId: [...] }"`. A page that still passes `columns` and `filters`
 gets the same declaration made for it: each filter is a `choice`, each `sortable` column a text sort
-(`sortType` words it as numbers or dates).
+(`sortType` words it as numbers or dates). `description` is one line under the title saying what the list
+holds. The `before` slot is drawn above the view tabs, so what the page shows first is not parted from
+its title by them. An empty list says so once: its primary action stays in the title bar and is not
+repeated in the empty state.
 
 - **Toolbar:** search (always first, across every field), **Filters** with a count, **Sort**, **Columns**.
   Filters opens a popover on a laptop and a drawer on a phone, one labelled field for each filter, in six
   kinds: `choice`, `choices`, `grouped`, `lookup`, `dates` (relative presets or two days; days are the
   device's until the theatre's day is passed in) and `yes-no`. Changes made in one visit to the panel make
   one history entry. A chip for each filter that is on opens the panel; its cross is named "Remove the
-  filter State: Draft".
+  filter State: Draft". A view's own preset filters fill the panel's fields but are not chips and are not
+  counted on the button: the open tab already says them. Only what the person adds is.
 - **Sort** says how the list is sorted ("Sort: Seats, Lowest first") and lists every declared sort, shown or not.
   A heading sorts in its natural direction, again reverses, a third press returns to the default.
 - **Columns** ticks optional columns; the choice is kept on the device for each list
   (`core:list-columns:<id>`), is not in the address, and is cleared on sign-out. Below 1024 pixels the
   rows are cards, so the control is not drawn.
-- **Cards** (below 1024 pixels) show the row's label as the title, then up to three columns marked
+- **Cards** (below 1024 pixels) show the row's label as the title, then up to four columns marked
   `card`. A column whose text the title already says (a name, a reference) is left out, so the next
   one takes its place.
 - **Paging:** a list that fits on one page says "7 in all" and draws no pager; a longer one says

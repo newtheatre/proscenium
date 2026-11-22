@@ -365,10 +365,10 @@ export const identityContributions = {
     channels: ['email' as const, 'inbox' as const],
     lane: 'prompt' as const,
     variables: { scheme: 'text' as const },
-    link: '/account',
+    link: '/account/access',
     wording: {
       'en-GB': {
-        subject: 'Thanks, we\'ve got your answer',
+        subject: 'We have your answer: {{ scheme }}',
         body: 'Thank you for answering. {{ theatre }} has your answer about your application to the {{ scheme }}, and the people who run it will read it and let you know.\n\nYou can see where it is in your account.',
         action: 'See my application',
       },
