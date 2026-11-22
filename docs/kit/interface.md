@@ -149,7 +149,7 @@ with the name when the description runs to several lines. A RecordList that fill
 row of figures on a record's summary and on a screen's totals; its columns follow the width of what
 holds it, and a long value takes two columns. **FieldGroup** (`title`, `description`, `first`) is a
 titled group of fields inside one form or card: a real heading, with a rule above every group but the
-first. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
+first, and an `actions` slot beside the heading. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
 a PageList: a popover on a laptop, a drawer on a phone, ending in "Clear all" and "Done", with the
 screen's own fields in its slot. **TabStrip** wraps a row of tabs that scrolls sideways and fades the
 edge that has more. **EmptyState** takes one `action` (`label`, `to` or `onClick`, `icon`) for the usual

@@ -38,6 +38,7 @@
   "core.person.details.save": "Save details",
   "core.person.details.saved": "Details saved.",
   "core.person.email.add": "Add",
+  "core.person.email.add-long": "Add an email address",
   "core.person.email.add-title": "Add an email address for {name}",
   "core.person.email.add-help": "We send a link to it. It does nothing until the link is used, and their confirmed addresses are told it was added.",
   "core.person.email.address": "Email address",

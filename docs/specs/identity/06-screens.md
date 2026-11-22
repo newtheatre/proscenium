@@ -69,7 +69,7 @@ Console shell. Each row names the ability that shows it.
 | Screen | Purpose | Ability | Release |
 | --- | --- | --- | --- |
 | Accounts | Search and filter everyone; unclaimed and anonymised accounts hidden unless looked for, with a count of what is hidden | `core.account.read` | First |
-| Account | One person, in sections by side (see the wireframe). Details and addresses are edited here (ID-46) | `core.account.read`; each section also needs its own ability; `core.account.update` to edit | First |
+| Account | One person, in sections by side (see the wireframe). Details and addresses are edited here (ID-46), in one Details card: name, pronouns, then the email addresses (Matt, 21 November 2026) | `core.account.read`; each section also needs its own ability; `core.account.update` to edit | First |
 | Add someone | Name and address, optionally a role; creates an unclaimed account and sends an invitation | `core.account.create` | First |
 | Merge accounts | Choose the second account, see the preview, confirm | `core.account.merge` | First |
 | Merges | Recent merges, with undo while the window is open. Not in the menu: reached from Accounts' "More" button and by search (Matt, 21 November 2026); a merge starts from a person's actions menu | `core.account.merge` | First |
