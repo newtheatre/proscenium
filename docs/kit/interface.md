@@ -650,7 +650,9 @@ the console a worded back link sits above the title. A link to a list returns th
 On a phone a page with a trail shows its title on a line of its own under the bar, as a record does,
 so the back button and the page's actions never squeeze it. `PageForm` takes `trail` too, for a form
 that is a page. In a sidebar only one entry is current: the one whose address covers the page most
-closely (`resolveEntry`), so Merges is not Accounts as well.
+closely (`resolveEntry`), so Who holds what is not Accounts as well. An entry marked `unlisted` keeps
+its address and its ability but is not drawn in the menu: its page is reached from another page (Merges,
+from Accounts) and by search, and the menu shows the listed entry above it as current.
 
 `PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
 `searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`

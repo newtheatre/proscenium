@@ -112,6 +112,7 @@ function item(entry: DeclaredEntry): NavItem {
   return {
     id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0, module: entry.module,
     ...(entry.attentionValue ? { attention: entry.attentionValue } : {}),
+    ...(entry.unlisted ? { unlisted: true } : {}),
     // My account is drawn in groups; an entry that names none sits at the theatre.
     ...(entry.menu === 'account' ? { group: entry.group ?? 'theatre' } : {}),
   }

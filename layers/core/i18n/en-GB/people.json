@@ -1,5 +1,6 @@
 {
   "core.navigation.people.label": "Accounts",
+  "core.people.more": "More about accounts",
   "core.people.column.name": "Name",
   "core.people.column.state": "State",
   "core.people.column.since": "Since",
