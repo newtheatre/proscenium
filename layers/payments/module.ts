@@ -36,7 +36,7 @@ export default defineModule({
     'test-mode.takes-sales': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
   }),
 
-  // R-37: every other group sits on /console/payments/settings, the module's own page; how long
+  // R-37: every other group sits on the module's own page, its Settings tab in Admin; how long
   // webhook bodies are kept is upkeep, on the shared Advanced page.
   settingGroups: {
     'retention': { advanced: true },

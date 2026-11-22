@@ -336,7 +336,6 @@
   "core.form.conflict.mine": "Keep mine: {value}",
   "core.form.conflict.theirs": "Use theirs: {value}",
   "core.form.conflict.apply": "Use these choices",
-  "core.settings-page.title": "{module} settings",
   "core.settings-page.site-title": "Site settings",
   "core.settings-page.save": "Save {section} settings",
   "core.settings-page.choose": "Choose…",

@@ -45,19 +45,16 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
   }
   for (const [pageId, abilities] of changers) {
     const page = registry.settingPages.get(pageId)!
-    const short = pageId.slice(page.module.length + 1)
-    // A module's own console page sits in the set-up half of the module's own group.
-    const group = page.group ?? out.find(e => e.module === page.module && e.menu === 'console' && e.group)?.group ?? page.module
+    const group = page.group ?? page.module
     out.push({
-      id: short === 'settings' ? pageId : `${pageId}-settings`,
+      id: `${pageId}-settings`,
       module: page.module,
       label: page.label,
-      menu: page.place === 'admin' ? 'admin' : 'console',
+      menu: 'admin',
       to: page.to,
       icon: page.icon,
       ability: [...abilities],
       group,
-      ...(page.place === 'console' ? { section: 'setup' as const } : {}),
       order: page.order,
       settingsPage: pageId,
       ...(page.settingsIn ? { settingsIn: [...page.settingsIn] } : {}),

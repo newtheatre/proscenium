@@ -61,8 +61,8 @@ contributes: {
   account entry with none). `match` widens the addresses an entry covers.
 - Every page of settings gets an entry without declaring one (see "Pages of settings" in the kit
   README). A module's own page of settings is the Settings tab of its page in Admin
-  (`/admin/modules/<module>`), so a module that is off takes its settings with it. A page placed in
-  the console sits in the set-up half of the module's own group. A declared page's entry sits in
+  (`/admin/modules/<module>`), so a module that is off takes its settings with it. No page of settings
+  is made in the console: staff there open the tab from the cog. A declared page's entry sits in
   the group its `settingPages` entry names. The entry is open to anyone who may change one of its
   settings.
 - **A module's page in Admin.** Any admin entry at or below `/admin/modules/<module>` is a tab of

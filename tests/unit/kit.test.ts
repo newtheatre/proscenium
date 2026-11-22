@@ -263,13 +263,12 @@ describe('where settings are shown', () => {
   it('refuse scope, naming settingGroups', () => {
     expect(() => defineSettings('x', { 'a.b': { ...setting.boolean({ default: true, change: 'x.settings.manage' }), scope: 'site' } as any })).toThrow(/settingGroups/)
   })
-  it('put a group with no declaration on the module\'s own page in Admin, and one placed in the console on its console page', () => {
+  it('put a group with no declaration on the module\'s own page in Admin, and refuse one placed in the console', () => {
     const registry = buildRegistry([lost({})])
     expect(registry.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.admin' })
     expect(registry.settingPages.get('lost-property.admin')).toMatchObject({ place: 'admin', group: 'modules', to: '/admin/modules/lost-property' })
-    const consoled = buildRegistry([lost({ settingGroups: { items: { place: 'console' } } })])
-    expect(consoled.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.settings' })
-    expect(consoled.settingPages.get('lost-property.settings')).toMatchObject({ place: 'console', to: '/console/lost-property/settings' })
+    expect(() => lost({ settingGroups: { items: { place: 'console' as never } } })).toThrow(/no page of settings is made in the console/)
+    expect(() => lost({ settingPages: { desk: { place: 'console' as never, group: 'modules' } } })).toThrow(/no page of settings is made in the console/)
   })
   it('keep About for the module\'s page', () => {
     expect(() => buildRegistry([lost({ settingPages: { about: { place: 'admin', group: 'modules' } } })])).toThrow(/the platform makes itself/)
@@ -289,7 +288,7 @@ describe('where settings are shown', () => {
     expect(() => lost({ settingPages: { desk: { place: 'admin', group: 'modules' } }, settingGroups: { items: { page: 'desk', advanced: true } } })).toThrow(/one home/)
     expect(() => lost({ settingGroups: { items: { page: 'theatre' } } })).toThrow(/not one of lost-property's settingPages/)
     expect(() => lost({ settingGroups: { raffle: { advanced: true } } })).toThrow(/declares no setting in this group/)
-    expect(() => buildRegistry([lost({ settingPages: { settings: { place: 'console', group: 'people' } } })])).toThrow(/the platform makes itself/)
+    expect(() => buildRegistry([lost({ settingPages: { settings: { place: 'admin', group: 'modules' } } })])).toThrow(/the platform makes itself/)
   })
   it('want every group of core to name its home', () => {
     expect(() => defineModule({ id: 'core', manifest: 1, since: '0.1.0', settings: defineSettings('core', { 'odd.one': setting.boolean({ default: true, change: 'core.settings.manage' }) }) } as any)).toThrow(/core has no settings page of its own/)
