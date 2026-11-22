@@ -5,4 +5,7 @@ import { listChecklists } from '../../../checklists'
 export default defineRoute({
   ability: 'front-of-house.checklist.manage',
   rateLimit: 'default',
-}, async () => ({ checklists: await listChecklists() }))
+}, async () => {
+  const all = await listChecklists({ includeArchived: true })
+  return { checklists: all.filter(c => c.archivedAt === null), archived: all.filter(c => c.archivedAt !== null) }
+})

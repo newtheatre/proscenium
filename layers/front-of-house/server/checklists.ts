@@ -6,6 +6,7 @@ import { all, first, localDate, newId, nowMs, refuse, type UnitView } from '#kit
 import { sql } from 'drizzle-orm'
 import { assertTerm, getPerformance } from '#modules/core'
 import { checklistItems } from './db/schema'
+import { arriveByActing } from './arrival'
 
 export const EXCEPTION_REASONS = 'front-of-house.exception-reason'
 
@@ -94,6 +95,12 @@ export function archiveChecklist(unit: UnitView, id: string): void {
   unit.add({ sql: 'UPDATE front_of_house_checklists SET archived_at = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL', params: [at, at, id] })
     .expect(1, { code: 'core.not-found', reason: 'There is no such checklist, or it is already archived.' })
   unit.audit({ action: 'archive', detail: { checklist: id } })
+}
+
+export function restoreChecklist(unit: UnitView, id: string): void {
+  unit.add({ sql: 'UPDATE front_of_house_checklists SET archived_at = NULL, updated_at = ? WHERE id = ? AND archived_at IS NOT NULL', params: [nowMs(), id] })
+    .expect(1, { code: 'front-of-house.checklist-not-archived', reason: 'There is no such checklist, or it is not archived.' })
+  unit.audit({ action: 'update', detail: { checklist: id, restored: true } })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -208,6 +215,7 @@ export interface EntryInput {
 /**
  * Enters one item. Makes the run if no one has opened it yet; refused once the run is complete,
  * which is how a queued entry arriving late is shown as stuck. The last write wins per item.
+ * An entry on your own shift counts as arriving.
  */
 export async function enterItem(unit: UnitView, input: EntryInput): Promise<void> {
   const { performance } = await applying(input.checklistId, input.performanceId)
@@ -231,6 +239,7 @@ export async function enterItem(unit: UnitView, input: EntryInput): Promise<void
       ? { code: 'front-of-house.checklist-run-complete', reason: 'This checklist is already complete, or that reason is not one of the theatre\'s.', remedy: 'Ask someone leading to reopen it if something has changed.' }
       : { code: 'front-of-house.checklist-run-complete', reason: 'This checklist is already complete.', remedy: 'Ask someone leading to reopen it if something has changed.' })
   unit.audit({ action: 'update', record: ['core.performance', input.performanceId], detail: { checklist: input.checklistId, item: item.id, outcome: input.outcome } })
+  await arriveByActing(unit, { performanceId: input.performanceId, accountId: input.by, when: doneAt })
 }
 
 /** Completes a run once every required item has an entry: with exceptions when any entry is one. */
