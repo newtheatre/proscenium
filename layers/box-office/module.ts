@@ -45,7 +45,8 @@ export default defineModule({
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
     'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
-    'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
+    // Off as shipped (Matt, 21 November 2026): a guest's reservation is made at once and the email is the receipt.
+    'reservations.confirm-email': setting.boolean({ default: false, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.release-before': setting.duration({ default: '10m', min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),

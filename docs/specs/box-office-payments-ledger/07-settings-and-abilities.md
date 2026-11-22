@@ -25,7 +25,7 @@ On saving, a fresh sign-in follows the setting and not the ability, so each sett
 | `box-office.baskets.pay-within` | duration | 15m | 5m to 60m | BO | public | No | How long a hold lasts once payment starts |
 | `box-office.orders.seat-cap` | integer (seats) | 8 | 1 to 50 | BO | public | Yes | Most tickets in one online order. Per performance: `max_per_order` |
 | `box-office.orders.desk-seat-cap` | integer (seats) | 30 | 1 to 500 | BO | staff | No | Most tickets in one desk order, for group bookings |
-| `box-office.reservations.confirm-email` | boolean | true |  | BO | public | No | A reservation holds seats only once the buyer has confirmed their email address by link; a signed-in buyer skips it |
+| `box-office.reservations.confirm-email` | boolean | false |  | BO | public | No | When on, a reservation holds seats only once the buyer has confirmed their email address by link; a signed-in buyer skips it. Off as shipped (Matt, 21 November 2026): a guest's reservation is made at once, the email is its receipt, and the unpaid-release rule guards against a mistyped address |
 | `box-office.reservations.max-tickets-per-order` | integer (tickets) | 8 | 1 to 50 | BO | public | Yes | Most tickets in one reservation |
 | `box-office.reservations.max-tickets-per-person` | integer (tickets) | 8 | 1 to 50 | BO | public | Yes | Most reserved tickets one person may hold for one performance |
 | `box-office.reservations.release-before` | duration | unset | 0m to 24h | BO | public | Yes | Unclaimed reservations are released this long before the start. Unset means staff release by hand |
