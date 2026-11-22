@@ -104,7 +104,7 @@ Redesigned on 16 November 2026 (integration ruling R-37, agreed by Matt; brief i
 - **The page draws a page, not a module.** A settings page is declared once and holds the groups placed on it, each group a section. A module's own page is at `/console/<module>/settings`, in the set-up half of its group; a page placed in site administration is listed there. Core has no page of its own: its groups go to named pages (Theatre, Sign-in, Privacy, Programme settings, People settings).
 - **Every setting has exactly one home.** A setting managed on a screen of its own is not drawn on a generated page; search still finds it and opens that screen. There is no catch-all page.
 - **Each setting shows** its current value, its default with a "Reset" link when changed, its limits, and a "Quoted on public pages" tag where a content page shows it live. Under a changed setting is one line, "Changed by Sam Patel, 12 November", which opens that setting's history in a drawer. A setting managed by the deployment is shown read-only and says so.
-- **One line says who may change a section.** Where every setting in a section shares an ability the section is headed "Changed by people who can manage box office"; a setting that differs says so itself. A setting the viewer may read but not change is read-only.
+- **One line says who may change a section.** Where every setting in a section shares an ability the section is headed "Changed by people who can manage box office"; a setting that differs says so itself. A setting the viewer may read but not change is read-only. As changed (Matt, 21 November 2026): the line is shown only to someone who may not change the setting ("You can read this but not change it. Ask someone who can: ..."); someone who can is not told so.
 - **Search is at the top of every settings page** and in the command palette. It is one index across both shells, matches label, help text and key, shows only settings on pages the viewer may open, and opens the setting's page or screen with it scrolled into view.
 - **A "Changed" filter** leaves only the settings that differ from their default.
 - **Changes save per section** with a stated summary ("3 changes"). "Reset section" sits beside Save and goes through the same save, so it is confirmed and recorded like any change.
@@ -117,7 +117,7 @@ As built (kit PR 115, 17 November 2026), three details differ from what R-37 fir
 
 ### Home
 
-- **A home page is a queue, not a menu.** Cards are ordered by urgency: things overdue, things due today, things to know.
+- **A home page is a queue, not a menu.** Cards are ordered by urgency: things overdue, things due today, things to know. The middle band is headed "Needs doing", since much of what it holds has no date (Matt, 21 November 2026).
 - **A card has one fact and one action.** "4 refunds awaiting approval. Review." A card with nothing to say is not shown.
 - **When there is nothing to do, the page says so** and offers the two or three most common starting points.
 

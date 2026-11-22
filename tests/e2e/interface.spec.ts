@@ -290,13 +290,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await context.close()
     })
 
-    test('the settings window: the cog opens the module\'s settings, each showing its default, who may change it and a quoted tag', async ({ page }) => {
+    test('the settings window: the cog opens the module\'s settings, each showing its default and a quoted tag, and says who may change one only to someone who may not', async ({ page }) => {
       await visit(page, '/console/gallery/list')
       await page.getByRole('link', { name: 'Gallery settings' }).click()
       await expect(page).toHaveURL(/settings=gallery/)
       await expect(page.getByRole('dialog').getByRole('heading', { name: 'Gallery settings' })).toBeVisible()
       await expect(page.getByText('Quoted on public pages')).toBeVisible()
-      await expect(page.getByText('Changed by people who can: Change the gallery\'s settings.').first()).toBeVisible()
+      await expect(page.getByText(/Changed by people who can/)).toHaveCount(0)
       await noViolations(page)
       const title = page.getByLabel('Show title', { exact: true })
       await title.fill('Macbeth')
