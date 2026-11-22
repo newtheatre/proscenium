@@ -25,7 +25,7 @@ export async function verifySendingDomain(unit: UnitView): Promise<VerifyResult>
   const theatre = await theatreName(domain)
   const message = render(
     { subject: 'Test message from {{ theatre }}', body: 'This message confirms that {{ theatre }} can send email from this domain. Nothing else needs doing.' },
-    { values: {}, kinds: {}, accent: (await brandTokens()).light.link, theatre },
+    { values: {}, kinds: {}, accent: (await brandTokens()).light.link, dark: (await brandTokens()).dark, theatre },
   )
   try {
     await useMailer()({ from: { name: sender.name, email: sender.email }, to, ...message })

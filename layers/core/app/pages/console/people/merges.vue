@@ -28,6 +28,12 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ merges: Merge[] }>('/api/core/accounts/merges', { key: 'core:merges' })
 
+// Merges is reached from Accounts, so it leads back there for anyone who may open Accounts.
+const { data: navigation } = await useNavigation('console')
+const trail = computed(() => navigation.value?.groups.some(g => g.everyday.some(e => e.id === 'core.people'))
+  ? [{ label: t('core.navigation.people.label'), to: '/console/people' }]
+  : undefined)
+
 const { dateTime: when } = useDates()
 const nameOf = (a: { name: string | null }) => a.name ?? t('core.merges.unnamed')
 const TONE: Record<State, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = { moving: 'info', complete: 'success', undoing: 'info', undone: 'neutral', closed: 'neutral' }
@@ -61,6 +67,7 @@ async function undo(merge: Merge) {
   <PageFrame
     :title="t('core.navigation.merges.label')"
     :description="t('core.merges.intro')"
+    :trail="trail"
   >
     <template #primary>
       <UButton

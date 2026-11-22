@@ -19,7 +19,7 @@ import deleteProduction from '../../server/api/core/productions/[id]/index.delet
 import duplicateProduction from '../../server/api/core/productions/[id]/duplicate.post'
 import { productionBySlug } from '../../server/services'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
+import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 
 // Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
 const BOOKING = 'https://tickets.example/book'
@@ -214,5 +214,32 @@ describe('productions', () => {
     // Each row says when it is next on and where; with no dates, neither.
     expect(found.body.rows[0]).toMatchObject({ next: null, space: null, firstStartsAt: null })
     expect((await req('GET', '/api/core/productions?sort=dates&order=asc', undefined, viewer)).status).toBe(200)
+  })
+
+  it('list by view: coming up soonest first, past newest first, drafts, and all', async () => {
+    const day = 24 * 60 * 60 * 1000
+    const dated = async (title: string, first: number | null, last: number | null, state = 'published') => {
+      const id = await production({ title })
+      await env.DB.prepare('UPDATE core_productions SET first_starts_at = ?, last_ends_at = ?, state = ? WHERE id = ?').bind(first, last, state, id).run()
+      return id
+    }
+    const now = Date.now()
+    await dated('View later', now + 9 * day, now + 12 * day)
+    await dated('View sooner', now + 2 * day, now + 3 * day)
+    await dated('View running', now - day, now + day)
+    await dated('View undated', null, null)
+    await dated('View draft', now + 5 * day, now + 6 * day, 'draft')
+    await dated('View long ago', now - 90 * day, now - 80 * day)
+    await dated('View last week', now - 9 * day, now - 7 * day)
+    await dated('View called off', now + 4 * day, now + 4 * day, 'withdrawn')
+    const titles = async (query: string) => (await req('GET', `/api/core/productions?q=view&size=100&${query}`, undefined, viewer)).body.rows.map((p: { title: string }) => p.title)
+    // Coming up: anything not over and not called off, in date order, with what has no dates last.
+    expect(await titles('view=coming-up')).toEqual(['View running', 'View sooner', 'View draft', 'View later', 'View undated'])
+    expect(await titles('view=past')).toEqual(['View last week', 'View long ago'])
+    expect(await titles('view=drafts')).toEqual(['View draft'])
+    expect((await titles('view=all')).length).toBe(8)
+    // A sort the person chose wins over the view's own.
+    expect(await titles('view=past&sort=title&order=asc')).toEqual(['View last week', 'View long ago'].sort())
+    expect((await req('GET', '/api/core/productions?view=nonsense', undefined, viewer)).status).toBe(422)
   })
 })

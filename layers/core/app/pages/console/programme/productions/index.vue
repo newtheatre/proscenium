@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // Productions (C-01): every production with when it is on, its next performance, where, and its
-// state; the season is a filter. "New production" starts a draft in a season, the one on now or
-// the next to come by default, with its usual space, and opens it.
+// state; the season is a filter. It opens on what is coming up, soonest first, with Drafts, Past and
+// All as views. "New production" starts a draft in a season, the one on now or the next to come by
+// default, with its usual space, and opens it.
+import { defineList } from '../../../../../shared/list'
 import { productionInput } from '../../../../../server/programme/input'
 
 interface Row {
@@ -22,17 +24,29 @@ const { t } = useT()
 const { $api } = useNuxtApp()
 const { range, dateTime, toLocal } = useDates()
 const { data: seasons } = await useAPI<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
-const columns = [
-  { key: 'title', label: 'Production', sortable: true, card: true },
-  { key: 'dates', label: 'Dates', sortable: true, sortType: 'date' as const, card: true },
-  { key: 'next', label: 'Next performance' },
-  { key: 'space', label: 'Space' },
-  { key: 'state', label: 'State', card: true },
-]
-const filters = computed(() => [
-  { name: 'state', label: 'State', primary: true, options: [{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }, { value: 'withdrawn', label: 'Withdrawn' }, { value: 'cancelled', label: 'Cancelled' }] },
-  { name: 'seasonId', label: 'Season', primary: true, options: (seasons.value?.rows ?? []).map(s => ({ value: s.id, label: s.name })) },
-])
+const list = defineList('core.productions', {
+  filters: {
+    state: { kind: 'choice', label: 'State', options: [{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }, { value: 'withdrawn', label: 'Withdrawn' }, { value: 'cancelled', label: 'Cancelled' }] },
+    seasonId: { kind: 'choice', label: 'Season', options: [] },
+  },
+  sorts: { title: { label: 'Production', type: 'text' }, dates: { label: 'Dates', type: 'date' } },
+  columns: {
+    title: { label: 'Production', sort: 'title', card: true, always: true },
+    dates: { label: 'Dates', sort: 'dates', card: true },
+    next: { label: 'Next performance' },
+    space: { label: 'Space' },
+    state: { label: 'State', card: true },
+  },
+  // The route narrows and orders each view; Drafts also says so in the State filter.
+  views: {
+    'coming-up': { label: 'Coming up', sort: 'dates', order: 'asc' },
+    'drafts': { label: 'Drafts', filters: { state: 'draft' } },
+    'past': { label: 'Past', sort: 'dates', order: 'desc' },
+    'all': { label: 'All' },
+  },
+  defaultView: 'coming-up',
+})
+const seasonOptions = computed(() => ({ seasonId: (seasons.value?.rows ?? []).map(s => ({ value: s.id, label: s.name })) }))
 const KINDS = [{ value: 'own', label: 'Our own production' }, { value: 'visiting', label: 'A visiting company' }, { value: 'hire', label: 'A hire' }, { value: 'event', label: 'An event, such as a workshop' }]
 const TONES = { draft: 'neutral', published: 'success', withdrawn: 'warning', cancelled: 'danger' } as const
 
@@ -85,8 +99,8 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
   <PageList
     title="Productions"
     route="/api/core/productions"
-    :columns="columns"
-    :filters="filters"
+    :list="list"
+    :filter-options="seasonOptions"
     :row-label="(row: Row) => row.title"
     :row-to="rowTo"
     :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"

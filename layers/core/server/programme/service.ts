@@ -259,9 +259,12 @@ export async function getProduction(id: string): Promise<Production & { advisori
   return { ...production, advisories, effects }
 }
 
-export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, page: number, size: number, sort?: 'title' | 'next' | 'dates', order?: 'asc' | 'desc' }
+export interface ProductionQuery { q?: string, state?: ProductionState, seasonId?: string, categoryTermId?: string, view?: 'coming-up' | 'drafts' | 'past' | 'all', page: number, size: number, sort?: 'title' | 'next' | 'dates', order?: 'asc' | 'desc' }
 
-/** The console's list: newest first by default, or by title, or by when the run starts. */
+/**
+ * The console's list. A view narrows it and orders it: coming up (not over, not called off) soonest
+ * first, past newest first. With no view: newest made first, or by title, or by when the run starts.
+ */
 export async function listProductions(query: ProductionQuery): Promise<{ rows: (Production & { next: { startsAt: number, space: string } | null, space: string | null })[], total: number }> {
   const where: string[] = []
   const params: unknown[] = []
@@ -277,9 +280,21 @@ export async function listProductions(query: ProductionQuery): Promise<{ rows: (
     where.push(`${column} = ?`)
     params.push(wanted)
   }
+  if (query.view === 'coming-up') {
+    where.push("state NOT IN ('cancelled', 'withdrawn') AND (last_ends_at IS NULL OR last_ends_at >= ?)")
+    params.push(nowMs())
+  }
+  else if (query.view === 'past') {
+    where.push('last_ends_at < ?')
+    params.push(nowMs())
+  }
+  else if (query.view === 'drafts' && !query.state) {
+    where.push("state = 'draft'")
+  }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const direction = query.order === 'asc' ? 'ASC' : 'DESC'
-  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' || query.sort === 'dates' ? `first_starts_at IS NULL, first_starts_at ${direction}` : 'created_at DESC'
+  const viewOrder = query.view === 'coming-up' ? 'first_starts_at IS NULL, first_starts_at ASC' : query.view === 'past' ? 'last_ends_at DESC' : 'created_at DESC'
+  const order = query.sort === 'title' ? `lower(title) ${query.order === 'desc' ? 'DESC' : 'ASC'}` : query.sort === 'next' || query.sort === 'dates' ? `first_starts_at IS NULL, first_starts_at ${direction}` : viewOrder
   const total = (await first<{ n: number }>(`SELECT count(*) AS n FROM core_productions ${clause}`, ...params))!.n
   const rows = await all<ProductionRow>(`SELECT * FROM core_productions ${clause} ORDER BY ${order}, id LIMIT ? OFFSET ?`, ...params, query.size, (query.page - 1) * query.size)
   const placed = await whereAndWhen(rows.map(r => r.id))

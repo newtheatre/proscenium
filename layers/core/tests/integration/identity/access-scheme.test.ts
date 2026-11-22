@@ -191,7 +191,7 @@ describe('reviewing (ID-40)', () => {
     const answered = await browser.post('/api/core/me/access', { needs: [{ term: need.other }], companions: 0, answer: 'A seat near the aisle' })
     expect(answered.status).toBe(200)
     await deliver()
-    expect(to(mine).map(e => e.subject)).toEqual(['Thanks, we\'ve got your answer'])
+    expect(to(mine).map(e => e.subject)).toEqual([expect.stringMatching(/^We have your answer: /)])
     expect((await desk.browser.get(`/api/core/access-scheme/${accountId}`)).body.application.pending).toMatchObject({ answer: 'A seat near the aisle' })
     await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })
     const mineNow = (await browser.get('/api/core/me/access')).body.application

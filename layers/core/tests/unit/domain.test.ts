@@ -229,7 +229,7 @@ describe('email wording (C-27)', () => {
     expect(out.html).toContain('aria-label="QR code"')
     expect(out.html.match(/<tr>/g)).toHaveLength(29)
     const two = render({ subject: 'Hi', body: '{{ qr codes }}' }, { values: { codes: 'Ticket 1 of 2\tt.k.AAAA.sig\nTicket 2 of 2\tt.k.BBBB.sig' }, kinds: { codes: 'sealed' }, accent: '#000000', theatre: 'T' })
-    expect(two.html.match(/aria-label="QR code"/g)).toHaveLength(2)
+    expect(two.html.match(/aria-label="QR code: Ticket \d of 2"/g)).toHaveLength(2)
     expect(two.html).toContain('>Ticket 2 of 2</p>')
     expect(render({ subject: 'Hi', body: 'A.\n\n{{ qr codes }}' }, { values: { codes: ' ' }, kinds: { codes: 'sealed' }, accent: '#000000', theatre: 'T' }).html).not.toContain('QR code')
     expect(out.html).toContain('bgcolor=#000')
@@ -278,6 +278,31 @@ describe('email wording (C-27)', () => {
   it('keeps the subject on one line', () => {
     const out = render({ subject: 'Hello {{ name }}', body: 'x' }, { values: { name: 'A\r\nBcc: x@y' }, kinds: { name: 'text' }, accent: '#000000', theatre: 'T' })
     expect(out.subject).toBe('Hello A Bcc: x@y')
+  })
+
+  it('names its language and subject for screen readers, and repaints for dark mode only when given dark colours', () => {
+    const light = render({ subject: 'Hello <b>', body: 'x' }, { values: {}, kinds: {}, accent: '#000000', theatre: 'T' })
+    expect(light.html).toContain('<html lang="en-GB">')
+    expect(light.html).toContain('<title>Hello &lt;b&gt;</title>')
+    expect(light.html).toContain('role="article" aria-roledescription="email" aria-label="Hello &lt;b&gt;"')
+    expect(light.html).toContain('<meta name="color-scheme" content="light">')
+    expect(light.html).not.toContain('prefers-color-scheme')
+    const dark = render({ subject: 'Hi', body: 'x' }, { values: {}, kinds: {}, accent: '#000000', theatre: 'T', lang: 'cy', dark: { background: '#020617', text: '#f1f5f9', muted: '#94a3b8', link: '#93c5fd' } })
+    expect(dark.html).toContain('<html lang="cy">')
+    expect(dark.html).toContain('content="light dark"')
+    expect(dark.html).toMatch(/prefers-color-scheme: dark\)\{\.body\{background:#020617!important/)
+  })
+
+  it('draws a variable of bulleted lines as a list, and keeps the bullets in the text', () => {
+    const out = render({ subject: 'Hi', body: 'Open:\n\n{{ shifts }}' }, { values: { shifts: '• Posh, Thu: Usher\n• Posh, Fri: <Bar>' }, kinds: { shifts: 'text' }, accent: '#000000', theatre: 'T' })
+    expect(out.html).toContain('<li style="margin:0 0 4px">Posh, Thu: Usher</li><li style="margin:0 0 4px">Posh, Fri: &lt;Bar&gt;</li></ul>')
+    expect(out.text).toContain('• Posh, Thu: Usher\n• Posh, Fri: <Bar>')
+    const prose = render({ subject: 'Hi', body: '{{ note }}' }, { values: { note: '• one\nnot a bullet' }, kinds: { note: 'text' }, accent: '#000000', theatre: 'T' })
+    expect(prose.html).not.toContain('<ul')
+  })
+
+  it('opens the footer with the signature delimiter', () => {
+    expect(render({ subject: 'Hi', body: 'x' }, { values: {}, kinds: {}, accent: '#000000', theatre: 'T', footer: 'Address' }).text).toBe('x\n\n-- \nAddress\n')
   })
 })
 

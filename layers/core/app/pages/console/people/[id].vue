@@ -348,58 +348,70 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
             <dl class="space-y-2 text-sm">
               <div>
                 <dt class="text-muted">
+                  {{ t('core.person.details.name') }}
+                </dt>
+                <dd>{{ p.name ?? t('core.person.details.none') }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
                   {{ t('core.person.details.pronouns') }}
                 </dt>
                 <dd>{{ p.pronouns ?? t('core.person.details.none') }}</dd>
               </div>
             </dl>
-          </PageSection>
-          <PageSection :title="t('core.person.addresses')">
-            <template
-              v-if="p.actions.update"
-              #actions
+            <!-- One card for who the person is: name, pronouns and their addresses. -->
+            <FieldGroup
+              :title="t('core.person.addresses')"
+              class="mt-4"
             >
-              <UButton
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-plus"
-                :label="t('core.person.email.add')"
-                @click="openAddAddress"
-              />
-            </template>
-            <p
-              v-if="!p.addresses.length"
-              class="text-sm text-muted"
-            >
-              {{ t('core.person.no-addresses') }}
-            </p>
-            <ul
-              v-else
-              class="space-y-2"
-            >
-              <li
-                v-for="a in p.addresses"
-                :key="a.id"
-                class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+              <template
+                v-if="p.actions.update"
+                #actions
               >
-                <span class="w-full break-all">{{ a.address }}</span>
-                <StatusBadge
-                  :tone="a.verified ? 'success' : 'neutral'"
-                  :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  icon="i-lucide-plus"
+                  :label="t('core.person.email.add')"
+                  :aria-label="t('core.person.email.add-long')"
+                  @click="openAddAddress"
                 />
-                <StatusBadge
-                  v-if="a.audience"
-                  tone="info"
-                  :label="t('core.person.email.audience')"
-                />
-                <RowActions
-                  v-if="p.actions.update"
-                  class="ms-auto"
-                  :items="addressActions(a)"
-                  :label="t('core.person.email.actions', { address: a.address })"
-                />
-              </li>
-            </ul>
+              </template>
+              <p
+                v-if="!p.addresses.length"
+                class="text-sm text-muted"
+              >
+                {{ t('core.person.no-addresses') }}
+              </p>
+              <ul
+                v-else
+                class="space-y-2"
+              >
+                <li
+                  v-for="a in p.addresses"
+                  :key="a.id"
+                  class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                >
+                  <span class="w-full break-all">{{ a.address }}</span>
+                  <StatusBadge
+                    :tone="a.verified ? 'success' : 'neutral'"
+                    :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                  />
+                  <StatusBadge
+                    v-if="a.audience"
+                    tone="info"
+                    :label="t('core.person.email.audience')"
+                  />
+                  <RowActions
+                    v-if="p.actions.update"
+                    class="ms-auto"
+                    :items="addressActions(a)"
+                    :label="t('core.person.email.actions', { address: a.address })"
+                  />
+                </li>
+              </ul>
+            </FieldGroup>
           </PageSection>
         </template>
 

@@ -2,7 +2,9 @@
 // refused because the sign-in is not fresh, or not strong enough, opens the dialogue over the page;
 // once the person confirms, the same request is sent again, so the save they pressed completes. The
 // person never leaves the page and never signs in again.
-export type ConfirmReason = 'core.access.not-fresh' | 'core.access.needs-strong-sign-in'
+// A request refused because two-step sign-in is not set up cannot be confirmed here: the dialogue
+// says so and links to where it is set up, and the request is not sent again.
+export type ConfirmReason = 'core.access.not-fresh' | 'core.access.needs-strong-sign-in' | 'core.access.two-step-not-set-up'
 
 export const CONFIRM_REASONS: readonly string[] = ['core.access.not-fresh', 'core.access.needs-strong-sign-in']
 
