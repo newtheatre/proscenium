@@ -207,6 +207,18 @@ values back, delete what was just added, add again what was just deleted), then 
 Undone, or why it could not be. Use it in place of a plain success toast wherever the reverse act
 exists; Seasons is the worked example. Browser `alert`, `confirm` and `prompt` are a lint error.
 
+**A sign-in that is not strong enough.** An ability that needs a strong sign-in refuses a basic one
+with one of two codes, both 403: `core.access.needs-strong-sign-in` when the account has a passkey
+(or an accepted authenticator app) that was not used, and `core.access.two-step-not-set-up` when it
+has neither. `$api` confirms the first in place and sends the request again. The second cannot be
+confirmed: an act opens a dialogue that says "This needs two-step sign-in" with "Set it up", and
+`RefusalNotice`, `RefusalPanel` and `DataBoundary` show the same link (`refusalAction(refusal)`, to
+Sign-in in My account), so a screen needs nothing of its own. A route that makes its own check with
+`can()` and refuses `core.access.denied` is answered with the sign-in refusal when that was what
+stood in the way, so do not word "no permission" yourself for it. In the console and Admin
+`StrongerSignInNotice` (drawn by PageFrame) tells someone in this position before they try, from the
+viewer's `strongerSignIn` (`set-up` or `confirm`); `/api/core/me` carries the same field.
+
 A short list that needs a search only now and then takes `SearchToggle` beside its primary action:
 an icon that opens into a search box. Bind its `v-model:open` and, while it is open, give the
 primary button `:ui="{ label: open ? 'max-sm:sr-only' : '' }"`, so on a phone the button drops to

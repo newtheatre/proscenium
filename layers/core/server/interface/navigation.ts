@@ -1,7 +1,7 @@
 // What the shells show and what the guard allows come from one place: the navigation entries that
 // modules which are switched on contribute, plus a settings page generated for each module that
 // has settings. The menu and the guard agree because they read the same declaration.
-import { can, usePoint, type Actor, type Decision } from '#kit'
+import { can, usePoint, STRONGER_SIGN_IN, type Actor, type Decision } from '#kit'
 import { countOf, shows } from './counts'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
@@ -74,7 +74,7 @@ export async function declaredGroups(): Promise<(NavigationGroupDecl & { module:
 
 /** Holding an ability, even if a fresh sign-in is still needed to use it: enough to be shown the way. */
 export function holds(decision: Decision): boolean {
-  return decision.allowed || decision.code === 'core.access.not-fresh' || decision.code === 'core.access.needs-strong-sign-in'
+  return decision.allowed || decision.code === 'core.access.not-fresh' || (STRONGER_SIGN_IN as readonly string[]).includes(decision.code)
 }
 
 /** Whether the actor holds any of the abilities. An entry with none (account entries) needs only a sign-in. */

@@ -35,6 +35,7 @@ const lastGoodText = computed(() => lastGood.value ? dates.time(lastGood.value) 
       v-if="failedFirst"
       :reason="reason"
       :status="refusal.status"
+      :code="refusal.code"
       :remedy="refusal.remedy"
       :retrying="status === 'pending'"
       @retry="emit('retry')"

@@ -27,7 +27,8 @@ const CODE_LENGTH = 6 // not-policy: the length of the code the server sends
 // One box a digit; the request takes them as one string.
 const digits = ref<number[]>([])
 const code = computed(() => digits.value.join(''))
-const strongNeeded = computed(() => props.reason === 'core.access.needs-strong-sign-in')
+const notSetUp = computed(() => props.reason === TWO_STEP_NOT_SET_UP)
+const strongNeeded = computed(() => props.reason === 'core.access.needs-strong-sign-in' || notSetUp.value)
 
 async function usePasskey() {
   busy.value = true
@@ -68,6 +69,11 @@ async function checkApp() {
 
 // As it opens: find how this sign-in may confirm, and start the quickest way at once.
 onMounted(async () => {
+  // Nothing is set up to confirm with: there is nothing to ask the server.
+  if (notSetUp.value) {
+    ways.value = []
+    return
+  }
   const answer = await callIdentity<{ ways: ('passkey' | 'authenticator' | 'code')[], address: string | null, authenticatorStrong: boolean }>('/api/core/me/reassert')
   if (!answer.ok) {
     refusal.value = answer.refusal
@@ -84,9 +90,9 @@ onMounted(async () => {
 
 <template>
   <UModal
-    :title="t('core.confirm-its-you.title')"
+    :title="notSetUp || (strongNeeded && ways && !ways.includes('passkey') && !useApp) ? t('core.two-step.needed') : t('core.confirm-its-you.title')"
     :close="{ onClick: () => settle(false) }"
-    :description="strongNeeded ? (useApp ? t('core.confirm-its-you.strong-or-app') : t('core.confirm-its-you.strong')) : t('core.confirm-its-you.description')"
+    :description="notSetUp ? t('core.two-step.explain') : strongNeeded ? (useApp ? t('core.confirm-its-you.strong-or-app') : t('core.confirm-its-you.strong')) : t('core.confirm-its-you.description')"
   >
     <template #body>
       <div class="space-y-4">
@@ -177,11 +183,14 @@ onMounted(async () => {
           />
         </template>
         <template v-else>
-          <p>{{ strongNeeded ? t('core.confirm-its-you.add-passkey') : t('core.confirm-its-you.no-way') }}</p>
+          <p v-if="!notSetUp">
+            {{ strongNeeded ? t('core.two-step.explain') : t('core.confirm-its-you.no-way') }}
+          </p>
           <UButton
             block
-            :to="strongNeeded ? '/account/passkey' : '/sign-in'"
-            :label="strongNeeded ? t('core.confirm-its-you.add-passkey-button') : t('core.confirm-its-you.sign-in')"
+            :to="strongNeeded ? TWO_STEP_SET_UP_AT : '/sign-in'"
+            :label="strongNeeded ? t('core.two-step.set-up') : t('core.confirm-its-you.sign-in')"
+            trailing-icon="i-lucide-arrow-right"
             @click="settle(false)"
           />
         </template>
