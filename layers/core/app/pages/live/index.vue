@@ -1,5 +1,6 @@
 <!-- The Tonight hub: tonight's performances, each with its start time and the figures other modules
-     give for it (core.tonight-figure), read again while the hub is open, then the live screens this
+     give for it (core.tonight-figure), read again while the hub is open (on a dark day, when the next
+     performance is), then the live screens this
      person may open, one large tile each. Each performance says when latecomers are let in. The tiles are the live menu's entries (core.navigation with
      menu 'live'), so a module that brings live screens adds its own tile and nothing here names a
      module. Performances are those of the operating day, so a late show stays past midnight. -->
@@ -13,13 +14,14 @@ const CURRENCY = /^[A-Z]{3}$/ // not-policy: the shape of an ISO 4217 code
 const REFRESH = 30_000 // not-policy: how often the figures are read again
 
 const { t, te } = useT()
-const { time } = useDates()
+const { time, dayBrief } = useDates()
 const { data: navigation } = await useNavigation('live')
 const tiles = computed(() => navigation.value?.items ?? [])
-const { data: tonight, refresh } = await useAPI<{ performances: Performance[] }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [] }) })
+const { data: tonight, refresh } = await useAPI<{ performances: Performance[], next?: { title: string, label: string | null, startsAt: number, venue: string } | null }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [], next: null }) })
 // The figures move all night (sold, in, still to come), so the hub reads them again while open.
 useIntervalFn(() => { void refresh() }, REFRESH)
 const performances = computed(() => tonight.value?.performances ?? [])
+const next = computed(() => tonight.value?.next ?? null)
 
 // A label is translated when the catalogue has it; a value whose unit is a currency is money in minor units.
 const labelOf = (text: string) => (te(text) ? t(text) : text)
@@ -100,12 +102,20 @@ function valueOf(f: Figure): string {
             </dl>
           </li>
         </ul>
-        <p
+        <div
           v-else
-          class="text-muted"
+          class="rounded-lg border border-default p-4"
         >
-          {{ t('core.live.no-performances') }}
-        </p>
+          <p class="text-muted">
+            {{ t('core.live.no-performances') }}
+          </p>
+          <p
+            v-if="next"
+            class="mt-1 text-lg"
+          >
+            {{ t('core.live.next', { title: [next.title, next.label].filter(Boolean).join(', '), when: `${dayBrief(next.startsAt)}, ${time(next.startsAt)}`, venue: next.venue }) }}
+          </p>
+        </div>
       </section>
       <section
         v-if="tiles.length"

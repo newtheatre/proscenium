@@ -469,16 +469,17 @@ a layout, not a shell, and it has no navigation of its own.
   figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
   `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
   minor units): Box office gives sold, not yet paid, in, still to come and seats left, Payments
-  what the tills have taken. The hub reads them again every 30 seconds while open. The screens'
-  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
+  what the tills have taken. The hub reads them again every 30 seconds while open. On a day with
+  no performance the route also answers `next` (the first scheduled performance after today) and the
+  hub says "Next: The Lighthouse Keeper, Sun 22 Nov, 19:30, Main house". The screens' tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.
 - **PageLive** is the page type: `title` and `context` (both already translated, for example the
   screen and the performance), an optional `back` address, the task in the default slot and a sticky
   `footer` slot. Its status strip shows the title, the context, whether the device is online and the
-  way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
-  or My account.
+  way out: an arrow back to the Tonight hub from a screen, and on the hub a worded "Leave" button
+  (named "Leave live mode") back to the console, members' area or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
   may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
