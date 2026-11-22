@@ -106,17 +106,13 @@ async function invitationOf(row: TokenRow & { issued_by?: string | null }, accou
   return { by: issuer?.name || null, roles: roles.map(r => r.name) }
 }
 
-/** Set by "Not now" on the passkey offer; read here so the offer is skipped while it lasts. */
-export const PASSKEY_LATER_COOKIE = 'proscenium-passkey-later'
-
 /**
- * Whether to offer a passkey after an email sign-in: when the account has none, and the person has
- * not said "Not now" lately. Somebody whose roles reach the console is asked every time, because
- * the console needs one.
+ * Whether to send the person to the passkey screen after an email sign-in: only somebody with no
+ * passkey whose roles reach the console, which needs one. Everyone else is offered a passkey by a
+ * notice on My account instead (Matt, 21 November), so a buyer goes straight to what they came for.
  */
-async function shouldOfferPasskey(event: H3Event, accountId: string): Promise<boolean> {
+async function shouldOfferPasskey(accountId: string): Promise<boolean> {
   if (await first('SELECT 1 AS one FROM core_passkeys WHERE account_id = ? LIMIT 1', accountId)) return false
-  if (!readCookie(event, PASSKEY_LATER_COOKIE)) return true
   return holdsPrivileged(accountId)
 }
 
@@ -137,7 +133,7 @@ async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'li
   unit.audit({ action: 'sign-in', record: ['core.account', accountId], detail: { method } })
   const account = await accountById(accountId)
   const invitation = row.purpose === 'invite' ? await invitationOf(row, accountId) : undefined
-  return { accountId, next: row.next_path, offerPasskey: await shouldOfferPasskey(event, accountId), created, welcome: !account?.name, ...(invitation ? { invitation } : {}) }
+  return { accountId, next: row.next_path, offerPasskey: await shouldOfferPasskey(accountId), created, welcome: !account?.name, ...(invitation ? { invitation } : {}) }
 }
 
 /** Uses an emailed link. A second use, even a moment later in a race, signs nobody in. */
@@ -151,6 +147,18 @@ export async function useLink(unit: UnitView, event: H3Event, token: string): Pr
     .expect(1, { code: 'core.sign-in.link-used', reason: 'This link has been used.', remedy: 'Ask for a new email if you need to sign in again.' })
   if (row.purpose === 'enrol_passkey') return { ...(await useEnrolmentLink(unit, event, row)), offerPasskey: true, created: false, welcome: false }
   return finish(unit, event, row, 'link')
+}
+
+// Uses a link as its page opens, only in the browser that asked (docs/specs/identity/12-link-without-a-press.md).
+// Any other opening answers null and spends nothing: a scanner, another browser, an unknown or lapsed link.
+export async function useLinkHere(unit: UnitView, event: H3Event, token: string): Promise<SignedIn | null> {
+  const browser = readCookie(event, BROWSER_COOKIE)
+  if (!browser || browser.length > 100) return null // not-policy: a browser token is 43 characters
+  const row = await tokenByHash(await digest('link', token))
+  // Only a sign-in the person asked for here: never an invitation, a claim or a staff-issued link.
+  if (!row || row.purpose !== 'sign_in' || row.used_at || row.expires_at <= nowMs() || !row.browser_hash) return null
+  if (!sameText(await digest('browser', browser), row.browser_hash)) return null
+  return useLink(unit, event, token)
 }
 
 const WRONG = { code: 'core.sign-in.code-wrong', reason: 'That code is not right, or it has expired.', remedy: 'Check the code in the email, or ask for a new one.' }

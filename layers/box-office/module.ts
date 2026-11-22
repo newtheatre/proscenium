@@ -268,7 +268,7 @@ export default defineModule({
       // The person's own bookings, in My account (C3).
       { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
       // The person's own passes, beside their tickets.
-      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31 },
+      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31, count: 'box-office.my-passes', hideEmpty: true },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
       // Each space's seating layouts and wheelchair spaces, beside Venues in the programme's settings (decision 10).
       { id: 'box-office.seating-layouts', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/seating-layouts', icon: 'i-lucide-armchair', ability: 'box-office.pricing.manage', order: 42, settingsIn: ['programme', 'box-office.performances'] },
@@ -296,7 +296,7 @@ export default defineModule({
     ],
     'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
-    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
+    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }, { id: 'box-office.my-passes', file: 'my-passes' }],
     'core.upcoming': [{ id: 'box-office.tickets', file: 'tickets' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
     'core.vocabulary': [{

@@ -474,14 +474,13 @@ test.describe('confirming it is you', () => {
 test.describe('the access scheme screens', () => {
   const reviewerActor = { ...person('Rhea Reviewer', [grant('core.access-scheme.review')]), assurance: 'strong', reassertedAt: Date.now() }
 
-  test('My account\'s access scheme page offers the scheme, with no accessibility violations', async ({ browser }) => {
+  test('My account\'s access scheme page opens on the form, with no accessibility violations', async ({ browser }) => {
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(audience) })
     const page = await context.newPage()
     await visit(page, '/account/access')
     await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
-    await noViolations(page)
-    await page.getByRole('link', { name: 'Apply' }).click()
-    await expect(page).toHaveURL(/\/account\/access\/apply$/)
+    await expect(page.getByRole('link', { name: 'Apply' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Send application' })).toBeVisible()
     // Needs are square ticks; the wheelchair question asks its follow-up only once ticked.
     await expect(page.getByRole('checkbox', { name: 'Steps and stairs' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toHaveCount(0)

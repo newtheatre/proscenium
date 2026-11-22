@@ -1,6 +1,6 @@
-<!-- The passkey offer after an email sign-in (ID-03). Skippable: "Not now" is remembered in this browser
-     for 90 days, during which the offer is not made again (the server reads the cookie). Staff are told
-     the console needs one, and are asked every time until they have one. -->
+<!-- The passkey offer after an email sign-in (ID-03), made only to staff whose roles reach the
+     console: they are told it needs one, and are asked every time until they have one. Everyone
+     else meets the offer as a notice on My account, which "Not now" here also puts away. -->
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
@@ -66,7 +66,6 @@ async function add() {
     <RecoveryCodes
       v-else
       :codes="codes"
-      check-path="/api/core/me/recovery-codes/check"
       @kept="navigateTo(next)"
     />
   </IdentityCard>

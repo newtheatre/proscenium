@@ -23,9 +23,49 @@ describe('email sign-in (ID-01)', () => {
     expect(message?.variables.code).toMatch(/^\d{6}$/)
     const used = await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })
     expect(used.status).toBe(200)
-    expect(used.body).toEqual({ next: '/', offerPasskey: true, welcome: true })
+    expect(used.body).toEqual({ next: '/', offerPasskey: false, welcome: true })
     const me = await browser.get('/api/core/me')
     expect(me.body).toMatchObject({ signedIn: true, session: { assurance: 'basic' }, addresses: [{ address: to, verified: true }] })
+  })
+
+  it('opened in the browser that asked, the link signs in with no press', async () => {
+    const browser = new Browser()
+    const to = address()
+    const { message } = await emailSignIn(browser, to)
+    const here = await browser.post('/api/core/sign-in/link', { token: tokenOf(message!), here: true })
+    expect(here.status).toBe(200)
+    expect(here.body).toEqual({ next: '/', offerPasskey: false, welcome: true })
+    expect((await browser.get('/api/core/me')).body).toMatchObject({ signedIn: true, addresses: [{ address: to, verified: true }] })
+  })
+
+  it('opened anywhere else, the link spends nothing until it is pressed: a scanner cannot use it', async () => {
+    const browser = new Browser()
+    const to = address()
+    const { message } = await emailSignIn(browser, to)
+    const token = tokenOf(message!)
+    // A scanner, or the person's other device: no cookie from the asking browser.
+    const scanner = new Browser()
+    const opened = await scanner.post('/api/core/sign-in/link', { token, here: true })
+    expect(opened.status).toBe(200)
+    expect(opened.body).toEqual({ press: true })
+    expect((await scanner.get('/api/core/me')).body.signedIn).toBe(false)
+    expect(await rows('SELECT id FROM core_account_tokens WHERE address = ? AND used_at IS NOT NULL', to)).toEqual([])
+    // A browser with a cookie of its own, from asking for a different address, is no nearer.
+    const other = new Browser()
+    await emailSignIn(other, address())
+    expect((await other.post('/api/core/sign-in/link', { token, here: true })).body).toEqual({ press: true })
+    // The press still works there, as it always did.
+    expect((await scanner.post('/api/core/sign-in/link', { token })).status).toBe(200)
+  })
+
+  it('with no press, an unknown, used or lapsed link says only to press, as any other does', async () => {
+    const browser = new Browser()
+    const { message } = await emailSignIn(browser, address())
+    const token = tokenOf(message!)
+    expect((await browser.post('/api/core/sign-in/link', { token: 'x'.repeat(43), here: true })).body).toEqual({ press: true })
+    await env.DB.prepare('UPDATE core_account_tokens SET expires_at = 1 WHERE used_at IS NULL').run()
+    expect((await browser.post('/api/core/sign-in/link', { token, here: true })).body).toEqual({ press: true })
+    expect((await browser.post('/api/core/sign-in/link', { token })).body.code).toBe('core.sign-in.link-expired')
   })
 
   it('sign-in reveals nothing: the same answer for a known and an unknown address', async () => {

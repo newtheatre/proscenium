@@ -1,8 +1,6 @@
 {
   "core.navigation.inbox.label": "Inbox",
   "core.navigation.members-inbox.label": "Inbox",
-  "core.members.line.core.members-inbox": "{count} unread",
-  "core.members.line-none.core.members-inbox": "Nothing unread",
   "core.inbox.title": "Inbox",
   "core.inbox.which": "Which messages",
   "core.inbox.current": "Messages",

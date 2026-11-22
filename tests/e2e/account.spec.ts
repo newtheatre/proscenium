@@ -33,20 +33,30 @@ test.describe('My account', () => {
   test('lists identity\'s screens as entries', async ({ page }) => {
     await visit(page, '/account')
     for (const [name, href] of [
-      ['Your details', '/account/details'],
-      ['Email addresses', '/account/email'],
+      ['Details', '/account/details'],
       ['Signing in', '/account/sign-in'],
-      ['Notifications', '/account/notifications'],
-      ['Your data', '/account/data'],
-    ]) await expect(page.getByRole('link', { name }).first()).toHaveAttribute('href', href)
+      ['Data', '/account/data'],
+    ]) await expect(page.getByRole('link', { name, exact: true }).first()).toHaveAttribute('href', href)
+  })
+
+  test('leaves out the entries that would open on nothing', async ({ page }) => {
+    await visit(page, '/account')
+    const menu = page.getByRole('navigation', { name: 'My account' })
+    await expect(menu.getByRole('link', { name: 'Signing in' })).toBeVisible()
+    // Nobody outside the membership has a kind of message to choose, and this person holds no pass.
+    for (const name of ['Notifications', 'Passes', 'Email addresses']) await expect(menu.getByRole('link', { name, exact: true })).toHaveCount(0)
+  })
+
+  test('the old Email addresses page lands on Details, at the addresses', async ({ page }) => {
+    await page.goto('/account/email')
+    await expect(page).toHaveURL(/\/account\/details#email$/)
+    await expect(page.getByRole('heading', { level: 2, name: 'Email addresses' })).toBeVisible()
   })
 
   for (const [path, title] of [
-    ['/account/details', 'Your details'],
-    ['/account/email', 'Email addresses'],
+    ['/account/details', 'Details'],
     ['/account/sign-in', 'Signing in'],
-    ['/account/notifications', 'Notifications'],
-    ['/account/data', 'Your data'],
+    ['/account/data', 'Data'],
   ]) {
     test(`${path} renders under My account and has no violations`, async ({ page }) => {
       await visit(page, path!)
@@ -54,7 +64,7 @@ test.describe('My account', () => {
       // On a laptop the account's menu stands in for the trail, with this page marked.
       const menu = page.getByRole('navigation', { name: 'My account' })
       await expect(menu.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/account')
-      await expect(menu.getByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
+      await expect(menu.getByRole('link', { name: title, exact: true })).toHaveAttribute('aria-current', 'page')
       await noViolations(page)
     })
   }
@@ -89,7 +99,7 @@ test.describe('My account', () => {
       await visit(page, '/account')
       await expect(page.getByRole('navigation', { name: 'My account' })).toBeHidden()
       const list = page.getByRole('list', { name: 'Your account' })
-      await expect(list.getByRole('link', { name: /Your details/ })).toHaveAttribute('href', '/account/details')
+      await expect(list.getByRole('link', { name: /^Details/ })).toHaveAttribute('href', '/account/details')
       await visit(page, '/account/details')
       await expect(page.getByRole('link', { name: 'Back to My account' })).toBeVisible()
       await noViolations(page)
@@ -98,14 +108,13 @@ test.describe('My account', () => {
 
   test('the forms carry their labels', async ({ page }) => {
     await visit(page, '/account/details')
-    await expect(page.getByLabel('Your name')).toBeVisible()
+    await expect(page.getByLabel('Name', { exact: true })).toBeVisible()
     await expect(page.getByLabel('Pronouns')).toBeVisible()
-    await visit(page, '/account/email')
-    await expect(page.getByLabel('Email address')).toBeVisible()
+    await expect(page.getByLabel('Add an address')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible()
   })
 
-  test('Your data offers nothing until the theatre names its privacy contact, then offers both', async ({ page, playwright }) => {
+  test('Data offers nothing until the theatre names its privacy contact, then offers both', async ({ page, playwright }) => {
     await visit(page, '/account/data')
     await expect(page.getByText('Downloads and erasure are not available yet')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Make a download' })).toBeHidden()
