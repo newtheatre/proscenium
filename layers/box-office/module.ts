@@ -45,7 +45,8 @@ export default defineModule({
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
     'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
-    'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
+    // Off as shipped (Matt, 21 November 2026): a guest's reservation is made at once and the email is the receipt.
+    'reservations.confirm-email': setting.boolean({ default: false, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.release-before': setting.duration({ default: '10m', min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
@@ -268,7 +269,7 @@ export default defineModule({
       // The person's own bookings, in My account (C3).
       { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
       // The person's own passes, beside their tickets.
-      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31 },
+      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31, count: 'box-office.my-passes', hideEmpty: true },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
       // Each space's seating layouts and wheelchair spaces, beside Venues in the programme's settings (decision 10).
       { id: 'box-office.seating-layouts', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/seating-layouts', icon: 'i-lucide-armchair', ability: 'box-office.pricing.manage', order: 42, settingsIn: ['programme', 'box-office.performances'] },
@@ -296,7 +297,7 @@ export default defineModule({
     ],
     'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
-    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
+    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }, { id: 'box-office.my-passes', file: 'my-passes' }],
     'core.upcoming': [{ id: 'box-office.tickets', file: 'tickets' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
     'core.vocabulary': [{

@@ -162,11 +162,12 @@ function actions(i: Item) {
     <template #primary>
       <UButton
         v-if="data?.can.receive"
-        to="/console/bar/deliveries/new"
+        to="/console/bar/stock/deliveries/new"
         icon="i-lucide-truck"
         :label="t('bar.screens.deliveries.record')"
       />
     </template>
+    <BarStockTabs />
     <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
       <UFormField
         :label="t('bar.screens.stock-levels.find')"

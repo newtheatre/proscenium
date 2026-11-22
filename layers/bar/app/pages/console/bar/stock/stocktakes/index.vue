@@ -43,7 +43,7 @@ async function start() {
   try {
     const made = await $api<{ stocktakeId: string }>('/api/bar/stocktakes', { method: 'POST', body: { locationId: s.locationId, categoryId: s.categoryId === EVERYTHING ? null : s.categoryId, heldOnly: s.heldOnly } })
     starting.value = null
-    await router.push(`/console/bar/stocktakes/${made.stocktakeId}`)
+    await router.push(`/console/bar/stock/stocktakes/${made.stocktakeId}`)
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -55,7 +55,7 @@ async function start() {
 </script>
 
 <template>
-  <PageFrame :title="t('bar.navigation.stocktakes.label')">
+  <PageFrame :title="t('bar.navigation.stock-levels.label')">
     <template #primary>
       <UButton
         icon="i-lucide-plus"
@@ -63,6 +63,7 @@ async function start() {
         @click="openStart"
       />
     </template>
+    <BarStockTabs />
     <DataBoundary
       :data="data"
       :status="status"
@@ -86,12 +87,12 @@ async function start() {
         </EmptyState>
         <RecordList
           v-if="d.stocktakes.length && phone"
-          :label="t('bar.navigation.stocktakes.label')"
+          :label="t('bar.screens.stocktakes.list-title')"
         >
           <RecordListItem
             v-for="r in d.stocktakes"
             :key="r.id"
-            :to="`/console/bar/stocktakes/${r.id}`"
+            :to="`/console/bar/stock/stocktakes/${r.id}`"
             :name="[r.location, r.category ?? t('bar.screens.stocktakes.everything')].join(' · ')"
             :description="[dateTime(r.startedAt), r.startedBy].join(' · ')"
           >
@@ -109,13 +110,13 @@ async function start() {
           v-else-if="d.stocktakes.length"
           :data="d.stocktakes"
           :columns="columns"
-          :caption="t('bar.navigation.stocktakes.label')"
+          :caption="t('bar.screens.stocktakes.list-title')"
           :meta="{ class: { tr: 'cursor-pointer' } }"
-          @select="(_event: Event, row: { original: Stocktake }) => navigateTo(`/console/bar/stocktakes/${row.original.id}`)"
+          @select="(_event: Event, row: { original: Stocktake }) => navigateTo(`/console/bar/stock/stocktakes/${row.original.id}`)"
         >
           <template #when-cell="{ row }">
             <ULink
-              :to="`/console/bar/stocktakes/${row.original.id}`"
+              :to="`/console/bar/stock/stocktakes/${row.original.id}`"
               class="font-medium"
             >
               {{ dateTime(row.original.startedAt) }}

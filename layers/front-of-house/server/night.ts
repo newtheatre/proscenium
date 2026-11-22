@@ -7,6 +7,7 @@ import { accountLabel, canonicalAccount, getPerformance } from '#modules/core'
 import { AUTHORITY_STATES, type TIMING_KINDS } from './db/schema'
 import { shiftsOf } from './shifts'
 import { runsFor } from './checklists'
+import { arriveByActing } from './arrival'
 import type { TonightFigure } from './points/tonight-figure'
 import type { TonightNeed, TonightNeeds } from './points/tonight-needs'
 
@@ -63,6 +64,7 @@ export async function markNotComing(unit: UnitView, assignmentId: string, by: st
 /**
  * Records a moment of the night, once per kind; recording it again replaces it and is audited.
  * With checklists.block-house-open on, house open is refused while a pre-show run is still open.
+ * Recording one on your own shift counts as arriving.
  */
 export async function recordTiming(unit: UnitView, input: { performanceId: string, kind: TimingKind, at?: number, by: string }): Promise<void> {
   const now = nowMs()
@@ -78,6 +80,7 @@ export async function recordTiming(unit: UnitView, input: { performanceId: strin
     ON CONFLICT (performance_id, kind) DO UPDATE SET at = excluded.at, recorded_by = excluded.recorded_by, updated_at = excluded.updated_at`)
     .expect(1, { code: 'front-of-house.checklists-open', reason: 'A checklist for before the show is not finished yet.', remedy: 'Finish the checklist, or note what could not be done, then open the house.' })
   unit.audit({ action: 'update', record: ['core.performance', input.performanceId], detail: { timing: input.kind, at } })
+  await arriveByActing(unit, { performanceId: input.performanceId, accountId: input.by })
 }
 
 /** Takes back a recorded moment, as Undo does straight after a tap. Audited; a second clear changes nothing. */

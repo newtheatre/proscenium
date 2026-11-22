@@ -23,7 +23,16 @@ const account = computed(() => me.value?.account)
 const name = computed(() => account.value?.name ?? viewer.value.name ?? '')
 const greeting = computed(() => name.value)
 const who = computed(() => account.value?.pronouns || undefined)
-const notices = computed(() => noticeData.value.notices)
+// The passkey offer can be put away for a while; the cookie is the one "Not now" always set.
+const PASSKEY_OFFER = 'core.passkey-offer:offer'
+const LATER_DAYS = 90 // not-policy: how long "Not now" lasts in this browser
+const later = useCookie(PASSKEY_LATER_COOKIE, { maxAge: LATER_DAYS * 24 * 60 * 60, sameSite: 'lax', path: '/' })
+const notices = computed(() => noticeData.value.notices.filter(n => n.key !== PASSKEY_OFFER || !later.value))
+function actionsOf(n: Notice) {
+  const go = n.to && n.action ? [{ label: t(n.action), to: n.to, color: 'neutral' as const, variant: 'outline' as const }] : []
+  if (n.key !== PASSKEY_OFFER) return go
+  return [...go, { label: t('core.account.notices.not-now'), color: 'neutral' as const, variant: 'ghost' as const, onClick: () => { later.value = '1' } }]
+}
 
 // A name that no component answers to is left out rather than breaking the page.
 const sections = computed(() => data.value.sections.flatMap((s) => {
@@ -70,7 +79,7 @@ const listed = computed(() => {
           :icon="n.icon"
           :title="t(n.title, n.params ?? {})"
           :description="n.description ? t(n.description, n.params ?? {}) : undefined"
-          :actions="n.to && n.action ? [{ label: t(n.action), to: n.to, color: 'neutral', variant: 'outline' }] : []"
+          :actions="actionsOf(n)"
         />
       </section>
 

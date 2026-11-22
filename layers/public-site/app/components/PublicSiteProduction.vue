@@ -113,6 +113,11 @@ const eyebrow = computed(() => [production.value?.season?.name, production.value
 
 // Every public date, cancelled ones struck through. With one date, its action shows at the top too.
 const dates = computed(() => production.value?.performances ?? [])
+// On a phone the date buttons already book every date when there are few, so the jump button would be a third way in.
+const SHOWN = 4 // not-policy: how many date buttons the top shows
+const loadedAt = Date.now()
+const comingDates = computed(() => dates.value.filter(d => d.state === 'scheduled' && d.startsAt >= loadedAt).length)
+const allDatesShown = computed(() => comingDates.value > 0 && comingDates.value <= SHOWN)
 const only = computed(() => (dates.value.length === 1 && dates.value[0]!.state === 'scheduled' ? dates.value[0] : null))
 // The dates and tickets panel: beside the story from lg, sticky; on a phone, after the guidance, with
 // a button by the title that jumps to it.
@@ -256,6 +261,7 @@ useHead(() => {
           <PublicSiteDateButtons
             v-if="!only"
             :performances="dates"
+            :shown="SHOWN"
             :title="production.title"
             more="#dates"
           />
@@ -275,7 +281,7 @@ useHead(() => {
               :label="t('public-site.production.book')"
               trailing-icon="i-lucide-arrow-down"
               size="lg"
-              class="public-show-book"
+              :class="['public-show-book', allDatesShown ? 'max-sm:hidden' : '']"
             />
           </div>
         </div>

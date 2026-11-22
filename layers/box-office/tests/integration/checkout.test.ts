@@ -4,7 +4,7 @@
 // line and posts the sale to deferred ticket income; a payment that ends without the money puts the
 // seats back on sale; and an order with nothing to pay is confirmed at once with no posting.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { advanceClock, createUnit, newId, openSpecial, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, newId, openSpecial, setClock } from '#kit'
 import { signing } from '#kit/signing'
 import { resetRateLimits } from '#kit/ratelimit'
 import { addAttempt } from '../../../payments/server/answers'
@@ -107,6 +107,12 @@ describe('with no online payment provider', () => {
     const f = await house(4)
     await free(f)
     const b = await basket(f, 1)
+    // The theatre asks for a confirmed address here, so the free order waits on the link.
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'box-office.reservations.confirm-email', true, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
     const done = await req('POST', `/api/box-office/baskets/${b.orderId}/reserve`, { expectedTotalMinor: 0, email: address(), name: 'Free Guest' }, null, { 'x-basket-token': b.token })
     expect(done.body.state).toBe('confirm-email')
     const confirm = await mail('box-office.reservation-confirm', b.orderId)
@@ -115,6 +121,11 @@ describe('with no online payment provider', () => {
     expect(pressed.body.state).toBe('confirmed')
     expect(pressed.body.doorCodes).toHaveLength(1)
     expect((await order(b.orderId)).state).toBe('confirmed')
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'box-office.reservations.confirm-email', false, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
   })
 })
 

@@ -74,14 +74,17 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
   // One part of the house and one type: neither is named.
   await expect(page.getByRole('heading', { name: 'Circle' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Choose your tickets' })).toBeDisabled()
+  // Nothing chosen: the button can be pressed, and says what is missing.
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await expect(page.getByText('Choose at least one ticket.')).toBeVisible()
   await noViolations(page)
 
   await page.getByRole('button', { name: 'Add a ticket' }).click()
   await page.getByRole('button', { name: 'Add a ticket' }).click()
-  await page.getByRole('button', { name: 'Hold 2 tickets, £20.00' }).click()
+  await page.getByRole('button', { name: 'Continue with 2 tickets, £20.00' }).click()
 
-  await expect(page).toHaveURL(/\/book\/basket$/)
+  // Check and pay follows on the same address, as the second step.
+  await expect(page).toHaveURL(new RegExp(`/book/[^/]+/${performanceId}$`))
   await expect(page.getByRole('heading', { name: 'Check and pay' })).toBeVisible()
   await expect(page.getByText(/Held for \d+:\d\d/)).toBeVisible()
   // Its only type goes unnamed here too, as on Choose tickets.
@@ -99,7 +102,7 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   // Manage booking, from the link: one of the two tickets is cancelled, and its seat goes back on sale.
   await page.getByRole('link', { name: 'Manage your booking' }).click()
   await expect(page.getByRole('heading', { name: 'Your booking' })).toBeVisible()
-  await expect(page.getByText('To pay at the box office: £20.00')).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Total to pay at the box office' })).toContainText('£20.00')
   await noViolations(page)
   await page.getByRole('checkbox', { name: /^Ticket 1, / }).check()
   await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
@@ -107,7 +110,7 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page.getByText('1 ticket cancelled. Its seat is back on sale.')).toBeVisible()
   // The dialog fades out; checking it half-faded would judge its contrast mid-animation.
   await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText('To pay at the box office: £10.00')).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Total to pay at the box office' })).toContainText('£10.00')
   await noViolations(page)
 
   // The basket is spent: coming back shows nothing held.
@@ -124,17 +127,17 @@ test('a buyer books from the show\'s page in a drawer, without leaving it', asyn
   const drawer = page.getByRole('dialog', { name: title })
   await expect(drawer).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/whats-on/${productionSlug}$`))
-  await expect(drawer.getByRole('button', { name: 'Choose your tickets' })).toBeDisabled()
+  await expect(drawer.getByRole('button', { name: 'Continue', exact: true })).toBeEnabled()
   await noViolations(page)
 
   await drawer.getByRole('button', { name: 'Add a ticket' }).click()
-  await drawer.getByRole('button', { name: 'Hold 1 ticket, £10.00' }).click()
+  await drawer.getByRole('button', { name: 'Continue with 1 ticket, £10.00' }).click()
   await expect(drawer.getByText(/Held for \d+:\d\d/)).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/whats-on/${productionSlug}$`))
   // Change tickets goes back a step in the drawer, with the choice kept.
   await drawer.getByRole('button', { name: 'Change tickets' }).click()
-  await expect(drawer.getByRole('button', { name: 'Hold 1 ticket, £10.00' })).toBeVisible()
-  await drawer.getByRole('button', { name: 'Hold 1 ticket, £10.00' }).click()
+  await expect(drawer.getByRole('button', { name: 'Continue with 1 ticket, £10.00' })).toBeVisible()
+  await drawer.getByRole('button', { name: 'Continue with 1 ticket, £10.00' }).click()
   await drawer.getByLabel('Your name').fill('Drawer Buyer')
   await drawer.getByLabel('Email address').fill(`drawer.buyer.${stamp}@example.org`)
   await noViolations(page)
@@ -191,6 +194,7 @@ test('a buyer cancels paid tickets from their link when the theatre allows it, a
 
 test('a buyer types a promo code, sees the saving on one ticket, and holds at that price', async ({ page }) => {
   await visit(page, `/book/a/${performanceId}`)
+  await page.getByRole('button', { name: /^Have a (pass or a )?promo code\?$/ }).click()
   await page.getByLabel('Promo code').fill('nosuchcode')
   await page.getByRole('button', { name: 'Apply' }).click()
   await expect(page.getByText('We do not recognise that code.')).toBeVisible()
@@ -201,7 +205,6 @@ test('a buyer types a promo code, sees the saving on one ticket, and holds at th
   // The code is for one ticket an order: the second is at the full price.
   await page.getByRole('button', { name: 'Add a ticket' }).click()
   await page.getByRole('button', { name: 'Add a ticket' }).click()
-  await page.getByRole('button', { name: 'Hold 2 tickets, £18.00' }).click()
-  await expect(page).toHaveURL(/\/book\/basket$/)
+  await page.getByRole('button', { name: 'Continue with 2 tickets, £18.00' }).click()
   await expect(page.getByRole('button', { name: 'Reserve and pay £18.00 at the box office' })).toBeVisible()
 })

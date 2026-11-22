@@ -7,7 +7,7 @@
 export interface ChosenPass { code: string, name: string, priceName: string, owedMinor: number, wheelchair: boolean, own: boolean }
 interface Offered { code: string, name: string, priceName: string, owedMinor: number, left: number | null, unusable: string | null }
 
-const props = defineProps<{ performanceId: string, mine: Offered[], /** Whether the visitor may book a wheelchair space here. */ wheelchair: boolean, /** A refusal of the hold that is about a pass. */ refusal?: { reason: string, remedy?: string } | null }>()
+const props = defineProps<{ performanceId: string, mine: Offered[], /** Whether the visitor may book a wheelchair space here. */ wheelchair: boolean, /** Drawn open from the start, where the page has its own line that opens it. */ startOpen?: boolean, /** A refusal of the hold that is about a pass. */ refusal?: { reason: string, remedy?: string } | null }>()
 const passes = defineModel<ChosenPass[]>({ default: () => [] })
 
 const { t } = useT()
@@ -18,7 +18,7 @@ const { money } = await useMoney()
 const typed = ref('')
 const busy = ref(false)
 const tried = ref<ReturnType<typeof toRefusal> | null>(null)
-const open = ref(passes.value.length > 0 || props.mine.length > 0)
+const open = ref(props.startOpen || passes.value.length > 0 || props.mine.length > 0)
 const has = (code: string) => passes.value.some(p => p.code === code)
 const unused = computed(() => props.mine.filter(m => !has(m.code)))
 const said = computed(() => tried.value ?? props.refusal ?? null)

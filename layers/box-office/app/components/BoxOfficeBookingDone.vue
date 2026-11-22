@@ -30,6 +30,7 @@ watch(() => props.outcome.token, async (token) => {
       v-if="booking"
       :booking="booking"
       :desk-code="outcome.deskCode"
+      :manage-to="outcome.token ? `/book/order/${outcome.token}` : undefined"
     />
     <template v-else>
       <p class="text-lg">
@@ -67,7 +68,7 @@ watch(() => props.outcome.token, async (token) => {
       :order-token="outcome.token"
     />
     <UButton
-      v-if="outcome.token"
+      v-if="outcome.token && !booking?.show"
       :to="`/book/order/${outcome.token}`"
       variant="outline"
       color="neutral"

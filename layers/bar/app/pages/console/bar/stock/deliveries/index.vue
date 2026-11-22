@@ -20,14 +20,15 @@ const columns = computed(() => [
 </script>
 
 <template>
-  <PageFrame :title="t('bar.navigation.deliveries.label')">
+  <PageFrame :title="t('bar.navigation.stock-levels.label')">
     <template #primary>
       <UButton
-        to="/console/bar/deliveries/new"
+        to="/console/bar/stock/deliveries/new"
         icon="i-lucide-plus"
         :label="t('bar.screens.deliveries.record')"
       />
     </template>
+    <BarStockTabs />
     <DataBoundary
       :data="data"
       :status="status"
@@ -43,7 +44,7 @@ const columns = computed(() => [
         >
           <template #actions>
             <UButton
-              to="/console/bar/deliveries/new"
+              to="/console/bar/stock/deliveries/new"
               icon="i-lucide-plus"
               :label="t('bar.screens.deliveries.record')"
             />
@@ -51,12 +52,12 @@ const columns = computed(() => [
         </EmptyState>
         <RecordList
           v-if="d.deliveries.length && phone"
-          :label="t('bar.navigation.deliveries.label')"
+          :label="t('bar.screens.deliveries.title')"
         >
           <RecordListItem
             v-for="r in d.deliveries"
             :key="r.id"
-            :to="`/console/bar/deliveries/${r.id}`"
+            :to="`/console/bar/stock/deliveries/${r.id}`"
             :name="[r.supplier ?? t('bar.screens.deliveries.no-supplier'), locationName(r.locationId)].join(' · ')"
             :description="[dateTime(r.receivedAt ?? r.createdAt), r.supplierRef ? t('bar.screens.deliveries.note-ref', { ref: r.supplierRef }) : null, t('bar.screens.deliveries.items-count', { count: r.lines.length })].filter(Boolean).join(' · ')"
           >
@@ -70,13 +71,13 @@ const columns = computed(() => [
           v-else-if="d.deliveries.length"
           :data="d.deliveries"
           :columns="columns"
-          :caption="t('bar.navigation.deliveries.label')"
+          :caption="t('bar.screens.deliveries.title')"
           :meta="{ class: { tr: 'cursor-pointer' } }"
-          @select="(_event: Event, row: { original: Delivery }) => navigateTo(`/console/bar/deliveries/${row.original.id}`)"
+          @select="(_event: Event, row: { original: Delivery }) => navigateTo(`/console/bar/stock/deliveries/${row.original.id}`)"
         >
           <template #when-cell="{ row }">
             <ULink
-              :to="`/console/bar/deliveries/${row.original.id}`"
+              :to="`/console/bar/stock/deliveries/${row.original.id}`"
               class="font-medium"
             >
               {{ dateTime(row.original.receivedAt ?? row.original.createdAt) }}

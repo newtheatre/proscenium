@@ -1,9 +1,9 @@
-<!-- Price lists (S12): Standard, which always exists, and any others such as Committee or Staff. A
-     list is priced by hand, falling back to Standard where it has no price; a percentage off is a
+<!-- Price lists (S12), a section of Outlets, where a list is chosen: Standard, which always exists,
+     and any others such as Committee or Staff. A list is priced by hand, falling back to Standard where it has no price; a percentage off is a
      promotion, not a list. A restricted list needs its own ability to choose at the till.
      Retired lists sit below a divider. -->
 <script setup lang="ts">
-import { priceListInput, priceListPatch } from '../../../../../../server/input'
+import { priceListInput, priceListPatch } from '../../server/input'
 
 interface List { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, active: boolean }
 
@@ -13,6 +13,12 @@ const { toRefusal, fieldErrors } = useRefusal()
 const toast = useToast()
 const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<{ lists: List[] }>('/api/bar/price-lists', { key: 'bar:price-lists' })
+// The page around it offers these lists on each outlet, so it is told when one changes.
+const emit = defineEmits<{ changed: [] }>()
+async function changed() {
+  await refresh()
+  emit('changed')
+}
 
 function describe(l: List): string {
   const how = l.standard
@@ -57,7 +63,7 @@ async function save() {
       await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body })
       offer(t('bar.screens.lists.saved'), was && (async () => {
         await $api(`/api/bar/price-lists/${id}` as string, { method: 'PATCH', body: was.standard ? { name: was.name, restricted: was.restricted } : { name: was.name, restricted: was.restricted, fallsBack: was.fallsBack } })
-        await refresh()
+        await changed()
       }))
     }
     else {
@@ -65,7 +71,7 @@ async function save() {
       toast.add({ title: t('bar.screens.lists.saved'), color: 'success' })
     }
     form.value = null
-    await refresh()
+    await changed()
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -75,10 +81,10 @@ async function save() {
 async function setActive(l: List, active: boolean) {
   try {
     await $api(`/api/bar/price-lists/${l.id}` as string, { method: 'PATCH', body: { active } })
-    await refresh()
+    await changed()
     offer(active ? t('bar.screens.lists.restored', { name: l.name }) : t('bar.screens.lists.retired', { name: l.name }), async () => {
       await $api(`/api/bar/price-lists/${l.id}` as string, { method: 'PATCH', body: { active: !active } })
-      await refresh()
+      await changed()
     })
   }
   catch (e) {
@@ -88,22 +94,37 @@ async function setActive(l: List, active: boolean) {
 </script>
 
 <template>
-  <PageFrame :title="t('bar.navigation.price-lists.label')">
-    <template #primary>
-      <div class="flex items-center gap-2">
+  <section
+    id="price-lists"
+    aria-labelledby="bar-price-lists-title"
+    class="space-y-4 pt-6"
+  >
+    <div class="flex flex-wrap items-center gap-2">
+      <h2
+        id="bar-price-lists-title"
+        class="text-lg font-semibold text-highlighted"
+      >
+        {{ t('bar.screens.lists.title') }}
+      </h2>
+      <div class="ms-auto flex items-center gap-2">
         <SearchToggle
           v-model="query"
           v-model:open="searching"
           :label="t('bar.screens.lists.search')"
         />
         <UButton
+          color="neutral"
+          variant="outline"
           icon="i-lucide-plus"
           :label="t('bar.screens.lists.new')"
           :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
           @click="edit()"
         />
       </div>
-    </template>
+    </div>
+    <p class="text-sm text-muted">
+      {{ t('bar.screens.lists.about') }}
+    </p>
     <DataBoundary
       :data="data"
       :status="status"
@@ -137,7 +158,7 @@ async function setActive(l: List, active: boolean) {
           </p>
           <RecordList
             v-if="current.length"
-            :label="t('bar.navigation.price-lists.label')"
+            :label="t('bar.screens.lists.title')"
           >
             <RecordListItem
               v-for="l in current"
@@ -146,7 +167,7 @@ async function setActive(l: List, active: boolean) {
               :muted="!l.active"
             >
               <template #name>
-                <ULink :to="`/admin/modules/bar/price-lists/${l.id}`">
+                <ULink :to="`/admin/modules/bar/outlets/price-lists/${l.id}`">
                   {{ l.name }}
                 </ULink>
               </template>
@@ -175,7 +196,7 @@ async function setActive(l: List, active: boolean) {
                 :muted="!l.active"
               >
                 <template #name>
-                  <ULink :to="`/admin/modules/bar/price-lists/${l.id}`">
+                  <ULink :to="`/admin/modules/bar/outlets/price-lists/${l.id}`">
                     {{ l.name }}
                   </ULink>
                 </template>
@@ -242,5 +263,5 @@ async function setActive(l: List, active: boolean) {
         />
       </template>
     </UModal>
-  </PageFrame>
+  </section>
 </template>

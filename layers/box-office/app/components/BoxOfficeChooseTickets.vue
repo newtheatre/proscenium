@@ -128,6 +128,8 @@ const totalMinor = computed(() => {
   return each.reduce((sum, e) => sum + e.full, 0) - saving
 })
 const currency = computed(() => data.value?.currency ?? undefined)
+// The pass and promo code boxes open by themselves for somebody who already has one in play.
+const extrasOpen = ref(passes.value.length > 0 || (data.value?.passes.mine.length ?? 0) > 0)
 // A pass entry is a ticket a companion may come with, as a paid one is.
 const companionAlone = computed(() => chosen.value.length > 0 && !passes.value.length && !buying.value.length && !swaps.value.length && chosen.value.every(c => c.type.needsPaidTicket))
 const tooMany = computed(() => quantity.value > (data.value?.maxPerOrder ?? 0))
@@ -185,7 +187,10 @@ function setReference(bandId: string, typeId: string, n: number, value: string) 
 const referencesMissing = computed(() => chosen.value.some(c => typing(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).filter(Boolean).length < c.quantity))
 // A member price swapped for without signing in needs what proves it, one for each pass.
 const swapReferencesMissing = computed(() => swaps.value.some(s => (data.value?.passes.onSale.find(p => p.id === s.passTypeId)?.prices.find(p => p.id === s.passPriceId)?.allowed === false) && s.references.slice(0, s.count).filter(r => r?.trim()).length < s.count))
-const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && !swapReferencesMissing.value && (!siteKey || !!challenge.value))
+// The button is always there to press and says what is missing; only the bot check, which no field can fix, holds it back.
+const checking = computed(() => !!siteKey && !challenge.value)
+const ready = computed(() => quantity.value > 0 && !companionAlone.value && !tooMany.value && !referencesMissing.value && !swapReferencesMissing.value && !checking.value)
+const pressed = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // A refused reference is said beside the references typed; the notice at the top is for the rest.
 const referenceRefusal = computed(() => refusal.value?.code.startsWith('box-office.requirement.reference-') ? refusal.value : null)
@@ -257,6 +262,7 @@ onMounted(async () => {
   }, 1000)
   if ((props.changing || route.query.change) && remembered.choices) {
     counts.value = Object.fromEntries(remembered.choices.map(c => [keyOf(c.bandId, c.ticketTypeId), c.quantity]))
+    if (remembered.passes?.length || remembered.promoCode) extrasOpen.value = true
     if (remembered.passes) passes.value = remembered.passes
     if (remembered.buying) buying.value = remembered.buying
     if (remembered.swaps) swaps.value = remembered.swaps
@@ -271,6 +277,8 @@ const heldLeft = computed(() => held.value ? Math.max(0, Math.floor((held.value.
 const heldClock = computed(() => `${Math.floor(heldLeft.value / 60)}:${String(heldLeft.value % 60).padStart(2, '0')}`)
 
 async function hold() {
+  pressed.value = true
+  if (!ready.value) return
   refusal.value = null
   busy.value = true
   try {
@@ -366,28 +374,6 @@ async function hold() {
         :title="t('box-office.book.ask.sent')"
         :description="t('box-office.book.ask.sent-help')"
       />
-      <BoxOfficePassBox
-        v-if="data.passes.accepted"
-        v-model="passes"
-        :performance-id="performanceId"
-        :mine="data.passes.mine"
-        :wheelchair="data.passes.wheelchair"
-        :refusal="passRefusal"
-      />
-      <BoxOfficePassOffer
-        v-for="pass in data.passes.onSale.filter(p => !swappable.includes(p))"
-        :key="pass.id"
-        v-model="buying"
-        :pass="pass"
-        :currency="currency"
-        :wheelchair="data.passes.wheelchair"
-      />
-      <p
-        v-if="passes.length || buying.length"
-        class="text-sm font-medium text-muted"
-      >
-        {{ t('box-office.book.pass.more-tickets') }}
-      </p>
       <section
         v-for="band in data.bands"
         :key="band.bandId"
@@ -518,39 +504,75 @@ async function hold() {
       >
         {{ t('box-office.book.swap.references-missing') }}
       </p>
-      <UFormField
-        :label="t('box-office.book.promo.label')"
-        name="promoCode"
-        :error="promoRefusal?.reason"
-        :help="promo ? t('box-office.book.promo.applied', { code: promo.code }) : undefined"
+      <BoxOfficePassOffer
+        v-for="pass in data.passes.onSale.filter(p => !swappable.includes(p))"
+        :key="pass.id"
+        v-model="buying"
+        :pass="pass"
+        :currency="currency"
+        :wheelchair="data.passes.wheelchair"
+      />
+      <!-- A pass code or a promo code: one quiet line until somebody has one (Matt, 21 November 2026). -->
+      <UButton
+        v-if="!extrasOpen"
+        color="neutral"
+        variant="link"
+        icon="i-lucide-ticket-percent"
+        :label="t(data.passes.accepted ? 'box-office.book.extras.both' : 'box-office.book.extras.promo')"
+        class="px-0"
+        @click="extrasOpen = true"
+      />
+      <template v-else>
+        <BoxOfficePassBox
+          v-if="data.passes.accepted"
+          v-model="passes"
+          start-open
+          :performance-id="performanceId"
+          :mine="data.passes.mine"
+          :wheelchair="data.passes.wheelchair"
+          :refusal="passRefusal"
+        />
+        <UFormField
+          :label="t('box-office.book.promo.label')"
+          name="promoCode"
+          :error="promoRefusal?.reason"
+          :help="promo ? t('box-office.book.promo.applied', { code: promo.code }) : undefined"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="promoInput"
+              :disabled="!!promo"
+              autocomplete="off"
+              maxlength="40"
+              class="w-48"
+              @keydown.enter.prevent="tryCode"
+            />
+            <UButton
+              v-if="!promo"
+              :label="t('box-office.book.promo.apply')"
+              color="neutral"
+              variant="outline"
+              :loading="promoBusy"
+              :disabled="!promoInput.trim()"
+              @click="tryCode"
+            />
+            <UButton
+              v-else
+              :label="t('box-office.book.promo.remove')"
+              color="neutral"
+              variant="ghost"
+              @click="dropCode"
+            />
+          </div>
+        </UFormField>
+      </template>
+      <p
+        v-if="pressed && !quantity"
+        class="text-sm text-error"
+        role="alert"
       >
-        <div class="flex flex-wrap items-center gap-2">
-          <UInput
-            v-model="promoInput"
-            :disabled="!!promo"
-            autocomplete="off"
-            maxlength="40"
-            class="w-48"
-            @keydown.enter.prevent="tryCode"
-          />
-          <UButton
-            v-if="!promo"
-            :label="t('box-office.book.promo.apply')"
-            color="neutral"
-            variant="outline"
-            :loading="promoBusy"
-            :disabled="!promoInput.trim()"
-            @click="tryCode"
-          />
-          <UButton
-            v-else
-            :label="t('box-office.book.promo.remove')"
-            color="neutral"
-            variant="ghost"
-            @click="dropCode"
-          />
-        </div>
-      </UFormField>
+        {{ t('box-office.book.choose-one') }}
+      </p>
       <p
         v-if="companionAlone"
         class="text-sm text-error"
@@ -560,7 +582,9 @@ async function hold() {
       </p>
       <p
         v-if="referencesMissing"
-        class="text-sm text-muted"
+        class="text-sm"
+        :class="pressed ? 'text-error' : 'text-muted'"
+        :role="pressed ? 'alert' : undefined"
       >
         {{ t('box-office.book.references-missing') }}
       </p>
@@ -582,8 +606,8 @@ async function hold() {
           size="xl"
           class="justify-center max-sm:w-full"
           :loading="busy"
-          :disabled="!ready"
-          :label="quantity ? (buying.length || swaps.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.choose')"
+          :disabled="checking"
+          :label="quantity ? (buying.length || swaps.length ? t('box-office.book.hold-with-pass', { count: quantity, total: money(totalMinor + passMinor, currency) }) : totalMinor === 0 ? t('box-office.book.hold-free', { count: quantity }) : t('box-office.book.hold', { count: quantity, total: money(totalMinor, currency) })) : t('box-office.book.continue')"
           @click="hold"
         />
       </div>

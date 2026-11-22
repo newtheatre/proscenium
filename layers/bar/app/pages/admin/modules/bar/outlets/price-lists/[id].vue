@@ -17,7 +17,7 @@ const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ categories: Category[], lists: List[] }>('/api/bar/price-lists', { key: 'bar:price-lists' })
 const list = computed(() => data.value?.lists.find(l => l.id === String(route.params.id)))
 const standard = computed(() => data.value?.lists.find(l => l.standard))
-const trail = computed(() => [{ label: t('bar.navigation.price-lists.label'), to: '/admin/modules/bar/price-lists' }])
+const trail = computed(() => [{ label: t('bar.navigation.outlets.label'), to: '/admin/modules/bar/outlets#price-lists' }])
 
 // The mixer measure is priced by the Mixer choices, never on a list, so it is not shown.
 const sizeName = (p: Product, v: Variant) => p.variants.filter(x => !x.mixerMeasure).length === 1 && v.name === 'Each' ? p.name : `${p.name}, ${v.name}`
@@ -82,7 +82,7 @@ function onStandard(v: Variant): string {
 
 <template>
   <PageFrame
-    :title="list?.name ?? t('bar.navigation.price-lists.label')"
+    :title="list?.name ?? t('bar.screens.lists.title')"
     :trail="trail"
   >
     <template #primary>

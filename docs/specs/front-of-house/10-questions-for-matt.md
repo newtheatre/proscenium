@@ -85,3 +85,17 @@ Recorded for the build. None is open.
 - **Communications.** It expects front of house to contribute audience sources such as "people on this week's rota". Added as FH-46, later.
 - **The on-shift bar's point.** Interface has confirmed `core.on-shift-bar`, and ruled that the board appears on screen as the Front of house section of Tonight, with tiles naming abilities, not facts.
 - **Core's event names** for a performance moved or cancelled are confirmed and written into part 4.
+
+## Changes approved on 21 November 2026
+
+Matt approved these nine changes from the interface review on 21 November 2026. Each is written into the part named.
+
+1. **One performance tonight opens its board.** The list of tonight's performances is skipped when there is exactly one (part 5, "Live mode").
+2. **The incident report is one page**, not steps, with "Send the report" always in reach (part 5).
+3. **A checklist starts with its first answer.** There is no "Start this checklist" (part 5; part 3, "Checklists", rule 1 already allowed it).
+4. **Shifts is one page with "My shifts" and "Open shifts" tabs** (part 5, "Members' area").
+5. **Arriving once.** Recording a timing or entering a checklist item on your own shift checks you in (part 3, "The Tonight board"; FH-21).
+6. **Archived duties, rota templates and checklists can be restored**, and archiving offers Undo instead of asking first (part 5, "Console"; FH-05, FH-24).
+7. **"Who else is on" leaves out the person reading it** (part 5, "Members' area").
+8. **The board has no Incidents tile** (part 5, "Live mode").
+9. **Volunteer hours sits in the console's People group** (part 5, "Console").

@@ -1,5 +1,5 @@
-<!-- Your details (ID-11; identity spec part 6): the name and pronouns,
-     and for a member their emergency contacts (ID-17).
+<!-- Details (ID-11, ID-12; identity spec part 6): the name and pronouns, the email addresses
+     (Matt, 21 November: one page, not two), and for a member their emergency contacts (ID-17).
      Everything that shows the person reads the account, so after saving the app's data is fetched
      again and the header shows the new name at once. -->
 <script setup lang="ts">
@@ -57,43 +57,48 @@ async function save() {
       :error="error"
       @retry="refresh()"
     >
-      <UForm
-        :schema="schema"
-        :state="form"
-        class="space-y-6"
-        novalidate
-        @submit="save"
-      >
-        <RefusalNotice :refusal="refusal" />
-        <UFormField
-          name="name"
-          :label="t('core.me.details.name')"
-          :help="t('core.me.details.name-help')"
-          required
-        >
-          <UInput
-            v-model="form.name"
-            autocomplete="name"
-            maxlength="120"
-          />
-        </UFormField>
-        <UFormField
-          name="pronouns"
-          :label="t('core.me.details.pronouns')"
-          :help="t('core.me.details.pronouns-help')"
-        >
-          <UInput
-            v-model="form.pronouns"
-            maxlength="40"
-          />
-        </UFormField>
-        <UButton
-          type="submit"
-          :loading="saving"
-          :label="t('core.me.details.save')"
-        />
-      </UForm>
-      <MyEmergencyContacts class="mt-8" />
+      <div class="space-y-6">
+        <PageSection :title="t('core.me.details.name-title')">
+          <UForm
+            :schema="schema"
+            :state="form"
+            class="space-y-4"
+            novalidate
+            @submit="save"
+          >
+            <RefusalNotice :refusal="refusal" />
+            <UFormField
+              name="name"
+              :label="t('core.me.details.name')"
+              :help="t('core.me.details.name-help')"
+              required
+            >
+              <UInput
+                v-model="form.name"
+                autocomplete="name"
+                maxlength="120"
+              />
+            </UFormField>
+            <UFormField
+              name="pronouns"
+              :label="t('core.me.details.pronouns')"
+              :help="t('core.me.details.pronouns-help')"
+            >
+              <UInput
+                v-model="form.pronouns"
+                maxlength="40"
+              />
+            </UFormField>
+            <UButton
+              type="submit"
+              :loading="saving"
+              :label="t('core.me.details.save')"
+            />
+          </UForm>
+        </PageSection>
+        <MyEmailAddresses />
+        <MyEmergencyContacts />
+      </div>
     </DataBoundary>
   </PageFrame>
 </template>

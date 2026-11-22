@@ -1,24 +1,26 @@
-<!-- Recovery codes (ID-14). Shown after a new set is made, when the person confirms they kept them by
-     typing one back; or shown again from Signing in (`review`), where used codes are struck through
-     and nothing needs typing. Either way the set can be downloaded as a text file or copied. -->
+<!-- Recovery codes (ID-14). Shown after a new set is made, when the person downloads or copies them
+     and ticks that they are saved (Matt, 21 November: a tick, not a code typed back); or shown again
+     from Signing in (`review`), where used codes are struck through and a Done button closes them. -->
 <script setup lang="ts">
 import { z } from 'zod'
 
 const props = defineProps<{
   codes: string[]
-  checkPath?: string
   /** Which codes have been used, by position. Only when showing an existing set again. */
   used?: boolean[]
-  /** Showing an existing set: no typing back, a Done button instead. */
+  /** Showing an existing set: no tick, a Done button instead. */
   review?: boolean
 }>()
 const emit = defineEmits<{ kept: [code: string] }>()
 // Made by Vue, so two of these on one page (or one in a dialogue over another) never share an id.
 const headingId = useId()
-const typed = ref('')
-const wrong = ref(false)
-// One code typed back; left empty, the field says so.
-const typedSchema = z.object({ typed: z.string().trim().min(1) })
+// Downloading or copying comes first; the tick then says the person has put them somewhere.
+const taken = ref(false)
+const state = reactive({ saved: false })
+const savedSchema = z.object({ saved: z.boolean() }).superRefine((v, ctx) => {
+  if (!taken.value) ctx.addIssue({ code: 'custom', path: ['saved'], message: 'Download or copy the codes first.' })
+  else if (!v.saved) ctx.addIssue({ code: 'custom', path: ['saved'], message: 'Tick this once you have saved them.' })
+})
 const toast = useToast()
 const { data: brand } = await useBrand()
 const { dayLong } = useDates()
@@ -45,28 +47,23 @@ function download() {
   const link = Object.assign(document.createElement('a'), { href: url, download: `${site || 'site'}-recovery-codes.txt` })
   link.click()
   URL.revokeObjectURL(url)
+  taken.value = true
 }
 
 async function copy() {
   try {
     await navigator.clipboard.writeText(asText())
     toast.add({ title: 'Recovery codes copied', color: 'success' })
+    taken.value = true
   }
   catch {
     toast.add({ title: 'Your browser did not allow copying. Download the codes instead.', color: 'warning' })
   }
 }
 
-async function confirm() {
-  wrong.value = false
-  if (props.checkPath) {
-    const answer = await callIdentity<{ matches: boolean }>(props.checkPath, { code: typed.value })
-    if (!answer.ok || !answer.data.matches) {
-      wrong.value = true
-      return
-    }
-  }
-  emit('kept', typed.value)
+// Setup's last step takes one of the codes as proof they were shown, so the first is passed on.
+function confirm() {
+  emit('kept', props.codes[0] ?? '')
 }
 </script>
 
@@ -129,27 +126,23 @@ async function confirm() {
     />
     <UForm
       v-else
-      :schema="typedSchema"
-      :state="{ typed }"
+      :schema="savedSchema"
+      :state="state"
       class="flex flex-col gap-4"
       novalidate
       @submit="confirm"
     >
-      <UFormField
-        label="Type one of the codes to show you have kept them"
-        name="typed"
-        :error="wrong ? 'That is not one of the codes above. Check it and try again.' : undefined"
-      >
-        <UInput
-          v-model="typed"
-          autocomplete="off"
+      <UFormField name="saved">
+        <UCheckbox
+          v-model="state.saved"
+          label="I have saved these codes somewhere safe"
         />
       </UFormField>
       <UButton
         type="submit"
         block
       >
-        I have kept them
+        Continue
       </UButton>
     </UForm>
   </section>
