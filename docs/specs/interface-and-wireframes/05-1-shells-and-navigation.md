@@ -67,13 +67,13 @@ Groups and entries, in the platform's fixed order. A group's id is what an entry
 | none | Overview | `/admin` | interface |
 | Theatre (`theatre`) | Theatre (generated settings page: the site, the organisation, language and region) | `/admin/theatre` | core domain declares, interface draws |
 |  | Branding (its own screen; its settings are drawn nowhere else) | `/admin/branding` | core domain |
-|  | Vocabularies | `/admin/vocabularies` | core domain |
+|  | Lists (the theatre's own vocabularies; a module's are the Lists tab of its page, `/admin/modules/<module>/lists`) | `/admin/vocabularies` | core domain |
 |  | Navigation | `/admin/navigation` | interface |
 |  | Site readiness | `/admin/site-readiness` | core domain |
 | Modules (`modules`) | Modules | `/admin/modules` | foundations |
 |  | A module's own page, when it places a settings group here | `/admin/modules/<module>` | the module declares, interface draws |
 | Access (`access`) | Roles, and one role | `/admin/roles`, `/admin/roles/<role>` | identity |
-|  | Facts | `/admin/facts` | identity |
+|  | Automatic access (the facts), a tab of Roles with no menu entry of its own | `/admin/roles/automatic` | identity |
 |  | Sign-in (generated settings page: sign-in, sessions, recovery, access) | `/admin/sign-in` | identity declares, interface draws |
 |  | Privacy (generated settings page) | `/admin/privacy` | core declares, interface draws |
 | Email (`email`) | Senders (its own screen; holds the sending domain, label and footer) | `/admin/email` | core domain |

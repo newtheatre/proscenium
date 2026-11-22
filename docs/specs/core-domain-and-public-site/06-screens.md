@@ -19,17 +19,18 @@ On 16 November 2026 Matt added a fourth shell, Admin at `/admin`, for screens ab
 | Delivery log | Console | unchanged |
 | Branding | Admin | `/admin/branding` |
 | Theatre (the generated settings page that holds the site, organisation and locale groups) | Admin | `/admin/theatre` |
-| Vocabularies | Admin | `/admin/vocabularies` |
+| Lists (the theatre's own vocabularies) | Admin | `/admin/vocabularies` |
+| A module's vocabularies | Admin, the Lists tab of the module's page | `/admin/modules/<module>/lists` |
 | Senders, with the sending-domain setup and the email outcomes step | Admin | `/admin/email` |
 | Delivery health, with the suppression list | Admin | `/admin/email/health` |
-| Webhooks, Webhook editor, Webhook delivery log | Admin | `/admin/webhooks` |
-| Site readiness | Admin | `/admin/site-readiness` |
+| Webhooks, Webhook editor, Webhook delivery log (the delivery limits are settings on Advanced) | Admin | `/admin/webhooks` |
+| Site readiness (letting search engines in is a button on its notice, not a settings card) | Admin | `/admin/site-readiness` |
 
 Each Admin entry declares `menu: 'admin'` and one of the interface specification's groups:
 
 | Group | Core's entries, in order |
 | --- | --- |
-| `theatre` (Theatre) | Theatre, Branding, Vocabularies, then the interface's Navigation, then Site readiness |
+| `theatre` (Theatre) | Theatre, Branding, Lists, then the interface's Navigation, then Site readiness |
 | `email` (Email) | Senders, Delivery health |
 | `connections` (Connections) | After the foundations' Credentials: Webhooks |
 
