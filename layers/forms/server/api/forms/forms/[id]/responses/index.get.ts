@@ -38,7 +38,7 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
   const mayDecide = mayMove && (await can(actor, 'forms.response.decide', on)).allowed
   const currency = await useSetting('core.locale.currency') as string
   return {
-    form: { id: form.id, title: form.title, slug: form.slug, anonymous: form.anonymous, status: form.status },
+    form: { id: form.id, title: form.title, slug: form.slug, anonymous: form.anonymous, status: form.status, published: form.liveVersionId !== null, canEdit: (await can(actor, 'forms.form.edit', on)).allowed },
     columns,
     // A column per calculation of the live version. One worked out from restricted answers shows as restricted.
     calculations: figureColumns(liveDef),

@@ -2,7 +2,7 @@
      (forms', another module's or the theatre's own), or from an exported file. -->
 <script setup lang="ts">
 interface Template { key: string, name: string, description: string | null, own: boolean, anonymous: boolean, questions: number, mode: 'submission' | 'record' | null }
-interface FormRow { id: string, slug: string, title: string, status: 'draft' | 'live' | 'paused' | 'closed' | 'archived', published: boolean, mode: 'submission' | 'record', responses: number | null }
+interface FormRow { canEdit?: boolean, canRead?: boolean, id: string, slug: string, title: string, status: 'draft' | 'live' | 'paused' | 'closed' | 'archived', published: boolean, mode: 'submission' | 'record', responses: number | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -97,6 +97,8 @@ const matching = computed(() => {
   const words = search.value.trim().toLowerCase()
   return (data.value?.forms ?? []).filter(f => !words || f.title.toLowerCase().includes(words) || f.slug.includes(words))
 })
+// A form that has been published opens on its responses, which is what people come back for; a draft opens to be built.
+const where = (f: FormRow) => f.canRead && (!f.canEdit || (f.mode !== 'record' && f.published)) ? `/console/forms/${f.id}/responses` : `/console/forms/${f.id}`
 const current = computed(() => matching.value.filter(f => f.status !== 'archived'))
 const archived = computed(() => matching.value.filter(f => f.status === 'archived'))
 // A set of custom fields is filled in on its record: it has no address, and nobody is sent it.
@@ -112,7 +114,7 @@ watch(() => state.template, () => {
   offered = chosen.value ? nameOf(chosen.value) : ''
   state.title = offered
 })
-const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'neutral', archived: 'neutral' } as const
+const tone = { draft: 'neutral', live: 'success', paused: 'neutral', closed: 'neutral', archived: 'neutral' } as const
 </script>
 
 <template>
@@ -164,7 +166,7 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
         <RecordListItem
           v-for="f in current"
           :key="f.id"
-          :to="`/console/forms/${f.id}`"
+          :to="where(f)"
           :icon="f.mode === 'record' ? 'i-lucide-list-plus' : 'i-lucide-file-text'"
           :name="f.title"
           :description="about(f)"
@@ -184,7 +186,7 @@ const tone = { draft: 'neutral', live: 'success', paused: 'warning', closed: 'ne
           <RecordListItem
             v-for="f in archived"
             :key="f.id"
-            :to="`/console/forms/${f.id}`"
+            :to="where(f)"
             :icon="f.mode === 'record' ? 'i-lucide-list-plus' : 'i-lucide-file-text'"
             :name="f.title"
             :description="about(f)"

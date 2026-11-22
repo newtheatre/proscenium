@@ -16,9 +16,7 @@ stateDiagram-v2
     Live --> Live: publish a new version
     Live --> Closed: close
     Closed --> Archived: archive
-    Live --> Paused: pause
-    Paused --> Live: resume
-    Paused --> Closed: close
+    Closed --> Live: open again
   }
   state "Each version" as VER {
     direction LR
@@ -33,7 +31,7 @@ stateDiagram-v2
 
 *life cycle of a form and of each version*
 
-The form's status says whether it takes responses; a version's state says whether its definition can still change.
+The form's status says whether it takes responses (a form was once paused as well as closed; pausing went on 21 November 2026, see [part 13](13-changes-2026-11-21.md)); a version's state says whether its definition can still change.
 
 | Change | Guard |
 | --- | --- |
@@ -41,8 +39,7 @@ The form's status says whether it takes responses; a version's state says whethe
 | Edit the draft version | Ability `forms.form.edit` on this form. The save states the draft version's `edit_revision`; a stale one is refused and the editor is shown who saved last |
 | Publish | Ability `forms.form.publish`. The definition has no errors in the problems list. A form with a personal, free-text or special question has a retention period. The draft version differs from the live version |
 | Publish a breaking change | As publish, and the person has confirmed the impact statement, which names each retired question and the number of answers it holds |
-| Pause, resume | Ability `forms.form.publish`. Pausing stops new responses; draft responses in progress are kept |
-| Close | Ability `forms.form.publish`. No new responses or submissions; staff work on existing responses continues |
+| Close, open again | Ability `forms.form.publish`. No new responses or submissions; staff work on existing responses continues |
 | Archive | The form is closed and no response is short of a final stage |
 | Delete | Only a form that was never published. A published form is archived, and its responses leave by retention |
 

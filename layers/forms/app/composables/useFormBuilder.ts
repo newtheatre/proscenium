@@ -12,6 +12,8 @@ export interface BuilderData {
   today: string | null
   requireRetention?: boolean
   shared?: boolean
+  /** Whether this person may read the form's responses, which decides the Responses tab. */
+  canRead?: boolean
   form: BuilderForm
   draft: { definition: Definition, editRevision: number, editedBy: string | null, updatedAt: number }
   fields: PublishedField[]
@@ -36,6 +38,8 @@ export interface FormBuilder {
   state: Ref<SaveState>
   failure: Ref<string | null>
   selected: Ref<string | null>
+  /** Custom fields, filled in on their record: nobody is greeted, thanked or asked to send. */
+  record: boolean
   pageId: Ref<string>
   problems: ComputedRef<Problem[]>
   problemsAt: ComputedRef<Map<string, Problem[]>>
@@ -108,7 +112,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
   /** Keeps the selection and the open page on things that still exist. */
   function settle() {
     const def = definition.value
-    if (selected.value && !find(def, selected.value) && !def.endings?.some(e => e.id === selected.value) && !def.calculations?.some(c => c.id === selected.value)) selected.value = null
+    if (selected.value && !selected.value.startsWith('form:') && !find(def, selected.value) && !def.endings?.some(e => e.id === selected.value) && !def.calculations?.some(c => c.id === selected.value)) selected.value = null
     if (!def.pages.some(p => p.id === pageId.value)) pageId.value = def.pages[0]!.id
   }
   function apply(next: Definition, merge?: string) {
@@ -148,6 +152,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
     return map
   })
   return {
+    record: data.form.mode === 'record',
     definition, revision, state, failure, selected, pageId, problems, problemsAt,
     published: computed(() => new Map(fields().map(f => [f.questionId, f]))),
     sources: computed(() => data.sources ?? []),

@@ -16,7 +16,7 @@ interface Move { key: string, label: string, to: string, toKind: string, decisio
 interface FigureColumn { id: string, key: string, label: string, type: CalculationType, restricted: boolean }
 interface Row { figures: Record<string, Figure>, id: string, reference: string, version: number, who: string | null, submittedAt: number, stage: { key: string | null, name: string, kind: string } | null, cells: Record<string, { text: string, restricted: boolean }> }
 interface Table {
-  form: { id: string, title: string, slug: string, anonymous: boolean, status: string }
+  form: { id: string, title: string, slug: string, anonymous: boolean, status: string, published?: boolean, canEdit?: boolean }
   columns: Column[]
   calculations?: FigureColumn[]
   rows: Row[]
@@ -324,10 +324,10 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
 
 <template>
   <PageFrame
-    :title="t('forms.screens.responses.title')"
+    :title="data?.form.title ?? t('forms.screens.responses.title')"
     :description="data && (data.total || filtered) ? t('forms.screens.responses.count', { count: data.total }) : undefined"
     width="full"
-    :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }, ...(data ? [{ label: data.form.title, to: `/console/forms/${formId}` }] : [])]"
+    :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }]"
   >
     <template
       v-if="data?.canExport"
@@ -343,99 +343,109 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         target="_blank"
       />
     </template>
-    <template
-      v-if="hasAny"
-      #toolbar
-    >
-      <component
-        :is="phone ? UDrawer : UPopover"
-        v-model:open="filtering"
-        v-bind="phone ? { direction: 'bottom', title: t('core.list.filters'), description: t('core.list.filters-description') } : { content: { align: 'start' } }"
-      >
-        <UButton
-          :label="filterCount ? t('core.list.filters-on', { count: filterCount }) : t('core.list.filters')"
-          icon="i-lucide-sliders-horizontal"
-          color="neutral"
-          variant="outline"
-          aria-haspopup="dialog"
+    <template #toolbar>
+      <div class="flex min-w-0 flex-1 flex-col gap-1 py-1">
+        <FormsTabs
+          :form-id="formId"
+          current="responses"
+          :build="!!data?.form.canEdit"
+          :history="!!data?.form.canEdit && !!data?.form.published"
         />
-        <template #content>
-          <div
-            class="w-full space-y-4 p-4 sm:w-96"
-            role="group"
-            :aria-label="t('core.list.filters')"
+        <div
+          v-if="hasAny"
+          class="flex min-w-0 flex-wrap items-center gap-2"
+        >
+          <component
+            :is="phone ? UDrawer : UPopover"
+            v-model:open="filtering"
+            v-bind="phone ? { direction: 'bottom', title: t('core.list.filters'), description: t('core.list.filters-description') } : { content: { align: 'start' } }"
           >
-            <div class="grid grid-cols-2 gap-3">
-              <UFormField :label="t('forms.screens.responses.from-date')">
-                <FieldDate v-model="from" />
-              </UFormField>
-              <UFormField :label="t('forms.screens.responses.to-date')">
-                <FieldDate v-model="to" />
-              </UFormField>
-            </div>
-            <UFormField
-              v-if="stageItems.length"
-              :label="t('forms.screens.responses.stage')"
-            >
-              <USelect
-                v-model="stage"
-                :items="stageItems"
-                :placeholder="t('forms.screens.responses.any-stage')"
-              />
-            </UFormField>
-            <UFormField :label="t('forms.screens.responses.where')">
-              <USelect
-                v-model="question"
-                :items="questionItems"
-                :placeholder="t('forms.screens.responses.any-answer')"
-              />
-            </UFormField>
-            <UFormField
-              v-if="view.question"
-              :label="t('forms.screens.responses.is')"
-              :help="t('forms.screens.responses.is-help')"
-            >
-              <UInput
-                v-model="typed"
-                @change="show({ value: typed.trim() || undefined })"
-              />
-            </UFormField>
-            <div class="flex items-center justify-between gap-2 border-t border-default pt-3">
-              <UButton
-                color="neutral"
-                variant="link"
-                :label="t('core.list.clear-all')"
-                :disabled="!filtered"
-                @click="router.replace({ query: {} })"
-              />
-              <UButton
-                :label="t('core.list.done')"
-                @click="filtering = false"
-              />
-            </div>
-          </div>
-        </template>
-      </component>
-      <UDropdownMenu
-        v-if="columnItems.length > 1 && !phone"
-        :items="columnItems"
-        :ui="{ content: 'max-h-96 overflow-y-auto' }"
-      >
-        <UButton
-          :label="hidden.length ? t('forms.screens.responses.columns-n', { shown: columnItems.length - hidden.length, of: columnItems.length }) : t('forms.screens.responses.columns')"
-          icon="i-lucide-columns-3"
-          color="neutral"
-          variant="outline"
-        />
-      </UDropdownMenu>
-      <UButton
-        v-if="filtered"
-        :label="t('forms.screens.responses.clear')"
-        icon="i-lucide-x"
-        color="neutral"
-        variant="ghost"
-        @click="router.replace({ query: {} })"
-      />
+            <UButton
+              :label="filterCount ? t('core.list.filters-on', { count: filterCount }) : t('core.list.filters')"
+              icon="i-lucide-sliders-horizontal"
+              color="neutral"
+              variant="outline"
+              aria-haspopup="dialog"
+            />
+            <template #content>
+              <div
+                class="w-full space-y-4 p-4 sm:w-96"
+                role="group"
+                :aria-label="t('core.list.filters')"
+              >
+                <div class="grid grid-cols-2 gap-3">
+                  <UFormField :label="t('forms.screens.responses.from-date')">
+                    <FieldDate v-model="from" />
+                  </UFormField>
+                  <UFormField :label="t('forms.screens.responses.to-date')">
+                    <FieldDate v-model="to" />
+                  </UFormField>
+                </div>
+                <UFormField
+                  v-if="stageItems.length"
+                  :label="t('forms.screens.responses.stage')"
+                >
+                  <USelect
+                    v-model="stage"
+                    :items="stageItems"
+                    :placeholder="t('forms.screens.responses.any-stage')"
+                  />
+                </UFormField>
+                <UFormField :label="t('forms.screens.responses.where')">
+                  <USelect
+                    v-model="question"
+                    :items="questionItems"
+                    :placeholder="t('forms.screens.responses.any-answer')"
+                  />
+                </UFormField>
+                <UFormField
+                  v-if="view.question"
+                  :label="t('forms.screens.responses.is')"
+                  :help="t('forms.screens.responses.is-help')"
+                >
+                  <UInput
+                    v-model="typed"
+                    @change="show({ value: typed.trim() || undefined })"
+                  />
+                </UFormField>
+                <div class="flex items-center justify-between gap-2 border-t border-default pt-3">
+                  <UButton
+                    color="neutral"
+                    variant="link"
+                    :label="t('core.list.clear-all')"
+                    :disabled="!filtered"
+                    @click="router.replace({ query: {} })"
+                  />
+                  <UButton
+                    :label="t('core.list.done')"
+                    @click="filtering = false"
+                  />
+                </div>
+              </div>
+            </template>
+          </component>
+          <UDropdownMenu
+            v-if="columnItems.length > 1 && !phone"
+            :items="columnItems"
+            :ui="{ content: 'max-h-96 overflow-y-auto' }"
+          >
+            <UButton
+              :label="hidden.length ? t('forms.screens.responses.columns-n', { shown: columnItems.length - hidden.length, of: columnItems.length }) : t('forms.screens.responses.columns')"
+              icon="i-lucide-columns-3"
+              color="neutral"
+              variant="outline"
+            />
+          </UDropdownMenu>
+          <UButton
+            v-if="filtered"
+            :label="t('forms.screens.responses.clear')"
+            icon="i-lucide-x"
+            color="neutral"
+            variant="ghost"
+            @click="router.replace({ query: {} })"
+          />
+        </div>
+      </div>
     </template>
 
     <DataBoundary
@@ -451,7 +461,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         :description="filtered ? undefined : t(data?.form.status === 'draft' ? 'forms.screens.responses.none-draft' : 'forms.screens.responses.none-help')"
       >
         <template
-          v-if="!filtered && data?.form.status === 'draft'"
+          v-if="!filtered && data?.form.status === 'draft' && data.form.canEdit"
           #actions
         >
           <UButton
