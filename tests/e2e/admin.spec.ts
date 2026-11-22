@@ -213,9 +213,9 @@ test.describe('on a phone, in dark mode', () => {
 
   test('has one header with one menu button, and the drawer opens from it', async ({ page }) => {
     await visit(page, '/admin')
-    // The Admin mark gives way to the page's own name on a phone.
+    // The Admin mark shows at every width; on a phone it is its icon, with the word kept for a screen reader.
     await expect(page.locator('#main').getByRole('heading', { level: 1 })).toBeVisible()
-    await expect(page.locator('#main').getByText('Admin', { exact: true }).first()).toBeHidden()
+    await expect(page.locator('#main').getByText('Admin', { exact: true }).first()).toHaveClass(/sr-only/)
     const toggle = page.getByRole('button', { name: 'Open sidebar' })
     await expect(toggle).toHaveCount(1)
     await toggle.click()

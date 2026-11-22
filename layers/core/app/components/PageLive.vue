@@ -45,7 +45,7 @@ const out = computed(() => {
         </h1>
         <p
           v-if="context"
-          class="truncate text-sm text-muted"
+          class="line-clamp-2 text-sm text-pretty text-muted"
         >
           {{ context }}
         </p>

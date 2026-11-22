@@ -8,6 +8,8 @@ const props = defineProps<{
   icon?: string
   /** The screen's documentation page. */
   help?: string
+  /** The one thing that fills it, when a button needs no slot of its own. */
+  action?: { label: string, to?: string, icon?: string, onClick?: () => void }
 }>()
 const { t } = useT()
 const slots = defineSlots<{ actions?: () => VNode[] }>()
@@ -19,7 +21,7 @@ function filled(nodes: VNode[]): boolean {
       ? Array.isArray(n.children) && filled(n.children as VNode[])
       : n.type !== Text || !!String(n.children).trim())
 }
-const hasActions = () => !!props.help || (!!slots.actions && filled(slots.actions()))
+const hasActions = () => !!props.help || !!props.action || (!!slots.actions && filled(slots.actions()))
 </script>
 
 <template>
@@ -32,6 +34,10 @@ const hasActions = () => !!props.help || (!!slots.actions && filled(slots.action
       v-if="hasActions()"
       #actions
     >
+      <UButton
+        v-if="action"
+        v-bind="action"
+      />
       <slot name="actions" />
       <UButton
         v-if="help"

@@ -14,7 +14,7 @@ export default defineRoute({
   const tokens = tokensFor({ ...(await brandChoice()), ...stripUndefined(input) })
   const email = render(
     { subject: 'Your tickets for {{ theatre }}', body: 'Thank you for booking.\n\n[View your tickets]({{ link }})' },
-    { values: { link: 'https://example.org/tickets' }, kinds: { link: 'url' }, accent: tokens.light.link, theatre: await theatreName('Your theatre') },
+    { values: { link: 'https://example.org/tickets' }, kinds: { link: 'url' }, accent: tokens.light.link, dark: tokens.dark, theatre: await theatreName('Your theatre') },
   )
   return { tokens, email: { subject: email.subject, html: email.html } }
 })
