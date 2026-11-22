@@ -377,6 +377,7 @@ export default defineModule({
         'en-GB': {
           subject: 'New shifts on the rota: {{ count }}',
           body: 'These shifts have just gone on the rota and are open for sign-up:\n\n{{ shifts }}\n\nChoose the ones that suit you from Open shifts. Places go to whoever signs up first.',
+          action: 'See open shifts',
         },
       },
     }, {

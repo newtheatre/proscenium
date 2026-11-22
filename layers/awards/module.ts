@@ -70,7 +70,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'You have been awarded: {{ award }}',
-          body: '{{ theatre }} has awarded you **{{ award }}**.\n\nSign in to see it, and to choose where it is listed on the roll of honour: [My awards]({{ link }})',
+          body: '{{ theatre }} has awarded you **{{ award }}**.\n\nSign in to see it, and to choose where it is listed on the roll of honour.\n\n[See my awards]({{ link }})',
         },
       },
     }],
