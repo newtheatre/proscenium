@@ -154,7 +154,7 @@ A few console screens build a thing rather than fill in a record: the form build
 One `Calendar` component serves every module that shows time: Spaces' bookings, Front of house's rota and Training's sessions. No module draws its own.
 
 - **Views:** day and week, with several columns side by side (one per space, role or trainer). On a phone it shows one day and one column at a time, with the column chosen from a menu.
-- **Blocks carry state** in three ways at once: a word, a border style and a colour, so state never depends on colour alone.
+- **Blocks carry state** in three ways at once: a word, a border style and a colour, so state never depends on colour alone. The usual state (a scheduled performance) keeps its border and colour and is read out, but its word is not drawn; only a state that differs is worded on the block (Matt, 21 November 2026).
 - **The list is the equal route.** Every calendar has a List view of the same items with the same filters and actions, reachable by one control and by keyboard. It is the accessible route and the default at phone width when there are more than three columns.
 - **Calendar colours** are a fixed, named set of eight (`calendar-1` to `calendar-8`), each with a light and dark pair that passes 4.5 to 1 for text and 3 to 1 against the page. They are separate from the brand accent and from the status colours, so no brand can make them unreadable. A module maps its categories to names, never to colour values.
 - **Times** follow the theatre's zone and the show-night rule; a block that crosses midnight is drawn once, on the night it belongs to.

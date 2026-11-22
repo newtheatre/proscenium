@@ -385,7 +385,9 @@ Four rules:
 - **Place by operating day.** Give each item the operating day the server worked out, so a show at
   00:30 sits with the evening before and is drawn once.
 - **State three ways.** Each block shows its state as a word, an edge (solid, dashed, dotted or
-  double) and a colour, so nothing rests on colour alone.
+  double) and a colour, so nothing rests on colour alone. The state most blocks are in is marked
+  `usual` (a scheduled performance): its word is still read out but is not drawn, so a Draft or a
+  Cancelled block stands out (Matt, 21 November 2026).
 - **Name a calendar colour, never a value.** `calendar-1` to `calendar-8` are set in `main.css`,
   apart from the brand and the status colours, with a fill, text and edge for light and dark.
 - **The list is the equal route.** The List view holds the same items. It is the one shown at phone
