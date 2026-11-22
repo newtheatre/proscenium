@@ -138,11 +138,13 @@ test.describe('the account menu on a phone', () => {
     await expect(drawer).toBeHidden()
   })
 
-  test('signed out, Sign in is an icon that still says what it is', async ({ browser }) => {
+  test('signed out, Sign in is in the menu and not a second icon in the header', async ({ browser }) => {
     const visitor = await browser.newContext({ baseURL: BASE, viewport: { width: 390, height: 844 }, extraHTTPHeaders: {} })
     const page = await visitor.newPage()
     await visit(page, '/')
-    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Sign in' }).locator('visible=true')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    await expect(page.getByRole('link', { name: 'Sign in' }).locator('visible=true')).toHaveCount(1)
     await visitor.close()
   })
 })

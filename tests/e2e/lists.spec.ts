@@ -15,15 +15,23 @@ const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }
 test.describe('a list with views and rows that open', () => {
   test.use({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(staff) } })
 
-  test('the default view shows its own filter as a chip, and another view replaces it', async ({ page }) => {
+  test('a view filters by its own preset without a chip or a count, and a filter the person adds is a chip', async ({ page }) => {
     await visit(page, '/console/gallery/shows')
     await expect(page.getByRole('tab', { name: 'Now and next' })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('button', { name: /Remove the filter State: On sale/ })).toBeVisible()
     await expect(page.getByText('2 in all').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /Remove the filter/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Filters', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Clear all' })).toHaveCount(0)
     await page.getByRole('tab', { name: 'Drafts' }).click()
     await expect(page).toHaveURL(/view=drafts/)
-    await expect(page.getByRole('button', { name: /Remove the filter State: Draft/ })).toBeVisible()
     await expect(page.getByText('2 in all').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /Remove the filter/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Filters', exact: true }).click()
+    await expect(page.getByRole('checkbox', { name: 'Draft' })).toBeChecked()
+    await page.getByRole('radio', { name: 'Yes' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByRole('button', { name: /Remove the filter Listed: Yes/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Filters (1)' })).toBeVisible()
     await page.getByRole('tab', { name: 'All' }).click()
     await expect(page.getByText('5 in all').first()).toBeVisible()
     await noViolations(page)

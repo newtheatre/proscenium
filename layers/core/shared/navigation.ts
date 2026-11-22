@@ -45,6 +45,8 @@ export interface NavigationEntry {
   /** A count of things that need the person (an address to confirm): above zero, the entry is marked. */
   attention?: string
   match?: string
+  /** A page with its own ability that the menu does not list: reached from another page, and found by search. */
+  unlisted?: boolean
   /** A tab of a module's page in Admin: the console entries or groups whose settings window shows it. */
   settingsIn?: string[]
   /**
@@ -76,6 +78,8 @@ export interface NavItem {
   count?: number
   /** How many things under the entry need the person; shown as a warning, not a tally. */
   attention?: number
+  /** Not drawn in the menu; the page it names is reached from another page. */
+  unlisted?: boolean
   /** The entry's group, for a flat menu drawn in groups (My account's). */
   group?: string
   order: number

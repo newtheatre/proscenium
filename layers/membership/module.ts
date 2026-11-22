@@ -180,7 +180,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'Pay for your membership: {{ scheme }}',
-          body: 'The theatre has added you as a member of **{{ scheme }}**. Your membership starts once the fee of {{ amount }} is paid.\n\nSign in to pay: [Pay for my membership]({{ link }})',
+          body: 'The theatre has added you as a member of **{{ scheme }}**. Your membership starts once the fee of {{ amount }} is paid.\n\n[Pay for my membership]({{ link }})\n\nYou will be asked to sign in first.',
         },
       },
     }, {
