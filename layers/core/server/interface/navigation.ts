@@ -1,7 +1,7 @@
 // What the shells show and what the guard allows come from one place: the navigation entries that
 // modules which are switched on contribute, plus a settings page generated for each module that
 // has settings. The menu and the guard agree because they read the same declaration.
-import { can, usePoint, type Actor, type Decision } from '#kit'
+import { can, usePoint, STRONGER_SIGN_IN, type Actor, type Decision } from '#kit'
 import { countOf, shows } from './counts'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
@@ -45,19 +45,16 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
   }
   for (const [pageId, abilities] of changers) {
     const page = registry.settingPages.get(pageId)!
-    const short = pageId.slice(page.module.length + 1)
-    // A module's own console page sits in the set-up half of the module's own group.
-    const group = page.group ?? out.find(e => e.module === page.module && e.menu === 'console' && e.group)?.group ?? page.module
+    const group = page.group ?? page.module
     out.push({
-      id: short === 'settings' ? pageId : `${pageId}-settings`,
+      id: `${pageId}-settings`,
       module: page.module,
       label: page.label,
-      menu: page.place === 'admin' ? 'admin' : 'console',
+      menu: 'admin',
       to: page.to,
       icon: page.icon,
       ability: [...abilities],
       group,
-      ...(page.place === 'console' ? { section: 'setup' as const } : {}),
       order: page.order,
       settingsPage: pageId,
       ...(page.settingsIn ? { settingsIn: [...page.settingsIn] } : {}),
@@ -77,7 +74,7 @@ export async function declaredGroups(): Promise<(NavigationGroupDecl & { module:
 
 /** Holding an ability, even if a fresh sign-in is still needed to use it: enough to be shown the way. */
 export function holds(decision: Decision): boolean {
-  return decision.allowed || decision.code === 'core.access.not-fresh' || decision.code === 'core.access.needs-strong-sign-in'
+  return decision.allowed || decision.code === 'core.access.not-fresh' || (STRONGER_SIGN_IN as readonly string[]).includes(decision.code)
 }
 
 /** Whether the actor holds any of the abilities. An entry with none (account entries) needs only a sign-in. */
@@ -112,6 +109,7 @@ function item(entry: DeclaredEntry): NavItem {
   return {
     id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0, module: entry.module,
     ...(entry.attentionValue ? { attention: entry.attentionValue } : {}),
+    ...(entry.unlisted ? { unlisted: true } : {}),
     // My account is drawn in groups; an entry that names none sits at the theatre.
     ...(entry.menu === 'account' ? { group: entry.group ?? 'theatre' } : {}),
   }

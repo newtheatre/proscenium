@@ -5,6 +5,7 @@ import type { AccessProvider, Actor } from '#kit'
 import { first, useContext } from '#kit'
 import { currentSession } from './sessions'
 import { kitGrantsOf, factAbilityMap } from './grants'
+import { strongSignInSetUp } from './me'
 import { checkOrigin } from './web'
 
 /** Routes a recovery session may call: enrolling a passkey and signing out, nothing else. */
@@ -31,4 +32,5 @@ export const identityAccess: AccessProvider = {
   },
   grants: async actor => actor.accountId ? kitGrantsOf(actor.accountId) : [],
   factAbilities: () => factAbilityMap(),
+  strongSetUp: async actor => !!actor.accountId && strongSignInSetUp(actor.accountId),
 }

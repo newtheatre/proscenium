@@ -20,8 +20,8 @@ export interface CalendarItem {
   column?: string
   /** One of the eight calendar colours, 1 to 8. */
   colour: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** The state in words, and the edge that goes with it. */
-  state: { label: string, edge: 'solid' | 'dashed' | 'dotted' | 'double' }
+  /** The state in words, and the edge that goes with it. `usual` marks the state most blocks are in: its word is read out but not drawn. */
+  state: { label: string, edge: 'solid' | 'dashed' | 'dotted' | 'double', usual?: boolean }
   /** Where acting on the block goes: the record's page. */
   to?: string
 }

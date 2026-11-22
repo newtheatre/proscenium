@@ -43,7 +43,7 @@ The interface layer itself owns 34 screens: the frames, the homes, and the scree
 | Console home | Work awaiting this person, then today | Anyone with a console ability | Home | Yes |
 | Command palette | Go to, find, do; shared with site administration | Anyone with a console or site administration ability | Overlay | Yes |
 | Help panel | This screen's documentation beside the screen | Anyone with a console or site administration ability | Overlay | Yes |
-| Generated settings page | Generated from the registry for each declared settings page: a module's at `/console/<module>/settings`, core's Programme settings and People settings in the console, and Theatre, Sign-in and Privacy in site administration (R-37) | Per setting's ability | Settings | Yes |
+| Generated settings page | Generated from the registry for each declared settings page: a module's as the Settings tab of its page in Admin (`/admin/modules/<module>`), opened in the console from the cog on the page it governs, and Theatre, Sign-in and Privacy in site administration (R-37). No page of settings is made in the console (Matt, 21 November 2026) | Per setting's ability | Settings | Yes |
 | Module setup | A module's guided setup | Site owner or the module's manager | Steps | Yes |
 | Saved views manager | Rename, share and delete saved views | Anyone with a saved view | List | Later |
 
