@@ -76,6 +76,8 @@ export default defineRoute({
     }))),
     can: {
       release: order.state === 'reserved' && await allowed('box-office.order.release'),
+      // Printing is the tickets themselves, so it asks what selling them does.
+      print: order.state === 'confirmed' && !!performanceId && lines.some(l => l.kind === 'ticket' && l.state === 'live') && (await can(actor, 'box-office.order.sell', ['core.performance', performanceId])).allowed,
       collect: order.state === 'reserved' && await allowed('box-office.order.take-payment'),
       cancel: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.cancel'),
       refund: order.state === 'confirmed' && await allowed('box-office.order.refund'),

@@ -369,13 +369,6 @@ test.describe('the box office console', () => {
     await expect(page.getByText('On sale', { exact: true }).first()).toBeVisible()
     await noViolations(page)
 
-    // The Bulk cancellation screen, as the core's refusal to cancel links to it.
-    await visit(page, `/console/box-office/performances/${performanceId}/change?for=cancel`)
-    await expect(page.getByRole('heading', { name: 'What happens to them' })).toBeVisible()
-    await expect(page.getByRole('radio', { name: /Refund everyone/ })).toBeVisible()
-    await expect(page.getByRole('radio', { name: /Keep the bookings/ })).toHaveCount(0)
-    await noViolations(page)
-
     await visit(page, `/console/box-office/performances/${performanceId}/door`)
     await expect(page.getByRole('heading', { level: 1, name: 'Door list' })).toBeVisible()
     await noViolations(page)

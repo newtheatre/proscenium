@@ -73,10 +73,7 @@ const groups = computed(() => {
 <template>
   <UContainer>
     <UPage>
-      <UPageHeader
-        :title="t('public-site.whats-on.title')"
-        :description="t('public-site.whats-on.description')"
-      />
+      <UPageHeader :title="t('public-site.whats-on.title')" />
       <UPageBody>
         <PublicSiteSpotlight
           v-if="spotlight"

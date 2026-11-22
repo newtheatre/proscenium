@@ -192,7 +192,7 @@ Tested with a stand-in requirement source, so the cases do not wait for the Memb
 - Every scheduled task run twice in a row changes nothing the second time.
 - Module switches: with Box office off, its routes answer 404 and Payments and Finance still work; Box office refuses to switch on without Payments and Finance.
 - With Front of house off, admission needs an ordinary grant and nothing errors.
-- `core.change-guard` refuses cancelling, rescheduling or moving a performance with tickets until a decision is recorded on the Bulk cancellation screen; the core's event then runs that decision.
+- `core.change-guard` refuses cancelling, rescheduling or moving a performance with tickets until a decision is recorded; the refusal carries the question for a person who may answer it and none for anyone else; the core's event then runs that decision.
 - Waiting list: offer, accept, lapse, next offer, stop before curtain.
 - Complimentary tickets: request, approve within cap, refuse over cap, issue.
 - Sessions: one open per person; close blocked by a pending attempt; variance posting.

@@ -30,6 +30,7 @@ import payPost from '../../server/api/box-office/baskets/[id]/pay.post'
 import checkPost from '../../server/api/box-office/baskets/[id]/check.post'
 import basketReleasePost from '../../server/api/box-office/baskets/[id]/release.post'
 import confirmPost from '../../server/api/box-office/reservations/confirm.post'
+import confirmGet from '../../server/api/box-office/reservations/confirm.get'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
@@ -84,6 +85,7 @@ import changeGet from '../../server/api/box-office/performances/[id]/change/inde
 import changePost from '../../server/api/box-office/performances/[id]/change/index.post'
 import corePerformancePatch from '../../../core/server/api/core/performances/[id]/index.patch'
 import corePerformanceCancel from '../../../core/server/api/core/performances/[id]/cancel.post'
+import corePerformanceImpact from '../../../core/server/api/core/performances/[id]/impact.get'
 import compsGet from '../../server/api/box-office/comps/index.get'
 import compsPost from '../../server/api/box-office/comps/index.post'
 import compApprove from '../../server/api/box-office/comps/[id]/approve.post'
@@ -130,6 +132,7 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/check': checkPost,
   'POST /api/box-office/baskets/:id/release': basketReleasePost,
   'POST /api/box-office/reservations/confirm': confirmPost,
+  'GET /api/box-office/reservations/confirm': confirmGet,
   'GET /api/box-office/orders/link': orderLinkGet,
   'GET /api/box-office/orders': ordersGet,
   'GET /api/box-office/performances': performancesGet,
@@ -180,6 +183,7 @@ export const handle = server({
   'POST /api/box-office/performances/:id/change': changePost,
   'PATCH /api/core/performances/:id': corePerformancePatch,
   'POST /api/core/performances/:id/cancel': corePerformanceCancel,
+  'GET /api/core/performances/:id/impact': corePerformanceImpact,
   'GET /api/box-office/comps': compsGet,
   'POST /api/box-office/comps': compsPost,
   'POST /api/box-office/comps/:id/approve': compApprove,

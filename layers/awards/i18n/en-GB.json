@@ -20,11 +20,9 @@
 
   "awards.navigation.types.label": "Award types",
   "awards.navigation.awards.label": "Awards",
-  "awards.navigation.mine.label": "My awards",
+  "awards.navigation.mine.label": "Awards",
   "awards.record-tabs.account.label": "Awards",
 
-  "awards.screens.type-states.active": "In use",
-  "awards.screens.type-states.archived": "Archived",
   "awards.screens.award-states.current": "Current",
   "awards.screens.award-states.revoked": "Revoked",
   "awards.screens.visibility.public": "On the public roll",
@@ -35,6 +33,7 @@
   "awards.screens.sources.import": "Imported",
 
   "awards.screens.types.help": "The kinds of award the theatre gives, such as a fellowship or a commendation. Each says whether it carries a ticket price.",
+  "awards.screens.types.added": "{name} added",
   "awards.screens.types.add": "New award type",
   "awards.screens.types.create": "Create award type",
   "awards.screens.types.empty": "No award types yet",
@@ -44,7 +43,6 @@
   "awards.screens.types.holders.other": "Held by {count} people",
   "awards.screens.types.with-benefit": "Carries a ticket price",
 
-  "awards.screens.type.details": "Details",
   "awards.screens.type.name": "Name",
   "awards.screens.type.name-help": "What the award is called wherever it is shown, such as Fellowship.",
   "awards.screens.type.key": "Web address",
@@ -121,7 +119,7 @@
   "awards.screens.award.decision-note-help": "Such as the meeting and the vote. Staff only.",
   "awards.screens.award.no-decision": "No decision was recorded.",
   "awards.screens.award.listed": "Listed",
-  "awards.screens.award.listed-help": "The holder can change this for themselves in My awards.",
+  "awards.screens.award.listed-help": "The holder can change this for themselves under Awards in My account.",
   "awards.screens.award.pending": "Waiting for the holder to choose",
   "awards.screens.award.pending-help": "It was given before they signed in, so it is not on the roll yet. They are asked when they next sign in. You can list it for them instead.",
   "awards.screens.award.list-for-holder": "List it on the roll",
@@ -181,7 +179,7 @@
   "awards.screens.import.queued-help": "They appear in the list over the next minute or so.",
 
   "awards.screens.link.title": "Link an account",
-  "awards.screens.link.help": "The holder then sees the award in My awards, and it carries its ticket price if it has one.",
+  "awards.screens.link.help": "The holder then sees the award under Awards in My account, and it carries its ticket price if it has one.",
   "awards.screens.link.how-person": "Somebody with an account",
   "awards.screens.link.how-address": "By email address",
   "awards.screens.link.submit": "Link account",

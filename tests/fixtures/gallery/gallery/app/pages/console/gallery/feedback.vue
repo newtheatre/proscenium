@@ -5,7 +5,8 @@ const { confirm } = useConfirm()
 const undo = useUndo()
 const answer = ref('')
 const ok = useAPI('/api/gallery/items', { query: { size: 1 }, key: 'gallery:ok' })
-const broken = useAPI('/api/gallery/nothing-here', { key: 'gallery:broken', retry: false })
+const broken = useAPI('/api/gallery/unavailable', { key: 'gallery:broken', retry: false })
+const missing = useAPI('/api/gallery/nothing-here', { key: 'gallery:missing', retry: false })
 
 async function cancel() {
   answer.value = await confirm({ verb: 'Cancel', thing: 'the 19:30 performance of Hamlet', consequence: '84 ticket holders will be emailed.', button: 'Cancel performance' }) ? 'cancelled' : 'kept'
@@ -41,6 +42,14 @@ async function cancel() {
         @retry="broken.refresh()"
       >
         <p>never shown</p>
+      </DataBoundary>
+      <DataBoundary
+        :data="missing.data.value"
+        :status="missing.status.value"
+        :error="missing.error.value"
+        @retry="missing.refresh()"
+      >
+        <p>never shown either</p>
       </DataBoundary>
       <DataBoundary
         :data="ok.data.value"

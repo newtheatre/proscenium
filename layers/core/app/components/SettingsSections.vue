@@ -1,7 +1,7 @@
 <!-- The sections of settings the Settings page type draws (UI-14), for a generated page or for the
      settings a bespoke screen manages (`screen` on a setting or its group), so a screen like Email
      sending saves its settings exactly as a generated page does. Each setting shows its value, its
-     default with a Reset link once changed, who may change it, its latest change and a "Quoted on
+     default with a Reset link once changed, who may change it (to someone who may not), its latest change and a "Quoted on
      public pages" tag where a content page shows it live. Changes save per section with a stated
      summary, asking again first for a setting declared onChange: 'confirm'. -->
 <script setup lang="ts">
@@ -210,11 +210,6 @@ const sectionTitle = (section: { module: string, group: string }) => {
   const name = t(`${section.module}.settings-sections.${section.group}`)
   return advanced ? `${t(`${section.module}.module.name`)}: ${name}` : name
 }
-// One line for a section when every setting in it is changed by the same people; otherwise each says its own.
-const sharedAbility = (settings: SettingView[]) => {
-  const first = settings[0]?.changeLabelKey
-  return first && settings.every(s => s.changeLabelKey === first && s.canChange) ? first : null
-}
 /**
  * Whether Reset is offered. Not where the default is "not set" and a change is confirmed, such as the
  * site's address or the time zone, which setup records: resetting would only break what depends on them.
@@ -303,12 +298,6 @@ onMounted(() => {
         @submit.prevent="save(section.id, section.settings)"
       >
         <PageSection :title="heading ?? sectionTitle(section)">
-          <p
-            v-if="sharedAbility(section.settings)"
-            class="mb-4 text-sm text-muted"
-          >
-            {{ t('core.settings-page.who', { ability: t(sharedAbility(section.settings)!) }) }}
-          </p>
           <div class="divide-y divide-default">
             <div
               v-for="s in section.settings"
@@ -535,7 +524,6 @@ onMounted(() => {
                 <span v-if="!s.canChange">
                   {{ s.managed ? t('core.settings-page.managed') : t('core.settings-page.read-only', { ability: t(s.changeLabelKey) }) }}
                 </span>
-                <span v-else-if="!sharedAbility(section.settings)">{{ t('core.settings-page.who', { ability: t(s.changeLabelKey) }) }}</span>
                 <UButton
                   v-if="s.lastChange && !s.sensitive"
                   color="neutral"

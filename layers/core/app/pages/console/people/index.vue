@@ -52,6 +52,10 @@ onMounted(() => {
   void navigateTo({ query: { ...route.query, invite: undefined } }, { replace: true })
 })
 
+// Merges has no entry in the menu: whoever may merge reaches its history from here.
+const { data: navigation } = await useNavigation('console')
+const merges = computed(() => navigation.value?.groups.flatMap(g => g.everyday).find(e => e.id === 'core.merges'))
+
 const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased') : (row.name ?? t('core.people.unnamed'))
 </script>
 
@@ -65,10 +69,22 @@ const label = (row: Row) => row.state === 'anonymised' ? t('core.people.erased')
     :empty="{ title: t('core.people.empty.title'), description: t('core.people.empty.description'), icon: 'i-lucide-users' }"
   >
     <template
-      v-if="mayInvite"
+      v-if="mayInvite || merges"
       #primary
     >
+      <UDropdownMenu
+        v-if="merges"
+        :items="[[{ label: t(merges.label), icon: merges.icon, to: merges.to }]]"
+      >
+        <IconButton
+          icon="i-lucide-ellipsis"
+          color="neutral"
+          variant="outline"
+          :label="t('core.people.more')"
+        />
+      </UDropdownMenu>
       <UButton
+        v-if="mayInvite"
         icon="i-lucide-mail-plus"
         :label="t('core.grants.invite.open')"
         @click="inviting = true"

@@ -13,5 +13,5 @@ export default defineRoute({
 }, async (_event, { record, actor, input: { kind } }) => {
   const change = { record: { type: 'core.performance', id: record!.id }, kind }
   const refusal = await firstRefusal(change, actor)
-  return { lines: await changeImpact(change, actor), refusal: refusal ? { code: refusal.code, reason: refusal.reason, link: refusal.link ?? null } : null }
+  return { lines: await changeImpact(change, actor), refusal: refusal ? { code: refusal.code, reason: refusal.reason, link: refusal.link ?? null, question: refusal.question ?? null } : null }
 })

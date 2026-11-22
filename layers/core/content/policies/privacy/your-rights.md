@@ -15,7 +15,7 @@ You have the right to:
 - **take it elsewhere** in a format another service can read;
 - **withdraw consent** you gave us.
 
-The quickest way to use most of these is **My account, Your data**:
+The quickest way to use most of these is **My account, Data**:
 
 - **Download my data** prepares a file of everything we hold about you. The link to it works for :setting{name="core.privacy.export-lifetime"}.
 - **Delete my account** starts erasure. For :setting{name="core.privacy.cooling-off"} you can change your mind by signing in. After that it cannot be undone.

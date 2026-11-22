@@ -1,6 +1,6 @@
 <!-- Wraps data a screen loads. Loading shows the frame at once and a skeleton where data will be.
-     A failed first load shows only the reason and Retry. A failed refresh keeps the data on screen
-     and marks it with when it was last good (UI-18). -->
+     A failed first load shows only the reason and Retry, or the way back when a retry cannot help.
+     A failed refresh keeps the data on screen and marks it with when it was last good (UI-18). -->
 <script setup lang="ts" generic="T">
 const props = defineProps<{
   data: T | null | undefined
@@ -21,7 +21,8 @@ const hasData = computed(() => props.data !== null && props.data !== undefined)
 const failedFirst = computed(() => props.status === 'error' && !hasData.value)
 const failedRefresh = computed(() => props.status === 'error' && hasData.value)
 const dates = useDates()
-const reason = computed(() => toRefusal(props.error).reason)
+const refusal = computed(() => toRefusal(props.error))
+const reason = computed(() => refusal.value.reason)
 const lastGoodText = computed(() => lastGood.value ? dates.time(lastGood.value) : '')
 </script>
 
@@ -33,6 +34,9 @@ const lastGoodText = computed(() => lastGood.value ? dates.time(lastGood.value) 
     <PageFailed
       v-if="failedFirst"
       :reason="reason"
+      :status="refusal.status"
+      :code="refusal.code"
+      :remedy="refusal.remedy"
       :retrying="status === 'pending'"
       @retry="emit('retry')"
     />

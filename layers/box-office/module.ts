@@ -45,7 +45,8 @@ export default defineModule({
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
     'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
-    'reservations.confirm-email': setting.boolean({ default: true, change, audience: 'public' }),
+    // Off as shipped (Matt, 21 November 2026): a guest's reservation is made at once and the email is the receipt.
+    'reservations.confirm-email': setting.boolean({ default: false, change, audience: 'public' }),
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.release-before': setting.duration({ default: '10m', min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
@@ -156,7 +157,7 @@ export default defineModule({
       'box-office.comp-request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), state: z.enum(['issued', 'declined', 'withdrawn']) }), internal: true }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
     },
-    // The decision recorded on the Bulk cancellation screen is carried out when the core's change goes through (R-11).
+    // The decision recorded for the bookings is carried out when the core's change goes through (R-11).
     listens: {
       // Makes the ticket types a module declares when it is switched on, Box office's own included.
       'core.module.enabled': 'managed-ticket-types',
@@ -268,7 +269,7 @@ export default defineModule({
       // The person's own bookings, in My account (C3).
       { id: 'box-office.mine', menu: 'account', group: 'theatre', to: '/account/tickets', icon: 'i-lucide-ticket', ability: 'signed-in', order: 30 },
       // The person's own passes, beside their tickets.
-      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31 },
+      { id: 'box-office.my-passes', menu: 'account', group: 'theatre', to: '/account/passes', icon: 'i-lucide-id-card', ability: 'signed-in', order: 31, count: 'box-office.my-passes', hideEmpty: true },
       { id: 'box-office.ticket-presets', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-presets', icon: 'i-lucide-ticket', ability: 'box-office.pricing.manage', order: 41, settingsIn: ['box-office.performances'] },
       // Each space's seating layouts and wheelchair spaces, beside Venues in the programme's settings (decision 10).
       { id: 'box-office.seating-layouts', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/seating-layouts', icon: 'i-lucide-armchair', ability: 'box-office.pricing.manage', order: 42, settingsIn: ['programme', 'box-office.performances'] },
@@ -296,7 +297,7 @@ export default defineModule({
     ],
     'core.record-fact': [{ id: 'box-office.production-tickets', record: 'core.production', ability: 'box-office.performance.manage', component: 'BoxOfficeProductionTicketsFact', order: 10 }],
     // Comps requests waiting for a decision, on the console home of whoever may decide them.
-    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }],
+    'core.count': [{ id: 'box-office.comps-waiting', file: 'comps-waiting' }, { id: 'box-office.my-passes', file: 'my-passes' }],
     'core.upcoming': [{ id: 'box-office.tickets', file: 'tickets' }],
     'core.home-card': [{ id: 'box-office.comps', home: 'console', ability: 'box-office.comp.approve', component: 'BoxOfficeCompsCard', urgency: 'today', count: 'box-office.comps-waiting' }],
     'core.vocabulary': [{
@@ -487,7 +488,7 @@ export default defineModule({
       variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, cancelled: 'text' as const, remaining: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Cancelled: {{ show }}, {{ when }}',
+          subject: 'Tickets cancelled: {{ show }}, {{ when }}',
           body: 'We have cancelled {{ cancelled }} on booking **{{ reference }}** for **{{ show }}**, {{ when }}.\n\n{{ remaining }}',
         },
       },
@@ -501,7 +502,7 @@ export default defineModule({
       variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, what: 'text' as const, money: 'text' as const },
       wording: {
         'en-GB': {
-          subject: 'Cancelled: {{ show }}, {{ when }}',
+          subject: 'Booking cancelled: {{ show }}, {{ when }}',
           body: 'We are sorry: **{{ show }}**, {{ when }}, {{ what }}.\n\n{{ money }}\n\nBooking reference: **{{ reference }}**',
         },
       },
@@ -530,7 +531,7 @@ export default defineModule({
       wording: {
         'en-GB': {
           subject: 'Something to know before you see {{ show }}',
-          body: 'We have added information about **{{ show }}** that you may want to read before you come.\n\n{{ what }}\n\nYou can read it all on the show\'s page: {{ pageUrl }}\n\nNothing is needed from you. If you cannot come now, contact the box office to exchange your tickets or to have them refunded.\n\nBooking reference: **{{ reference }}**',
+          body: 'We have added information about **{{ show }}** that you may want to read before you come.\n\n{{ what }}\n\n[Read it on the show\'s page]({{ pageUrl }})\n\nNothing is needed from you. If you cannot come now, contact the box office to exchange your tickets or to have them refunded.\n\nBooking reference: **{{ reference }}**',
         },
       },
     }],

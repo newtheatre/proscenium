@@ -1,5 +1,5 @@
-<!-- Membership schemes (MEM-01, MEM-02): every scheme with its side, state and how many hold it now.
-     A new scheme starts as a draft and opens on its own page once it is ready. -->
+<!-- Membership schemes (MEM-01, MEM-02): every scheme with its kind, state and how many hold it now.
+     A new scheme is named, starts as a draft and is set up on its own page. -->
 <script setup lang="ts">
 interface Scheme { id: string, key: string, name: string, side: 'members' | 'audience', state: 'draft' | 'open' | 'closed' | 'archived', lengthRule: string, holders: number }
 
@@ -10,29 +10,19 @@ const { data, status, error, refresh } = await useAPI<{ schemes: Scheme[] }>('/a
 
 const TONE = { draft: 'neutral', open: 'success', closed: 'warning', archived: 'neutral' } as const
 
+// A draft is made from its name alone; everything else is asked on the page that opens.
 const open = ref(false)
-const form = reactive({ name: '', key: '', side: 'members' as Scheme['side'], lengthRule: 'rolling' as 'fixed' | 'rolling' | 'indefinite', fixedEndMonth: 7, fixedEndDay: 31, idempotency: '' })
+const form = reactive({ name: '', idempotency: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-// The address follows the name until somebody types one.
-const keyTouched = ref(false)
-watch(() => form.name, (name) => {
-  if (!keyTouched.value) form.key = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
-})
 function openAdd() {
-  Object.assign(form, { name: '', key: '', side: 'members', lengthRule: 'rolling', fixedEndMonth: 7, fixedEndDay: 31, idempotency: crypto.randomUUID() })
-  keyTouched.value = false
+  Object.assign(form, { name: '', idempotency: crypto.randomUUID() })
   refusal.value = null
   open.value = true
 }
 async function create() {
   refusal.value = null
   try {
-    const fixed = form.lengthRule === 'fixed'
-    const made = await $api<{ schemeId: string }>('/api/membership/schemes', {
-      method: 'POST',
-      headers: { 'idempotency-key': form.idempotency },
-      body: { name: form.name, key: form.key, side: form.side, lengthRule: form.lengthRule, fixedEndMonth: fixed ? form.fixedEndMonth : null, fixedEndDay: fixed ? form.fixedEndDay : null },
-    })
+    const made = await $api<{ schemeId: string }>('/api/membership/schemes', { method: 'POST', headers: { 'idempotency-key': form.idempotency }, body: { name: form.name } })
     open.value = false
     await navigateTo(`/admin/modules/membership/schemes/${made.schemeId}`)
   }
@@ -99,12 +89,13 @@ async function create() {
     <UModal
       v-model:open="open"
       :title="t('membership.screens.schemes.add')"
+      :description="t('membership.screens.schemes.add-help')"
     >
       <template #body>
         <UForm
           id="membership-new-scheme"
           :state="form"
-          :validate="() => needs({ name: form.name, key: form.key })"
+          :validate="() => needs({ name: form.name })"
           class="space-y-4"
           novalidate
           @submit="create"
@@ -121,35 +112,6 @@ async function create() {
               maxlength="80"
             />
           </UFormField>
-          <UFormField
-            name="key"
-            :label="t('membership.screens.scheme.key')"
-            :help="t('membership.screens.scheme.key-help')"
-            required
-            :error="refusal?.fields?.key || refusal?.code === 'membership.scheme.key-taken' ? refusal.reason : undefined"
-          >
-            <UInput
-              v-model="form.key"
-              maxlength="60"
-              class="font-mono"
-              @update:model-value="keyTouched = true"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('membership.screens.scheme.side')"
-            :help="t('membership.screens.scheme.side-help')"
-            required
-          >
-            <URadioGroup
-              v-model="form.side"
-              :items="(['members', 'audience'] as const).map(v => ({ value: v, label: t(`membership.screens.sides.${v}`), description: t(`membership.screens.sides.${v}-help`) }))"
-            />
-          </UFormField>
-          <MembershipLengthRule
-            v-model:rule="form.lengthRule"
-            v-model:month="form.fixedEndMonth"
-            v-model:day="form.fixedEndDay"
-          />
         </UForm>
       </template>
       <template #footer>

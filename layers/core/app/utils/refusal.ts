@@ -10,6 +10,15 @@ export interface RefusalView {
   detail?: Record<string, string>
 }
 
+/** The refusal of someone who holds the ability but has no two-step sign-in set up, and where they set it up. */
+export const TWO_STEP_NOT_SET_UP = 'core.access.two-step-not-set-up'
+export const TWO_STEP_SET_UP_AT = '/account/sign-in'
+
+/** What a refusal offers to do about it, when the answer is somewhere to go: "Set it up" for two-step sign-in. */
+export function refusalAction(refusal: { code?: string } | null | undefined): { label: string, to: string } | undefined {
+  return refusal?.code === TWO_STEP_NOT_SET_UP ? { label: translate('core.two-step.set-up'), to: TWO_STEP_SET_UP_AT } : undefined
+}
+
 const KEY = /^[a-z][a-z0-9-]*(\.[a-z0-9-]+){2,}$/
 
 /** Reasons and remedies are translation keys or plain sentences; both end up as words. */

@@ -75,7 +75,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
-| Productions | `core.production.view` | A table: title, season, state, next performance, performances count. Filters for state, season, category. "New production". |
+| Productions | `core.production.view` | A table: title, season, state, next performance, performances count. Opens on the view "Coming up" (not over, not withdrawn or cancelled; soonest first, what has no dates yet last), with "Drafts", "Past" (newest first) and "All" beside it (Matt, 21 November 2026). Filters for state, season, category. "New production". |
 | Production | `core.production.view` on it | See the wireframe. The page follows the interface specification's Record convention. Tabs: Overview, Details, Dates, Credits, Media, Advisories and access, then any tab another module adds through `core.record-tab`, such as Box office's tickets or the form builder's custom fields. |
 | Add dates | `core.performance.schedule` | Two ways in one dialog: a single date, or a run (first date, last date, days of the week, times). A run shows every date it will create, with clashes and closures marked, before anything is saved. A long run is created by a job, and the dialog shows its progress (C-04). |
 | Calendar | `core.production.view` | Month, week and day views of performances and closures, by venue and space. Drag to reschedule a draft; a scheduled performance opens the reschedule dialog instead. |

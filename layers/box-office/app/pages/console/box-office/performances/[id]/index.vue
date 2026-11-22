@@ -474,13 +474,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <UIcon name="i-lucide-door-open" />
               {{ t('box-office.door.title') }}
             </ULink>
-            <ULink
-              :to="`/console/box-office/performances/${encodeURIComponent(d.performance.id)}/change`"
-              class="inline-flex items-center gap-1 text-sm"
-            >
-              <UIcon name="i-lucide-calendar-x" />
-              {{ t('box-office.change.link') }}
-            </ULink>
           </div>
           <p
             v-if="folded"

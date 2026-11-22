@@ -61,13 +61,13 @@ describe('unfinished working copies', () => {
     expect(await toldOf('forms.unfinished-reminder', sender)).toEqual([])
   })
 
-  it('reminds before the form closes, sends only that one when both are due, and nothing on a paused form', async () => {
+  it('reminds before the form closes, sends only that one when both are due, and nothing on a closed form', async () => {
     setClock(NOV_17)
     const closing = await offered(definition(question('name')), { closesAt: NOV_17 + 10 * DAY }, { title: 'Auditions' })
     await keep(closing.slug, closer)
     const paused = await offered(definition(question('name')))
     await keep(paused.slug, pauser)
-    expect((await req('POST', `/api/forms/forms/${paused.formId}/status`, { to: 'paused' })).status).toBe(200)
+    expect((await req('POST', `/api/forms/forms/${paused.formId}/status`, { to: 'closed' })).status).toBe(200)
 
     await run(NOV_17 + 6 * DAY)
     expect(await toldOf('forms.closing-reminder', closer)).toEqual([])

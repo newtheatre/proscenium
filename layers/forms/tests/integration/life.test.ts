@@ -1,7 +1,8 @@
-// A form's life after publishing: paused and closed forms take no new responses, a form is
+// A form's life after publishing: it is open or closed, a closed form takes no new responses, it is
 // archived only once it is closed and nothing is waiting on anybody, and each step can be undone.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { person } from '../../../../tests/integration/helpers'
+import { createUnit } from '#kit'
+import { inContext, person } from '../../../../tests/integration/helpers'
 import { account, definition, form, offered, question, ready, req, send } from './stage'
 import { reviewWorkflow } from '../../shared/engine'
 
@@ -16,20 +17,31 @@ const to = (formId: string, status: string, actor = undefined as ReturnType<type
 const state = async (slug: string) => (await req('GET', `/api/forms/open/${slug}`, undefined, member)).body.state
 
 describe('a form after it is published', () => {
-  it('is paused and resumed, closed and opened again, and takes responses only while live', async () => {
+  it('is closed and opened again, takes responses only while open, and cannot be paused', async () => {
     const { formId, slug } = await offered(definition(question('name')))
-    expect((await to(formId, 'paused', member)).status).toBe(403)
+    expect((await to(formId, 'closed', member)).status).toBe(403)
     expect((await to(formId, 'archived')).body.code).toBe('forms.form.status')
-    expect((await to(formId, 'paused')).body).toEqual({ status: 'paused' })
-    expect(await state(slug)).toBe('paused')
-    expect((await send(slug, { name: 'Mo' }, member)).status).toBe(409)
-    expect((await to(formId, 'live')).status).toBe(200)
+    // Pausing was folded into closing (change 3 of 21 November 2026): the address refuses it.
+    expect((await to(formId, 'paused')).status).toBe(422)
     expect((await send(slug, { name: 'Mo' }, member)).status).toBe(200)
     expect((await to(formId, 'closed')).status).toBe(200)
     expect(await state(slug)).toBe('closed')
     expect((await send(slug, { name: 'Mo' }, member)).body.code).toBe('forms.link.closed')
     expect((await to(formId, 'live')).status).toBe(200)
     expect(await state(slug)).toBe('open')
+  })
+
+  it('opens a form that was paused before pausing went, and its link with it', async () => {
+    const { formId, slug } = await offered(definition(question('name')), { status: 'paused' })
+    await inContext(async () => {
+      const unit = createUnit()
+      unit.view().add({ sql: 'UPDATE forms_forms SET status = \'paused\' WHERE id = ?', params: [formId] })
+      await unit.commit()
+    })
+    expect(await state(slug)).toBe('paused')
+    expect((await to(formId, 'live')).body).toEqual({ status: 'live' })
+    expect(await state(slug)).toBe('open')
+    expect((await send(slug, { name: 'Mo' }, member)).status).toBe(200)
   })
 
   it('is archived only when closed with nothing waiting, is then gone from its address and cannot be edited, and comes back closed', async () => {

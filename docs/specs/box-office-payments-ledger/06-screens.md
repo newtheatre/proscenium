@@ -15,11 +15,11 @@ The wireframes show layout and wording, not visual design; workstream 6 owns the
 | Screen | Route | What it does | Release |
 | --- | --- | --- | --- |
 | Booking action | part of the core's show and performance pages | The contribution to `core.booking-action`, one per performance, in the core's five states (part 4) | First |
-| Choose tickets | `/book/<production>/<performance>` | Ticket types with steppers, what is left, promo code, access needs. Pressing Hold tickets runs the claim batch and starts the hold | First |
+| Choose tickets | `/book/<production>/<performance>` | Ticket rows with steppers first, then any pass on offer, then one line, "Have a pass or a promo code?", that opens the pass and promo code boxes. The button, "Continue with N tickets, total", can always be pressed and says what is missing; pressing it runs the claim batch and starts the hold. Check and pay then follows on the same address, under a marker of the two steps, exactly as in the booking drawer (Matt, 21 November 2026) | First |
 | Choose seats | `/book/<production>/<performance>/seats` | "Best available" first, then the seat map, for allocated performances | Allocated-seating phase |
-| Check and pay | `/book/basket` | One address shown as short steps on a phone: basket, details, pay or reserve. Countdown, lines, fee, total, contact details | First |
+| Check and pay | second step of `/book/<production>/<performance>` and of the drawer; `/book/basket` | Countdown, lines, total, contact details, pay or reserve. `/book/basket` is no longer a step of its own: it is where a card payment on the provider's page comes back to, and where "Tickets held" in the public header leads while a basket is held | First |
 | Paying | provider's page or embedded form | Card entry belongs to the provider; the platform never sees a card number | First |
-| Check your email | `/book/confirm/<token>` | For a reservation by a buyer who is not signed in, when `box-office.reservations.confirm-email` is on | First |
+| Check your email | `/book/confirm/<token>` | For a reservation by a buyer who is not signed in, when `box-office.reservations.confirm-email` is on (it ships off). The page says the show, the tickets, the amount, the address and until when they are held, above the button | First |
 | Booked, or Reserved | `/book/done/<token>` | Reference, tickets or the desk code and amount due, calendar link, manage link | First |
 | Payment did not complete | `/book/problem/<token>` | Says plainly what happened: declined (try again, seats still held), or still checking (we will tell you) | First |
 | Manage booking | `/book/order/<token>` | View tickets, reissue, cancel a reservation; cancel or exchange paid tickets where the theatre allows | First |
@@ -64,7 +64,7 @@ What the three screens must get right:
 | Passes | `/console/box-office/passes` | `box-office.pass.manage` | Pass types and passes issued | Later |
 | Seating plans | `/console/box-office/plans` | `box-office.plan.manage` | Draw and publish a plan | Allocated-seating phase |
 | Sales report | `/console/box-office/reports/sales` | `box-office.report.view`; export needs `box-office.report.export` | By performance, ticket type and channel | First |
-| Bulk cancellation | `/console/box-office/performances/<id>/change`, reached from the link in the change guard's refusal | `box-office.performance.manage` | Shows the tickets and money affected and records the decision the core's cancel, reschedule or move then runs: refund all, offer exchange, or keep | First |
+| What happens to the bookings | No page of its own: asked inside Programme's cancel, reschedule and move windows, which post the answer to `POST /api/box-office/performances/<id>/change` (Matt, 21 November 2026) | `box-office.performance.manage` | The window shows the tickets and money affected and asks: refund all, offer exchange, or keep (never for a cancellation). The answer is recorded and the change made in one step | First |
 
 ![desk sale wireframe · 1 tablet screen](images/06-w2-desk-sale-wireframe.png)
 

@@ -10,7 +10,7 @@ const { t } = useT()
       {{ t('membership.screens.home-card.applications', { count: count ?? 0 }) }}
     </p>
     <UButton
-      to="/console/membership/applications"
+      to="/console/membership#waiting"
       :label="t('membership.screens.home-card.applications-action')"
       color="neutral"
       variant="outline"

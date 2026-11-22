@@ -100,6 +100,8 @@ export async function requestReservation(unit: UnitView, input: ReserveInput): P
   return { state: 'confirm-email', orderId: order.id, expiresAt: order.expires_at! }
 }
 
+const LINK_INVALID = { code: 'box-office.reservation.link-invalid', reason: 'This link does not confirm a reservation. It may have been used already, or the seats were held for too short a time.', remedy: 'If your reservation was confirmed, its details are in the email that followed. Otherwise choose your tickets again.' }
+
 /**
  * The link in the confirmation message: the address is proved, so its account is found or made and
  * the basket is reserved for it. A wrong, used or lapsed link gets the one answer.
@@ -108,10 +110,21 @@ export async function confirmReservation(unit: UnitView, token: string): Promise
   const order = token
     ? await first<OrderRow>(`${ORDER} WHERE confirm_token_hash = ? AND state = 'basket' AND confirm_expires_at > ?`, await hashOf(token), nowMs())
     : null
-  if (!order) refuse('box-office.reservation.link-invalid', 'This link does not confirm a reservation. It may have been used already, or the seats were held for too short a time.', { status: 404, remedy: 'If your reservation was confirmed, its details are in the email that followed. Otherwise choose your tickets again.' })
+  if (!order) refuse(LINK_INVALID.code, LINK_INVALID.reason, { status: 404, remedy: LINK_INVALID.remedy })
   const lines = await checkBasket(order, order.total_minor)
   const { accountId, madeWith } = await findOrCreateAccount(unit, { address: order.confirm_email, name: order.confirm_name, origin: 'guest' })
   return reserve(unit, order, lines, accountId, false, madeWith, order.confirm_email)
+}
+
+/** What the link in the confirmation message is about to reserve, for its page to say before the button is pressed. */
+export async function reservationToConfirm(token: string) {
+  const order = token
+    ? await first<OrderRow>(`${ORDER} WHERE confirm_token_hash = ? AND state = 'basket' AND confirm_expires_at > ?`, await hashOf(token), nowMs())
+    : null
+  const lines = order ? await liveLines(order.id) : []
+  if (!order || !lines.length) refuse(LINK_INVALID.code, LINK_INVALID.reason, { status: 404, remedy: LINK_INVALID.remedy })
+  const words = await wordsFor(order, lines, order.total_minor)
+  return { show: words.show, startsAt: words.startsAt, tickets: words.tickets, totalMinor: order.total_minor, currency: order.currency, email: order.confirm_email, expiresAt: order.expires_at }
 }
 
 // What can be told before the batch: the basket is still held, reserving is offered, and the size

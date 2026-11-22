@@ -1,5 +1,6 @@
-<!-- Check and pay, as a page of its own (BoxOfficeCheckout): where Choose tickets on its own page
-     goes, and where a card payment on the provider's page comes back to. -->
+<!-- Check and pay on an address of its own (BoxOfficeCheckout): where a card payment on the
+     provider's page comes back to, and where "Tickets held" in the header leads. Booking itself
+     does both steps on the performance's page or in the drawer. -->
 <script setup lang="ts">
 definePageMeta({ key: 'box-office-basket' })
 const { t } = useT()

@@ -18,6 +18,7 @@ import settingsWindow from '../../server/api/core/settings-window.get'
 import gettingReady from '../../server/api/core/getting-ready.get'
 import { resetRateLimits } from '#kit/ratelimit'
 import { useSetting } from '#kit/settings-store'
+import notificationTopics from '../../server/contributions/core.count/notification-topics'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
 const handle = server({
@@ -379,18 +380,28 @@ describe("My account's menu and what needs the person", () => {
     expect(items.find(i => i.id === 'gallery.account')?.group).toBe('theatre')
   })
 
-  it('marks Email addresses and says which address needs confirming, and only for its owner', async () => {
+  it('marks Details and says which address needs confirming, and only for its owner', async () => {
     const actor = audience()
+    const unconfirmed = async (who = actor) => (await notices(who)).filter(n => n.key.startsWith('core.unconfirmed-addresses:'))
     await withAddress(actor, true)
-    expect((await menu(actor)).find(i => i.id === 'core.account-email')?.attention).toBeUndefined()
-    expect((await notices(actor)).filter(n => n.key.startsWith('core.'))).toEqual([])
+    expect((await menu(actor)).some(i => i.id === 'core.account-email')).toBe(false)
+    expect((await menu(actor)).find(i => i.id === 'core.account-details')?.attention).toBeUndefined()
+    expect(await unconfirmed()).toEqual([])
 
     await withAddress(actor, false)
-    expect((await menu(actor)).find(i => i.id === 'core.account-email')?.attention).toBe(1)
-    const [notice] = (await notices(actor)).filter(n => n.key.startsWith('core.'))
-    expect(notice).toMatchObject({ tone: 'warning', title: 'core.account.notices.unconfirmed.title', to: '/account/email' })
+    expect((await menu(actor)).find(i => i.id === 'core.account-details')?.attention).toBe(1)
+    const [notice] = await unconfirmed()
+    expect(notice).toMatchObject({ tone: 'warning', title: 'core.account.notices.unconfirmed.title', to: '/account/details#email' })
     expect(notice?.params?.address).toMatch(/@example\.org$/)
-    expect(await notices(audience())).toEqual([])
+    expect(await unconfirmed(audience())).toEqual([])
+  })
+
+  it('leaves Notifications out of the menu for somebody with no optional messages to choose between', async () => {
+    const actor = audience()
+    const choices = await inContext(() => notificationTopics.value(actor))
+    expect((await menu(actor)).some(i => i.id === 'core.account-notifications')).toBe(choices > 0)
+    // The address still opens, as any hidden entry's does.
+    expect((await decide('/account/notifications', actor)).decision).toBe('allow')
   })
 
   it('refuses notices to someone signed out', async () => {

@@ -1,8 +1,9 @@
-// A form's life after it is published (form builder specification, part 3): paused and resumed,
-// closed and opened again, archived and brought back. Paused or closed, it takes no new responses;
+// A form's life after it is published (form builder specification, part 3, as changed on
+// 21 November 2026): open or closed, archived and brought back. Closed, it takes no new responses;
 // staff carry on with the ones it has. It can be archived once it is closed and nothing is still
 // waiting on anybody, and an archived form is out of the way but keeps its responses, which leave
-// by retention. A form never published can be archived too, in place of deleting it.
+// by retention. A form never published can be archived too, in place of deleting it. Nothing is
+// paused any more: a form paused before that went is opened or closed from where it is.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, first, nowMs, refuse } from '#kit'
@@ -11,8 +12,8 @@ import { requireForm } from '../../../../forms'
 const CONFLICT = 409 // not-policy: HTTP status
 type Status = 'draft' | 'live' | 'paused' | 'closed' | 'archived'
 /** Where each status may go. Back out of the archive is to closed, or to draft for a form never published. */
-const OPEN: Record<Status, Status[]> = { draft: ['archived'], live: ['paused', 'closed'], paused: ['live', 'closed'], closed: ['live', 'archived'], archived: ['closed', 'draft'] }
-const input = z.object({ to: z.enum(['live', 'paused', 'closed', 'archived', 'draft']) })
+const OPEN: Record<Status, Status[]> = { draft: ['archived'], live: ['closed'], paused: ['live', 'closed'], closed: ['live', 'archived'], archived: ['closed', 'draft'] }
+const input = z.object({ to: z.enum(['live', 'closed', 'archived', 'draft']) })
 
 export default defineRoute({ ability: 'forms.form.publish', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, unit }) => {
   const form = await requireForm(record!.id)
@@ -26,6 +27,8 @@ export default defineRoute({ ability: 'forms.form.publish', record: event => ['f
   }
   unit.add({ sql: 'UPDATE forms_forms SET status = ?, archived_at = ? WHERE id = ? AND status = ?', params: [input.to, input.to === 'archived' ? nowMs() : null, form.id, form.status] })
     .expect(1, { code: 'forms.form.status', reason: 'This form has just been changed by somebody else.', remedy: 'Open it again to see where it is now.' })
+  // Opening the form opens its own link too, so a link paused on the old switch does not keep it shut.
+  if (input.to === 'live') unit.add({ sql: 'UPDATE forms_placements SET status = \'active\' WHERE form_id = ? AND slot_key = \'forms.link\' AND subject_type IS NULL AND status = \'paused\'', params: [form.id] })
   unit.audit({ action: 'state', record: ['forms.form', form.id], detail: { from: form.status, to: input.to } })
   if (input.to === 'closed' && form.status !== 'archived') unit.announce('forms.form.closed', { formId: form.id }, { record: ['forms.form', form.id] })
   return { status: input.to }

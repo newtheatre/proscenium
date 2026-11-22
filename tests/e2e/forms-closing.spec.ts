@@ -49,8 +49,8 @@ test('several responses take one move, and the form is closed, archived and brou
   await expect(share.getByLabel('Address')).toHaveValue(/\/forms\//)
   const address = new URL(await share.getByLabel('Address').inputValue()).pathname
   const builder = new URL(page.url()).pathname
-  await share.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
+  // Publishing for the first time shared it in the same step.
+  await expect(share.getByText('0 responses so far')).toBeVisible()
 
   // ---- three people answer ----
   for (const n of [1, 2, 3]) {
@@ -86,17 +86,21 @@ test('several responses take one move, and the form is closed, archived and brou
 
   // ---- the form is closed, then archiving waits for the responses ----
   await visit(page, builder)
-  await page.getByRole('button', { name: 'More' }).click()
-  await page.getByRole('menuitem', { name: 'Close the form' }).click()
+  // Open or closed is one control in the toolbar; nothing is paused.
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Close the form' }).click()
   await expect(page.getByText('The form is closed', { exact: true })).toBeVisible()
-  await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Closed', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'More' }).click()
+  await expect(page.getByRole('menuitem', { name: /Pause/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('menu')).toHaveCount(0)
   await axe(page)
   await page.getByRole('button', { name: 'More' }).click()
   await page.getByRole('menuitem', { name: 'Archive the form' }).click()
   await expect(page.getByText('3 responses are still waiting on somebody.', { exact: true })).toBeVisible()
   // It can be opened again.
-  await page.getByRole('button', { name: 'More' }).click()
-  await page.getByRole('menuitem', { name: 'Open the form again' }).click()
+  await page.getByRole('button', { name: 'Closed', exact: true }).click()
+  await page.getByRole('button', { name: 'Open the form again' }).click()
   await expect(page.getByText('The form is taking responses', { exact: true })).toBeVisible()
 })

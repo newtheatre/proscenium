@@ -53,7 +53,7 @@ async function noViolations(page: Page) {
 }
 
 test('a count is started, counted, submitted and approved, and the level is put right', async ({ page }) => {
-  await visit(page, '/console/bar/stocktakes')
+  await visit(page, '/console/bar/stock/stocktakes')
   await page.getByRole('button', { name: 'Start a count' }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('combobox', { name: /^Location/ }).click()
@@ -62,12 +62,12 @@ test('a count is started, counted, submitted and approved, and the level is put 
   await page.getByRole('option', { name: `Spirits ${stamp}` }).click()
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Start counting' }).click()
-  await expect(page).toHaveURL(/\/console\/bar\/stocktakes\/bstk_/)
+  await expect(page).toHaveURL(/\/console\/bar\/stock\/stocktakes\/bstk_/)
   await expect(page.getByRole('heading', { name: `Count of Spirits ${stamp} at Back store ${stamp}` })).toBeVisible()
 
-  // The level is shown, since counts are not blind; four and a half bottles are counted.
-  const row = page.getByRole('row', { name: new RegExp(`Gin ${stamp}`) })
-  await expect(row.getByRole('cell', { name: '6 bottles (4,200 ml)' })).toBeVisible()
+  // Counts are blind unless the bar says otherwise, so the level is not shown; four and a half bottles are counted.
+  await expect(page.getByText(/The levels are hidden so the count is your own/)).toBeVisible()
+  await expect(page.getByRole('row', { name: new RegExp(`Gin ${stamp}`) }).getByRole('cell', { name: '6 bottles (4,200 ml)' })).toHaveCount(0)
   await page.getByLabel(`Count of Gin ${stamp}`).fill('4.5')
   // A number field takes what was typed when it loses focus.
   await page.getByLabel(`Count of Gin ${stamp}`).press('Tab')

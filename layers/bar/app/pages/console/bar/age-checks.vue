@@ -5,13 +5,13 @@
 type Outcome = 'not_needed' | 'id_checked' | 'self_attested' | 'refused'
 interface Row { id: string, at: number, outlet: string, outcome: Outcome, reason: string | null, product: string | null, scope: 'restricted' | 'all' | null, idType: string | null, by: string, sale: string | null, description: string | null }
 interface Review { id: string, outlet: string | null, fromDay: string, toDay: string, refusals: number, by: string, at: number }
-interface Register { rows: Row[], reviews: Review[], outlets: { id: string, name: string }[], canReview: boolean, describing: boolean, ages: { minimum: number, challenge: number } }
+interface Register { rows: Row[], reviews: Review[], nextReview: { fromDay: string, toDay: string }, outlets: { id: string, name: string }[], canReview: boolean, describing: boolean, ages: { minimum: number, challenge: number } }
 
 const { t } = useT()
 const route = useRoute()
 const router = useRouter()
 const { $api } = useNuxtApp()
-const { dateTime, range: dayRange } = useDates()
+const { dateTime, day, range: dayRange } = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -81,9 +81,13 @@ async function erase(row: Row) {
 // Signing: choose the days (and an outlet, or every outlet), see how many refusals they cover, confirm.
 const signing = ref<{ days: { start: string, end: string }, outlet: string } | null>(null)
 const covered = ref<number | null>(null)
+// The signature that reaches latest, which the offered days follow on from.
+const lastSigned = computed(() => [...(data.value?.reviews ?? [])].sort((a, b) => b.toDay.localeCompare(a.toDay))[0])
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function startSigning() {
-  signing.value = { days: { start: '', end: '' }, outlet: ALL }
+  // The days not yet signed, up to today: the usual signature, and the dates can still be changed.
+  const next = data.value?.nextReview
+  signing.value = { days: { start: next?.fromDay ?? '', end: next?.toDay ?? '' }, outlet: ALL }
   covered.value = null
   refusal.value = null
 }
@@ -308,6 +312,9 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
           @submit="sign"
         >
           <RefusalNotice :refusal="refusal" />
+          <p class="text-sm text-muted">
+            {{ lastSigned ? t('bar.screens.age-checks.last-signed', { day: day(lastSigned.toDay), name: lastSigned.by }) : t('bar.screens.age-checks.never-signed') }}
+          </p>
           <UFormField
             :label="t('bar.screens.age-checks.days-filter')"
             name="days"
