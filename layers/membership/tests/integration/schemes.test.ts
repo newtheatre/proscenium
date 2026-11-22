@@ -23,6 +23,17 @@ describe('setting up a scheme', () => {
     expect(body.checklist).toEqual([{ code: 'length-option', done: true }, { code: 'members-area', done: true }])
   })
 
+  it('creates a draft from its name alone: a members\' scheme from the day it starts, with a free address', async () => {
+    const name = `Name Only ${Date.now()}`
+    const first = await req('POST', '/api/membership/schemes', { name })
+    expect(first.status).toBe(200)
+    const { scheme: made } = (await req('GET', `/api/membership/schemes/${first.body.schemeId}`)).body
+    expect(made).toMatchObject({ state: 'draft', side: 'members', lengthRule: 'rolling', joinMode: 'apply', key: name.toLowerCase().replace(/ /g, '-') })
+    // A second scheme of the same name is not refused for its address: it takes the next free one.
+    const second = await req('POST', '/api/membership/schemes', { name })
+    expect((await req('GET', `/api/membership/schemes/${second.body.schemeId}`)).body.scheme.key).toBe(`${made.key}-2`)
+  })
+
   it('refuses a fixed scheme with no end date, or one ending on 29 February', async () => {
     expect((await req('POST', '/api/membership/schemes', { key: 'fixed-a', name: 'Fixed', side: 'members', lengthRule: 'fixed' })).body.code).toBe('membership.scheme.fixed-end')
     expect((await req('POST', '/api/membership/schemes', { key: 'fixed-b', name: 'Fixed', side: 'members', lengthRule: 'fixed', fixedEndMonth: 2, fixedEndDay: 29 })).body.code).toBe('membership.scheme.fixed-end-day')
