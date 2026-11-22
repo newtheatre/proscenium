@@ -460,11 +460,15 @@ a layout, not a shell, and it has no navigation of its own.
   way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
   or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
-  `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
+  `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment.
+  `?only=box-office` (a comma list of modules) narrows it to those panels, which is how the
+  console's Sell screens open it on a phone. A till with one panel draws no heading over it. A panel
   may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
   one receipt beside the panels, grouped by panel, with the ways to pay on it: one press makes the
   sale and starts that way of paying, and Split takes it in parts. On a narrow screen the receipt is
-  a sheet, opened from a bar at the foot that also takes payment. The sheet swipes down to close; its
+  a sheet, opened from a bar at the foot that also takes payment; the bar appears once the sale has
+  a line. Clear empties the sale and toasts with Undo. "Still to pay" shows only once part is paid,
+  and a payment in progress has one way out, Cancel sale. The sheet swipes down to close; its
   body scrolls only when the sale is too long to fit (a scrolling box takes a swipe as a scroll).
   Codes and discounts go in one box on the receipt, not a window: typing offers "Use code", the
   box's list holds the discounts the seller may give, and one that asks for a reason shows a Reason

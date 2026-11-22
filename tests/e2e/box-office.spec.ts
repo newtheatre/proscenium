@@ -124,7 +124,7 @@ async function noViolations(page: Page) {
 
 async function payCash(page: Page, amount: string, afterSale?: () => Promise<void>) {
   await cash(page).click()
-  await expect(page.getByText(`Still to pay: ${amount}`)).toBeVisible()
+  await expect(page.getByText(`Payment in progress: ${amount} to take`)).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
   // The till says so once.
   await expect(page.getByText(`Paid ${amount}`, { exact: true })).toHaveCount(1)
@@ -140,7 +140,6 @@ test('Sell sells tickets at the desk for cash', async ({ page }) => {
   expect(response?.status()).toBe(200)
   await expect(page.getByRole('heading', { level: 1, name: 'Sell' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sell' }).first()).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible()
   // A tile for each kind of ticket; each tap adds one, and the receipt holds how many.
   // The show has one price throughout, so its one section goes unnamed.
   const tile = page.getByRole('button', { name: new RegExp(`^${typeName}\\s*£12\\.00\\s*add one$`) })
@@ -225,12 +224,12 @@ test('a payment left by a reload is picked up again, and another till can cancel
   await page.getByLabel(/^Booking reference, desk code, name or pass/).fill(unfinished)
   await page.getByRole('button', { name: 'Find' }).click()
   await cash(page).click()
-  await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £12.00 to take')).toBeVisible()
   // Reloaded mid-payment: the till carries on with the same payment.
   await page.reload()
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
   await expect(page.getByText('A payment of £12.00 was not finished').first()).toBeVisible()
-  await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £12.00 to take')).toBeVisible()
 
   // Someone at another till finds the booking waiting on it, and cancels that payment to take it themselves.
   const officeContext = await browser.newContext(as(office))
@@ -333,9 +332,8 @@ test('the till in live mode collects a reservation, changed to who came, and tak
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await page.getByRole('button', { name: 'Next customer' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
-  // Below 900px in live mode the receipt is a sheet: open it to see it is empty.
-  await page.getByRole('button', { name: 'Sale (0)' }).click()
-  await expect(page.getByText('Nothing added yet.')).toBeVisible()
+  // Below 900px in live mode the receipt is a sheet, and its bar waits for the next sale's first line.
+  await expect(page.getByRole('button', { name: 'Sale (0)' })).toHaveCount(0)
 })
 
 test.describe('the box office console', () => {
@@ -452,22 +450,24 @@ test.describe('the box office console', () => {
     const code = `SAVE${stamp}`
     await visit(page, '/console/promotions')
     await expect(page.getByRole('heading', { level: 1, name: 'Promotions' })).toBeVisible()
-    await page.getByRole('button', { name: 'New promotion' }).first().click()
-    const dialog = page.getByRole('dialog', { name: 'New promotion' })
-    await dialog.getByLabel('Name', { exact: true }).fill(`Spring ${stamp}`)
+    await page.getByRole('link', { name: 'New promotion' }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: 'New promotion' })).toBeVisible()
+    await page.getByLabel('Name', { exact: true }).fill(`Spring ${stamp}`)
     // A character a code cannot hold is named beside the field; a space is left out when it is saved.
-    await dialog.getByRole('textbox', { name: 'Code', exact: true }).fill('half price!')
-    await dialog.getByRole('button', { name: 'Save promotion' }).click()
-    await expect(dialog.getByText('Use only letters, numbers, hyphens and underscores.')).toBeVisible()
-    await dialog.getByRole('textbox', { name: 'Code', exact: true }).fill(`${code.slice(0, 4).toLowerCase()} ${code.slice(4)}`)
-    await dialog.getByRole('spinbutton', { name: 'Percentage off' }).fill('15')
-    await dialog.getByRole('button', { name: 'Limits, dates and where it is sold' }).click()
-    await dialog.getByRole('spinbutton', { name: 'Uses in all' }).fill('40')
+    await page.getByRole('textbox', { name: 'Code', exact: true }).fill('half price!')
+    await page.getByRole('button', { name: 'Save promotion' }).click()
+    await expect(page.getByText('Use only letters, numbers, hyphens and underscores.')).toBeVisible()
+    await page.getByRole('textbox', { name: 'Code', exact: true }).fill(`${code.slice(0, 4).toLowerCase()} ${code.slice(4)}`)
+    await page.getByRole('spinbutton', { name: 'Percentage off' }).fill('15')
+    await page.getByRole('spinbutton', { name: 'Uses in all' }).fill('40')
     await noViolations(page)
-    await dialog.getByRole('button', { name: 'Save promotion' }).click()
-    await expect(dialog).toBeHidden()
+    await page.getByRole('button', { name: 'Save promotion' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Promotions' })).toBeVisible()
     await expect(page.getByText(`Spring ${stamp} added.`).first()).toBeVisible()
-    await expect(page.getByText(`15% off · on Tickets · code ${code} · 0 of 40 used`)).toBeVisible()
+    const row = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `Actions for Spring ${stamp}` }) })
+    await expect(row.getByText('15% off · on Tickets', { exact: true })).toBeVisible()
+    await expect(row.getByText(code, { exact: true })).toBeVisible()
+    await expect(row.getByText('0 of 40 used', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: `Actions for Spring ${stamp}` }).click()
     await page.getByRole('menuitem', { name: 'Retire' }).click()
     await expect(page.getByRole('button', { name: /^Retired promotions \(\d+\)$/ })).toBeVisible()

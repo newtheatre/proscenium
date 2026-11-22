@@ -259,6 +259,10 @@ describe('the routes', () => {
     expect(body.blockers.map(b => b.sentence).join(' ')).toMatch(/has not ended yet/)
     // The screen offers Close and Reopen only to those who may.
     expect(body).toMatchObject({ canClose: false, canReopen: false })
+    // A period still running says when it can be closed, so the screen need not show it as blocked.
+    expect(body).toMatchObject({ ended: false, closableFrom: '2026-12-01' })
+    const [october] = await rows<{ id: string }>("SELECT id FROM finance_periods WHERE starts_on = '2026-10-01'")
+    expect(await (await call(handle, 'GET', `/api/finance/periods/${october!.id}`, { actor: viewer })).json()).toMatchObject({ ended: true, closableFrom: '2026-11-01' })
     const closer = await (await call(handle, 'GET', `/api/finance/periods/${november!.id}`, { actor: person(['finance.ledger.view', 'finance.period.close', 'finance.period.reopen']) })).json()
     expect(closer).toMatchObject({ canClose: true, canReopen: true })
     const refused = await call(handle, 'POST', `/api/finance/periods/${november!.id}/close`, { actor: viewer })
@@ -271,6 +275,9 @@ describe('the routes', () => {
     for (const period of periods) {
       const body = await (await call(handle, 'GET', `/api/finance/periods/${period.id}`, { actor: person(['finance.ledger.view']) })).json() as { movement: { accountId: string, kind: string, currency: string, amountMinor: number }[] }
       const ledger = await inContext(() => balances({ periodId: period.id }))
+      // What is held (liabilities) reads positive and agrees with the ledger too.
+      for (const h of (body as unknown as { held: { accountId: string, currency: string, amountMinor: number }[] }).held)
+        expect(h.amountMinor).toBe(-ledger.find(b => b.accountId === h.accountId && b.currency === h.currency)!.balanceMinor)
       for (const m of body.movement) {
         expect(['income', 'expense']).toContain(m.kind)
         const b = ledger.find(l => l.accountId === m.accountId && l.currency === m.currency)!

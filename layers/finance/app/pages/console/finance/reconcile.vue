@@ -1,13 +1,15 @@
 <!-- Reconciliation (Box office specification, part 5; FIN-06, first release by totals): what each
      clearing account holds, which should equal the payouts still to come from its provider, with
-     what payouts have taken out so far and when the last was entered. Line-by-line matching is later. -->
+     what payouts have taken out so far, the latest payouts entered, and (from Payments) entering one.
+     Line-by-line matching is later. -->
 <script setup lang="ts">
+interface Payout { postingId: string, name: string, currency: string, outMinor: number, feesMinor: number, occurredAt: number }
 interface Line { accountId: string, code: string, name: string, currency: string, balanceMinor: number, paidOutMinor: number, lastPayoutAt: number | null }
 
 const { t } = useT()
 const { money } = await useMoney()
 const { day } = useDates()
-const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/api/finance/reconcile', { key: 'finance:reconcile' })
+const { data, status, error, refresh } = await useAPI<{ accounts: Line[], payouts?: Payout[] }>('/api/finance/reconcile', { key: 'finance:reconcile' })
 </script>
 
 <template>
@@ -15,6 +17,10 @@ const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/ap
     :title="t('finance.navigation.reconcile.label')"
     :description="t('finance.screens.reconcile.help')"
   >
+    <template #primary>
+      <!-- Payments owns entering a payout, and draws nothing for someone who may not. -->
+      <PaymentsPayout @recorded="refresh()" />
+    </template>
     <DataBoundary
       :data="data"
       :status="status"
@@ -54,6 +60,23 @@ const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/ap
           </div>
         </RecordListItem>
       </RecordList>
+      <PageSection
+        v-if="data?.payouts?.length"
+        class="mt-6"
+        :title="t('finance.screens.reconcile.payouts-title')"
+        :description="t('finance.screens.reconcile.payouts-help')"
+      >
+        <RecordList :label="t('finance.screens.reconcile.payouts-title')">
+          <RecordListItem
+            v-for="p in data.payouts"
+            :key="`${p.postingId}:${p.currency}`"
+            :name="day(p.occurredAt)"
+            :description="p.feesMinor ? t('finance.screens.reconcile.payout-line-fees', { account: p.name, fees: money(p.feesMinor, p.currency) }) : p.name"
+          >
+            <span class="font-medium tabular-nums">{{ money(p.outMinor - p.feesMinor, p.currency) }}</span>
+          </RecordListItem>
+        </RecordList>
+      </PageSection>
     </DataBoundary>
   </PageFrame>
 </template>

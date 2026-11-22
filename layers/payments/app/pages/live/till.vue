@@ -3,10 +3,16 @@
      basket and one payment. Box office's Sell is the same till narrowed to tickets, in the console. -->
 <script setup lang="ts">
 const { t } = useT()
+// Another screen may open the till narrowed to its own module, such as Box office's Sell on a phone.
+const route = useRoute()
+const only = computed(() => typeof route.query.only === 'string' && route.query.only ? route.query.only.split(',') : undefined)
 </script>
 
 <template>
   <PageLive :title="t('payments.navigation.live-till.label')">
-    <PaymentsTill live />
+    <PaymentsTill
+      live
+      :modules="only"
+    />
   </PageLive>
 </template>

@@ -13,6 +13,8 @@ const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ modules: string[], accounts: Account[] }>('/api/finance/accounts', { key: 'finance:accounts' })
 
 const KINDS: Kind[] = ['asset', 'liability', 'income', 'expense', 'equity']
+// The ledger holds income, liabilities and equity as credits, which are negative; here each account reads in its own sense.
+const natural = (a: Account, minor: number) => (a.kind === 'asset' || a.kind === 'expense' || minor === 0 ? minor : -minor)
 const moduleLabel = (id: string) => (te(`${id}.module.name`) ? t(`${id}.module.name`) : id)
 const byKind = computed(() => KINDS.map(kind => ({ kind, accounts: (data.value?.accounts ?? []).filter(a => a.kind === kind) })).filter(g => g.accounts.length))
 
@@ -95,7 +97,7 @@ async function save() {
                       v-for="b in a.balances"
                       :key="b.currency"
                       class="block"
-                    >{{ money(b.balanceMinor, b.currency) }}</span>
+                    >{{ money(natural(a, b.balanceMinor), b.currency) }}</span>
                   </span>
                 </span>
               </template>
