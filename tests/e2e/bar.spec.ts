@@ -117,7 +117,7 @@ test('one press adds a product sold one way; one with sizes asks which, and the 
   await noViolations(page)
 
   await cash(page).click()
-  await expect(page.getByText('Still to pay: £10.40')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £10.40 to take')).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £10.40', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Next customer' }).click()
@@ -143,7 +143,7 @@ test('two devices signed in as the same seller share one sale until one disconne
   // The payment started on one is taken on the other, and both move on.
   await cash(page).click()
   await expect(phone.getByText(/^This payment was started on/)).toBeVisible()
-  await expect(phone.getByText('Still to pay: £4.00')).toBeVisible()
+  await expect(phone.getByText('Payment in progress: £4.00 to take')).toBeVisible()
   await cash(phone).click()
   await phone.getByRole('button', { name: 'Cash taken' }).click()
   await expect(phone.getByText('Paid £4.00', { exact: true })).toBeVisible()
@@ -193,7 +193,7 @@ test('another seller links their device with a code, shares the sale, and leaves
 
   // The payment one seller starts is taken by the other.
   await cash(page).click()
-  await expect(theirs.getByText('Still to pay: £2.00')).toBeVisible()
+  await expect(theirs.getByText('Payment in progress: £2.00 to take')).toBeVisible()
   await cash(theirs).click()
   await theirs.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £2.00', { exact: true })).toBeVisible()
@@ -284,7 +284,7 @@ test('a drink with choices opens one window: size, the usual spirit already pick
   await expect(receipt.getByText('£12.00', { exact: true })).toBeVisible()
 
   await cash(page).click()
-  await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £12.00 to take')).toBeVisible()
   await page.getByRole('button', { name: 'Cash taken' }).click()
   await expect(page.getByText('Paid £12.00', { exact: true })).toBeVisible()
 })

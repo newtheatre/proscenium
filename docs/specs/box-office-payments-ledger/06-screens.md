@@ -105,15 +105,15 @@ What the door must get right:
 | --- | --- | --- | --- | --- |
 | My session | `/console/payments/session` | `payments.session.open` | Open with a float; cash up with a count; variance reason | First |
 | Sessions | `/console/payments/sessions` | `payments.session.view` | Every session, expected against counted | First |
-| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, unfulfilled payments, failed refunds | First |
+| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, unfulfilled payments, failed refunds, and (for someone who may approve them) refunds waiting for approval | First |
 | Refunds | `/console/payments/refunds` | `payments.refund.approve` | Requests waiting, with who asked and why | First |
 | Providers and readers | `/console/payments/providers` | `payments.provider.manage` | Add a provider, pair a reader, test mode, health | First |
 | Ledger | `/console/finance/ledger` | `finance.ledger.view` | Postings with their entries; filter by account, production, performance, period; every row links to its source | First |
 | Accounts | `/console/finance/accounts` | `finance.account.manage` | Chart of accounts; rename and recode | First |
 | Periods | `/console/finance/periods` | `finance.period.close` | The close checklist, close, reopen with a reason | First |
 | Production statement | `/console/finance/productions/<id>` | `finance.ledger.view` on that production | Income, fees and refunds for one production, for a visiting company's settlement | First |
-| Reconciliation | `/console/finance/reconcile` | `finance.ledger.view` | Clearing account balance against provider payouts | First: totals. Later: line matching |
-| Export | `/console/finance/export` | `finance.ledger.export` | CSV of postings for an accounting package | First |
+| Reconciliation | `/console/finance/reconcile` | `finance.ledger.view` | Clearing account balance against provider payouts, the latest payouts entered, and Record a payout for someone with `payments.provider.manage` | First: totals. Later: line matching |
+| Export | on the Ledger (`/console/finance/ledger?export=1`; the old address redirects) | `finance.ledger.export` | CSV of postings for an accounting package, from an Export button on the Ledger | First |
 
 ## States every screen has
 

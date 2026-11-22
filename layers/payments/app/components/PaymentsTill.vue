@@ -67,6 +67,7 @@ const router = useRouter()
 const { currency, money, toMinor, toMajor } = await useMoney()
 const { toRefusal } = useRefusal()
 const { confirm, confirmTicked } = useConfirm()
+const { offer } = useUndo()
 const toast = useToast()
 // The till's toasts replace one another rather than stacking up.
 const TOAST = 'payments-till'
@@ -248,9 +249,20 @@ function said(id: string, receipt: PanelReceipt | null) {
 }
 // The panels' other ways to finish, at the console's till only: live mode takes payment and nothing else.
 const panelActions = computed(() => (props.live ? [] : panels.value.flatMap(p => (inputs[p.id] === null || inputs[p.id] === undefined ? [] : receipts[p.id]?.actions ?? []))))
+// Clearing takes the whole sale away at once, so the toast offers it back.
 function clearAll() {
+  const kept = JSON.stringify({ inputs: Object.fromEntries(panels.value.map(p => [p.id, inputs[p.id] ?? null])), codes: pricing.codes, staff: pricing.staff })
   emptyPanels()
   added.value = null
+  // The sheet would cover the toast that offers Undo.
+  sheet.value = false
+  offer(t('payments.screens.till.cleared'), () => {
+    if (sale.value) return
+    const was = JSON.parse(kept) as { inputs: Record<string, unknown>, codes: string[], staff: typeof pricing.staff }
+    for (const p of panels.value) inputs[p.id] = was.inputs[p.id] ?? null
+    pricing.codes = was.codes
+    pricing.staff = was.staff
+  })
 }
 
 // The sale opens as a sheet where there is no room beside the panels. A scrolling box takes a swipe
@@ -1736,15 +1748,14 @@ function ended() {
                 v-else-if="sale"
                 class="space-y-4"
               >
-                <p class="font-medium">
-                  {{ t('payments.screens.till.due', { amount: money(due) }) }}
-                </p>
-                <p
-                  v-if="paidInPart"
-                  class="text-sm text-muted"
-                >
-                  {{ t('payments.screens.till.paid-so-far', { amount: money(payment?.paidMinor ?? 0) }) }}
-                </p>
+                <template v-if="paidInPart">
+                  <p class="font-medium">
+                    {{ t('payments.screens.till.due', { amount: money(due) }) }}
+                  </p>
+                  <p class="text-sm text-muted">
+                    {{ t('payments.screens.till.paid-so-far', { amount: money(payment?.paidMinor ?? 0) }) }}
+                  </p>
+                </template>
 
                 <UAlert
                   v-if="result?.kind === 'declined'"
@@ -1989,7 +2000,7 @@ function ended() {
             class="mb-4"
             :title="t('payments.screens.till.in-progress', { amount: money(due) })"
             :description="t('payments.screens.till.in-progress-help')"
-            :actions="paidInPart ? [] : [{ label: t('payments.screens.till.in-progress-cancel'), color: 'neutral', variant: 'outline', disabled: taking, onClick: cancel }]"
+            :actions="paidInPart || beside ? [] : [{ label: t('payments.screens.till.cancel-button'), color: 'neutral', variant: 'outline', disabled: taking, onClick: cancel }]"
           />
           <div
             class="grid grid-cols-1 gap-6"
@@ -2026,20 +2037,32 @@ function ended() {
               :class="sale ? 'opacity-40' : undefined"
               :inert="!!sale || adrift"
             >
-              <PageSection
-                v-for="p in panels"
-                :key="p.id"
-                :title="t(p.label)"
-              >
-                <component
-                  :is="p.component"
-                  v-model="inputs[p.id]"
-                  :locked="!!sale || adrift"
-                  :summary="summaryOf(p.id)"
-                  :settled="settledFor(p.id)"
-                  @receipt="(r: PanelReceipt | null) => said(p.id, r)"
-                />
-              </PageSection>
+              <!-- A till narrowed to one panel sits under a page already named for it. -->
+              <component
+                :is="panels[0]!.component"
+                v-if="modules && panels.length === 1"
+                v-model="inputs[panels[0]!.id]"
+                :locked="!!sale || adrift"
+                :summary="summaryOf(panels[0]!.id)"
+                :settled="settledFor(panels[0]!.id)"
+                @receipt="(r: PanelReceipt | null) => said(panels[0]!.id, r)"
+              />
+              <template v-else>
+                <PageSection
+                  v-for="p in panels"
+                  :key="p.id"
+                  :title="t(p.label)"
+                >
+                  <component
+                    :is="p.component"
+                    v-model="inputs[p.id]"
+                    :locked="!!sale || adrift"
+                    :summary="summaryOf(p.id)"
+                    :settled="settledFor(p.id)"
+                    @receipt="(r: PanelReceipt | null) => said(p.id, r)"
+                  />
+                </PageSection>
+              </template>
             </div>
 
             <aside
@@ -2068,6 +2091,7 @@ function ended() {
           <!-- No room beside the panels: the sale is in reach of a thumb, and opens as a sheet. -->
           <template v-if="!beside">
             <div
+              v-if="groups.length || sale || finished"
               class="sticky bottom-2 z-10 mt-6 space-y-2 rounded-xl border border-default bg-elevated p-3 shadow-lg"
               :aria-label="t('payments.screens.till.total-label')"
               role="region"
