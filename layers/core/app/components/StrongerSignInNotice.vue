@@ -13,6 +13,8 @@ async function confirm() {
   // What was held back is now allowed: the page's data and the menus are read again.
   await Promise.all([refresh(), refreshNuxtData()])
 }
+// The button's props type leaves out attributes; the label still reaches the button.
+const closeButton = computed(() => ({ 'aria-label': t('core.two-step.banner.dismiss') }) as Record<string, string>)
 </script>
 
 <template>
@@ -25,7 +27,7 @@ async function confirm() {
     :actions="need === 'set-up'
       ? [{ label: t('core.two-step.set-up'), to: TWO_STEP_SET_UP_AT, color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }]
       : [{ label: t('core.two-step.banner.confirm-button'), color: 'neutral', variant: 'outline', onClick: confirm }]"
-    :close="{ 'aria-label': t('core.two-step.banner.dismiss') }"
+    :close="closeButton"
     orientation="horizontal"
     @update:open="hidden = true"
   />
