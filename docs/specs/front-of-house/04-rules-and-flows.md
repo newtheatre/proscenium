@@ -35,7 +35,7 @@ Each resolver answers the three things Foundations asks of a fact: whether it ho
 What follows from that:
 
 - **A requested assignment gives no authority.** Only a confirmed one does. Rostered holds from the request, so a new volunteer can reach the members' area to see what they asked for.
-- **Being on shift does not need check-in.** A steward who forgets to tap "I'm here" can still scan. Check-in is a record of attendance, not a key (question 6).
+- **Being on shift does not need check-in.** A steward who forgets to tap "I'm here" can still scan. Check-in is a record of attendance, not a key (question 6). Working the night records it for them (see "Arriving once" under the Tonight board).
 - **A shift not tied to a performance confers rostered only** (question 8). There is no performance for the other two facts to hold on.
 - **Loss takes effect on the next request.** Nothing is cached beyond the request. A page open on a phone keeps showing what it showed; its next write is refused with `front-of-house.shift-ended`, which the interface shows as stuck, never retried.
 - **Leading-shift grants privileged abilities only when the theatre confirms it**, as Foundations requires of any fact. The setup step for the module asks once.
@@ -90,6 +90,7 @@ A manager may change `places` at any time, never below `places_taken`. A draft s
 The board is a read of one performance: who is on which duty and whether they have arrived, the timings recorded so far, each checklist's progress, open incidents by number, and the figures other modules contribute through `front-of-house.tonight-figure`. It is served by one live-data source and refreshes on the interval the interface sets for live mode. A contributed figure that fails or is slow is shown as unavailable; it never blocks the board.
 
 - **Arrived.** A person is flagged "not arrived" when the performance is within `front-of-house.shifts.late-after` of the call time passing and they have not checked in. It is a prompt to the lead, not a state.
+- **Arriving once.** Doing a job of the night on your own shift is arriving. When a person records a timing or enters a checklist item for a performance, each of their own confirmed or release\_requested assignments on a published shift of that performance, inside its window, becomes checked\_in in the same unit, audited as a state change with `implied: true`. The time kept is when the act was done (a queued checklist entry carries its own time), never earlier than the window opening, and an earlier check-in is never replaced. It never refuses the act: someone with no place tonight, a place marked as not coming, or a window that has not opened is left as they are. "I'm here" is only offered until then. Where `front-of-house.hours.count-from` is checked, hours count from this time as they would from a tap. Approved by Matt on 21 November 2026.
 - **Timings.** Each kind is recorded once per performance by a tap, with the time adjustable by up to an hour either way. Recording one again replaces it and is audited.
 - **House open.** When `front-of-house.checklists.block-house-open` is on, recording house\_open is refused while a pre-show checklist run for the performance is still open. The default is off: the board warns instead.
 
