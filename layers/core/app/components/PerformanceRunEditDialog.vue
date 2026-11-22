@@ -61,7 +61,7 @@ const blocked = computed(() => [
 ])
 // Held by something no answer here can settle.
 const stuck = computed(() => !!change.value?.refusal && !change.value.refusal.question)
-const answer = ref<string | undefined>(undefined)
+const heldAnswer = ref<string | undefined>(undefined)
 const nothing = computed(() => !!change.value && !adds.value.length && !moves.value.length && !change.value.remove.length)
 const counted = (n: number) => n === 1 ? '1 performance' : `${n} performances`
 
@@ -85,14 +85,14 @@ async function apply() {
   if (!run || !change.value || nothing.value) return
   refusal.value = null
   // A module's question, such as what happens to the bookings, is answered before the run changes.
-  if (change.value.refusal?.question && !answer.value) {
+  if (change.value.refusal?.question && !heldAnswer.value) {
     refusal.value = { code: 'core.form.invalid', reason: `Choose an answer to "${change.value.refusal.question.label}" first.` } as ReturnType<typeof toRefusal>
     return
   }
   busy.value = true
   try {
     if (change.value.refusal) {
-      const still = await settleChange(change.value.refusal, answer.value, async () => (await $api<Change>(`/api/core/productions/${props.productionId}/runs/${run.id}/plan` as string, { method: 'POST', body: body() })).refusal)
+      const still = await settleChange(change.value.refusal, heldAnswer.value, async () => (await $api<Change>(`/api/core/productions/${props.productionId}/runs/${run.id}/plan` as string, { method: 'POST', body: body() })).refusal)
       change.value.refusal = still
       if (still) return
     }
@@ -167,7 +167,7 @@ async function apply() {
           class="space-y-4 text-sm"
         >
           <ChangeHeld
-            v-model:answer="answer"
+            v-model:answer="heldAnswer"
             :refusal="change.refusal"
           />
           <p v-if="nothing">
