@@ -38,6 +38,7 @@ export default defineModule({
     'core.count': [
       ...identity.identityContributions['core.count'], ...domain.contributes['core.count'],
       { id: 'core.getting-ready', file: 'getting-ready' },
+      { id: 'core.notification-topics', file: 'notification-topics' },
       { id: 'core.email-unverified', file: 'email-unverified' },
     ],
     // Admin's overview after setup: nothing is emailed until a domain is verified, and the first
@@ -57,10 +58,10 @@ export default defineModule({
       // The one inbox (C-30, AC-2), with every side the person has: in My account, and in the members' area for a member.
       { id: 'core.inbox', menu: 'account', group: 'account', to: '/account/inbox', icon: 'i-lucide-inbox', ability: 'signed-in', order: 5, count: 'core.inbox-unread' },
       { id: 'core.members-inbox', menu: 'members', to: '/members/inbox', icon: 'i-lucide-inbox', order: 90, count: 'core.inbox-unread' },
-      { id: 'core.account-details', menu: 'account', group: 'account', to: '/account/details', match: '/account/welcome', icon: 'i-lucide-user-round', ability: 'signed-in', order: 10 },
-      { id: 'core.account-email', menu: 'account', group: 'account', to: '/account/email', icon: 'i-lucide-mail', ability: 'signed-in', order: 20, attention: 'core.unconfirmed-addresses' },
+      // Details holds the email addresses too, so an address waiting for its link marks it (ID-12).
+      { id: 'core.account-details', menu: 'account', group: 'account', to: '/account/details', match: '/account/welcome', icon: 'i-lucide-user-round', ability: 'signed-in', order: 10, attention: 'core.unconfirmed-addresses' },
       { id: 'core.account-sign-in', menu: 'account', group: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
-      { id: 'core.account-notifications', menu: 'account', group: 'account', to: '/account/notifications', icon: 'i-lucide-bell', ability: 'signed-in', order: 40 },
+      { id: 'core.account-notifications', menu: 'account', group: 'account', to: '/account/notifications', icon: 'i-lucide-bell', ability: 'signed-in', order: 40, count: 'core.notification-topics', hideEmpty: true },
       { id: 'core.account-data', menu: 'account', group: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },
       // Venues and their spaces are set up once, so they are a tab of Core's page, opened from the programme's cog.
       { id: 'core.venues', menu: 'admin', group: 'modules', to: '/admin/modules/core/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30, settingsIn: ['programme'] },

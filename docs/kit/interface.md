@@ -269,7 +269,8 @@ the server for actions and sources when it is first opened, not on every page.
   pixels a bottom bar of the first four plus More. Its entries are `core.navigation` entries with
   `menu: 'members'`. With `core.members-area.enabled` off, or for anyone for whom the fact
   `core.member` is not true, every `/members` address answers "not found". The name shown is
-  `core.members-area.name`.
+  `core.members-area.name`. The home shows only the cards modules put on it; the bar is the way to
+  each section, so the home repeats none of them, and with no card it says nothing needs the person.
 - **My account** (`/account`): the same pages for everyone signed in. On a laptop every account page
   sits beside the account's menu (`AccountNavigation`, drawn by `PageFrame` for any address under
   `/account`): an Overview, then the `core.navigation` entries with `menu: 'account'` in two groups,
@@ -291,6 +292,7 @@ the server for actions and sources when it is first opened, not on every page.
 - **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
   returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
+  Passes (no pass held) and Notifications (no kind of message to choose) are hidden this way.
 - **Colour mode**: `core.appearance.default` is what a first-time visitor sees; a person's own choice
   from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
   pages light. The mode is kept in a cookie and decided on the server before the page renders
