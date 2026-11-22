@@ -2,6 +2,8 @@
      to use, so a missing button or a refusal is never the first they hear of it: where to set up
      two-step sign-in, or a button to use the passkey they have. Hidden for the visit once dismissed. -->
 <script setup lang="ts">
+import type { ButtonProps } from '@nuxt/ui'
+
 const { t } = useT()
 const { viewer, refresh } = useViewer()
 const { confirmItsYou } = useConfirmItsYou()
@@ -14,7 +16,7 @@ async function confirm() {
   await Promise.all([refresh(), refreshNuxtData()])
 }
 // The button's props type leaves out attributes; the label still reaches the button.
-const closeButton = computed(() => ({ 'aria-label': t('core.two-step.banner.dismiss') }) as Record<string, string>)
+const closeButton = computed(() => ({ 'aria-label': t('core.two-step.banner.dismiss') }) as unknown as ButtonProps)
 </script>
 
 <template>
