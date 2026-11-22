@@ -102,8 +102,7 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   // Manage booking, from the link: one of the two tickets is cancelled, and its seat goes back on sale.
   await page.getByRole('link', { name: 'Manage your booking' }).click()
   await expect(page.getByRole('heading', { name: 'Your booking' })).toBeVisible()
-  await expect(page.getByText('Total to pay at the box office')).toBeVisible()
-  await expect(page.getByText('£20.00', { exact: true })).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Total to pay at the box office' })).toContainText('£20.00')
   await noViolations(page)
   await page.getByRole('checkbox', { name: /^Ticket 1, / }).check()
   await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
@@ -111,8 +110,7 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page.getByText('1 ticket cancelled. Its seat is back on sale.')).toBeVisible()
   // The dialog fades out; checking it half-faded would judge its contrast mid-animation.
   await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText('Total to pay at the box office')).toBeVisible()
-  await expect(page.getByText('£10.00', { exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Total to pay at the box office' })).toContainText('£10.00')
   await noViolations(page)
 
   // The basket is spent: coming back shows nothing held.
