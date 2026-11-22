@@ -460,7 +460,7 @@ test.describe('confirming it is you', () => {
     await visit(page, '/admin/email')
     // One flow: the way chosen shows only its own setting, the label for Cloudflare's set-up or the domain typed by hand.
     const section = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Email footer' }) })
-    await page.getByRole('tab', { name: 'I have set one up in Cloudflare' }).click()
+    await page.getByRole('tab', { name: 'I already have one' }).click()
     await expect(page.getByRole('textbox', { name: 'Sending domain' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Sending label' })).toHaveCount(0)
     // The verified domain is the status at the top, so it is not drawn again.

@@ -69,7 +69,7 @@ const way = computed<Way>({ get: () => picked.value ?? startsOn.value, set: (v) 
 const changing = ref(false)
 const ways = [
   { label: 'Set it up for me', value: 'automatic', icon: 'i-lucide-wand-sparkles' },
-  { label: 'I have set one up in Cloudflare', value: 'own', icon: 'i-lucide-pencil-line' },
+  { label: 'I already have one', value: 'own', icon: 'i-lucide-pencil-line' },
 ]
 const choosing = computed(() => !data.value?.verified || changing.value)
 const highlight = computed(() => typeof route.query.setting === 'string' ? route.query.setting : undefined)
@@ -139,7 +139,6 @@ async function setUp() {
             :items="ways"
             :content="false"
             aria-label="How to set up the sending domain"
-            :ui="{ list: 'max-sm:flex-col', trigger: 'max-sm:justify-start' }"
           />
           <template
             v-if="(data.domain && !data.verified) || !choosing"
