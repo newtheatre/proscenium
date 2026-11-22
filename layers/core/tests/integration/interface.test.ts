@@ -219,6 +219,14 @@ describe("core's settings", () => {
     expect((await decide('/admin/modules/core', person(['core.programme.configure']))).decision).toBe('not-found')
   })
 
+  it('a module that ships vocabularies has a Lists tab, for whoever looks after vocabularies', async () => {
+    const tabsOf = async (module: string, actor: ReturnType<typeof person>) => ((await (await call(handle, 'GET', `/api/core/modules/${module}/tabs`, { actor })).json()) as { tabs: { to: string }[] }).tabs.map(t => t.to)
+    expect(await tabsOf('core', person(['core.vocabulary.manage']))).toEqual(['/admin/modules/core/lists'])
+    expect(await tabsOf('core', person(['core.programme.configure']))).not.toContain('/admin/modules/core/lists')
+    // Facts are a tab of Roles now, so the old address is covered by no entry of its own.
+    expect((await decide('/admin/roles/automatic', person(['core.role.read']))).decision).toBe('allow')
+  })
+
   it('show in the settings window only where they belong: the cog on a page opens that page\'s tabs', async () => {
     type Window = { name: string, tabs: { id: string, to: string }[] }
     const window = async (scope: string, actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', `/api/core/settings-window?for=${scope}`, { actor })).json()) as Window

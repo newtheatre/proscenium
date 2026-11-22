@@ -71,7 +71,7 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
   const owners = new Set((await usePoint<unknown>('core.vocabulary')).map(c => c.module))
   for (const id of owners) {
     if (!on.has(id)) continue
-    out.push({ id: `core.modules.lists.${id}`, module: id, label: 'core.modules.tab.lists', menu: 'admin', group: 'modules', to: `${moduleHome(id)}/lists`, match: `${moduleHome(id)}/lists`, icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 900 }) // not-policy: Lists sits just before About
+    out.push({ id: `core.modules.lists.${id}`, module: id, label: 'core.modules.tab.lists', menu: 'admin', group: 'modules', to: `${moduleHome(id)}/lists`, match: `${moduleHome(id)}/lists`, icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 900, ...(id === 'core' ? { settingsIn: ['programme'] } : {}) }) // not-policy: Lists sits just before About
   }
   return out
 }

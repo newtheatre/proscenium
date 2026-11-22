@@ -15,11 +15,11 @@ const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }
 test.describe('someone who reads roles and sets up sign-in', () => {
   test.use(as(['core.role.read', 'core.identity-settings.manage']))
 
-  test('finds Roles, Facts and Sign-in under Access', async ({ page }) => {
+  test('finds Roles and Sign-in under Access', async ({ page }) => {
     await visit(page, '/admin')
     const nav = page.getByRole('navigation', { name: 'Admin', exact: true })
     await nav.getByRole('button', { name: 'Access' }).click() // a group is a collapsible section
-    for (const name of ['Roles', 'Facts', 'Sign-in']) await expect(nav.getByRole('link', { name })).toBeVisible()
+    for (const name of ['Roles', 'Sign-in']) await expect(nav.getByRole('link', { name })).toBeVisible()
   })
 
   test('the roles list opens, with a way to make one', async ({ page }) => {
