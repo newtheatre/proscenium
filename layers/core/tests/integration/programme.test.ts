@@ -231,7 +231,7 @@ describe('productions', () => {
     await dated('View draft', now + 5 * day, now + 6 * day, 'draft')
     await dated('View long ago', now - 90 * day, now - 80 * day)
     await dated('View last week', now - 9 * day, now - 7 * day)
-    await dated('View called off', now + 4 * day, now + 4 * day, 'cancelled')
+    await dated('View called off', now + 4 * day, now + 4 * day, 'withdrawn')
     const titles = async (query: string) => (await req('GET', `/api/core/productions?q=view&size=100&${query}`, undefined, viewer)).body.rows.map((p: { title: string }) => p.title)
     // Coming up: anything not over and not called off, in date order, with what has no dates last.
     expect(await titles('view=coming-up')).toEqual(['View running', 'View sooner', 'View draft', 'View later', 'View undated'])
