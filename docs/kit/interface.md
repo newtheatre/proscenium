@@ -71,7 +71,11 @@ contributes: {
   `core.modules.manage` and `core.health.view`). The tabs do not entitle anyone to Admin, so console
   staff stay out of it. `GET /api/core/modules/:id/tabs` lists the tabs the viewer may open.
   `ModuleFrame` draws the page: the list of modules on the left at 1024 pixels and wider, the
-  module's toggle, and the tabs, which scroll sideways on a phone.
+  module's toggle, and the tabs, which scroll sideways on a phone. What the module does is said on
+  About, on a module that is off and on one with no other tab, not above every tab. For a week
+  after a module is switched on its first tab and About carry a "Set up" card: each step names
+  the job ("Check the settings", "Set up Price lists"), a screen is ticked once it has been opened
+  on this device, and on a phone the card starts folded to its count ("1 of 3 done").
 - **Set-up screens** (things done once or rarely) are tabs too: a module declares the entry with
   `menu: 'admin', group: 'modules', to: '/admin/modules/<module>/<screen>'` and puts the page (and
   its record pages) under `pages/admin/modules/<module>/`. The admin layout draws `ModuleFrame`
@@ -118,7 +122,7 @@ contributes: {
 - **PageForm**: validates with the schema the server validates with; a panel up to six fields, a
   page beyond; a stale save shows both versions and asks which to keep; leaving with changes asks once.
 - **PageSettings**: the generated page for a module's settings, one section at a time with a stated
-  summary, a Reset to default, who may change each, and a tag where a content page quotes it.
+  summary, a Reset to default, who may change each (said only to someone who may not), and a tag where a content page quotes it.
 - **KeysCard**: the keys a page manages, by name, as one section: where each comes from now
   (saved here, saved for the whole site, or not set); a set key's field shows dots between its prefix and last
   four characters (`sk_live_••••4242`) until Replace opens it; Remove; and Save
