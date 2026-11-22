@@ -1,8 +1,8 @@
-<!-- Facts (ID-22; identity spec part 6): each fact a module declares, such as "leads tonight's
-     shift", with the abilities the theatre maps to it, edited the same way as a role. Whoever the
-     fact names holds those abilities while it holds. A privileged one needs the theatre's confirmation. -->
+<!-- Automatic access, the second tab of Roles (ID-22; identity spec part 6): each fact a module
+     declares, such as "leads tonight's shift", with the abilities the theatre maps to it. Whoever the
+     fact names holds them while it holds. A privileged one needs the theatre's confirmation. -->
 <script setup lang="ts">
-import type { CatalogueAbility } from '../../components/AbilityPicker.vue'
+import type { CatalogueAbility } from '../../../components/AbilityPicker.vue'
 
 interface Fact { name: string, module: string, on: string | null, standing: boolean, label: string, abilities: { ability: string, confirmed: boolean }[] }
 
@@ -80,6 +80,7 @@ async function save(fact: Fact) {
     :description="t('core.facts.description')"
     width="reading"
   >
+    <RolesTabs />
     <DataBoundary
       :data="data"
       :status="status"
