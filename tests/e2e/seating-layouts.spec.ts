@@ -108,10 +108,13 @@ test('a manager gives a space a seating layout, and its performance takes the wh
   // The performance there uses the space's usual layout without anyone choosing it.
   await visit(page, `/console/box-office/performances/${performanceId}`)
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
-  await expect(section.getByRole('radio', { name: 'As the run' })).toBeChecked()
   await expect(section.getByText('The space\'s usual layout, End-on: 2 wheelchair spaces, each in place of 2 seats')).toBeVisible()
   await expect(section.getByText('0 of 2 booked')).toBeVisible()
   await expect(section.getByText(/^4 seats until /)).toBeVisible()
+  await noViolations(page)
+  // Its own choice is with the rest of what can differ from the run, folded until asked for.
+  await page.getByRole('button', { name: 'Show', exact: true }).click()
+  await expect(page.getByRole('radio', { name: 'As the run' })).toBeChecked()
   await noViolations(page)
 })
 
@@ -136,7 +139,9 @@ test('a wheelchair user books a space online, and the performance counts it', as
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
   await expect(section.getByText('1 of 2 booked')).toBeVisible()
   await expect(section.getByText(/^2 seats until /)).toBeVisible()
-  await expect(page.getByText('2 taken')).toBeVisible()
+  // The seats taken are with the night's own seats, folded until asked for.
+  await page.getByRole('button', { name: 'Show', exact: true }).click()
+  await expect(page.getByText(/^2 taken/)).toBeVisible()
 })
 
 test('the run types its own numbers on the Tickets tab, and one performance overrides them', async ({ page }) => {
@@ -155,10 +160,13 @@ test('the run types its own numbers on the Tickets tab, and one performance over
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Wheelchair spaces', exact: true }) })
   await expect(section.getByText('3 wheelchair spaces, each in place of 1 seat')).toBeVisible()
   await expect(section.getByText('1 of 3 booked')).toBeVisible()
-  await section.getByRole('radio', { name: 'Numbers typed in' }).check()
-  await section.getByRole('spinbutton', { name: 'Wheelchair spaces' }).fill('2')
-  await section.getByRole('button', { name: 'Save wheelchair spaces' }).click()
+  await page.getByRole('button', { name: 'Show', exact: true }).click()
+  await page.getByRole('radio', { name: 'Numbers typed in' }).check()
+  await page.getByRole('spinbutton', { name: 'Wheelchair spaces' }).fill('2')
+  // The page's one Save saves it with anything else that changed.
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(section.getByText('1 of 2 booked')).toBeVisible()
+  await expect(section.getByText(/^This night's own: 2 wheelchair spaces/)).toBeVisible()
   await noViolations(page)
 
   // The Tickets tab says one night has its own.

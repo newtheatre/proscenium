@@ -13,7 +13,7 @@ Counts: 71 stories. 63 are in the first release (17 of them Gate; two with a par
 | Id | Story | Acceptance criteria | Release |
 | --- | --- | --- | --- |
 | BO-01 | As a box-office manager I set up a performance for sale | Given a scheduled performance, I can add bands with capacities, choose prices per ticket type, and set an on-sale time. The checklist names anything missing. Going on sale is refused with the reason while a band has no price or a paid price has no way to pay | First |
-| BO-02 | As a box-office manager I copy the set-up from another performance | Bands, capacities, prices and limits are copied; sold tickets and holds are not | First |
+| BO-02 | As a box-office manager I copy the set-up from another performance | Bands, capacities, prices and limits are copied; sold tickets and holds are not. A date added to a run takes the run's set-up by itself, and a new production starts from its ticket preset, so the console no longer offers copying by hand (Matt, 21 November 2026); the route remains | First |
 | BO-03 | As a box-office manager I change a price after going on sale | New baskets get the new price. Existing baskets and orders keep the price they were given. The price history shows who changed it and when | First |
 | BO-04 | As a box-office manager I raise or cut capacity | Raising above the space's own capacity needs `box-office.performance.exceed-venue` and records who confirmed. Cutting below tickets sold is refused, stating how many are sold | First |
 | BO-05 | As a box-office manager I pause and resume sales | While paused, new baskets are refused with "sales are paused"; baskets already open can still be paid | First |

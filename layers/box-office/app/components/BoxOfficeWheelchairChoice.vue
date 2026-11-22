@@ -1,6 +1,7 @@
 <!-- Where wheelchair spaces come from (Matt 2026-11-17, 21:58): handed on (a run to each space's
      usual layout, a performance to its run), a seating layout, or numbers typed in. Used on a
-     production's Tickets tab and on a performance's set-up; the parent saves what is chosen. -->
+     production's Tickets tab and on a performance's set-up; the parent saves what is chosen. With
+     `nested` it has no button of its own: the page's one Save reads `pending` and saves it. -->
 <script setup lang="ts">
 import type { z } from 'zod'
 import type { wheelchairChoice } from '../../server/input'
@@ -8,7 +9,7 @@ import type { wheelchairChoice } from '../../server/input'
 type Choice = z.input<typeof wheelchairChoice>
 interface Layout { id: string, name: string, usual: boolean, spaceName?: string | null }
 
-const props = defineProps<{ layouts: Layout[], sections: { id: string, name: string }[], current: Choice, inheritLabel: string, inheritDescription: string }>()
+const props = defineProps<{ layouts: Layout[], sections: { id: string, name: string }[], current: Choice, inheritLabel: string, inheritDescription: string, nested?: boolean }>()
 const emit = defineEmits<{ save: [choice: Choice] }>()
 const { t } = useT()
 
@@ -41,12 +42,15 @@ function submit() {
   const choice = chosen()
   if (choice) emit('save', choice)
 }
+// What a Save elsewhere would save: null while nothing has changed or a layout is still to be chosen.
+defineExpose({ pending: computed(() => unchanged.value ? null : chosen()) })
 </script>
 
 <template>
   <UForm
     :state="state"
     class="space-y-4"
+    :nested="nested"
     novalidate
     @submit="submit"
   >
@@ -111,6 +115,7 @@ function submit() {
       </UFormField>
     </div>
     <UButton
+      v-if="!nested"
       type="submit"
       color="neutral"
       variant="outline"

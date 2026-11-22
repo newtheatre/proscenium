@@ -365,8 +365,12 @@ test.describe('the box office console', () => {
     await noViolations(page)
 
     await visit(page, `/console/box-office/performances/${performanceId}`)
-    await expect(page.getByRole('heading', { name: 'Seats to sell' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'When it sells' })).toBeVisible()
     await expect(page.getByText('On sale', { exact: true }).first()).toBeVisible()
+    await noViolations(page)
+    // Where the night differs from the run is folded away until asked for.
+    await page.getByRole('button', { name: 'Show', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Seats to sell' })).toBeVisible()
     await noViolations(page)
 
     await visit(page, `/console/box-office/performances/${performanceId}/door`)
