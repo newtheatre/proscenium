@@ -6,18 +6,18 @@
 import type { ModuleView } from '../../../utils/modules'
 
 const { t } = useT()
-const { nameOf, descriptionOf, listOf, keptOnBy, needsOf } = useModuleWords()
+const { nameOf, pageNameOf, pageDescriptionOf, listOf, keptOnBy, needsOf } = useModuleWords()
 const { data, status, error, refresh } = await useAPI<{ modules: ModuleView[], manage: boolean }>('/api/core/modules', { key: 'core:modules' })
 const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [])
 
-const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : nameOf(a.id).localeCompare(nameOf(b.id))
+const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : pageNameOf(a.id).localeCompare(pageNameOf(b.id))
 // Grouped as the list beside a module's page is: what is on, what could be, and what cannot be switched.
 const SEARCH_OVER = 20 // not-policy: a catalogue this long gets its search box back
 const search = ref('')
 const groups = computed(() => {
   const words = search.value.trim().toLocaleLowerCase('en-GB')
   const all = [...(data.value?.modules ?? [])]
-    .filter(m => !words || `${nameOf(m.id)} ${descriptionOf(m.id) ?? ''}`.toLocaleLowerCase('en-GB').includes(words))
+    .filter(m => !words || `${pageNameOf(m.id)} ${nameOf(m.id)} ${pageDescriptionOf(m.id) ?? ''}`.toLocaleLowerCase('en-GB').includes(words))
     .sort(byName)
   return [
     { id: 'on', label: t('core.modules.group.on'), modules: all.filter(m => m.on && !m.alwaysOn) },
@@ -110,10 +110,10 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
                         :to="m.open"
                         class="text-highlighted hover:underline"
                       >
-                        {{ nameOf(m.id) }}
+                        {{ pageNameOf(m.id) }}
                       </ULink>
                       <template v-else>
-                        {{ nameOf(m.id) }}
+                        {{ pageNameOf(m.id) }}
                       </template>
                     </h3>
                     <UBadge
@@ -157,10 +157,10 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
               </div>
               <div class="flex-1">
                 <p
-                  v-if="descriptionOf(m.id)"
+                  v-if="pageDescriptionOf(m.id)"
                   class="line-clamp-3 text-sm text-muted"
                 >
-                  {{ descriptionOf(m.id) }}
+                  {{ pageDescriptionOf(m.id) }}
                 </p>
               </div>
               <UAlert
@@ -189,7 +189,7 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
                   v-if="m.open"
                   :to="m.open"
                   :label="t('core.modules.open')"
-                  :aria-label="t('core.modules.open-module', { module: nameOf(m.id) })"
+                  :aria-label="t('core.modules.open-module', { module: pageNameOf(m.id) })"
                   trailing-icon="i-lucide-chevron-right"
                   color="neutral"
                   variant="ghost"

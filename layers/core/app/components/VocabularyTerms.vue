@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { RecordList, RecordListItem, SortableList, SortableRow } from '#components'
+
 // One vocabulary (C-20, C-21), on a module's Lists tab or under Admin > Lists: its terms in order,
 // each with the count of records that use it. A record stores the term's id, so a rename reaches all.
 
@@ -85,13 +87,14 @@ async function saveHeading(h: Heading) {
   if (!label || label === h.label) return (editingHeading.value = null)
   if (await run(() => api(`/groups/${h.id}`, 'PATCH', { label }), `Renamed to ${label}`, () => api(`/groups/${h.id}`, 'PATCH', { label: h.label }))) editingHeading.value = null
 }
-async function moveHeading(h: Heading, by: -1 | 1) {
-  const ids = headings.value.map(x => x.id)
-  const from = ids.indexOf(h.id)
-  const to = from + by
-  if (to < 0 || to >= ids.length) return
-  ;[ids[from], ids[to]] = [ids[to]!, ids[from]!]
-  await run(() => api('/groups/order', 'PUT', { ids }))
+// The list is put in its new order at once and saved behind; a refusal reloads the order that stands.
+async function moveHeading(h: Heading, to: number) {
+  const next = [...headings.value]
+  const from = next.findIndex(x => x.id === h.id)
+  if (from < 0 || to < 0 || to >= next.length || from === to) return
+  next.splice(to, 0, next.splice(from, 1)[0]!)
+  data.value!.groups = next
+  if (!await run(() => api('/groups/order', 'PUT', { ids: next.map(x => x.id) }))) await refresh()
 }
 async function removeHeading(h: Heading) {
   if (!await confirm({ verb: 'Remove', thing: `the heading ${h.label}`, consequence: 'It has no terms, so nothing else changes.', button: 'Remove heading' })) return
@@ -101,8 +104,10 @@ function startEditHeading(h: Heading) {
   editingHeading.value = h.id
   editHeading.label = h.label
 }
-const headingActions = (h: Heading) => [[
+const headingActions = (h: Heading, at: number) => [[
   { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEditHeading(h) },
+  { label: 'Move up', icon: 'i-lucide-arrow-up', disabled: at === 0, onSelect: () => moveHeading(h, at - 1) },
+  { label: 'Move down', icon: 'i-lucide-arrow-down', disabled: at === headings.value.length - 1, onSelect: () => moveHeading(h, at + 1) },
   ...(locked.value || h.terms > 0 ? [] : [{ label: 'Remove', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeHeading(h) }]),
 ]]
 
@@ -121,15 +126,30 @@ async function saveEdit(term: Term) {
   if (await run(() => api(`/terms/${term.id}`, 'PATCH', { label, ...(moved ? { groupId: edit.groupId } : {}) }), moved ? `${label} moved` : `Renamed to ${label}`, () => api(`/terms/${term.id}`, 'PATCH', back))) editing.value = null
 }
 
-async function move(term: Term, by: -1 | 1) {
-  const ids = data.value!.terms.map(t => t.id)
-  const from = ids.indexOf(term.id)
-  const order = (grouped.value ? live.value.filter(t => t.groupId === term.groupId) : live.value).map(t => t.id)
-  const to = order.indexOf(term.id) + by
-  if (to < 0 || to >= order.length) return
-  const swap = ids.indexOf(order[to]!)
-  ;[ids[from], ids[swap]] = [ids[swap]!, ids[from]!]
-  await run(() => api('/order', 'PUT', { ids }))
+// A term moves among those it is listed with (its heading's, in a grouped list); the rest keep their places.
+async function move(term: Term, to: number) {
+  const beside = (grouped.value ? live.value.filter(t => t.groupId === term.groupId) : live.value)
+  const from = beside.findIndex(t => t.id === term.id)
+  if (from < 0 || to < 0 || to >= beside.length || from === to) return
+  const order = [...beside]
+  order.splice(to, 0, order.splice(from, 1)[0]!)
+  const places = new Set(beside.map(t => t.id))
+  const next = data.value!.terms.map(t => places.has(t.id) ? order.shift()! : t)
+  data.value!.terms = next
+  if (!await run(() => api('/order', 'PUT', { ids: next.map(t => t.id) }))) await refresh()
+}
+// On a handle the arrow keys move the row one place, and the handle keeps the focus.
+async function onHandleKey(event: KeyboardEvent, id: string, at: number, moveTo: (to: number) => Promise<void>) {
+  const by = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+  if (!by) return
+  event.preventDefault()
+  const focus = () => document.querySelector<HTMLElement>(`[data-drag-handle="${id}"]`)?.focus()
+  const saving = moveTo(at + by)
+  await nextTick()
+  focus()
+  await saving
+  await nextTick()
+  focus()
 }
 
 const retire = (term: Term) => run(() => api(`/terms/${term.id}/retire`, 'POST'), `${term.label} retired`, () => api(`/terms/${term.id}/restore`, 'POST'))
@@ -141,10 +161,17 @@ async function remove(term: Term) {
   await run(() => api(`/terms/${term.id}`, 'DELETE'), `${term.label} deleted`)
 }
 
+const orderHelp = 'Drag a row by its handle to reorder. From the keyboard, focus the handle and press the up or down arrow.'
 const uses = (term: Term) => t('core.counts.records', { count: term.uses })
 
-const actions = (term: Term) => [[
+const actions = (term: Term, at: number, of: number) => [[
   { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEdit(term) },
+  ...(manual.value
+    ? [
+        { label: 'Move up', icon: 'i-lucide-arrow-up', disabled: at === 0, onSelect: () => move(term, at - 1) },
+        { label: 'Move down', icon: 'i-lucide-arrow-down', disabled: at === of - 1, onSelect: () => move(term, at + 1) },
+      ]
+    : []),
   ...(locked.value ? [] : [{ label: 'Retire', icon: 'i-lucide-archive', onSelect: () => retire(term) }]),
   ...(locked.value || term.uses > 0 || (term.seeded && data.value?.vocabulary.owner !== 'theatre') ? [] : [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(term) }]),
 ]]
@@ -202,10 +229,15 @@ const actions = (term: Term) => [[
             </UFieldGroup>
           </UFormField>
         </UForm>
-        <RecordList label="Headings">
-          <RecordListItem
+        <SortableList
+          label="Headings"
+          @reorder="m => headings[m.from]?.id === m.id && moveHeading(headings[m.from]!, m.to)"
+        >
+          <SortableRow
             v-for="(h, hIndex) in headings"
+            :id="h.id"
             :key="h.id"
+            :index="hIndex"
             :name="h.label"
             :description="t('core.counts.terms', { count: h.terms })"
           >
@@ -235,32 +267,30 @@ const actions = (term: Term) => [[
                 </UFieldGroup>
               </UForm>
             </template>
-            <UFieldGroup>
+            <template #leading>
               <IconButton
-                icon="i-lucide-arrow-up"
-                color="neutral"
-                variant="outline"
+                :data-drag-handle="h.id"
+                icon="i-lucide-grip-vertical"
                 size="sm"
-                :label="`Move ${h.label} up`"
-                :disabled="hIndex === 0"
-                @click="moveHeading(h, -1)"
+                class="cursor-grab touch-none"
+                :label="`Move ${h.label}`"
+                aria-describedby="vocabulary-heading-order-help"
+                @keydown="onHandleKey($event, h.id, hIndex, to => moveHeading(h, to))"
               />
-              <IconButton
-                icon="i-lucide-arrow-down"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                :label="`Move ${h.label} down`"
-                :disabled="hIndex === headings.length - 1"
-                @click="moveHeading(h, 1)"
-              />
-            </UFieldGroup>
+            </template>
             <RowActions
-              :items="headingActions(h)"
+              :items="headingActions(h, hIndex)"
               :label="`Actions for ${h.label}`"
             />
-          </RecordListItem>
-        </RecordList>
+          </SortableRow>
+        </SortableList>
+        <p
+          v-if="headings.length > 1"
+          id="vocabulary-heading-order-help"
+          class="text-sm text-muted"
+        >
+          {{ orderHelp }}
+        </p>
       </PageSection>
 
       <PageSection
@@ -324,13 +354,18 @@ const actions = (term: Term) => [[
           >
             No terms under this heading yet.
           </p>
-          <RecordList
+          <component
+            :is="manual ? SortableList : RecordList"
             v-if="section.terms.length"
             :label="section.label ? `Terms under ${section.label}` : 'Terms'"
+            @reorder="(m: { id: string, from: number, to: number }) => section.terms[m.from]?.id === m.id && move(section.terms[m.from]!, m.to)"
           >
-            <RecordListItem
+            <component
+              :is="manual ? SortableRow : RecordListItem"
               v-for="(term, index) in section.terms"
+              :id="manual ? term.id : undefined"
               :key="term.id"
+              :index="manual ? index : undefined"
               :icon="term.icon ?? undefined"
               :name="term.label"
               :description="uses(term)"
@@ -367,33 +402,34 @@ const actions = (term: Term) => [[
                   </UFieldGroup>
                 </UForm>
               </template>
-              <UFieldGroup v-if="manual">
+              <template
+                v-if="manual"
+                #leading
+              >
                 <IconButton
-                  icon="i-lucide-arrow-up"
-                  color="neutral"
-                  variant="outline"
+                  :data-drag-handle="term.id"
+                  icon="i-lucide-grip-vertical"
                   size="sm"
-                  :label="`Move ${term.label} up`"
-                  :disabled="index === 0"
-                  @click="move(term, -1)"
+                  class="cursor-grab touch-none"
+                  :label="`Move ${term.label}`"
+                  aria-describedby="vocabulary-order-help"
+                  @keydown="onHandleKey($event, term.id, index, to => move(term, to))"
                 />
-                <IconButton
-                  icon="i-lucide-arrow-down"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  :label="`Move ${term.label} down`"
-                  :disabled="index === section.terms.length - 1"
-                  @click="move(term, 1)"
-                />
-              </UFieldGroup>
+              </template>
               <RowActions
-                :items="actions(term)"
+                :items="actions(term, index, section.terms.length)"
                 :label="`Actions for ${term.label}`"
               />
-            </RecordListItem>
-          </RecordList>
+            </component>
+          </component>
         </template>
+        <p
+          v-if="manual && live.length > 1"
+          id="vocabulary-order-help"
+          class="text-sm text-muted"
+        >
+          {{ orderHelp }}
+        </p>
         <CollapsibleDivider
           v-model:open="showRetired"
           label="Retired"

@@ -72,3 +72,25 @@ test.describe('someone who reads roles and sets up sign-in', () => {
     await noViolations(page)
   })
 })
+
+test.describe('someone who looks after the lists', () => {
+  test.use(as(['core.vocabulary.manage', 'core.settings.manage']))
+
+  test('a list\'s terms are put in order from the handle or the row\'s menu, and the order is kept', async ({ page }) => {
+    const name = `Order ${Date.now()}`
+    const { key } = await (await page.request.post('/api/core/vocabularies', { data: { label: name, ordering: 'manual' } })).json() as { key: string }
+    for (const label of ['First', 'Second', 'Third']) await page.request.post(`/api/core/vocabularies/${key}/terms`, { data: { label } })
+    const saved = async () => ((await (await page.request.get(`/api/core/vocabularies/${key}`)).json()) as { terms: { label: string }[] }).terms.map(t => t.label)
+    await visit(page, `/admin/vocabularies/${key}`)
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+    // The arrow keys on the handle move the row one place.
+    await page.getByRole('button', { name: 'Move Third', exact: true }).focus()
+    await page.keyboard.press('ArrowUp')
+    await expect.poll(saved).toEqual(['First', 'Third', 'Second'])
+    // The same from the row's menu, so the order never depends on dragging.
+    await page.getByRole('button', { name: 'Actions for First' }).click()
+    await page.getByRole('menuitem', { name: 'Move down' }).click()
+    await expect.poll(saved).toEqual(['Third', 'First', 'Second'])
+    await noViolations(page)
+  })
+})

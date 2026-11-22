@@ -98,7 +98,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Branding | `core.branding.edit` | See the wireframe. |
 | Theatre | `core.organisation.edit` | Name, time zone, language, currency and day start, which are foundations settings shown on this page, with core's contact details, social links, legal name and year end. Changing the time zone or day start shows how many performances will be recalculated. |
 | Site readiness | `public-site.readiness.view` | A checklist: pages still marked as placeholder, missing brand items, images without alt text, components whose module is off, settings a page quotes that are still unset, whether search engines are being turned away. Each line links to where it is fixed, or names the file to edit. |
-| Vocabularies | `core.vocabulary.manage` | Every vocabulary, grouped by module, with "New vocabulary" for a list of the theatre's own. Inside one: terms in order, drag to reorder, rename, retire, merge, with a count of records using each. |
+| Lists | `core.vocabulary.manage` | The theatre's own vocabularies under Admin > Lists, with "New list"; a module's on the Lists tab of its page. Inside one: terms in order (and headings, where it has them), dragged by a handle to reorder, with the arrow keys on the handle and Move up and Move down in the row's menu; rename, retire, merge, with a count of records using each. |
 | Files | `core.file.manage` | Every file: preview, owner, slot, size, state. Filter by owner type and state. Restore a deleted file before its purge date. Storage used. |
 
 ## Messages (console, except Senders and Delivery health)

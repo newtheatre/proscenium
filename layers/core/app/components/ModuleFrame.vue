@@ -13,7 +13,7 @@ defineSlots<{ default?: () => unknown }>()
 
 const { t, te } = useT()
 const route = useRoute()
-const { nameOf, descriptionOf, listOf, keptOnBy } = useModuleWords()
+const { nameOf, pageNameOf, pageDescriptionOf, listOf, keptOnBy } = useModuleWords()
 const { data } = await useAPI<{ modules: ModuleView[], manage: boolean }>('/api/core/modules', { key: 'core:modules' })
 const { data: tabData } = await useAPI<{ tabs: ModuleTabView[] }>(() => `/api/core/modules/${encodeURIComponent(props.module)}/tabs`, { key: `core:module-tabs:${props.module}` })
 const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [])
@@ -25,11 +25,11 @@ const items = computed(() => tabs.value.map(tab => ({ label: te(tab.label) ? t(t
 // A record page below a tab's screen keeps that tab open.
 const active = computed(() => resolveEntry(tabs.value, route.path)?.to)
 
-const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : nameOf(a.id).localeCompare(nameOf(b.id))
+const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : pageNameOf(a.id).localeCompare(pageNameOf(b.id))
 const side = computed<NavigationMenuItem[][]>(() => {
   const all = [...(data.value?.modules ?? [])].sort(byName)
   const link = (m: ModuleView): NavigationMenuItem => ({
-    label: nameOf(m.id),
+    label: pageNameOf(m.id),
     icon: m.icon,
     to: m.open ?? moduleHome(m.id),
     active: m.id === props.module,
@@ -61,7 +61,7 @@ const side = computed<NavigationMenuItem[][]>(() => {
       </template>
     </UDashboardPanel>
     <PageFrame
-      :title="nameOf(module)"
+      :title="pageNameOf(module)"
       :trail="[{ label: t('core.modules.title'), to: '/admin/modules' }]"
       width="reading"
     >
@@ -95,10 +95,10 @@ const side = computed<NavigationMenuItem[][]>(() => {
         />
       </template>
       <p
-        v-if="descriptionOf(module)"
+        v-if="pageDescriptionOf(module)"
         class="text-sm text-muted"
       >
-        {{ descriptionOf(module) }}
+        {{ pageDescriptionOf(module) }}
       </p>
       <p
         v-if="lockedBy.length"
@@ -128,7 +128,7 @@ const side = computed<NavigationMenuItem[][]>(() => {
           :items="items"
           :content="false"
           variant="link"
-          :aria-label="t('core.modules.tabs', { module: nameOf(module) })"
+          :aria-label="t('core.modules.tabs', { module: pageNameOf(module) })"
           :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
           @update:model-value="to => navigateTo(String(to))"
         />

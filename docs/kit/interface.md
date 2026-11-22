@@ -65,7 +65,10 @@ contributes: {
   the console sits in the set-up half of the module's own group. A declared page's entry sits in
   the group its `settingPages` entry names. The entry is open to anyone who may change one of its
   settings.
-- **A module's page in Admin.** Any admin entry at or below `/admin/modules/<module>` is a tab of
+- **A module's page in Admin.** A module's page and its card in the catalogue may go by what an
+  administrator looks for there: `core.modules.page.<module>.name` and `.description`
+  (`pageNameOf` in `useModuleWords`); Core's is "Programme and people", and About names the module
+  itself. Any admin entry at or below `/admin/modules/<module>` is a tab of
   that module's page (`moduleTabOf` in `shared/navigation.ts`), never a sidebar entry: its pages of
   settings, set-up screens a module puts there, Lists (generated for a module that ships a
   vocabulary, open to `core.vocabulary.manage`) and About (generated for every module, open to

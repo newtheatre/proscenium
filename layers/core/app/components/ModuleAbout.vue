@@ -5,7 +5,7 @@ import type { ModuleView } from '../utils/modules'
 
 const props = defineProps<{ module: string, view: ModuleView | undefined }>()
 const { t } = useT()
-const { nameOf, listOf, screensOf } = useModuleWords()
+const { nameOf, descriptionOf, pageNameOf, listOf, screensOf } = useModuleWords()
 const screens = computed(() => props.view ? screensOf(props.view) : [])
 const version = computed(() => props.view ? [props.view.since, ...(props.view.stability === 'stable' ? [] : [t(`core.modules.stability.${props.view.stability}`).toLocaleLowerCase('en-GB')])].join(', ') : '')
 // What it uses, and the modules that add to it (Box office's figures on Front of house's board).
@@ -25,6 +25,12 @@ const needed = (n: 'always' | 'when-used' | 'optional') => t(`core.modules.about
   >
     <PageSection :title="t('core.modules.about.depends')">
       <dl class="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
+        <template v-if="pageNameOf(module) !== nameOf(module)">
+          <dt class="text-muted">
+            {{ t('core.modules.about.module') }}
+          </dt>
+          <dd>{{ nameOf(module) }}. {{ descriptionOf(module) }}</dd>
+        </template>
         <dt class="text-muted">
           {{ t('core.modules.about.requires') }}
         </dt>
