@@ -1,6 +1,7 @@
-// Creates an empty list (its upload time is 0 until a file is loaded). A reference list needs the whole phrase its checkout field shows (V13).
+// Creates an empty list (its upload time is 0 until a file is loaded), and the list key with the first one. A reference list needs the whole phrase its checkout field shows (V13).
 import { defineRoute, newId, nowMs, refuse } from '#kit'
 import { listInput } from '../../../list-input'
+import { ensureListKey } from '../../../lists'
 
 export default defineRoute({ ability: 'membership.verification-list.manage', rateLimit: 'write', idempotent: true, input: listInput }, async (_event, { input, actor, unit }) => {
   if (input.keyKind === 'reference' && !input.referenceLabel)
@@ -14,6 +15,7 @@ export default defineRoute({ ability: 'membership.verification-list.manage', rat
           VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
     params: [id, input.name, input.keyKind, input.validUntil ?? null, actor.accountId, 0, input.keyKind === 'reference' ? input.referenceLabel : null, input.keyKind === 'reference' ? input.referenceNoun : null, input.referenceShape ? JSON.stringify(input.referenceShape) : null, at],
   }).expect(1)
+  await ensureListKey(unit, actor.accountId ?? null)
   unit.audit({ action: 'create', record: ['membership.verification-list', id] })
   return { listId: id }
 })

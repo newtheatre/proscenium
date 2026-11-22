@@ -18,6 +18,21 @@ Nothing is waiting on a decision. Thirteen questions were put to Matt and all we
 | 12 | What does "1 year" mean at NNT, and can the union give a list? | A rolling 12 or 36 months from purchase; the union supplies a CSV of names, student IDs and end dates | Rules D8, D9; the student society preset |
 | 13 | Accept a student ID in place of signing in, for the member price? | Yes, as a choice for each scheme, off unless turned on | Rules V8 to V19 |
 
+## Changes after the interface review
+
+Matt approved these on 21 November 2026, after the review of the staff screens. Each changes how a screen is arranged, not a rule.
+
+| # | Change | Where |
+| --- | --- | --- |
+| 14 | Applications waiting on staff are a section of Members, not a screen and sidebar entry of their own. The count moves to Members | Tab 5, "Applications waiting" |
+| 15 | One queue for a check and for approval. A check is passed or declined on its row; approval is still decided on the form's response, which its row opens, so the form's stages, reasons and conflict rules are not copied | Tab 5, "Applications waiting"; rule AP2 |
+| 16 | New scheme asks for the name only. The key follows the name, and the draft starts as a members' scheme of rolling length | Tab 5, "A scheme"; `POST /api/membership/schemes` |
+| 17 | Screens say "Members' scheme" and "Supporters' scheme", and the side is one switch, "Holders become members". "Side" stays a specification word | Tab 5, "A scheme" |
+| 18 | Add member and Import are on Members only, not on a scheme's page in Admin | Tab 5, "A scheme" |
+| 19 | The list key is made with the first verification list, so nobody has to type one. Its card folds away once a key is saved; a theatre may still replace it | Tab 5, "Verification lists"; rule V10 |
+| 20 | Open scheme can always be pressed, and says what is missing by moving to the checklist | Tab 5, "A scheme"; rule S4 |
+| 21 | A scheme's fees are a section of the scheme's own page. The fees module's prices page is gone and its address leads to Schemes | Tab 5, "A scheme" |
+
 ## Why, in brief
 
 1. **Two modules.** Foundations rules that a dependency is hard or absent. One module that both kept the member list and took fees would make every theatre wanting a member list switch on Payments and Finance, even where members pay nothing or pay somebody else. NNT is that theatre: its students' union takes the fee.

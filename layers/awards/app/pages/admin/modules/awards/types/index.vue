@@ -1,5 +1,5 @@
 <!-- Award types: what the theatre can give, each with how many hold it now. Archived ones sit below
-     a divider. A new type can be given straight away. -->
+     a divider. A type opens in a window over the list (?type=), and a new one can be given at once. -->
 <script setup lang="ts">
 import type { TypeForm } from '../../../../../components/AwardsTypeFields.vue'
 
@@ -8,6 +8,13 @@ interface AwardType { id: string, name: string, summary: string | null, givesTic
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
+const toast = useToast()
+const route = useRoute()
+// The type being changed is named in the address, so a link to one opens its window.
+const editing = computed<string | null>({
+  get: () => typeof route.query.type === 'string' ? route.query.type : null,
+  set: id => navigateTo({ query: { ...route.query, type: id ?? undefined } }, { replace: !id }),
+})
 const { data, status, error, refresh } = await useAPI<{ types: AwardType[] }>('/api/awards/types', { key: 'awards:types' })
 const active = computed(() => (data.value?.types ?? []).filter(x => x.state === 'active'))
 const archived = computed(() => (data.value?.types ?? []).filter(x => x.state === 'archived'))
@@ -34,9 +41,10 @@ function openAdd() {
 async function create() {
   refusal.value = null
   try {
-    const made = await $api<{ typeId: string }>('/api/awards/types', { method: 'POST', headers: { 'idempotency-key': idempotency }, body: { ...form.value, summary: form.value.summary.trim() || null } })
+    await $api<{ typeId: string }>('/api/awards/types', { method: 'POST', headers: { 'idempotency-key': idempotency }, body: { ...form.value, summary: form.value.summary.trim() || null } })
     open.value = false
-    await navigateTo(`/admin/modules/awards/types/${made.typeId}`)
+    toast.add({ title: t('awards.screens.types.added', { name: form.value.name.trim() }), color: 'success' })
+    await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -80,7 +88,7 @@ async function create() {
           <RecordListItem
             v-for="x in active"
             :key="x.id"
-            :to="`/admin/modules/awards/types/${x.id}`"
+            :to="`/admin/modules/awards/types?type=${x.id}`"
             icon="i-lucide-award"
             :name="x.name"
             :description="describe(x)"
@@ -95,7 +103,7 @@ async function create() {
             <RecordListItem
               v-for="x in archived"
               :key="x.id"
-              :to="`/admin/modules/awards/types/${x.id}`"
+              :to="`/admin/modules/awards/types?type=${x.id}`"
               icon="i-lucide-award"
               :name="x.name"
               :description="describe(x)"
@@ -105,6 +113,11 @@ async function create() {
         </CollapsibleDivider>
       </div>
     </DataBoundary>
+
+    <AwardsTypeDialog
+      v-model:type-id="editing"
+      @changed="refresh()"
+    />
 
     <UModal
       v-model:open="open"

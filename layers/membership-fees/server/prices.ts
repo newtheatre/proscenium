@@ -16,7 +16,7 @@ export async function priceInForce(schemeId: string, lengthOptionId: string | nu
   return row ? { priceId: row.id, amountMinor: row.amountMinor, currency: row.currency, taxCode: row.taxCode } : null
 }
 
-/** Every price a scheme has had, newest first: the history the Fees page shows. */
+/** Every price a scheme has had, newest first: the history the scheme's page shows. */
 export function pricesOf(schemeId: string): Promise<PriceRow[]> {
   return all<PriceRow>(`${SELECT} WHERE scheme_id = ? ORDER BY from_date DESC, created_at DESC`, schemeId)
 }
