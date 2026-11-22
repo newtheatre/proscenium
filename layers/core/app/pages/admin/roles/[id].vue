@@ -240,9 +240,11 @@ async function archive() {
             :label="t('core.roles.ends.label')"
             :help="expiryHelp"
           >
-            <URadioGroup
+            <USelect
               v-model="form.expiryRule"
               :items="expiryOptions"
+              value-key="value"
+              class="w-72"
             />
           </UFormField>
           <UFormField
@@ -257,7 +259,7 @@ async function archive() {
             />
           </UFormField>
           <UFormField name="opensMembersArea">
-            <USwitch
+            <UCheckbox
               v-model="form.opensMembersArea"
               :label="t('core.roles.opens-members')"
               :description="t('core.roles.opens-members-help')"
