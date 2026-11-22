@@ -86,7 +86,7 @@ Every method ends in a session, and the method decides its assurance. A basic se
 1. The screen offers a passkey first, and an address field. A browser that holds a passkey for the site offers it in the field itself.
 2. An address on a managed domain is sent to that domain's provider and nowhere else.
 3. Any other address is emailed a link and a six-digit code. The answer on screen is identical whether or not the address is known.
-4. The link works in any browser. The code works only in the browser that asked, up to the attempt limit. Opening the link uses nothing: the landing page waits for the person to press Sign in, because mail security scanners (Microsoft 365's among them) open every link in a real browser before the person sees the email, and a link used on load would be spent, with its code, by the scanner. The landings for verifying an address and confirming an erasure wait for a press for the same reason.
+4. The link works in any browser. The code works only in the browser that asked, up to the attempt limit. Opened in the browser that asked, the link signs the person in on arrival: the cookie that binds the code to that browser vouches for it ([part 12](12-link-without-a-press.md), Matt, 21 November 2026). Opened anywhere else, the link uses nothing: the landing page waits for the person to press Sign in, because mail security scanners (Microsoft 365's among them) open every link in a real browser before the person sees the email, and a link used on load would be spent, with its code, by the scanner. The landings for verifying an address and confirming an erasure always wait for a press, for the same reason.
 5. A link or code used for an unknown address creates the account. Used for an unclaimed account, it claims it.
 6. The session opens at **basic** assurance for a link, a code or an ordinary provider, and at **strong** for a passkey.
 7. A person who signed in without a passkey is offered one, once, and can decline. A person who holds an ability that needs strong assurance cannot decline: they are taken to create one before the console opens.
@@ -128,7 +128,7 @@ Every method ends in a session, and the method decides its assurance. A basic se
 | The only Owner is locked out | Whoever controls the theatre's Cloudflare account sets a one-time secret on the Worker. The site then offers an owner-recovery screen that accepts it once, creates a passkey for an existing Owner, and tells every Owner. Removing the secret closes the screen. |
 | Lost access to every address | Staff, having satisfied themselves who it is, add a new address on the person's behalf; it is verified in the usual way. |
 
-Recovery codes are offered to anyone and required of nobody except Owners, who are shown them at setup and must type one back.
+Recovery codes are offered to anyone and required of nobody except Owners, who are shown them at setup and must download or copy them and tick that they are saved before going on (Matt, 21 November 2026; typing one back proved only that the page was still open).
 
 ## A grant
 
@@ -175,7 +175,7 @@ Ending is the only change a grant row ever takes, which is what lets the history
 One function answers every "may this person do this?" in the platform. It takes the actor, an ability and, where there is one, the record acted on.
 
 1. **No session, or an ended one:** no.
-2. **Assurance:** if the ability needs strong and the session is basic, the answer is "not yet", with the reason "use your passkey".
+2. **Assurance:** if the ability needs strong and the session is basic, the answer is "not yet", with the reason "use your passkey". When the account has no way to sign in strongly at all (no passkey, and no authenticator app where the theatre accepts one), there is nothing stronger to ask for, so the answer says that instead: `core.access.two-step-not-set-up`, "This needs two-step sign-in", with the same status. It is never "You do not have permission": a route that makes its own check and would answer `core.access.denied` answers the sign-in refusal when that was what stood in the way. Every screen that shows the refusal offers "Set it up", which opens Sign-in in My account; an act refused this way says so in a dialogue over the page; and the console and Admin say it before the person tries, with "Set it up" or, where a passkey exists and was not used, "Confirm it is you" (Matt, 21 November 2026).
 3. **Owner:** a live Owner grant answers yes.
 4. **Grants:** a live grant of a role holding the ability answers yes if its scope covers the target. Site covers everything; module covers that module's records; record covers that record and what its module says hangs off it.
 5. **Derived authority:** each source a module registered is asked. A source answers from a fact in its own tables: tonight's confirmed shift, a current training record, a place on a production's team.
@@ -318,7 +318,7 @@ A person's access needs are held because they applied to the theatre's access sc
 
 | Matter | Rule |
 | --- | --- |
-| Where it starts | The theatre's public page `/access` says how the theatre supports people and carries an "Apply" button. The same button is in My account. Both lead to the application form, which needs a signed-in account; a person without one signs in or signs up on the way and lands back on the form. |
+| Where it starts | The theatre's public page `/access` says how the theatre supports people and carries an "Apply" button. In My account the Access scheme page is the form itself until the person has applied (Matt, 21 November 2026). Both lead to the application form, which needs a signed-in account; a person without one signs in or signs up on the way and lands back on the form. |
 | Asking by email or phone | Staff who run the scheme use "Invite to apply": they give a name and address, the platform finds or makes the account and emails a single-use link that signs the person in and opens the form. |
 | When a person cannot use the form | Staff may fill it in for them, by phone or in person. The application is marked as made by staff, and the person is told at their address and can correct it. |
 | What the form asks | Ticks against the vocabulary `core.access-need`, each with an optional note of up to 200 characters; how many essential companions they need (none, one or two); and anything else the theatre should know. Barriers, never diagnoses. No document is uploaded. |

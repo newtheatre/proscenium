@@ -18,7 +18,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
 
-interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers: string }, tickets: number, admitted: number, unpaid: number }
+interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers: string }, tickets: number, admitted: number, unpaid: number, canRelease?: boolean }
 interface Scan {
   result: string
   admittedAt?: number
@@ -310,6 +310,36 @@ async function submitQuery() {
   await scan(code)
 }
 
+// Release unpaid no-shows (Matt, 2026-11-18), from the door itself: the seats of every reservation
+// still unpaid go to people waiting. Undo seats them again where the seats are still free.
+const { confirm } = useConfirm()
+const { offer } = useUndo()
+const releasing = ref(false)
+async function releaseUnpaid() {
+  if (!await confirm({ verb: t('box-office.door.release.verb'), thing: t('box-office.door.release.thing'), consequence: t('box-office.door.release.consequence'), button: t('box-office.door.release.button') })) return
+  releasing.value = true
+  try {
+    const { released } = await $api<{ released: string[] }>(`${base.value}/door/release-unpaid`, { method: 'POST', body: {} })
+    await refresh()
+    if (found.value) await search()
+    if (!released.length) {
+      toast.add({ title: t('box-office.door.release.none'), color: 'neutral' })
+      return
+    }
+    offer(t('box-office.door.release.done', { count: released.length }), async () => {
+      for (const orderId of released) await $api(`/api/box-office/orders/${encodeURIComponent(orderId)}/reinstate`, { method: 'POST', body: {} })
+      await refresh()
+    })
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+  finally {
+    releasing.value = false
+  }
+}
+
 async function admit(row: Row, count: number): Promise<number> {
   if (!online.value) {
     const admitted = door.admit(row.id, count)
@@ -597,6 +627,7 @@ async function admit(row: Row, count: number): Promise<number> {
     <USlideover
       v-model:open="finding"
       :title="t('box-office.live-door.find')"
+      :ui="{ footer: 'flex-wrap' }"
     >
       <template #body>
         <div class="space-y-4">
@@ -699,6 +730,16 @@ async function admit(row: Row, count: number): Promise<number> {
         </div>
       </template>
       <template #footer>
+        <UButton
+          v-if="data?.canRelease && online && (counts ?? data)?.unpaid"
+          icon="i-lucide-clock-alert"
+          color="neutral"
+          variant="outline"
+          size="lg"
+          :loading="releasing"
+          :label="t('box-office.door.release.button')"
+          @click="releaseUnpaid"
+        />
         <!-- The paper fallback, printed before the doors open. -->
         <UButton
           :to="`/live/door/${encodeURIComponent(id)}/print`"

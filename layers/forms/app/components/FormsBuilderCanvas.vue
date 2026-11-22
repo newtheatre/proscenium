@@ -116,6 +116,7 @@ function newEnding() {
   next.endings = [...(next.endings ?? []), { id, title: '', submits: false }]
   builder.apply(next)
   builder.selected.value = id
+  formsFocusDetails()
 }
 function dropEnding(id: string) {
   const next = JSON.parse(JSON.stringify(def.value)) as Definition
@@ -138,7 +139,9 @@ function newCalculation() {
   const made = addCalculation(def.value, page.value.id)
   builder.apply(made.def)
   builder.select(made.id)
+  formsFocusDetails()
 }
+const more = (kind: 'ending' | 'calculation') => kind === 'ending' ? newEnding() : newCalculation()
 async function dropCalculation(id: string, name: string) {
   const readers = dependents(def.value, id).length
   if (readers && !(await confirm({ verb: t('forms.screens.builder.remove'), thing: `"${name}"`, consequence: t('forms.screens.calculations.remove-read', { count: readers }) }))) return
@@ -154,6 +157,10 @@ const calculationMenu = (id: string, i: number, name: string) => [
 const calculationWrong = (id: string) => builder.problemsAt.value.get(id)?.some(p => p.level === 'error')
 // Where the details open over the canvas, typing a page's title on its card does not open them.
 const beside = useScreenQuery('(min-width: 1280px)')
+function pickEnd(id: string) {
+  builder.selected.value = id
+  formsFocusDetails()
+}
 const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(def.value, page.value.id, fn), `${page.value.id}:${field}`)
 </script>
 
@@ -205,15 +212,12 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
             @click="newPage"
           />
         </div>
-        <div :class="outline ? '' : 'hidden lg:block'">
+        <div
+          v-if="def.endings?.length"
+          :class="outline ? '' : 'hidden lg:block'"
+        >
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('forms.screens.endings.title') }}
-          </p>
-          <p
-            v-if="!def.endings?.length"
-            class="mb-1 text-xs text-pretty text-muted"
-          >
-            {{ t('forms.screens.endings.hint') }}
           </p>
           <ul class="space-y-1">
             <li
@@ -248,15 +252,12 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
             @click="newEnding"
           />
         </div>
-        <div :class="outline ? '' : 'hidden lg:block'">
+        <div
+          v-if="calculations.length"
+          :class="outline ? '' : 'hidden lg:block'"
+        >
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('forms.screens.calculations.title') }}
-          </p>
-          <p
-            v-if="!calculations.length"
-            class="mb-1 text-xs text-pretty text-muted"
-          >
-            {{ t('forms.screens.calculations.hint') }}
           </p>
           <ul class="space-y-1">
             <li
@@ -307,6 +308,23 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
         ref="list"
         class="mx-auto w-full max-w-3xl space-y-4"
       >
+        <!-- Before the first page: what people read before any question. -->
+        <button
+          v-if="!builder.record && pageIndex === 0"
+          type="button"
+          class="block w-full rounded-lg border bg-default p-4 text-left"
+          :class="builder.selected.value === FORMS_START ? 'border-primary ring-1 ring-primary' : 'border-default'"
+          @click="pickEnd(FORMS_START)"
+        >
+          <span class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
+            <UIcon name="i-lucide-door-open" />
+            {{ t('forms.screens.ends.start') }}
+          </span>
+          <span
+            class="mt-2 block text-sm"
+            :class="def.presentation?.introduction ? 'line-clamp-3 whitespace-pre-line' : 'text-muted'"
+          >{{ def.presentation?.introduction || t('forms.screens.ends.start-empty') }}</span>
+        </button>
         <div
           class="rounded-lg border bg-default p-4"
           :class="builder.selected.value === page.id ? 'border-primary ring-1 ring-primary' : 'border-default'"
@@ -341,7 +359,10 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
           @add="add($event.kind, $event.into)"
         >
           <template #empty>
-            <FormsAddMenu @add="add($event)" />
+            <FormsAddMenu
+              @add="add($event)"
+              @more="more"
+            />
           </template>
         </FormsBuilderList>
 
@@ -371,7 +392,31 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
         <FormsAddMenu
           v-if="page.items.length"
           @add="add($event)"
+          @more="more"
         />
+
+        <!-- After the last page: the button that sends, and what is read once it has. -->
+        <button
+          v-if="!builder.record && pageIndex === def.pages.length - 1"
+          type="button"
+          class="block w-full rounded-lg border bg-default p-4 text-left"
+          :class="builder.selected.value === FORMS_END ? 'border-primary ring-1 ring-primary' : 'border-default'"
+          @click="pickEnd(FORMS_END)"
+        >
+          <span class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
+            <UIcon name="i-lucide-flag" />
+            {{ t('forms.screens.ends.end') }}
+          </span>
+          <span class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            <UBadge
+              color="neutral"
+              variant="subtle"
+              size="lg"
+              :label="def.presentation?.submitLabel || t('forms.screens.fill.send')"
+            />
+            <span :class="def.presentation?.confirmation ? 'line-clamp-2' : 'text-muted'">{{ def.presentation?.confirmation || t('forms.screens.ends.end-empty') }}</span>
+          </span>
+        </button>
       </div>
     </div>
   </DragDropProvider>

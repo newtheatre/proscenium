@@ -61,8 +61,8 @@ contributes: {
   account entry with none). `match` widens the addresses an entry covers.
 - Every page of settings gets an entry without declaring one (see "Pages of settings" in the kit
   README). A module's own page of settings is the Settings tab of its page in Admin
-  (`/admin/modules/<module>`), so a module that is off takes its settings with it. A page placed in
-  the console sits in the set-up half of the module's own group. A declared page's entry sits in
+  (`/admin/modules/<module>`), so a module that is off takes its settings with it. No page of settings
+  is made in the console: staff there open the tab from the cog. A declared page's entry sits in
   the group its `settingPages` entry names. The entry is open to anyone who may change one of its
   settings.
 - **A module's page in Admin.** A module's page and its card in the catalogue may go by what an
@@ -75,7 +75,11 @@ contributes: {
   `core.modules.manage` and `core.health.view`). The tabs do not entitle anyone to Admin, so console
   staff stay out of it. `GET /api/core/modules/:id/tabs` lists the tabs the viewer may open.
   `ModuleFrame` draws the page: the list of modules on the left at 1024 pixels and wider, the
-  module's toggle, and the tabs, which scroll sideways on a phone.
+  module's toggle, and the tabs, which scroll sideways on a phone. What the module does is said on
+  About, on a module that is off and on one with no other tab, not above every tab. For a week
+  after a module is switched on its first tab and About carry a "Set up" card: each step names
+  the job ("Check the settings", "Set up Price lists"), a screen is ticked once it has been opened
+  on this device, and on a phone the card starts folded to its count ("1 of 3 done").
 - **Set-up screens** (things done once or rarely) are tabs too: a module declares the entry with
   `menu: 'admin', group: 'modules', to: '/admin/modules/<module>/<screen>'` and puts the page (and
   its record pages) under `pages/admin/modules/<module>/`. The admin layout draws `ModuleFrame`
@@ -122,7 +126,7 @@ contributes: {
 - **PageForm**: validates with the schema the server validates with; a panel up to six fields, a
   page beyond; a stale save shows both versions and asks which to keep; leaving with changes asks once.
 - **PageSettings**: the generated page for a module's settings, one section at a time with a stated
-  summary, a Reset to default, who may change each, and a tag where a content page quotes it.
+  summary, a Reset to default, who may change each (said only to someone who may not), and a tag where a content page quotes it.
 - **KeysCard**: the keys a page manages, by name, as one section: where each comes from now
   (saved here, saved for the whole site, or not set); a set key's field shows dots between its prefix and last
   four characters (`sk_live_••••4242`) until Replace opens it; Remove; and Save
@@ -153,7 +157,7 @@ with the name when the description runs to several lines. A RecordList that fill
 row of figures on a record's summary and on a screen's totals; its columns follow the width of what
 holds it, and a long value takes two columns. **FieldGroup** (`title`, `description`, `first`) is a
 titled group of fields inside one form or card: a real heading, with a rule above every group but the
-first. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
+first, and an `actions` slot beside the heading. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
 a PageList: a popover on a laptop, a drawer on a phone, ending in "Clear all" and "Done", with the
 screen's own fields in its slot. **TabStrip** wraps a row of tabs that scrolls sideways and fades the
 edge that has more. **EmptyState** takes one `action` (`label`, `to` or `onClick`, `icon`) for the usual
@@ -211,6 +215,18 @@ values back, delete what was just added, add again what was just deleted), then 
 Undone, or why it could not be. Use it in place of a plain success toast wherever the reverse act
 exists; Seasons is the worked example. Browser `alert`, `confirm` and `prompt` are a lint error.
 
+**A sign-in that is not strong enough.** An ability that needs a strong sign-in refuses a basic one
+with one of two codes, both 403: `core.access.needs-strong-sign-in` when the account has a passkey
+(or an accepted authenticator app) that was not used, and `core.access.two-step-not-set-up` when it
+has neither. `$api` confirms the first in place and sends the request again. The second cannot be
+confirmed: an act opens a dialogue that says "This needs two-step sign-in" with "Set it up", and
+`RefusalNotice`, `RefusalPanel` and `DataBoundary` show the same link (`refusalAction(refusal)`, to
+Sign-in in My account), so a screen needs nothing of its own. A route that makes its own check with
+`can()` and refuses `core.access.denied` is answered with the sign-in refusal when that was what
+stood in the way, so do not word "no permission" yourself for it. In the console and Admin
+`StrongerSignInNotice` (drawn by PageFrame) tells someone in this position before they try, from the
+viewer's `strongerSignIn` (`set-up` or `confirm`); `/api/core/me` carries the same field.
+
 A short list that needs a search only now and then takes `SearchToggle` beside its primary action:
 an icon that opens into a search box. Bind its `v-model:open` and, while it is open, give the
 primary button `:ui="{ label: open ? 'max-sm:sr-only' : '' }"`, so on a phone the button drops to
@@ -257,7 +273,8 @@ the server for actions and sources when it is first opened, not on every page.
   pixels a bottom bar of the first four plus More. Its entries are `core.navigation` entries with
   `menu: 'members'`. With `core.members-area.enabled` off, or for anyone for whom the fact
   `core.member` is not true, every `/members` address answers "not found". The name shown is
-  `core.members-area.name`.
+  `core.members-area.name`. The home shows only the cards modules put on it; the bar is the way to
+  each section, so the home repeats none of them, and with no card it says nothing needs the person.
 - **My account** (`/account`): the same pages for everyone signed in. On a laptop every account page
   sits beside the account's menu (`AccountNavigation`, drawn by `PageFrame` for any address under
   `/account`): an Overview, then the `core.navigation` entries with `menu: 'account'` in two groups,
@@ -279,6 +296,7 @@ the server for actions and sources when it is first opened, not on every page.
 - **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
   returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
+  Passes (no pass held) and Notifications (no kind of message to choose) are hidden this way.
 - **Colour mode**: `core.appearance.default` is what a first-time visitor sees; a person's own choice
   from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
   pages light. The mode is kept in a cookie and decided on the server before the page renders
@@ -389,7 +407,9 @@ Four rules:
 - **Place by operating day.** Give each item the operating day the server worked out, so a show at
   00:30 sits with the evening before and is drawn once.
 - **State three ways.** Each block shows its state as a word, an edge (solid, dashed, dotted or
-  double) and a colour, so nothing rests on colour alone.
+  double) and a colour, so nothing rests on colour alone. The state most blocks are in is marked
+  `usual` (a scheduled performance): its word is still read out but is not drawn, so a Draft or a
+  Cancelled block stands out (Matt, 21 November 2026).
 - **Name a calendar colour, never a value.** `calendar-1` to `calendar-8` are set in `main.css`,
   apart from the brand and the status colours, with a fill, text and edge for light and dark.
 - **The list is the equal route.** The List view holds the same items. It is the one shown at phone
@@ -471,16 +491,17 @@ a layout, not a shell, and it has no navigation of its own.
   figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
   `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
   minor units): Box office gives sold, not yet paid, in, still to come and seats left, Payments
-  what the tills have taken. The hub reads them again every 30 seconds while open. The screens'
-  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
+  what the tills have taken. The hub reads them again every 30 seconds while open. On a day with
+  no performance the route also answers `next` (the first scheduled performance after today) and the
+  hub says "Next: The Lighthouse Keeper, Sun 22 Nov, 19:30, Main house". The screens' tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.
 - **PageLive** is the page type: `title` and `context` (both already translated, for example the
   screen and the performance), an optional `back` address, the task in the default slot and a sticky
   `footer` slot. Its status strip shows the title, the context, whether the device is online and the
-  way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
-  or My account.
+  way out: an arrow back to the Tonight hub from a screen, and on the hub a worded "Leave" button
+  (named "Leave live mode") back to the console, members' area or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
   may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
@@ -527,6 +548,15 @@ A theatre restyles the band with CSS rather than copying the component. The hook
 `public-show-top` (the band), `public-show-poster`, `public-show-title`, `public-show-actions` and
 `public-show-book` on the show's page, and `public-spotlight`, `public-spotlight-poster`,
 `public-spotlight-title` and `public-spotlight-book` on what's on.
+
+## The public header's extra items
+
+A module may put something of its own in the public header beside the account menu, such as box
+office's "Tickets held 8:41" while a basket is held. It names a global component from a plugin:
+`usePublicHeaderItems().value = [...usePublicHeaderItems().value, 'BoxOfficeHeldTickets']`.
+`layouts/default.vue` draws each name it can resolve and leaves out the rest. The component draws
+nothing when it has nothing to say. On a phone, while such an item shows a link, it takes the place of
+the signed-out Sign in icon, which the menu repeats.
 
 ## Seams for Identity
 
@@ -654,7 +684,9 @@ the console a worded back link sits above the title. A link to a list returns th
 On a phone a page with a trail shows its title on a line of its own under the bar, as a record does,
 so the back button and the page's actions never squeeze it. `PageForm` takes `trail` too, for a form
 that is a page. In a sidebar only one entry is current: the one whose address covers the page most
-closely (`resolveEntry`), so Merges is not Accounts as well.
+closely (`resolveEntry`), so Who holds what is not Accounts as well. An entry marked `unlisted` keeps
+its address and its ability but is not drawn in the menu: its page is reached from another page (Merges,
+from Accounts) and by search, and the menu shows the listed entry above it as current.
 
 `PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
 `searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`

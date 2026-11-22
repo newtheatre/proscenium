@@ -5,7 +5,7 @@ import type { Answers, Definition } from '../../../../../shared/engine'
 
 interface Change { kind: 'added' | 'retired' | 'changed', impact: 'safe' | 'caution' | 'breaking', questionId: string, label: string, what: string[] }
 interface Version { number: number, live: boolean, publishedAt: number, publishedBy: string | null, responses: number, summary: { impact: Change['impact'], changes: Change[] } }
-interface History { form: { id: string, title: string, status: string, archived: boolean }, editRevision: number, versions: Version[] }
+interface History { form: { id: string, title: string, mode?: string, status: string, archived: boolean, canRead?: boolean }, editRevision: number, versions: Version[] }
 
 definePageMeta({ layout: 'console' })
 const { t } = useT()
@@ -74,10 +74,17 @@ async function restore() {
 
 <template>
   <PageFrame
-    :title="t('forms.screens.versions.title')"
+    :title="data?.form.title ?? t('forms.screens.versions.title')"
     :description="t('forms.screens.versions.help')"
-    :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }, ...(data ? [{ label: data.form.title, to: `/console/forms/${formId}` }] : [])]"
+    :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }]"
   >
+    <template #toolbar>
+      <FormsTabs
+        :form-id="formId"
+        current="history"
+        :responses="data?.form.mode !== 'record' && !!data?.form.canRead"
+      />
+    </template>
     <DataBoundary
       :data="data"
       :status="status"

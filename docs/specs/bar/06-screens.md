@@ -10,14 +10,14 @@ The bar has one live-mode screen (the till), one panel on the box office desk, f
 | S2 | Bar panel on the desk | inside `/console/box-office/sell` | Panel in the desk screen | `bar.sale.sell` |
 | S3 | Bar sales | `/console/bar/sales` | List | `bar.sale.view` |
 | S4 | Bar sale | `/console/bar/sales/<reference>` | Record | `bar.sale.view` |
-| S5 | Openings | `/console/bar/openings` | List | `bar.report.view` |
+| S5 | Openings | on Bar sales, `/console/bar/sales` | A list above the sales | `bar.opening.manage` |
 | S6 | Opening | `/console/bar/openings/<id>` | Record | `bar.report.view` |
 | S7 | Stock | `/console/bar/stock` | List | `bar.stock.view` |
 | S8 | Stock item | `/console/bar/stock/<id>` | Record | `bar.stock.view` |
-| S9 | Deliveries, and Record a delivery | `/console/bar/deliveries` | List, Form | `bar.stock.receive` |
-| S10 | Stocktakes, Count, and Review | `/console/bar/stocktakes` | List, Steps, Record | `bar.stock.count`, `bar.stocktake.approve` |
+| S9 | Deliveries, and Record a delivery | `/console/bar/stock/deliveries`, a tab of Stock | List, Form | `bar.stock.receive` |
+| S10 | Stocktakes, Count, and Review | `/console/bar/stock/stocktakes`, the Counts tab of Stock | List, Steps, Record | `bar.stock.count`, `bar.stocktake.approve` |
 | S11 | Products | `/console/bar/products` | List, Record, Form | `bar.product.manage` |
-| S12 | Price lists | `/console/bar/price-lists` | List, Record | `bar.price.manage` |
+| S12 | Price lists | a section of Outlets; a list is `/admin/modules/bar/outlets/price-lists/<id>` | List, Record | `bar.price.manage` |
 | S13 | Outlets | `/console/bar/outlets` | List, Form | `bar.outlet.manage` |
 | S14 | Reports | `/console/bar/reports` | List of reports, each a List | `bar.report.view` |
 | S15 | Refusals register | `/console/bar/age-checks` | List | `bar.age-check.view` |
@@ -26,6 +26,13 @@ The bar has one live-mode screen (the till), one panel on the box office desk, f
 | S18 | My bar tab | `/members/bar/tab` | Steps, in the members' area | `bar.tab.hold` |
 
 Bar is its own group in the console sidebar. Everyday work is Bar sales, Bar tabs, Openings, Stock, Deliveries and Stocktakes; set-up is Products, Price lists, Outlets, Reports, Refusals register and Settings. A shell follows whose business a screen does, not what guards it: everything where staff act for the theatre is under `/console/bar` or in live mode, and a person's own staff tab is in the members' area.
+
+**As built, after the interface pass Matt approved on 21 November 2026.** The console's Bar group has four entries: Sell, Bar sales, Stock and the Refusals register.
+
+- Openings have no screen of their own. Bar sales lists what is trading now above the sales, each with its takings and "Close Foyer bar", for whoever holds `bar.opening.manage`; a past opening is a filter on the sales, which shows its takings. Someone who may close an outlet but not read sales still finds the openings there. The old address redirects.
+- Stock is one screen with three tabs: Levels, Deliveries and Counts. A tab shows only for someone who may open it (`bar.stock.view`, `bar.stock.receive`, `bar.stock.count`). The old addresses of Deliveries and Stocktakes redirect.
+- Set-up is tabs of the bar's page in Admin: Settings, Products, Outlets and Stock. Choices are a section at the foot of Products. Price lists are a section of Outlets, which opens for whoever holds `bar.outlet.manage` or `bar.price.manage`, each seeing the part they may change.
+- Signing the refusals register (S15) starts from the days not yet signed: the day after the last day signed, or the register's first day, to today.
 
 ## S1. Till (live mode)
 
@@ -108,7 +115,7 @@ A Form page: location, supplier (from the list), delivery note number, then line
 **Count** is a Steps page built for a phone held in a cellar: 1 Choose (location; everything or one category), 2 Count, 3 Check, 4 Submit.
 
 - Step 2 lists items by category with two fields each: whole count units and the part unit. Large steppers; a "Not counted" switch per item; progress as "18 of 42 counted". It saves every entry and can be left and resumed.
-- With `bar.stocktake.blind` on, no expected figure appears before submission.
+- With `bar.stocktake.blind` on, which it is unless the bar switches it off, no level or expected figure appears before submission.
 - Step 3 shows only what is unusual: items not counted, and, when not blind, the largest differences.
 - Step 4's button reads "Submit count of Cellar".
 

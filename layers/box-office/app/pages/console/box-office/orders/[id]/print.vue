@@ -16,11 +16,42 @@ const { data, status, error, refresh } = await useAPI<Printed>(() => `/api/box-o
 const print = () => window.print()
 const when = (at: number) => `${dayNamed(at)} ${time(at)}`
 useHead({ title: () => t('box-office.print-tickets.title', { reference: data.value?.reference ?? '' }) })
+// A booking not yet paid for has no tickets to print: it says so and leads to the till instead.
+const { toRefusal } = useRefusal()
+const unpaid = computed(() => !!error.value && toRefusal(error.value).code === 'box-office.desk.not-sold')
+const { $api } = useNuxtApp()
+const order = ref<{ reference: string, can: { collect: boolean } } | null>(null)
+watch(unpaid, async (is) => {
+  if (is) order.value = await $api<{ reference: string, can: { collect: boolean } }>(`/api/box-office/orders/${encodeURIComponent(id.value)}`).catch(() => null)
+}, { immediate: true })
 </script>
 
 <template>
   <div class="flex-1 p-4 sm:p-6 print:bg-white print:p-0 print:text-black">
+    <EmptyState
+      v-if="unpaid"
+      icon="i-lucide-hand-coins"
+      :title="t('box-office.print-tickets.unpaid.title')"
+      :description="t('box-office.print-tickets.unpaid.description')"
+    >
+      <template #actions>
+        <UButton
+          v-if="order?.can.collect"
+          :to="`/console/box-office/sell?collect=${encodeURIComponent(order.reference)}`"
+          icon="i-lucide-banknote"
+          :label="t('box-office.order.collect')"
+        />
+        <UButton
+          :to="`/console/box-office/orders/${encodeURIComponent(id)}`"
+          icon="i-lucide-receipt"
+          color="neutral"
+          variant="outline"
+          :label="t('box-office.print-tickets.booking')"
+        />
+      </template>
+    </EmptyState>
     <DataBoundary
+      v-else
       :data="data"
       :status="status"
       :error="error"

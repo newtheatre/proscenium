@@ -1,4 +1,5 @@
 {
+  "membership-fees.navigation.groups.membership-fees.label": "Membership fees",
   "membership-fees.module.name": "Membership fees",
   "membership-fees.module.description": "Prices for membership schemes, and taking the fee online through Payments, with the income posted to the ledger. Leave it off where members pay somebody else, such as a students' union.",
   "membership-fees.settings-sections.checkout": "Paying online",

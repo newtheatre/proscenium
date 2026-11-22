@@ -1,6 +1,6 @@
 <!-- A module's page in Admin: on a laptop and wider the list of modules down the left (none on a
-     phone), then the module's name, its toggle, what it does and its tabs, which scroll sideways on
-     a narrow screen. The tabs are the module's pages of settings, its set-up screens and About, as
+     phone), then the module's name, its toggle, what it does (on About, or while it is off) and its
+     tabs, which scroll sideways on a narrow screen. The tabs are the module's pages of settings, its set-up screens and About, as
      many as the viewer may open. The admin layout draws it round every page under the module's
      address, and the open tab's page in the slot, as an embedded screen. -->
 <script setup lang="ts">
@@ -24,6 +24,8 @@ const tabs = computed(() => tabData.value?.tabs ?? [])
 const items = computed(() => tabs.value.map(tab => ({ label: te(tab.label) ? t(tab.label) : tab.label, value: tab.to, icon: tab.icon })))
 // A record page below a tab's screen keeps that tab open.
 const active = computed(() => resolveEntry(tabs.value, route.path)?.to)
+// On About, on a module that is off, or on one with no other tab to say what it is.
+const introduces = computed(() => !view.value?.on || tabs.value.length < 2 || route.path.replace(/\/$/, '').endsWith('/about'))
 
 const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : pageNameOf(a.id).localeCompare(pageNameOf(b.id))
 const side = computed<NavigationMenuItem[][]>(() => {
@@ -94,8 +96,9 @@ const side = computed<NavigationMenuItem[][]>(() => {
           @update:model-value="toggle(view)"
         />
       </template>
+      <!-- What the module does is said where someone is deciding about it, not above every tab. -->
       <p
-        v-if="pageDescriptionOf(module)"
+        v-if="pageDescriptionOf(module) && introduces"
         class="text-sm text-muted"
       >
         {{ pageDescriptionOf(module) }}

@@ -90,7 +90,9 @@ describe('a stocktake', () => {
     expect(got.stocktake).toMatchObject({ state: 'counting', location: 'Count bar', startedBy: expect.any(String) })
     const lines = got.lines.filter((l: any) => [s.crisps, s.cider, s.gin].includes(l.stockItemId))
     expect(lines).toHaveLength(3)
-    expect(lineOf(lines, s.cider)).toMatchObject({ weighable: true, level: 40000, counted: null, expected: null })
+    // Counts are blind unless the bar says otherwise: the counter is not told the level.
+    expect(got.blind).toBe(true)
+    expect(lineOf(lines, s.cider)).toMatchObject({ weighable: true, level: null, counted: null, expected: null })
 
     // Submitting before every line is counted is refused.
     expect((await send('POST', `/api/bar/stocktakes/${id}/counts`, { lines: [{ lineId: lineOf(lines, s.crisps).id, counted: 32 }] }, counter)).status).toBe(200)
@@ -210,11 +212,16 @@ describe('a stocktake', () => {
     expect((await send('GET', '/api/bar/stocktakes', undefined, counter)).body.uncategorised).toBeGreaterThanOrEqual(2)
   })
 
-  it('hides the level from counters when counts are blind', async () => {
-    await commit(unit => changeSetting(unit.view(), 'bar.stocktake.blind' as never, true, { reason: 'test', confirm: true }))
+  it('hides the level from counters by default, and shows it once the bar switches blind counts off', async () => {
     const id = (await send('POST', '/api/bar/stocktakes', { locationId: s.cellar }, counter)).body.stocktakeId
-    const got = (await send('GET', `/api/bar/stocktakes/${id}`, undefined, counter)).body
+    let got = (await send('GET', `/api/bar/stocktakes/${id}`, undefined, counter)).body
     expect(got.blind).toBe(true)
     expect(got.lines.every((l: any) => l.level === null && l.expected === null)).toBe(true)
+
+    await commit(unit => changeSetting(unit.view(), 'bar.stocktake.blind' as never, false, { reason: 'test', confirm: true }))
+    got = (await send('GET', `/api/bar/stocktakes/${id}`, undefined, counter)).body
+    expect(got.blind).toBe(false)
+    expect(lineOf(got.lines, s.crisps)).toMatchObject({ level: expect.any(Number), expected: null })
+    await commit(unit => changeSetting(unit.view(), 'bar.stocktake.blind' as never, true, { reason: 'test', confirm: true }))
   })
 })

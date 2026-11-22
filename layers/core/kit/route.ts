@@ -6,7 +6,7 @@ import { defineEventHandler, getHeader, getQuery, getRequestIP, getRouterParams,
 import type { z } from 'zod'
 import { runInContext, useContext, type Actor, type KitContext, type KitEnv } from './context'
 import { Refusal, isRefusal, DeclarationError, type RefusalBody } from './refusal'
-import { useAccessProvider, can } from './access'
+import { useAccessProvider, can, STRONGER_REFUSAL, type Decision } from './access'
 import { isEnabled } from './modules-store'
 import { createUnit, type UnitOfWork } from './unit'
 import { countAgainstRate, RATE_CLASSES, waitRemedy, type RateClass } from './ratelimit'
@@ -237,7 +237,16 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
 
     const unit = createUnit()
     const ability = decl.ability && decl.ability !== 'signed-in' ? registry.abilities.get(decl.ability)?.decl : undefined
-    const result = await handler(event, { input: input as any, record: record as any, actor, unit })
+    let result: unknown
+    try {
+      result = await handler(event, { input: input as any, record: record as any, actor, unit })
+    }
+    catch (error) {
+      // A route's own check answered "no permission" after the sign-in was what stood in the way: say that instead.
+      const stronger = context.cache[STRONGER_REFUSAL] as Extract<Decision, { allowed: false }> | undefined
+      if (stronger && error instanceof Refusal && error.code === 'core.access.denied') throw new Refusal(stronger.code, stronger.reason, { status: stronger.status, remedy: stronger.remedy })
+      throw error
+    }
     const body = result === undefined ? null : result
 
     if (!unit.committed) {

@@ -45,7 +45,7 @@ stateDiagram-v2
 | Draft | Published | `core.production.publish` | Has a title, a summary and a category. Advisories are either listed or confirmed as none. Every public image has alt text. |
 | Published | Withdrawn | `core.production.publish` | None. The person sees what is attached first (see "Changes with a wide reach"). |
 | Withdrawn | Published | `core.production.publish` | Same as Draft to Published. |
-| Published or Withdrawn | Cancelled | `core.production.cancel` | A reason is chosen. Any module may refuse through the change guard. The refusal shows its reason and a link to where the matter is settled. |
+| Published or Withdrawn | Cancelled | `core.production.cancel` | A reason is chosen. Any module may refuse through the change guard. The refusal shows its reason and, where the module asks one, the question that settles it; otherwise a link to where the matter is settled. |
 | Cancelled | Withdrawn | `core.production.cancel` | None. Performances stay cancelled and are reinstated one by one. |
 | Draft | (deleted) | `core.production.edit` on this record | Never published. No performance has left draft. No other module holds anything against it. |
 
@@ -77,7 +77,7 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | (new) | Draft | `core.performance.schedule` | `ends_at` is after `starts_at`. The space belongs to the venue and is performable. |
 | Draft | Scheduled | `core.performance.schedule` | Starts in the future. No overlap with another scheduled performance in an exclusive space. No blocking closure covers it. |
-| Scheduled | Cancelled | `core.performance.cancel` | A reason is chosen. Any module may refuse through the change guard. The refusal shows its reason and a link to where the matter is settled. |
+| Scheduled | Cancelled | `core.performance.cancel` | A reason is chosen. Any module may refuse through the change guard. The refusal shows its reason and, where the module asks one, the question that settles it; otherwise a link to where the matter is settled. |
 | Cancelled | Scheduled | `core.performance.cancel` | Has not started. The overlap and closure guards pass again. |
 | Scheduled | Completed | The five-minute task only | `ends_at` has passed. |
 | Draft | (deleted) | `core.performance.schedule` | Has never been scheduled. |
@@ -184,7 +184,7 @@ Rules:
 Before a person cancels, withdraws, reschedules or moves something public, they see what depends on it and must confirm. Proscenium calls this the blast radius. Here it is two points that other modules fill:
 
 - **`core.change-impact`** (data). Each module returns counts in plain words for a given record and change: "42 tickets across 31 orders", "6 volunteers on the rota". Core shows them all on the confirmation.
-- **`core.change-guard`** (code). A module may refuse the change with a reason: "Refund or move the 42 tickets first". Core runs every guard inside the batch and stops on the first refusal. A refusal may carry a link to the module's own screen where the matter is settled, such as Box office's choice between refunding and exchanging the tickets of a performance about to be cancelled. Core never collects another module's decision: the person settles it there, and then the cancel goes through.
+- **`core.change-guard`** (code). A module may refuse the change with a reason: "Refund or move the 42 tickets first". Core runs every guard inside the batch and stops on the first refusal. A refusal may carry a link to the module's own screen where the matter is settled, or one question with its options and the module's own route to post the answer to, such as Box office's choice between refunding and exchanging the tickets of a performance about to be cancelled. The window making the change asks the question and posts the answer to that route, under the module's own ability, before it makes the change. Core never stores or interprets the answer (integration ruling R-11, as amended on Matt's approval of 21 November 2026).
 
 With no other module switched on, both points are empty and the change goes straight through.
 

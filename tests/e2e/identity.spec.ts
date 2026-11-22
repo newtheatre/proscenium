@@ -72,23 +72,28 @@ test('the built Worker takes its own origin from the request, so a same-site cha
   expect(other.status()).toBe(403)
 })
 
-test('opening an emailed link uses nothing until Sign in is pressed, so a mail scanner cannot spend it', async ({ page }) => {
-  const used: string[] = []
+test('opening an emailed link in a browser that did not ask spends nothing until Sign in is pressed', async ({ page }) => {
+  const asked: { here?: boolean }[] = []
   page.on('request', (request) => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/core/sign-in/link') used.push(request.url())
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/core/sign-in/link') asked.push(request.postDataJSON())
   })
   // The shape of a real token (43 characters), so the refusal is the unknown link, not the input check.
+  const answered = page.waitForResponse(response => new URL(response.url()).pathname === '/api/core/sign-in/link')
   await page.goto(`/sign-in/link#${'x'.repeat(43)}`)
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+  // The page asks once whether this is the browser that asked; the answer is the press and nothing is spent (12).
+  const first = await answered
+  expect(first.status()).toBe(200)
+  expect(await first.json()).toEqual({ press: true })
+  expect(asked.map(a => a.here)).toEqual([true])
   const signIn = page.getByRole('button', { name: 'Sign in' })
-  await expect(signIn).toBeVisible()
+  await expect(signIn).toBeEnabled()
   expect(page.url()).not.toContain('#')
-  expect(used).toEqual([])
   const results = await new AxeBuilder({ page }).withTags(tags).analyze()
   expect(results.violations.map(v => v.id)).toEqual([])
   await signIn.click()
   await expect(page.getByRole('alert')).toContainText('This link is not valid.')
-  expect(used).toHaveLength(1)
+  expect(asked.map(a => a.here)).toEqual([true, undefined])
 })
 
 for (const [path, endpoint, button] of [

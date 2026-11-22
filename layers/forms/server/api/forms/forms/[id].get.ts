@@ -37,6 +37,7 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     sources: (await sources()).map(s => ({ key: s.key, label: s.label, people: !!s.people })),
     // What other modules can do when a response takes a move, for the stages editor.
     actions: await actionList(),
+    canRead: (await can(actor, 'forms.response.read', ['forms.form', form.id])).allowed,
     canSaveTemplate: (await can(actor, 'forms.template.manage')).allowed,
     versions: versions.map(v => ({ id: v.id, number: v.number, publishedAt: v.publishedAt, publishedBy: v.publishedBy, summary: JSON.parse(v.changeSummary) })),
   }

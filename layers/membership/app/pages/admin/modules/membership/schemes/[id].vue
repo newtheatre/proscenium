@@ -1,10 +1,9 @@
 <!-- One membership scheme (MEM-01, 02, 24, 56): what opening it still needs, its details, the
-     lengths it can be held for with the dates a membership taken today would run to, and adding a
-     member directly. -->
+     lengths it can be held for with the dates a membership taken today would run to, and its fee
+     where Membership fees is on. Members are added from Console > Members. -->
 <script setup lang="ts">
 import { z } from 'zod'
 import { convertCount, endsOnFor } from '../../../../../../shared/dates'
-import type { MembershipSchemeChoice } from '../../../../../../shared/scheme-choice'
 
 interface Scheme {
   id: string
@@ -59,6 +58,8 @@ const rolloverWindow = asDuration('rolloverDays')
 const renewalWindow = asDuration('renewalOpensDays')
 const graceWindow = asDuration('graceDays')
 const detailsRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A scheme's side, asked as the one thing it decides: whether holding it makes somebody a member.
+const becomesMember = computed({ get: () => details.side === 'members', set: (on: boolean) => { details.side = on ? 'members' : 'audience' } })
 watch(scheme, (s) => {
   if (!s) return
   const config = s.verifierConfig ? JSON.parse(s.verifierConfig) as { listId?: string, domains?: string[] } : {}
@@ -106,7 +107,14 @@ async function saveDetails() {
   }
 }
 
+// Pressed before the scheme is ready, Open scheme leads to the list of what it still needs.
+const notReady = useTemplateRef<{ $el: HTMLElement }>('notReady')
 async function move(to: 'open' | 'closed' | 'archived') {
+  if (to === 'open' && missing.value.length) {
+    notReady.value?.$el.scrollIntoView({ block: 'center' })
+    notReady.value?.$el.focus()
+    return
+  }
   if (to !== 'open' && !(await confirm({ verb: t(`membership.screens.scheme.verb-${to}`), thing: scheme.value!.name, consequence: t(`membership.screens.scheme.confirm-${to}`), button: t(`membership.screens.scheme.to-${to}`) }))) return
   try {
     const result = await $api<{ holders: number, pending: number }>(`/api/membership/schemes/${id.value}/state` as string, { method: 'POST', body: { to } })
@@ -133,7 +141,6 @@ const actions = computed(() => {
   const out = []
   if (s.state === 'closed') out.push({ label: t('membership.screens.scheme.to-archived'), icon: 'i-lucide-archive', onSelect: () => move('archived') })
   if (s.state === 'archived') out.push({ label: t('membership.screens.scheme.to-closed'), icon: 'i-lucide-archive-restore', onSelect: () => move('closed') })
-  if (data.value?.canImport && (s.state === 'open' || s.state === 'closed')) out.push({ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', onSelect: () => { importing.value = true } })
   if (s.state === 'draft') out.push({ label: t('membership.screens.scheme.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove })
   return out
 })
@@ -157,11 +164,8 @@ async function downloadPoster() {
   }
 }
 
-// Adding and importing members: the windows are shared with Console > Members, and offered the schemes this viewer may use.
-const { data: choices, refresh: refreshChoices } = await useAPI<{ schemes: MembershipSchemeChoice[] }>('/api/membership/members/schemes', { key: 'membership:members:schemes', default: () => ({ schemes: [] }) })
-const canAddHere = computed(() => !!choices.value?.schemes.some(s => s.id === id.value && s.canAdd))
-const importing = ref(false)
-const adding = ref(false)
+// Console > Members offers this scheme's lengths, and the fee section lists them.
+const refreshAll = () => Promise.all([refresh(), refreshNuxtData(['membership:members:schemes', 'membership-fees:schemes'])])
 
 // Lengths: added from a window, withdrawn or offered again from the row's menu with an Undo.
 const option = reactive({ name: '', count: 12, idempotency: '' })
@@ -183,7 +187,7 @@ async function addOption() {
     await $api(`/api/membership/schemes/${id.value}/options` as string, { method: 'POST', headers: { 'idempotency-key': option.idempotency }, body: { name: option.name, count: option.count } })
     toast.add({ title: t('membership.screens.lengths.added', { name: option.name.trim() }), color: 'success' })
     addingOption.value = false
-    await Promise.all([refresh(), refreshChoices()])
+    await refreshAll()
   }
   catch (e) {
     optionRefusal.value = toRefusal(e)
@@ -193,10 +197,10 @@ const setOption = (o: Option, state: Option['state']) => $api(`/api/membership/s
 async function toggleOption(o: Option) {
   const to = o.state === 'offered' ? 'withdrawn' : 'offered'
   await setOption(o, to)
-  await Promise.all([refresh(), refreshChoices()])
+  await refreshAll()
   offer(t(`membership.screens.lengths.${to}-done`, { name: o.name }), async () => {
     await setOption(o, o.state)
-    await Promise.all([refresh(), refreshChoices()])
+    await refreshAll()
   })
 }
 const optionActions = (o: Option) => [[o.state === 'offered'
@@ -228,15 +232,8 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
     >
       <div class="flex gap-2">
         <UButton
-          v-if="scheme.state === 'open' && canAddHere"
-          :label="t('membership.screens.add-member.title')"
-          icon="i-lucide-user-plus"
-          @click="adding = true"
-        />
-        <UButton
           v-if="scheme.state === 'draft' || scheme.state === 'closed'"
           :label="t('membership.screens.scheme.to-open')"
-          :disabled="missing.length > 0"
           :color="scheme.state === 'draft' ? 'primary' : 'neutral'"
           :variant="scheme.state === 'draft' ? 'solid' : 'outline'"
           loading-auto
@@ -266,7 +263,9 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
         class="space-y-6"
       >
         <UAlert
-          v-if="scheme.state === 'draft' && missing.length"
+          v-if="(scheme.state === 'draft' || scheme.state === 'closed') && missing.length"
+          ref="notReady"
+          tabindex="-1"
           color="warning"
           variant="subtle"
           icon="i-lucide-list-checks"
@@ -367,6 +366,12 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
           :description="t('membership.screens.lengths.indefinite')"
         />
 
+        <MembershipFeesSchemePrices
+          v-if="data.feesModuleOn && scheme.state !== 'archived'"
+          :scheme-id="scheme.id"
+          @saved="refresh()"
+        />
+
         <PageSection
           v-if="scheme.joinMode === 'apply' && scheme.state !== 'archived'"
           :title="t('membership.join.admin-title')"
@@ -456,16 +461,12 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
               />
             </UFormField>
             <USeparator :label="t('membership.screens.scheme.groups.who')" />
-            <UFormField
-              :label="t('membership.screens.scheme.side')"
-              :help="data.sideLocked ? t('membership.screens.scheme.side-locked') : t('membership.screens.scheme.side-help')"
-            >
-              <URadioGroup
-                v-model="details.side"
-                :disabled="data.sideLocked"
-                :items="(['members', 'audience'] as const).map(v => ({ value: v, label: t(`membership.screens.sides.${v}`), description: t(`membership.screens.sides.${v}-help`) }))"
-              />
-            </UFormField>
+            <USwitch
+              v-model="becomesMember"
+              :disabled="data.sideLocked"
+              :label="t('membership.screens.scheme.becomes-member')"
+              :description="t(data.sideLocked ? 'membership.screens.scheme.side-locked' : 'membership.screens.scheme.becomes-member-help')"
+            />
             <UFormField :label="t('membership.screens.scheme.join-mode')">
               <URadioGroup
                 v-model="details.joinMode"
@@ -652,17 +653,5 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
         />
       </template>
     </UModal>
-
-    <MembershipAddMemberModal
-      v-model:open="adding"
-      :schemes="choices?.schemes ?? []"
-      :scheme-id="id"
-      @added="refresh()"
-    />
-    <MembershipImportModal
-      v-model:open="importing"
-      :schemes="choices?.schemes ?? []"
-      :scheme-id="id"
-    />
   </PageFrame>
 </template>

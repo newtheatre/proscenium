@@ -9,6 +9,8 @@ const props = defineProps<{
   booking: BookingView
   /** A reservation's box office code, where the screen has just been given it. Otherwise the reference is shown to be scanned, which the desk finds as well. */
   deskCode?: string | null
+  /** Where the booking is managed, offered beside Add to calendar on the screen that has just made it. */
+  manageTo?: string
 }>()
 const { t } = useT()
 const { dateTime } = useDates()
@@ -19,6 +21,8 @@ const lines = computed(() => groupedBookingLines(props.booking.lines))
 const free = computed(() => props.booking.state === 'confirmed' && props.booking.totalMinor === 0)
 const reserved = computed(() => props.booking.state === 'reserved' || props.booking.state === 'awaiting_payment')
 const tickets = computed(() => props.booking.state === 'confirmed' ? props.booking.tickets ?? [] : [])
+// With the whole total still to pay, the total's own row says so, and the amount is said once.
+const allDue = computed(() => lines.value.length > 0 && props.booking.amountDueMinor > 0 && props.booking.amountDueMinor === props.booking.totalMinor)
 const price = (amountMinor: number) => amountMinor === 0 ? t('box-office.manage.free-price') : money(amountMinor, props.booking.currency)
 const badge = computed(() => free.value ? t('box-office.manage.state.free') : t(`box-office.manage.state.${props.booking.state}`))
 
@@ -67,10 +71,19 @@ function addToCalendar() {
         :title="t('box-office.booking.cancelled')"
       />
       <div
-        v-else
+        v-if="!show.cancelled || manageTo"
         class="flex flex-wrap gap-2 pt-2"
       >
         <UButton
+          v-if="manageTo"
+          :to="manageTo"
+          variant="outline"
+          color="neutral"
+          icon="i-lucide-ticket"
+          :label="t('box-office.manage.open')"
+        />
+        <UButton
+          v-if="!show.cancelled"
           variant="outline"
           color="neutral"
           icon="i-lucide-calendar-plus"
@@ -78,7 +91,7 @@ function addToCalendar() {
           @click="addToCalendar"
         />
         <UButton
-          v-if="show.venueSlug"
+          v-if="show.venueSlug && !show.cancelled"
           :to="`/venues/${show.venueSlug}`"
           variant="ghost"
           color="neutral"
@@ -112,12 +125,12 @@ function addToCalendar() {
           <span>{{ price(line.amountMinor) }}</span>
         </li>
         <li class="flex justify-between gap-4 py-2 font-semibold">
-          <span>{{ t('box-office.basket.total') }}</span>
+          <span>{{ allDue ? t('box-office.manage.total-due') : t('box-office.basket.total') }}</span>
           <span>{{ price(booking.totalMinor) }}</span>
         </li>
       </ul>
       <p
-        v-if="booking.amountDueMinor > 0"
+        v-if="booking.amountDueMinor > 0 && !allDue"
         class="font-semibold"
       >
         {{ t('box-office.manage.due', { amount: money(booking.amountDueMinor, booking.currency) }) }}

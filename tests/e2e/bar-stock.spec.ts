@@ -51,9 +51,13 @@ async function noViolations(page: Page) {
 test.describe.configure({ mode: 'serial' })
 
 test('a delivery is drafted, then received into its location', async ({ page }) => {
+  // The old address leads to Stock's Deliveries tab; this person may not count, so there is no Counts tab.
   await visit(page, '/console/bar/deliveries')
+  await expect(page).toHaveURL(/\/console\/bar\/stock\/deliveries$/)
+  await expect(page.getByRole('tab', { name: 'Deliveries', selected: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Counts' })).toHaveCount(0)
   await page.getByRole('link', { name: 'Record a delivery' }).first().click()
-  await expect(page).toHaveURL(/\/console\/bar\/deliveries\/new/)
+  await expect(page).toHaveURL(/\/console\/bar\/stock\/deliveries\/new/)
   await page.getByLabel('Into').click()
   await page.getByRole('option', { name: `Cellar ${stamp}` }).click()
   await page.getByLabel('Delivery note number').fill(`DN-${stamp}`)
@@ -69,7 +73,7 @@ test('a delivery is drafted, then received into its location', async ({ page }) 
   await expect(page.getByRole('cell', { name: '54 each' })).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Save draft' }).click()
-  await expect(page).toHaveURL(/\/console\/bar\/deliveries\/bdlv_/)
+  await expect(page).toHaveURL(/\/console\/bar\/stock\/deliveries\/bdlv_/)
   await expect(page.getByText('Draft', { exact: true })).toBeVisible()
 
   // Receiving is final, so it asks first, naming what arrives.
@@ -84,6 +88,7 @@ test('a delivery is drafted, then received into its location', async ({ page }) 
 
 test('Stock shows each location, and a row writes stock off and moves it', async ({ page }) => {
   await visit(page, '/console/bar/stock')
+  await expect(page.getByRole('tab', { name: 'Levels', selected: true })).toBeVisible()
   const row = page.getByRole('row', { name: new RegExp(`Cola can ${stamp}`) })
   await expect(row.getByRole('cell', { name: '54 each' }).first()).toBeVisible()
   await noViolations(page)

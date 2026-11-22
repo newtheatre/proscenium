@@ -3,6 +3,7 @@
      label would not be a heading. -->
 <script setup lang="ts">
 withDefaults(defineProps<{ title: string, description?: string, /** Leave the rule out for the first group of a form. */ first?: boolean }>(), { description: undefined, first: false })
+defineSlots<{ default?: () => unknown, /** Beside the heading: the one thing done to this group, such as Add. */ actions?: () => unknown }>()
 const id = useId()
 </script>
 
@@ -12,19 +13,22 @@ const id = useId()
     class="space-y-4"
   >
     <USeparator v-if="!first" />
-    <div>
-      <h3
-        :id="id"
-        class="text-sm font-semibold text-highlighted"
-      >
-        {{ title }}
-      </h3>
-      <p
-        v-if="description"
-        class="text-sm text-muted"
-      >
-        {{ description }}
-      </p>
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <div class="min-w-0">
+        <h3
+          :id="id"
+          class="text-sm font-semibold text-highlighted"
+        >
+          {{ title }}
+        </h3>
+        <p
+          v-if="description"
+          class="text-sm text-muted"
+        >
+          {{ description }}
+        </p>
+      </div>
+      <slot name="actions" />
     </div>
     <slot />
   </section>

@@ -208,6 +208,25 @@ export async function sign(unit: UnitView, input: z.infer<typeof reviewInput>, b
   return { id, refusals }
 }
 
+/** The day after a local date, YYYY-MM-DD. */
+export function dayAfter(day: string): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number]
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10) // not-policy: a date's ten characters
+}
+
+/**
+ * The days the next signature would cover, offered when signing: from the day after the last day
+ * signed (or the register's first day, with no signature yet) to today.
+ */
+export async function nextReviewDays(): Promise<{ fromDay: string, toDay: string }> {
+  const toDay = await operatingDayOf(nowMs())
+  const row = await first<{ signed: string | null, earliest: string | null }>(
+    `SELECT (SELECT max(to_day) FROM bar_register_reviews) AS signed,
+            (SELECT min(o.operating_day) FROM bar_age_checks a JOIN bar_openings o ON o.id = a.opening_id) AS earliest`)
+  const fromDay = row?.signed ? dayAfter(row.signed) : row?.earliest ?? toDay
+  return { fromDay: fromDay > toDay ? toDay : fromDay, toDay }
+}
+
 /** Erases the description on one row. The audit entry says who and when, never the words. */
 export function eraseDescription(unit: UnitView, id: string): void {
   unit.add({ sql: 'UPDATE bar_age_checks SET description = NULL WHERE id = ? AND description IS NOT NULL', params: [id] })

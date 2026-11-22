@@ -22,7 +22,7 @@ Public shell. Every screen works on a phone and with a screen reader, and none a
 | --- | --- | --- | --- |
 | Sign in | Offer a passkey; take an address; send a managed-domain address to its provider | Anyone signed out | First |
 | Check your email | Say a link and a code were sent; take the code; offer to send again after a pause | Anyone who asked for a link | First |
-| Link landing | Finish a sign-in from the email when the person presses Sign in, never on opening; explain plainly when a link is spent, expired or opened for a different purpose, and offer a new one | Anyone opening a link | First |
+| Link landing | Finish a sign-in from the email: at once in the browser that asked for it, and anywhere else only when the person presses Sign in, never on opening ([part 12](12-link-without-a-press.md)); explain plainly when a link is spent, expired or opened for a different purpose, and offer a new one | Anyone opening a link | First |
 | Your name | Ask a new person for their name, once, after their first link | A person whose account was just created | First |
 | Add a passkey | Offer a passkey after a link sign-in; skippable unless a sensitive ability is held | A signed-in person without one | First |
 | Welcome, you were invited | Say who invited them and to what, then sign them in | The holder of an invite link | First |
@@ -45,12 +45,11 @@ Public shell, audience side. Other modules add their own sections here through t
 | Screen | Purpose | Who sees it | Release |
 | --- | --- | --- | --- |
 | Overview | The sections available, and anything needing attention such as an unverified address | Any signed-in person | First |
-| Your details | Name, pronouns, phone, language (no "known as" name, ID-11) | Any signed-in person | First |
-| Email addresses | Add, verify and remove addresses; choose the address for tickets and receipts | Any signed-in person | First |
+| Details | Name, pronouns, phone, language (no "known as" name, ID-11); then the email addresses: add, verify and remove addresses, and choose the address for tickets and receipts. One page since 21 November 2026 (Matt); the old address `/account/email` leads to its addresses section | Any signed-in person | First |
 | Signing in | Passkeys with their labels and last use; linked Google account; recovery codes | Any signed-in person | First |
 | Where you are signed in | Each session with its device and last use; end one, or all the others | Any signed-in person | First |
-| Access scheme | Before applying: what the scheme is and an "Apply" button. The form: square tick boxes with a plain description and optional notes, "I use a wheelchair" with its follow-up, companions, anything else, and who will read it. Afterwards: the application's state in plain words, the reviewer's message, change or leave, switches for other purposes, and every read by staff. The public page `/access` is the theatre's own content and carries the same button. | Any signed-in person | First |
-| Your data | Download your data; ask for your account to be erased; see a request's progress; cancel it | Any signed-in person | First |
+| Access scheme | Before applying: the form itself, under a line on what the scheme is, with no page in between (Matt, 21 November 2026). The form: square tick boxes with a plain description and optional notes, "I use a wheelchair" with its follow-up, companions, anything else, and who will read it. Afterwards: the application's state in plain words, the reviewer's message, change or leave, switches for other purposes, and every read by staff. The public page `/access` is the theatre's own content and carries the same button. | Any signed-in person | First |
+| Data | Download your data; ask for your account to be erased; see a request's progress; cancel it | Any signed-in person | First |
 
 ## Members' area
 
@@ -69,10 +68,10 @@ Console shell. Each row names the ability that shows it.
 | Screen | Purpose | Ability | Release |
 | --- | --- | --- | --- |
 | Accounts | Search and filter everyone; unclaimed and anonymised accounts hidden unless looked for, with a count of what is hidden | `core.account.read` | First |
-| Account | One person, in sections by side (see the wireframe). Details and addresses are edited here (ID-46) | `core.account.read`; each section also needs its own ability; `core.account.update` to edit | First |
+| Account | One person, in sections by side (see the wireframe). Details and addresses are edited here (ID-46), in one Details card: name, pronouns, then the email addresses (Matt, 21 November 2026) | `core.account.read`; each section also needs its own ability; `core.account.update` to edit | First |
 | Add someone | Name and address, optionally a role; creates an unclaimed account and sends an invitation | `core.account.create` | First |
 | Merge accounts | Choose the second account, see the preview, confirm | `core.account.merge` | First |
-| Merges | Recent merges, with undo while the window is open | `core.account.merge` | First |
+| Merges | Recent merges, with undo while the window is open. Not in the menu: reached from Accounts' "More" button and by search (Matt, 21 November 2026); a merge starts from a person's actions menu | `core.account.merge` | First |
 | Who holds what | Every live, pending and soon-to-lapse grant; filter by role, scope and module; grant, renew and end | `core.grant.read`; `core.grant.manage` to change | First |
 | Data requests | Exports and erasures with their state, holds and respond-by date | `core.data-request.manage` | First |
 
@@ -123,12 +122,12 @@ Interface fixes the prefixes: a person's own sections sit under `/account/` on t
 | Screen | Address |
 | --- | --- |
 | My account: Overview | `/account` |
-| Your details | `/account/details` |
-| Email addresses | `/account/email` |
+| Details | `/account/details` |
+| Email addresses | a section of Details, `/account/details#email` (since 2026-11-21) |
 | Signing in | `/account/sign-in` |
 | Where you are signed in | a section of Signing in, `/account/sign-in` (since 2026-11-17) |
 | Access scheme | `/account/access` |
-| Your data | `/account/data` |
+| Data | `/account/data` |
 | Member details | `/members/account/details` |
 | Emergency contacts (part of Member details, and linkable) | `/members/account/emergency-contacts` |
 | What you can do | `/members/account/abilities` |
@@ -161,7 +160,7 @@ Foundations owns the first-run sequence and the setup code that guards it. Ident
 
 | Step | Required | Does |
 | --- | --- | --- |
-| Create the first Owner | Yes | Name, address, passkey, recovery codes typed back; writes the setup grant |
+| Create the first Owner | Yes | Name, address, passkey, recovery codes downloaded or copied and ticked as saved; writes the setup grant |
 | Add a second Owner | No, recommended | Invites another person as Owner so one lost device cannot lock the theatre out |
 | Choose how people sign in | No | Email link on or off; Google; a managed domain |
 | Choose roles | No | Applies the preset's roles, which can be renamed straight away |

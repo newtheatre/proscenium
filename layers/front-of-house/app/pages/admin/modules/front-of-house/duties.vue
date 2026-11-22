@@ -19,9 +19,9 @@ interface Duty {
 const { t, te } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const undo = useUndo()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ duties: Duty[], requirementOptions?: { value: string, label: string }[], requirementLabels?: Record<string, string> }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
+const { data, status, error, refresh } = await useAPI<{ duties: Duty[], archived?: Duty[], requirementOptions?: { value: string, label: string }[], requirementLabels?: Record<string, string> }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
 // A fact's label arrives as its translation key.
 const said = (label: string) => te(label) ? t(label) : label
 const requirementItems = computed(() => (data.value?.requirementOptions ?? []).map(o => ({ value: o.value, label: said(o.label) })))
@@ -61,22 +61,27 @@ async function save() {
   }
 }
 
-async function archive(duty: Duty) {
-  if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.duties.thing', { name: duty.name }), consequence: t('front-of-house.duties.archive-consequence'), button: t('front-of-house.archive.button') })) return
+// Archiving asks nothing first: it is undone from its own toast, or later from the archived list.
+async function setArchived(duty: Duty, archived: boolean) {
   refusal.value = null
+  const call = (to: boolean) => write(`/api/front-of-house/duties/${encodeURIComponent(duty.id)}/${to ? 'archive' : 'restore'}`, { method: 'POST', body: {} })
   try {
-    await write(`/api/front-of-house/duties/${encodeURIComponent(duty.id)}/archive`, { method: 'POST', body: {} })
-    toast.add({ title: t('front-of-house.duties.archived', { name: duty.name }), color: 'success' })
+    await call(archived)
+    undo.offer(t(archived ? 'front-of-house.duties.archived' : 'front-of-house.duties.restored', { name: duty.name }), async () => {
+      await call(!archived)
+      await refresh()
+    })
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
 }
+const showArchived = ref(false)
 
 const actions = (duty: Duty): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(duty) }],
-  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void archive(duty) } }],
+  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(duty, true) } }],
 ]
 const minutes = (n: number) => t('front-of-house.minutes', { count: n })
 </script>
@@ -105,28 +110,56 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
         @retry="refresh()"
       >
         <template #default="{ data: d }">
-          <EmptyState
-            v-if="!d.duties.length"
-            :title="t('front-of-house.duties.empty.title')"
-            :description="t('front-of-house.duties.empty.description')"
-            icon="i-lucide-badge-check"
-          />
-          <RecordList
-            v-else
-            :label="t('front-of-house.navigation.duties.label')"
-          >
-            <RecordListItem
-              v-for="duty in d.duties"
-              :key="duty.id"
-              :name="duty.name"
-              :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
+          <div class="space-y-4">
+            <EmptyState
+              v-if="!d.duties.length"
+              :title="t('front-of-house.duties.empty.title')"
+              :description="t('front-of-house.duties.empty.description')"
+              icon="i-lucide-badge-check"
+            />
+            <RecordList
+              v-else
+              :label="t('front-of-house.navigation.duties.label')"
             >
-              <RowActions
-                :items="actions(duty)"
-                :label="t('front-of-house.actions-for', { name: duty.name })"
-              />
-            </RecordListItem>
-          </RecordList>
+              <RecordListItem
+                v-for="duty in d.duties"
+                :key="duty.id"
+                :name="duty.name"
+                :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
+              >
+                <RowActions
+                  :items="actions(duty)"
+                  :label="t('front-of-house.actions-for', { name: duty.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              v-model:open="showArchived"
+              :label="t('front-of-house.archived.label')"
+              :count="d.archived?.length ?? 0"
+            >
+              <RecordList :label="t('front-of-house.duties.archived-list')">
+                <RecordListItem
+                  v-for="duty in d.archived"
+                  :key="duty.id"
+                  :name="duty.name"
+                  :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
+                  muted
+                >
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    icon="i-lucide-archive-restore"
+                    :label="t('front-of-house.restore.button')"
+                    :aria-label="t('front-of-house.restore.named', { name: duty.name })"
+                    loading-auto
+                    @click="setArchived(duty, false)"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
+          </div>
         </template>
       </DataBoundary>
     </div>

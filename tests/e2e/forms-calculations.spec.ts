@@ -43,7 +43,8 @@ test('the proposal\'s total reads as money on its page, and a calculation is bui
   await axe(page)
 
   // ---- a new one: the share of the budget that goes on the set ----
-  await outline.getByRole('button', { name: 'Add calculation' }).click()
+  await page.getByRole('button', { name: 'Add a question', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Calculation', exact: true }).click()
   await expect(page.getByRole('button', { name: '1 problem' })).toBeVisible()
   await details.getByRole('textbox', { name: 'Name', exact: true }).fill('Set share')
   await details.getByRole('combobox', { name: 'Shown as' }).click()

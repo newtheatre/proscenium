@@ -32,8 +32,8 @@ As a returning person, I sign in with my device, so that it takes one tap.
 
 ### ID-03 Be offered a passkey after first signing in (first release)
 
-- The offer appears once after an email sign-in on an account with no passkey, and can be skipped.
-- Adding the first passkey offers recovery codes. Anyone may skip them except an Owner, who must type one back before the page can be left.
+- Somebody holding a privileged ability meets the offer as a screen after an email sign-in on an account with no passkey, and can skip it. Everybody else goes straight to where they were heading and finds the offer as a notice on My account's overview, there until they add a passkey or press "Not now" (Matt, 21 November 2026).
+- Adding the first passkey offers recovery codes. Anyone may skip them except an Owner, who must download or copy them and tick that they are saved before the page can be left.
 - Staff holding a privileged ability are told the console needs a passkey, and what to do, before they hit a refusal.
 
 ### ID-04 Sign in with Google (first release)
@@ -140,7 +140,7 @@ As a member, I record who to ring for me, so that the theatre can reach them if 
 
 As somebody who faces barriers at the theatre, I apply once and say what I need, so that I am not asked every time I book.
 
-- The "Apply" button on the public page `/access` and the one in My account both open the application form. A signed-out person signs in or signs up first and lands on the form, not on the home page.
+- The "Apply" button on the public page `/access` opens the application form, and My account's Access scheme page is that form until the person has applied. A signed-out person signs in or signs up first and lands on the form, not on the home page.
 - The form offers the access-needs list as square tick boxes, each with a plain description and an optional note; asks "I use a wheelchair" separately and, once ticked, whether the person would rather stay in it or move to a seat; asks how many companions are needed (none, one or two); and asks for no diagnosis and no upload.
 - Before sending, the form says who will read the application and that the box office will use it for the person's bookings.
 - Sending makes the application Submitted, emails the person a confirmation, and puts it in the reviewers' queue. A second application cannot be started while one is open.

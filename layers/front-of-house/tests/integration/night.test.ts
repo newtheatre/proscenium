@@ -75,6 +75,45 @@ describe('FH-21: check-in', () => {
   })
 })
 
+describe('FH-21: arriving once', () => {
+  it('counts a person as arrived when they record a time or tick a checklist item on their own shift', async () => {
+    const s = await onShift()
+    const c = await checklist()
+    setClock(s.callAt)
+    const path = `/api/front-of-house/performances/${s.p.id}/checklists/${c.id}`
+    expect((await req('PUT', `${path}/items/${c.items[0]!.id}`, { outcome: 'done' }, s.amy)).status).toBe(200)
+    expect(await rows('SELECT state, checked_in_at FROM front_of_house_assignments WHERE id = ?', s.a)).toEqual([{ state: 'checked_in', checked_in_at: s.callAt }])
+    expect(await rows('SELECT state FROM front_of_house_assignments WHERE id = ?', s.b)).toEqual([{ state: 'confirmed' }])
+    expect(await rows('SELECT detail FROM core_audit WHERE record_type = \'front-of-house.assignment\' AND record_id = ? AND action = \'state\'', s.a)).toEqual([{ detail: expect.stringContaining('"implied":true') }])
+    // A later tick keeps the first time, as a second check-in does.
+    setClock(s.callAt + 5 * MINUTE)
+    expect((await req('PUT', `${path}/items/${c.items[2]!.id}`, { outcome: 'done' }, s.amy)).status).toBe(200)
+    expect(await rows('SELECT checked_in_at FROM front_of_house_assignments WHERE id = ?', s.a)).toEqual([{ checked_in_at: s.callAt }])
+  })
+
+  it('checks in the person who records a time, and nobody who is not on tonight\'s rota', async () => {
+    const s = await onShift()
+    const lead = person(['front-of-house.shift.sign-up', 'front-of-house.shift.view', 'front-of-house.assignment.check-in'])
+    const l = (await req('POST', `/api/front-of-house/shifts/${s.id}/sign-up`, {}, lead)).body.assignmentId as string
+    setClock(s.callAt)
+    // The owner has no place tonight, so recording a time checks nobody in.
+    expect((await req('POST', `/api/front-of-house/performances/${s.p.id}/timings`, { kind: 'house_open' })).status).toBe(200)
+    expect(await rows('SELECT count(*) AS n FROM front_of_house_assignments WHERE shift_id = ? AND state = \'checked_in\'', s.id)).toEqual([{ n: 0 }])
+    expect((await req('POST', `/api/front-of-house/performances/${s.p.id}/timings`, { kind: 'curtain_up' }, lead)).status).toBe(200)
+    expect(await rows('SELECT state, checked_in_at FROM front_of_house_assignments WHERE id = ?', l)).toEqual([{ state: 'checked_in', checked_in_at: s.callAt }])
+  })
+
+  it('leaves someone marked as not coming alone, and does nothing before the window opens', async () => {
+    const s = await onShift()
+    const c = await checklist()
+    const path = `/api/front-of-house/performances/${s.p.id}/checklists/${c.id}`
+    setClock(s.callAt)
+    expect((await req('POST', `/api/front-of-house/assignments/${s.b}/not-coming`, {})).status).toBe(200)
+    await req('PUT', `${path}/items/${c.items[0]!.id}`, { outcome: 'done' }, s.ben)
+    expect(await rows('SELECT state, checked_in_at FROM front_of_house_assignments WHERE id = ?', s.b)).toEqual([{ state: 'no_show', checked_in_at: null }])
+  })
+})
+
 describe('FH-19: live mode', () => {
   it('lists today\'s performances for those who may see them, with what the viewer may do on the board', async () => {
     const s = await onShift()
@@ -181,6 +220,16 @@ describe('FH-24 and FH-25: checklists', () => {
     const listed = (await req('GET', '/api/front-of-house/checklists')).body.checklists.find((x: any) => x.id === c.id)
     expect(listed.items.map((i: any) => i.label)).toEqual(['Spare programmes', 'All fire exits clear', 'Toilets stocked'])
     expect((await req('POST', `/api/front-of-house/checklists/${c.id}/archive`, {})).status).toBe(200)
+    // An archived checklist is listed apart and comes back with its items.
+    const gone = (await req('GET', '/api/front-of-house/checklists')).body
+    expect(gone.checklists.some((x: any) => x.id === c.id)).toBe(false)
+    expect(gone.archived.find((x: any) => x.id === c.id).items).toHaveLength(3)
+    expect((await req('POST', `/api/front-of-house/checklists/${c.id}/restore`, {}, steward())).status).toBe(403)
+    expect((await req('POST', `/api/front-of-house/checklists/${c.id}/restore`, {})).status).toBe(200)
+    const back = (await req('GET', '/api/front-of-house/checklists')).body
+    expect(back.checklists.find((x: any) => x.id === c.id).items).toHaveLength(3)
+    expect(back.archived.some((x: any) => x.id === c.id)).toBe(false)
+    expect((await req('POST', `/api/front-of-house/checklists/${c.id}/restore`, {})).body.code).toBe('front-of-house.checklist-not-archived')
   })
 
   it('works through a run: entries, an exception with its reason, completion, and a late entry refused', async () => {

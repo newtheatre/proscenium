@@ -290,13 +290,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await context.close()
     })
 
-    test('the settings window: the cog opens the module\'s settings, each showing its default, who may change it and a quoted tag', async ({ page }) => {
+    test('the settings window: the cog opens the module\'s settings, each showing its default and a quoted tag, and says who may change one only to someone who may not', async ({ page }) => {
       await visit(page, '/console/gallery/list')
       await page.getByRole('link', { name: 'Gallery settings' }).click()
       await expect(page).toHaveURL(/settings=gallery/)
       await expect(page.getByRole('dialog').getByRole('heading', { name: 'Gallery settings' })).toBeVisible()
       await expect(page.getByText('Quoted on public pages')).toBeVisible()
-      await expect(page.getByText('Changed by people who can: Change the gallery\'s settings.').first()).toBeVisible()
+      await expect(page.getByText(/Changed by people who can/)).toHaveCount(0)
       await noViolations(page)
       const title = page.getByLabel('Show title', { exact: true })
       await title.fill('Macbeth')
@@ -480,14 +480,13 @@ test.describe('confirming it is you', () => {
 test.describe('the access scheme screens', () => {
   const reviewerActor = { ...person('Rhea Reviewer', [grant('core.access-scheme.review')]), assurance: 'strong', reassertedAt: Date.now() }
 
-  test('My account\'s access scheme page offers the scheme, with no accessibility violations', async ({ browser }) => {
+  test('My account\'s access scheme page opens on the form, with no accessibility violations', async ({ browser }) => {
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(audience) })
     const page = await context.newPage()
     await visit(page, '/account/access')
     await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
-    await noViolations(page)
-    await page.getByRole('link', { name: 'Apply' }).click()
-    await expect(page).toHaveURL(/\/account\/access\/apply$/)
+    await expect(page.getByRole('link', { name: 'Apply' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Send application' })).toBeVisible()
     // Needs are square ticks; the wheelchair question asks its follow-up only once ticked.
     await expect(page.getByRole('checkbox', { name: 'Steps and stairs' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toHaveCount(0)

@@ -8,6 +8,8 @@ export interface Viewer {
   membersName?: string
   sides: ('audience' | 'members' | 'console' | 'admin' | 'live')[]
   navigation: (NavItem & { shell: ShellName })[]
+  /** Something the person holds needs a stronger sign-in: two-step to set up, or their passkey to use. */
+  strongerSignIn?: 'set-up' | 'confirm'
 }
 
 const ANONYMOUS: Viewer = { signedIn: false, sides: ['audience'], navigation: [] }

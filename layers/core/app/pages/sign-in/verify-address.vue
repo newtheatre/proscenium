@@ -36,7 +36,7 @@ async function finish() {
     <UButton
       v-if="done || refusal"
       block
-      to="/account/email"
+      to="/account/details#email"
       color="neutral"
       variant="outline"
     >

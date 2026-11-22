@@ -56,6 +56,13 @@ describe('the sales report', () => {
     expect(seen.body.canExport).toBe(false)
   })
 
+  it('opens on the production whose performance is nearest to now when none is asked for', async () => {
+    const soon = await house(10, { startsAt: NOV_16 + 3_600_000 })
+    const seen = await req('GET', '/api/box-office/reports/sales', undefined, reader())
+    expect(seen.status, JSON.stringify(seen.body)).toBe(200)
+    expect(seen.body.report.production.id).toBe(soon.productionId)
+  })
+
   it('shows a production-scoped reader only that production', async () => {
     const scoped = person([], { grants: [{ ability: 'box-office.report.view', via: 'role', record: { type: 'core.production', id: other.productionId } }] })
     const seen = await req('GET', '/api/box-office/reports/sales', undefined, scoped)

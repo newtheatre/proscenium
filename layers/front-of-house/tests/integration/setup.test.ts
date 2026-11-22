@@ -5,7 +5,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { listTerms } from '#modules/core'
 import { setClock } from '#kit'
-import { deliver, env, inContext, rows } from '../../../../tests/integration/helpers'
+import { deliver, env, inContext, person, rows } from '../../../../tests/integration/helpers'
 import { duty, holds, notes, performance, ready, req, shift, shiftRow, volunteer, MINUTE, NOV_16 } from './stage'
 
 beforeAll(ready)
@@ -21,6 +21,38 @@ describe('FH-05: duties and rota templates', () => {
     expect((await req('GET', '/api/front-of-house/duties')).body.duties.some((x: any) => x.id === d)).toBe(false)
     const p = await performance()
     expect((await req('POST', `/api/front-of-house/performances/${p.id}/shifts`, { dutyId: d, places: 1 })).body.code).toBe('front-of-house.duty-archived')
+  })
+
+  it('lists archived duties apart and restores one, unless its name has been taken since', async () => {
+    const d = await duty('Usher')
+    const name = (await req('GET', '/api/front-of-house/duties')).body.duties.find((x: any) => x.id === d).name as string
+    await req('POST', `/api/front-of-house/duties/${d}/archive`, {})
+    const listed = (await req('GET', '/api/front-of-house/duties')).body
+    expect(listed.duties.some((x: any) => x.id === d)).toBe(false)
+    expect(listed.archived.find((x: any) => x.id === d)).toMatchObject({ name })
+    expect((await req('POST', `/api/front-of-house/duties/${d}/restore`, {}, person(['front-of-house.shift.view']))).status).toBe(403)
+    expect((await req('POST', `/api/front-of-house/duties/${d}/restore`, {})).status).toBe(200)
+    const after = (await req('GET', '/api/front-of-house/duties')).body
+    expect(after.duties.some((x: any) => x.id === d)).toBe(true)
+    expect(after.archived.some((x: any) => x.id === d)).toBe(false)
+    expect((await req('POST', `/api/front-of-house/duties/${d}/restore`, {})).body.code).toBe('front-of-house.duty-not-archived')
+    // A live duty has taken the name while this one was archived.
+    await req('POST', `/api/front-of-house/duties/${d}/archive`, {})
+    expect((await req('POST', '/api/front-of-house/duties', { name, callBeforeMinutes: 60, stayAfterMinutes: 30 })).status).toBe(200)
+    expect((await req('POST', `/api/front-of-house/duties/${d}/restore`, {})).body.code).toBe('front-of-house.duty-name-taken')
+  })
+
+  it('restores an archived rota template without making it the default again', async () => {
+    const d = await duty('Steward')
+    const made = (await req('POST', '/api/front-of-house/rota-templates', { name: `Matinee ${Math.random()}`.slice(0, 24), isDefault: true, lines: [{ dutyId: d, places: 2 }] })).body.templateId
+    await req('POST', `/api/front-of-house/rota-templates/${made}/archive`, {})
+    const listed = (await req('GET', '/api/front-of-house/rota-templates')).body
+    expect(listed.templates.some((t: any) => t.id === made)).toBe(false)
+    expect(listed.archived.find((t: any) => t.id === made)).toMatchObject({ isDefault: false, lines: [{ dutyId: d, places: 2 }] })
+    expect((await req('POST', `/api/front-of-house/rota-templates/${made}/restore`, {})).status).toBe(200)
+    const after = (await req('GET', '/api/front-of-house/rota-templates')).body
+    expect(after.templates.find((t: any) => t.id === made)).toMatchObject({ isDefault: false })
+    expect((await req('POST', `/api/front-of-house/rota-templates/${made}/restore`, {})).body.code).toBe('front-of-house.template-not-archived')
   })
 
   it('keeps one default template per venue', async () => {

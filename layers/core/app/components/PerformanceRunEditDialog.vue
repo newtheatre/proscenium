@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { HeldRefusal } from './ChangeHeld.vue'
+
 // Editing a whole run: its space, dates and start times, starting from the pattern it was made
 // from. Nothing changes until the person has seen what the new pattern adds, moves and removes
 // (drafts deleted, scheduled performances cancelled), with what those changes touch and any module
@@ -15,7 +17,7 @@ interface Change {
   remove: { performanceId: string, state: 'draft' | 'scheduled', startsAt: number }[]
   keep: number
   lines: string[]
-  refusal: { code: string, reason: string, link: string | null } | null
+  refusal: HeldRefusal | null
 }
 
 const props = defineProps<{ productionId: string, run: EditableRun | null, spaces: Space[] }>()
@@ -57,6 +59,9 @@ const blocked = computed(() => [
   ...(change.value?.add ?? []).filter(p => p.problem).map(p => ({ key: `add-${p.startsAt}`, at: p.startsAt, description: p.reason ?? undefined })),
   ...(change.value?.move ?? []).filter(m => m.problem).map(m => ({ key: m.performanceId, at: m.toStartsAt, description: `Stays at ${dates.dateTime(m.startsAt)}: ${m.reason}` })),
 ])
+// Held by something no answer here can settle.
+const stuck = computed(() => !!change.value?.refusal && !change.value.refusal.question)
+const heldAnswer = ref<string | undefined>(undefined)
 const nothing = computed(() => !!change.value && !adds.value.length && !moves.value.length && !change.value.remove.length)
 const counted = (n: number) => n === 1 ? '1 performance' : `${n} performances`
 
@@ -79,8 +84,18 @@ async function apply() {
   const run = props.run
   if (!run || !change.value || nothing.value) return
   refusal.value = null
+  // A module's question, such as what happens to the bookings, is answered before the run changes.
+  if (change.value.refusal?.question && !heldAnswer.value) {
+    refusal.value = { code: 'core.form.invalid', reason: `Choose an answer to "${change.value.refusal.question.label}" first.` } as ReturnType<typeof toRefusal>
+    return
+  }
   busy.value = true
   try {
+    if (change.value.refusal) {
+      const still = await settleChange(change.value.refusal, heldAnswer.value, async () => (await $api<Change>(`/api/core/productions/${props.productionId}/runs/${run.id}/plan` as string, { method: 'POST', body: body() })).refusal)
+      change.value.refusal = still
+      if (still) return
+    }
     const answer = await $api<object>(`/api/core/productions/${props.productionId}/runs/${run.id}/edit` as string, {
       method: 'POST',
       body: { ...body(), seen: { add: adds.value.length, move: moves.value.length, remove: change.value.remove.length } },
@@ -151,21 +166,10 @@ async function apply() {
           v-else
           class="space-y-4 text-sm"
         >
-          <UAlert
-            v-if="change.refusal"
-            color="error"
-            icon="i-lucide-circle-x"
-            :title="change.refusal.reason"
-          >
-            <template
-              v-if="change.refusal.link"
-              #description
-            >
-              <ULink :to="change.refusal.link">
-                See what is holding it
-              </ULink>
-            </template>
-          </UAlert>
+          <ChangeHeld
+            v-model:answer="heldAnswer"
+            :refusal="change.refusal"
+          />
           <p v-if="nothing">
             The new pattern changes nothing.
           </p>
@@ -251,12 +255,12 @@ async function apply() {
         <template v-else>
           <UButton
             label="Change the pattern"
-            :color="nothing || change.refusal ? undefined : 'neutral'"
-            :variant="nothing || change.refusal ? 'solid' : 'outline'"
+            :color="nothing || stuck ? undefined : 'neutral'"
+            :variant="nothing || stuck ? 'solid' : 'outline'"
             @click="change = null"
           />
           <UButton
-            v-if="!nothing && !change.refusal"
+            v-if="!nothing && !stuck"
             type="submit"
             form="performance-run-edit"
             label="Apply the changes"

@@ -13,10 +13,12 @@ import dutiesPost from '../../server/api/front-of-house/duties/index.post'
 import dutiesGet from '../../server/api/front-of-house/duties/index.get'
 import dutyPut from '../../server/api/front-of-house/duties/[id]/index.put'
 import dutyArchive from '../../server/api/front-of-house/duties/[id]/archive.post'
+import dutyRestore from '../../server/api/front-of-house/duties/[id]/restore.post'
 import templatesGet from '../../server/api/front-of-house/rota-templates/index.get'
 import templatesPost from '../../server/api/front-of-house/rota-templates/index.post'
 import templatePut from '../../server/api/front-of-house/rota-templates/[id]/index.put'
 import templateArchive from '../../server/api/front-of-house/rota-templates/[id]/archive.post'
+import templateRestore from '../../server/api/front-of-house/rota-templates/[id]/restore.post'
 import templateApply from '../../server/api/front-of-house/rota-templates/[id]/apply.post'
 import shiftsPost from '../../server/api/front-of-house/performances/[id]/shifts/index.post'
 import shiftsGet from '../../server/api/front-of-house/performances/[id]/shifts/index.get'
@@ -60,6 +62,7 @@ import checklistsGet from '../../server/api/front-of-house/checklists/index.get'
 import checklistsPost from '../../server/api/front-of-house/checklists/index.post'
 import checklistPut from '../../server/api/front-of-house/checklists/[id]/index.put'
 import checklistArchive from '../../server/api/front-of-house/checklists/[id]/archive.post'
+import checklistRestore from '../../server/api/front-of-house/checklists/[id]/restore.post'
 import cardsGet from '../../server/api/front-of-house/emergency-cards/index.get'
 import cardPut from '../../server/api/front-of-house/emergency-cards/[venueId].put'
 import incidentsPost from '../../server/api/front-of-house/incidents/index.post'
@@ -100,10 +103,12 @@ export const handle = server({
   'GET /api/front-of-house/duties': dutiesGet,
   'PUT /api/front-of-house/duties/:id': dutyPut,
   'POST /api/front-of-house/duties/:id/archive': dutyArchive,
+  'POST /api/front-of-house/duties/:id/restore': dutyRestore,
   'GET /api/front-of-house/rota-templates': templatesGet,
   'POST /api/front-of-house/rota-templates': templatesPost,
   'PUT /api/front-of-house/rota-templates/:id': templatePut,
   'POST /api/front-of-house/rota-templates/:id/archive': templateArchive,
+  'POST /api/front-of-house/rota-templates/:id/restore': templateRestore,
   'POST /api/front-of-house/rota-templates/:id/apply': templateApply,
   'POST /api/front-of-house/performances/:id/shifts': shiftsPost,
   'GET /api/front-of-house/performances/:id/shifts': shiftsGet,
@@ -147,6 +152,7 @@ export const handle = server({
   'POST /api/front-of-house/checklists': checklistsPost,
   'PUT /api/front-of-house/checklists/:id': checklistPut,
   'POST /api/front-of-house/checklists/:id/archive': checklistArchive,
+  'POST /api/front-of-house/checklists/:id/restore': checklistRestore,
   'GET /api/front-of-house/emergency-cards': cardsGet,
   'PUT /api/front-of-house/emergency-cards/:venueId': cardPut,
   'GET /api/front-of-house/performances/:id/report': reportGet,

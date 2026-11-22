@@ -43,7 +43,7 @@ Each frame is recognisable at a glance, which matters most for a person who uses
 - **Page header:** sidebar toggle, page title, the page's one primary action, search, help for this screen.
 - **Console home** is a work queue: things awaiting this person (refunds to approve, bookings to confirm, failed sends), then today's performances. Modules contribute the cards.
 - **Command palette** (Ctrl or Cmd K): go to any screen the viewer may open, find a person, an order or a production, run a common action.
-- **There is no System group.** Screens that run the installation are in site administration, below. The console keeps each module's own settings page at `/console/<module>/settings`, because hold times, prices and rotas are operational.
+- **There is no System group.** Screens that run the installation are in site administration, below. A module's own settings are the Settings tab of its page in Admin; console staff who may change them open that tab from the cog on the console page it governs, because hold times, prices and rotas are operational. No page of settings is made in the console (Matt, 21 November 2026).
 - On a phone the sidebar becomes a drawer and tables become stacked cards. Every console screen works on a phone; none is designed there first.
 
 ### Admin
@@ -91,7 +91,7 @@ There is no Settings entry and no page of "core settings": integration ruling R-
 
 **For now** (the format as built, kit PR 115, 17 November 2026). A setting may name a screen of its own only once that screen shows and saves it, so three things differ from the table until those screens do: Branding at `/admin/branding` is a generated settings page; the email footer, sending label and digest settings are on the Theatre page until the Senders screen draws them; and `core.retention.armed` is on Advanced until identity's Retention screen ships. The table above is the end state.
 
-Staying in the console: every module's own work and its settings page; two generated settings pages for core's console-side groups, Programme settings (in Programme's set-up half) and People settings (in People's); core's Programme screens, Files, message types, the template editor and the delivery log; identity's People group (accounts, adding and merging, who holds what, data requests and the access scheme). The old `/console/system/...` addresses redirect to their `/admin` ones. A theatre's own module may add an entry to one of these groups, or declare a group of its own placed `before` or `after` one.
+Staying in the console: every module's own work, with its settings in the window the cog opens; core's Programme screens, Files, message types, the template editor and the delivery log; identity's People group (accounts, adding and merging, who holds what, data requests and the access scheme). The old `/console/system/...` addresses redirect to their `/admin` ones. A theatre's own module may add an entry to one of these groups, or declare a group of its own placed `before` or `after` one.
 
 ### Live mode
 

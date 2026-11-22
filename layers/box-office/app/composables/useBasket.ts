@@ -17,10 +17,14 @@ export interface RememberedBasket {
 }
 
 const KEY = 'box-office:basket'
+/** Fired on the window when this tab's basket is remembered or forgotten, for the header's held-tickets link. */
+export const BASKET_CHANGED = 'box-office:basket-changed'
+const changed = () => window.dispatchEvent(new Event(BASKET_CHANGED))
 
 export function rememberBasket(basket: RememberedBasket): void {
   try {
     sessionStorage.setItem(KEY, JSON.stringify(basket))
+    changed()
   }
   catch {
     // Storage blocked: the next page says the basket was not found and offers to choose again.
@@ -41,6 +45,7 @@ export function recallBasket(): RememberedBasket | null {
 export function forgetBasket(): void {
   try {
     sessionStorage.removeItem(KEY)
+    changed()
   }
   catch {
     // Nothing to forget.

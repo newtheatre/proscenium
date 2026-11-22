@@ -51,7 +51,7 @@ async function finish() {
       color="neutral"
       variant="outline"
     >
-      {{ answer ? 'Go to Your data' : 'See the request in your account' }}
+      {{ answer ? 'Go to your account' : 'See the request in your account' }}
     </UButton>
     <template v-if="!answer && !refusal">
       <p class="text-sm text-muted">

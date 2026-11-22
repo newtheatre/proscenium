@@ -78,8 +78,8 @@ test('a panel votes in private, the chair releases the result and decides with a
   const share = page.getByRole('dialog', { name: 'Share' })
   await expect(share.getByLabel('Address')).toHaveValue(/\/forms\//)
   const address = new URL(await share.getByLabel('Address').inputValue()).pathname
-  await share.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
+  // Publishing for the first time shared it in the same step.
+  await expect(share.getByText('0 responses so far')).toBeVisible()
 
   // ---- a member sends a nomination, and the chair puts it to the panel ----
   const mine = await as(browser, member)

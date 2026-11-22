@@ -290,7 +290,7 @@ export const identityContributions = {
     { id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' },
   ],
   // What needs the person on My account's overview.
-  'core.account-notice': [{ id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' }],
+  'core.account-notice': [{ id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' }, { id: 'core.passkey-offer', file: 'passkey-offer' }],
   'core.account-section': [
     { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
   ],

@@ -10,6 +10,7 @@ import { call, inContext, person, rows, server, setModule } from '../../../../te
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import closePost from '../../server/api/bar/openings/[id]/close.post'
+import salesGet from '../../server/api/bar/sales/index.get'
 import standardListener from '../../server/listeners/standard-price-list'
 import { addCategory, addOutlet, addPriceList, addProduct } from '../../server/catalogue'
 
@@ -18,9 +19,13 @@ const handle = server({
   'POST /api/payments/till/sale': tillSalePost,
   'POST /api/payments/till/summary': tillSummaryPost,
   'POST /api/bar/openings/:id/close': closePost,
+  'GET /api/bar/sales': salesGet,
 })
 const seller = person(['payments.session.open', 'payments.attempt.attest', 'bar.sale.sell', 'bar.opening.manage'], { reassertedAt: NOW })
 const onlooker = person(['payments.session.open'])
+// Reads bar sales; one may also close an outlet, the other may not.
+const closer = person(['bar.sale.view', 'bar.opening.manage'], { reassertedAt: NOW })
+const reader = person(['bar.sale.view'], { reassertedAt: NOW })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
   return inContext(async () => {
@@ -121,6 +126,26 @@ describe('selling drinks in the till', () => {
     const next = await till(basket('after-1-xxxxxxx', [[stock.crisps, 1]], 120))
     expect(next.status, JSON.stringify(next.body)).toBe(200)
     expect((await sale('after-1-xxxxxxx'))!.opening_id).not.toBe(waiting!.opening_id)
+  })
+
+  it('lists openings beside the sales for someone who may close one, and the sales of one opening', async () => {
+    const get = async (path: string, actor: typeof closer) => {
+      const response = await call(handle, 'GET', path, { actor })
+      return { status: response.status, body: await response.json() as any }
+    }
+    const closed = (await sale('retry-1-xxxxxxx'))!.opening_id
+    const open = (await sale('after-1-xxxxxxx'))!.opening_id
+    const all = await get('/api/bar/sales', closer)
+    expect(all.status, JSON.stringify(all.body)).toBe(200)
+    // What is trading comes first, with what it has taken.
+    const mine = all.body.openings.filter((o: any) => o.outletId === stock.outlet)
+    expect(mine.map((o: any) => [o.id, o.state])).toEqual([[open, 'open'], [closed, 'closed']])
+    expect(mine[1]).toMatchObject({ sales: 1, unpaid: 0, waiting: 0 })
+
+    const one = await get(`/api/bar/sales?opening=${closed}`, closer)
+    expect(one.body.rows.map((r: any) => r.reference).sort()).toEqual([(await sale('paid-1-xxxxxxxx'))!.reference, (await sale('retry-1-xxxxxxx'))!.reference].sort())
+    // Someone who only reads sales is told nothing about openings.
+    expect((await get('/api/bar/sales', reader)).body.openings).toEqual([])
   })
 
   it('keeps lines unchangeable once a sale has left open', async () => {

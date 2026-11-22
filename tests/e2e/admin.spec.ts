@@ -295,8 +295,8 @@ test.describe('the Branding screen', () => {
     await expect(page.getByRole('button', { name: 'Upload a logo' })).toHaveCount(2)
     await expect(page.getByText('Brand revision')).toHaveCount(0)
     await expect(page.getByText('Set on the brand screen')).toHaveCount(0)
-    // Who may change the brand is said once, by the settings, and not again above the logos.
-    await expect(page.getByText('Changed by people who can: Change the brand.')).toHaveCount(1)
+    // Who may change the brand is said only to someone who may not.
+    await expect(page.getByText(/Changed by people who can/)).toHaveCount(0)
     await expect(page.getByRole('figure').filter({ hasText: 'Light' })).toBeVisible()
     await page.getByRole('combobox', { name: 'Corners' }).click()
     await page.getByRole('option', { name: 'Square' }).click()

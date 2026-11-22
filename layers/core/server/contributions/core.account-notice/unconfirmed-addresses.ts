@@ -1,5 +1,5 @@
 // An address the person added that does nothing until its link is used (ID-12): one notice each,
-// pointing at Email addresses, where the link can be sent again or the address removed.
+// pointing at Details, where the link can be sent again or the address removed.
 import { all } from '#kit'
 import type { AccountNoticeSource } from '../../points/account-notice'
 
@@ -14,7 +14,7 @@ export default {
       title: 'core.account.notices.unconfirmed.title',
       description: 'core.account.notices.unconfirmed.description',
       params: { address: r.address },
-      to: '/account/email',
+      to: '/account/details#email',
       action: 'core.account.notices.unconfirmed.action',
     }))
   },

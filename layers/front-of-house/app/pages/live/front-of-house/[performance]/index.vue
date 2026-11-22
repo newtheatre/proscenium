@@ -1,6 +1,6 @@
 <!-- The tonight board (Front of house specification, part 5, "Live mode"; FH-19 to FH-23): the
      performance, time to curtain and the next timing as one large button; then People, Checklists,
-     Figures and Incidents; at the foot, reporting an incident and the emergency card. Someone leading
+     and Figures; at the foot, reporting an incident and the emergency card. Someone leading
      also sees who is coming needing help, can correct a timing, and after curtain down "Extend
      tonight" and the night report. It reads again every half minute. -->
 <script setup lang="ts">
@@ -305,21 +305,6 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
                   v-if="people.missing"
                   class="text-warning"
                 >{{ t('front-of-house.live.not-arrived', { count: people.missing }) }}</span>
-              </span>
-            </UButton>
-            <UButton
-              v-if="d.openIncidents !== null"
-              to="/console/front-of-house/incidents"
-              icon="i-lucide-shield-alert"
-              color="neutral"
-              variant="outline"
-              size="xl"
-              block
-              class="min-h-24 justify-start"
-            >
-              <span class="flex flex-col text-start">
-                <span class="text-lg font-semibold">{{ t('front-of-house.live.incidents') }}</span>
-                <span>{{ t('front-of-house.live.open-incidents', { count: d.openIncidents }) }}</span>
               </span>
             </UButton>
             <UButton

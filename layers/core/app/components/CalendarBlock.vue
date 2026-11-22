@@ -1,5 +1,6 @@
 <!-- One block on the shared calendar: its colour, an edge that matches its state and the state in
-     words, so nothing rests on colour alone. A block with a record opens it. -->
+     words, so nothing rests on colour alone. The usual state's word is read out but not drawn, so
+     the ones that differ stand out. A block with a record opens it. -->
 <script setup lang="ts">
 import type { CalendarItem } from './CalendarBoard.vue'
 
@@ -26,7 +27,7 @@ const NuxtLink = resolveComponent('NuxtLink')
       class="block px-1.5 py-0.5 text-xs break-words"
     >
       <span class="font-medium">{{ item.startsAt === undefined ? '' : `${when.split('–')[0]} ` }}</span>{{ item.title }}
-      <span class="text-[0.6875rem] font-semibold uppercase"> · {{ item.state.label }}</span>
+      <span :class="item.state.usual ? 'sr-only' : 'text-[0.6875rem] font-semibold uppercase'"> · {{ item.state.label }}</span>
     </span>
     <span
       v-else
@@ -36,7 +37,7 @@ const NuxtLink = resolveComponent('NuxtLink')
         <span class="block font-medium">{{ item.title }}</span>
         <span class="block text-xs">{{ when }}{{ item.detail ? ` · ${item.detail}` : '' }}</span>
       </span>
-      <span class="text-xs font-semibold uppercase tracking-wide">{{ item.state.label }}</span>
+      <span :class="item.state.usual ? 'sr-only' : 'text-xs font-semibold uppercase tracking-wide'">{{ item.state.label }}</span>
     </span>
   </component>
 </template>

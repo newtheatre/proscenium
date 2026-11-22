@@ -1,5 +1,6 @@
 <!-- Front of house tonight (Front of house specification, part 5, "Live mode"): today's performances
-     this person may open, one large button each, then reporting an incident and the emergency cards. -->
+     this person may open, one large button each, then reporting an incident and the emergency cards.
+     With one performance tonight there is nothing to choose, so it opens that board straight away. -->
 <script setup lang="ts">
 interface Tonight {
   performances: { id: string, show: string, startsAt: number, venueId: string | null, venue: string | null, last: string | null, expected: number, arrived: number }[]
@@ -9,6 +10,8 @@ interface Tonight {
 const { t } = useT()
 const { time } = useDates()
 const { data, status, error, refresh } = await useAPI<Tonight>('/api/front-of-house/tonight', { key: 'front-of-house:tonight' })
+const only = data.value?.performances.length === 1 ? data.value.performances[0] : undefined
+if (only) await navigateTo(`/live/front-of-house/${encodeURIComponent(only.id)}`, { replace: true })
 // The cards are kept on the device from here, before anyone needs one in a hurry.
 const { fetchAhead } = useKeptCards()
 onMounted(() => { if (data.value?.cards.length) void fetchAhead() })
