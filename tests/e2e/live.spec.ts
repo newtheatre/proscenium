@@ -21,6 +21,8 @@ test.describe('someone who can work tonight', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Tonight' })).toBeVisible()
     await expect(page.locator('html')).toHaveClass(/dark/)
     await expect(page.getByRole('link', { name: 'Leave live mode' })).toBeVisible()
+    // Worded, not an arrow alone.
+    await expect(page.getByRole('link', { name: 'Leave live mode' })).toContainText('Leave')
     await noViolations(page)
   })
 

@@ -5,7 +5,8 @@
 // In the browser `$api` confirms it is you in place when the server asks (ID-28): a refusal of
 // "confirm it is you" opens the dialogue, and once the person confirms, the request is sent again,
 // once. A screen therefore needs nothing of its own to get this. The dialogue's own requests are
-// left alone, so a refusal there cannot open a second dialogue. On the server it is the request's
+// left alone, so a refusal there cannot open a second dialogue. A refusal that says two-step sign-in
+// is not set up cannot be confirmed: the dialogue says where to set it up, and nothing is sent again. On the server it is the request's
 // own fetch, which carries the visitor's cookies to the API.
 //
 // Every write sent from the browser carries an Idempotency-Key, made here when the screen gave none,
@@ -48,6 +49,13 @@ export default defineNuxtPlugin(() => {
       const e = error as { statusCode?: number, data?: { code?: string } | null }
       const code = e?.data?.code
       const path = typeof request === 'string' ? request : ''
+      // Two-step sign-in not set up: an act says so over the page and is not sent again. A load only
+      // shows the refusal where its data would be, with the same way to set it up.
+      if (e?.statusCode === 403 && code === TWO_STEP_NOT_SET_UP && !path.startsWith(OWN)) {
+        const method = String((options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()
+        if (method !== 'GET' && method !== 'HEAD') await confirmItsYou(TWO_STEP_NOT_SET_UP)
+        throw error
+      }
       if (e?.statusCode !== 403 || !code || !CONFIRM_REASONS.includes(code) || path.startsWith(OWN)) throw error
       if (!(await confirmItsYou(code as ConfirmReason))) throw error
       return send(request, options)

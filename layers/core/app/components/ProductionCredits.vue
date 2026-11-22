@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { watchDebounced } from '@vueuse/core'
 
 // A production's credits (C-09): who made the show, by section, each with a printed name and a role,
-// linked to a person's account or not. Credits move up and down within their section. A linked person
+// linked to a person's account or not. Credits are dragged into order within their section. A linked person
 // is told, and may change who sees their own credit from their account.
 type Visibility = 'public' | 'members' | 'hidden'
 interface Credit {
@@ -117,11 +118,47 @@ async function remove(credit: Credit) {
   await act(() => $api<{ id: string }>(`${base.value}/${credit.id}` as string, { method: 'DELETE', body: {} }), 'Credit removed')
 }
 
-async function move(section: { id: string, credits: Credit[] }, index: number, by: -1 | 1) {
+// A credit moves within its section: dragged by its handle, with the arrow keys on the handle, or
+// from its menu. The list is put in the new order at once and the saved order follows.
+type Grouped = { id: string, credits: Credit[] }
+const moved = ref('')
+async function place(section: Grouped, from: number, to: number) {
+  if (to < 0 || to >= section.credits.length || from === to) return
   const ids = section.credits.map(c => c.id)
-  const [moved] = ids.splice(index, 1)
-  ids.splice(index + by, 0, moved!)
-  await act(() => $api<{ id: string }>(`${base.value}/order` as string, { method: 'PUT', body: { sectionTermId: section.id, ids } }))
+  const [id] = ids.splice(from, 1)
+  ids.splice(to, 0, id!)
+  const credit = section.credits[from]!
+  if (data.value) {
+    const rest = data.value.credits.filter(c => c.sectionTermId !== section.id)
+    data.value = { ...data.value, credits: [...rest, ...ids.map(i => section.credits.find(c => c.id === i)!)] }
+  }
+  const ok = await act(() => $api<{ id: string }>(`${base.value}/order` as string, { method: 'PUT', body: { sectionTermId: section.id, ids } }))
+  if (ok) moved.value = `${credit.creditedName} is now ${to + 1} of ${ids.length}`
+  else await refresh()
+}
+async function onHandleKey(event: KeyboardEvent, section: Grouped, index: number) {
+  const by = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+  if (!by) return
+  event.preventDefault()
+  const id = section.credits[index]!.id
+  // The row is drawn again in its new place, and again when the saved order returns: keep the keyboard on its handle.
+  const keepFocus = () => document.querySelector<HTMLElement>(`[data-drag-handle="${id}"]`)?.focus()
+  const saving = place(section, index, index + by)
+  await nextTick()
+  keepFocus()
+  await saving
+  await nextTick()
+  keepFocus()
+}
+function actions(section: Grouped, c: Credit, i: number): DropdownMenuItem[][] {
+  return [
+    [{ label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => start(c) }],
+    [
+      { label: 'Move up', icon: 'i-lucide-arrow-up', disabled: i === 0, onSelect: () => { void place(section, i, i - 1) } },
+      { label: 'Move down', icon: 'i-lucide-arrow-down', disabled: i === section.credits.length - 1, onSelect: () => { void place(section, i, i + 1) } },
+    ],
+    [{ label: 'Remove', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => { void remove(c) } }],
+  ]
 }
 </script>
 
@@ -175,54 +212,51 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
           >
             {{ section.label }}
           </h3>
-          <RecordList :label="section.label">
-            <RecordListItem
+          <SortableList
+            :label="section.label"
+            @reorder="({ from, to }) => place(section, from, to)"
+          >
+            <SortableRow
               v-for="(c, i) in section.credits"
+              :id="c.id"
               :key="c.id"
+              :index="i"
               :icon="c.accountId ? 'i-lucide-user-round-check' : 'i-lucide-user-round'"
               :name="`${c.creditedName}, ${c.role}`"
               :description="c.accountId ? `Linked to ${c.accountLabel ?? 'an account'}` : 'Not linked to an account'"
             >
-              <div class="flex flex-wrap items-center justify-end gap-1">
-                <StatusBadge
-                  v-if="c.visibility !== 'public'"
-                  :tone="TONES[c.visibility]"
-                  :label="visibilityLabel(c.visibility)"
-                />
+              <template #leading>
                 <IconButton
+                  v-if="section.credits.length > 1"
+                  :data-drag-handle="c.id"
+                  icon="i-lucide-grip-vertical"
                   size="sm"
-                  icon="i-lucide-arrow-up"
-                  :label="`Move ${c.creditedName} up`"
-                  :disabled="i === 0"
-                  @click="move(section, i, -1)"
+                  class="cursor-grab touch-none"
+                  :label="`Drag to move ${c.creditedName}`"
+                  aria-describedby="credits-order-help"
+                  @keydown="onHandleKey($event, section, i)"
                 />
-                <IconButton
-                  size="sm"
-                  icon="i-lucide-arrow-down"
-                  :label="`Move ${c.creditedName} down`"
-                  :disabled="i === section.credits.length - 1"
-                  @click="move(section, i, 1)"
-                />
-                <UButton
-                  size="sm"
-                  color="neutral"
-                  variant="ghost"
-                  label="Edit"
-                  :aria-label="`Edit ${c.creditedName}`"
-                  @click="start(c)"
-                />
-                <IconButton
-                  size="sm"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  :label="`Remove ${c.creditedName}`"
-                  @click="remove(c)"
-                />
-              </div>
-            </RecordListItem>
-          </RecordList>
+              </template>
+              <StatusBadge
+                v-if="c.visibility !== 'public'"
+                :tone="TONES[c.visibility]"
+                :label="visibilityLabel(c.visibility)"
+              />
+              <RowActions
+                :items="actions(section, c, i)"
+                :label="`Actions for ${c.creditedName}`"
+              />
+            </SortableRow>
+          </SortableList>
         </section>
+        <span
+          id="credits-order-help"
+          class="sr-only"
+        >Press the up or down arrow to move this credit, or drag it.</span>
+        <span
+          class="sr-only"
+          aria-live="polite"
+        >{{ moved }}</span>
       </div>
     </DataBoundary>
 

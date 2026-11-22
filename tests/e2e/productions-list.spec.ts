@@ -1,5 +1,6 @@
-// The productions list and "New production": the list says when each production is on and where,
-// and a new production starts in the season on now (or the next to come), and says it was created.
+// The productions list and "New production": the list opens on what is coming up and says when each
+// production is on and where, and a new production starts in the season on now (or the next to come),
+// and says it was created.
 import { test, expect, type Page } from '@playwright/test'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -13,6 +14,8 @@ test.beforeAll(async ({ playwright }) => {
   seasonName = `Season now ${RUN}`
   const year = new Date().getFullYear()
   await api.post('/api/core/seasons', { data: { name: seasonName, startsOn: `${year - 1}-01-01`, endsOn: `${year + 1}-12-31` } })
+  // A draft with no dates yet is still to come, so the first view is never empty.
+  await api.post('/api/core/productions', { data: { title: `Listed Play ${RUN}`, kind: 'own' } })
   await api.dispose()
 })
 test.use(as(producer))
@@ -24,7 +27,15 @@ async function visit(page: Page, url: string) {
 
 test('the list shows dates, the next performance and the space, and a new production starts in a season', async ({ page }) => {
   await visit(page, '/console/programme/productions')
+  await expect(page.getByRole('tab', { name: 'Coming up' })).toHaveAttribute('aria-selected', 'true')
+  for (const view of ['Drafts', 'Past', 'All']) await expect(page.getByRole('tab', { name: view })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sort: Dates, Soonest first' })).toBeVisible()
+  // The view's own narrowing is not a filter the person set.
+  await expect(page.getByRole('button', { name: /Remove the filter/ })).toHaveCount(0)
   for (const heading of ['Dates', 'Next performance', 'Space', 'State']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+  await page.getByRole('tab', { name: 'Drafts' }).click()
+  await expect(page).toHaveURL(/view=drafts/)
+  await page.getByRole('tab', { name: 'Coming up' }).click()
 
   await page.getByRole('button', { name: 'New production' }).click()
   const panel = page.getByRole('dialog', { name: 'New production' })

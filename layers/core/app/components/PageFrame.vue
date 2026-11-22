@@ -189,6 +189,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
         >
           {{ description }}
         </p>
+        <StrongerSignInNotice />
         <slot />
       </div>
     </template>

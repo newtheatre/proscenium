@@ -36,6 +36,7 @@ import createSeason from '../../server/api/core/seasons/index.post'
 import { guidanceFor } from '../../server/programme/guidance'
 import { completeEnded } from '../../server/programme/performances'
 import { latecomersFor } from '../../server/programme/latecomers'
+import { nextPerformance } from '../../server/interface/tonight'
 import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
@@ -117,6 +118,22 @@ afterEach(async () => {
     env.DB.prepare('DELETE FROM core_closures'),
     env.DB.prepare("DELETE FROM core_settings WHERE key = 'core.locale.time-zone'"),
   ])
+})
+
+describe('the Tonight hub on a dark day', () => {
+  it('names the next scheduled performance after today, never a draft or a cancelled one', async () => {
+    const s = await stage()
+    const day = 24 * 60 * 60 * 1000
+    const soon = new Date(Date.now() + 3 * day).toISOString().slice(0, 10)
+    const sooner = new Date(Date.now() + 2 * day).toISOString().slice(0, 10)
+    const draft = await add(s, `${sooner}T19:30`)
+    const next = await add(s, `${soon}T19:30`, { label: 'Opening night' })
+    expect((await req('POST', `/api/core/performances/${next}/schedule`, {})).status).toBe(200)
+    const found = await inContext(() => nextPerformance())
+    expect(found).toMatchObject({ id: next, title: expect.stringMatching(/^Performed/), label: 'Opening night', venue: expect.stringMatching(/^Performance venue/) })
+    expect(found!.id).not.toBe(draft)
+    expect(found!.startsAt).toBeGreaterThan(Date.now())
+  })
 })
 
 describe('latecomers', () => {

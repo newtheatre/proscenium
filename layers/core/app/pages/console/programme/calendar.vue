@@ -88,7 +88,7 @@ function colourOf(id: string): CalendarItem['colour'] {
 }
 const STATES = {
   draft: { label: 'Draft', edge: 'dashed' },
-  scheduled: { label: 'Scheduled', edge: 'solid' },
+  scheduled: { label: 'Scheduled', edge: 'solid', usual: true },
   cancelled: { label: 'Cancelled', edge: 'dotted' },
   completed: { label: 'Completed', edge: 'solid' },
 } as const

@@ -61,8 +61,8 @@ contributes: {
   account entry with none). `match` widens the addresses an entry covers.
 - Every page of settings gets an entry without declaring one (see "Pages of settings" in the kit
   README). A module's own page of settings is the Settings tab of its page in Admin
-  (`/admin/modules/<module>`), so a module that is off takes its settings with it. A page placed in
-  the console sits in the set-up half of the module's own group. A declared page's entry sits in
+  (`/admin/modules/<module>`), so a module that is off takes its settings with it. No page of settings
+  is made in the console: staff there open the tab from the cog. A declared page's entry sits in
   the group its `settingPages` entry names. The entry is open to anyone who may change one of its
   settings.
 - **A module's page in Admin.** Any admin entry at or below `/admin/modules/<module>` is a tab of
@@ -153,7 +153,7 @@ with the name when the description runs to several lines. A RecordList that fill
 row of figures on a record's summary and on a screen's totals; its columns follow the width of what
 holds it, and a long value takes two columns. **FieldGroup** (`title`, `description`, `first`) is a
 titled group of fields inside one form or card: a real heading, with a rule above every group but the
-first. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
+first, and an `actions` slot beside the heading. **FilterPanel** (`count`, `v-model:open`, `clear`) is the Filters button for a screen that is not
 a PageList: a popover on a laptop, a drawer on a phone, ending in "Clear all" and "Done", with the
 screen's own fields in its slot. **TabStrip** wraps a row of tabs that scrolls sideways and fades the
 edge that has more. **EmptyState** takes one `action` (`label`, `to` or `onClick`, `icon`) for the usual
@@ -210,6 +210,18 @@ seconds: `undo` does the reverse act (move a record back to the state it was in,
 values back, delete what was just added, add again what was just deleted), then the toast says
 Undone, or why it could not be. Use it in place of a plain success toast wherever the reverse act
 exists; Seasons is the worked example. Browser `alert`, `confirm` and `prompt` are a lint error.
+
+**A sign-in that is not strong enough.** An ability that needs a strong sign-in refuses a basic one
+with one of two codes, both 403: `core.access.needs-strong-sign-in` when the account has a passkey
+(or an accepted authenticator app) that was not used, and `core.access.two-step-not-set-up` when it
+has neither. `$api` confirms the first in place and sends the request again. The second cannot be
+confirmed: an act opens a dialogue that says "This needs two-step sign-in" with "Set it up", and
+`RefusalNotice`, `RefusalPanel` and `DataBoundary` show the same link (`refusalAction(refusal)`, to
+Sign-in in My account), so a screen needs nothing of its own. A route that makes its own check with
+`can()` and refuses `core.access.denied` is answered with the sign-in refusal when that was what
+stood in the way, so do not word "no permission" yourself for it. In the console and Admin
+`StrongerSignInNotice` (drawn by PageFrame) tells someone in this position before they try, from the
+viewer's `strongerSignIn` (`set-up` or `confirm`); `/api/core/me` carries the same field.
 
 A short list that needs a search only now and then takes `SearchToggle` beside its primary action:
 an icon that opens into a search box. Bind its `v-model:open` and, while it is open, give the
@@ -389,7 +401,9 @@ Four rules:
 - **Place by operating day.** Give each item the operating day the server worked out, so a show at
   00:30 sits with the evening before and is drawn once.
 - **State three ways.** Each block shows its state as a word, an edge (solid, dashed, dotted or
-  double) and a colour, so nothing rests on colour alone.
+  double) and a colour, so nothing rests on colour alone. The state most blocks are in is marked
+  `usual` (a scheduled performance): its word is still read out but is not drawn, so a Draft or a
+  Cancelled block stands out (Matt, 21 November 2026).
 - **Name a calendar colour, never a value.** `calendar-1` to `calendar-8` are set in `main.css`,
   apart from the brand and the status colours, with a fill, text and edge for light and dark.
 - **The list is the equal route.** The List view holds the same items. It is the one shown at phone
@@ -471,16 +485,17 @@ a layout, not a shell, and it has no navigation of its own.
   figures modules give for it through `core.tonight-figure` (`label`, `ability`, `order`,
   `read(performanceId)` → `{ value, state, unit?, to? }`; a currency `unit` makes the value money in
   minor units): Box office gives sold, not yet paid, in, still to come and seats left, Payments
-  what the tills have taken. The hub reads them again every 30 seconds while open. The screens'
-  tiles follow. Someone whose only work is in live mode who opens the console is sent here.
+  what the tills have taken. The hub reads them again every 30 seconds while open. On a day with
+  no performance the route also answers `next` (the first scheduled performance after today) and the
+  hub says "Next: The Lighthouse Keeper, Sun 22 Nov, 19:30, Main house". The screens' tiles follow. Someone whose only work is in live mode who opens the console is sent here.
 - **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
   the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
   pixels) square.
 - **PageLive** is the page type: `title` and `context` (both already translated, for example the
   screen and the performance), an optional `back` address, the task in the default slot and a sticky
   `footer` slot. Its status strip shows the title, the context, whether the device is online and the
-  way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
-  or My account.
+  way out: an arrow back to the Tonight hub from a screen, and on the hub a worded "Leave" button
+  (named "Leave live mode") back to the console, members' area or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment. A panel
   may give a short `tab` label, an `icon` and a larger `livePanel` component for it. The sale is
@@ -654,7 +669,9 @@ the console a worded back link sits above the title. A link to a list returns th
 On a phone a page with a trail shows its title on a line of its own under the bar, as a record does,
 so the back button and the page's actions never squeeze it. `PageForm` takes `trail` too, for a form
 that is a page. In a sidebar only one entry is current: the one whose address covers the page most
-closely (`resolveEntry`), so Merges is not Accounts as well.
+closely (`resolveEntry`), so Who holds what is not Accounts as well. An entry marked `unlisted` keeps
+its address and its ability but is not drawn in the menu: its page is reached from another page (Merges,
+from Accounts) and by search, and the menu shows the listed entry above it as current.
 
 `PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
 `searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`

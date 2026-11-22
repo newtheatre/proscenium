@@ -2,7 +2,7 @@
 // day, so a show that runs past midnight stays until the day rolls over (core.locale.day-start), each
 // with the figures other modules give for it (core.tonight-figure) that this person may see, and
 // when latecomers are let in, which everyone working it should know.
-import { all, can, nowMs, usePoint, type Actor } from '#kit'
+import { all, can, first, nowMs, usePoint, type Actor } from '#kit'
 import { operatingDayOf } from '../calendar'
 import type { TonightFigure } from '../points/tonight-figure'
 import { latecomersFor, type LatecomerRule } from '../programme/latecomers'
@@ -35,6 +35,17 @@ export interface TonightPerformance {
   /** When latecomers are let in, for everyone working it. */
   latecomers: LatecomerRule
   figures: ({ id: string, label: string } & Answer)[]
+}
+
+export interface NextPerformance { id: string, title: string, label: string | null, startsAt: number, venue: string }
+
+/** The first scheduled performance after today's operating day: what a dark day's hub names. */
+export async function nextPerformance(): Promise<NextPerformance | null> {
+  const day = await operatingDayOf(nowMs())
+  const row = await first<{ id: string, title: string, label: string | null, starts_at: number, venue: string }>(
+    `SELECT f.id, p.title, f.label, f.starts_at, v.name AS venue FROM core_performances f JOIN core_productions p ON p.id = f.production_id
+      JOIN core_venues v ON v.id = f.venue_id WHERE f.state = 'scheduled' AND f.operating_day > ? ORDER BY f.starts_at, f.id LIMIT 1`, day)
+  return row ? { id: row.id, title: row.title, label: row.label, startsAt: row.starts_at, venue: row.venue } : null
 }
 
 /** Today's performances (by the operating day) and the figures this person may see on each. */
