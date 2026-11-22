@@ -254,6 +254,8 @@ function clearAll() {
   const kept = JSON.stringify({ inputs: Object.fromEntries(panels.value.map(p => [p.id, inputs[p.id] ?? null])), codes: pricing.codes, staff: pricing.staff })
   emptyPanels()
   added.value = null
+  // The sheet would cover the toast that offers Undo.
+  sheet.value = false
   offer(t('payments.screens.till.cleared'), () => {
     if (sale.value) return
     const was = JSON.parse(kept) as { inputs: Record<string, unknown>, codes: string[], staff: typeof pricing.staff }

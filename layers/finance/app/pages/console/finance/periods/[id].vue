@@ -23,7 +23,6 @@ const moved = computed(() => (data.value?.movement ?? []).filter(m => m.currency
 const bars = computed(() => moved.value.map(m => ({ account: m.name, income: m.kind === 'income' ? m.amountMinor : 0, expense: m.kind === 'expense' ? m.amountMinor : 0 })))
 // Money taken in the period that is not income yet, in the theatre's own currency.
 const held = computed(() => (data.value?.held ?? []).filter(h => h.currency === currency.value))
-const heldTotal = computed(() => held.value.reduce((sum, h) => sum + h.amountMinor, 0))
 // A period still running is early, not blocked.
 const running = computed(() => !!data.value && !data.value.period.closed && data.value.ended === false)
 const total = (kind: Movement['kind']) => moved.value.filter(m => m.kind === kind).reduce((sum, m) => sum + m.amountMinor, 0)
@@ -132,7 +131,6 @@ async function reopen() {
               { label: t('finance.screens.period.dates'), value: t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }), strong: false },
               { label: t('finance.screens.period.income'), value: money(total('income')) },
               { label: t('finance.screens.period.expenses'), value: money(total('expense')) },
-              ...(heldTotal ? [{ label: t('finance.screens.period.held'), value: money(heldTotal) }] : []),
             ]"
           />
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
