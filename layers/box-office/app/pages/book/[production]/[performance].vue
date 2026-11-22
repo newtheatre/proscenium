@@ -1,6 +1,6 @@
-<!-- Choose tickets for one performance, as a page of its own (BoxOfficeChooseTickets): what a link
-     from outside, a page with scripts off, and signing in in the middle of booking come back to. The
-     show's own page opens the same step in a drawer. -->
+<!-- Booking one performance on a page of its own (BoxOfficeBookingSteps): what a link from outside
+     and signing in in the middle of booking come back to. Both steps happen here; the show's own
+     page opens the same steps in a drawer. -->
 <script setup lang="ts">
 const { t } = useT()
 const { dateTime } = useDates()
@@ -25,8 +25,9 @@ useSeoMeta({ title: () => t('box-office.book.title', { title: data.value?.produc
         :description="t('box-office.book.when', { when: dateTime(data.performance.startsAt), venue: data.performance.venue })"
       />
       <UPageBody>
-        <BoxOfficeChooseTickets
+        <BoxOfficeBookingSteps
           :performance-id="performanceId"
+          headed
           class="max-w-2xl"
         />
       </UPageBody>

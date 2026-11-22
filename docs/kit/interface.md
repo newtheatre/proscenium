@@ -543,6 +543,15 @@ A theatre restyles the band with CSS rather than copying the component. The hook
 `public-show-book` on the show's page, and `public-spotlight`, `public-spotlight-poster`,
 `public-spotlight-title` and `public-spotlight-book` on what's on.
 
+## The public header's extra items
+
+A module may put something of its own in the public header beside the account menu, such as box
+office's "Tickets held 8:41" while a basket is held. It names a global component from a plugin:
+`usePublicHeaderItems().value = [...usePublicHeaderItems().value, 'BoxOfficeHeldTickets']`.
+`layouts/default.vue` draws each name it can resolve and leaves out the rest. The component draws
+nothing when it has nothing to say. On a phone, while such an item shows a link, it takes the place of
+the signed-out Sign in icon, which the menu repeats.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the

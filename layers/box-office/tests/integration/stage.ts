@@ -30,6 +30,7 @@ import payPost from '../../server/api/box-office/baskets/[id]/pay.post'
 import checkPost from '../../server/api/box-office/baskets/[id]/check.post'
 import basketReleasePost from '../../server/api/box-office/baskets/[id]/release.post'
 import confirmPost from '../../server/api/box-office/reservations/confirm.post'
+import confirmGet from '../../server/api/box-office/reservations/confirm.get'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
@@ -130,6 +131,7 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/check': checkPost,
   'POST /api/box-office/baskets/:id/release': basketReleasePost,
   'POST /api/box-office/reservations/confirm': confirmPost,
+  'GET /api/box-office/reservations/confirm': confirmGet,
   'GET /api/box-office/orders/link': orderLinkGet,
   'GET /api/box-office/orders': ordersGet,
   'GET /api/box-office/performances': performancesGet,
