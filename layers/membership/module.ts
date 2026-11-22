@@ -150,8 +150,7 @@ export default defineModule({
     ],
     'core.navigation': [
       { id: 'membership.schemes', menu: 'admin', group: 'modules', to: '/admin/modules/membership/schemes', match: '/admin/modules/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
-      { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
-      { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5, count: 'membership.applications-waiting' },
+      { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1, count: 'membership.applications-waiting' },
       { id: 'membership.lists', menu: 'admin', group: 'modules', to: '/admin/modules/membership/lists', match: '/admin/modules/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35, forNonMembers: true },
     ],
@@ -235,7 +234,7 @@ export default defineModule({
       { id: 'membership.first-scheme', required: true, to: '/admin/modules/membership/schemes', order: 40 },
       { id: 'membership.verification-list', required: false, to: '/admin/modules/membership/lists', order: 41 },
     ],
-    // Applications waiting on staff: beside the Applications entry, and as a card on the console home.
+    // Applications waiting on staff: beside the Members entry, and as a card on the console home.
     'core.count': [{ id: 'membership.applications-waiting', file: 'applications-waiting' }, { id: 'membership.cards-held', file: 'cards-held' }],
     // Current members and joins by month, on the console home's grid.
     'core.home-figure': [{ id: 'membership.members', file: 'members' }],

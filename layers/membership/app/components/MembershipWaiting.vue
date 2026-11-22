@@ -1,17 +1,19 @@
-<!-- Applications waiting to be checked (tab 5, "Applications"; V2, V3): each with who applied, for
-     which scheme and why it waits, and Pass and Decline. The server refuses a person checking
-     their own, or without membership.membership.verify. -->
+<!-- Applications waiting on staff, above the members (tab 5, "Members"; V2, V3, AP2): who applied,
+     for which scheme and what it waits for. A check is passed or declined here; approval is
+     decided on the application form's response, which its row opens. Nothing is drawn when
+     nothing waits. -->
 <script setup lang="ts">
-import { addDays } from '../../../../../shared/dates'
+import { addDays } from '../../shared/dates'
 
-interface Application { id: string, accountId: string, accountName: string | null, schemeId: string, schemeName: string, appliedAt: number, reason: string | null, reference: string | null, listName: string | null, claimedBy: { membershipId: string, name: string | null } | null, startsNow: boolean, endsOn: string | null }
+interface Application { id: string, accountId: string, accountName: string | null, schemeId: string, schemeName: string, appliedAt: number, reason: string | null, reference: string | null, listName: string | null, claimedBy: { membershipId: string, name: string | null } | null, startsNow: boolean, endsOn: string | null, waitsFor: 'check' | 'approval', responseTo: string | null }
 
+const emit = defineEmits<{ decided: [] }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { day } = useDates()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ today: string, applications: Application[] }>('/api/membership/applications', { key: 'membership:applications' })
+const { data, refresh } = await useAPI<{ today: string, applications: Application[] }>('/api/membership/applications', { key: 'membership:applications' })
 
 const deciding = ref<{ application: Application, outcome: 'pass' | 'decline' } | null>(null)
 const note = ref('')
@@ -36,8 +38,9 @@ async function decide() {
     await $api(`/api/membership/applications/${application.id}/decide` as string, { method: 'POST', body: { outcome, note: note.value.trim() || null, ...(outcome === 'pass' && application.reason === 'not-on-list' ? { addToList: addToList.value } : {}), ...(settingEnd.value && endsOn.value && endsOn.value !== application.endsOn ? { endsOn: endsOn.value } : {}) } })
     toast.add({ title: t(`membership.screens.applications.done-${outcome}`, { name: application.accountName ?? '' }), color: 'success' })
     deciding.value = null
-    // The sidebar's count and the home card follow the decision.
+    // The sidebar's count, the home card and the members below follow the decision.
     await Promise.all([refresh(), refreshNuxtData(['core:navigation:console', 'core:home:console'])])
+    emit('decided')
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -48,62 +51,71 @@ const describe = (a: Application) => [
   a.schemeName,
   t('membership.screens.applications.applied', { date: day(new Date(a.appliedAt).toISOString().slice(0, 10)) }), // not-policy: the length of a date
 ].join(' · ')
-const waitsFor = (a: Application) => [
-  t(`membership.screens.applications.reasons.${a.reason ?? 'staff-check'}`),
-  ...(a.reason === 'not-on-list' && a.reference ? [t('membership.screens.applications.reference', { reference: a.reference })] : []),
-  ...(a.listName ? [t('membership.screens.applications.list-name', { name: a.listName })] : []),
-  ...(a.claimedBy ? [t('membership.screens.applications.claimed-by', { name: a.claimedBy.name ?? t('membership.screens.applications.no-name') })] : []),
-].join(' · ')
+const waitsFor = (a: Application) => a.waitsFor === 'approval'
+  ? t('membership.screens.applications.reasons.approval')
+  : [
+      t(`membership.screens.applications.reasons.${a.reason ?? 'staff-check'}`),
+      ...(a.reason === 'not-on-list' && a.reference ? [t('membership.screens.applications.reference', { reference: a.reference })] : []),
+      ...(a.listName ? [t('membership.screens.applications.list-name', { name: a.listName })] : []),
+      ...(a.claimedBy ? [t('membership.screens.applications.claimed-by', { name: a.claimedBy.name ?? t('membership.screens.applications.no-name') })] : []),
+    ].join(' · ')
+// A long queue shows its oldest few; the rest fold away so the members stay in reach.
+const FIRST = 5 // not-policy: how many rows show before the fold
+const more = ref(false)
+const shown = computed(() => more.value ? data.value?.applications ?? [] : (data.value?.applications ?? []).slice(0, FIRST))
 </script>
 
 <template>
-  <PageFrame
-    :title="t('membership.navigation.applications.label')"
+  <PageSection
+    v-if="data?.applications.length"
+    id="waiting"
+    :title="t('membership.screens.applications.title', { count: data.applications.length })"
     :description="t('membership.screens.applications.help')"
   >
-    <DataBoundary
-      :data="data"
-      :status="status"
-      :error="error"
-      @retry="refresh()"
-    >
-      <EmptyState
-        v-if="!data?.applications.length"
-        icon="i-lucide-inbox"
-        :title="t('membership.screens.applications.empty')"
-        :description="t('membership.screens.applications.empty-help')"
-      />
-      <RecordList
-        v-else
-        :label="t('membership.navigation.applications.label')"
+    <RecordList :label="t('membership.screens.applications.title', { count: data.applications.length })">
+      <RecordListItem
+        v-for="a in shown"
+        :key="a.id"
+        :name="a.accountName ?? t('membership.screens.applications.no-name')"
       >
-        <RecordListItem
-          v-for="a in data.applications"
-          :key="a.id"
-          :name="a.accountName ?? t('membership.screens.applications.no-name')"
+        <template #description>
+          <span class="block">{{ describe(a) }}</span>
+          <span class="block text-default">{{ waitsFor(a) }}</span>
+        </template>
+        <div
+          v-if="a.waitsFor === 'check'"
+          class="flex gap-2"
         >
-          <template #description>
-            <span class="block">{{ describe(a) }}</span>
-            <span class="block text-default">{{ waitsFor(a) }}</span>
-          </template>
-          <div class="flex gap-2">
-            <UButton
-              size="sm"
-              :label="t('membership.screens.applications.pass')"
-              @click="open(a, 'pass')"
-            />
-            <UButton
-              size="sm"
-              color="neutral"
-              variant="outline"
-              :label="t('membership.screens.applications.decline')"
-              @click="open(a, 'decline')"
-            />
-          </div>
-        </RecordListItem>
-      </RecordList>
-    </DataBoundary>
-
+          <UButton
+            size="sm"
+            :label="t('membership.screens.applications.pass')"
+            @click="open(a, 'pass')"
+          />
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="outline"
+            :label="t('membership.screens.applications.decline')"
+            @click="open(a, 'decline')"
+          />
+        </div>
+        <UButton
+          v-else-if="a.responseTo"
+          size="sm"
+          color="neutral"
+          variant="outline"
+          :to="a.responseTo"
+          :label="t('membership.screens.applications.read')"
+        />
+      </RecordListItem>
+    </RecordList>
+    <UButton
+      v-if="!more && data.applications.length > FIRST"
+      color="neutral"
+      variant="link"
+      :label="t('membership.screens.applications.more', { count: data.applications.length })"
+      @click="more = true"
+    />
     <UModal
       :open="!!deciding"
       :title="deciding ? t(`membership.screens.applications.title-${deciding.outcome}`, { name: deciding.application.accountName ?? '', scheme: deciding.application.schemeName }) : ''"
@@ -170,5 +182,5 @@ const waitsFor = (a: Application) => [
         />
       </template>
     </UModal>
-  </PageFrame>
+  </PageSection>
 </template>

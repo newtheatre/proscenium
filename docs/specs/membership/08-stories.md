@@ -59,7 +59,7 @@ The gate (MEM-01, 06, 07, 08, 11, 18, 24, 35) needs only Foundations, Identity a
 
 | Id | Story | Done when | Release |
 | --- | --- | --- | --- |
-| MEM-18 | As a membership officer I pass or decline applications waiting to be checked | The Applications list shows what each waits for; Pass and Decline take a note and are audited; my own application is never in my queue | First, gate |
+| MEM-18 | As a membership officer I pass or decline applications waiting to be checked | The waiting section of Members shows what each waits for; Pass and Decline take a note and are audited; my own application is never in my queue | First, gate |
 | MEM-19 | As a student I am verified by my university address | A verified address at a listed domain passes at once; without one I am told to add it, and verifying it completes the check without my returning (the listener on `core.account-email.verified`) | First |
 | MEM-20 | As a membership officer I upload the students' union's list and members are verified against it | A file of up to three columns (address or reference, end date, name) loads with the first column as hashes; importing again keeps the id of every entry whose reference is unchanged; the file is deleted; a verified address on the list passes; no screen or route shows the list | First |
 | MEM-21 | As a theatre whose members are identified by a number from another body, each number is claimed by one account | A typed reference matching an unclaimed entry passes and claims it; a claim from a second account goes to staff with the reason | First |

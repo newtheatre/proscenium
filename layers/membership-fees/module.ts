@@ -70,15 +70,12 @@ export default defineModule({
     'payments.settlement': [{ id: 'membership-fees' }],
     // Its panel in the till: an application waiting for its fee, paid alone or with tickets (P8).
     'payments.desk-basket': [{ id: 'membership-fees' }],
-    // Setting up fees (MEM-45): a price for each scheme that requires payment.
-    'core.setup-step': [{ id: 'membership-fees.prices', required: false, to: '/admin/modules/membership-fees/prices', order: 42 }],
+    // Setting up fees (MEM-45): a price for each scheme that requires payment, set on the scheme's page.
+    'core.setup-step': [{ id: 'membership-fees.prices', required: false, to: '/admin/modules/membership/schemes', order: 42 }],
     'core.record-resolver': [{ id: 'membership-fees.charge', file: 'charge' }, { id: 'membership-fees.price', file: 'price' }],
     // Expected to find none: a fee paid with no income in the ledger (tab 4).
     'core.health-check': [{ id: 'membership-fees.unposted-charges', file: 'unposted-charges' }],
     // Fees are income in full on the day they are paid (P6).
     'finance.system-account': [{ id: 'income', name: 'Membership fee income', kind: 'income' }],
-    'core.navigation': [
-      { id: 'membership-fees.prices', menu: 'admin', group: 'modules', to: '/admin/modules/membership-fees/prices', match: '/admin/modules/membership-fees/prices', icon: 'i-lucide-banknote', ability: 'membership-fees.price.manage', order: 15 },
-    ],
   },
 })

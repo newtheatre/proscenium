@@ -1,13 +1,14 @@
-// Creates a scheme as a draft (MEM-01). Renewal window, grace and whether holders may end their own
-// membership start from the settings when they are not given.
-import { defineRoute, newId, nowMs, refuse } from '#kit'
+// Creates a scheme as a draft (MEM-01) from its name alone: a members' scheme running from the day
+// it starts, its address made from the name. Whatever else is given is kept; the rest is settings.
+import { all, defineRoute, newId, nowMs, refuse } from '#kit'
 import { charger } from '../../../charge'
 import { checkLengthRule, schemeDefaults, schemeFields } from '../../../schemes'
 
-const input = schemeFields.omit({ verifier: true, listId: true, domains: true }).partial({ summary: true, joinMode: true, fixedEndMonth: true, fixedEndDay: true, rolloverDays: true, renewalOpensDays: true, graceDays: true, reverifyOnRenewal: true, needsApproval: true, requiresPayment: true, voting: true, acceptsReference: true, holderMayEnd: true })
+const input = schemeFields.omit({ verifier: true, listId: true, domains: true }).partial({ summary: true, joinMode: true, fixedEndMonth: true, fixedEndDay: true, rolloverDays: true, key: true, side: true, lengthRule: true, renewalOpensDays: true, graceDays: true, reverifyOnRenewal: true, needsApproval: true, requiresPayment: true, voting: true, acceptsReference: true, holderMayEnd: true })
 
 export default defineRoute({ ability: 'membership.scheme.manage', rateLimit: 'write', idempotent: true, input }, async (_event, { input, unit }) => {
-  const fields = { ...(await schemeDefaults()), summary: null, joinMode: 'apply' as const, fixedEndMonth: null, fixedEndDay: null, rolloverDays: 0, reverifyOnRenewal: true, needsApproval: false, requiresPayment: false, voting: false, acceptsReference: false, ...input }
+  const key = input.key ?? await freeKey(input.name)
+  const fields = { ...(await schemeDefaults()), side: 'members' as const, lengthRule: 'rolling' as const, summary: null, joinMode: 'apply' as const, fixedEndMonth: null, fixedEndDay: null, rolloverDays: 0, reverifyOnRenewal: true, needsApproval: false, requiresPayment: false, voting: false, acceptsReference: false, ...input, key }
   checkLengthRule(fields)
   if (fields.requiresPayment && !(await charger()))
     refuse('membership.scheme.fees-off', 'A fee can only be collected while the Membership fees module is on.', { status: 409, remedy: 'Switch Membership fees on in Admin > Modules first.', fields: { requiresPayment: 'membership.scheme.fees-off' } })
@@ -24,3 +25,11 @@ export default defineRoute({ ability: 'membership.scheme.manage', rateLimit: 'wr
   unit.audit({ action: 'create', record: ['membership.scheme', id] })
   return { schemeId: id }
 })
+
+/** An address made from the name, with a number after it when another scheme already has that one. */
+async function freeKey(name: string): Promise<string> {
+  const base = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50).replace(/-$/, '') || 'scheme' // not-policy: room for a number within the address's bound
+  const taken = new Set((await all<{ key: string }>('SELECT key FROM membership_schemes WHERE key = ? OR key LIKE ?', base, `${base}-%`)).map(r => r.key))
+  if (!taken.has(base)) return base
+  for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
+}

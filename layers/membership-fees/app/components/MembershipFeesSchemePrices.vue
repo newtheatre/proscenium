@@ -1,7 +1,7 @@
-<!-- Fees (tab 5, scheme "Fee"): each scheme with the price in force today for joining and for renewing
-     at each length, and its price history. A new price starts on a date, today or later, and replaces
-     the one before from then; a price is never edited, so nobody's charge changes after they were
-     quoted. A price may be for every length or one, and for joining, renewing or both. -->
+<!-- A scheme's fee (tab 5, scheme "Fee"), drawn on the scheme's own page: the price in force today for
+     joining and for renewing at each length, and its price history. A new price starts on a date,
+     today or later, and replaces the one before from then; a price is never edited, so nobody's
+     charge changes after they were quoted. -->
 <script setup lang="ts">
 interface Price { id: string, lengthOptionId: string | null, amountMinor: number, currency: string, appliesTo: string, fromDate: string }
 interface Scheme { id: string, name: string, state: string, requiresPayment: boolean, lengths: { id: string | null, name: string | null, join: number | null, renew: number | null }[], history: Price[] }
@@ -12,9 +12,13 @@ const { toRefusal } = useRefusal()
 const { day } = useDates()
 const { money } = await useMoney()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ today: string, schemes: Scheme[] }>('/api/membership-fees/schemes', { key: 'membership-fees:schemes' })
+const props = defineProps<{ schemeId: string }>()
+const emit = defineEmits<{ saved: [] }>()
+const { data, refresh } = await useAPI<{ today: string, schemes: Scheme[] }>('/api/membership-fees/schemes', { key: 'membership-fees:schemes' })
+// Nothing is drawn for somebody who may not manage prices: the request is refused and holds no scheme.
+const s = computed(() => data.value?.schemes.find(x => x.id === props.schemeId) ?? null)
 
-const historyOpen = reactive<Record<string, boolean>>({})
+const historyOpen = ref(false)
 const setting = ref<Scheme | null>(null)
 const form = reactive({ lengthOptionId: 'all', appliesTo: 'join-and-renew', amountMinor: null as number | null, fromDate: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -32,74 +36,53 @@ async function save() {
     toast.add({ title: t('membership-fees.prices.saved'), color: 'success' })
     setting.value = null
     await refresh()
+    emit('saved')
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
 }
-const lengthName = (s: Scheme, id: string | null) => id ? s.lengths.find(l => l.id === id)?.name ?? '' : t('membership-fees.prices.every-length')
+const lengthName = (id: string | null) => id ? s.value?.lengths.find(l => l.id === id)?.name ?? '' : t('membership-fees.prices.every-length')
 const shown = (minor: number | null) => minor === null ? t('membership-fees.prices.none') : money(minor)
 </script>
 
 <template>
-  <PageFrame :title="t('membership-fees.navigation.prices.label')">
-    <DataBoundary
-      :data="data"
-      :status="status"
-      :error="error"
-      @retry="refresh()"
+  <PageSection
+    v-if="s"
+    :title="t('membership-fees.prices.title')"
+    :description="t(s.requiresPayment ? 'membership-fees.prices.help' : 'membership-fees.prices.free-scheme')"
+  >
+    <template #actions>
+      <UButton
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-plus"
+        :label="t('membership-fees.prices.set')"
+        @click="openSet(s)"
+      />
+    </template>
+    <RecordList :label="t('membership-fees.prices.title')">
+      <RecordListItem
+        v-for="l in s.lengths"
+        :key="l.id ?? 'all'"
+        :name="l.name ?? t('membership-fees.prices.every-length')"
+        :description="t('membership-fees.prices.in-force', { join: shown(l.join), renew: shown(l.renew) })"
+      />
+    </RecordList>
+    <CollapsibleDivider
+      v-model:open="historyOpen"
+      :label="t('membership-fees.prices.history')"
+      :count="s.history.length"
     >
-      <div
-        v-if="data"
-        class="space-y-6"
-      >
-        <EmptyState
-          v-if="!data.schemes.length"
-          :title="t('membership-fees.prices.no-schemes')"
-          :description="t('membership-fees.prices.no-schemes-help')"
-          icon="i-lucide-banknote"
+      <RecordList :label="t('membership-fees.prices.history')">
+        <RecordListItem
+          v-for="p in s.history"
+          :key="p.id"
+          :name="money(p.amountMinor, p.currency)"
+          :description="t('membership-fees.prices.history-line', { length: lengthName(p.lengthOptionId), applies: t(`membership-fees.prices.applies.${p.appliesTo}`), date: day(p.fromDate) })"
         />
-        <PageSection
-          v-for="s in data.schemes"
-          :key="s.id"
-          :title="s.name"
-          :description="s.requiresPayment ? undefined : t('membership-fees.prices.free-scheme')"
-        >
-          <template #actions>
-            <UButton
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-plus"
-              :label="t('membership-fees.prices.set')"
-              @click="openSet(s)"
-            />
-          </template>
-          <RecordList :label="s.name">
-            <RecordListItem
-              v-for="l in s.lengths"
-              :key="l.id ?? 'all'"
-              :name="l.name ?? t('membership-fees.prices.every-length')"
-              :description="t('membership-fees.prices.in-force', { join: shown(l.join), renew: shown(l.renew) })"
-            />
-          </RecordList>
-          <CollapsibleDivider
-            v-model:open="historyOpen[s.id]"
-            :label="t('membership-fees.prices.history')"
-            :count="s.history.length"
-          >
-            <RecordList :label="t('membership-fees.prices.history')">
-              <RecordListItem
-                v-for="p in s.history"
-                :key="p.id"
-                :name="money(p.amountMinor, p.currency)"
-                :description="t('membership-fees.prices.history-line', { length: lengthName(s, p.lengthOptionId), applies: t(`membership-fees.prices.applies.${p.appliesTo}`), date: day(p.fromDate) })"
-              />
-            </RecordList>
-          </CollapsibleDivider>
-        </PageSection>
-      </div>
-    </DataBoundary>
-
+      </RecordList>
+    </CollapsibleDivider>
     <UModal
       :open="!!setting"
       :title="setting ? t('membership-fees.prices.set-title', { scheme: setting.name }) : ''"
@@ -162,5 +145,5 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
         />
       </template>
     </UModal>
-  </PageFrame>
+  </PageSection>
 </template>
