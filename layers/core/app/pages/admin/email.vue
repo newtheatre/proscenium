@@ -57,18 +57,20 @@ async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}
 
 // The two ways to give the site a sending domain; the page shows one at a time.
 type Way = 'automatic' | 'own'
-const way = ref<Way>('automatic')
+// A domain typed in by hand, or a site Cloudflare cannot set up, starts on the second way.
+const startsOn = computed<Way>(() => {
+  const sender = data.value
+  if (!sender) return 'automatic'
+  const cannot = sender.automatic.unavailable === 'local' || sender.automatic.unavailable === 'workers-dev'
+  return cannot || (sender.domain && sender.domain !== sender.automatic.proposed) ? 'own' : 'automatic'
+})
+const picked = ref<Way | null>(null)
+const way = computed<Way>({ get: () => picked.value ?? startsOn.value, set: (v) => { picked.value = v } })
 const changing = ref(false)
 const ways = [
   { label: 'Set it up for me', value: 'automatic', icon: 'i-lucide-wand-sparkles' },
   { label: 'I have set one up in Cloudflare', value: 'own', icon: 'i-lucide-pencil-line' },
 ]
-// A domain typed in by hand, or a site Cloudflare cannot set up, starts on the second way.
-watch(data, (sender, before) => {
-  if (!sender || before) return
-  const cannot = sender.automatic.unavailable === 'local' || sender.automatic.unavailable === 'workers-dev'
-  if (cannot || (sender.domain && sender.domain !== sender.automatic.proposed)) way.value = 'own'
-}, { immediate: true })
 const choosing = computed(() => !data.value?.verified || changing.value)
 const highlight = computed(() => typeof route.query.setting === 'string' ? route.query.setting : undefined)
 const KEYS = { domain: 'core.notifications.sending-domain', verified: 'core.notifications.verified-domain', footer: 'core.notifications.email-footer', label: 'core.notifications.sending-label' }
