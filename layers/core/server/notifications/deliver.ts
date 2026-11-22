@@ -137,7 +137,7 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
     const values = { ...JSON.parse(row.payload!), ...opened }
     const locale = type.wording[row.locale] ? row.locale : 'en-GB'
     const action = await actionFor(type, wording, locale, values)
-    const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, theatre, footer, action })
+    const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, dark: brand.dark, lang: locale, theatre, footer, action })
     const sender = (row.sender_key ? await senderByKey(row.sender_key, domain) : undefined) ?? await senderFor(type.topic ?? 'transactional', domain)
     try {
       const result = await useMailer()({ from: { name: sender.name, email: sender.email }, to: address, replyTo: sender.replyTo, ...message, headers: { 'X-Entity-Ref-ID': row.id } })

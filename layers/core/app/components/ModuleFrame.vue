@@ -25,34 +25,6 @@ const items = computed(() => tabs.value.map(tab => ({ label: te(tab.label) ? t(t
 // A record page below a tab's screen keeps that tab open.
 const active = computed(() => resolveEntry(tabs.value, route.path)?.to)
 
-// The tab row scrolls sideways when the tabs do not fit; a fade at the edge with more beyond says so.
-const tabStrip = useTemplateRef<HTMLElement>('tabStrip')
-const scroll = reactive({ left: true, right: true })
-let list: HTMLElement | null = null
-function measure() {
-  if (!list) return
-  scroll.left = list.scrollLeft <= 1
-  scroll.right = list.scrollLeft + list.clientWidth >= list.scrollWidth - 1
-}
-function attach() {
-  const next = tabStrip.value?.querySelector<HTMLElement>('[role="tablist"]') ?? null
-  if (next === list) return measure()
-  list?.removeEventListener('scroll', measure)
-  list = next
-  list?.addEventListener('scroll', measure, { passive: true })
-  list?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ inline: 'center', block: 'nearest' })
-  measure()
-}
-onMounted(() => {
-  attach()
-  window.addEventListener('resize', measure)
-})
-onUpdated(attach)
-onBeforeUnmount(() => {
-  list?.removeEventListener('scroll', measure)
-  window.removeEventListener('resize', measure)
-})
-
 const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : nameOf(a.id).localeCompare(nameOf(b.id))
 const side = computed<NavigationMenuItem[][]>(() => {
   const all = [...(data.value?.modules ?? [])].sort(byName)
@@ -150,21 +122,7 @@ const side = computed<NavigationMenuItem[][]>(() => {
           :description="t('core.modules.missing-secret', { name })"
         />
       </template>
-      <div
-        v-if="items.length > 1"
-        ref="tabStrip"
-        class="relative"
-      >
-        <span
-          v-show="!scroll.left"
-          aria-hidden="true"
-          class="pointer-events-none absolute inset-y-0 start-0 z-10 w-8 bg-gradient-to-r from-default to-transparent"
-        />
-        <span
-          v-show="!scroll.right"
-          aria-hidden="true"
-          class="pointer-events-none absolute inset-y-0 end-0 z-10 w-8 bg-gradient-to-l from-default to-transparent"
-        />
+      <TabStrip v-if="items.length > 1">
         <UTabs
           :model-value="active"
           :items="items"
@@ -174,7 +132,7 @@ const side = computed<NavigationMenuItem[][]>(() => {
           :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
           @update:model-value="to => navigateTo(String(to))"
         />
-      </div>
+      </TabStrip>
       <EmbeddedScreens>
         <slot />
       </EmbeddedScreens>
