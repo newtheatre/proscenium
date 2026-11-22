@@ -159,6 +159,7 @@ const label = computed(() => viewer.value.name ?? t('core.menu.account'))
     variant="outline"
     icon="i-lucide-log-in"
     :label="t('core.menu.sign-in')"
-    :ui="{ leadingIcon: 'sm:hidden', label: 'max-sm:sr-only' }"
+    :ui="{ leadingIcon: 'hidden' }"
+    class="max-sm:hidden"
   />
 </template>

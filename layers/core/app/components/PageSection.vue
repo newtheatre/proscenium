@@ -27,7 +27,7 @@ function filled(nodes: VNode[]): boolean {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div
           class="min-w-0 flex-1"
-          :class="description ? 'basis-64' : 'basis-24'"
+          :class="description ? 'basis-44' : 'basis-24'"
         >
           <h2
             :id="id"
