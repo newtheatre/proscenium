@@ -102,8 +102,9 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
             v-if="lengthItems.length > 1"
             :label="t('membership-fees.prices.length')"
           >
-            <USelect
+            <USelectMenu
               v-model="form.lengthOptionId"
+              value-key="value"
               :items="lengthItems"
             />
           </UFormField>

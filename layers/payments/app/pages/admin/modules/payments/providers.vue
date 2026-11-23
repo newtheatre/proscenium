@@ -35,9 +35,7 @@ const hasDetails = (a: Account) => {
 const managing = ref<string | null>(null)
 const managed = computed(() => data.value?.accounts.find(a => a.id === managing.value))
 // Taking an account out of use, or putting it back: payments stop being offered through it, nothing else changes.
-const switching = ref(false)
 async function setActive(a: Account, active: boolean, undoable = true) {
-  switching.value = true
   try {
     await $api(`/api/payments/providers/${a.id}` as string, { method: 'PATCH', body: { active } })
     await refresh()
@@ -49,9 +47,6 @@ async function setActive(a: Account, active: boolean, undoable = true) {
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
-  }
-  finally {
-    switching.value = false
   }
 }
 const webhookAddress = (a: Account) => (import.meta.client ? `${window.location.origin}/api/payments/webhooks/${a.id}` : `/api/payments/webhooks/${a.id}`)
@@ -289,8 +284,9 @@ const keyItems = (a: Account) => a.keys.map(k => ({ ...k, label: keyLabel(k.name
                   v-if="providerOf(a)?.pairsReaders"
                   :label="t('payments.screens.test.reader')"
                 >
-                  <USelect
+                  <USelectMenu
                     v-model="(testing[a.id] ??= { busy: false }).readerId"
+                    value-key="value"
                     :items="(readers[a.id] ?? []).map(r => ({ value: r.id, label: r.label }))"
                     size="sm"
                     class="w-48"
@@ -358,7 +354,7 @@ const keyItems = (a: Account) => a.keys.map(k => ({ ...k, label: keyLabel(k.name
           :icon="managed.active ? 'i-lucide-circle-pause' : 'i-lucide-circle-play'"
           color="neutral"
           variant="outline"
-          :loading="switching"
+          loading-auto
           @click="setActive(managed, !managed.active)"
         />
       </template>

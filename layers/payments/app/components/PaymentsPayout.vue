@@ -80,8 +80,9 @@ async function record() {
           :label="t('payments.screens.payouts.account')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="payout.providerAccountId"
+            value-key="value"
             :items="accounts.map(a => ({ value: a.id, label: a.label }))"
           />
         </UFormField>
