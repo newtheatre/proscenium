@@ -299,6 +299,18 @@ describe('the staff queue (ID-35)', () => {
     expect((await desk.browser.delete(`/api/core/data-requests/${started.body.id}`)).status).toBe(200)
   })
 
+  it('nobody opens their own request, except an Owner, who has nobody above them to ask', async () => {
+    const { browser, accountId, mine } = await person()
+    const id = await askAndConfirm(browser, mine)
+    await grantDirectly(accountId, ['core.data-request.manage'])
+    expect((await browser.get(`/api/core/data-requests/${id}`)).body.code).toBe('core.access.own-record')
+    const [existing] = await rows<{ id: string }>('SELECT id FROM core_roles WHERE key = \'owner\'')
+    await grantDirectly(accountId, [], existing ? { roleId: existing.id } : { roleKey: 'owner' })
+    const opened = await browser.get(`/api/core/data-requests/${id}`)
+    expect(opened.status).toBe(200)
+    expect(opened.body.request.accountId).toBe(accountId)
+  })
+
   it('a request closes only once it has run and every hand-search line is ticked', async () => {
     const { browser, mine } = await person()
     const id = await askAndConfirm(browser, mine)
