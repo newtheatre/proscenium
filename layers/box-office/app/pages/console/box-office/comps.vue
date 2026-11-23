@@ -153,7 +153,8 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                 <span class="inline-flex flex-wrap gap-2">
                   <UButton
                     size="sm"
-                    :loading="busy === r.id"
+                    loading-auto
+                    :disabled="busy === r.id"
                     :label="t('box-office.comps.approve.button')"
                     @click="act(r, 'approve')"
                   />
@@ -161,7 +162,8 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                     size="sm"
                     variant="outline"
                     color="neutral"
-                    :loading="busy === r.id"
+                    loading-auto
+                    :disabled="busy === r.id"
                     :label="t('box-office.comps.decline.button')"
                     @click="act(r, 'decline')"
                   />
@@ -225,7 +227,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
                       size="sm"
                       variant="outline"
                       color="neutral"
-                      :loading="busy === r.id"
+                      loading-auto
                       :label="t('box-office.comps.withdraw.button')"
                       @click="act(r, 'withdraw')"
                     />
@@ -280,8 +282,9 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
             :label="t('box-office.comps.ask.performance')"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.performanceId"
+              value-key="value"
               :items="performanceItems"
             />
           </UFormField>

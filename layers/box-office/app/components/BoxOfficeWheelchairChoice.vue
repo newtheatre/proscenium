@@ -84,7 +84,7 @@ defineExpose({ pending: computed(() => unchanged.value ? null : chosen()) })
         name="wheelchairSpaces"
         required
       >
-        <UInputNumber
+        <FieldNumber
           v-model="state.wheelchairSpaces"
           :min="0"
           :max="500"
@@ -96,7 +96,7 @@ defineExpose({ pending: computed(() => unchanged.value ? null : chosen()) })
         :help="t('box-office.layouts.each-help')"
         required
       >
-        <UInputNumber
+        <FieldNumber
           v-model="state.seatsPerSpace"
           :min="0"
           :max="20"

@@ -61,28 +61,23 @@ async function commit(): Promise<(() => Promise<void>) | null> {
 </script>
 
 <template>
-  <section
+  <FieldGroup
     v-if="data"
-    class="space-y-4"
+    :title="t('box-office.setup.own.wheelchair-title')"
+    :description="t('box-office.layouts.performance.description')"
   >
-    <div class="flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <h3 class="font-medium text-highlighted">
-          {{ t('box-office.setup.own.wheelchair-title') }}
-        </h3>
-        <p class="text-sm text-muted">
-          {{ t('box-office.layouts.performance.description') }}
-        </p>
-      </div>
+    <template
+      v-if="!data.layouts.length"
+      #actions
+    >
       <UButton
-        v-if="!data.layouts.length"
         :label="t('box-office.layouts.performance.manage')"
         to="/admin/modules/box-office/seating-layouts"
         color="neutral"
         variant="outline"
         size="sm"
       />
-    </div>
+    </template>
     <BoxOfficeWheelchairChoice
       ref="choice"
       nested
@@ -92,5 +87,5 @@ async function commit(): Promise<(() => Promise<void>) | null> {
       :inherit-label="t('box-office.layouts.choice.as-run')"
       :inherit-description="inheritDescription"
     />
-  </section>
+  </FieldGroup>
 </template>

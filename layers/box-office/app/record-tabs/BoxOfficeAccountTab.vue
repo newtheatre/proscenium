@@ -34,7 +34,10 @@ const orderDetail = (o: Order) => [o.show && o.startsAt ? `${o.show}, ${dateTime
           v-if="d.passes.length"
           :title="t('box-office.account-tab.passes')"
         >
-          <RecordList :label="t('box-office.account-tab.passes')">
+          <RecordList
+            :label="t('box-office.account-tab.passes')"
+            flush
+          >
             <RecordListItem
               v-for="p in d.passes"
               :key="p.id"
@@ -54,6 +57,7 @@ const orderDetail = (o: Order) => [o.show && o.startsAt ? `${o.show}, ${dateTime
           <RecordList
             v-else
             :label="t('box-office.account-tab.orders')"
+            flush
           >
             <RecordListItem
               v-for="o in d.orders"

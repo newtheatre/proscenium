@@ -82,8 +82,9 @@ function setField(section: GridSection, field: 'name' | 'seats', value: string |
                     @click="remove(s.key)"
                   />
                 </div>
-                <UInputNumber
+                <FieldNumber
                   :model-value="s.seats ?? undefined"
+                  class="w-full"
                   :min="0"
                   :placeholder="t('box-office.tickets.section.seats-placeholder')"
                   :aria-label="t('box-office.tickets.section.seats', { name: s.name || i + 1 })"

@@ -97,6 +97,7 @@ const facts = computed(() => {
         variant="outline"
         icon="i-lucide-lock-open"
         :label="t('box-office.layouts.release.button')"
+        loading-auto
         @click="release"
       />
       <UButton
@@ -105,6 +106,7 @@ const facts = computed(() => {
         variant="outline"
         icon="i-lucide-lock"
         :label="t('box-office.layouts.release.keep')"
+        loading-auto
         @click="keepBack"
       />
     </div>

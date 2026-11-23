@@ -110,6 +110,7 @@ const actions = (s: Section) => [[
       </UFormField>
       <UButton
         type="submit"
+        loading-auto
         :label="t('box-office.setup.bands.add')"
         color="neutral"
         variant="outline"
@@ -140,6 +141,7 @@ const actions = (s: Section) => [[
           </UFormField>
           <UButton
             type="submit"
+            loading-auto
             :label="t('box-office.setup.bands.rename')"
           />
         </UForm>
