@@ -128,8 +128,9 @@ async function cancel() {
           :label="t('box-office.order.cancel.reason')"
           :required="paid"
         >
-          <USelect
+          <USelectMenu
             v-model="form.reasonTermId"
+            value-key="value"
             :items="reasonItems"
             :placeholder="t('box-office.order.cancel.reason-placeholder')"
           />

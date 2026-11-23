@@ -69,8 +69,9 @@ defineExpose({ pending: computed(() => unchanged.value ? null : chosen()) })
       name="layoutId"
       required
     >
-      <USelect
+      <USelectMenu
         v-model="state.layoutId"
+        value-key="value"
         :items="items"
         :placeholder="t('box-office.layouts.performance.placeholder')"
       />

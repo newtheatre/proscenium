@@ -293,8 +293,9 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
             :label="t('box-office.comps.ask.band')"
             :help="t('box-office.comps.ask.band-help')"
           >
-            <USelect
+            <USelectMenu
               v-model="form.bandId"
+              value-key="value"
               :items="bandItems"
               :disabled="!form.performanceId"
             />
@@ -337,8 +338,9 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
             :label="t('box-office.comps.ask.reason')"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.reasonTermId"
+              value-key="value"
               :items="reasonItems"
             />
           </UFormField>
