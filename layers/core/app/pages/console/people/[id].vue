@@ -384,33 +384,35 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
               >
                 {{ t('core.person.no-addresses') }}
               </p>
-              <ul
+              <RecordList
                 v-else
-                class="space-y-2"
+                :label="t('core.person.addresses')"
               >
-                <li
+                <RecordListItem
                   v-for="a in p.addresses"
                   :key="a.id"
-                  class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
                 >
-                  <span class="w-full break-all">{{ a.address }}</span>
-                  <StatusBadge
-                    :tone="a.verified ? 'success' : 'neutral'"
-                    :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
-                  />
-                  <StatusBadge
-                    v-if="a.audience"
-                    tone="info"
-                    :label="t('core.person.email.audience')"
-                  />
+                  <template #name>
+                    <span class="break-all">{{ a.address }}</span>
+                  </template>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <StatusBadge
+                      :tone="a.verified ? 'success' : 'neutral'"
+                      :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                    />
+                    <StatusBadge
+                      v-if="a.audience"
+                      tone="info"
+                      :label="t('core.person.email.audience')"
+                    />
+                  </div>
                   <RowActions
                     v-if="p.actions.update"
-                    class="ms-auto"
                     :items="addressActions(a)"
                     :label="t('core.person.email.actions', { address: a.address })"
                   />
-                </li>
-              </ul>
+                </RecordListItem>
+              </RecordList>
             </FieldGroup>
           </PageSection>
         </template>

@@ -78,13 +78,13 @@ async function run(fn: () => Promise<unknown>, done?: string, form?: { setErrors
   }
 }
 
-const KINDS = [{ value: 'own', label: 'Our own production' }, { value: 'visiting', label: 'A visiting company' }, { value: 'hire', label: 'A hire' }, { value: 'event', label: 'An event' }]
+const KINDS = computed(() => (['own', 'visiting', 'hire', 'event'] as const).map(value => ({ value, label: t(`core.productions.kinds.${value}`) })))
 const NONE = '__none'
 const TONES = { draft: 'neutral', published: 'success', withdrawn: 'warning', cancelled: 'danger' } as const
 const STATE_TONES = { scheduled: 'success', draft: 'neutral', cancelled: 'danger', completed: 'neutral' } as const
 const categories = computed(() => (data.value?.options.categories ?? []).filter(c => !c.retired || c.id === production.value?.categoryTermId).map(c => ({ value: c.id, label: c.label })))
-const seasons = computed(() => [{ value: NONE, label: 'No season' }, ...(data.value?.options.seasons ?? []).map(s => ({ value: s.id, label: s.name }))])
-const spaces = computed(() => [{ value: NONE, label: 'Not set' }, ...(data.value?.options.spaces ?? []).map(s => ({ value: s.id, label: s.label }))])
+const seasons = computed(() => [{ value: NONE, label: t('core.productions.new.no-season') }, ...(data.value?.options.seasons ?? []).map(s => ({ value: s.id, label: s.name }))])
+const spaces = computed(() => [{ value: NONE, label: t('core.productions.new.space-none') }, ...(data.value?.options.spaces ?? []).map(s => ({ value: s.id, label: s.label }))])
 
 // Details
 const details = reactive({
@@ -94,7 +94,7 @@ const details = reactive({
 })
 // When latecomers are let in: the theatre's usual practice unless the show says otherwise. Each date may differ too.
 const latecomerItems = computed(() => [
-  { value: NONE, label: `Usual: ${t(`core.latecomers.short.${data.value?.theatre.latecomers ?? 'suitable-point'}`).toLowerCase()}` },
+  { value: NONE, label: t('core.production.latecomers.usual', { rule: t(`core.latecomers.short.${data.value?.theatre.latecomers ?? 'suitable-point'}`).toLowerCase() }) },
   ...LATECOMER_RULES.map(value => ({ value, label: t(`core.latecomers.short.${value}`) })),
 ])
 const withLatecomers = (schema: z.ZodType) => z.preprocess(v => ({ ...(v as object), latecomers: (v as { latecomers?: string }).latecomers === NONE ? null : (v as { latecomers?: string }).latecomers }), schema)
@@ -121,7 +121,7 @@ const resetDetails = () => production.value && Object.assign(details, detailsFro
 watch(production, resetDetails, { immediate: true })
 // Leaving the Details tab, or the page, with changes asks first; leaving drops them.
 const detailsDirty = computed(() => !!production.value && JSON.stringify({ ...details }) !== JSON.stringify(detailsFrom(production.value)))
-useLeaveGuard(detailsDirty, { query: ['tab'], thing: 'this tab', discard: resetDetails })
+useLeaveGuard(detailsDirty, { query: ['tab'], thing: t('core.production.this-tab'), discard: resetDetails })
 const saveDetails = () => run(() => api('', 'PATCH', {
   ...(({ bookedElsewhere: _, ...rest }) => rest)(details),
   categoryTermId: details.categoryTermId || null,
@@ -130,19 +130,16 @@ const saveDetails = () => run(() => api('', 'PATCH', {
   latecomers: details.latecomers === NONE ? null : details.latecomers,
   externalBookingUrl: elsewhere.value ? details.externalBookingUrl.trim() || null : null,
   runningMinutes: details.runningMinutes || null,
-}), 'Production saved', detailsForm.value)
+}), t('core.production.saved'), detailsForm.value)
 
 // Moves. Publishing opens a window first: what is still to do, or where the page will appear.
 const needs = computed(() => data.value?.needs ?? [])
 const publicPath = computed(() => `/whats-on/${production.value?.slug ?? ''}`)
 const publishing = ref(false)
-const publishBusy = ref(false)
 const { data: checkList } = useNuxtData<{ checks: { id: string, done: boolean, sentence: string, needed?: boolean }[] }>(`core:record-checks:core.production:${String(route.params.id)}`)
 const wanted = computed(() => (checkList.value?.checks ?? []).filter(c => c.needed === false && !c.done))
 async function publish() {
-  publishBusy.value = true
   const done = await run(() => api('/publish', 'POST'))
-  publishBusy.value = false
   // Something changed since the page was read: the window shows the list as it is now, in place of the refusal.
   if (!done && refusal.value?.code === 'core.production.not-ready') {
     refusal.value = null
@@ -152,23 +149,23 @@ async function publish() {
   publishing.value = false
   if (!done) return
   say({
-    title: 'Production published',
+    title: t('core.production.published'),
     duration: 10_000, // not-policy: the ten seconds Undo is offered for
     actions: [
-      { label: 'View public page', icon: 'i-lucide-external-link', color: 'neutral', variant: 'outline', to: publicPath.value, target: '_blank' },
-      { label: t('core.undo.button'), icon: 'i-lucide-undo-2', color: 'neutral', variant: 'outline', onClick: () => { void run(() => api('/withdraw', 'POST'), 'Production withdrawn') } },
+      { label: t('core.production.view-public'), icon: 'i-lucide-external-link', color: 'neutral', variant: 'outline', to: publicPath.value, target: '_blank' },
+      { label: t('core.undo.button'), icon: 'i-lucide-undo-2', color: 'neutral', variant: 'outline', onClick: () => { void run(() => api('/withdraw', 'POST'), t('core.production.withdrawn')) } },
     ],
   })
 }
 async function withdraw() {
-  if (!await confirm({ verb: 'Withdraw', thing: production.value!.title, consequence: 'It leaves the public site, with its dates, until you publish it again.', button: 'Withdraw' })) return
-  await run(() => api('/withdraw', 'POST'), 'Production withdrawn')
+  if (!await confirm({ verb: t('core.production.withdraw'), thing: production.value!.title, consequence: t('core.production.withdraw-consequence'), button: t('core.production.withdraw') })) return
+  await run(() => api('/withdraw', 'POST'), t('core.production.withdrawn'))
 }
 async function duplicate() {
   refusal.value = null
   try {
     const { id } = await $api<{ id: string }>(`${base.value}/duplicate` as string, { method: 'POST', body: {} })
-    say({ title: 'Production duplicated', description: 'Its dates, credits and images were not copied.' })
+    say({ title: t('core.production.duplicated'), description: t('core.production.duplicated-help') })
     await navigateTo(`/console/programme/productions/${id}`)
   }
   catch (e) {
@@ -177,11 +174,11 @@ async function duplicate() {
 }
 const cancelling = ref(false)
 async function restore() {
-  if (!await confirm({ verb: 'Bring back', thing: production.value!.title, consequence: 'It becomes withdrawn, so you can publish it again. Its performances stay cancelled until you reinstate each one.', button: 'Bring back' })) return
-  await run(() => api('/restore', 'POST'), 'Production brought back')
+  if (!await confirm({ verb: t('core.production.restore'), thing: production.value!.title, consequence: t('core.production.restore-consequence'), button: t('core.production.restore') })) return
+  await run(() => api('/restore', 'POST'), t('core.production.restored'))
 }
 async function remove() {
-  if (!await confirm({ verb: 'Delete', thing: production.value!.title, consequence: 'The draft is removed for good.', button: 'Delete production' })) return
+  if (!await confirm({ verb: t('core.production.delete'), thing: production.value!.title, consequence: t('core.production.delete-consequence'), button: t('core.production.delete-button') })) return
   if (await run(() => api('', 'DELETE'))) await navigateTo('/console/programme/productions')
 }
 
@@ -190,9 +187,9 @@ const primary = computed(() => {
   const state = production.value?.state
   if (state === 'draft' || state === 'withdrawn') {
     const n = needs.value.length
-    return { label: state === 'draft' ? 'Publish' : 'Publish again', icon: 'i-lucide-globe', hint: n ? `${n} ${n === 1 ? 'thing' : 'things'} to do before it can be published` : undefined }
+    return { label: state === 'draft' ? t('core.production.publish') : t('core.production.publish-again'), icon: 'i-lucide-globe', hint: n ? t('core.production.to-do', { count: n }) : undefined }
   }
-  if (state === 'cancelled') return { label: 'Bring back', icon: 'i-lucide-undo-2' }
+  if (state === 'cancelled') return { label: t('core.production.restore'), icon: 'i-lucide-undo-2' }
   return undefined
 })
 function onPrimary() {
@@ -208,12 +205,12 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   const deletable = p.state === 'draft' && !p.publishedAt
   return [
     [
-      { label: 'Duplicate', icon: 'i-lucide-copy', onSelect: () => { void duplicate() } },
-      { label: 'Withdraw', icon: 'i-lucide-eye-off', disabled: !published, description: published ? undefined : 'Only a published production can be withdrawn.', onSelect: () => { void withdraw() } },
+      { label: t('core.production.duplicate'), icon: 'i-lucide-copy', onSelect: () => { void duplicate() } },
+      { label: t('core.production.withdraw'), icon: 'i-lucide-eye-off', disabled: !published, description: published ? undefined : t('core.production.withdraw-not'), onSelect: () => { void withdraw() } },
     ],
     [
-      { label: 'Cancel production', icon: 'i-lucide-calendar-x', color: 'error', disabled: !cancellable, description: cancellable ? undefined : p.state === 'cancelled' ? 'It is already cancelled.' : 'A draft is not public, so there is nothing to cancel. Delete it instead.', onSelect: () => { cancelling.value = true } },
-      { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', disabled: !deletable, description: deletable ? undefined : 'Once it has been public it is kept: withdraw or cancel it instead.', onSelect: () => { void remove() } },
+      { label: t('core.production.cancel'), icon: 'i-lucide-calendar-x', color: 'error', disabled: !cancellable, description: cancellable ? undefined : p.state === 'cancelled' ? t('core.production.cancel-already') : t('core.production.cancel-draft'), onSelect: () => { cancelling.value = true } },
+      { label: t('core.production.delete'), icon: 'i-lucide-trash-2', color: 'error', disabled: !deletable, description: deletable ? undefined : t('core.production.delete-not'), onSelect: () => { void remove() } },
     ],
   ]
 })
@@ -235,21 +232,14 @@ const summary = computed(() => {
   const next = comingUp.value[0]
   const cancelled = performances.value.filter(x => x.state === 'cancelled').length
   return [
-    { label: 'Run', value: first && last ? span(first.startsAt, last.startsAt) : 'No dates yet' },
+    { label: t('core.production.facts.run'), value: first && last ? span(first.startsAt, last.startsAt) : t('core.productions.no-dates') },
     // The venue only when the run plays in more than one.
-    { label: 'Next performance', value: next ? (oneVenue.value ? dateTime(next.startsAt) : `${dateTime(next.startsAt)}, ${venueName(next.venueId)}`) : 'None to come' },
-    { label: 'Season', value: data.value?.options.seasons.find(s => s.id === p.seasonId)?.name ?? 'None' },
-    { label: 'Performances', value: cancelled ? `${running.value.length}, and ${cancelled} cancelled` : String(running.value.length) },
+    { label: t('core.productions.columns.next'), value: next ? (oneVenue.value ? dateTime(next.startsAt) : `${dateTime(next.startsAt)}, ${venueName(next.venueId)}`) : t('core.productions.none-to-come') },
+    { label: t('core.productions.season'), value: data.value?.options.seasons.find(s => s.id === p.seasonId)?.name ?? t('core.production.facts.no-season') },
+    { label: t('core.production.facts.performances'), value: cancelled ? t('core.production.facts.with-cancelled', { running: running.value.length, cancelled }) : String(running.value.length) },
   ]
 })
-const tabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'details', label: 'Details' },
-  { id: 'dates', label: 'Dates' },
-  { id: 'credits', label: 'Credits' },
-  { id: 'media', label: 'Media' },
-  { id: 'advisories', label: 'Age, effects and warnings' },
-]
+const tabs = computed(() => (['overview', 'details', 'dates', 'credits', 'media', 'advisories'] as const).map(id => ({ id, label: t(`core.production.tabs.${id}`) })))
 const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, { replace: true })
 </script>
 
@@ -270,8 +260,8 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       record-type="core.production"
       :record-id="production.id"
       :tabs="tabs"
-      :trail="[{ label: 'Productions', to: '/console/programme/productions' }]"
-      checklist-title="Ready to publish?"
+      :trail="[{ label: t('core.productions.title'), to: '/console/programme/productions' }]"
+      :checklist-title="t('core.production.ready')"
       :checklist="production.state === 'draft' || production.state === 'withdrawn'"
       aside-below
       @primary="onPrimary"
@@ -286,11 +276,11 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
             v-if="production.publishedAt"
             class="text-sm"
           >
-            First published on {{ day(production.publishedAt) }}.
+            {{ t('core.production.first-published', { day: day(production.publishedAt) }) }}
           </p>
           <div class="flex flex-wrap gap-2">
             <UButton
-              label="View public page"
+              :label="t('core.production.view-public')"
               icon="i-lucide-external-link"
               color="neutral"
               variant="outline"
@@ -299,7 +289,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               target="_blank"
             />
             <UButton
-              label="Withdraw"
+              :label="t('core.production.withdraw')"
               icon="i-lucide-eye-off"
               color="neutral"
               variant="ghost"
@@ -313,7 +303,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       <template #tab-overview>
         <div class="space-y-4">
           <RefusalNotice :refusal="refusal" />
-          <PageSection title="About">
+          <PageSection :title="t('core.production.about')">
             <p
               v-if="production.subtitle"
               class="font-medium"
@@ -327,16 +317,16 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               v-else
               class="text-muted"
             >
-              No summary yet. Add one on the Details tab: lists and search results show it.
+              {{ t('core.production.no-summary') }}
             </p>
           </PageSection>
           <PageSection
-            title="Coming up"
-            :description="comingUp.length ? undefined : 'No scheduled performances to come.'"
+            :title="t('core.productions.views.coming-up')"
+            :description="comingUp.length ? undefined : t('core.production.none-coming')"
           >
             <RecordList
               v-if="comingUp.length"
-              label="Coming up"
+              :label="t('core.productions.views.coming-up')"
             >
               <RecordListItem
                 v-for="p in comingUp"
@@ -353,7 +343,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
             </RecordList>
             <template #footer>
               <UButton
-                :label="performances.length ? `All dates (${performances.length})` : 'Add dates'"
+                :label="performances.length ? t('core.production.all-dates', { n: performances.length }) : t('core.production.add-dates')"
                 color="neutral"
                 variant="outline"
                 trailing-icon="i-lucide-arrow-right"
@@ -367,7 +357,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       <template #tab-details>
         <div class="space-y-4">
           <RefusalNotice :refusal="refusal" />
-          <PageSection title="Details">
+          <PageSection :title="t('core.production.tabs.details')">
             <UForm
               id="production-details"
               ref="detailsForm"
@@ -379,7 +369,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
             >
               <UFormField
                 name="title"
-                label="Title"
+                :label="t('core.productions.new.title-label')"
                 required
               >
                 <UInput
@@ -389,7 +379,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               </UFormField>
               <UFormField
                 name="subtitle"
-                label="Subtitle"
+                :label="t('core.production.fields.subtitle')"
               >
                 <UInput
                   v-model="details.subtitle"
@@ -398,8 +388,8 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               </UFormField>
               <UFormField
                 name="summary"
-                label="Summary"
-                help="One or two sentences for lists and search results. Needed to publish."
+                :label="t('core.production.fields.summary')"
+                :help="t('core.production.fields.summary-help')"
               >
                 <UTextarea
                   v-model="details.summary"
@@ -409,8 +399,8 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               </UFormField>
               <UFormField
                 name="description"
-                label="About the production"
-                help="Shown on its public page. You can use **bold**, *italic*, lists, headings and links that start with https."
+                :label="t('core.production.fields.description')"
+                :help="t('core.production.fields.description-help')"
               >
                 <UTextarea
                   v-model="details.description"
@@ -418,183 +408,178 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   maxlength="20000"
                 />
               </UFormField>
-              <USeparator />
-              <h3 class="text-sm font-semibold text-highlighted">
-                In the programme
-              </h3>
-              <div class="grid gap-4 sm:grid-cols-2">
+              <FieldGroup :title="t('core.production.groups.programme')">
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <UFormField
+                    name="kind"
+                    :label="t('core.productions.new.kind')"
+                  >
+                    <USelect
+                      v-model="details.kind"
+                      :items="KINDS"
+                    />
+                  </UFormField>
+                  <UFormField
+                    name="categoryTermId"
+                    :label="t('core.production.fields.category')"
+                    :help="t('core.production.fields.needed')"
+                  >
+                    <USelectMenu
+                      v-model="details.categoryTermId"
+                      value-key="value"
+                      :items="categories"
+                      :placeholder="t('core.production.fields.category-choose')"
+                    />
+                  </UFormField>
+                  <UFormField
+                    name="seasonId"
+                    :label="t('core.productions.season')"
+                  >
+                    <USelectMenu
+                      v-model="details.seasonId"
+                      value-key="value"
+                      :items="seasons"
+                    />
+                  </UFormField>
+                  <UFormField
+                    name="usualSpaceId"
+                    :label="t('core.productions.new.space')"
+                    :help="t('core.productions.new.space-help')"
+                  >
+                    <USelectMenu
+                      v-model="details.usualSpaceId"
+                      value-key="value"
+                      :items="spaces"
+                    />
+                  </UFormField>
+                  <UFormField
+                    v-if="details.kind !== 'own'"
+                    name="companyName"
+                    :label="t('core.production.fields.company')"
+                  >
+                    <UInput
+                      v-model="details.companyName"
+                      maxlength="200"
+                    />
+                  </UFormField>
+                </div>
+              </FieldGroup>
+              <FieldGroup :title="t('core.production.groups.night')">
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <UFormField
+                    :label="t('core.production.fields.running')"
+                    :hint="t('core.production.fields.running-hint')"
+                    name="runningMinutes"
+                  >
+                    <DefaultedMinutes
+                      v-model="details.runningMinutes"
+                      :fallback="data?.theatre.runningMinutes"
+                      :min="1"
+                      :label="t('core.production.fields.running')"
+                    />
+                  </UFormField>
+                  <UFormField
+                    :label="t('core.production.fields.doors')"
+                    name="doorsBeforeMinutes"
+                  >
+                    <DefaultedMinutes
+                      v-model="details.doorsBeforeMinutes"
+                      :fallback="data?.theatre.doorsBeforeMinutes"
+                      :max="180"
+                      :label="t('core.production.fields.doors')"
+                    />
+                  </UFormField>
+                  <UFormField
+                    :label="t('core.production.fields.intervals')"
+                    name="intervalCount"
+                  >
+                    <FieldNumber
+                      v-model="details.intervalCount"
+                      :min="0"
+                      :max="10"
+                    />
+                  </UFormField>
+                  <UFormField
+                    :label="t('core.production.fields.interval')"
+                    name="intervalMinutes"
+                  >
+                    <DefaultedMinutes
+                      v-model="details.intervalMinutes"
+                      :fallback="data?.theatre.intervalMinutes"
+                      :max="120"
+                      :label="t('core.production.fields.interval')"
+                    />
+                  </UFormField>
+                  <UFormField
+                    :label="t('core.production.fields.capacity')"
+                    name="capacity"
+                  >
+                    <FieldNumber
+                      v-model="details.capacity"
+                      class="w-48"
+                      :placeholder="t('core.production.fields.capacity-placeholder')"
+                      :min="1"
+                    />
+                  </UFormField>
+                  <UFormField
+                    :label="t('core.production.fields.latecomers')"
+                    name="latecomers"
+                    :help="t('core.production.fields.latecomers-help')"
+                  >
+                    <USelect
+                      v-model="details.latecomers"
+                      :items="latecomerItems"
+                    />
+                  </UFormField>
+                </div>
+              </FieldGroup>
+              <FieldGroup :title="t('core.production.groups.public')">
                 <UFormField
-                  name="kind"
-                  label="What it is"
-                >
-                  <USelect
-                    v-model="details.kind"
-                    :items="KINDS"
-                  />
-                </UFormField>
-                <UFormField
-                  name="categoryTermId"
-                  label="Category"
-                  help="Needed to publish."
-                >
-                  <USelectMenu
-                    v-model="details.categoryTermId"
-                    value-key="value"
-                    :items="categories"
-                    placeholder="Choose a category"
-                  />
-                </UFormField>
-                <UFormField
-                  name="seasonId"
-                  label="Season"
-                >
-                  <USelectMenu
-                    v-model="details.seasonId"
-                    value-key="value"
-                    :items="seasons"
-                  />
-                </UFormField>
-                <UFormField
-                  name="usualSpaceId"
-                  label="Usual space"
-                  help="Where it usually plays: adding dates starts there."
-                >
-                  <USelectMenu
-                    v-model="details.usualSpaceId"
-                    value-key="value"
-                    :items="spaces"
-                  />
-                </UFormField>
-                <UFormField
-                  v-if="details.kind !== 'own'"
-                  name="companyName"
-                  label="Company"
+                  name="slug"
+                  :label="t('core.production.fields.slug')"
+                  :help="t('core.production.fields.slug-help')"
                 >
                   <UInput
-                    v-model="details.companyName"
-                    maxlength="200"
+                    v-model="details.slug"
+                    maxlength="60"
                   />
                 </UFormField>
-              </div>
-              <USeparator />
-              <h3 class="text-sm font-semibold text-highlighted">
-                On the night
-              </h3>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <UFormField
-                  label="Running time"
-                  hint="Including the intervals"
-                  name="runningMinutes"
-                >
-                  <DefaultedMinutes
-                    v-model="details.runningMinutes"
-                    :fallback="data?.theatre.runningMinutes"
-                    :min="1"
-                    label="Running time"
-                  />
-                </UFormField>
-                <UFormField
-                  label="Doors open before"
-                  name="doorsBeforeMinutes"
-                >
-                  <DefaultedMinutes
-                    v-model="details.doorsBeforeMinutes"
-                    :fallback="data?.theatre.doorsBeforeMinutes"
-                    :max="180"
-                    label="Doors open before"
-                  />
-                </UFormField>
-                <UFormField
-                  label="Intervals"
-                  name="intervalCount"
-                >
-                  <FieldNumber
-                    v-model="details.intervalCount"
-                    :min="0"
-                    :max="10"
-                  />
-                </UFormField>
-                <UFormField
-                  label="Each interval"
-                  name="intervalMinutes"
-                >
-                  <DefaultedMinutes
-                    v-model="details.intervalMinutes"
-                    :fallback="data?.theatre.intervalMinutes"
-                    :max="120"
-                    label="Each interval"
-                  />
-                </UFormField>
-                <UFormField
-                  label="Capacity"
-                  name="capacity"
-                >
-                  <UInputNumber
-                    v-model="details.capacity"
-                    placeholder="Each space's own"
-                    :min="1"
-                  />
-                </UFormField>
-                <UFormField
-                  label="Latecomers"
-                  name="latecomers"
-                  help="When people who arrive after the start are let in. A date can differ."
-                >
-                  <USelect
-                    v-model="details.latecomers"
-                    :items="latecomerItems"
-                  />
-                </UFormField>
-              </div>
-              <USeparator />
-              <h3 class="text-sm font-semibold text-highlighted">
-                Public page and tickets
-              </h3>
-              <UFormField
-                name="slug"
-                label="Web address"
-                help="An old address keeps working once the production has been public."
-              >
-                <UInput
-                  v-model="details.slug"
-                  maxlength="60"
+                <UCheckbox
+                  :model-value="elsewhere"
+                  :disabled="!sellsHere"
+                  :label="t('core.production.fields.elsewhere')"
+                  :description="sellsHere ? t('core.production.fields.elsewhere-help') : t('core.production.fields.elsewhere-always')"
+                  @update:model-value="details.bookedElsewhere = !!$event"
                 />
-              </UFormField>
-              <UCheckbox
-                :model-value="elsewhere"
-                :disabled="!sellsHere"
-                label="Booked elsewhere"
-                :description="sellsHere ? 'Tickets are sold on another website, not here.' : 'Nothing here sells tickets, so every production is booked on another website.'"
-                @update:model-value="details.bookedElsewhere = !!$event"
-              />
-              <UFormField
-                v-if="elsewhere"
-                label="Booking link"
-                name="externalBookingUrl"
-                :required="linkNeeded"
-                :help="linkNeeded ? undefined : 'Needed to publish. You can save the draft without it.'"
-              >
-                <UInput
-                  v-model="details.externalBookingUrl"
-                  type="url"
-                  placeholder="https://"
+                <UFormField
+                  v-if="elsewhere"
+                  :label="t('core.production.fields.link')"
+                  name="externalBookingUrl"
+                  :required="linkNeeded"
+                  :help="linkNeeded ? undefined : t('core.production.fields.link-help')"
+                >
+                  <UInput
+                    v-model="details.externalBookingUrl"
+                    type="url"
+                    placeholder="https://"
+                  />
+                </UFormField>
+                <UCheckbox
+                  v-model="details.creditsPublic"
+                  :label="t('core.production.fields.credits-public')"
                 />
-              </UFormField>
-              <UCheckbox
-                v-model="details.creditsPublic"
-                label="Show the cast and crew on the public page"
-              />
-              <UCheckbox
-                v-model="details.listed"
-                label="List it on what's on"
-                description="Turn off to keep a published production out of lists and feeds while its own page still answers."
-              />
+                <UCheckbox
+                  v-model="details.listed"
+                  :label="t('core.production.fields.listed')"
+                  :description="t('core.production.fields.listed-help')"
+                />
+              </FieldGroup>
             </UForm>
             <template #footer>
               <UButton
                 type="submit"
                 form="production-details"
-                label="Save production"
+                :label="t('core.production.save')"
               />
             </template>
           </PageSection>
@@ -635,8 +620,8 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
     <UModal
       v-if="production"
       v-model:open="publishing"
-      :title="needs.length ? 'Not ready to publish yet' : `Publish ${production.title}?`"
-      :description="needs.length ? 'Publishing needs these first. Each link opens the place to put it right.' : 'It goes on the public site, where anyone can see it.'"
+      :title="needs.length ? t('core.production.publishing.not-ready') : t('core.production.publishing.title', { title: production.title })"
+      :description="needs.length ? t('core.production.publishing.not-ready-help') : t('core.production.publishing.help')"
     >
       <template #body>
         <div class="space-y-4 text-sm">
@@ -659,16 +644,15 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
           </ul>
           <template v-else>
             <p>
-              Its page will be at
+              {{ t('core.production.publishing.page-at') }}
               <ULink
                 :to="publicPath"
                 target="_blank"
                 class="underline"
-              >{{ publicPath }}</ULink>,
-              with its scheduled dates.
+              >{{ publicPath }}</ULink>{{ t('core.production.publishing.page-at-end') }}
             </p>
             <div v-if="wanted.length">
-              <p>Not done yet, though it can be published without:</p>
+              <p>{{ t('core.production.publishing.wanted') }}</p>
               <ul class="list-disc space-y-1 ps-5">
                 <li
                   v-for="w in wanted"
@@ -684,16 +668,16 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <UButton
-            :label="needs.length ? 'Close' : 'Cancel'"
+            :label="needs.length ? t('core.production.publishing.close') : t('core.form.cancel')"
             color="neutral"
             variant="outline"
             @click="publishing = false"
           />
           <UButton
             v-if="!needs.length"
-            label="Publish"
+            :label="t('core.production.publish')"
             icon="i-lucide-globe"
-            :loading="publishBusy"
+            loading-auto
             @click="publish()"
           />
         </div>

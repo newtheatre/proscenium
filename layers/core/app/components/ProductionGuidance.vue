@@ -106,7 +106,6 @@ const dirty = computed(() => ageDirty.value || effectsDirty.value || warningsDir
 
 useLeaveGuard(dirty, { query: ['tab'], thing: 'this tab' })
 
-const saving = ref(false)
 async function save() {
   attempted.value = true
   if (ungraded.value.length) {
@@ -120,7 +119,6 @@ async function save() {
     return
   }
   refusal.value = null
-  saving.value = true
   // "None" is confirmed before an emptied list is sent, so a published production always keeps an answer.
   const first: Record<string, unknown> = ageDirty.value ? { ...ageNow.value } : {}
   if (effectsNoneNow.value && !props.production.effectsConfirmedNone) first.effectsConfirmedNone = true
@@ -139,9 +137,6 @@ async function save() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    saving.value = false
   }
 }
 </script>
@@ -221,18 +216,17 @@ async function save() {
       description="What the story is about that someone may want to know first. Grade each by how much of it the show holds. They sit behind a &quot;show&quot; control on the public page, because they can spoil the plot. List them, or confirm there are none."
     >
       <!-- What is chosen comes first, with its level and detail, so the long list below can stay folded. -->
-      <div
+      <FieldGroup
         v-if="chosen.length"
-        class="space-y-3"
+        :title="`Chosen (${chosen.length})`"
+        :description="LEVEL_HELP"
+        first
       >
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <h3 class="text-sm font-semibold text-highlighted">
-            Chosen ({{ chosen.length }})
-          </h3>
-          <UFormField
-            v-if="chosen.length > 1"
-            label="Set all chosen to"
-          >
+        <template
+          v-if="chosen.length > 1"
+          #actions
+        >
+          <UFormField label="Set all chosen to">
             <USelect
               v-model="setAll"
               :items="LEVELS"
@@ -241,10 +235,7 @@ async function save() {
               @update:model-value="applySetAll"
             />
           </UFormField>
-        </div>
-        <p class="text-sm text-muted">
-          {{ LEVEL_HELP }}
-        </p>
+        </template>
         <RecordList label="Chosen content warnings">
           <RecordListItem
             v-for="w in chosen"
@@ -288,7 +279,7 @@ async function save() {
             </template>
           </RecordListItem>
         </RecordList>
-      </div>
+      </FieldGroup>
 
       <UFormField
         label="Find a warning"
@@ -363,7 +354,7 @@ async function save() {
       <UButton
         type="submit"
         label="Save"
-        :loading="saving"
+        loading-auto
       />
     </div>
   </UForm>
